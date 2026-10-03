@@ -21,7 +21,9 @@ Changes save online automatically. Open Settings to check the save status before
 
 Settings also contains Account, Charge codes, Project management, editable built-in lists, screen visibility, Backup, Restore, Retry/refresh, Reload cloud records, and Sign out. Restore and Reload cloud records require the current account email and password. Activity deletion requires the current password; credentials are verified by Supabase Auth and are not stored in tracker data.
 
-Tasks can be linked to a project, ticket, or custom reference. Scheduling supports 01:00–24:00 entry, status colours, configurable work locations, and automatic weekend TOIL identification. Project governance includes editable phases, Go-Live countdowns, project health, companies, SAP MM decisions, phase gates, milestone alerts, and planned-versus-actual confirmation.
+Tasks can be linked to a project, ticket, or custom reference. Scheduling supports 01:00–24:00 entry, status colours, configurable work locations, and automatic weekend TOIL identification. Project governance includes editable phase-specific acceptance criteria, gate skipping, Go-Live countdowns, project health, and planned-versus-actual confirmation.
+
+Use **Companies & processes → Upload company / process Excel** to import Organization Structure, Master Data, Inventory Management, and Procurement mappings. The preview can add companies, departments, organization/master-data items, BPML processes, and decision states together. Re-importing the same code or item creates a new proposal version. The workbook stays in the browser; only normalized rows and source metadata are saved online. Project items can select an imported company and record expected and due dates.
 
 ## Bring in existing records once
 
@@ -39,7 +41,7 @@ The existing paused Supabase project was restored. If a free project pauses afte
 
 The client is @supabase/supabase-js 2.117.2, bundled with esbuild 0.28.2. Exact package versions and lockfile are included. Rebuild the vendor bundle with `npm ci` and `npx esbuild cloud-entry.js --bundle --minify --platform=browser --target=es2020 --outfile=supabase-client.js`.
 
-`cloud-schema.sql` documents the installed private-record schema; do not rerun it on an initialized project.
+The browser bundle also includes JSZip 3.10.1 under the MIT license to read selected `.xlsx` and `.xlsm` mapping files locally. `cloud-schema.sql` documents the installed private-record schema; do not rerun it on an initialized project.
 
 GitHub Pages: https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site
 Supabase redirect URLs: https://supabase.com/docs/guides/auth/redirect-urls
