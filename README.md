@@ -17,7 +17,11 @@ The existing Supabase project is connected and its private-record schema is inst
 
 In Supabase Authentication → URL Configuration, set Site URL to the published website address and add that address to Redirect URLs. This makes confirmation emails return to the website. If a default confirmation redirect cannot open, return to the tracker and sign in after confirming the email.
 
-Changes save online automatically. Wait for Saved online before closing. The same tracker login on another device opens the same records. Each browser keeps a private recovery copy and pending uploads. Clearing browser storage before an upload finishes can lose unsaved changes.
+Changes save online automatically. Open Settings to check the save status before closing. The same tracker login on another device opens the same records. Each browser keeps a private recovery copy and pending uploads. Clearing browser storage before an upload finishes can lose unsaved changes.
+
+Settings also contains Account, Charge codes, Project management, editable built-in lists, screen visibility, Backup, Restore, Retry/refresh, Reload cloud records, and Sign out. Restore and Reload cloud records require the current account email and password. Activity deletion requires the current password; credentials are verified by Supabase Auth and are not stored in tracker data.
+
+Tasks can be linked to a project, ticket, or custom reference. Scheduling supports 01:00–24:00 entry, status colours, configurable work locations, and automatic weekend TOIL identification. Project governance includes editable phases, Go-Live countdowns, project health, companies, SAP MM decisions, phase gates, milestone alerts, and planned-versus-actual confirmation.
 
 ## Bring in existing records once
 
