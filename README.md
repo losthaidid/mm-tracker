@@ -91,15 +91,17 @@ The existing Tickets, Tasks, Schedule and Projects remain available alongside **
 
 All tabs share the same warm, colourful visual system. A laptop uses a workspace sidebar; a phone uses compact scrolling navigation, stacked panels and touch-sized controls. Existing forms, reports and private records use the same workflows.
 
-Choose **Edit header** beside the website title to maintain the title and subtitle. The title also names the browser tab. These small settings save with the existing private account and are included in JSON backups.
+Choose **Settings → Edit header** to maintain the title and subtitle. The title also names the browser tab. These small settings save with the existing private account and are included in JSON backups. **Settings → Appearance & motion** opens Theme Studio, with palette swatches, a live preview and an explicit Save theme action. Changing the custom colour selects the Custom palette automatically.
 
-Momo floats above the visible page, with no surrounding card. Drag the companion anywhere on a phone or laptop; its position is remembered on that device. It remains within the visible screen after resizing, rotation or a phone keyboard opening. A focused companion can also move using arrow keys. Its position and animation never trigger cloud uploads.
+Momo floats above the visible page and gently wanders around it. Movement pauses during typing, dialogs, dragging, presentation mode and when the page is hidden. Disable wandering in Appearance & motion, choose Animations Off, or use the device’s reduced-motion preference. Drag the companion anywhere on a phone or laptop; its chosen position is remembered on that device. It remains within the visible screen after resizing, rotation or a phone keyboard opening. A focused companion can also move using arrow keys. Its position and animation never trigger cloud uploads.
+
+Privacy has a visible **Privacy is on** indicator and a **Show details** control. It blurs marked record titles, notes and descriptions; it is a visual screen-sharing aid, not a change to record permissions. Present removes navigation, editing controls and floating decorations from the current view. **Exit presentation** or Escape restores the normal workspace. These modes are local and do not change saved records.
 
 Dashboard widgets and task-board cards have dotted drag handles. Hold and move a handle with a finger, mouse or pen; highlighted drop targets show where the item will go. Drop a widget over another widget to reorder it, or drop a task into a status column. Reordering saves once at the end of the gesture. Cancelling leaves records unchanged. Keyboard users can focus a handle and use up/down for widgets or left/right for task columns. The existing Move to selectors and widget buttons remain available.
 
 ## Work stopwatch
 
-Start from the toolbar or a linked task, ticket or project item. Choose the linked activity (optionally a task's subtask), session title, charge code and remarks. A floating stopwatch stays visible as you navigate. Pause/resume excludes breaks, and Notes lets you update remarks during work.
+Start from the toolbar or a linked task, ticket or project item. Choose the linked activity (optionally a task's subtask), session title, charge code and remarks. A floating stopwatch stays visible as you navigate. Drag its dotted handle with a mouse or finger, or focus the handle and use arrow keys. Minimise it to a small clock and expand it when needed; its position and size preference are remembered on the device. The panel stays within the screen when the phone keyboard opens or the screen rotates. Pause/resume excludes breaks, and Notes lets you update remarks during work.
 
 The running timer is stored locally per tracker account using timestamps, not second-by-second cloud uploads. Refreshing/reopening that browser recovers it. A running timer is local to that browser; completed session records sync to your other devices. Starting a second timer in the same browser is blocked until the first is stopped.
 

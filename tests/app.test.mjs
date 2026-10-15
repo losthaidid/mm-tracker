@@ -8,12 +8,15 @@ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
 const copy=value=>JSON.parse(JSON.stringify(value));
 const settle=async()=>{for(let i=0;i<12;i++)await Promise.resolve();};
 
-async function app(t,{storage={},rpcError=null,remote=null,login=true}={}){
+async function app(t,{storage={},rpcError=null,remote=null,login=true,styles=false}={}){
  const dom=new JSDOM(html,{url:'https://losthaidid.github.io/mm-tracker/',runScripts:'outside-only',pretendToBeVisual:true});
  const {window}=dom;
  t.after(()=>window.close());
  window.TextEncoder=TextEncoder;window.TextDecoder=TextDecoder;window.Blob=Blob;
- window.setTimeout=()=>0;window.setInterval=()=>0;
+ const intervals=[],frames=new Map();let nextFrame=1;
+ window.setTimeout=()=>0;window.setInterval=(callback,ms)=>{intervals.push({callback,ms});return intervals.length;};
+ window.requestAnimationFrame=callback=>{const id=nextFrame++;frames.set(id,callback);return id;};window.cancelAnimationFrame=id=>frames.delete(id);
+ if(styles){const style=window.document.createElement('style');style.textContent=readFileSync(new URL('../studio.css',import.meta.url),'utf8');window.document.head.append(style);}
  window.HTMLDialogElement.prototype.showModal=function(){this.setAttribute('open','');};
  window.HTMLDialogElement.prototype.close=function(){this.removeAttribute('open');};
  window.confirm=()=>true;
@@ -45,7 +48,7 @@ async function app(t,{storage={},rpcError=null,remote=null,login=true}={}){
  };`);
  await settle();
  if(login)window.api.login();
- return{window,document:window.document,api:window.api,db};
+ return{window,document:window.document,api:window.api,db,intervals,frames};
 }
 
 function addCompany(api,document,name='Farms'){
@@ -429,4 +432,59 @@ test('task handles move a card to a status column with touch without losing its 
 
 test('cancelling a drag leaves both layout and records unchanged',async t=>{
  const {api,document,window,db}=await app(t);api.showTab('home');const initial=copy(api.state().workhub.widgets),handle=document.querySelector('[data-widget] [data-hub-drag]');pointer(window,handle,'pointerdown',200,200);pointer(window,document,'pointermove',300,300);pointer(window,document,'pointercancel',300,300);assert.deepEqual(copy(api.state().workhub.widgets),initial);assert.equal(db.calls.length,0);assert.equal(document.querySelector('.hub-sort-ghost'),null);
+});
+
+test('the page security policy permits its actual stylesheet and the dashboard receives its layout',async t=>{
+ const {document,window}=await app(t,{styles:true});
+ const policy=Object.fromEntries(document.querySelector('meta[http-equiv="Content-Security-Policy"]').content.split(';').map(part=>part.trim().split(/\s+/)).map(([key,...values])=>[key,values]));
+ const styleSources=policy['style-src-elem']||policy['style-src']||policy['default-src'];
+ for(const link of document.querySelectorAll('link[rel="stylesheet"]')){assert.equal(new URL(link.href).origin,window.location.origin);assert.ok(styleSources.includes("'self'"),'The shipped stylesheet must be allowed by CSP.');}
+ assert.ok(policy['style-src'].includes("'unsafe-inline'"),'Existing generated per-record styles must remain supported.');
+ assert.ok(policy['default-src'].includes("'none'"));
+ assert.equal(window.getComputedStyle(document.querySelector('.hub-layout')).display,'grid');
+ assert.equal(window.getComputedStyle(document.querySelector('.hub-widget-head')).display,'flex');
+ assert.equal(window.getComputedStyle(document.querySelector('.hub-list')).display,'grid');
+ assert.equal(window.getComputedStyle(document.body).fontSize,'15px');
+});
+
+test('privacy and presentation clicks visibly change the screen and restore on exit',async t=>{
+ const {api,document,window,db}=await app(t,{styles:true});addMainTask(api,document,'Private rollout title');await settle();api.showTab('home');const writes=db.calls.length;
+ document.querySelector('#hubToolbar [data-hub="privacy"]').click();await settle();
+ const title=document.querySelector('[data-widget="tasks"] .hub-sensitive');assert.match(window.getComputedStyle(title).filter,/blur\(/);assert.match(document.getElementById('hubViewStatus').textContent,/Privacy is on/);assert.equal(document.querySelector('#hubToolbar [data-hub="privacy"]').getAttribute('aria-pressed'),'true');
+ document.querySelector('#hubToolbar [data-hub="presentation"]').click();await settle();
+ assert.equal(window.getComputedStyle(document.getElementById('hubToolbar')).display,'none');assert.equal(window.getComputedStyle(document.getElementById('hubPet')).display,'none');assert.equal(window.getComputedStyle(document.getElementById('hubSidebar')).display,'none');assert.ok(document.getElementById('hubExitPresentation'));
+ document.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(document.getElementById('hubExitPresentation'),null);assert.notEqual(window.getComputedStyle(document.getElementById('hubToolbar')).display,'none');assert.equal(document.querySelector('#hubToolbar [data-hub="presentation"]').getAttribute('aria-pressed'),'false');
+ document.querySelector('#hubViewStatus [data-hub="privacy"]').click();await settle();assert.equal(document.getElementById('hubViewStatus'),null);assert.doesNotMatch(window.getComputedStyle(title).filter,/blur/);assert.equal(db.calls.length,writes);
+});
+
+test('Edit header is inside Settings and its action closes the settings menu',async t=>{
+ const {document}=await app(t);const settings=document.getElementById('settingsMenu');assert.equal(document.querySelectorAll('[data-hub="header-edit"]').length,1);assert.ok(settings.querySelector('[data-hub="header-edit"]'));assert.equal(document.querySelector('.hub-header-brand [data-hub="header-edit"]'),null);
+ settings.open=true;settings.querySelector('[data-hub="header-edit"]').click();await settle();assert.equal(settings.open,false);assert.ok(document.getElementById('hubHeaderForm'));
+});
+
+test('palette and custom colour changes preview, save through the form, and reload from the account',async t=>{
+ const {api,document,window,db}=await app(t,{styles:true});api.hub.setTool('theme');api.showTab('studio');const originalTitle=api.state().workhub.preferences.workspace;
+ document.querySelector('[data-theme-choice="forest"]').click();await settle();assert.equal(document.body.dataset.hubTheme,'forest');assert.equal(api.state().workhub.preferences.theme,'ocean');assert.equal(db.calls.length,0);const forestSurface=window.getComputedStyle(document.body).getPropertyValue('--hub-bg');
+ document.querySelector('[data-theme-choice="sunset"]').click();await settle();assert.notEqual(window.getComputedStyle(document.body).getPropertyValue('--hub-bg'),forestSurface);assert.equal(document.querySelector('[data-theme-choice="sunset"]').getAttribute('aria-pressed'),'true');
+ let form=document.getElementById('hubTheme');form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));await settle();assert.equal(api.state().workhub.preferences.theme,'sunset');assert.equal(db.row.document.data.workhub.preferences.theme,'sunset');assert.equal(api.state().workhub.preferences.workspace,originalTitle);assert.match(document.getElementById('hubThemeStatus').textContent,/Theme saved/);
+ form=document.getElementById('hubTheme');form.elements.namedItem('accent').value='#7652b5';form.elements.namedItem('accent').dispatchEvent(new window.Event('input',{bubbles:true}));assert.equal(document.body.dataset.hubTheme,'custom');assert.equal(document.documentElement.style.getPropertyValue('--hub-accent'),'#7652b5');form.elements.namedItem('roaming').checked=false;form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));await settle();
+ const second=await app(t,{remote:copy(db.row),login:false});await second.api.loadCloud(sessionUser);await settle();assert.equal(second.document.body.dataset.hubTheme,'custom');assert.equal(second.api.state().workhub.preferences.roaming,false);assert.equal(second.document.documentElement.style.getPropertyValue('--hub-accent'),'#7652b5');
+});
+
+test('the floating timer moves, minimises, recovers and stays within a phone viewport without cloud writes',async t=>{
+ const {api,document,window,db}=await app(t);api.hub.startTimer({kind:'custom',title:'Floating session'});const id=api.hub.timer().id,bar=document.getElementById('hubTimerBar');assert.equal(bar.parentElement,document.body);assert.equal(bar.style.position,'fixed');assert.equal(bar.style.bottom,'auto');
+ const handle=bar.querySelector('[data-hub="timer-drag"]');pointer(window,handle,'pointerdown',800,200);pointer(window,document,'pointermove',300,320);pointer(window,document,'pointerup',300,320);const position={left:bar.style.left,top:bar.style.top};window.dispatchEvent(new window.Event('scroll'));assert.equal(bar.style.top,position.top);api.showTab('knowledge');assert.equal(bar.style.left,position.left);
+ Object.defineProperty(window,'innerWidth',{value:375,configurable:true});Object.defineProperty(window,'innerHeight',{value:667,configurable:true});window.dispatchEvent(new window.Event('resize'));assert.ok(parseFloat(bar.style.left)>=12);assert.ok(parseFloat(bar.style.left)+parseFloat(bar.style.width)<=363);assert.ok(parseFloat(bar.style.top)+250<=655);
+ document.querySelector('[data-hub="timer-minimize"]').click();await settle();assert.equal(bar.dataset.minimized,'true');assert.ok(bar.querySelector('#hubTimerClock'));assert.equal(api.hub.timer().id,id);
+ const storage=Object.fromEntries(Array.from({length:window.localStorage.length},(_,i)=>window.localStorage.key(i)).filter(k=>k.startsWith('mm-tracker.timer')).map(k=>[k,window.localStorage.getItem(k)]));const second=await app(t,{storage});assert.equal(second.document.getElementById('hubTimerBar').dataset.minimized,'true');assert.equal(second.api.hub.timer().id,id);
+ document.querySelector('[data-hub="timer-minimize"]').click();await settle();document.querySelector('[data-hub="timer-pause"]').click();await settle();assert.equal(api.hub.timer().runningSince,null);document.querySelector('[data-hub="timer-resume"]').click();await settle();assert.ok(api.hub.timer().runningSince);assert.equal(db.calls.length,0);
+ Object.defineProperty(window,'visualViewport',{value:{width:375,height:220,offsetTop:40,offsetLeft:0},configurable:true});window.dispatchEvent(new window.Event('resize'));assert.ok(parseFloat(bar.style.top)>=52);assert.ok(parseFloat(bar.style.top)+parseFloat(bar.style.maxHeight)<=248);
+});
+
+test('Momo walks locally and pauses for typing, reduced motion, presentation and disabled wandering',async t=>{
+ const {api,document,window,db,intervals,frames}=await app(t),tick=intervals.find(x=>x.ms===1000).callback,pet=document.getElementById('hubPet'),before=pet.style.top;
+ tick();assert.ok(frames.size);assert.equal(pet.dataset.roaming,'true');for(const [id,callback]of [...frames]){frames.delete(id);callback(window.performance.now()+6000);}assert.notEqual(pet.style.top,before);assert.equal(db.calls.length,0);
+ const start=Date.now();window.Date.now=()=>start+30000;tick();assert.ok(frames.size);api.showTab('knowledge');document.getElementById('hubSearch').focus();assert.equal(frames.size,0);assert.equal(pet.dataset.roaming,'false');document.getElementById('hubSearch').blur();
+ window.matchMedia=()=>({matches:true});tick();assert.equal(frames.size,0);window.matchMedia=()=>({matches:false});tick();assert.ok(frames.size);document.querySelector('#hubToolbar [data-hub="presentation"]').click();await settle();assert.equal(frames.size,0);
+ document.getElementById('hubExitPresentation').click();await settle();api.hub.setTool('theme');api.showTab('studio');const form=document.getElementById('hubTheme');form.elements.namedItem('roaming').checked=false;form.elements.namedItem('roaming').dispatchEvent(new window.Event('change',{bubbles:true}));tick();assert.equal(frames.size,0);assert.equal(db.calls.length,0);
 });
