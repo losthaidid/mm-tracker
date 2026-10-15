@@ -2,13 +2,14 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { JSDOM } from 'jsdom';
+process.env.TZ='Asia/Kuala_Lumpur';
 
 const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
 const copy=value=>JSON.parse(JSON.stringify(value));
 const settle=async()=>{for(let i=0;i<12;i++)await Promise.resolve();};
 
 async function app(t,{storage={},rpcError=null,remote=null,login=true}={}){
- const dom=new JSDOM(html,{url:'https://losthaidid.github.io/mm-tracker/',runScripts:'outside-only'});
+ const dom=new JSDOM(html,{url:'https://losthaidid.github.io/mm-tracker/',runScripts:'outside-only',pretendToBeVisual:true});
  const {window}=dom;
  t.after(()=>window.close());
  window.TextEncoder=TextEncoder;window.TextDecoder=TextDecoder;window.Blob=Blob;
@@ -17,21 +18,24 @@ async function app(t,{storage={},rpcError=null,remote=null,login=true}={}){
  window.HTMLDialogElement.prototype.close=function(){this.removeAttribute('open');};
  window.confirm=()=>true;
  for(const [key,value]of Object.entries(storage))window.localStorage.setItem(key,value);
- const db={row:remote,calls:[],error:rpcError,read:null};
+ const db={row:remote,calls:[],error:rpcError,read:null,selects:[]};
  const client={
   auth:{getSession:async()=>({data:{session:null},error:null}),onAuthStateChange:()=>({data:{subscription:{unsubscribe(){}}}})},
-  from:()=>({select:()=>({eq:()=>({maybeSingle:async()=>db.read?db.read():({data:copy(db.row),error:null})})})}),
+  from:()=>({select:columns=>{db.selects.push(columns);return{eq:()=>({maybeSingle:async()=>db.read?db.read():({data:copy(db.row),error:null})})};}}),
   rpc:async(name,args)=>{
    db.calls.push({name,args:copy(args)});
    if(db.error)return{data:null,error:db.error};
+   if(db.row?.mutation_id===args.p_mutation_id)return{data:[{revision:db.row.revision,mutation_id:db.row.mutation_id}],error:null};
+   if((db.row?.revision||0)!==args.p_expected_revision)return{data:null,error:{code:'PT409',message:'Another device saved newer records.'}};
    db.row={document:copy(args.p_document),revision:(db.row?.revision||0)+1,mutation_id:args.p_mutation_id,updated_at:new Date().toISOString()};
    return{data:[{revision:db.row.revision,mutation_id:db.row.mutation_id,updated_at:db.row.updated_at}],error:null};
   }
  };
  window.MMTrackerSupabase={createClient:()=>client};
+ for(const file of ['sync-merge.js','studio.js'])window.eval(readFileSync(new URL('../'+file,import.meta.url),'utf8'));
  const script=[...window.document.scripts].find(script=>script.textContent.includes("'use strict'"));
  window.eval(script.textContent+`\nwindow.api={
-  state:()=>state,steps:()=>STEPS,cloud,KEY,payload,parseBackup,emptyState,validate,mutate,loadCloud,flushCloud,refreshCloud,
+  hub,queueCloudReview,state:()=>state,steps:()=>STEPS,cloud,KEY,payload,parseBackup,emptyState,validate,mutate,loadCloud,flushCloud,refreshCloud,retryCloud,closeModal,
   openMMAreaManager,saveMMAreas,editMMAreaDraft,canonicalArea,summarizeGovernanceRows,
   renderProjectCompanies,editCompany,saveCompany,editProcess,saveProcess,editProject,saveProject,
   browserMigrationAction,notice,action,projectMMAreas,editRecord,saveEdit,editSubItem,saveSubItem,openSubItems,editTaskSub,saveTaskSub,openRangeEditor,saveRange,scheduleEntries,viewBooking,workhubAction,workhubChange,rangeSegments,rangeTimes,editPlan,savePlan,reportModel,reportDashboard,exportReport,scheduleMonthMetrics,formatDuration,
@@ -161,7 +165,7 @@ test('older documents gain area defaults and the current format survives backup/
   const restored=api.parseBackup(JSON.stringify({app:'mm-ticket-tracker',version,data}));
   assert.deepEqual(copy(restored.projects[0].mmAreas).map(area=>area.name),['Organization Structure','Master Data','Inventory Management','Procurement']);
  }
- assert.equal(JSON.parse(api.payload(api.state())).version,8);
+ assert.equal(JSON.parse(api.payload(api.state())).version,9);
 });
 
 test('areas can be added, renamed, reordered, hidden and restored with their mappings',async t=>{
@@ -261,7 +265,7 @@ test('earlier browser records import into an empty account once and remain in br
  await api.browserMigrationAction('cloud-import-browser');
  assert.match(document.getElementById('modalBody').textContent,/owner@example.com/);
  await api.browserMigrationAction('cloud-apply-browser-import');await settle();
- assert.equal(api.state().projects[0].name,'Existing browser work');assert.equal(db.row.document.version,8);
+ assert.equal(api.state().projects[0].name,'Existing browser work');assert.equal(db.row.document.version,9);
  assert.equal(api.steps()[0],'Custom analysis');
  assert.equal(window.localStorage.getItem(api.KEY),raw);assert.equal(document.getElementById('browserMigrationNotice').hidden,true);
  await assert.rejects(api.browserMigrationAction('cloud-apply-browser-import'),/Cloud records already exist/);
@@ -275,4 +279,115 @@ test('browser import detects a cloud document created after the import prompt',a
  db.row={document:JSON.parse(api.payload(api.state())),revision:1};
  await assert.rejects(api.browserMigrationAction('cloud-apply-browser-import'),/Cloud records now exist/);
  assert.equal(db.calls.length,0);assert.equal(api.state().projects[0].name,'SAP Projects');
+});
+
+const sessionUser={user:{id:'11111111-1111-4111-8111-111111111111',email:'owner@example.com'}};
+async function loggedCloud(t){const ctx=await app(t,{login:false});const data=ctx.api.emptyState();ctx.db.row={document:JSON.parse(ctx.api.payload(data)),revision:1,mutation_id:'initial'};await ctx.api.loadCloud(sessionUser);await settle();return ctx;}
+async function hubAction(api,hub,extra={}){await api.hub.handle({dataset:{hub,...extra}});await settle();}
+function fill(form,values){for(const[k,v]of Object.entries(values)){const el=form.elements.namedItem(k);if(el.type==='checkbox')el.checked=v;else el.value=v;}}
+
+test('a clean device automatically follows newer cloud records and clears a stale conflict',async t=>{
+ const {api,db}=await loggedCloud(t);const remote=copy(db.row);remote.revision=2;remote.document.data.projects[0].name='Latest laptop work';db.row=remote;api.cloud.conflict=true;
+ await api.refreshCloud();assert.equal(api.state().projects[0].name,'Latest laptop work');assert.equal(api.cloud.revision,2);assert.equal(api.cloud.conflict,false);assert.equal(db.calls.length,0);
+});
+
+test('independent offline and cloud edits merge without discarding either device',async t=>{
+ const {api,db}=await loggedCloud(t);db.error={message:'Failed to fetch'};api.mutate(d=>d.projects[0].name='Local project title');await settle();
+ db.row.document.data.projects[0].code='Laptop-code';db.row.revision=2;db.row.mutation_id='laptop';db.error=null;await api.retryCloud();await settle();
+ assert.equal(api.state().projects[0].name,'Local project title');assert.equal(api.state().projects[0].code,'Laptop-code');assert.equal(db.row.document.data.projects[0].name,'Local project title');assert.equal(api.cloud.conflict,false);assert.equal(api.cloud.pending,null);assert.equal(api.cloud.inFlight,null);
+});
+
+test('competing edits of the same field stay protected and recover on reopening',async t=>{
+ const {api,db,window}=await loggedCloud(t);db.error={message:'Failed to fetch'};api.mutate(d=>d.projects[0].name='Phone edit');await settle();
+ db.row.document.data.projects[0].name='Laptop edit';db.row.revision=2;db.row.mutation_id='laptop';db.error=null;await api.retryCloud();
+ assert.equal(api.cloud.conflict,true);assert.equal(api.state().projects[0].name,'Phone edit');assert.equal(db.row.document.data.projects[0].name,'Laptop edit');
+ const storage=Object.fromEntries(Object.keys(window.localStorage).map(k=>[k,window.localStorage.getItem(k)]));const reopened=await app(t,{storage,remote:db.row,login:false});await reopened.api.loadCloud(sessionUser);assert.equal(reopened.api.cloud.conflict,true);assert.equal(reopened.api.state().projects[0].name,'Phone edit');assert.equal(reopened.db.calls.length,0);
+});
+
+test('a persisted acknowledgement with no different edits clears a false review',async t=>{
+ const {api,db,window}=await loggedCloud(t),key=api.cloud.key,cache=JSON.parse(window.localStorage.getItem(key));cache.pending=copy(cache.document);cache.document.savedAt='older';cache.revision=0;delete cache.baseDocument;
+ const reopened=await app(t,{storage:{[key]:JSON.stringify(cache)},remote:db.row,login:false});await reopened.api.loadCloud(sessionUser);assert.equal(reopened.api.cloud.conflict,false);assert.equal(reopened.api.cloud.pending,null);assert.equal(reopened.db.calls.length,0);
+});
+
+test('cloud refresh protects form drafts and resumes after the editor closes',async t=>{
+ const {api,db,document}=await loggedCloud(t);api.editRecord('tasks');document.getElementById('editForm').elements.namedItem('task').value='Unsaved draft';db.row.document.data.projects[0].name='New cloud';db.row.revision=2;
+ await api.refreshCloud();assert.equal(document.getElementById('editForm').elements.namedItem('task').value,'Unsaved draft');assert.equal(api.cloud.refreshDeferred,true);
+ api.closeModal();await settle();assert.equal(api.state().projects[0].name,'New cloud');assert.equal(api.cloud.refreshDeferred,false);
+});
+
+test('visibility and focus fetch new records without requiring settings',async t=>{
+ const {api,db,window}=await loggedCloud(t);db.row.document.data.projects[0].code='Visible update';db.row.revision=2;
+ window.dispatchEvent(new window.Event('focus'));await settle();assert.equal(api.state().projects[0].code,'Visible update');
+ db.row.document.data.projects[0].code='Return update';db.row.revision=3;window.document.dispatchEvent(new window.Event('visibilitychange'));await settle();assert.equal(api.state().projects[0].code,'Return update');
+});
+
+test('navigating projects and months does not create conflicting record uploads',async t=>{
+ const {api,db}=await loggedCloud(t);api.mutate(d=>d.calendarMonth='2026-11');await settle();assert.equal(db.calls.length,0);assert.equal(api.cloud.pending,null);assert.equal(api.state().calendarMonth,'2026-11');
+});
+
+test('the notebook saves linked details, escapes markup and survives backup restore',async t=>{
+ const {api,document,db}=await app(t);await hubAction(api,'note-edit');const form=document.getElementById('hubNote');fill(form,{title:'<script>unsafe</script>',tags:'Goods receipt',tcodes:'MIGO',body:'Cause and solution',configuration:'Configuration path',errors:'Error details',testing:'Check quantity',projectId:api.state().activeProjectId});api.hub.submit(form);await settle();const n=api.state().workhub.notes[0];assert.equal(db.row.document.data.workhub.notes[0].body,'Cause and solution');await hubAction(api,'note-view',{id:n.id});assert.equal(document.getElementById('modalBody').querySelector('script'),null);assert.match(document.getElementById('modalBody').textContent,/Configuration path/);assert.equal(api.parseBackup(api.payload(api.state())).workhub.notes[0].tcodes,'MIGO');
+});
+
+test('Waiting on preserves dates and notes through resolve, reopen, delete and undo',async t=>{
+ const {api,document}=await app(t);await hubAction(api,'waiting-edit');let form=document.getElementById('hubWaiting');fill(form,{title:'Approval',person:'Finance',followUp:'2026-10-20',notes:'Ask for confirmation'});api.hub.submit(form);await settle();const id=api.state().workhub.waiting[0].id;await hubAction(api,'waiting-toggle',{id});assert.equal(api.state().workhub.waiting[0].resolved,true);await hubAction(api,'waiting-toggle',{id});assert.equal(api.state().workhub.waiting[0].resolved,false);await hubAction(api,'waiting-delete',{id});assert.equal(api.state().workhub.waiting.length,0);await hubAction(api,'undo');assert.equal(api.state().workhub.waiting[0].person,'Finance');
+});
+
+test('Process Hub maintains T-codes, branches, order and links without invalid connections',async t=>{
+ const {api,document}=await app(t);await hubAction(api,'process-example');let process=api.state().workhub.processes[0];assert.equal(process.steps.length,4);const id=process.steps[0].id;await hubAction(api,'step-edit',{process:process.id,id});let form=document.getElementById('hubStep');fill(form,{tcodes:'CUSTOM1, CUSTOM2',notes:'Company-specific usage',title:'Prepare purchase request'});api.hub.submit(form);await settle();process=api.state().workhub.processes[0];assert.equal(process.steps[0].tcodes,'CUSTOM1, CUSTOM2');assert.equal(process.steps[0].next.length,1);await hubAction(api,'step-delete',{id:process.steps[1].id});process=api.state().workhub.processes[0];assert.equal(process.steps.length,3);assert.equal(process.steps[0].next.length,0);api.validate(api.state());
+});
+
+test('task board changes status without losing subtasks or notes',async t=>{
+ const {api,document}=await app(t),id=addMainTask(api,document,'Main card');addTaskSub(api,document,id,'Child','Remark','Feedback');await settle();api.hub.moveTask(id,'blocked');await settle();assert.equal(api.state().tasks[0].boardStatus,'blocked');assert.equal(api.state().tasks[0].done,false);api.hub.moveTask(id,'done');await settle();assert.equal(api.state().tasks[0].done,true);assert.ok(api.state().tasks[0].doneDate);api.hub.moveTask(id,'doing');await settle();assert.equal(api.state().tasks[0].done,false);assert.equal(api.state().tasks[0].subTasks[0].feedback,'Feedback');api.hub.setBoard(true);api.showTab('tasks');assert.equal(document.querySelectorAll('.hub-column').length,4);assert.match(document.getElementById('view').textContent,/Main card/);
+});
+
+test('dashboard selection, sizing and reordering persist as compact settings',async t=>{
+ const {api,document}=await app(t);await hubAction(api,'widget-size',{id:'tasks'});await hubAction(api,'widget-up',{id:'tasks'});assert.equal(api.state().workhub.widgets[0].id,'tasks');assert.equal(api.state().workhub.widgets[0].span,'wide');await hubAction(api,'layout');const form=document.getElementById('hubLayout');form.querySelector('[value="desk"]').checked=false;form.querySelector('[value="focus"]').checked=true;api.hub.submit(form);await settle();assert.ok(!api.state().workhub.widgets.some(w=>w.id==='desk'));assert.ok(api.state().workhub.widgets.some(w=>w.id==='focus'));
+});
+
+test('theme preview stays local until saved and imported settings are validated',async t=>{
+ const {api,document,window,db}=await app(t);api.hub.setTool('theme');api.showTab('studio');const form=document.getElementById('hubTheme');fill(form,{theme:'dark',name:'Haidid',radius:'24',motion:'off'});form.elements.namedItem('theme').dispatchEvent(new window.Event('input',{bubbles:true}));assert.equal(document.body.dataset.hubTheme,'dark');assert.equal(api.state().workhub.preferences.theme,'ocean');assert.equal(db.calls.length,0);api.hub.submit(form);await settle();assert.equal(api.state().workhub.preferences.name,'Haidid');assert.equal(api.state().workhub.preferences.motion,'off');await assert.rejects(api.hub.importTheme({size:10,text:async()=>JSON.stringify({app:'mm-tracker-theme',version:1,preferences:{accent:'url(javascript:bad)'}})}),/theme settings/);
+});
+
+test('the document simulator computes quantity and price differences locally',async t=>{
+ const {api,db}=await app(t);const result=api.hub.simulationValues({quantity:100,price:10,received:80,invoiced:90,invoicePrice:11,tolerance:2});assert.equal(result.order,1000);assert.equal(result.receipt,800);assert.equal(result.invoice,990);assert.equal(result.quantityDifference,10);assert.equal(result.priceVariance,10);assert.equal(result.withinTolerance,false);assert.equal(db.calls.length,0);
+});
+
+test('stopping a project stopwatch creates synchronized schedule and project records once',async t=>{
+ const {api,db}=await app(t);api.hub.startTimer({kind:'project',linkId:api.state().activeProjectId,title:'Project testing',notes:'Verified quantity',chargeCode:'MM-TEST'});const draft=api.hub.timer();draft.started='2026-10-16T09:15:00+08:00';draft.runningSince=null;draft.segments=[{start:'2026-10-16T09:15:00+08:00',end:'2026-10-16T10:05:00+08:00'},{start:'2026-10-16T10:15:00+08:00',end:'2026-10-16T10:45:00+08:00'}];api.hub.finishTimer();await settle();assert.equal(api.hub.timer(),null);assert.equal(api.state().workhub.sessions.length,1);assert.equal(api.state().workhub.sessions[0].seconds,4800);assert.equal(api.state().projectPlans.length,2);assert.equal(api.state().schedule.reduce((n,r)=>n+(+r.endTime.slice(0,2)*60 + +r.endTime.slice(3))-(+r.time.slice(0,2)*60 + +r.time.slice(3)),0),80);assert.ok(api.state().schedule.every(r=>r.planId&&r.sessionId));api.validate(api.state());api.hub.finishTimer();assert.equal(api.state().workhub.sessions.length,1);assert.equal(db.row.document.data.workhub.sessions[0].scheduled,true);
+});
+
+test('a stopwatch overlapping a booking preserves both the booking and timer for review',async t=>{
+ const {api,document}=await app(t);addBooking(api,document,'09:00','10:00',{date:'2026-10-16'});await settle();api.hub.startTimer({kind:'custom',title:'Investigation'});const draft=api.hub.timer();draft.started='2026-10-16T09:15:00+08:00';draft.runningSince=null;draft.segments=[{start:'2026-10-16T09:15:00+08:00',end:'2026-10-16T09:30:00+08:00'}];api.hub.finishTimer();assert.ok(api.hub.timer());assert.equal(api.state().workhub.sessions.length,0);assert.match(document.getElementById('modalBody').textContent,/overlaps/);api.hub.finishTimer(true);await settle();assert.equal(api.state().workhub.sessions[0].scheduled,false);assert.equal(api.state().schedule[0].text,'Focused work');
+});
+
+test('a local timer survives refresh without uploading every tick and stays scoped to its account',async t=>{
+ const first=await app(t);first.api.hub.startTimer({kind:'custom',title:'Reading'});assert.equal(first.db.calls.length,0);const storage=Object.fromEntries(Object.keys(first.window.localStorage).map(k=>[k,first.window.localStorage.getItem(k)]));const reopened=await app(t,{storage,login:false});await reopened.api.loadCloud(sessionUser);assert.equal(reopened.api.hub.timer().title,'Reading');await reopened.api.loadCloud({user:{id:'22222222-2222-4222-8222-222222222222',email:'other@example.com'}});assert.equal(reopened.api.hub.timer(),null);
+});
+
+test('project phase changes create editable scrapbook keepsakes',async t=>{
+ const {api}=await app(t);api.mutate(d=>d.projects[0].phase=d.lists.projectPhases[1]);await settle();assert.equal(api.state().workhub.scrapbook.length,1);assert.match(api.state().workhub.scrapbook[0].title,/Blueprint/);api.validate(api.state());
+});
+
+test('automatic refresh never overwrites another tab’s durable pending upload',async t=>{
+ const {api,window}=await loggedCloud(t),raw=JSON.parse(window.localStorage.getItem(api.cloud.key));raw.document.data.projects[0].name='Other tab draft';raw.pending=copy(raw.document);const other=JSON.stringify(raw);window.localStorage.setItem(api.cloud.key,other);await api.refreshCloud();assert.equal(window.localStorage.getItem(api.cloud.key),other);assert.match(api.cloud.status,/Another browser tab/);assert.notEqual(api.state().projects[0].name,'Other tab draft');
+});
+
+test('a stale RPC revision automatically merges disjoint changes and retries against the new revision',async t=>{
+ const {api,db}=await loggedCloud(t);db.row.document.data.projects[0].code='Laptop latest';db.row.revision=2;db.row.mutation_id='remote';api.mutate(d=>d.projects[0].name='Phone new title');for(let i=0;i<5;i++)await settle();assert.equal(api.cloud.conflict,false);assert.equal(db.row.document.data.projects[0].code,'Laptop latest');assert.equal(db.row.document.data.projects[0].name,'Phone new title');assert.equal(api.cloud.revision,3);
+});
+
+test('midnight and paused stopwatch intervals retain local dates and minute boundaries',async t=>{
+ const {api}=await app(t);const ranges=copy(api.hub.sessionRanges({intervals:[{start:'2026-10-15T23:45:10+08:00',end:'2026-10-16T00:15:01+08:00'}]}));assert.deepEqual(ranges,[{date:'2026-10-15',time:'23:45',endTime:'24:00'},{date:'2026-10-16',time:'00:00',endTime:'00:16'}]);
+});
+
+test('all new screens render with working navigation, commands, privacy and presentation exit',async t=>{
+ const {api,document}=await app(t);for(const tab of ['home','tickets','tasks','schedule','specs','knowledge','processhub','waiting','studio']){api.showTab(tab);assert.ok(document.getElementById('view').innerHTML.length>50,tab);assert.ok(document.querySelector('[data-tab="'+tab+'"]'));}
+ await hubAction(api,'commands');assert.ok(document.getElementById('hubCommandResults').children.length);await hubAction(api,'privacy');assert.ok(document.body.classList.contains('hub-private'));await hubAction(api,'presentation');assert.ok(document.getElementById('hubExitPresentation'));await hubAction(api,'presentation');assert.equal(document.getElementById('hubExitPresentation'),null);
+ await api.loadCloud(null);assert.equal(document.getElementById('hubToolbar').hidden,true);assert.equal(document.getElementById('hubPet').hidden,true);
+});
+
+test('unchanged background checks fetch only lightweight revision metadata',async t=>{
+ const {api,db}=await loggedCloud(t);db.selects.length=0;await api.refreshCloud();assert.deepEqual(db.selects,['revision,mutation_id,updated_at']);
+ db.row.revision=2;db.row.document.data.projects[0].code='Changed';await api.refreshCloud();assert.equal(db.selects.at(-1),'document,revision,mutation_id,updated_at');assert.equal(api.state().projects[0].code,'Changed');
 });
