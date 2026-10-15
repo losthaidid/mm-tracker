@@ -21,7 +21,7 @@ Changes save automatically to Supabase. The header and Settings show **Saving to
 
 Settings also contains Account, Charge codes, Project management, editable built-in lists, screen visibility, Backup, Restore, Retry/refresh, Reload cloud records, and Sign out. Restore and Reload cloud records require the current account email and password. Activity deletion requires the current password; credentials are verified by Supabase Auth and are not stored in tracker data.
 
-Tasks can be linked to a project, ticket, or custom reference. Scheduling supports 01:00–24:00 entry, status colours, configurable work locations, and automatic weekend TOIL identification. Project governance includes editable phase-specific acceptance criteria, gate skipping, Go-Live countdowns, project health, and planned-versus-actual confirmation.
+Tasks can be linked to a project, ticket, or custom reference. Scheduling supports 00:00–24:00 entry with minute precision, status colours, configurable work locations, and automatic weekend TOIL identification. Project governance includes editable phase-specific acceptance criteria, gate skipping, Go-Live countdowns, project health, and planned-versus-actual confirmation.
 
 Use **Companies & processes → Upload company / process Excel** to import Organization Structure, Master Data, Inventory Management, and Procurement mappings. The preview can add companies, departments, organization/master-data items, BPML processes, and decision states together. Re-importing the same code or item creates a new proposal version. The workbook stays in the browser; only normalized rows and source metadata are saved online. Project items can select an imported company and record expected and due dates.
 
@@ -41,11 +41,11 @@ If a Free plan project pauses after inactivity, restore it in your Supabase dash
 
 ## Update an existing installation
 
-1. In the existing Supabase project’s SQL Editor, run `supabase/migrations/20261015010000_support_document_versions_5_to_7.sql` once. This only broadens the document-format constraint; it preserves all rows, ownership policies, revisions, and the save function. It can be reapplied safely.
+1. In the existing Supabase project’s SQL Editor, run `supabase/migrations/20261015033904_precise_schedules_and_subtask_notes.sql` once. This only broadens the document-format constraint; it preserves all rows, ownership policies, revisions, and the save function. It can be reapplied safely.
 2. Deploy the updated `index.html` alongside the existing `supabase-client.js`, Excel template and `.nojekyll` through the repository’s current GitHub Pages deployment.
 3. Sign in to the tracker. Make an edit, wait for **Saved to Supabase**, and reopen it using the same tracker account on another device.
 
-The previous checked-in SQL accepted only document versions 1–4, while the previous website wrote version 6. This migration accepts versions 1–7. The updated app writes version 7 so older pages cannot silently reinterpret custom areas. It can restore older backups, including version 6. Do not run `cloud-schema.sql` on an initialized database; that file is for a fresh installation.
+The previous checked-in SQL accepted only document versions 1–4, while the previous website wrote version 6. The current migration accepts versions 1–8. The updated app writes version 8 so older pages cannot discard sub-task details or reinterpret precise schedule times. It can restore older backups, including versions 6 and 7. Do not run `cloud-schema.sql` on an initialized database; that file is for a fresh installation.
 
 ## Maintain SAP MM areas
 
@@ -58,6 +58,20 @@ Open **SAP Projects → Companies & processes → Manage SAP MM areas**, or **Se
 - The Add/Edit process dropdown and Excel import preview use the maintained areas, including custom areas such as Invoice Verification.
 
 Click **Save areas** to apply changes. They use the same Supabase autosave and revision protection as the rest of the tracker.
+
+## Sub-items and sub-tasks
+
+Project sub-items have their own Remarks field under **Sub-items → Add/Edit sub-item**. Existing sub-items start with blank remarks.
+
+The Tasks tab displays each main title with its own sub-tasks. Use **Add sub-task** to maintain an individual title, status, remarks, and feedback. Updates belong only to that sub-task. Editing or archiving a main task preserves its children. Main-task completion remains a separate control. Search includes sub-task titles and notes. The formatted Excel report includes individual child rows with the main title and each child’s notes.
+
+## Schedule viewing and precise times
+
+Select a booking to view its dates, exact times, duration, linked task/project and notes. Choose **Edit activity** to make changes. Go-Live milestones in Schedule also open in display mode before editing. Empty grid cells and **Plan this day** create a new booking.
+
+Enter start and end times to the minute, such as **09:15–10:45**. Quick-duration buttons offer 15, 30, 45, 60 and 90 minutes. For an end at midnight, select **End at midnight (24:00)**. A date range repeats the same daily time range. Adjacent bookings are allowed; overlapping intervals are blocked. Durations, weekend TOIL, project calendar syncing and Excel times retain minute precision. The time-grid view shows one week from 00:00–24:00.
+
+Tickets have a new card layout with a Table option, and Tasks use a main-task/sub-task layout. These styles are scoped to Tickets, Tasks and Schedule; the Projects layout is retained.
 
 ## Development checks
 
