@@ -391,3 +391,42 @@ test('unchanged background checks fetch only lightweight revision metadata',asyn
  const {api,db}=await loggedCloud(t);db.selects.length=0;await api.refreshCloud();assert.deepEqual(db.selects,['revision,mutation_id,updated_at']);
  db.row.revision=2;db.row.document.data.projects[0].code='Changed';await api.refreshCloud();assert.equal(db.selects.at(-1),'document,revision,mutation_id,updated_at');assert.equal(api.state().projects[0].code,'Changed');
 });
+
+function pointer(window,target,type,x,y,id=1){const e=new window.MouseEvent(type,{bubbles:true,cancelable:true,clientX:x,clientY:y,button:0});Object.defineProperty(e,'pointerId',{value:id});target.dispatchEvent(e);return e;}
+
+test('the companion floats in viewport space, moves by touch, and remembers its place',async t=>{
+ const {api,document,window,db}=await app(t),pet=document.getElementById('hubPet'),button=pet.querySelector('button');
+ assert.equal(pet.parentElement,document.body);assert.equal(pet.style.position,'fixed');assert.equal(pet.style.bottom,'auto');assert.ok(parseFloat(pet.style.top)<window.innerHeight-pet.getBoundingClientRect().height);
+ const oldTop=pet.style.top;window.dispatchEvent(new window.Event('scroll'));assert.equal(pet.style.top,oldTop);
+ pointer(window,button,'pointerdown',900,300);pointer(window,document,'pointermove',200,200);pointer(window,document,'pointerup',200,200);assert.ok(parseFloat(pet.style.left)<400);assert.ok(window.localStorage.getItem('mm-tracker.companion-position.v1'));assert.equal(db.calls.length,0);
+ const place={left:pet.style.left,top:pet.style.top};api.showTab('tasks');assert.equal(pet.style.left,place.left);assert.equal(pet.style.top,place.top);
+ Object.defineProperty(window,'innerWidth',{value:375,configurable:true});Object.defineProperty(window,'innerHeight',{value:667,configurable:true});window.dispatchEvent(new window.Event('resize'));assert.ok(parseFloat(pet.style.left)>=12);assert.ok(parseFloat(pet.style.left)+parseFloat(pet.style.width)<=363);assert.ok(parseFloat(pet.style.top)+parseFloat(pet.style.height)<=655);
+});
+
+test('the companion remains visible around the phone keyboard and supports keyboard movement',async t=>{
+ const {document,window}=await app(t),pet=document.getElementById('hubPet'),button=pet.querySelector('button'),before=parseFloat(pet.style.left);
+ button.dispatchEvent(new window.KeyboardEvent('keydown',{key:'ArrowLeft',bubbles:true,cancelable:true}));assert.ok(parseFloat(pet.style.left)<before);
+ Object.defineProperty(window,'innerHeight',{value:240,configurable:true});window.dispatchEvent(new window.Event('resize'));assert.ok(parseFloat(pet.style.top)+parseFloat(pet.style.height)<=228);
+});
+
+test('editable website title and subtitle save to the same private account and survive restore',async t=>{
+ const {api,document,db}=await app(t);await hubAction(api,'header-edit');const form=document.getElementById('hubHeaderForm');fill(form,{workspace:'Haidid’s SAP Space',headerSubtitle:'A place for ideas & progress'});api.hub.submit(form);await settle();
+ assert.equal(document.getElementById('hubSiteTitle').textContent,'Haidid’s SAP Space');assert.equal(document.getElementById('hubSiteSubtitle').textContent,'A place for ideas & progress');assert.equal(document.title,'Haidid’s SAP Space');assert.equal(db.row.document.data.workhub.headerSubtitle,'A place for ideas & progress');assert.equal(api.parseBackup(api.payload(api.state())).workhub.preferences.workspace,'Haidid’s SAP Space');
+ assert.equal(document.getElementById('tabs').parentElement.id,'hubSidebar');assert.equal(document.querySelector('main.page').parentElement.id,'hubShell');
+});
+
+test('dashboard handles support pointer dragging and keyboard reorder with a single saved drop',async t=>{
+ const {api,document,window,db}=await app(t);api.showTab('home');const tasks=document.querySelector('[data-widget="tasks"]'),target=document.querySelector('[data-widget="today"]'),handle=tasks.querySelector('[data-hub-drag="widget"]');document.elementFromPoint=()=>target;
+ const before=db.calls.length;pointer(window,handle,'pointerdown',300,300);pointer(window,document,'pointermove',200,200);assert.ok(document.querySelector('.hub-sort-ghost'));assert.ok(target.classList.contains('hub-drop-target'));assert.equal(db.calls.length,before);
+ pointer(window,document,'pointerup',200,200);await settle();assert.equal(api.state().workhub.widgets[0].id,'tasks');assert.equal(db.calls.length,before+1);assert.equal(document.querySelector('.hub-sort-ghost'),null);
+ document.querySelector('[data-widget="tasks"] [data-hub-drag]').dispatchEvent(new window.KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true,cancelable:true}));await settle();assert.equal(api.state().workhub.widgets[0].id,'today');
+});
+
+test('task handles move a card to a status column with touch without losing its child records',async t=>{
+ const {api,document,window}=await app(t),id=addMainTask(api,document,'Drag me');addTaskSub(api,document,id,'Child','Keep remarks','Keep feedback');await settle();api.hub.setBoard(true);api.showTab('tasks');const handle=document.querySelector('[data-task-card] [data-hub-drag="task"]'),target=document.querySelector('[data-column="blocked"]');document.elementFromPoint=()=>target;
+ pointer(window,handle,'pointerdown',300,300);pointer(window,document,'pointermove',400,300);pointer(window,document,'pointerup',400,300);await settle();assert.equal(api.state().tasks[0].boardStatus,'blocked');assert.equal(api.state().tasks[0].subTasks[0].feedback,'Keep feedback');assert.ok(document.querySelector('[data-column="blocked"] [data-task-card]'));
+});
+
+test('cancelling a drag leaves both layout and records unchanged',async t=>{
+ const {api,document,window,db}=await app(t);api.showTab('home');const initial=copy(api.state().workhub.widgets),handle=document.querySelector('[data-widget] [data-hub-drag]');pointer(window,handle,'pointerdown',200,200);pointer(window,document,'pointermove',300,300);pointer(window,document,'pointercancel',300,300);assert.deepEqual(copy(api.state().workhub.widgets),initial);assert.equal(db.calls.length,0);assert.equal(document.querySelector('.hub-sort-ghost'),null);
+});

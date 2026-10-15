@@ -87,6 +87,16 @@ The existing Tickets, Tasks, Schedule and Projects remain available alongside **
 - **Studio:** focus timer, editable milestone scrapbook, project journey, daily wrap-up and recorded work sessions. Project phase changes add small scrapbook keepsakes. Decorations grow with completed tasks without streak penalties. Celebrations can be replayed.
 - **Search & commands:** find loaded records and navigate quickly; Ctrl/Cmd+K opens it. Quick add opens common creation flows. Privacy blurs marked descriptions; presentation mode hides decorative controls, with an explicit exit button or Escape.
 
+## Playful layouts, moving controls and your header
+
+All tabs share the same warm, colourful visual system. A laptop uses a workspace sidebar; a phone uses compact scrolling navigation, stacked panels and touch-sized controls. Existing forms, reports and private records use the same workflows.
+
+Choose **Edit header** beside the website title to maintain the title and subtitle. The title also names the browser tab. These small settings save with the existing private account and are included in JSON backups.
+
+Momo floats above the visible page, with no surrounding card. Drag the companion anywhere on a phone or laptop; its position is remembered on that device. It remains within the visible screen after resizing, rotation or a phone keyboard opening. A focused companion can also move using arrow keys. Its position and animation never trigger cloud uploads.
+
+Dashboard widgets and task-board cards have dotted drag handles. Hold and move a handle with a finger, mouse or pen; highlighted drop targets show where the item will go. Drop a widget over another widget to reorder it, or drop a task into a status column. Reordering saves once at the end of the gesture. Cancelling leaves records unchanged. Keyboard users can focus a handle and use up/down for widgets or left/right for task columns. The existing Move to selectors and widget buttons remain available.
+
 ## Work stopwatch
 
 Start from the toolbar or a linked task, ticket or project item. Choose the linked activity (optionally a task's subtask), session title, charge code and remarks. A floating stopwatch stays visible as you navigate. Pause/resume excludes breaks, and Notes lets you update remarks during work.
