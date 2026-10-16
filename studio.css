@@ -355,6 +355,10 @@ body .workspace-v10 :is(.task-parent-notes,.task-child-notes) { background: var(
 body .workspace-v10 .task-child { border-color: var(--hub-border); border-left-color: var(--hub-accent); border-radius: 12px; background: var(--hub-surface); }
 body .workspace-v10 .task-child.status-completed { border-left-color: var(--hub-success); }
 body .workspace-v10 .task-child.status-blocked { border-left-color: var(--hub-danger); }
+body .task-child-head { flex-wrap: wrap; gap: 8px; }
+body .task-child-head > strong { flex: 1 1 180px; }
+body .hub-subtask-complete { color: var(--hub-success); }
+body .hub-subtask-complete:disabled { opacity: .85; background: var(--hub-mint); color: var(--hub-success); }
 body .workspace-v10 .ticket-queue-card { border-top: 4px solid var(--hub-accent); padding: 22px; }
 body .workspace-v10 .ticket-queue-card.priority-high { border-top-color: #d09a50; }
 body .workspace-v10 .ticket-queue-card.priority-critical { border-top-color: var(--hub-danger); }
@@ -520,6 +524,11 @@ body .go-live-schedule-card small { color: var(--hub-warning); }
 .hub-timerbar[data-minimized="true"] .hub-timer-head .hub-timer { font-size: 1rem; }
 .hub-timer { color: var(--hub-accent); font-size: 1.35rem; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .hub-focus-clock { display: grid; place-items: center; width: 205px; height: 205px; margin: 22px auto; border: 10px solid color-mix(in srgb,var(--hub-text) 9%,transparent); border-radius: 50%; background: var(--hub-surface); box-shadow: 0 0 0 1px var(--hub-border),0 5px 0 #2434490a; color: var(--hub-text); font-size: 2.75rem; font-weight: 600; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.hub-focus-form { min-width: 0; }
+.hub-focus-clock[data-long="true"] { font-size: 2rem; }
+.hub-focus-duration { display: grid; gap: 6px; margin: 16px 0; }
+.hub-focus-duration input { width: 100%; max-width: 180px; }
+.hub-focus-duration small { line-height: 1.5; }
 body.hub-focus #hubHeader, body.hub-focus footer { opacity: .55; transition: opacity .25s; }
 body.hub-focus #hubHeader:hover, body.hub-focus footer:hover { opacity: 1; }
 .hub-commands { display: grid; gap: 7px; max-height: 60vh; overflow-y: auto; margin-top: 16px; }
