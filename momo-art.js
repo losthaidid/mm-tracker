@@ -15,7 +15,7 @@ function svg(name='glasses'){
  // can become Chromium's broken-image placeholder when cloned with <use>.
  const part=(cls,source,target,clip='')=>`<g class="${cls}"><svg x="${target[0]}" y="${target[1]}" width="${target[2]}" height="${target[3]}" viewBox="${source.join(' ')}" preserveAspectRatio="none" overflow="hidden" style="width:${target[2]}px;height:${target[3]}px;overflow:hidden;filter:none"><g${clip?` clip-path="url(#${clip})"`:''}><image class="momo-part-image" href="${ATLAS}" width="1024" height="1536"/></g></svg></g>`;
  const eye=(side,x,y)=>`<g class="momo-eye-${side}"><g clip-path="url(#momo-eye-clip-${side})"><g class="momo-pupils"><ellipse cx="${x}" cy="${y+.6}" rx="3.75" ry="4.65" fill="url(#momo-iris)"/><ellipse cx="${x}" cy="${y}" rx="1.85" ry="3.1" fill="#182b34"/><ellipse cx="${x-1.2}" cy="${y-2.4}" rx="1.45" ry="1.7" fill="#fff"/><circle cx="${x+1.6}" cy="${y+2.4}" r=".7" fill="#d5ffff"/></g></g></g>`;
- return `<svg class="momo-anime-art" viewBox="0 0 140 155" role="img" aria-label="Momo, an original anime boy in a mint hoodie" xmlns="http://www.w3.org/2000/svg">
+ return `<svg class="momo-anime-art" data-art-ready="false" viewBox="0 0 140 155" role="img" aria-label="Momo, an original anime boy in a mint hoodie" xmlns="http://www.w3.org/2000/svg">
  <defs>
   <radialGradient id="momo-iris" cx="45%" cy="25%"><stop stop-color="#244856"/><stop offset=".56" stop-color="#4d8d91"/><stop offset=".83" stop-color="#78c6bc"/><stop offset="1" stop-color="#244553"/></radialGradient>
   <radialGradient id="momo-skin"><stop stop-color="#f8d0b7"/><stop offset="1" stop-color="#f5c7b0"/></radialGradient>
@@ -67,5 +67,14 @@ function svg(name='glasses'){
  <path class="momo-surprise-mark" d="m109 39 2-8m-1 12h.1m7-8 4-5" fill="none" stroke="#e9aa62" stroke-width="2" stroke-linecap="round"/>
  </svg>`;
 }
-root.WorkHubMomoArt=Object.freeze({svg,accessory});
+function mount(container){
+ const art=container?.querySelector('.momo-anime-art'),source=art?.querySelector('.momo-part-image')?.getAttribute('href');
+ if(!art||!source)return;
+ art.dataset.artReady='false';
+ const image=new root.Image();
+ image.onload=()=>{art.dataset.artReady='true';};
+ image.onerror=()=>{art.dataset.artReady='false';};
+ image.src=source;
+}
+root.WorkHubMomoArt=Object.freeze({svg,accessory,mount});
 })(window);

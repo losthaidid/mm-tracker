@@ -1,4 +1,5 @@
 /* The atlas supplies the soft 3D finish; the live rig supplies the personality. */
+.momo-anime-art[data-art-ready="false"] { opacity:0; }
 #hubPet > button > .momo-anime-art { filter:drop-shadow(0 3px 3px #30445018); overflow:visible; }
 #hubPet .momo-anime-art svg { display:block; pointer-events:none; }
 #hubPet .pet-body { transform-origin:70px 145px; transform-box:view-box; }

@@ -518,6 +518,14 @@ test('tickets and projects have independent synced reminders and a snoozed proje
  const other=await app(t,{remote:copy(db.row),login:false});await other.api.loadCloud(sessionUser);await settle();assert.equal(other.api.state().workhub.reminders.length,2);assert.equal(other.window.WorkHubReminders.lookup(other.api.state(),'tickets',ticket).until,'2026-10-21');
 });
 
+test('Momo reveals the complete rig only after its artwork loads and hides failed artwork',async t=>{
+ const {document,window,db}=await app(t,{styles:true}),pet=document.getElementById('hubPet'),art=pet.querySelector('.momo-anime-art'),images=[];
+ window.Image=class{constructor(){images.push(this);}};
+ window.WorkHubMomoArt.mount(pet);assert.equal(window.getComputedStyle(art).opacity,'0');assert.match(images[0].src,/assets\/momo\/anime-rig\.webp/);
+ images[0].onload();assert.equal(art.dataset.artReady,'true');assert.notEqual(window.getComputedStyle(art).opacity,'0');
+ window.WorkHubMomoArt.mount(pet);images[1].onerror();assert.equal(window.getComputedStyle(art).opacity,'0');assert.equal(db.calls.length,0);
+});
+
 test('Momo has live glossy anime eyes and pickup reactions stay local',async t=>{
  const {document,window,db,frames}=await app(t),pet=document.getElementById('hubPet');assert.ok(pet.querySelector('radialGradient'));assert.equal(pet.querySelector('svg').getAttribute('viewBox'),'0 0 140 155');assert.ok(pet.querySelector('.momo-pupils'));
  pointer(window,document.body,'pointermove',0,0);for(const [id,fn]of [...frames]){frames.delete(id);fn(window.performance.now()+20);}assert.ok(parseFloat(pet.style.getPropertyValue('--momo-look-x'))<0);

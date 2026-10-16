@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="../studio.css?v=20261017-momo-anime">
 <link rel="stylesheet" href="../music.css?v=20261017-momo-anime">
 <link rel="stylesheet" href="../workspace-upgrades.css?v=20261017-momo-anime">
-<link rel="stylesheet" href="../momo-anime.css?v=20261017-momo-anime">
+<link rel="stylesheet" href="../momo-anime.css?v=20261017-momo-render-fix2">
 <style>
 body{margin:0;padding:32px;background:#fff7df;font-family:system-ui;color:#31434a}
 main{max-width:560px;margin:auto}h1{font-size:24px;margin:0 0 8px}p{line-height:1.5}
@@ -21,12 +21,13 @@ main{max-width:560px;margin:auto}h1{font-size:24px;margin:0 0 8px}p{line-height:
 <div class="stage"><aside id="hubPet" data-pose="idle" data-expression="curious"><button type="button" aria-label="Momo anime boy"></button></aside></div>
 <div class="poses"><button data-pose="idle">Standing</button><button data-pose="startled">Startled</button><button data-pose="held">Picked up</button><button data-pose="annoyed">Annoyed</button><button data-pose="idle-sit">Chair</button><button data-pose="idle-sleep">Sleeping</button></div>
 </main>
-<script src="../momo-art.js?v=20261017-momo-render-fix"></script>
+<script src="../momo-art.js?v=20261017-momo-render-fix2"></script>
 <script>
 const pet=document.getElementById('hubPet');
 pet.querySelector('button').innerHTML=WorkHubMomoArt.svg('glasses');
 // This page lives one directory below the app; keep image paths relative to it.
 pet.querySelectorAll('.momo-part-image').forEach(image=>image.setAttribute('href','../'+image.getAttribute('href')));
+WorkHubMomoArt.mount(pet);
 document.querySelector('.poses').addEventListener('click',event=>{
  const pose=event.target.dataset.pose;if(!pose)return;
  pet.dataset.pose=pose;pet.dataset.expression=({startled:'surprised',held:'surprised',annoyed:'annoyed','idle-sleep':'sleepy'})[pose]||'curious';
