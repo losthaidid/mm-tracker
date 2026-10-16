@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Momo visual check</title>
+<link rel="stylesheet" href="../studio.css?v=20261017-momo-anime">
+<link rel="stylesheet" href="../music.css?v=20261017-momo-anime">
+<link rel="stylesheet" href="../workspace-upgrades.css?v=20261017-momo-anime">
+<link rel="stylesheet" href="../momo-anime.css?v=20261017-momo-anime">
+<style>
+body{margin:0;padding:32px;background:#fff7df;font-family:system-ui;color:#31434a}
+main{max-width:560px;margin:auto}h1{font-size:24px;margin:0 0 8px}p{line-height:1.5}
+.stage{height:340px;position:relative;border:1px solid #ded5be;border-radius:18px;background:#fffaf0;margin:24px 0}
+#hubPet{position:absolute!important;left:calc(50% - 100px)!important;top:50px!important;right:auto!important;width:200px!important;height:222px!important}
+.poses{display:flex;gap:8px;flex-wrap:wrap}button{font:inherit}
+</style>
+</head>
+<body data-motion="calm">
+<main><h1>Momo visual check</h1><p>Live artwork and styles, without account data. Move your cursor to check his eyes, then select a pose.</p>
+<div class="stage"><aside id="hubPet" data-pose="idle" data-expression="curious"><button type="button" aria-label="Momo anime boy"></button></aside></div>
+<div class="poses"><button data-pose="idle">Standing</button><button data-pose="startled">Startled</button><button data-pose="held">Picked up</button><button data-pose="annoyed">Annoyed</button><button data-pose="idle-sit">Chair</button><button data-pose="idle-sleep">Sleeping</button></div>
+</main>
+<script src="../momo-art.js?v=20261017-momo-render-fix"></script>
+<script>
+const pet=document.getElementById('hubPet');
+pet.querySelector('button').innerHTML=WorkHubMomoArt.svg('glasses');
+// This page lives one directory below the app; keep image paths relative to it.
+pet.querySelectorAll('.momo-part-image').forEach(image=>image.setAttribute('href','../'+image.getAttribute('href')));
+document.querySelector('.poses').addEventListener('click',event=>{
+ const pose=event.target.dataset.pose;if(!pose)return;
+ pet.dataset.pose=pose;pet.dataset.expression=({startled:'surprised',held:'surprised',annoyed:'annoyed','idle-sleep':'sleepy'})[pose]||'curious';
+ if(pose==='idle-sit')pet.dataset.chairPhase='whistle';else pet.removeAttribute('data-chair-phase');
+});
+document.addEventListener('pointermove',event=>{
+ const box=pet.getBoundingClientRect();pet.style.setProperty('--momo-look-x',Math.max(-1.45,Math.min(1.45,(event.clientX-box.left-box.width/2)/90))+'px');
+ pet.style.setProperty('--momo-look-y',Math.max(-1.15,Math.min(1.15,(event.clientY-box.top-box.height*.35)/105))+'px');
+});
+</script>
+</body>
+</html>
