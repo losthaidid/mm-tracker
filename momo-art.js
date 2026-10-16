@@ -3,7 +3,7 @@
  * Eyes are live vector layers, so Momo can keep watching the cursor. */
 (function(root){
 'use strict';
-const ATLAS='./assets/momo/anime-rig.webp?v=20261017-momo-anime';
+const ATLAS='./assets/momo/anime-rig.webp?v=20261017-momo-render-fix';
 function accessory(name){
  if(name==='none')return '';
  if(name==='helmet')return '<path d="M39 37a31 29 0 0162 0H39" fill="#f2c362" stroke="#9c753b" stroke-width="1.2"/><path d="M36 37h68M70 12v19" stroke="#ffe8a6" stroke-width="4" stroke-linecap="round"/>';
@@ -11,11 +11,12 @@ function accessory(name){
  return '<g fill="none" stroke="#594e54" stroke-width=".9"><rect x="50.7" y="48.9" width="14.1" height="10.8" rx="4.2"/><rect x="74.4" y="48" width="14.1" height="10.8" rx="4.2"/><path d="M65 53.5q4.5-2.8 9.3-.5m-24-.6-6-1m44-1 6-1"/></g>';
 }
 function svg(name='glasses'){
- const part=(cls,source,target,clip='')=>`<g class="${cls}"><svg x="${target[0]}" y="${target[1]}" width="${target[2]}" height="${target[3]}" viewBox="${source.join(' ')}" preserveAspectRatio="none" overflow="hidden" style="width:${target[2]}px;height:${target[3]}px;overflow:hidden;filter:none"><g${clip?` clip-path="url(#${clip})"`:''}><use href="#momo-atlas"/></g></svg></g>`;
+ // Keep each raster image in its rendered viewport. A shared image in <defs>
+ // can become Chromium's broken-image placeholder when cloned with <use>.
+ const part=(cls,source,target,clip='')=>`<g class="${cls}"><svg x="${target[0]}" y="${target[1]}" width="${target[2]}" height="${target[3]}" viewBox="${source.join(' ')}" preserveAspectRatio="none" overflow="hidden" style="width:${target[2]}px;height:${target[3]}px;overflow:hidden;filter:none"><g${clip?` clip-path="url(#${clip})"`:''}><image class="momo-part-image" href="${ATLAS}" width="1024" height="1536"/></g></svg></g>`;
  const eye=(side,x,y)=>`<g class="momo-eye-${side}"><g clip-path="url(#momo-eye-clip-${side})"><g class="momo-pupils"><ellipse cx="${x}" cy="${y+.6}" rx="3.75" ry="4.65" fill="url(#momo-iris)"/><ellipse cx="${x}" cy="${y}" rx="1.85" ry="3.1" fill="#182b34"/><ellipse cx="${x-1.2}" cy="${y-2.4}" rx="1.45" ry="1.7" fill="#fff"/><circle cx="${x+1.6}" cy="${y+2.4}" r=".7" fill="#d5ffff"/></g></g></g>`;
  return `<svg class="momo-anime-art" viewBox="0 0 140 155" role="img" aria-label="Momo, an original anime boy in a mint hoodie" xmlns="http://www.w3.org/2000/svg">
  <defs>
-  <image id="momo-atlas" href="${ATLAS}" width="1024" height="1536"/>
   <radialGradient id="momo-iris" cx="45%" cy="25%"><stop stop-color="#244856"/><stop offset=".56" stop-color="#4d8d91"/><stop offset=".83" stop-color="#78c6bc"/><stop offset="1" stop-color="#244553"/></radialGradient>
   <radialGradient id="momo-skin"><stop stop-color="#f8d0b7"/><stop offset="1" stop-color="#f5c7b0"/></radialGradient>
   <filter id="momo-mouth-blend" x="-30%" y="-70%" width="160%" height="240%"><feGaussianBlur stdDeviation=".45"/></filter>
