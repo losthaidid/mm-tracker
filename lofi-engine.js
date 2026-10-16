@@ -11,7 +11,12 @@ function createBuffer(context,track='lantern'){
   for(const hit of [1,3])add(start+hit*beat,.15,t=>(random()*2-1)*exp(-t*36)+.2*sin(tau*165*t)*exp(-t*29),.075,.08);
   for(let h=0;h<8;h++){const swing=h%2?.075:0;add(start+(h*.5+swing)*beat,.055,t=>(random()*2-1)*exp(-t*90),h%2?.022:.035,h%2?.25:-.25);}
  }
- let previous=0;for(let i=Math.max(0,length-500);i<length;i++)previous=previous*.72+left[i]*.28;for(let i=0;i<length;i++){const dust=(random()*2-1)*.0013;previous=previous*.72+left[i]*.28;left[i]=tanh((previous+dust)*1.15)*.82;right[i]=tanh((right[i]+dust)*1.05)*.82;}
+ let previous=0,energy=0;for(let i=Math.max(0,length-500);i<length;i++)previous=previous*.72+left[i]*.28;
+ for(let i=0;i<length;i++){const dust=(random()*2-1)*.0013;previous=previous*.72+left[i]*.28;left[i]=tanh((previous+dust)*1.15)*.82;right[i]=tanh((right[i]+dust)*1.05)*.82;energy+=left[i]**2+right[i]**2;}
+ // Match both tracks' perceived level, then round off transient peaks gently.
+ // This raises the music itself, without turning up rain or other ambience.
+ const rms=Math.sqrt(energy/(length*2)),boost=rms?Math.min(12,.20/rms):1;
+ for(let i=0;i<length;i++){left[i]=.78*tanh(left[i]*boost/.78);right[i]=.78*tanh(right[i]*boost/.78);}
  return buffer;
 }
 root.WorkHubLofi={TRACKS,createBuffer};
