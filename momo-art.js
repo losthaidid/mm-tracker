@@ -77,12 +77,12 @@
         <path d="M111 91c1 24-7 35-24 39" fill="none" stroke="#36a8a2" stroke-width="5" stroke-linecap="round" opacity=".23"/>
         <ellipse class="momo-belly" cx="70" cy="114" rx="27" ry="20" fill="url(#momo-belly)"/>
         <path d="M52 107q11-9 23-7" fill="none" stroke="#fffef3" stroke-width="2" stroke-linecap="round" opacity=".65"/>
-        <ellipse cx="32" cy="87" rx="12" ry="9" fill="url(#momo-blush)"/>
-        <ellipse cx="109" cy="87" rx="12" ry="9" fill="url(#momo-blush)"/>
+        <ellipse class="momo-cheek" cx="32" cy="87" rx="12" ry="9" fill="url(#momo-blush)"/>
+        <ellipse class="momo-cheek" cx="109" cy="87" rx="12" ry="9" fill="url(#momo-blush)"/>
         <g class="momo-brows" fill="none" stroke="#398d91" stroke-width="2.3" stroke-linecap="round">
           <path d="M39 52q6-5 12-2"/><path d="M86 50q6-2 12 3"/>
         </g>
-        <g class="pet-eye">
+        <g class="pet-eye"><g class="momo-eye-left">
           <ellipse cx="49" cy="74" rx="15" ry="18" fill="#e1fff1" fill-opacity=".5"/>
           <ellipse cx="49" cy="74" rx="13.5" ry="16.5" fill="url(#momo-eye-glass)" stroke="#2d6877" stroke-width=".8"/>
           <g class="momo-pupils" style="transform:translate(var(--momo-look-x,0px),var(--momo-look-y,0px));transform-box:fill-box;transform-origin:center">
@@ -92,7 +92,7 @@
             <circle cx="53.5" cy="79.5" r="2.1" fill="#d5f8ff" fill-opacity=".95"/>
           </g>
           <path d="M41 83q7 7 14 0" fill="none" stroke="#92dce0" stroke-width="1" stroke-linecap="round" opacity=".55"/>
-          <ellipse cx="91" cy="74" rx="15" ry="18" fill="#e1fff1" fill-opacity=".5"/>
+          </g><g class="momo-eye-right"><ellipse cx="91" cy="74" rx="15" ry="18" fill="#e1fff1" fill-opacity=".5"/>
           <ellipse cx="91" cy="74" rx="13.5" ry="16.5" fill="url(#momo-eye-glass)" stroke="#2d6877" stroke-width=".8"/>
           <g class="momo-pupils" style="transform:translate(var(--momo-look-x,0px),var(--momo-look-y,0px));transform-box:fill-box;transform-origin:center">
             <ellipse cx="91" cy="76" rx="9.3" ry="11.8" fill="url(#momo-iris)"/>
@@ -101,9 +101,17 @@
             <circle cx="95.5" cy="79.5" r="2.1" fill="#d5f8ff" fill-opacity=".95"/>
           </g>
           <path d="M83 83q7 7 14 0" fill="none" stroke="#92dce0" stroke-width="1" stroke-linecap="round" opacity=".55"/>
-        </g>
+        </g></g>
+        <g class="momo-eye-smiles" fill="none" stroke="#285a69" stroke-width="3" stroke-linecap="round"><path d="M38 76q11-13 22 0"/><path d="M80 76q11-13 22 0"/></g>
+        <path class="momo-eye-wink" d="M80 76q11-9 22 0" fill="none" stroke="#285a69" stroke-width="3" stroke-linecap="round"/>
+        <g class="momo-dizzy-eyes" fill="none" stroke="#285a69" stroke-width="2.7" stroke-linecap="round"><path d="m40 67 18 15m0-15-18 15m42-15 18 15m0-15-18 15"/></g>
         <path class="momo-nose" d="M66 85q4-2 8 0l-4 4Z" fill="#397981"/>
         <path class="pet-mouth" d="M62 92q4 5 8 0 4 5 8 0" fill="none" stroke="#2e6570" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <g class="momo-mouth-grin"><path d="M60 92q10 4 20 0c-1 15-19 15-20 0Z" fill="#285769" stroke="#2e6570" stroke-width="1.6"/><path d="M64 101q6-6 12 0" fill="#f7a1b0"/></g>
+        <ellipse class="momo-mouth-o" cx="70" cy="97" rx="4.5" ry="6" fill="#285769"/>
+        <path class="momo-tongue" d="M66 95h8v6a4 4 0 01-8 0Z" fill="#f5a1b3" stroke="#b96483" stroke-width="1.2"/>
+        <g class="momo-sparkles" fill="#ffc95d" stroke="#e0a53c" stroke-width=".6"><path d="m18 49 2-6 2 6 6 2-6 2-2 6-2-6-6-2Z"/><path d="m119 47 1.5-5 1.5 5 5 1.5-5 1.5-1.5 5-1.5-5-5-1.5Z"/></g>
+        <path class="momo-sweat" d="M112 52q11 13 1 14-8-1-1-14Z" fill="#a9e2ff" stroke="#5b9dbe" stroke-width="1"/>
         <g class="momo-arm-left">
           <path d="M28 102C15 106 9 96 14 88c3-4 6-2 6 2 0 4 3 6 8 4" fill="url(#momo-limb)" stroke="#399c99" stroke-width="2" stroke-linecap="round"/>
           <path d="m14 91 3 1m-3 3 3 1" stroke="#e4fff0" stroke-width="1.6" stroke-linecap="round"/>
