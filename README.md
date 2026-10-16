@@ -109,6 +109,10 @@ The running timer is stored locally per tracker account using timestamps, not se
 
 If recorded time overlaps an existing booking, the timer stays paused and preserved. Adjust the finishing time or save the session for calendar review; existing bookings are never overwritten. **Studio → Work sessions** can schedule a review session after the conflict is resolved. Session IDs protect against duplicate saves.
 
+Work sessions opens on **Active**, with **Archived** and **All** views. Archive a finished session to tidy the active list, or restore it whenever needed. Archive state syncs between devices. **Delete** asks for confirmation and offers **Undo deletion** until the next deletion or account change. Archiving or deleting a session preserves its existing Schedule and Project activities. Archived sessions remain in Excel's time history, marked in the **Record** column; deleted sessions leave that history.
+
+The Tickets tab starts with **Pending** selected. Choose **All statuses** or another status whenever needed; the selected filter remains while navigating within the current page.
+
 ## Automatic device syncing
 
 Opening the tracker reads the latest cloud record. Returning to the page, reconnecting and visible-page checks (every 20 seconds) refresh clean copies automatically. Background checks read only revision metadata unless records have changed. Read-only details close when newer records replace them; editable modal drafts defer the refresh until the editor closes. Project/month navigation does not create record uploads.
@@ -131,6 +135,8 @@ Momo is a local vector character with soft dimensional shading and glossy eyes t
 
 Drag the ball with a finger or mouse to toss it again. Escape closes play controls and puts the ball away; the menu also offers **Put ball away** on phones. Home position is remembered on that device. Expressions, gaze, play and home placement do not trigger cloud saves. Animations Off and reduced-motion settings stop animated travel and gaze movement; normal tracker controls remain usable.
 
+Momo also grins, winks, blushes, sticks out his tongue, sneezes and occasionally trips over an imaginary pixel before recovering. Little funny speech bubbles appear occasionally (normally 2–5 minutes apart) while the page is visible and you are not typing, editing, playing or focusing. They are text bubbles, without audio or network calls. Tap Momo for **Tell me something silly** or **Quiet time**; the quiet preference stays on that device. Reduced motion and Animations Off disable automatic antics and chatter.
+
 ## Readable Excel reports
 
 **Export Excel report** opens options for an activity period, a recent-closure window (30 days by default), and an optional archive of older closed tickets. Current statuses are a snapshot of the saved records; the activity period filters Schedule, work sessions and dated project activities. This is a report, not a full JSON backup.
@@ -140,6 +146,8 @@ The Dashboard uses formula-linked figures and native charts. Its ticket workload
 Detail sheets use plain labels and names, frozen headings, filters, status colours, typed dates and numeric Excel durations. Long ticket history lives in **Ticket updates**; milestone names and states live in **Ticket milestones**. **Tasks** groups subtasks under main tasks, with their remarks and feedback in **Task notes**. **Projects**, **Project items** and **Project notes** explain project progress, sub-item remarks, companies, processes and decisions. **Schedule**, **Work sessions**, **Follow-ups** and **Reminders** cover time and outstanding actions.
 
 Adjacent hourly pieces from one booking are combined into a readable activity row while breaks and dates remain separate. Exact work-session seconds remain available. Duration totals and Dashboard figures recalculate in Excel. Long notes continue onto additional rows rather than being truncated or duplicating time totals. Landscape print areas, repeated headings, links back to Dashboard and collapsible child rows support review and printing.
+
+The export uses the required OOXML worksheet-property order (`tabColor`, `outlinePr`, `pageSetUpPr`), correcting an Excel repair/corruption warning. Export a new copy to get the corrected file; previously downloaded files are unchanged. Export checks cover the actual download form, ZIP contents, worksheet ordering and package relationships.
 
 ## Development checks
 

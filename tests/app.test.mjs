@@ -542,3 +542,64 @@ test('Excel export opens options and long remarks continue without duplicate tim
  const {api,document,window}=await app(t);document.getElementById('exportButton').click();assert.ok(document.getElementById('reportExportForm'));assert.equal(document.querySelector('#reportExportForm [name="includeArchive"]').checked,false);assert.equal(document.querySelector('#reportExportForm [name="closedDays"]').value,'30');
  const d=copy(api.state()),long='A detailed finding with a newline\n'.repeat(200);d.workhub.waiting.push({id:'long-notes',title:'Long follow-up',person:'Team',projectId:'',followUp:'',resolved:false,notes:long});const result=window.WorkHubReports.files(d,{asOf:'2026-10-16'}),s=result.model.sheets.find(s=>s.name==='Follow-ups');assert.ok(s.expanded.length>1);assert.equal(s.expanded.map(r=>r.values[5]).join(''),long);assert.equal(s.expanded.reduce((n,r)=>n+r.record,0),1);assert.throws(()=>window.WorkHubReports.files(d,{asOf:'2026-10-16',from:'2026-11-01',to:'2026-10-16'}),/report dates/);
 });
+
+test('recorded sessions archive, restore, delete and undo while preserving calendar and project entries',async t=>{
+ const {api,document,window,db}=await app(t);
+ api.hub.startTimer({kind:'project',linkId:api.state().activeProjectId,title:'Session to manage'});
+ const draft=api.hub.timer();draft.started='2026-10-16T09:15:00+08:00';draft.runningSince=null;draft.segments=[{start:draft.started,end:'2026-10-16T09:45:12+08:00'}];api.hub.finishTimer();await settle();
+ const id=api.state().workhub.sessions[0].id,schedule=copy(api.state().schedule),plans=copy(api.state().projectPlans);
+ api.hub.setTool('sessions');api.showTab('studio');assert.match(document.querySelector('[data-session-id]').textContent,/30m 12s/);
+ document.querySelector('[data-hub="session-archive"]').click();await settle();assert.equal(document.querySelectorAll('[data-session-id]').length,0);assert.equal(db.row.document.data.workhub.sessions[0].archived,true);
+ document.querySelector('[data-hub="session-view"][data-view="archived"]').click();await settle();assert.ok(document.querySelector('[data-hub="session-restore"]'));
+ const second=await app(t,{remote:copy(db.row),login:false});await second.api.loadCloud(sessionUser);assert.equal(second.api.state().workhub.sessions[0].archived,true);
+ const report=window.WorkHubReports.build(api.state(),{asOf:'2026-10-16'});assert.equal(report.sheets.find(s=>s.name==='Work sessions').rows[0].values[7],'Archived');assert.ok(report.metrics.recordedHours>0.5);
+ document.querySelector('[data-hub="session-restore"]').click();await settle();assert.equal(api.state().workhub.sessions[0].archived,false);
+ document.querySelector('[data-hub="session-view"][data-view="active"]').click();await settle();let prompt='';window.confirm=value=>{prompt=value;return false;};document.querySelector('[data-hub="session-delete"]').click();await settle();assert.equal(api.state().workhub.sessions.length,1);assert.match(prompt,/Schedule and Project entries will be kept/);
+ window.confirm=()=>true;document.querySelector('[data-hub="session-delete"]').click();await settle();assert.equal(api.state().workhub.sessions.length,0);assert.equal(db.row.document.data.workhub.sessions.length,0);assert.deepEqual(copy(api.state().schedule),schedule);assert.deepEqual(copy(api.state().projectPlans),plans);
+ document.getElementById('hubUndo').click();await settle();assert.equal(api.state().workhub.sessions[0].id,id);assert.deepEqual(copy(api.state().schedule),schedule);assert.deepEqual(copy(api.state().projectPlans),plans);
+ const bad=copy(api.state());bad.workhub.sessions[0].archived='yes';assert.throws(()=>api.validate(bad),/work session/);
+});
+
+test('Tickets starts with Pending selected and All statuses remains available',async t=>{
+ const {api,document,window}=await app(t),pending=addReportTicket(api,document,'PENDING-DEFAULT'),closed=addReportTicket(api,document,'CLOSED-HISTORY');await settle();api.mutate(d=>d.tickets.find(x=>x.id===closed).status='Closed');await settle();api.showTab('tickets');
+ assert.equal(document.getElementById('statusFilter').value,'Pending');assert.equal(document.querySelectorAll('.ticket-queue-card').length,1);assert.match(document.querySelector('.ticket-queue-card').textContent,/PENDING-DEFAULT/);
+ document.getElementById('statusFilter').value='';document.getElementById('statusFilter').dispatchEvent(new window.Event('change',{bubbles:true}));assert.equal(document.querySelectorAll('.ticket-queue-card').length,2);api.showTab('home');api.showTab('tickets');assert.equal(document.getElementById('statusFilter').value,'');assert.ok(api.state().tickets.find(t=>t.id===pending));
+});
+
+test('Momo offers expressive local jokes, clumsy recovery poses and persistent quiet time',async t=>{
+ const {api,document,window,db}=await app(t),pet=document.getElementById('hubPet');window.Math.random=()=>0;
+ assert.ok(pet.querySelector('.momo-mouth-grin'));assert.ok(pet.querySelector('.momo-dizzy-eyes'));assert.equal(pet.querySelectorAll('.momo-eye-right').length,1);
+ api.hub.life.menu();document.querySelector('[data-momo="quip"]').click();assert.equal(pet.dataset.pose,'stumble');assert.equal(pet.dataset.expression,'dizzy');assert.match(document.getElementById('hubPetBubble').textContent,/tripped over a pixel/);
+ const end=new window.Event('animationend',{bubbles:true});Object.defineProperty(end,'animationName',{value:'momo-oops'});pet.querySelector('.pet-body').dispatchEvent(end);assert.equal(pet.dataset.expression,'shy');
+ let clock=window.Date.now()+9000;window.Date.now=()=>clock;api.hub.life.tick();assert.equal(pet.dataset.pose,'idle');assert.equal(pet.dataset.expression,'curious');
+ api.hub.life.menu();document.querySelector('[data-momo="quip"]').click();assert.equal(pet.dataset.pose,'sneeze');assert.equal(pet.dataset.expression,'surprised');
+ api.hub.life.menu();document.querySelector('[data-momo="quiet"]').click();assert.equal(window.localStorage.getItem('mm-tracker.momo-chatter.v1'),'quiet');const message=document.getElementById('hubPetBubble').textContent;clock+=600000;document.getElementById('hubPetBubble').hidden=true;api.hub.life.tick();assert.equal(document.getElementById('hubPetBubble').textContent,message);
+ const second=await app(t,{storage:{'mm-tracker.momo-chatter.v1':'quiet'}});second.api.hub.life.menu();assert.equal(second.document.querySelector('[data-momo="quiet"]').getAttribute('aria-pressed'),'true');assert.equal(db.calls.length,0);
+ Object.defineProperty(window,'innerWidth',{value:375,configurable:true});Object.defineProperty(window,'innerHeight',{value:667,configurable:true});api.hub.life.menu();const menu=document.getElementById('hubMomoMenu');Object.defineProperty(menu,'scrollHeight',{value:500,configurable:true});api.hub.life.layout();assert.ok(parseFloat(menu.style.top)>=12);assert.ok(parseFloat(menu.style.top)+500<=655);assert.ok(parseFloat(menu.style.width)<=351);
+});
+
+test('random Momo chats pause for forms, Focus, presentation, hidden pages and reduced motion',async t=>{
+ const {api,document,window,db}=await app(t),pet=document.getElementById('hubPet'),bubble=document.getElementById('hubPetBubble');window.Math.random=()=>0;let clock=window.Date.now()+200000;window.Date.now=()=>clock;
+ const reset=()=>{bubble.hidden=true;};const noChat=()=>{reset();api.hub.life.tick();assert.equal(bubble.hidden,true);};
+ api.showTab('knowledge');document.getElementById('hubSearch').focus();noChat();document.getElementById('hubSearch').blur();
+ api.editRecord('tasks');noChat();api.closeModal();document.body.classList.add('hub-focus');noChat();document.body.classList.remove('hub-focus');document.body.classList.add('hub-present');noChat();document.body.classList.remove('hub-present');
+ Object.defineProperty(document,'hidden',{configurable:true,value:true});noChat();Object.defineProperty(document,'hidden',{configurable:true,value:false});window.matchMedia=()=>({matches:true});noChat();window.matchMedia=()=>({matches:false});
+ api.hub.life.tick();assert.equal(bubble.hidden,false);assert.equal(pet.dataset.pose,'stumble');const first=bubble.textContent;clock+=10000;reset();api.hub.life.tick();assert.equal(bubble.hidden,true);clock+=300000;api.hub.life.tick();assert.notEqual(bubble.textContent,first);assert.equal(db.calls.length,0);
+});
+
+test('downloaded Excel uses the real form path and preserves the OOXML element order and package links',async t=>{
+ const {api,document,window}=await app(t);let downloaded=null,filename='';window.URL.createObjectURL=blob=>{downloaded=blob;return'blob:report';};window.HTMLAnchorElement.prototype.click=function(){filename=this.download;};
+ document.getElementById('exportButton').click();document.getElementById('reportExportForm').dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));await settle();assert.ok(downloaded);assert.match(filename,/\.xlsx$/);assert.equal(downloaded.type,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+ const entries=await unzipReport(downloaded),parse=s=>new window.DOMParser().parseFromString(s,'application/xml');assert.ok(entries['xl/workbook.xml']);
+ // ECMA-376 Part 4, CT_SheetPr: tabColor, outlinePr, pageSetUpPr.
+ // Excel repairs this file if outlinePr is emitted after pageSetUpPr.
+ for(const [path,content]of Object.entries(entries)){
+  const xml=parse(content);assert.equal(xml.querySelector('parsererror'),null,path);
+  if(/^xl\/worksheets\/sheet\d+\.xml$/.test(path)){
+   const props=xml.getElementsByTagName('sheetPr')[0],order=['tabColor','outlinePr','pageSetUpPr'];const positions=[...props.children].map(n=>order.indexOf(n.localName));assert.deepEqual(positions,[...positions].sort((a,b)=>a-b),path);
+   const sheetOrder=['sheetPr','dimension','sheetViews','sheetFormatPr','cols','sheetData','autoFilter','mergeCells','conditionalFormatting','hyperlinks','printOptions','pageMargins','pageSetup','headerFooter','drawing'];let last=-1;for(const node of xml.documentElement.children){const n=sheetOrder.indexOf(node.localName);assert.ok(n>=last,path+': '+node.localName);last=n;}
+   const refs=[...xml.getElementsByTagName('c')].map(n=>n.getAttribute('r'));assert.equal(new Set(refs).size,refs.length,path);
+  }
+  if(path.endsWith('.rels'))for(const rel of xml.documentElement.children){if(rel.getAttribute('TargetMode')==='External')continue;const source=path==='_rels/.rels'?'':path.replace(/_rels\/[^/]+\.rels$/,'');const target=new URL(rel.getAttribute('Target'),'https://package/'+source).pathname.slice(1);assert.ok(entries[target],path+' -> '+target);}
+ }
+});

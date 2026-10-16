@@ -871,7 +871,7 @@ body[data-motion="off"] .hub-confetti { display: none; }
 
 /* A small dimensional friend. Positioning and play do not save records. */
 #hubPet .pet-body { transform-origin: 70px 128px; }
-#hubPet .pet-eye { transform-origin: 70px 74px; }
+#hubPet .pet-eye { transform-box: view-box; transform-origin: 70px 74px; }
 #hubPet .momo-arm-left { transform-origin: 28px 98px; }
 #hubPet .momo-arm-right { transform-origin: 113px 92px; }
 body:not([data-motion="off"]) #hubPet .momo-ear-left { transform-origin: 35px 43px; animation: momo-ear 9s ease-in-out infinite; }
@@ -910,3 +910,43 @@ body.hub-present :is(#hubMomoBall,#hubMomoHome,#hubMomoMenu) { display: none !im
 @media (max-width:600px) { .reminder-row { flex-wrap: wrap; gap: 12px; } .reminder-row .actions { justify-content: flex-start; flex-basis: 100%; } .reminder-row .actions button, .reminder-item-control button, .reminder-presets button { min-height: 44px; } #hubMomoHome { width: 48px; height: 46px; } }
 @media (prefers-reduced-motion:reduce) { #hubPet *, #hubMomoBall { animation: none !important; transition: none !important; } }
 @media print { #hubMomoBall, #hubMomoHome, #hubMomoMenu, .reminder-item-control { display: none !important; } }
+
+/* Sessions stay easy to manage on both small and wide screens. */
+.hub-session-row { align-items: center; gap: 18px; }
+.hub-session-copy { flex: 1; min-width: 0; }
+.hub-session-copy > strong, .hub-session-copy > small { display: block; overflow-wrap: anywhere; }
+.hub-session-copy > small { margin: 6px 0; color: var(--hub-muted); line-height: 1.6; }
+.hub-session-copy .hub-badge { margin-top: 8px; }
+.hub-session-row .actions { flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width:600px) { .hub-session-row { flex-wrap: wrap; } .hub-session-row .actions { flex-basis: 100%; justify-content: flex-start; } .hub-session-row button { min-height: 44px; } }
+
+/* Momo's expressions are vector shapes; the little mishaps stay in place. */
+#hubPet .momo-eye-smiles, #hubPet .momo-eye-wink, #hubPet .momo-dizzy-eyes, #hubPet .momo-mouth-grin, #hubPet .momo-mouth-o, #hubPet .momo-tongue, #hubPet .momo-sparkles, #hubPet .momo-sweat { display: none; }
+#hubPet .momo-eye-left { transform-box: view-box; transform-origin: 49px 74px; }
+#hubPet .momo-eye-right { transform-box: view-box; transform-origin: 91px 74px; }
+#hubPet[data-expression="delighted"] .pet-mouth { display: none; }
+#hubPet[data-expression="delighted"] .momo-mouth-grin, #hubPet[data-expression="delighted"] .momo-sparkles { display: inline; }
+#hubPet[data-expression="delighted"] .momo-cheek { opacity: 1; transform: scale(1.06); transform-origin: 70px 87px; }
+#hubPet[data-expression="surprised"] .pet-mouth, #hubPet[data-expression="surprised"] .momo-brows { display: none; }
+#hubPet[data-expression="surprised"] .momo-mouth-o { display: inline; }
+#hubPet[data-expression="surprised"] .pet-eye { animation: none; transform: scale(1.08); }
+#hubPet[data-expression="shy"] .pet-eye { animation: none; transform: translateY(3px) scale(.98,.9); }
+#hubPet[data-expression="shy"] .momo-brows { transform: translateY(-3px); }
+#hubPet[data-expression="cheeky"] .pet-mouth { transform: scale(1.15); }
+#hubPet[data-pose="wink"] .momo-eye-right { display: none; }
+#hubPet[data-pose="wink"] .momo-eye-wink { display: inline; }
+#hubPet[data-pose="wink"] .pet-eye { animation: none; }
+#hubPet[data-pose="blep"] .momo-tongue { display: inline; }
+#hubPet[data-expression="dizzy"] .pet-eye, #hubPet[data-expression="dizzy"] .pet-mouth { visibility: hidden; }
+#hubPet[data-expression="dizzy"] .momo-dizzy-eyes, #hubPet[data-expression="dizzy"] .momo-mouth-o, #hubPet[data-expression="dizzy"] .momo-sweat { display: inline; }
+#hubPet[data-pose="happy"] .pet-eye { display: none; }
+#hubPet[data-pose="happy"] .momo-eye-smiles { display: inline; }
+body:not([data-motion="off"]) #hubPet[data-pose="stumble"] .pet-body { animation: momo-oops 1.8s ease-in-out both; }
+body:not([data-motion="off"]) #hubPet[data-pose="stumble"] .momo-arm-left { transform: rotate(-38deg); }
+body:not([data-motion="off"]) #hubPet[data-pose="stumble"] .momo-arm-right { transform: rotate(35deg); }
+body:not([data-motion="off"]) #hubPet[data-pose="sneeze"] .pet-body { animation: momo-achoo 1.4s ease-in-out both; }
+body:not([data-motion="off"]) #hubPet[data-pose="shy"] .pet-body { animation: momo-shy 2s ease-in-out 2; }
+@keyframes momo-oops { 0%,100% { transform: none; } 18% { transform: rotate(-9deg) translateY(-3px); } 36% { transform: rotate(17deg) translateY(5px) scale(1.06,.94); } 53% { transform: rotate(-13deg); } 72% { transform: rotate(6deg); } 88% { transform: rotate(-2deg); } }
+@keyframes momo-achoo { 0%,100% { transform: none; } 40% { transform: translateY(-4px) scale(.95,1.05) rotate(-4deg); } 53% { transform: translateY(5px) scale(1.13,.87) rotate(6deg); } 68% { transform: translateY(-3px) scale(.98,1.03); } }
+@keyframes momo-shy { 50% { transform: rotate(-5deg) scale(.98); } }
+@media (prefers-reduced-motion:reduce) { #hubPet .pet-body { animation: none !important; } }
