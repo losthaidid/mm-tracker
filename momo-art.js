@@ -77,6 +77,7 @@
         <path d="M111 91c1 24-7 35-24 39" fill="none" stroke="#36a8a2" stroke-width="5" stroke-linecap="round" opacity=".23"/>
         <ellipse class="momo-belly" cx="70" cy="114" rx="27" ry="20" fill="url(#momo-belly)"/>
         <path d="M52 107q11-9 23-7" fill="none" stroke="#fffef3" stroke-width="2" stroke-linecap="round" opacity=".65"/>
+        <g class="momo-face">
         <ellipse class="momo-cheek" cx="32" cy="87" rx="12" ry="9" fill="url(#momo-blush)"/>
         <ellipse class="momo-cheek" cx="109" cy="87" rx="12" ry="9" fill="url(#momo-blush)"/>
         <g class="momo-brows" fill="none" stroke="#398d91" stroke-width="2.3" stroke-linecap="round">
@@ -112,6 +113,9 @@
         <path class="momo-tongue" d="M66 95h8v6a4 4 0 01-8 0Z" fill="#f5a1b3" stroke="#b96483" stroke-width="1.2"/>
         <g class="momo-sparkles" fill="#ffc95d" stroke="#e0a53c" stroke-width=".6"><path d="m18 49 2-6 2 6 6 2-6 2-2 6-2-6-6-2Z"/><path d="m119 47 1.5-5 1.5 5 5 1.5-5 1.5-1.5 5-1.5-5-5-1.5Z"/></g>
         <path class="momo-sweat" d="M112 52q11 13 1 14-8-1-1-14Z" fill="#a9e2ff" stroke="#5b9dbe" stroke-width="1"/>
+        <g class="momo-mouth-yawn"><ellipse cx="70" cy="96" rx="8" ry="11" fill="#285769"/><path d="M65 102q5-5 10 0" stroke="#f7a1b0" stroke-width="3" stroke-linecap="round"/></g>
+        <g id="hubPetAccessory">${accessory(name || 'glasses')}</g>
+        </g>
         <g class="momo-arm-left">
           <path d="M28 102C15 106 9 96 14 88c3-4 6-2 6 2 0 4 3 6 8 4" fill="url(#momo-limb)" stroke="#399c99" stroke-width="2" stroke-linecap="round"/>
           <path d="m14 91 3 1m-3 3 3 1" stroke="#e4fff0" stroke-width="1.6" stroke-linecap="round"/>
@@ -120,7 +124,7 @@
           <path d="M113 98c10 3 13-4 11-11-2-5-6-4-6 1 0 3-1 4-4 3" fill="url(#momo-limb)" stroke="#399c99" stroke-width="2" stroke-linecap="round"/>
           <path d="m121 88 3 1m-3 3 3 1" stroke="#e4fff0" stroke-width="1.6" stroke-linecap="round"/>
         </g>
-        <g id="hubPetAccessory">${accessory(name || 'glasses')}</g>
+
         <g class="momo-headphones" stroke="#6d5993" stroke-width="2" stroke-linejoin="round"><path d="M27 76V65a43 39 0 0186 0v11" fill="none" stroke="#b29bd4" stroke-width="5"/><rect x="21" y="67" width="13" height="25" rx="6" fill="#cdb8e8"/><rect x="107" y="67" width="13" height="25" rx="6" fill="#cdb8e8"/><path d="M25 73v12m91-12v12" stroke="#ede2fb" stroke-width="2.5" stroke-linecap="round"/></g>
       </g>
     </svg>`;

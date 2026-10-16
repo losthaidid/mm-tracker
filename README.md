@@ -163,7 +163,7 @@ The **Troubleshooting lab** is now a magnetic investigation workshop. The illust
 
 Drag cards by **Move**, scroll to pan and use the zoom controls or **Start** to return to the issue. Keyboard users press Enter on Move, use arrows (Shift for larger steps), then Enter to place or Escape to cancel. Only the final placement saves; moving, panning, zooming and animation frames do not upload records. Phones also have **Details** and **Connect to…** controls and the Notes view. View and zoom choices stay on the current device.
 
-Add an experiment with an action and expected result. **Record result** requires an observed result/evidence. Successful experiments snap into an available space and connect to the issue or another successful source; a short electric pulse follows powered paths. Branches are allowed and loops are rejected. An inconclusive result has a dotted connection and cannot power downstream work. Failed attempts move to the ruled-out shelf with their observations intact, disconnecting their outgoing links. **Try another approach** creates a separate experiment while keeping the failed evidence.
+Add an experiment with an action and expected result. **Record result** requires an observed result/evidence. Successful experiments snap into an available space and connect to the issue or another successful source; a short electric pulse follows powered paths. Branches are allowed and loops are rejected. An inconclusive result has a dotted connection and cannot power downstream work. Failed attempts remain movable on the board and are also listed on the ruled-out shelf with their observations intact, disconnecting their outgoing links. **Try another approach** creates a separate experiment while keeping the failed evidence.
 
 Brief local sparks and smoke accompany a failure; Momo startles, covers his eyes and peeks out again. Success brings a little celebration, inconclusive results a magnifying glass, and resolution a Verified stamp. Device reduced motion, Animations Off, Privacy and presentation are respected; there is no rapid flashing or extra sound. These effects use CSS/SVG, without downloaded videos or cloud animation writes.
 
@@ -227,3 +227,17 @@ The browser bundle also includes JSZip 3.10.1 under the MIT license to read sele
 
 GitHub Pages: https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site
 Supabase redirect URLs: https://supabase.com/docs/guides/auth/redirect-urls
+
+## Living workspace update
+
+Card drops preserve the existing Lab canvas and scroll position rather than replaying the page entrance. Successful and inconclusive cards pull toward eligible successful sources; failed or incompatible magnets visibly repel. Final placements avoid overlaps. **Arrange** lays out existing cards beside one another. Sparks and three smoke puffs render above the viewport, outside clipped cards, then clean themselves up. Reduced motion and privacy settings still apply.
+
+The little window has independent cloud layers, sun rays, a moon halo, twinkling stars, glass reflections and a swaying tree. Automatic sun/moon positions follow the device clock; manual atmosphere scenes keep an appropriate position. A compact window also appears in the phone header. Everything is SVG/CSS, with no weather service or cloud writes.
+
+Momo can sit on a little cushion, cover a yawn, wave, look around, tap a foot and stretch. The face, hands and feet animate independently. Short gestures happen occasionally while the workspace is idle; tap Momo for **Show me a little move** or **Sit with me**. Typing, dialogs, Lab dragging, Focus, Privacy, hidden pages and reduced motion pause these gestures. Quiet time pauses speech, while Momo can still move.
+
+**Studio → Theme studio** adds Lavender, Rose garden, Lagoon and Honey palettes, eight new patterns, and custom page/card/text/secondary colours alongside the accent. Save up to 12 named combinations, apply or delete them, or use theme export/import. Colours and patterns save in the existing private account document and follow the account across devices. A same-named combination replaces its earlier version. Custom card text is adjusted to maintain contrast with its surface.
+
+Project items and their sub-items capture the local date when their status changes. Full editors and quick status updates allow another date. The **Status date** button shows the transition history and corrects the current date without adding a false transition. Older records retain unknown dates until maintained; importing or restoring a backup does not invent historical changes.
+
+Project sub-items now offer **Track time** next to Edit and Delete. The start form preselects the project, main item and sub-item; the floating timer shows their context. Pause, Resume, remarks, recovery and Stop & save work as for other work sessions. Saved sessions keep stable item/sub-item links and title snapshots in the recorded-session list, Schedule and project calendar. Item and sub-item cards show total recorded time and session count, including archived sessions. Conflicting calendar entries still open a review rather than overwriting existing bookings. This uses the existing private JSON document, without a database migration.
