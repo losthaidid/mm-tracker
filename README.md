@@ -5,7 +5,7 @@ Tickets, tasks, projects, scheduling, reporting, and private cloud saving.
 ## Publish using GitHub Pages
 
 1. Create a repository named `mm-tracker`. GitHub Pages on a free personal account requires a public repository.
-2. Upload `index.html`, `supabase-client.js`, `THIRD-PARTY-LICENSES.txt`, and `.nojekyll` to its root. Commit the files.
+2. Upload the repository's root HTML, JavaScript and CSS files, `THIRD-PARTY-LICENSES.txt`, and `.nojekyll`. Keep their relative filenames and commit the files.
 3. Open Settings → Pages. Choose Deploy from a branch, main, and /(root). Save.
 4. Use the published website address displayed by GitHub Pages.
 
@@ -148,6 +148,34 @@ Momo is a local vector character with soft dimensional shading and glossy eyes t
 Drag the ball with a finger or mouse to toss it again. Escape closes play controls and puts the ball away; the menu also offers **Put ball away** on phones. Home position is remembered on that device. Expressions, gaze, play and home placement do not trigger cloud saves. Animations Off and reduced-motion settings stop animated travel and gaze movement; normal tracker controls remain usable.
 
 Momo also grins, winks, blushes, sticks out his tongue, sneezes and occasionally trips over an imaginary pixel before recovering. Little funny speech bubbles appear occasionally (normally 2–5 minutes apart) while the page is visible and you are not typing, editing, playing or focusing. They are text bubbles, without audio or network calls. Tap Momo for **Tell me something silly** or **Quiet time**; the quiet preference stays on that device. Reduced motion and Animations Off disable automatic antics and chatter.
+
+## Quick status updates, previews and Schedule colours
+
+Tap a status badge on a ticket, task, project item or child item to change its status without opening the full editor. Completing a main task completes its subtasks in the same save; reopening it keeps the children's existing statuses. Ticket filters and closure dates follow the updated status.
+
+Hover over an underlined record title on a laptop, or hold it briefly on a phone, for a compact preview with the latest notes and context. Keyboard users can focus an underlined title and press Enter. Open the record or change its status from the preview. Escape, scrolling or Privacy closes the preview. Holding a title does not also open it when released, and moving a finger to scroll cancels the hold.
+
+Project bookings now show the maintained **activity title** in Schedule. The month, agenda and time grid use the same colours: tasks are amber, tickets and ticket-linked tasks are rose, and project work uses a separate colour for each maintained work location. The colour legend names each location. Other activities have their own colour; existing status labels remain visible. Ticket stopwatch entries retain their ticket colour after deleting the finished session record.
+
+## SAP troubleshooting lab
+
+The **Troubleshooting lab** tab keeps each investigation in one place. Add a case title, error/symptoms, possible cause, system, T-codes/message IDs and notes, with optional links to a project and ticket. Record individual experiments with the action tried, observed result and Trying/Failed/Passed outcome. Edit attempts as the investigation develops. Search cases, filter Investigating/Testing/Solved, or archive and restore older investigations.
+
+Marking a case Solved requires a verified solution. **Save solution to Knowledge** creates a linked note containing the symptoms, cause, solution and experiment results. Using it again updates that note. Cases, attempts and linked notes save automatically with the existing private Supabase document, sync between devices, and are included in JSON Backup/Restore. The lab records your investigation; it does not connect to an SAP system or automatically diagnose errors.
+
+## Your local soundscape
+
+Choose **Settings → Your soundscape** to mix synthesized rain, café murmur, forest breeze and fireplace textures. Use a preset or adjust each channel, overall volume and mute. **Play soundscape** starts audio explicitly. A small floating control can pause it or reopen the mixer; changing tracker tabs does not restart it. There are no audio downloads, API keys or cloud uploads. The mix and volume are remembered on the current device; reopening the website waits for Play. Playback stops on sign-out and page closure. The tracker does not pause these sounds when hidden, though the browser or operating system can suspend background audio.
+
+## Momo’s little moments
+
+Tap Momo for **Tiny theatre**, **Desk discoveries** or **Little moment settings**. Settings also contains **Momo’s little moments**, with switches for each automatic behaviour and a choice of three performances to try immediately.
+
+- **Tiny theatre:** a paperclip knight, a plant interview and a lunchbox mystery, each with original SVG props and a short three-part performance. Occasional automatic shows wait until you are not editing, focusing, presenting or playing with Momo. Quiet time pauses automatic shows. Reduced motion offers a still performance when requested.
+- **Desk discoveries:** Momo occasionally leaves a little envelope linking a task or ticket to its related Knowledge note, matching a lab case's T-code/message ID to your notes, or pointing out a blocked task. Suggestions explain the record link and open the actual source. Snoozed work is excluded. With no matching records, Momo does not invent a discovery or change any records.
+- **Visitor meetings:** a butterfly can tickle Momo’s nose, a bird can become a very chirpy hat, and a firefly can meet a tiny lantern. These replace normal wandering briefly and keep clear of visible controls. Visitors can also continue to land elsewhere in the workspace.
+
+Scenes, props, matching, timing and preferences run locally without AI services, media uploads or Supabase animation writes. Automatic moments pause during typing, dialogs, Focus, Privacy, presentation, hidden pages and reduced motion. Their switches are remembered on each device.
 
 ## Readable Excel reports
 

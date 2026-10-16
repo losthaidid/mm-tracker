@@ -32,8 +32,9 @@ test('the migration repairs historical saves while preserving records, conflicts
  await db.exec(precisionMigration);
  await db.exec(studioMigration);
  await signIn(owner);
- const mutation=randomUUID(),saved=await save(document(9),1,mutation);assert.equal(saved.rows[0].revision,2);
- const retried=await save(document(9),1,mutation);assert.equal(retried.rows[0].revision,2);
+ const latest=document(9);latest.data.workhub={lab:[{id:'case-1',title:'Account determination',error:'M7 message',cause:'Missing QA assignment',solution:'Verified the approved assignment',notes:'Functional owner confirmed',system:'QA',tcodes:'MIGO',projectId:'project-default',ticketId:'',knowledgeId:'note-1',status:'Solved',archived:false,createdAt:'2026-10-16T00:00:00Z',updatedAt:'2026-10-16T01:00:00Z',attempts:[{id:'attempt-1',title:'Check assignment',action:'Reviewed QA',result:'Retest passed',outcome:'Passed',createdAt:'2026-10-16T00:00:00Z',updatedAt:'2026-10-16T01:00:00Z'}]}],notes:[{id:'note-1',title:'Account determination',body:'Verified the approved assignment'}]};
+ const mutation=randomUUID(),saved=await save(latest,1,mutation);assert.equal(saved.rows[0].revision,2);
+ const retried=await save(latest,1,mutation);assert.equal(retried.rows[0].revision,2);
  await assert.rejects(save(document(9),1),error=>error.code==='PT409');
  await assert.rejects(save(document(10),2),error=>error.code==='23514');
  await assert.rejects(save({app:'wrong-app',version:7,data:{}},2),error=>error.code==='23514');
@@ -43,6 +44,7 @@ test('the migration repairs historical saves while preserving records, conflicts
  assert.equal((await db.query('update public.mm_tracker_documents set revision=99 where user_id=$1 returning *',[owner])).rows.length,0);
  assert.equal((await save(document(9),0)).rows[0].revision,1);
  await signIn(owner);
+ assert.deepEqual((await db.query('select document from public.mm_tracker_documents')).rows[0].document.data.workhub,latest.data.workhub);
  assert.equal((await db.query('select document from public.mm_tracker_documents')).rows[0].document.data.projects[0].mmAreas[0].visible,false);
  await db.exec('reset role;set role anon;');
  await assert.rejects(db.query('select * from public.mm_tracker_documents'),error=>error.code==='42501');

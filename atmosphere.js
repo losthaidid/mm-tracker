@@ -23,7 +23,7 @@ function install(a){
  const quiet=()=>!a.ready()||document.hidden||!motion()||document.body.matches('.hub-present,.hub-private,.hub-focus,.hub-sorting')||!!document.querySelector('dialog[open]')||editing()||pointerHeld||root.Date.now()<quietUntil;
  const viewport=()=>{const v=root.visualViewport;return{x:v?.offsetLeft||0,y:v?.offsetTop||0,w:v?.width||root.innerWidth||375,h:v?.height||root.innerHeight||667};};
  function clearVisitor(){
-  if(!active)return;const previous=active,hadFocus=previous.el===document.activeElement;active=null;previous.el.remove();
+  if(!active)return;const previous=active,hadFocus=previous.el===document.activeElement;active=null;previous.el.remove();a.visitorEnd?.();
   if(hadFocus){const card=$('hubAtmosphereCard');(card?.getBoundingClientRect().width?card:$('settingsMenu')?.querySelector('summary'))?.focus({preventScroll:true});}
  }
  function sync(){
@@ -64,8 +64,8 @@ function install(a){
  }
  function invite(){
   sync();if(!preferences.visitors||quiet()||active)return false;
-  const perch=landing();if(!perch){nextVisit=root.Date.now()+15000;return false;}
   const v=viewport(),kind=phase==='morning'?'butterfly':phase==='afternoon'?'bird':phase==='evening'||phase==='night'?'firefly':(phaseAt()==='morning'?'butterfly':phaseAt()==='afternoon'?'bird':'firefly');
+  const perch=a.visitor?.(kind)||landing();if(!perch){nextVisit=root.Date.now()+15000;return false;}
   const el=document.createElement('button');el.type='button';el.className='hub-visitor';el.dataset.visitor=kind;el.setAttribute('aria-label',`Say hello to the ${kind}. Escape lets it fly away.`);el.title='A tiny visitor · tap to say hello';el.innerHTML='<span class="visitor-art">'+ART[kind]+'</span><span class="visitor-heart" aria-hidden="true">♡</span>';
   const fromLeft=perch.x<v.x+v.w/2;
   el.style.setProperty('--visitor-from-x',(fromLeft?v.x-65:v.x+v.w+12)+'px');el.style.setProperty('--visitor-from-y',Math.max(v.y+12,perch.y-110)+'px');el.style.setProperty('--visitor-x',perch.x+'px');el.style.setProperty('--visitor-y',perch.y+'px');el.style.setProperty('--visitor-out-x',(fromLeft?v.x+v.w+12:v.x-65)+'px');el.style.setProperty('--visitor-out-y',Math.max(v.y+12,perch.y-160)+'px');el.style.setProperty('--visitor-direction',fromLeft?'1':'-1');
