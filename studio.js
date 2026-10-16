@@ -19,11 +19,13 @@ function upgrade(d){
  if(h.ticketClosures===undefined)h.ticketClosures=[];
  root.WorkHubReminders?.upgrade(d);
  if(h.headerSubtitle===undefined)h.headerSubtitle='Your work, your rhythm.';
+ root.WorkHubWorkbench?.upgrade(d);
  if(h.simulator===undefined)h.simulator={quantity:100,price:10,received:80,invoiced:80,invoicePrice:10,tolerance:2};
  for(const t of d.tasks||[])if(!t.boardStatus)t.boardStatus=t.done?'done':'todo';
  return d;
 }
 function validate(d){
+ root.WorkHubWorkbench?.validate(d);
  root.WorkHubReminders?.validate(d);
  const h=d.workhub;if(!h||typeof h!=='object'||Array.isArray(h))throw Error('Check the workspace records.');
  function text(v,max=32767){return typeof v==='string'&&v.length<=max&&!/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(v);}
@@ -43,7 +45,7 @@ function validate(d){
  for(const t of d.tasks||[])if(!Object.hasOwn(BOARD,t.boardStatus))throw Error('Check the task board status.');
 }
 function install(a){
- let life=null,music=null,atmosphere=null;
+ let life=null,music=null,atmosphere=null,workbench=null,soundscape=null,moments=null;
  const reminders=root.WorkHubReminders?.install({...a,hubAction:el=>handle(el),react:(...args)=>react(...args)});
  const $=id=>document.getElementById(id),data=()=>a.state().workhub,prefs=()=>data().preferences;
  let currentTool='theme',processId='',stepId='',processArchive=false,sessionView='active',search='',board=false,dragId='',walkTimer=0,focus=null,petTimer=0,timerDraft=null,timerOwner='',viewTab='home',simulatorDraft=null,themePreview=null;
@@ -159,7 +161,7 @@ function install(a){
   let shell=$('hubShell');if(!shell){shell=document.createElement('div');shell.id='hubShell';page.before(shell);shell.append(page);const side=document.createElement('aside');side.className='hub-sidebar';side.id='hubSidebar';side.innerHTML='<div class="hub-side-intro"><span class="hub-kicker">YOUR WORKSPACE</span><p>A good place to make things happen.</p></div><div class="hub-side-note"><span>✦</span> Small steps count.</div>';shell.prepend(side);side.insertBefore($('tabs'),side.lastElementChild);}
   $('hubSidebar').hidden=!a.cloud().ready;shell.dataset.ready=String(a.cloud().ready);
   const bar=$('hubToolbar');if(bar&&bar.parentElement!==page)page.insertBefore(bar,$('view'));
-  const names={home:'My day',tickets:'Tickets',tasks:'Tasks',schedule:'Schedule',specs:'Projects',knowledge:'Knowledge',processhub:'Process Hub',waiting:'Waiting on',studio:'Studio'};
+  const names={home:'My day',tickets:'Tickets',tasks:'Tasks',schedule:'Schedule',specs:'Projects',knowledge:'Knowledge',processhub:'Process Hub',waiting:'Waiting on',studio:'Studio',lab:'Troubleshooting lab'};
   for(const b of $('tabs').querySelectorAll('[data-tab]')){const key=b.dataset.tab;if(!names[key])continue;b.innerHTML='<span class="hub-nav-icon">'+icon(key)+'</span><span class="hub-nav-label">'+names[key]+'</span>';if(key==='specs')b.title='Projects · '+projectName(a.state().activeProjectId);}
  }
  function syncViewModes(){
@@ -178,9 +180,9 @@ function install(a){
   if(!$('hubPet')){const pet=document.createElement('aside');pet.id='hubPet';pet.className='hub-pet';pet.innerHTML='<div id="hubPetBubble" class="hub-pet-bubble" hidden></div><button type="button" data-hub="pet" aria-label="Momo, your floating companion. Drag to pick up, tap for play controls, or use arrow keys." title="Drag to pick up · tap to play">'+root.WorkHubMomoArt.svg(prefs().accessory)+'</button>';document.body.append(pet);}
 
   if(!$('hubToolbar')){const bar=document.createElement('div');bar.id='hubToolbar';bar.className='hub-toolbar hub-private-only';bar.innerHTML=btn('commands','⌕ Search & commands','aria-label="Search records and commands"')+btn('quick','＋ Quick add')+btn('timer-new','◷ Start timer')+btn('privacy','◉ Privacy','aria-pressed="false"')+btn('presentation','▣ Present','aria-pressed="false"');$('tabs').before(bar);}
-  const extra={home:'⌂ My day',knowledge:'Knowledge',processhub:'Process Hub',waiting:'Waiting on',studio:'Studio'};
+  const extra={home:'⌂ My day',knowledge:'Knowledge',processhub:'Process Hub',waiting:'Waiting on',studio:'Studio',lab:'Troubleshooting lab'};
   for(const[id,label]of Object.entries(extra))if(!$('tabs').querySelector(`[data-tab="${id}"]`)){const b=document.createElement('button');b.dataset.tab=id;b.textContent=label;if(id==='home')$('tabs').prepend(b);else $('tabs').append(b);}
-  mountShell();const toolbar=$('hubToolbar');toolbar.hidden=!a.cloud().ready;positionCompanion();if(!a.cloud().ready)themePreview=null;applyTheme();if(a.cloud().ready)recoverTimer();else{timerOwner='';timerDraft=null;undo=null;$('hubUndo')?.remove();}renderTimerBar();syncViewModes();life?.mount();music?.mount();atmosphere?.mount();
+  mountShell();const toolbar=$('hubToolbar');toolbar.hidden=!a.cloud().ready;positionCompanion();if(!a.cloud().ready)themePreview=null;applyTheme();if(a.cloud().ready)recoverTimer();else{timerOwner='';timerDraft=null;undo=null;$('hubUndo')?.remove();}renderTimerBar();syncViewModes();life?.mount();music?.mount();atmosphere?.mount();workbench?.decorate();soundscape?.mount();moments?.mount();
  }
  function desk(){const completed=a.state().tasks.filter(t=>t.done).length,level=Math.min(5,1+Math.floor(completed/3));return`<div class="hub-desk"><div class="desk-scene" aria-label="Your growing workspace, level ${level}"><div class="desk-shelf">${Array.from({length:level+1},(_,i)=>`<i class="desk-book" style="--book:${i}"></i>`).join('')}</div><div class="desk-lamp"></div><div class="desk-plant"><i></i><i></i><i></i></div><span>${esc(prefs().workspace)}</span></div><div class="hub-meta">Workspace level ${level} · ${completed} completed tasks. Your space grows; there are no streak penalties.</div>${btn('tool','Decorate your space','data-tool="theme"','small')}</div>`;}
  function journey(){const p=a.state().projects.find(p=>p.id===a.state().activeProjectId)||a.state().projects[0],phases=a.state().lists.projectPhases,i=phases.indexOf(p.phase);return`<h3>${esc(p.name)}</h3><div class="hub-journey">${phases.map((phase,n)=>`<div class="hub-phase ${n<i?'done':n===i?'current':''}"><span>${n<i?'✓':n+1}</span><strong>${esc(phase)}</strong></div>`).join('')}</div>${btn('project','Open project','data-id="'+esc(p.id)+'"','small')}`;}
@@ -295,8 +297,8 @@ function install(a){
  }
  function scheduleSession(session,d){const ranges=sessionRanges(session);if(!ranges.length)throw Error('Record at least a moment of work before stopping.');for(const r of ranges)if(a.overlaps(d.schedule,[r.date],r.time,r.endTime))throw Error('The recorded time overlaps an existing activity.');const projectId=session.projectId&&d.projects.some(p=>p.id===session.projectId)?session.projectId:'',task=session.kind==='task'?d.tasks.find(t=>t.id===session.linkId):null;
   for(let i=0;i<ranges.length;i++){const r=ranges[i],id=session.id+'-'+i,location=d.lists.workLocations[0]||'Office',text=[session.title,session.notes,session.chargeCode?'Charge code: '+session.chargeCode:'',session.subTaskId?'Subtask: '+(task?.subTasks.find(s=>s.id===session.subTaskId)?.title||session.subTaskId):''].filter(Boolean).join('\n');
-   if(projectId)d.projectPlans.push({id,projectId,title:session.title,activity:d.lists.projectActivities[0]||'',text,date:r.date,endDate:r.date,time:r.time,endTime:r.endTime,location,status:'Completed',source:'Stopwatch',actualTask:session.notes||session.title,actualSame:null,actualReviewedAt:now(),sessionId:session.id});
-   for(const seg of a.rangeSegments(r.time,r.endTime))d.schedule.push({date:r.date,time:seg.time,endTime:seg.endTime,text,kind:projectId?'project':task?'task':'custom',linkId:projectId||task?.id||'',activity:projectId?d.lists.projectActivities[0]||'':'',location:projectId?location:'',bookingId:id,planId:projectId?id:'',sessionId:session.id});
+   if(projectId)d.projectPlans.push({id,projectId,title:session.title,activity:d.lists.projectActivities[0]||'',text,date:r.date,endDate:r.date,time:r.time,endTime:r.endTime,location,status:'Completed',source:'Stopwatch',actualTask:session.notes||session.title,actualSame:null,actualReviewedAt:now(),sessionId:session.id,...(session.kind==='ticket'?{ticketId:session.linkId}:{})});
+   for(const seg of a.rangeSegments(r.time,r.endTime))d.schedule.push({date:r.date,time:seg.time,endTime:seg.endTime,text,kind:projectId?'project':task?'task':'custom',linkId:projectId||task?.id||'',activity:projectId?d.lists.projectActivities[0]||'':'',location:projectId?location:'',bookingId:id,planId:projectId?id:'',sessionId:session.id,...(session.kind==='ticket'?{ticketId:session.linkId}:{})});
   }session.scheduled=true;
  }
  function finishTimer(skipCalendar=false,overrideEnd=''){if(!timerDraft)return;checkTimerOwner();pauseTimer();const t=timerDraft,intervals=copy(t.segments);if(overrideEnd){const end=new Date(overrideEnd).toISOString();for(let i=intervals.length-1;i>=0;i--){if(intervals[i].start>=end)intervals.splice(i,1);else if(intervals[i].end>end)intervals[i].end=end;}}
@@ -316,7 +318,7 @@ function install(a){
  function afterRender(tab){if(tab!=='studio'||currentTool!=='theme')themePreview=null;if(sorting&&!sorting.source.isConnected)clearSort();if(tab!=='processhub')clearTimeout(walkTimer);viewTab=tab;mountChrome();reminders?.decorate(tab);mountUndo();document.body.classList.toggle('hub-focus',!!focus);const extra=$('hubBoardToggle');if(extra)extra.remove();if(tab==='tasks'&&!board){const target=$('view').querySelector('.workspace-heading .actions,.workspace-heading,.panel-top');if(target){const b=document.createElement('button');b.id='hubBoardToggle';b.dataset.hub='toggle-board';b.textContent='▥ Board view';target.append(b);}}
   if(['tickets','tasks','specs'].includes(tab)){const cards=$('view').querySelectorAll(tab==='tasks'?'.task-main-card':tab==='tickets'?'.ticket-card':'.item-card');for(const card of cards){const edit=card.querySelector('[data-action="edit"]');if(!edit)continue;const timer=document.createElement('button');timer.type='button';timer.className='small hub-private-only';timer.dataset.hub='timer-new';timer.dataset.kind=tab==='tasks'?'task':tab==='tickets'?'ticket':'project';timer.dataset.id=tab==='specs'?a.state().specs.find(x=>x.id===edit.dataset.id)?.projectId||'':edit.dataset.id;timer.textContent='◷ Track time';card.append(timer);}}
  }
- const renderers={home:dashboard,knowledge,processhub:processHub,waiting,studio};
+ const renderers={home:dashboard,knowledge,processhub:processHub,waiting,studio,lab:()=>workbench?.render()};
  function render(tab){if(viewTab!==tab)search='';viewTab=tab;return tab==='tasks'&&board?taskBoard():renderers[tab]?.();}
  let undo=null,lastInteraction=Date.now();
  function remove(collection,id){const found=data()[collection].find(x=>x.id===id);if(!found)return;const record=copy(found);if(!confirm(collection==='sessions'?'Delete this recorded session? Its existing Schedule and Project entries will be kept. You can undo this deletion from the workspace toolbar.':'Delete this record? You can undo this action.'))return;if(save(h=>h[collection]=h[collection].filter(x=>x.id!==id),'Deleted. Use Undo in the workspace toolbar to restore.')){undo={collection,record};mountUndo();a.closeModal();}}
@@ -422,11 +424,14 @@ function install(a){
  document.addEventListener('keydown',event=>{if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='k'){event.preventDefault();openCommands();}if(event.key==='Escape'&&document.body.classList.contains('hub-present')){document.body.classList.remove('hub-present');syncViewModes();}});
  document.addEventListener('pointerdown',()=>{lastInteraction=Date.now();if(document.body.dataset.mascotMood==='sleep')document.body.dataset.mascotMood='idle';},{passive:true});
  root.addEventListener('storage',event=>{if(event.key===timerKey()){timerOwner='';recoverTimer();renderTimerBar();}});
- setInterval(()=>{if(document.hidden)return;life?.tick();atmosphere?.tick();tickCompanion();if($('hubTimerClock'))$('hubTimerClock').textContent=timerText();if(focus){if($('hubFocusClock'))$('hubFocusClock').textContent=focusText();if(Date.now()>=focus.end){focus=null;document.body.classList.remove('hub-focus');confetti();a.tell('Focus session complete. Take a moment to recharge.');a.render();}}if(Date.now()-lastInteraction>120000&&!petWalk)document.body.dataset.mascotMood='sleep';},1000);
+ setInterval(()=>{soundscape?.tick();if(document.hidden)return;life?.tick();atmosphere?.tick();moments?.tick();tickCompanion();if($('hubTimerClock'))$('hubTimerClock').textContent=timerText();if(focus){if($('hubFocusClock'))$('hubFocusClock').textContent=focusText();if(Date.now()>=focus.end){focus=null;document.body.classList.remove('hub-focus');confetti();a.tell('Focus session complete. Take a moment to recharge.');a.render();}}if(Date.now()-lastInteraction>120000&&!petWalk)document.body.dataset.mascotMood='sleep';},1000);
  life=root.WorkHubMomoLife?.install({prefs:()=>themePreview||prefs(),ready:()=>a.cloud().ready,pet:()=>$('hubPet'),move:positionCompanion,stop:stopCompanionWalk,react});
  music=root.WorkHubMusic?.install({ready:()=>a.cloud().ready,life:()=>life,tell:a.tell,openModal:a.openModal,closeModal:a.closeModal});
- atmosphere=root.WorkHubAtmosphere?.install({ready:()=>a.cloud().ready,prefs:()=>themePreview||prefs(),react,tell:a.tell,openModal:a.openModal,closeModal:a.closeModal});
- return{reminders,life,music,atmosphere,render,afterRender,prepare,saved,handle,submit,upgrade,validate,moveTask,simulationValues,sessionRanges,scheduleSession,startTimer,pauseTimer,resumeTimer,finishTimer,timer:()=>timerDraft,importTheme,themeValues,setBoard(value){board=value;},setTool(value){currentTool=value;},refreshTheme:applyTheme};
+ atmosphere=root.WorkHubAtmosphere?.install({ready:()=>a.cloud().ready,prefs:()=>themePreview||prefs(),react,tell:a.tell,openModal:a.openModal,closeModal:a.closeModal,visitor:kind=>moments?.visitor(kind),visitorEnd:()=>moments?.visitorEnd()});
+ workbench=root.WorkHubWorkbench?.install({...a,ready:()=>a.cloud().ready,owner:()=>a.cloud().user?.id||'',hubAction:handle});
+ soundscape=root.WorkHubSoundscape?.install({ready:()=>a.cloud().ready,tell:a.tell,openModal:a.openModal});
+ moments=root.WorkHubMomoMoments?.install({...a,ready:()=>a.cloud().ready,owner:()=>a.cloud().user?.id||'',prefs:()=>themePreview||prefs(),life:()=>life,workbench:()=>workbench,move:positionCompanion,react});
+ return{reminders,life,music,atmosphere,workbench,soundscape,moments,render,afterRender,prepare,saved,handle,submit,upgrade,validate,moveTask,simulationValues,sessionRanges,scheduleSession,startTimer,pauseTimer,resumeTimer,finishTimer,timer:()=>timerDraft,importTheme,themeValues,setBoard(value){board=value;},setTool(value){currentTool=value;},refreshTheme:applyTheme};
 }
 root.WorkHubStudio={upgrade,validate,install,DEFAULTS,WIDGETS,subtaskCompletionButton};
 })(window);
