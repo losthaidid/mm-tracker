@@ -1,134 +1,70 @@
-/* Momo's small, locally rendered SVG character. No images or network requests. */
-(function (global) {
-  'use strict';
-
-  function accessory(name) {
-    switch (name) {
-      case 'glasses':
-        return '<g class="momo-glasses" fill="none" stroke="#38617b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M28 70l8 3m69 0 8-3"/><rect x="33" y="61" width="33" height="29" rx="12" fill="#ddfaff" fill-opacity=".07"/><rect x="74" y="61" width="33" height="29" rx="12" fill="#ddfaff" fill-opacity=".07"/><path d="M66 72q4-4 8 0"/><path d="M38 66h11m30 0h10" stroke="#fff" stroke-opacity=".8" stroke-width="1.3"/></g>';
-      case 'helmet':
-        return '<g class="momo-helmet" stroke="#956326" stroke-width="1.7" stroke-linejoin="round"><path d="M35 43c0-23 15-34 35-34s35 11 35 34" fill="url(#momo-helmet)"/><path d="M64 12q6-4 12 0v29H64Z" fill="#ffe9a0"/><path d="M30 42q40-9 80 0v7q-40-5-80 0Z" fill="#ffc868"/><path d="M43 32q2-11 13-15" fill="none" stroke="#fff3ce" stroke-width="4" stroke-linecap="round"/></g>';
-      case 'party':
-        return '<g class="momo-party" stroke="#9b526d" stroke-width="1.5" stroke-linejoin="round"><path d="M47 36 73 3l15 38q-21 1-41-5Z" fill="url(#momo-party)"/><path d="m62 18 16 8m-23 1 27 9" stroke="#ffedb0" stroke-width="4"/><path d="M46 36q22-1 42 5" fill="none" stroke="#fff0d1" stroke-width="4" stroke-linecap="round"/><circle cx="73" cy="5" r="5" fill="#ffdd85" stroke="#d8a749"/></g>';
-      default:
-        return '';
-    }
-  }
-
-  function svg(name) {
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 155" width="112" height="124" aria-hidden="true" focusable="false">
-      <defs>
-        <radialGradient id="momo-body" cx=".32" cy=".22" r=".86">
-          <stop offset="0" stop-color="#dbfff0"/>
-          <stop offset=".3" stop-color="#a5ecda"/>
-          <stop offset=".67" stop-color="#6fd2c6"/>
-          <stop offset="1" stop-color="#42afa9"/>
-        </radialGradient>
-        <radialGradient id="momo-belly" cx=".35" cy=".2" r=".9">
-          <stop offset="0" stop-color="#faffed"/>
-          <stop offset=".65" stop-color="#e1f8d9"/>
-          <stop offset="1" stop-color="#b4e5ce"/>
-        </radialGradient>
-        <linearGradient id="momo-limb" x1="0" y1="0" x2="1" y2="1">
-          <stop stop-color="#b6f3df"/><stop offset="1" stop-color="#59bfb6"/>
-        </linearGradient>
-        <linearGradient id="momo-ear" x1="0" y1="0" x2=".7" y2="1">
-          <stop stop-color="#ffd3ce"/><stop offset="1" stop-color="#eaa9b1"/>
-        </linearGradient>
-        <radialGradient id="momo-eye-glass" cx=".32" cy=".2" r=".9">
-          <stop stop-color="#456e86"/><stop offset=".45" stop-color="#203d58"/>
-          <stop offset=".8" stop-color="#10283f"/><stop offset="1" stop-color="#37637b"/>
-        </radialGradient>
-        <radialGradient id="momo-iris" cx=".5" cy=".85" r=".8">
-          <stop stop-color="#68b4c0"/><stop offset=".5" stop-color="#305c7b"/>
-          <stop offset="1" stop-color="#10263c"/>
-        </radialGradient>
-        <radialGradient id="momo-blush">
-          <stop stop-color="#f99cac" stop-opacity=".65"/>
-          <stop offset="1" stop-color="#f99cac" stop-opacity="0"/>
-        </radialGradient>
-        <linearGradient id="momo-helmet" x1="0" y1="0" x2="1" y2="1">
-          <stop stop-color="#ffdf88"/><stop offset="1" stop-color="#eeab44"/>
-        </linearGradient>
-        <linearGradient id="momo-party" x1="0" y1="0" x2="1" y2="1">
-          <stop stop-color="#ffb8d7"/><stop offset="1" stop-color="#c87faf"/>
-        </linearGradient>
-        <radialGradient id="momo-ground">
-          <stop stop-color="#234954" stop-opacity=".22"/>
-          <stop offset="1" stop-color="#234954" stop-opacity="0"/>
-        </radialGradient>
-      </defs>
-      <ellipse class="momo-shadow" cx="71" cy="147" rx="45" ry="7" fill="url(#momo-ground)"/>
-      <g class="pet-body">
-        <path class="momo-tail" d="M108 119c18 9 25-3 21-12-3-6-8-4-8 0 0 5-6 7-12 1" fill="url(#momo-limb)" stroke="#399c99" stroke-width="2" stroke-linecap="round"/>
-        <g class="momo-ear-left">
-          <path d="M31 49C23 39 20 18 27 13c5-3 19 9 25 22" fill="url(#momo-body)" stroke="#399c99" stroke-width="2" stroke-linejoin="round"/>
-          <path d="M32 37c-3-8-5-15-3-17 2-1 11 7 14 14" fill="url(#momo-ear)"/>
-          <path d="M26 26q-1-8 2-9" fill="none" stroke="#efffef" stroke-width="2.5" stroke-linecap="round" opacity=".8"/>
-        </g>
-        <g class="momo-ear-right">
-          <path d="M90 33c7-11 18-21 23-17 6 5 2 24-6 36" fill="url(#momo-body)" stroke="#399c99" stroke-width="2" stroke-linejoin="round"/>
-          <path d="M99 35c4-7 10-13 12-12 2 2-1 11-4 17" fill="url(#momo-ear)"/>
-        </g>
-        <path class="momo-foot-left" d="M44 127c-9 1-12 10-9 14 3 4 20 3 23-1l2-13" fill="url(#momo-limb)" stroke="#399c99" stroke-width="2"/>
-        <path class="momo-foot-right" d="M85 128v11c4 5 19 6 22 1 3-5-3-12-11-13" fill="url(#momo-limb)" stroke="#399c99" stroke-width="2"/>
-        <path d="M70 28c24-1 42 12 47 33 4 16 0 26-1 37 0 20-9 36-30 40-11 2-24 2-35-1-19-5-27-19-26-37 0-10-7-22-3-38 5-21 23-34 48-34Z" fill="url(#momo-body)" stroke="#399c99" stroke-width="2" stroke-linejoin="round"/>
-        <path d="M30 62c5-17 17-26 33-28" fill="none" stroke="#edfff0" stroke-width="5" stroke-linecap="round" opacity=".8"/>
-        <path d="M111 91c1 24-7 35-24 39" fill="none" stroke="#36a8a2" stroke-width="5" stroke-linecap="round" opacity=".23"/>
-        <ellipse class="momo-belly" cx="70" cy="114" rx="27" ry="20" fill="url(#momo-belly)"/>
-        <path d="M52 107q11-9 23-7" fill="none" stroke="#fffef3" stroke-width="2" stroke-linecap="round" opacity=".65"/>
-        <g class="momo-face">
-        <ellipse class="momo-cheek" cx="32" cy="87" rx="12" ry="9" fill="url(#momo-blush)"/>
-        <ellipse class="momo-cheek" cx="109" cy="87" rx="12" ry="9" fill="url(#momo-blush)"/>
-        <g class="momo-brows" fill="none" stroke="#398d91" stroke-width="2.3" stroke-linecap="round">
-          <path d="M39 52q6-5 12-2"/><path d="M86 50q6-2 12 3"/>
-        </g>
-        <g class="pet-eye"><g class="momo-eye-left">
-          <ellipse cx="49" cy="74" rx="15" ry="18" fill="#e1fff1" fill-opacity=".5"/>
-          <ellipse cx="49" cy="74" rx="13.5" ry="16.5" fill="url(#momo-eye-glass)" stroke="#2d6877" stroke-width=".8"/>
-          <g class="momo-pupils" style="transform:translate(var(--momo-look-x,0px),var(--momo-look-y,0px));transform-box:fill-box;transform-origin:center">
-            <ellipse cx="49" cy="76" rx="9.3" ry="11.8" fill="url(#momo-iris)"/>
-            <ellipse cx="49" cy="73.5" rx="6.1" ry="9" fill="#102337"/>
-            <ellipse cx="45.6" cy="66.5" rx="4" ry="4.8" fill="#fff"/>
-            <circle cx="53.5" cy="79.5" r="2.1" fill="#d5f8ff" fill-opacity=".95"/>
-          </g>
-          <path d="M41 83q7 7 14 0" fill="none" stroke="#92dce0" stroke-width="1" stroke-linecap="round" opacity=".55"/>
-          </g><g class="momo-eye-right"><ellipse cx="91" cy="74" rx="15" ry="18" fill="#e1fff1" fill-opacity=".5"/>
-          <ellipse cx="91" cy="74" rx="13.5" ry="16.5" fill="url(#momo-eye-glass)" stroke="#2d6877" stroke-width=".8"/>
-          <g class="momo-pupils" style="transform:translate(var(--momo-look-x,0px),var(--momo-look-y,0px));transform-box:fill-box;transform-origin:center">
-            <ellipse cx="91" cy="76" rx="9.3" ry="11.8" fill="url(#momo-iris)"/>
-            <ellipse cx="91" cy="73.5" rx="6.1" ry="9" fill="#102337"/>
-            <ellipse cx="87.6" cy="66.5" rx="4" ry="4.8" fill="#fff"/>
-            <circle cx="95.5" cy="79.5" r="2.1" fill="#d5f8ff" fill-opacity=".95"/>
-          </g>
-          <path d="M83 83q7 7 14 0" fill="none" stroke="#92dce0" stroke-width="1" stroke-linecap="round" opacity=".55"/>
-        </g></g>
-        <g class="momo-eye-smiles" fill="none" stroke="#285a69" stroke-width="3" stroke-linecap="round"><path d="M38 76q11-13 22 0"/><path d="M80 76q11-13 22 0"/></g>
-        <path class="momo-eye-wink" d="M80 76q11-9 22 0" fill="none" stroke="#285a69" stroke-width="3" stroke-linecap="round"/>
-        <g class="momo-dizzy-eyes" fill="none" stroke="#285a69" stroke-width="2.7" stroke-linecap="round"><path d="m40 67 18 15m0-15-18 15m42-15 18 15m0-15-18 15"/></g>
-        <path class="momo-nose" d="M66 85q4-2 8 0l-4 4Z" fill="#397981"/>
-        <path class="pet-mouth" d="M62 92q4 5 8 0 4 5 8 0" fill="none" stroke="#2e6570" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        <g class="momo-mouth-grin"><path d="M60 92q10 4 20 0c-1 15-19 15-20 0Z" fill="#285769" stroke="#2e6570" stroke-width="1.6"/><path d="M64 101q6-6 12 0" fill="#f7a1b0"/></g>
-        <ellipse class="momo-mouth-o" cx="70" cy="97" rx="4.5" ry="6" fill="#285769"/>
-        <path class="momo-tongue" d="M66 95h8v6a4 4 0 01-8 0Z" fill="#f5a1b3" stroke="#b96483" stroke-width="1.2"/>
-        <g class="momo-sparkles" fill="#ffc95d" stroke="#e0a53c" stroke-width=".6"><path d="m18 49 2-6 2 6 6 2-6 2-2 6-2-6-6-2Z"/><path d="m119 47 1.5-5 1.5 5 5 1.5-5 1.5-1.5 5-1.5-5-5-1.5Z"/></g>
-        <path class="momo-sweat" d="M112 52q11 13 1 14-8-1-1-14Z" fill="#a9e2ff" stroke="#5b9dbe" stroke-width="1"/>
-        <g class="momo-mouth-yawn"><ellipse cx="70" cy="96" rx="8" ry="11" fill="#285769"/><path d="M65 102q5-5 10 0" stroke="#f7a1b0" stroke-width="3" stroke-linecap="round"/></g>
-        <g id="hubPetAccessory">${accessory(name || 'glasses')}</g>
-        </g>
-        <g class="momo-arm-left">
-          <path d="M28 102C15 106 9 96 14 88c3-4 6-2 6 2 0 4 3 6 8 4" fill="url(#momo-limb)" stroke="#399c99" stroke-width="2" stroke-linecap="round"/>
-          <path d="m14 91 3 1m-3 3 3 1" stroke="#e4fff0" stroke-width="1.6" stroke-linecap="round"/>
-        </g>
-        <g class="momo-arm-right">
-          <path d="M113 98c10 3 13-4 11-11-2-5-6-4-6 1 0 3-1 4-4 3" fill="url(#momo-limb)" stroke="#399c99" stroke-width="2" stroke-linecap="round"/>
-          <path d="m121 88 3 1m-3 3 3 1" stroke="#e4fff0" stroke-width="1.6" stroke-linecap="round"/>
-        </g>
-
-        <g class="momo-headphones" stroke="#6d5993" stroke-width="2" stroke-linejoin="round"><path d="M27 76V65a43 39 0 0186 0v11" fill="none" stroke="#b29bd4" stroke-width="5"/><rect x="21" y="67" width="13" height="25" rx="6" fill="#cdb8e8"/><rect x="107" y="67" width="13" height="25" rx="6" fill="#cdb8e8"/><path d="M25 73v12m91-12v12" stroke="#ede2fb" stroke-width="2.5" stroke-linecap="round"/></g>
-      </g>
-    </svg>`;
-  }
-
-  global.WorkHubMomoArt = Object.freeze({svg: svg, accessory: accessory});
+/* Original soft-3D anime artwork, assembled as a browser-animated rig.
+ * SVG viewports isolate the optimized atlas into six illustrated parts.
+ * Eyes are live vector layers, so Momo can keep watching the cursor. */
+(function(root){
+'use strict';
+const ATLAS='./assets/momo/anime-rig.webp?v=20261017-momo-anime';
+function accessory(name){
+ if(name==='none')return '';
+ if(name==='helmet')return '<path d="M39 37a31 29 0 0162 0H39" fill="#f2c362" stroke="#9c753b" stroke-width="1.2"/><path d="M36 37h68M70 12v19" stroke="#ffe8a6" stroke-width="4" stroke-linecap="round"/>';
+ if(name==='partyhat')return '<path d="M48 20L66-4 86 19Z" fill="#c4adf0" stroke="#765d9c"/><path d="m52 16 25-6m-20 1 12-9" stroke="#f7d486" stroke-width="3"/><circle cx="66" cy="-3" r="4" fill="#f4b8c9"/>';
+ return '<g fill="none" stroke="#594e54" stroke-width=".9"><rect x="50.7" y="48.9" width="14.1" height="10.8" rx="4.2"/><rect x="74.4" y="48" width="14.1" height="10.8" rx="4.2"/><path d="M65 53.5q4.5-2.8 9.3-.5m-24-.6-6-1m44-1 6-1"/></g>';
+}
+function svg(name='glasses'){
+ const part=(cls,source,target,clip='')=>`<g class="${cls}"><svg x="${target[0]}" y="${target[1]}" width="${target[2]}" height="${target[3]}" viewBox="${source.join(' ')}" preserveAspectRatio="none" overflow="hidden" style="width:${target[2]}px;height:${target[3]}px;overflow:hidden;filter:none"><g${clip?` clip-path="url(#${clip})"`:''}><use href="#momo-atlas"/></g></svg></g>`;
+ const eye=(side,x,y)=>`<g class="momo-eye-${side}"><g clip-path="url(#momo-eye-clip-${side})"><g class="momo-pupils"><ellipse cx="${x}" cy="${y+.6}" rx="3.75" ry="4.65" fill="url(#momo-iris)"/><ellipse cx="${x}" cy="${y}" rx="1.85" ry="3.1" fill="#182b34"/><ellipse cx="${x-1.2}" cy="${y-2.4}" rx="1.45" ry="1.7" fill="#fff"/><circle cx="${x+1.6}" cy="${y+2.4}" r=".7" fill="#d5ffff"/></g></g></g>`;
+ return `<svg class="momo-anime-art" viewBox="0 0 140 155" role="img" aria-label="Momo, an original anime boy in a mint hoodie" xmlns="http://www.w3.org/2000/svg">
+ <defs>
+  <image id="momo-atlas" href="${ATLAS}" width="1024" height="1536"/>
+  <radialGradient id="momo-iris" cx="45%" cy="25%"><stop stop-color="#244856"/><stop offset=".56" stop-color="#4d8d91"/><stop offset=".83" stop-color="#78c6bc"/><stop offset="1" stop-color="#244553"/></radialGradient>
+  <radialGradient id="momo-skin"><stop stop-color="#f8d0b7"/><stop offset="1" stop-color="#f5c7b0"/></radialGradient>
+  <filter id="momo-mouth-blend" x="-30%" y="-70%" width="160%" height="240%"><feGaussianBlur stdDeviation=".45"/></filter>
+  <linearGradient id="momo-chair-metal"><stop stop-color="#c0d0d8"/><stop offset=".5" stop-color="#5c7789"/><stop offset="1" stop-color="#b7cbd2"/></linearGradient>
+  <clipPath id="momo-eye-clip-left"><ellipse cx="58.1" cy="53.4" rx="4.9" ry="4.2"/></clipPath>
+  <clipPath id="momo-eye-clip-right"><ellipse cx="80.6" cy="52.5" rx="5.05" ry="4.2"/></clipPath>
+  <clipPath id="momo-arm-left-clip"><path d="M265 532H314L356 590V948H251V982H158V590Z"/></clipPath>
+  <clipPath id="momo-arm-right-clip"><path d="M710 532H765L867 590V982H784V948H668V590Z"/></clipPath>
+  <clipPath id="momo-leg-left-clip"><path d="M244 962H358V1522H161V1390L210 1190Z"/></clipPath>
+  <clipPath id="momo-leg-right-clip"><path d="M665 962H780L810 1190 867 1390V1522H665Z"/></clipPath>
+ </defs>
+ <ellipse class="momo-ground" cx="70" cy="152" rx="27" ry="2.3" fill="#344954" opacity=".13"/>
+ <g class="momo-folding-chair" aria-hidden="true">
+  <g class="momo-chair-back"><path d="M44 137V102q0-4 4-4h44q4 0 4 4v35" fill="none" stroke="url(#momo-chair-metal)" stroke-width="3"/><path d="M47 101h46v21H47Z" fill="#c6a4bb" stroke="#93718d"/><path d="M51 106h37m-37 4h37" stroke="#eed7e5" opacity=".6"/></g>
+  <g class="momo-chair-legs"><path d="m44 124 49 29m3-29-49 29" fill="none" stroke="url(#momo-chair-metal)" stroke-width="3.2" stroke-linecap="round"/><circle cx="70" cy="139" r="2.4" fill="#edf5f8" stroke="#587081"/></g>
+  <path class="momo-chair-seat" d="m43 123 48-1 6 8H42Z" fill="#b491ac" stroke="#7d637e" stroke-width="1.2"/>
+ </g>
+ <g class="pet-body">
+  ${part('momo-foot-left',[161,962,198,561],[47,108,23,44],'momo-leg-left-clip')}
+  ${part('momo-foot-right',[665,962,202,561],[70,108,23,44],'momo-leg-right-clip')}
+  ${part('momo-torso',[570,50,400,460],[45,75,50,39])}
+  ${part('momo-arm-left',[158,515,198,467],[36,78,20,47],'momo-arm-left-clip')}
+  ${part('momo-arm-right',[668,515,199,467],[84,78,20,47],'momo-arm-right-clip')}
+  <g class="momo-face">
+   ${part('momo-head',[45,0,508,510],[29,1,82,82])}
+   <g class="pet-eye">${eye('left',58.1,53.4)}${eye('right',80.6,52.5)}</g>
+   <g class="momo-eye-lids" fill="url(#momo-skin)"><ellipse cx="58.1" cy="53.4" rx="5.3" ry="4.5"/><ellipse cx="80.6" cy="52.5" rx="5.45" ry="4.5"/></g>
+   <g class="momo-eye-smiles" fill="none" stroke="#634a44" stroke-width="1.15" stroke-linecap="round"><path d="M53.7 54q4.5-4.7 9 0m13.4-1q4.5-4.7 9 0"/></g>
+   <path class="momo-eye-wink" d="M76 53q4.5-3.5 9 0" fill="none" stroke="#634a44" stroke-width="1.2" stroke-linecap="round"/>
+   <g class="momo-dizzy-eyes" fill="none" stroke="#634a44" stroke-width="1.2"><path d="m54 50 8 7m0-7-8 7m23-8 8 7m0-7-8 7"/></g>
+   <g class="momo-annoyed-eyes"><g clip-path="url(#momo-eye-clip-left)"><path d="M51 47H65V54L51 50Z" fill="url(#momo-skin)"/><path d="m52 50 12 3.6" fill="none" stroke="#715045" stroke-width=".8"/></g><g clip-path="url(#momo-eye-clip-right)"><path d="M74 46H87V49L74 53Z" fill="url(#momo-skin)"/><path d="m75 53 12-4" fill="none" stroke="#715045" stroke-width=".8"/></g></g>
+   <g class="momo-brows" fill="none" stroke="#725345" stroke-width="1.3" stroke-linecap="round"><path d="M53 46q4.5-2 9-.5m14-.5q4.5-2 9-1"/></g>
+   <ellipse class="momo-mouth-cover" cx="69.9" cy="65.5" rx="6.2" ry="2.2" fill="url(#momo-skin)" filter="url(#momo-mouth-blend)"/>
+   <path class="pet-mouth" d="M66 65.3q4 1.9 8-.4" fill="none" stroke="#aa695d" stroke-width=".65" stroke-linecap="round"/>
+   <g class="momo-mouth-grin"><path d="M66 65q4 1 8-.3c0 6-8 6-8 .3" fill="#74444c"/><path d="M68 68q2-1 4 0" stroke="#ef9b9f" stroke-width="1.4"/></g>
+   <ellipse class="momo-mouth-o" cx="70" cy="66" rx="1.9" ry="2.5" fill="#74444c"/>
+   <path class="momo-mouth-annoyed" d="m67 66 6-.5" stroke="#a25f58" stroke-width="1" stroke-linecap="round"/>
+   <path class="momo-tongue" d="M68.5 66h3v2.7a1.5 1.5 0 01-3 0Z" fill="#f5a1b3"/>
+   <g class="momo-mouth-yawn"><ellipse cx="70" cy="66" rx="2.8" ry="3.5" fill="#74444c"/><path d="M68.5 68q1.5-1 3 0" stroke="#ef9b9f" stroke-width="1"/></g>
+   <g class="momo-sparkles" fill="#efc76d"><path d="m30 32 1.5-4 1.5 4 4 1.5-4 1.5-1.5 4-1.5-4-4-1.5Zm77 3 1-3 1 3 3 1-3 1-1 3-1-3-3-1Z"/></g>
+   <path class="momo-sweat" d="M99 49q6 9 .5 9-4 0-.5-9Z" fill="#b8e9fa" stroke="#74a7bd" stroke-width=".6"/>
+   <g id="hubPetAccessory">${accessory(name)}</g>
+   <g class="momo-headphones" fill="#cdb8e8" stroke="#6d5993" stroke-width="1.1"><path d="M38 50V35a32 30 0 0164 0v15" fill="none" stroke="#b29bd4" stroke-width="3"/><rect x="35" y="45" width="6" height="15" rx="3"/><rect x="99" y="44" width="6" height="15" rx="3"/></g>
+  </g>
+ </g>
+ <g class="momo-whistle-notes" fill="#7f75b8" aria-hidden="true"><path d="M111 77v-8l7-2v9m-7-5 7-2" fill="none" stroke="currentColor" stroke-width="1.2"/><ellipse cx="109" cy="78" rx="2.3" ry="1.6"/><ellipse cx="116" cy="77" rx="2.3" ry="1.6"/><path d="M124 59v-7l5-1v3l-4 1v5Z"/><ellipse cx="122.5" cy="60" rx="2.1" ry="1.4"/></g>
+ <g class="momo-sleep-marks" fill="#8a83bb" aria-hidden="true"><text x="106" y="45" font-size="8" font-family="system-ui">z</text><text x="114" y="34" font-size="11" font-family="system-ui">z</text><text x="124" y="20" font-size="14" font-family="system-ui">Z</text></g>
+ <path class="momo-surprise-mark" d="m109 39 2-8m-1 12h.1m7-8 4-5" fill="none" stroke="#e9aa62" stroke-width="2" stroke-linecap="round"/>
+ </svg>`;
+}
+root.WorkHubMomoArt=Object.freeze({svg,accessory});
 })(window);
