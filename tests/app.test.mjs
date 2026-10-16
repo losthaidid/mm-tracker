@@ -441,10 +441,14 @@ test('cancelling a drag leaves both layout and records unchanged',async t=>{
  const {api,document,window,db}=await app(t);api.showTab('home');const initial=copy(api.state().workhub.widgets),handle=document.querySelector('[data-widget] [data-hub-drag]');pointer(window,handle,'pointerdown',200,200);pointer(window,document,'pointermove',300,300);pointer(window,document,'pointercancel',300,300);assert.deepEqual(copy(api.state().workhub.widgets),initial);assert.equal(db.calls.length,0);assert.equal(document.querySelector('.hub-sort-ghost'),null);
 });
 
-test('the page security policy permits its actual stylesheet and the dashboard receives its layout',async t=>{
+test('the page security policy permits its shipped styles and Momo artwork with matching browser checks',async t=>{
  const {document,window}=await app(t,{styles:true});
  const policy=Object.fromEntries(document.querySelector('meta[http-equiv="Content-Security-Policy"]').content.split(';').map(part=>part.trim().split(/\s+/)).map(([key,...values])=>[key,values]));
  const styleSources=policy['style-src-elem']||policy['style-src']||policy['default-src'];
+ const imageSources=policy['img-src']||policy['default-src'];
+ for(const image of document.querySelectorAll('.momo-part-image')){assert.equal(new URL(image.getAttribute('href'),window.location.href).origin,window.location.origin);assert.ok(imageSources.includes("'self'"),'The shipped Momo artwork must be allowed by CSP.');}
+ const preview=new JSDOM(readFileSync(new URL('./momo-preview.html',import.meta.url),'utf8'));t.after(()=>preview.window.close());
+ assert.equal(preview.window.document.querySelector('meta[http-equiv="Content-Security-Policy"]').content,document.querySelector('meta[http-equiv="Content-Security-Policy"]').content,'The browser check must use the production security policy.');
  for(const link of document.querySelectorAll('link[rel="stylesheet"]')){assert.equal(new URL(link.href).origin,window.location.origin);assert.ok(styleSources.includes("'self'"),'The shipped stylesheet must be allowed by CSP.');}
  assert.ok(policy['style-src'].includes("'unsafe-inline'"),'Existing generated per-record styles must remain supported.');
  assert.ok(policy['default-src'].includes("'none'"));
