@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync,writeFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { JSDOM } from 'jsdom';
 process.env.TZ='Asia/Kuala_Lumpur';
@@ -7,6 +7,7 @@ process.env.TZ='Asia/Kuala_Lumpur';
 const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
 const copy=value=>JSON.parse(JSON.stringify(value));
 const settle=async()=>{for(let i=0;i<12;i++)await Promise.resolve();};
+async function unzipReport(blob){const bytes=Buffer.from(await blob.arrayBuffer()),entries={};let offset=0;while(bytes.readUInt32LE(offset)===0x04034b50){const size=bytes.readUInt32LE(offset+18),nameLength=bytes.readUInt16LE(offset+26),extraLength=bytes.readUInt16LE(offset+28),name=bytes.subarray(offset+30,offset+30+nameLength).toString(),start=offset+30+nameLength+extraLength;assert.equal(bytes.readUInt16LE(offset+8),0);entries[name]=bytes.subarray(start,start+size).toString();offset=start+size;}assert.equal(bytes.readUInt32LE(offset),0x02014b50);return entries;}
 
 async function app(t,{storage={},rpcError=null,remote=null,login=true,styles=false}={}){
  const dom=new JSDOM(html,{url:'https://losthaidid.github.io/mm-tracker/',runScripts:'outside-only',pretendToBeVisual:true});
@@ -35,7 +36,7 @@ async function app(t,{storage={},rpcError=null,remote=null,login=true,styles=fal
   }
  };
  window.MMTrackerSupabase={createClient:()=>client};
- for(const file of ['sync-merge.js','studio.js'])window.eval(readFileSync(new URL('../'+file,import.meta.url),'utf8'));
+ for(const file of ['sync-merge.js','momo-art.js','momo-life.js','reminders.js','reports.js','studio.js'])window.eval(readFileSync(new URL('../'+file,import.meta.url),'utf8'));
  const script=[...window.document.scripts].find(script=>script.textContent.includes("'use strict'"));
  window.eval(script.textContent+`\nwindow.api={
   hub,queueCloudReview,state:()=>state,steps:()=>STEPS,cloud,KEY,payload,parseBackup,emptyState,validate,mutate,loadCloud,flushCloud,refreshCloud,retryCloud,closeModal,
@@ -143,7 +144,7 @@ test('reports include each sub-task under its main title and exact minute times'
  const models=api.reportModel(api.state(),'2026-10-16'),tasks=models.find(model=>model.name==='Tasks'),schedule=models.find(model=>model.name==='Schedule');
  assert.equal(tasks.rows[1][17],'Report parent');assert.equal(tasks.rows[1][21],'Own remarks');assert.equal(tasks.rows[1][22],'Own feedback');assert.equal(schedule.rows[0][1],555/1440);assert.equal(schedule.rows[0][12],'09:45');assert.equal(schedule.rows[0][13],30);assert.equal(api.reportDashboard(api.state(),'2026-10-16').C30.value,0.5);
  for(const model of models)for(const row of model.rows)assert.equal(row.length,model.headers.length,model.name);
- const blob=api.exportReport(api.state(),'2026-10-16');assert.ok(blob.size>1000);const zip=await window.JSZip.loadAsync(window.Array.from(new Uint8Array(await blob.arrayBuffer())));assert.ok(zip.file('xl/workbook.xml'));
+ const blob=api.exportReport(api.state(),'2026-10-16');assert.ok(blob.size>1000);const entries=await unzipReport(blob);assert.ok(entries['xl/workbook.xml']);
 });
 
 test('schedule milestones open in display mode and precise bookings remain visible in the weekly grid',async t=>{
@@ -487,4 +488,57 @@ test('Momo walks locally and pauses for typing, reduced motion, presentation and
  const start=Date.now();window.Date.now=()=>start+30000;tick();assert.ok(frames.size);api.showTab('knowledge');document.getElementById('hubSearch').focus();assert.equal(frames.size,0);assert.equal(pet.dataset.roaming,'false');document.getElementById('hubSearch').blur();
  window.matchMedia=()=>({matches:true});tick();assert.equal(frames.size,0);window.matchMedia=()=>({matches:false});tick();assert.ok(frames.size);document.querySelector('#hubToolbar [data-hub="presentation"]').click();await settle();assert.equal(frames.size,0);
  document.getElementById('hubExitPresentation').click();await settle();api.hub.setTool('theme');api.showTab('studio');const form=document.getElementById('hubTheme');form.elements.namedItem('roaming').checked=false;form.elements.namedItem('roaming').dispatchEvent(new window.Event('change',{bubbles:true}));tick();assert.equal(frames.size,0);assert.equal(db.calls.length,0);
+});
+
+function addReportTicket(api,document,number='INC-101'){
+ api.editRecord('tickets');const f=document.getElementById('editForm');fill(f,{ticket:number,description:'Investigate '+number,pic:'Haidid'});api.saveEdit(f);return api.state().tickets.at(-1).id;
+}
+function useDay(window,day){const RealDate=window.Date;window.Date=class extends RealDate{constructor(...args){super(...(args.length?args:[day+'T12:00:00']));}static now(){return new RealDate(day+'T12:00:00').getTime();}};}
+
+test('reminder presets and custom dates persist without changing task details or subtasks',async t=>{
+ const {api,document,window,db}=await app(t),id=addMainTask(api,document,'Revisit the rollout');addTaskSub(api,document,id,'Keep this child','Child remarks','Child feedback');await settle();const before=copy(api.state().tasks[0]);api.showTab('tasks');document.querySelector('.task-main-card [data-reminder="edit"]').click();await settle();
+ document.querySelector('[data-reminder="days"][data-days="7"]').click();assert.equal(document.getElementById('reminderDays').value,'7');document.getElementById('reminderDays').value='5';document.getElementById('reminderDays').dispatchEvent(new window.Event('input',{bubbles:true}));let f=document.getElementById('reminderForm');const until=window.WorkHubReminders.shift(window.api.state().tasks[0].doneDate||new window.Date().toLocaleDateString('en-CA'),5);assert.equal(f.elements.namedItem('until').value,until);f.elements.namedItem('note').value='Review transport after UAT';f.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));await settle();
+ assert.deepEqual(copy(api.state().tasks[0]),before);assert.equal(document.querySelectorAll('.task-main-card').length,0);assert.match(document.querySelector('.reminder-snoozed').textContent,/Review transport after UAT/);assert.equal(db.row.document.data.workhub.reminders[0].until,until);assert.equal(api.parseBackup(api.payload(api.state())).workhub.reminders[0].note,'Review transport after UAT');
+ api.hub.setBoard(true);api.showTab('tasks');assert.equal(document.querySelectorAll('[data-task-card]').length,0);api.hub.reminders.dismiss('tasks',id);await settle();assert.ok(document.querySelector('[data-task-card]'));assert.equal(api.state().tasks[0].subTasks[0].feedback,'Child feedback');
+});
+
+test('due reminders return automatically on the chosen local day and can be dismissed or resnoozed',async t=>{
+ const {api,document,window,db}=await app(t);useDay(window,'2026-10-16');const id=addMainTask(api,document,'Return tomorrow');await settle();api.hub.reminders.set('tasks',id,'2026-10-17','Do this next');await settle();const writes=db.calls.length;useDay(window,'2026-10-17');api.hub.reminders.tick();assert.ok(document.querySelector('.reminder-due-panel'));assert.match(document.querySelector('.reminder-due-panel').textContent,/Return tomorrow/);api.showTab('tasks');assert.ok(document.querySelector('.task-main-card'));assert.match(document.querySelector('.reminder-item-control').textContent,/Time to revisit/);assert.equal(db.calls.length,writes);
+ api.hub.reminders.set('tasks',id,'2026-10-20','Another review');await settle();assert.equal(document.querySelectorAll('.task-main-card').length,0);api.hub.reminders.dismiss('tasks',id);await settle();assert.equal(api.state().workhub.reminders.length,0);assert.ok(document.querySelector('.task-main-card'));assert.throws(()=>api.hub.reminders.set('tasks',id,'2026-10-17'),/after today/);assert.throws(()=>api.hub.reminders.set('tasks',id,'2026-02-30'),/after today/);
+});
+
+test('tickets and projects have independent synced reminders and a snoozed project keeps its child work available',async t=>{
+ const {api,document,window,db}=await app(t);useDay(window,'2026-10-16');const ticket=addReportTicket(api,document),task=addMainTask(api,document,'A linked action'),project=api.state().projects[0].id;await settle();api.hub.reminders.set('tickets',ticket,'2026-10-21','Wait for user');await settle();api.hub.reminders.set('projects',project,'2026-10-22','Phase review');await settle();api.showTab('tickets');assert.equal(document.querySelectorAll('.ticket-queue-card').length,0);assert.match(document.querySelector('.reminder-snoozed').textContent,/INC-101/);api.showTab('tasks');assert.ok(document.querySelector('.task-main-card'));assert.equal(window.WorkHubReminders.isSnoozed(api.state(),'tasks',task,'2026-10-16'),false);api.showTab('specs');assert.match(document.querySelector('.reminder-snoozed').textContent,/Phase review/);assert.ok(document.querySelector('.project-banner [data-reminder="edit"]'));
+ const other=await app(t,{remote:copy(db.row),login:false});await other.api.loadCloud(sessionUser);await settle();assert.equal(other.api.state().workhub.reminders.length,2);assert.equal(other.window.WorkHubReminders.lookup(other.api.state(),'tickets',ticket).until,'2026-10-21');
+});
+
+test('Momo has glossy vector eyes that follow the cursor and pickup/landing stays local',async t=>{
+ const {document,window,db,frames}=await app(t),pet=document.getElementById('hubPet');assert.ok(pet.querySelector('radialGradient'));assert.equal(pet.querySelector('svg').getAttribute('viewBox'),'0 0 140 155');assert.ok(pet.querySelector('.momo-pupils'));
+ pointer(window,document.body,'pointermove',0,0);for(const [id,fn]of [...frames]){frames.delete(id);fn(window.performance.now()+20);}assert.ok(parseFloat(pet.style.getPropertyValue('--momo-look-x'))<0);
+ const button=pet.querySelector('button');pointer(window,button,'pointerdown',900,300);pointer(window,document,'pointermove',700,250);assert.equal(pet.dataset.pose,'held');pointer(window,document,'pointerup',700,250);assert.equal(pet.dataset.pose,'land');assert.equal(db.calls.length,0);
+});
+
+test('Momo can go home, wake, play ball, perch and move away when a card is used',async t=>{
+ const {api,document,window,db,frames}=await app(t),pet=document.getElementById('hubPet');const finish=()=>{for(const [id,fn]of [...frames]){frames.delete(id);fn(window.performance.now()+10000);}};
+ pet.querySelector('button').click();await settle();assert.ok(document.getElementById('hubMomoMenu'));document.querySelector('[data-momo="place-home"]').click();assert.ok(window.localStorage.getItem('mm-tracker.momo-home.v1'));document.getElementById('hubMomoHome').click();finish();assert.equal(pet.dataset.pose,'nap');document.getElementById('hubMomoHome').click();assert.equal(pet.dataset.pose,'stretch');
+ api.hub.life.menu();document.querySelector('[data-momo="ball"]').click();assert.ok(document.getElementById('hubMomoBall'));finish();assert.equal(pet.dataset.pose,'play');
+ const card=document.querySelector('[data-widget]');card.getBoundingClientRect=()=>({left:200,top:250,width:400,height:200,right:600,bottom:450});api.hub.life.menu();document.querySelector('[data-momo="perch"]').click();finish();assert.equal(pet.dataset.pose,'perch');pointer(window,card,'pointerdown',300,300);assert.equal(pet.dataset.pose,'walk');finish();document.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(document.getElementById('hubMomoBall'),null);assert.equal(db.calls.length,0);
+});
+
+test('ticket closure dates are recorded on closing, preserved on edits and reset on reopening',async t=>{
+ const {api,document,window}=await app(t);useDay(window,'2026-10-16');const id=addReportTicket(api,document);await settle();api.mutate(d=>d.tickets.find(x=>x.id===id).status='Closed');await settle();assert.equal(api.state().workhub.ticketClosures[0].date,'2026-10-16');useDay(window,'2026-10-19');api.mutate(d=>d.tickets.find(x=>x.id===id).pic='New owner');await settle();assert.equal(api.state().workhub.ticketClosures[0].date,'2026-10-16');api.mutate(d=>d.tickets.find(x=>x.id===id).status='Pending');await settle();assert.equal(api.state().workhub.ticketClosures.length,0);
+});
+
+test('new Excel reports exclude older closures, retain subtasks and minutes, and contain valid linked XML',async t=>{
+ const {api,document,window}=await app(t),task=addMainTask(api,document,'UAT main task');addTaskSub(api,document,task,'Check receipt','Own child remarks','Own child feedback','Completed');addBooking(api,document,'09:15','10:45',{text:'Workshop'});const ticket=addReportTicket(api,document);await settle();addCompany(api,document,'Farm operations');api.editRecord('specs');fill(document.getElementById('editForm'),{description:'Prepare receiving configuration',remarks:'Confirm movement type and account determination'});api.saveEdit(document.getElementById('editForm'));const spec=api.state().specs.at(-1);api.editSubItem(spec.id);fill(document.getElementById('subItemForm'),{title:'Confirm receipt controls',remarks:'Document the agreed settings'});api.saveSubItem(document.getElementById('subItemForm'));const d=copy(api.state()),template=copy(d.tickets[0]);d.tickets=[{...template,id:'open-ticket',ticket:'OPEN-1',status:'Pending',historyDate:'2026-10-16',history:'Open update'},{...template,id:'recent-ticket',ticket:'RECENT-1',status:'Closed',historyDate:'2026-10-15',history:'Recent closure'},{...template,id:'old-ticket',ticket:'OLD-1',status:'Closed',historyDate:'2026-08-01',history:'Historical closure'},{...template,id:'unknown-ticket',ticket:'UNKNOWN-1',status:'Closed',historyDate:'',history:''}];d.trackers=[{id:'report-progress',ticket:'OPEN-1',steps:d.lists.milestones.map((_,i)=>i<3),onHold:false,remarks:'Awaiting UAT confirmation'}];d.workhub.sessions=[{id:'session-report',title:'UAT preparation',start:'2026-10-16T01:15:00Z',end:'2026-10-16T02:45:00Z',intervals:[{start:'2026-10-16T01:15:00Z',end:'2026-10-16T02:45:00Z'}],seconds:5400,kind:'custom',linkId:'',subTaskId:'',projectId:d.projects[0].id,notes:'Prepared the acceptance checklist',chargeCode:'F-UAT',scheduled:true}];d.workhub.reminders=[{id:'tasks:'+task,kind:'tasks',recordId:task,until:'2026-10-17',note:'Check the acceptance results',updatedAt:'2026-10-16T01:00:00Z'}];d.workhub.ticketClosures=[];d.workhub.waiting.push({id:'waiting',title:'Confirm UAT',person:'Team',followUp:'2026-10-17',notes:'Waiting for sign-off',projectId:d.projects[0].id,resolved:false,createdAt:'2026-10-16',resolvedAt:''});
+ const options={asOf:'2026-10-16',from:'2026-10-01',to:'2026-10-16',closedDays:30},result=window.WorkHubReports.files(d,options);assert.equal(result.model.metrics.openTickets,1);assert.equal(result.model.metrics.archivedTickets,1);assert.equal(result.model.metrics.closedInPeriod,1);assert.equal(result.model.sheets.some(s=>s.name==='Closed archive'),false);assert.deepEqual(Array.from(result.model.scope.tickets,t=>t.ticket),['OPEN-1','RECENT-1','UNKNOWN-1']);assert.equal(result.model.sheets.find(s=>s.name==='Schedule').rows.length,1);assert.equal(result.model.sheets.find(s=>s.name==='Schedule').rows[0].values[3],1.5/24);assert.equal(result.model.sheets.find(s=>s.name==='Task notes').rows.at(-1).values[3],'Own child feedback');assert.ok(result.model.sheets.find(s=>s.name==='Tasks').rows.some(r=>r.level===1));
+ const archive=window.WorkHubReports.files(d,{...options,includeArchive:true});assert.equal(archive.model.sheets.find(s=>s.name==='Closed archive').rows[0].values[0],'OLD-1');assert.equal(archive.model.metrics.openTickets,result.model.metrics.openTickets);const singleDay=window.WorkHubReports.files(d,{...options,from:'2026-10-16'});assert.match(singleDay.files['xl/charts/chart2.xml'],/Dashboard!\$M\$33:\$M\$33/);assert.equal(archive.model.sheets.find(s=>s.name==='Archive updates').rows[0].values[3],'Historical closure');
+ for(const [path,content]of Object.entries(archive.files)){const xml=new window.DOMParser().parseFromString(content,'application/xml');assert.equal(xml.querySelector('parsererror')?.textContent||'', '',path);}
+ const blob=api.exportReport(d,'2026-10-16',{...options,includeArchive:true}),entries=await unzipReport(blob);assert.ok(entries['xl/charts/chart1.xml']);assert.ok(entries['xl/worksheets/sheet2.xml'].includes('showGridLines="0"'));assert.ok(entries['xl/worksheets/sheet4.xml'].includes('Milestone'));
+ if(process.env.WORKHUB_QA_REPORT)writeFileSync(process.env.WORKHUB_QA_REPORT,Buffer.from(await blob.arrayBuffer()));
+});
+
+test('Excel export opens options and long remarks continue without duplicate time or lost text',async t=>{
+ const {api,document,window}=await app(t);document.getElementById('exportButton').click();assert.ok(document.getElementById('reportExportForm'));assert.equal(document.querySelector('#reportExportForm [name="includeArchive"]').checked,false);assert.equal(document.querySelector('#reportExportForm [name="closedDays"]').value,'30');
+ const d=copy(api.state()),long='A detailed finding with a newline\n'.repeat(200);d.workhub.waiting.push({id:'long-notes',title:'Long follow-up',person:'Team',projectId:'',followUp:'',resolved:false,notes:long});const result=window.WorkHubReports.files(d,{asOf:'2026-10-16'}),s=result.model.sheets.find(s=>s.name==='Follow-ups');assert.ok(s.expanded.length>1);assert.equal(s.expanded.map(r=>r.values[5]).join(''),long);assert.equal(s.expanded.reduce((n,r)=>n+r.record,0),1);assert.throws(()=>window.WorkHubReports.files(d,{asOf:'2026-10-16',from:'2026-11-01',to:'2026-10-16'}),/report dates/);
 });

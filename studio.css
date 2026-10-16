@@ -492,7 +492,7 @@ body .go-live-schedule-card small { color: var(--hub-warning); }
 #hubPet > button:hover { background: transparent; box-shadow: none; border-color: transparent; }
 #hubPet > button:active { cursor: grabbing; transform: none; }
 #hubPet svg { display: block; width: 100%; height: 100%; overflow: visible; pointer-events: none; filter: drop-shadow(0 5px 4px #24344917); }
-#hubPet .pet-body { transform-origin: 55px 96px; }
+#hubPet .pet-body { transform-origin: 70px 128px; }
 #hubPet .pet-eye, #hubPet .pet-mouth { transform-origin: center; transform-box: fill-box; }
 .hub-pet-bubble { position: absolute; bottom: calc(100% + 10px); right: 0; width: 240px; max-width: calc(100vw - 24px); padding: 13px 16px; border: 1px solid var(--hub-border); border-radius: 14px 14px 4px 14px; background: var(--hub-surface); color: var(--hub-text); font-size: .8125rem; line-height: 1.6; box-shadow: var(--hub-shadow-raised); pointer-events: none; }
 .hub-confetti { position: fixed; inset: 0; overflow: hidden; z-index: 100; pointer-events: none; }
@@ -846,3 +846,67 @@ body[data-motion="off"] .hub-confetti { display: none; }
   .hub-grid, .hub-layout { display: block; }
   .hub-widget { margin-bottom: 16px; }
 }
+
+/* Set work aside deliberately, then return to it. */
+.reminder-snoozed { margin: 0 0 23px; padding: 16px 19px; border: 1px dashed var(--hub-border); border-radius: var(--hub-radius); background: var(--hub-surface); }
+.reminder-snoozed > summary, .reminder-inbox summary { cursor: pointer; color: var(--hub-muted); font-weight: 600; min-height: 30px; }
+.reminder-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 17px 0; border-bottom: 1px solid var(--hub-border); }
+.reminder-row:last-child { border-bottom: 0; }
+.reminder-row > div:first-child { flex: 1; min-width: 0; }
+.reminder-row h4 { margin: 8px 0 5px; font-size: .95rem; overflow-wrap: anywhere; }
+.reminder-row p { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--hub-muted); margin: 7px 0; }
+.reminder-row small { color: var(--hub-muted); }
+.reminder-row .actions { flex: 0 1 255px; justify-content: flex-end; }
+.reminder-item-control { display: flex; margin-top: 12px; }
+.reminder-item-control.is-due button { border-color: var(--hub-warning); color: var(--hub-warning); background: var(--hub-yellow); }
+.reminder-due-panel { border-color: color-mix(in srgb,var(--hub-accent) 30%,var(--hub-border)); background: var(--hub-blue-soft); }
+.reminder-record { padding: 10px 0 20px; }
+.reminder-record h3 { margin: 0; }
+.reminder-presets { display: flex; flex-wrap: wrap; gap: 9px; margin: 0 0 24px; }
+.reminder-inbox > h3 { margin-top: 0; }
+.reminder-inbox > details { margin-top: 25px; }
+.report-export-intro { padding-bottom: 18px; }
+.report-export-intro h3 { margin: 0 0 8px; font-size: 1.3rem; }
+.report-export-intro p { color: var(--hub-muted); line-height: 1.7; }
+
+/* A small dimensional friend. Positioning and play do not save records. */
+#hubPet .pet-body { transform-origin: 70px 128px; }
+#hubPet .pet-eye { transform-origin: 70px 74px; }
+#hubPet .momo-arm-left { transform-origin: 28px 98px; }
+#hubPet .momo-arm-right { transform-origin: 113px 92px; }
+body:not([data-motion="off"]) #hubPet .momo-ear-left { transform-origin: 35px 43px; animation: momo-ear 9s ease-in-out infinite; }
+body:not([data-motion="off"]) #hubPet .pet-eye { animation: hub-blink 6s infinite; }
+body:not([data-motion="off"]) #hubPet .pet-body { animation: hub-breathe 4.5s ease-in-out infinite; }
+body:not([data-motion="off"]) #hubPet[data-pose="held"] .pet-body { animation: momo-dangle .8s ease-in-out infinite alternate; }
+body:not([data-motion="off"]) #hubPet[data-pose="held"] .momo-arm-left { transform: rotate(-25deg); }
+body:not([data-motion="off"]) #hubPet[data-pose="held"] .momo-arm-right { transform: rotate(25deg); }
+body:not([data-motion="off"]) #hubPet[data-pose="land"] .pet-body { animation: momo-land .75s ease-out both; }
+body:not([data-motion="off"]) #hubPet:is([data-pose="walk"],[data-roaming="true"]) .pet-body { animation: hub-walk .7s ease-in-out infinite; }
+body:not([data-motion="off"]) #hubPet[data-pose="happy"] .pet-body { animation: hub-happy .55s ease-in-out 3; }
+body:not([data-motion="off"]) #hubPet[data-pose="play"] .momo-arm-right { animation: momo-wave .55s ease-in-out 4 alternate; }
+body:not([data-motion="off"]) #hubPet[data-pose="stretch"] .pet-body { animation: momo-stretch 1.5s ease-in-out; }
+#hubPet[data-pose="nap"] .pet-eye { animation: none !important; transform: scaleY(.12); }
+#hubPet[data-pose="perch"] .pet-body { transform: translateY(4px) scale(1.02,.95); }
+#hubMomoHome { position: fixed; width: 56px; height: 54px; min-height: 44px; padding: 0; border: 0; background: transparent; z-index: 78; box-shadow: none; }
+#hubMomoHome svg { display: block; width: 100%; height: 100%; }
+#hubMomoHome:hover { background: transparent; transform: translateY(-2px); }
+#hubMomoMenu { position: fixed; z-index: 105; max-height: calc(100dvh - 24px); overflow: auto; padding: 17px; border: 1px solid var(--hub-border); border-radius: 20px; background: var(--hub-surface); box-shadow: var(--hub-shadow-raised); color: var(--hub-text); }
+#hubMomoMenu > p, #hubMomoMenu > small { font-size: .82rem; color: var(--hub-muted); }
+#hubMomoMenu .flex-title > button { min-height: 32px; padding: 4px 9px; }
+.momo-menu-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 15px 0; }
+.momo-menu-actions button { min-height: 44px; padding: 9px; font-size: .81rem; }
+#hubMomoBall { position: fixed; z-index: 84; width: 38px; height: 38px; min-height: 38px; padding: 0; border: 2px solid #6a507d; border-radius: 50%; background: radial-gradient(circle at 32% 25%,#fff5fc 0 7%,#e4b8ed 28%,#b483d2 65%,#885ab0); box-shadow: inset -4px -5px 6px #63367755,0 5px 8px #24344920; touch-action: none; cursor: grab; }
+#hubMomoBall span { display: block; width: 20px; height: 29px; margin: 2px 0 0 7px; border-left: 3px solid #fbeaff; border-right: 3px solid #c09cda; border-radius: 50%; transform: rotate(30deg); }
+body:not([data-motion="off"]) .momo-ball-bounce { animation: momo-ball .75s ease-out 2; }
+#hubMomoUmbrella { position: absolute; left: -23%; top: -48%; width: 96%; height: 90%; pointer-events: none; }
+#hubMomoUmbrella svg { width: 100%; height: 100%; }
+body.hub-present :is(#hubMomoBall,#hubMomoHome,#hubMomoMenu) { display: none !important; }
+@keyframes momo-ear { 0%,86%,100% { transform: rotate(0); } 89% { transform: rotate(-7deg); } 93% { transform: rotate(4deg); } }
+@keyframes momo-dangle { from { transform: rotate(-5deg) translateY(3px) scale(.98,1.03); } to { transform: rotate(5deg) translateY(3px) scale(.98,1.03); } }
+@keyframes momo-land { 0% { transform: translateY(-6px) scale(.94,1.08); } 35% { transform: translateY(6px) scale(1.12,.85); } 68% { transform: translateY(-4px) scale(.97,1.04); } 100% { transform: none; } }
+@keyframes momo-stretch { 50% { transform: scale(.93,1.12) translateY(-4px); } }
+@keyframes momo-wave { to { transform: rotate(-22deg); } }
+@keyframes momo-ball { 45% { transform: translateY(-18px) rotate(50deg); } 100% { transform: translateY(0) rotate(120deg); } }
+@media (max-width:600px) { .reminder-row { flex-wrap: wrap; gap: 12px; } .reminder-row .actions { justify-content: flex-start; flex-basis: 100%; } .reminder-row .actions button, .reminder-item-control button, .reminder-presets button { min-height: 44px; } #hubMomoHome { width: 48px; height: 46px; } }
+@media (prefers-reduced-motion:reduce) { #hubPet *, #hubMomoBall { animation: none !important; transition: none !important; } }
+@media print { #hubMomoBall, #hubMomoHome, #hubMomoMenu, .reminder-item-control { display: none !important; } }

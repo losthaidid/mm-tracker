@@ -42,7 +42,7 @@ If a Free plan project pauses after inactivity, restore it in your Supabase dash
 ## Update an existing installation
 
 1. In the existing Supabase project’s SQL Editor, run `supabase/migrations/20261015140424_workspace_studio_records.sql` once. This only broadens the document-format constraint; it preserves all rows, ownership policies, revisions, and the save function. It can be reapplied safely.
-2. Deploy the updated `index.html` alongside the existing `supabase-client.js`, Excel template and `.nojekyll` through the repository’s current GitHub Pages deployment.
+2. Deploy `index.html` with all referenced local JavaScript/CSS assets, the existing `supabase-client.js`, Excel template and `.nojekyll` through the repository’s current GitHub Pages deployment.
 3. Sign in to the tracker. Make an edit, wait for **Saved to Supabase**, and reopen it using the same tracker account on another device.
 
 The previous checked-in SQL accepted only document versions 1–4, while the previous website wrote version 6. The current migration accepts versions 1–9. The updated app writes version 9 so older pages cannot discard workspace features, sub-task details or precise schedule times. It can restore older backups, including versions 6, 7 and 8. Do not run `cloud-schema.sql` on an initialized database; that file is for a fresh installation.
@@ -115,7 +115,31 @@ Opening the tracker reads the latest cloud record. Returning to the page, reconn
 
 A saved baseline allows independent edits to combine conservatively. Same-field edits, delete-versus-edit conflicts, invalid merged schedules and unknown older pending queues remain protected for review. An acknowledged queue identical to cloud records is cleared automatically. Another browser tab's pending recovery queue is not overwritten. Backup and explicit Reload cloud records remain available for genuine conflicts.
 
-All animations, sounds, countdowns, theme previews, simulator calculations and growing-workspace decorations run in the browser. Supabase stores the compact text, numbers, layout settings and finished session records inside the existing private document. There are no media uploads or additional paid services. Full JSON Backup/Restore includes the new workspace records; the existing Excel report retains its original sheets, including stopwatch-created Schedule and project-calendar activities.
+All animations, sounds, countdowns, theme previews, simulator calculations and growing-workspace decorations run in the browser. Supabase stores the compact text, numbers, layout settings, reminder dates and finished session records inside the existing private document. There are no media uploads or additional paid services. Full JSON Backup/Restore includes workspace records. Excel reports provide readable summaries and detail sheets, including stopwatch-created Schedule activities and completed work sessions.
+
+## Remind me in
+
+Tickets, main tasks and the selected project have a **Remind me in…** button. Choose 1, 3, 7, 14 or 30 days, enter a custom number, or select a date. An optional note explains what to revisit. The date and note sync with the private tracker account and are included in JSON backups; original statuses, deadlines and child records are preserved.
+
+Future-snoozed tickets and tasks leave the active list and board and remain accessible in a collapsible **Snoozed** section. Use **Open**, **Change date**, or **Bring back now** there. Snoozing a project sets its reminder independently; the project remains selectable, and its tasks and tickets keep their own reminders.
+
+On the selected local calendar date, the item returns to its normal view with **Time to revisit**. **My Day** lists due reminders, the toolbar opens the reminder inbox, and Momo gives a small notification. Dismiss a reminder or set another date. Day changes are checked while WorkHub is visible and when returning to it; editable dialogs defer the refresh. This is an in-website reminder feature, with no WhatsApp, email, push service or closed-browser notification.
+
+## A more expressive Momo
+
+Momo is a local vector character with soft dimensional shading and glossy eyes that look toward the pointer. Dragging picks him up; placing him down gives a small landing bounce. Tap him to open play controls: give a pat, toss or put away a ball, invite him to an empty part of the workspace, find a visible card to perch on, rest at home, wake up, place his home, or show a little umbrella. He moves away when the perched card is used.
+
+Drag the ball with a finger or mouse to toss it again. Escape closes play controls and puts the ball away; the menu also offers **Put ball away** on phones. Home position is remembered on that device. Expressions, gaze, play and home placement do not trigger cloud saves. Animations Off and reduced-motion settings stop animated travel and gaze movement; normal tracker controls remain usable.
+
+## Readable Excel reports
+
+**Export Excel report** opens options for an activity period, a recent-closure window (30 days by default), and an optional archive of older closed tickets. Current statuses are a snapshot of the saved records; the activity period filters Schedule, work sessions and dated project activities. This is a report, not a full JSON backup.
+
+The Dashboard uses formula-linked figures and native charts. Its ticket workload and main Tickets sheet exclude older dated closures. Closed tickets without any usable date remain visible. New closures record a stable closing date automatically; reopening clears it. Older records use their last-update date when no closing date exists, so that date is an approximation. Including the archive adds **Closed archive** and **Archive updates**, without changing the main ticket figures.
+
+Detail sheets use plain labels and names, frozen headings, filters, status colours, typed dates and numeric Excel durations. Long ticket history lives in **Ticket updates**; milestone names and states live in **Ticket milestones**. **Tasks** groups subtasks under main tasks, with their remarks and feedback in **Task notes**. **Projects**, **Project items** and **Project notes** explain project progress, sub-item remarks, companies, processes and decisions. **Schedule**, **Work sessions**, **Follow-ups** and **Reminders** cover time and outstanding actions.
+
+Adjacent hourly pieces from one booking are combined into a readable activity row while breaks and dates remain separate. Exact work-session seconds remain available. Duration totals and Dashboard figures recalculate in Excel. Long notes continue onto additional rows rather than being truncated or duplicating time totals. Landscape print areas, repeated headings, links back to Dashboard and collapsible child rows support review and printing.
 
 ## Development checks
 
