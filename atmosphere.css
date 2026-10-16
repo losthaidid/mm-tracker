@@ -101,3 +101,14 @@ body.hub-present .ambient-landscape *,body.hub-private .ambient-landscape *{anim
 body #hubAtmospherePocket{display:none;padding:0;border:0;background:transparent;box-shadow:none;width:102px;min-height:0;margin:8px 0 0}#hubAtmospherePocket[data-paused="true"] .ambient-landscape *{animation-play-state:paused!important;transition:none!important}@media(max-width:900px){body #hubAtmospherePocket{display:block}}body #hubAtmospherePocket[hidden]{display:none!important}
 
 body[data-atmosphere-paused="true"] .ambient-landscape *{animation-play-state:paused!important;transition:none!important}
+
+/* Visibility is controlled on the orbit, so child animations cannot reveal the wrong sky. */
+.ambient-landscape .ambient-lunar-orbit{display:none}
+[data-phase="night"] .ambient-landscape .ambient-solar-orbit{display:none}
+[data-phase="night"] .ambient-landscape .ambient-lunar-orbit{display:block}
+[data-phase="off"] .ambient-landscape :is(.ambient-lunar-orbit,.ambient-solar-orbit){display:none}
+.ambient-landscape .ambient-sun{opacity:1;animation:ambient-orb-bob 7s ease-in-out infinite alternate}
+.ambient-landscape .ambient-moon{animation:ambient-moon-bob 9s ease-in-out infinite alternate}
+.ambient-landscape .ambient-sun-rays{animation-duration:26s}
+@keyframes ambient-orb-bob{from{transform:translateY(-3px)}to{transform:translateY(3px)}}
+@keyframes ambient-moon-bob{from{transform:translateY(2px) rotate(-2deg)}to{transform:translateY(-3px) rotate(2deg)}}
