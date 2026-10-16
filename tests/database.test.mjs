@@ -34,6 +34,8 @@ test('the migration repairs historical saves while preserving records, conflicts
  await signIn(owner);
  const latest=document(9);latest.data.workhub={lab:[{id:'case-1',title:'Account determination',error:'M7 message',cause:'Missing QA assignment',solution:'Verified the approved assignment',notes:'Functional owner confirmed',system:'QA',tcodes:'MIGO',projectId:'project-default',ticketId:'',knowledgeId:'note-1',status:'Solved',archived:false,createdAt:'2026-10-16T00:00:00Z',updatedAt:'2026-10-16T01:00:00Z',attempts:[{id:'attempt-1',title:'Check assignment',action:'Reviewed QA',result:'Retest passed',outcome:'Passed',createdAt:'2026-10-16T00:00:00Z',updatedAt:'2026-10-16T01:00:00Z'}]}],notes:[{id:'note-1',title:'Account determination',body:'Verified the approved assignment'}]};
  Object.assign(latest.data.workhub.lab[0],{process:'Goods receipt',expected:'Material document posted',actual:'Posting failed',verification:'Retest passed in QA',resolvedAt:'2026-10-16T01:00:00Z',position:{x:54,y:158}});Object.assign(latest.data.workhub.lab[0].attempts[0],{expected:'Assignment matches design',parentId:'@issue',position:{x:374,y:158}});
+ latest.data.specs=[{id:'item-1',status:'Completed',statusDate:'2026-10-15',statusHistory:[{id:'change-1',status:'Completed',date:'2026-10-15',changedAt:'2026-10-16T01:00:00Z'}],subItems:[{id:'sub-1',title:'Verify configuration',status:'Completed',statusDate:'2026-10-15',statusHistory:[]}]}];
+ latest.data.workhub.preferences={theme:'custom',accent:'#7955b5',background:'honeycomb',colors:{page:'#f6f2fc',surface:'#fffdfd',text:'#392d50',secondary:'#a48ac7'},palettes:[{id:'palette-1',name:'My desk',accent:'#7955b5',background:'honeycomb',colors:{page:'#f6f2fc',surface:'#fffdfd',text:'#392d50',secondary:'#a48ac7'}}]};latest.data.workhub.sessions=[{id:'session-1',title:'Verify configuration',kind:'project',linkId:'project-default',itemId:'item-1',subItemId:'sub-1',seconds:120}];
  const mutation=randomUUID(),saved=await save(latest,1,mutation);assert.equal(saved.rows[0].revision,2);
  const retried=await save(latest,1,mutation);assert.equal(retried.rows[0].revision,2);
  await assert.rejects(save(document(9),1),error=>error.code==='PT409');
@@ -45,7 +47,7 @@ test('the migration repairs historical saves while preserving records, conflicts
  assert.equal((await db.query('update public.mm_tracker_documents set revision=99 where user_id=$1 returning *',[owner])).rows.length,0);
  assert.equal((await save(document(9),0)).rows[0].revision,1);
  await signIn(owner);
- assert.deepEqual((await db.query('select document from public.mm_tracker_documents')).rows[0].document.data.workhub,latest.data.workhub);
+ assert.deepEqual((await db.query('select document from public.mm_tracker_documents')).rows[0].document.data.workhub,latest.data.workhub);assert.deepEqual((await db.query('select document from public.mm_tracker_documents')).rows[0].document.data.specs,latest.data.specs);
  assert.equal((await db.query('select document from public.mm_tracker_documents')).rows[0].document.data.projects[0].mmAreas[0].visible,false);
  await db.exec('reset role;set role anon;');
  await assert.rejects(db.query('select * from public.mm_tracker_documents'),error=>error.code==='42501');

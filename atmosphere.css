@@ -76,3 +76,28 @@ body[data-motion="off"] .ambient-clouds { animation: none; }
 @media (max-width: 520px) { .ambient-preview { align-items: flex-start; gap: 13px; padding: 14px; } .ambient-preview .ambient-landscape { width: 98px; flex-basis: 98px; } .ambient-preview .hub-kicker { font-size: .58rem; letter-spacing: .08em; } .ambient-preview h3 { font-size: 1rem; } #atmosphereForm .modal-actions { gap: 8px; } }
 @media (prefers-reduced-motion: reduce) { #hubVisitors,.ambient-rain { display: none !important; } .ambient-clouds { animation: none !important; } .ambient-landscape * { transition: none !important; } }
 @media print { #hubAtmosphere,#hubVisitors,#hubAtmosphereCard,#hubAtmosphereBadge { display: none !important; } body[data-atmosphere] #hubHeader { background-image: none !important; } }
+
+/* Independent cloud layers, a clock-driven orbit and a glint of window glass. */
+.ambient-landscape .ambient-clouds{animation:none}
+.ambient-solar-orbit{transform:translate(var(--ambient-sun-x,0px),var(--ambient-sun-y,0px));transition:transform 55s linear}
+.ambient-lunar-orbit{transform:translate(var(--ambient-moon-x,0px),var(--ambient-moon-y,0px));transition:transform 55s linear}
+.ambient-landscape .ambient-sun{transform:none;animation:ambient-warmth 9s ease-in-out infinite alternate}
+.ambient-sun-rays{transform-origin:176px 39px;animation:ambient-rays 80s linear infinite}
+.ambient-cloud-back{animation:ambient-cloud-back 68s linear infinite;opacity:.8}
+.ambient-cloud-front{animation:ambient-cloud-front 46s linear infinite}
+.ambient-tree{transform-origin:31px 117px;animation:ambient-tree-sway 10s ease-in-out infinite alternate}
+.ambient-stars circle{animation:ambient-twinkle 4s var(--star-delay,0s) ease-in-out infinite alternate}
+[data-phase="night"] .ambient-clouds{opacity:.25}
+#hubAtmosphereCard[data-paused="true"] .ambient-landscape *,body[data-motion="off"] .ambient-landscape *{animation-play-state:paused!important;transition:none!important}
+body.hub-present .ambient-landscape *,body.hub-private .ambient-landscape *{animation-play-state:paused!important}
+@keyframes ambient-cloud-front{from{transform:translateX(-110px)}to{transform:translateX(250px)}}
+@keyframes ambient-cloud-back{from{transform:translateX(-90px)}to{transform:translateX(250px)}}
+@keyframes ambient-rays{to{transform:rotate(360deg)}}
+@keyframes ambient-warmth{from{opacity:.82}to{opacity:1}}
+@keyframes ambient-tree-sway{from{transform:rotate(-1.8deg)}to{transform:rotate(1.8deg)}}
+@keyframes ambient-twinkle{from{opacity:.35}to{opacity:1}}
+@media(prefers-reduced-motion:reduce){.ambient-landscape *{animation:none!important;transition:none!important}}
+
+body #hubAtmospherePocket{display:none;padding:0;border:0;background:transparent;box-shadow:none;width:102px;min-height:0;margin:8px 0 0}#hubAtmospherePocket[data-paused="true"] .ambient-landscape *{animation-play-state:paused!important;transition:none!important}@media(max-width:900px){body #hubAtmospherePocket{display:block}}body #hubAtmospherePocket[hidden]{display:none!important}
+
+body[data-atmosphere-paused="true"] .ambient-landscape *{animation-play-state:paused!important;transition:none!important}
