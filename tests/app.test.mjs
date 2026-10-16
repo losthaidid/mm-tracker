@@ -23,7 +23,7 @@ async function app(t,{storage={},rpcError=null,remote=null,login=true,styles=fal
  const intervals=[],frames=new Map();let nextFrame=1;
  window.setTimeout=()=>0;window.setInterval=(callback,ms)=>{intervals.push({callback,ms});return intervals.length;};
  window.requestAnimationFrame=callback=>{const id=nextFrame++;frames.set(id,callback);return id;};window.cancelAnimationFrame=id=>frames.delete(id);
- if(styles){const style=window.document.createElement('style');style.textContent=['studio.css','music.css','atmosphere.css','workbench.css','lab-workshop.css','soundscape.css','momo-moments.css','workspace-upgrades.css','workspace-features.css','momo-anime.css'].map(file=>readFileSync(new URL('../'+file,import.meta.url),'utf8')).join('\n');window.document.head.append(style);}
+ if(styles){const style=window.document.createElement('style');style.textContent=['studio.css','music.css','atmosphere.css','workbench.css','lab-workshop.css','soundscape.css','momo-moments.css','workspace-upgrades.css','workspace-features.css','momo-anime.css','validator-studio.css'].map(file=>readFileSync(new URL('../'+file,import.meta.url),'utf8')).join('\n');window.document.head.append(style);}
  window.HTMLDialogElement.prototype.showModal=function(){this.setAttribute('open','');};
  window.HTMLDialogElement.prototype.close=function(){this.removeAttribute('open');};
  window.confirm=()=>true;
@@ -42,7 +42,7 @@ async function app(t,{storage={},rpcError=null,remote=null,login=true,styles=fal
   }
  };
  window.MMTrackerSupabase={createClient:()=>client};
- for(const file of ['sync-merge.js','momo-art.js','momo-life.js','music.js','atmosphere.js','lab-workshop.js','workspace-upgrades.js','workspace-features.js','workbench.js','lofi-engine.js','soundscape.js','momo-moments.js','reminders.js','reports.js','studio.js'])window.eval(readFileSync(new URL('../'+file,import.meta.url),'utf8'));
+ for(const file of ['sync-merge.js','momo-art.js','momo-life.js','music.js','atmosphere.js','lab-workshop.js','workspace-upgrades.js','workspace-features.js','workbench.js','lofi-engine.js','soundscape.js','momo-moments.js','reminders.js','reports.js','validator-engine.js','validator-files.js','validator-studio.js','studio.js'])window.eval(readFileSync(new URL('../'+file,import.meta.url),'utf8'));
  const script=[...window.document.scripts].find(script=>script.textContent.includes("'use strict'"));
  window.eval(script.textContent+`\nwindow.api={
   hub,queueCloudReview,state:()=>state,steps:()=>STEPS,cloud,KEY,payload,parseBackup,emptyState,validate,mutate,loadCloud,flushCloud,refreshCloud,retryCloud,closeModal,
@@ -528,6 +528,47 @@ test('Momo reveals the complete rig only after its artwork loads and hides faile
  window.WorkHubMomoArt.mount(pet);assert.equal(window.getComputedStyle(art).opacity,'0');assert.match(images[0].src,/assets\/momo\/anime-rig\.webp/);
  images[0].onload();assert.equal(art.dataset.artReady,'true');assert.notEqual(window.getComputedStyle(art).opacity,'0');
  window.WorkHubMomoArt.mount(pet);images[1].onerror();assert.equal(window.getComputedStyle(art).opacity,'0');assert.equal(db.calls.length,0);
+});
+
+test('Validation Studio is navigable and saves general-purpose definitions, references and frozen versions across devices',async t=>{
+ const {api,document,window,db}=await app(t),ui=api.hub.validator;
+ api.showTab('validator');assert.match(document.getElementById('view').textContent,/Validation Studio/);assert.ok(document.querySelector('[data-tab="validator"]'));
+ await ui.handle({dataset:{val:'example'}});assert.equal(ui.snapshot().draft.name,'Project intake');
+ assert.equal(ui.saveDraft(),true);await settle();const id=ui.snapshot().draft.id;
+ ui.publish();await settle();assert.equal(api.state().workhub.validator.templates[0].releases[0].version,1);
+ const snapshot=copy(api.state().workhub.validator.templates[0].releases[0]);
+ document.querySelector('#valColumnForm [name="label"]').value='Intake reference';
+ assert.equal(ui.saveDraft(),true);await settle();assert.equal(api.state().workhub.validator.templates[0].columns[0].label,'Intake reference');assert.deepEqual(copy(api.state().workhub.validator.templates[0].releases[0]),snapshot);
+ const loaded=await app(t,{remote:copy(db.row),login:false});await loaded.api.loadCloud(sessionUser);await settle();
+ assert.equal(loaded.api.state().workhub.validator.templates[0].id,id);assert.equal(loaded.api.state().workhub.validator.templates[0].releases[0].version,1);
+ assert.match(api.payload(api.state()),/Intake reference/);api.validate(api.state());
+});
+
+test('validator mapping, correction and revalidation keep uploaded data out of cloud records',async t=>{
+ const {api,document,window,db}=await app(t),ui=api.hub.validator;api.showTab('validator');await ui.handle({dataset:{val:'example'}});ui.saveDraft();await settle();
+ ui.loadSample();window.setTimeout=callback=>{queueMicrotask(callback);return 0;};await ui.run();await settle();
+ assert.equal(ui.snapshot().result.errors,3);assert.equal(ui.snapshot().result.warnings,1);assert.equal(api.state().workhub.validator.runs.length,1);
+ assert.equal(api.payload(api.state()).includes('REQ-002'),false);assert.equal(JSON.stringify(db.row).includes('REQ-002'),false);
+ const cell=document.querySelector('[data-cell="1"][data-field="OWNER"]');cell.value='Mira';cell.dispatchEvent(new window.Event('change',{bubbles:true}));await settle();
+ assert.equal(ui.snapshot().result,null);assert.equal(document.querySelector('[data-val="report"]').disabled,true);
+ await ui.run();await settle();assert.equal(ui.snapshot().result.errors,2);assert.equal(ui.snapshot().rows[1].OWNER,'Mira');
+ api.cloud.user=null;api.cloud.ready=false;api.showTab('home');assert.equal(ui.snapshot().draft,null);assert.deepEqual(copy(ui.snapshot().rows),[]);assert.equal(ui.snapshot().result,null);
+});
+
+test('validator discards an upload finishing after the account changes',async t=>{
+ const {api}=await app(t),ui=api.hub.validator;api.showTab('validator');await ui.handle({dataset:{val:'example'}});
+ let release;const text=new Promise(resolve=>release=resolve),pending=ui.loadFile({name:'private.csv',size:20,text:()=>text});
+ api.cloud.user=null;api.cloud.ready=false;api.showTab('home');release('Request ID,Request type\nPRIVATE-ROW,Standard');await pending;
+ assert.equal(ui.snapshot().draft,null);assert.equal(ui.snapshot().rows.length,0);assert.equal(ui.snapshot().result,null);
+});
+
+test('validator column renaming rewires conditions and prevents deleting referenced fields',async t=>{
+ const {api,document,window}=await app(t),ui=api.hub.validator;api.showTab('validator');await ui.handle({dataset:{val:'example'}});
+ const owner=ui.snapshot().draft.columns.find(c=>c.key==='OWNER');await ui.handle({dataset:{val:'select-column',id:owner.id}});
+ const field=document.querySelector('#valColumnForm [name="key"]');field.value='ASSIGNEE';field.dispatchEvent(new window.Event('input',{bubbles:true}));ui.saveDraft();await settle();
+ assert.equal(ui.snapshot().draft.rules[0].assertion.field,'ASSIGNEE');
+ await assert.rejects(ui.handle({dataset:{val:'remove-column',id:owner.id}}),/used in a condition/);
+ window.WorkHubValidatorEngine.checkSchema(ui.snapshot().draft);
 });
 
 test('Momo has live glossy anime eyes and pickup reactions stay local',async t=>{
