@@ -42,7 +42,7 @@ function validate(d){
  for(const t of d.tasks||[])if(!Object.hasOwn(BOARD,t.boardStatus))throw Error('Check the task board status.');
 }
 function install(a){
- let life=null,music=null;
+ let life=null,music=null,atmosphere=null;
  const reminders=root.WorkHubReminders?.install({...a,hubAction:el=>handle(el),react:(...args)=>react(...args)});
  const $=id=>document.getElementById(id),data=()=>a.state().workhub,prefs=()=>data().preferences;
  let currentTool='theme',processId='',stepId='',processArchive=false,sessionView='active',search='',board=false,dragId='',walkTimer=0,focus=null,petTimer=0,timerDraft=null,timerOwner='',viewTab='home',simulatorDraft=null,themePreview=null;
@@ -70,6 +70,7 @@ function install(a){
   if($('hubPet'))$('hubPet').hidden=!p.mascot||!a.cloud().ready;
   const acc=$('hubPetAccessory');if(acc)acc.innerHTML=root.WorkHubMomoArt.accessory(p.accessory);
   if(!p.roaming||!p.mascot||p.motion==='off')stopCompanionWalk();
+  atmosphere?.sync();
  }
  function confetti(){if(prefs().motion==='off'||root.matchMedia?.('(prefers-reduced-motion: reduce)').matches)return;const box=document.createElement('div');box.className='hub-confetti';box.setAttribute('aria-hidden','true');for(let i=0;i<22;i++){const s=document.createElement('span');s.style.cssText=`left:${Math.random()*100}vw;animation-delay:${Math.random()*.3}s;background:${['#2563eb','#22b89a','#ffbc63','#f87894'][i%4]}`;box.append(s);}document.body.append(box);setTimeout(()=>box.remove(),2500);chime();}
  function chime(){if(!prefs().sounds)return;try{const AC=root.AudioContext||root.webkitAudioContext;if(!AC)return;const c=new AC(),o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.frequency.setValueAtTime(660,c.currentTime);o.frequency.linearRampToValueAtTime(880,c.currentTime+.13);g.gain.setValueAtTime(.035,c.currentTime);g.gain.exponentialRampToValueAtTime(.001,c.currentTime+.28);o.start();o.stop(c.currentTime+.3);o.onended=()=>void c.close();}catch{}}
@@ -166,7 +167,7 @@ function install(a){
   for(const button of document.querySelectorAll('[data-hub="presentation"]'))button.setAttribute('aria-pressed',String(present));
   let status=$('hubViewStatus');if(privacy&&a.cloud().ready){if(!status){status=document.createElement('div');status.id='hubViewStatus';status.className='hub-view-status';status.setAttribute('role','status');$('view').before(status);}status.innerHTML='<span><strong>Privacy is on</strong> Record details are blurred on this screen.</span>'+btn('privacy','Show details','','hub-mode-exit');}else status?.remove();
   let exit=$('hubExitPresentation');if(present&&!exit){exit=document.createElement('button');exit.id='hubExitPresentation';exit.dataset.hub='presentation';exit.textContent='Exit presentation';exit.className='hub-exit-presentation';exit.setAttribute('aria-pressed','true');document.body.append(exit);}if(!present)exit?.remove();
-  if(present)stopCompanionWalk();music?.sync();
+  if(present)stopCompanionWalk();music?.sync();atmosphere?.sync();
  }
  function heroArt(){return '<div class="hub-hero-art" aria-hidden="true"><svg viewBox="0 0 280 170" fill="none"><ellipse cx="150" cy="145" rx="103" ry="12" fill="#d9e2df"/><circle cx="206" cy="61" r="46" fill="#f8dba4"/><rect x="45" y="41" width="114" height="99" rx="12" transform="rotate(-9 45 41)" fill="#c8dfd6" stroke="#456d68" stroke-width="2"/><rect x="75" y="27" width="118" height="114" rx="12" transform="rotate(8 75 27)" fill="#fffef7" stroke="#2c4359" stroke-width="2"/><path d="M96 57l5 5 10-12M95 82l5 5 10-12M95 107l5 5 10-12" stroke="#328976" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M124 57h43M122 82h40M121 107h28" stroke="#9baab5" stroke-width="4" stroke-linecap="round"/><path d="M204 139v-35M204 111c-28-3-30-22-22-28 13-7 24 10 22 28zM204 101c-1-25 19-29 26-20 7 12-9 22-26 20z" stroke="#366d5b" stroke-width="2" fill="#8bc5a3"/><path d="M188 121h33l-5 24h-23z" fill="#dd967e" stroke="#734f48" stroke-width="2"/><path d="M43 24l3 8 8 3-8 3-3 8-3-8-8-3 8-3 3-8zM239 25l2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5z" fill="#8d7dcb"/><circle cx="241" cy="117" r="4" fill="#e7b26d"/></svg></div>';}
  function mountChrome(){
@@ -175,7 +176,7 @@ function install(a){
   if(!$('hubToolbar')){const bar=document.createElement('div');bar.id='hubToolbar';bar.className='hub-toolbar hub-private-only';bar.innerHTML=btn('commands','⌕ Search & commands','aria-label="Search records and commands"')+btn('quick','＋ Quick add')+btn('timer-new','◷ Start timer')+btn('privacy','◉ Privacy','aria-pressed="false"')+btn('presentation','▣ Present','aria-pressed="false"');$('tabs').before(bar);}
   const extra={home:'⌂ My day',knowledge:'Knowledge',processhub:'Process Hub',waiting:'Waiting on',studio:'Studio'};
   for(const[id,label]of Object.entries(extra))if(!$('tabs').querySelector(`[data-tab="${id}"]`)){const b=document.createElement('button');b.dataset.tab=id;b.textContent=label;if(id==='home')$('tabs').prepend(b);else $('tabs').append(b);}
-  mountShell();const toolbar=$('hubToolbar');toolbar.hidden=!a.cloud().ready;positionCompanion();if(!a.cloud().ready)themePreview=null;applyTheme();if(a.cloud().ready)recoverTimer();else{timerOwner='';timerDraft=null;undo=null;$('hubUndo')?.remove();}renderTimerBar();syncViewModes();life?.mount();music?.mount();
+  mountShell();const toolbar=$('hubToolbar');toolbar.hidden=!a.cloud().ready;positionCompanion();if(!a.cloud().ready)themePreview=null;applyTheme();if(a.cloud().ready)recoverTimer();else{timerOwner='';timerDraft=null;undo=null;$('hubUndo')?.remove();}renderTimerBar();syncViewModes();life?.mount();music?.mount();atmosphere?.mount();
  }
  function desk(){const completed=a.state().tasks.filter(t=>t.done).length,level=Math.min(5,1+Math.floor(completed/3));return`<div class="hub-desk"><div class="desk-scene" aria-label="Your growing workspace, level ${level}"><div class="desk-shelf">${Array.from({length:level+1},(_,i)=>`<i class="desk-book" style="--book:${i}"></i>`).join('')}</div><div class="desk-lamp"></div><div class="desk-plant"><i></i><i></i><i></i></div><span>${esc(prefs().workspace)}</span></div><div class="hub-meta">Workspace level ${level} · ${completed} completed tasks. Your space grows; there are no streak penalties.</div>${btn('tool','Decorate your space','data-tool="theme"','small')}</div>`;}
  function journey(){const p=a.state().projects.find(p=>p.id===a.state().activeProjectId)||a.state().projects[0],phases=a.state().lists.projectPhases,i=phases.indexOf(p.phase);return`<h3>${esc(p.name)}</h3><div class="hub-journey">${phases.map((phase,n)=>`<div class="hub-phase ${n<i?'done':n===i?'current':''}"><span>${n<i?'✓':n+1}</span><strong>${esc(phase)}</strong></div>`).join('')}</div>${btn('project','Open project','data-id="'+esc(p.id)+'"','small')}`;}
@@ -402,10 +403,11 @@ function install(a){
  document.addEventListener('keydown',event=>{if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='k'){event.preventDefault();openCommands();}if(event.key==='Escape'&&document.body.classList.contains('hub-present')){document.body.classList.remove('hub-present');syncViewModes();}});
  document.addEventListener('pointerdown',()=>{lastInteraction=Date.now();if(document.body.dataset.mascotMood==='sleep')document.body.dataset.mascotMood='idle';},{passive:true});
  root.addEventListener('storage',event=>{if(event.key===timerKey()){timerOwner='';recoverTimer();renderTimerBar();}});
- setInterval(()=>{if(document.hidden)return;life?.tick();tickCompanion();if($('hubTimerClock'))$('hubTimerClock').textContent=timerText();if(focus){if($('hubFocusClock'))$('hubFocusClock').textContent=focusText();if(Date.now()>=focus.end){focus=null;document.body.classList.remove('hub-focus');confetti();a.tell('Focus session complete. Take a moment to recharge.');a.render();}}if(Date.now()-lastInteraction>120000&&!petWalk)document.body.dataset.mascotMood='sleep';},1000);
+ setInterval(()=>{if(document.hidden)return;life?.tick();atmosphere?.tick();tickCompanion();if($('hubTimerClock'))$('hubTimerClock').textContent=timerText();if(focus){if($('hubFocusClock'))$('hubFocusClock').textContent=focusText();if(Date.now()>=focus.end){focus=null;document.body.classList.remove('hub-focus');confetti();a.tell('Focus session complete. Take a moment to recharge.');a.render();}}if(Date.now()-lastInteraction>120000&&!petWalk)document.body.dataset.mascotMood='sleep';},1000);
  life=root.WorkHubMomoLife?.install({prefs:()=>themePreview||prefs(),ready:()=>a.cloud().ready,pet:()=>$('hubPet'),move:positionCompanion,stop:stopCompanionWalk,react});
  music=root.WorkHubMusic?.install({ready:()=>a.cloud().ready,life:()=>life,tell:a.tell,openModal:a.openModal,closeModal:a.closeModal});
- return{reminders,life,music,render,afterRender,prepare,saved,handle,submit,upgrade,validate,moveTask,simulationValues,sessionRanges,scheduleSession,startTimer,pauseTimer,resumeTimer,finishTimer,timer:()=>timerDraft,importTheme,themeValues,setBoard(value){board=value;},setTool(value){currentTool=value;},refreshTheme:applyTheme};
+ atmosphere=root.WorkHubAtmosphere?.install({ready:()=>a.cloud().ready,prefs:()=>themePreview||prefs(),react,tell:a.tell,openModal:a.openModal,closeModal:a.closeModal});
+ return{reminders,life,music,atmosphere,render,afterRender,prepare,saved,handle,submit,upgrade,validate,moveTask,simulationValues,sessionRanges,scheduleSession,startTimer,pauseTimer,resumeTimer,finishTimer,timer:()=>timerDraft,importTheme,themeValues,setBoard(value){board=value;},setTool(value){currentTool=value;},refreshTheme:applyTheme};
 }
 root.WorkHubStudio={upgrade,validate,install,DEFAULTS,WIDGETS};
 })(window);

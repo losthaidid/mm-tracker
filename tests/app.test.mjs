@@ -9,6 +9,11 @@ const copy=value=>JSON.parse(JSON.stringify(value));
 const settle=async()=>{for(let i=0;i<12;i++)await Promise.resolve();};
 async function unzipReport(blob){const bytes=Buffer.from(await blob.arrayBuffer()),entries={};let offset=0;while(bytes.readUInt32LE(offset)===0x04034b50){const size=bytes.readUInt32LE(offset+18),nameLength=bytes.readUInt16LE(offset+26),extraLength=bytes.readUInt16LE(offset+28),name=bytes.subarray(offset+30,offset+30+nameLength).toString(),start=offset+30+nameLength+extraLength;assert.equal(bytes.readUInt16LE(offset+8),0);entries[name]=bytes.subarray(start,start+size).toString();offset=start+size;}assert.equal(bytes.readUInt32LE(offset),0x02014b50);return entries;}
 function mockYouTube(window){const instances=[];window.YT={Player:function(frame,options){const p={frame,events:options.events,pauses:0,destroyed:false,getIframe:()=>frame,getCurrentTime:()=>42,getVideoData:()=>({title:'A test song'}),pauseVideo(){this.pauses++;},destroy(){this.destroyed=true;frame.remove();}};instances.push(p);return p;}};return instances;}
+async function atmosphereChoices(ctx,values={},meet=false){
+ const {api,document,window}=ctx;api.hub.atmosphere.settings();const form=document.getElementById('atmosphereForm');
+ for(const [name,value]of Object.entries(values)){const field=form.elements.namedItem(name);if(field.type==='checkbox')field.checked=value;else field.value=value;}
+ const submitter=form.querySelector('[value="'+(meet?'visit':'save')+'"]');form.dispatchEvent(new window.SubmitEvent('submit',{bubbles:true,cancelable:true,submitter}));await settle();
+}
 
 async function app(t,{storage={},rpcError=null,remote=null,login=true,styles=false}={}){
  const dom=new JSDOM(html,{url:'https://losthaidid.github.io/mm-tracker/',runScripts:'outside-only',pretendToBeVisual:true});
@@ -18,7 +23,7 @@ async function app(t,{storage={},rpcError=null,remote=null,login=true,styles=fal
  const intervals=[],frames=new Map();let nextFrame=1;
  window.setTimeout=()=>0;window.setInterval=(callback,ms)=>{intervals.push({callback,ms});return intervals.length;};
  window.requestAnimationFrame=callback=>{const id=nextFrame++;frames.set(id,callback);return id;};window.cancelAnimationFrame=id=>frames.delete(id);
- if(styles){const style=window.document.createElement('style');style.textContent=readFileSync(new URL('../studio.css',import.meta.url),'utf8')+readFileSync(new URL('../music.css',import.meta.url),'utf8');window.document.head.append(style);}
+ if(styles){const style=window.document.createElement('style');style.textContent=['studio.css','music.css','atmosphere.css'].map(file=>readFileSync(new URL('../'+file,import.meta.url),'utf8')).join('\n');window.document.head.append(style);}
  window.HTMLDialogElement.prototype.showModal=function(){this.setAttribute('open','');};
  window.HTMLDialogElement.prototype.close=function(){this.removeAttribute('open');};
  window.confirm=()=>true;
@@ -37,7 +42,7 @@ async function app(t,{storage={},rpcError=null,remote=null,login=true,styles=fal
   }
  };
  window.MMTrackerSupabase={createClient:()=>client};
- for(const file of ['sync-merge.js','momo-art.js','momo-life.js','music.js','reminders.js','reports.js','studio.js'])window.eval(readFileSync(new URL('../'+file,import.meta.url),'utf8'));
+ for(const file of ['sync-merge.js','momo-art.js','momo-life.js','music.js','atmosphere.js','reminders.js','reports.js','studio.js'])window.eval(readFileSync(new URL('../'+file,import.meta.url),'utf8'));
  const script=[...window.document.scripts].find(script=>script.textContent.includes("'use strict'"));
  window.eval(script.textContent+`\nwindow.api={
   hub,queueCloudReview,state:()=>state,steps:()=>STEPS,cloud,KEY,payload,parseBackup,emptyState,validate,mutate,loadCloud,flushCloud,refreshCloud,retryCloud,closeModal,
@@ -658,4 +663,66 @@ test('the music corner defaults to only a small video screen and keeps Momo outs
  await api.hub.music.search('M7lc1UVf-VE');assert.ok(document.getElementById('musicFrame'));document.querySelector('.music-header [data-music="controls"]').click();await settle();assert.equal(document.getElementById('modal').open,true);assert.ok(document.getElementById('musicQuery'));assert.equal(document.getElementById('musicFrame'),null);assert.equal(panel.hidden,true);
  document.querySelector('[data-music="settings-cancel"]').click();await settle();assert.equal(panel.hidden,false);assert.ok(document.getElementById('musicFrame'));assert.ok(parseFloat(panel.style.height)<=203);
  Object.defineProperty(window,'innerWidth',{configurable:true,value:375});Object.defineProperty(window,'innerHeight',{configurable:true,value:667});window.dispatchEvent(new window.Event('resize'));const seat=document.getElementById('musicMomoSeat'),rect=el=>({x:parseFloat(el.style.left),y:parseFloat(el.style.top),w:parseFloat(el.style.width),h:parseFloat(el.style.height)}),p=rect(panel),m=rect(seat);assert.equal(seat.hidden,false);assert.ok(m.x+m.w<=p.x||m.x>=p.x+p.w||m.y+m.h<=p.y||m.y>=p.y+p.h);assert.ok(m.x>=12&&m.x+m.w<=363&&m.y>=12&&m.y+m.h<=655);assert.equal(db.calls.length,0);
+});
+
+test('daylight follows the local clock across all four phases without changing records',async t=>{
+ const ctx=await app(t),{api,window,document,db}=ctx,original=window.Date;let clock=Date.parse('2026-10-16T04:59:00+08:00');
+ window.Date=class extends original{constructor(...args){super(...(args.length?args:[clock]));}static now(){return clock;}};
+ const before=JSON.stringify(api.state());
+ for(const [time,phase]of [['04:59','night'],['05:00','morning'],['10:59','morning'],['11:00','afternoon'],['16:59','afternoon'],['17:00','evening'],['19:59','evening'],['20:00','night']]){
+  clock=Date.parse('2026-10-16T'+time+':00+08:00');api.hub.atmosphere.tick();assert.equal(document.body.dataset.atmosphere,phase);assert.equal(api.hub.atmosphere.snapshot().phase,phase);assert.equal(document.getElementById('hubAtmosphereCard').dataset.phase,phase);
+ }
+ for(const tab of ['tasks','tickets','schedule','specs','home'])api.showTab(tab);
+ assert.equal(document.querySelectorAll('#hubAtmosphere').length,1);assert.equal(document.querySelectorAll('#hubVisitors').length,1);assert.equal(document.querySelectorAll('#atmosphereSettings').length,1);assert.ok(document.getElementById('settingsMenu').contains(document.getElementById('atmosphereSettings')));
+ assert.equal(JSON.stringify(api.state()),before);assert.equal(db.calls.length,0);
+});
+
+test('atmosphere choices save on this device, preview safely and synchronize across local tabs',async t=>{
+ const ctx=await app(t),{api,document,window,db}=ctx;const before=JSON.stringify(api.state());
+ await atmosphereChoices(ctx,{mode:'night',rain:true,visitors:false});assert.equal(document.body.dataset.atmosphere,'night');assert.equal(document.getElementById('hubAtmosphere').dataset.rain,'true');assert.equal(api.hub.atmosphere.invite(),false);
+ const storage={'mm-tracker.atmosphere.v1':window.localStorage.getItem('mm-tracker.atmosphere.v1')},second=await app(t,{storage});assert.equal(second.document.body.dataset.atmosphere,'night');assert.equal(second.api.hub.atmosphere.snapshot().preferences.visitors,false);
+ api.hub.atmosphere.settings();const select=document.getElementById('atmosphereMode');select.value='morning';select.dispatchEvent(new window.Event('change',{bubbles:true}));assert.equal(document.getElementById('atmospherePreview').dataset.phase,'morning');assert.equal(document.body.dataset.atmosphere,'night');document.querySelector('[data-atmosphere-action="cancel"]').click();await settle();assert.equal(document.body.dataset.atmosphere,'night');
+ window.localStorage.setItem('mm-tracker.atmosphere.v1',JSON.stringify({mode:'off',rain:false,visitors:false}));window.dispatchEvent(new window.StorageEvent('storage',{key:'mm-tracker.atmosphere.v1'}));assert.equal(document.body.dataset.atmosphere,'off');assert.equal(document.getElementById('hubAtmosphere').hidden,true);assert.equal(document.getElementById('hubAtmosphereCard').hidden,true);
+ assert.equal(JSON.stringify(api.state()),before);assert.equal(db.calls.length,0);assert.equal(second.db.calls.length,0);
+ const invalid=await app(t,{storage:{'mm-tracker.atmosphere.v1':'{"mode":"<script>","visitors":"yes","rain":1}'}});assert.ok(['morning','afternoon','evening','night'].includes(invalid.document.body.dataset.atmosphere));assert.equal(invalid.api.hub.atmosphere.snapshot().preferences.rain,false);
+});
+
+test('tiny visitors match the scenery, respond to a hello and leave without uploading anything',async t=>{
+ const ctx=await app(t),{api,document,window,db}=ctx;const before=JSON.stringify(api.state());
+ for(const [mode,kind]of [['morning','butterfly'],['afternoon','bird'],['evening','firefly'],['night','firefly']]){
+  await atmosphereChoices(ctx,{mode,visitors:true},true);const visitor=document.querySelector('.hub-visitor');assert.ok(visitor,mode);assert.equal(visitor.dataset.visitor,kind);assert.ok(visitor.querySelector('svg'));assert.match(visitor.getAttribute('aria-label'),/Say hello/);assert.equal(api.hub.atmosphere.invite(),false);assert.equal(document.querySelectorAll('.hub-visitor').length,1);
+  visitor.focus();assert.ok(visitor.classList.contains('is-held'));visitor.click();assert.ok(visitor.classList.contains('is-greeted'));assert.equal(api.hub.atmosphere.snapshot().visitor.greeted,true);assert.equal(document.getElementById('hubPetBubble').hidden,false);
+  const now=window.Date.now();window.Date.now=()=>now+2000;api.hub.atmosphere.tick();assert.equal(document.querySelector('.hub-visitor'),null);assert.equal(api.hub.atmosphere.snapshot().visitor,null);
+ }
+ assert.equal(JSON.stringify(api.state()),before);assert.equal(db.calls.length,0);
+});
+
+test('visitors and moving weather respect writing, dialogs, view modes and device motion settings',async t=>{
+ const ctx=await app(t),{api,document,window,db}=ctx;await atmosphereChoices(ctx,{mode:'morning',rain:true,visitors:true},true);assert.ok(document.querySelector('.hub-visitor'));
+ for(const cls of ['hub-focus','hub-private','hub-present','hub-sorting']){
+  document.body.classList.add(cls);api.hub.atmosphere.sync();assert.equal(document.querySelector('.hub-visitor'),null);assert.equal(api.hub.atmosphere.invite(),false);assert.equal(document.getElementById('hubAtmosphere').dataset.paused,'true');if(cls==='hub-present')assert.equal(document.getElementById('hubAtmosphere').hidden,true);document.body.classList.remove(cls);
+ }
+ api.editRecord('tasks');api.hub.atmosphere.sync();assert.equal(api.hub.atmosphere.invite(),false);api.closeModal();
+ api.showTab('knowledge');document.getElementById('hubSearch').focus();assert.equal(api.hub.atmosphere.invite(),false);document.getElementById('hubSearch').blur();
+ const base=window.Date.now();window.Date.now=()=>base+20000;
+ window.matchMedia=()=>({matches:true});api.hub.atmosphere.sync();assert.equal(api.hub.atmosphere.invite(),false);window.matchMedia=()=>({matches:false});
+ api.state().workhub.preferences.motion='off';api.hub.atmosphere.sync();assert.equal(api.hub.atmosphere.invite(),false);api.state().workhub.preferences.motion='calm';
+ Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new window.Event('visibilitychange'));assert.equal(api.hub.atmosphere.invite(),false);Object.defineProperty(document,'hidden',{configurable:true,value:false});document.dispatchEvent(new window.Event('visibilitychange'));window.Date.now=()=>base+30000;assert.equal(api.hub.atmosphere.invite(),true);
+ api.cloud.ready=false;api.hub.atmosphere.sync();assert.equal(document.querySelector('.hub-visitor'),null);assert.equal(document.getElementById('hubAtmosphere').hidden,true);assert.equal(db.calls.length,0);
+});
+
+test('visitors fit a phone viewport, avoid floating controls and clean up on resize and Escape',async t=>{
+ const ctx=await app(t),{api,document,window,db}=ctx;await atmosphereChoices(ctx,{mode:'morning',visitors:true});
+ Object.defineProperty(window,'visualViewport',{configurable:true,value:{offsetLeft:15,offsetTop:20,width:375,height:600,addEventListener(){}}});
+ document.getElementById('hubPet').getBoundingClientRect=()=>({left:25,top:548,right:73,bottom:596,width:48,height:48});
+ window.dispatchEvent(new window.Event('resize'));const now=window.Date.now();window.Date.now=()=>now+4000;assert.equal(api.hub.atmosphere.invite(),true);
+ let visitor=document.querySelector('.hub-visitor');const x=parseFloat(visitor.style.getPropertyValue('--visitor-x')),y=parseFloat(visitor.style.getPropertyValue('--visitor-y'));assert.ok(x>=23&&x+48<=382);assert.ok(y>=28&&y+48<=612);assert.ok(x>=79);visitor.focus();document.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(document.querySelector('.hub-visitor'),null);
+ window.dispatchEvent(new window.Event('resize'));assert.equal(document.querySelector('.hub-visitor'),null);window.Date.now=()=>now+8000;assert.equal(api.hub.atmosphere.invite(),true);window.dispatchEvent(new window.Event('resize'));assert.equal(document.querySelector('.hub-visitor'),null);
+ window.visualViewport.width=280;window.Date.now=()=>now+12000;assert.equal(api.hub.atmosphere.invite(),false);assert.equal(db.calls.length,0);
+});
+
+test('visitors arrive occasionally and clean up between visits without a cloud save',async t=>{
+ const ctx=await app(t),{api,window,document,db}=ctx;await atmosphereChoices(ctx,{mode:'morning',visitors:true});const base=window.Date.now();let elapsed=25000;window.Date.now=()=>base+elapsed;
+ api.hub.atmosphere.tick();assert.equal(document.querySelectorAll('.hub-visitor').length,1);api.hub.atmosphere.tick();assert.equal(document.querySelectorAll('.hub-visitor').length,1);
+ elapsed=45000;api.hub.atmosphere.tick();assert.equal(document.querySelectorAll('.hub-visitor').length,0);elapsed=200000;api.hub.atmosphere.tick();assert.equal(document.querySelectorAll('.hub-visitor').length,1);assert.equal(db.calls.length,0);
 });

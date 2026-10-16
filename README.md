@@ -99,6 +99,14 @@ Privacy has a visible **Privacy is on** indicator and a **Show details** control
 
 Dashboard widgets and task-board cards have dotted drag handles. Hold and move a handle with a finger, mouse or pen; highlighted drop targets show where the item will go. Drop a widget over another widget to reorder it, or drop a task into a status column. Reordering saves once at the end of the gesture. Cancelling leaves records unchanged. Keyboard users can focus a handle and use up/down for widgets or left/right for task columns. The existing Move to selectors and widget buttons remain available.
 
+## Atmosphere and tiny visitors
+
+Open **Settings → Atmosphere & visitors**. By default the scenery follows the device's local clock: morning light from 05:00, afternoon glow from 11:00, evening warmth from 17:00, and starlight from 20:00 until 05:00. Choose a fixed scene or turn the atmosphere off. Soft colour in the page margins and header preserves the chosen theme, readable record cards, and the existing My day background image. A small illustrated window appears in the laptop sidebar; phones show a compact atmosphere label in the header instead. Optional rain is visual only, without sound, location access or a weather service.
+
+Tiny visitors arrive occasionally: a butterfly in the morning, a bird in the afternoon, or a firefly in the evening and at night. Choose **Save & meet a visitor** to invite one immediately. Tap a visitor for a little hello from Momo; Escape lets it fly away. Only one appears at a time, landing away from visible controls and floating tools. If there is no room, it waits. A keyboard-focused visitor stays still until you greet it or leave it.
+
+Visitors and moving weather pause during typing, dialogs, Focus, Privacy, presentation, dragging and hidden pages. The device's reduced-motion setting and Theme Studio's Animations Off keep scenery still and disable visitors. Choices are remembered separately on each device, shared with other tracker tabs in that browser, and excluded from Supabase records, theme exports and backups. Scenery, visitor movement and greetings make no network requests or cloud writes. Existing tracker and YouTube behavior is unchanged.
+
 ## Work stopwatch
 
 Start from the toolbar or a linked task, ticket or project item. Choose the linked activity (optionally a task's subtask), session title, charge code and remarks. A floating stopwatch stays visible as you navigate. Drag its dotted handle with a mouse or finger, or focus the handle and use arrow keys. Minimise it to a small clock and expand it when needed; its position and size preference are remembered on the device. The panel stays within the screen when the phone keyboard opens or the screen rotates. Pause/resume excludes breaks, and Notes lets you update remarks during work.
