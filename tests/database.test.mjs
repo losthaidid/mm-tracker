@@ -33,6 +33,7 @@ test('the migration repairs historical saves while preserving records, conflicts
  await db.exec(studioMigration);
  await signIn(owner);
  const latest=document(9);latest.data.workhub={lab:[{id:'case-1',title:'Account determination',error:'M7 message',cause:'Missing QA assignment',solution:'Verified the approved assignment',notes:'Functional owner confirmed',system:'QA',tcodes:'MIGO',projectId:'project-default',ticketId:'',knowledgeId:'note-1',status:'Solved',archived:false,createdAt:'2026-10-16T00:00:00Z',updatedAt:'2026-10-16T01:00:00Z',attempts:[{id:'attempt-1',title:'Check assignment',action:'Reviewed QA',result:'Retest passed',outcome:'Passed',createdAt:'2026-10-16T00:00:00Z',updatedAt:'2026-10-16T01:00:00Z'}]}],notes:[{id:'note-1',title:'Account determination',body:'Verified the approved assignment'}]};
+ Object.assign(latest.data.workhub.lab[0],{process:'Goods receipt',expected:'Material document posted',actual:'Posting failed',verification:'Retest passed in QA',resolvedAt:'2026-10-16T01:00:00Z',position:{x:54,y:158}});Object.assign(latest.data.workhub.lab[0].attempts[0],{expected:'Assignment matches design',parentId:'@issue',position:{x:374,y:158}});
  const mutation=randomUUID(),saved=await save(latest,1,mutation);assert.equal(saved.rows[0].revision,2);
  const retried=await save(latest,1,mutation);assert.equal(retried.rows[0].revision,2);
  await assert.rejects(save(document(9),1),error=>error.code==='PT409');
