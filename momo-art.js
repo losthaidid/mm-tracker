@@ -121,6 +121,7 @@
           <path d="m121 88 3 1m-3 3 3 1" stroke="#e4fff0" stroke-width="1.6" stroke-linecap="round"/>
         </g>
         <g id="hubPetAccessory">${accessory(name || 'glasses')}</g>
+        <g class="momo-headphones" stroke="#6d5993" stroke-width="2" stroke-linejoin="round"><path d="M27 76V65a43 39 0 0186 0v11" fill="none" stroke="#b29bd4" stroke-width="5"/><rect x="21" y="67" width="13" height="25" rx="6" fill="#cdb8e8"/><rect x="107" y="67" width="13" height="25" rx="6" fill="#cdb8e8"/><path d="M25 73v12m91-12v12" stroke="#ede2fb" stroke-width="2.5" stroke-linecap="round"/></g>
       </g>
     </svg>`;
   }
