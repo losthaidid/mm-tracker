@@ -1,0 +1,15 @@
+/* Keep task actions together at the far right without crowding the title. */
+body .workspace-v10 .task-card-heading{align-items:flex-start;gap:25px}
+body .workspace-v10 .task-card-heading>div:first-child{min-width:0;flex:1}
+.task-action-cluster{display:flex;flex-direction:column;align-items:stretch;gap:11px;flex:0 0 auto;width:330px;max-width:47%;padding:12px;border:1px solid var(--hub-border,#ded6e9);border-radius:15px;background:var(--hub-surface-soft,#f8f5fb)}
+.task-action-status{display:flex;justify-content:flex-end;align-items:center;min-height:28px}
+.task-action-status .bench-status-badge{margin:0!important;max-width:100%}
+.task-action-buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+body .task-action-cluster .task-action-button{display:flex;align-items:center;justify-content:flex-start;gap:7px;width:100%;min-width:0;min-height:35px;margin:0!important;padding:8px 9px!important;font-size:11px!important;line-height:1.4;white-space:normal;text-align:left;border:1px solid var(--hub-border,#e1d9ea)!important;border-radius:9px!important;background:var(--hub-surface,#fff)!important;color:var(--hub-text,#51445f)!important;box-shadow:none;transition:background .18s,border-color .18s,transform .18s}
+body .task-action-cluster .task-action-button:hover{background:var(--hub-surface-soft,#f0eaf8)!important;transform:translateY(-1px)}
+.task-action-button svg{flex-shrink:0;opacity:.75}
+body .task-action-cluster .reminder-item-control{display:flex;padding:0!important;margin:0!important;border:0;background:none;min-width:0}
+body .task-action-cluster .task-action-button:focus-visible{outline:3px solid var(--hub-accent,#8463ab);outline-offset:2px}
+@media(max-width:760px){body .workspace-v10 .task-card-heading{flex-direction:column;gap:18px}.task-action-cluster{width:100%;max-width:none}.task-action-buttons{grid-template-columns:repeat(4,minmax(0,1fr))}.task-action-status{justify-content:flex-end}}
+@media(max-width:500px){.task-action-buttons{grid-template-columns:repeat(2,minmax(0,1fr))}.task-action-cluster{padding:11px;border-radius:12px}}
+@media(prefers-reduced-motion:reduce){body .task-action-cluster .task-action-button{transition:none;transform:none!important}}body[data-motion="off"] .task-action-cluster .task-action-button{transition:none;transform:none!important}
