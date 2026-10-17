@@ -19,7 +19,7 @@
 <p id="previewStatus" role="status"></p>
 <dialog id="modal"><div class="modal-head"><h2 id="modalTitle"></h2><button type="button" data-demo="close" aria-label="Close dialog">×</button></div><div id="modalBody"></div></dialog>
 <script src="../batch-a-engine.js?v=20261017-batch-a-1"></script>
-<script src="../batch-a.js?v=20261017-batch-a-1"></script>
+<script src="../batch-a.js?v=20261017-batch-a-2"></script>
 <script>
 const E=WorkHubBatchEngine,$=id=>document.getElementById(id),esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const task=(id,task,done=false)=>({id,task,number:id.slice(-1),done,doneDate:done?'2026-10-15':'',boardStatus:done?'done':'todo',archived:false,archivedAt:'',dueDate:'2026-10-22',priority:'High',taskType:'Project',linkId:'project-1',customLink:'',remarks:'Keep the design decision and test evidence together.',feedback:'Confirm the expected result with the process owner.',subTasks:[]});
