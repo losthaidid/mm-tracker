@@ -77,6 +77,11 @@ async function report(t,rows,result,acceptedOnly=false){
  const sheets=[{name:acceptedOnly?'Accepted data':'Validated data',rows:data}];
  if(!acceptedOnly)sheets.push({name:'Issues',rows:[['Excel row','Column','Technical field','Severity','Rule','Value','Message'],...result.issues.map(x=>[x.row,x.column,x.field,x.severity,x.rule,x.value,x.message])],widths:[13,24,24,14,35,35,70]});
  sheets.push({name:'Run details',rows:[['Item','Value'],['Template',t.name],['Rows checked',result.rows],['Rows without errors',result.passed],['Errors',result.errors],['Warnings',result.warnings],['Issues listed',result.issues.length],['Issues truncated',result.truncated?'Yes; split the file for the full report.':'No'],['Generated',new Date().toISOString()]]});
+ if(t.lookups.some(l=>l.nameColumn||l.descriptionColumns?.length)){
+  const matches=[['Data row (1-based)','Reference','Code','Display name','Description','Reference row','Matching rows','Upload fields']],cache=new Map();let truncated=false;
+  for(let i=0;i<rows.length;i++){if(acceptedOnly&&result.status[i].errors)continue;for(const m of E().referenceDetails(t,rows[i],cache)){if(matches.length>10000){truncated=true;break;}matches.push([i+1,m.reference,m.code,m.displayName,m.description,m.sourceRow,m.matchCount,m.fields.join(' + ')]);}if(truncated)break;}
+  sheets.push({name:'Reference matches',rows:matches,widths:[20,28,24,35,65,18,18,40]});if(truncated)sheets.find(s=>s.name==='Run details').rows.push(['Reference matches truncated','First 10,000 matches shown. Split the file to export more.']);
+ }
  return workbook(sheets);
 }
 root.WorkHubValidatorFiles=Object.freeze({read,workbook,template,report,describeGroup,col,excelDate});

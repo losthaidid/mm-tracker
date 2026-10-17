@@ -1,7 +1,7 @@
 {
   "private": true,
   "scripts": {
-    "test": "node --test tests/*.test.mjs"
+    "test": "node --max-old-space-size=6144 --test tests/*.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.117.2",

@@ -4,6 +4,8 @@ Tickets, tasks, projects, scheduling, reporting, and private cloud saving.
 
 The selected Batch A workflow enhancements are documented in [BATCH-A.md](BATCH-A.md), including dependencies, wrap-ups, resume context, labels, environment badges, glossary, reading mode and work-location totals.
 
+The seven selected wishlist items and refreshed ticket screens are documented in [WISHLIST.md](WISHLIST.md), including snippets, bundles, timelines, reusable fields, reference combinations, reference descriptions and copy formats.
+
 ## Publish using GitHub Pages
 
 1. Create a repository named `mm-tracker`. GitHub Pages on a free personal account requires a public repository.

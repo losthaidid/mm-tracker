@@ -1,0 +1,29 @@
+# Wishlist and ticket workspace
+
+The seven selected items are now part of the existing account document. The tracker keeps its current sign-in, saving, backup and restore workflows. No database migration is needed.
+
+| Selection | Where to use it |
+| --- | --- |
+| 11 · Reusable response snippets | Open **Snippets → New snippet**. Save a title, category and reusable wording. Write changing details as `{name}`, `{ticket}` or your own `{placeholder_name}`. |
+| 47 · Work timeline | Open **Timeline** on a ticket, task, project item or knowledge card; project context also provides it. Filter status changes, work sessions, pauses, dependencies or other updates, and expand an event to inspect before/after values. |
+| 60 · Snippet bundles | Use **Snippets → Manage bundles** to organize messages by workflow. Removing a bundle keeps its messages unbundled; Undo restores the grouping unless a message has since moved. |
+| 63 · Reference combination checks | In **Validation Studio → Conditions**, choose **combination exists in reference**. Select a reference and map 2–10 distinct upload fields to reference columns. All mapped values must match the same reference row. Include the highlighted issue field in the mapping. |
+| 79 · Reusable field definitions | Open **Field library** from the column designer, or **Reusable field library** in Settings. **Keep this field** saves a selected column's type, limits, values, aliases and instructions. Inserting creates an independent copy with a unique name. Later library edits leave inserted columns and published versions unchanged. |
+| 84 · Reference value explanations | Add a reference list, then choose its code column, optional display-name column and up to five description columns. After a check, **Reference details** beside a row shows matched code meanings. Reports include a **Reference matches** sheet when these columns are configured. |
+| 141 · Snippet copy formats | Choose **Plain text**, **Email layout (rich text)** or **Ticket comment (Markdown)** in the composer. Fill all placeholders, review the preview, then copy. Rich email copying falls back to plain text when unavailable; if the clipboard is blocked the preview can be copied manually. |
+
+**Use a snippet** from a record fills known ticket/task/project, system, client, transport, status, priority and PIC details where available. Unknown recipients, dates and scenario details remain empty. It never sends a message. Composed values and clipboard previews stay in the browser; only saved snippet definitions sync.
+
+Tickets now feature a distinct latest-update panel, ownership line, delivery progress and clear actions. **View details** separates the latest update, interactive milestones, written history and ticket facts. **Edit Ticket** groups all existing fields into essentials, ownership/progress, delivery/effort, and history/timestamps, followed by **Work Context**. Existing status, milestone, history timestamp and context-save behavior is preserved.
+
+## Timeline scope
+
+The timeline records future record edits, milestone changes, context changes, dependency updates, task prerequisites, saved sessions, and pauses/resumes. It also displays existing dated creation, status and session records. It does not manufacture dates for older undated work or parse arbitrary history prose into purported audit events. It retains up to 12,000 recent recorded events within a 2 MiB timeline size limit; the timeline displays a notice after older events roll off. Long before/after text is shortened with an explicit label; the original record text remains intact. Backups include the retained timeline.
+
+Reference matching follows each upload field's trimming, case and type policy. Keep codes as Text to preserve leading zeros. If several reference rows match, up to five are shown per mapping with the full match count; the app does not choose a preferred meaning. Excel exports cap reference matches at 10,000, with an explicit truncation entry in Run details. Uploaded data remains local and only validation counts are saved, as before.
+
+The [example workspace](https://losthaidid.github.io/mm-tracker/tests/wishlist-preview.html) uses sample records held in memory, resets on reload and has no connection to an account. It exercises the production snippet, field library, timeline, ticket-layout and validation modules. Account saving, restoration and ownership are tested against the main application and database contract.
+
+## Verification
+
+Run `npm test` for the application, engine, Excel and database tests. The command gives the Node test process a 6 GiB maximum heap for the full JSDOM suite; this is a test-runner setting and does not change browser memory limits.
