@@ -2,7 +2,7 @@
 (function(root){
 'use strict';
 const TYPES=['text','integer','decimal','date','boolean'];
-const OPS={eq:'equals',neq:'does not equal',empty:'is empty',notEmpty:'is not empty',gt:'is greater than',gte:'is at least',lt:'is less than',lte:'is at most',contains:'contains',starts:'starts with',ends:'ends with',in:'is in list',notIn:'is not in list',fieldEq:'equals field',fieldNeq:'differs from field',fieldGte:'is on/after field',fieldLte:'is on/before field',lookup:'exists in reference',pattern:'matches format'};
+const OPS={eq:'equals',neq:'does not equal',empty:'is empty',notEmpty:'is not empty',gt:'is greater than',gte:'is at least',lt:'is less than',lte:'is at most',contains:'contains',starts:'starts with',ends:'ends with',in:'is in list',notIn:'is not in list',fieldEq:'equals field',fieldNeq:'differs from field',fieldGte:'is on/after field',fieldLte:'is on/before field',lookup:'exists in reference',lookupTuple:'combination exists in reference',pattern:'matches format'};
 const FORMATS={digits:/^\d+$/,alphanumeric:/^[A-Za-z0-9]+$/,email:/^[^\s@]+@[^\s@]+\.[^\s@]+$/,url:/^https?:\/\/[^\s]+$/i,identifier:/^[A-Za-z0-9_-]+$/};
 const LIMITS={templates:60,columns:80,rules:100,rows:5000,cells:200000,lookups:20,referenceRows:2000,versions:15,issues:15000};
 const copy=v=>JSON.parse(JSON.stringify(v));
@@ -33,6 +33,9 @@ function checkSchema(t,allowEmpty=false){
  if(!Array.isArray(t.lookups)||t.lookups.length>LIMITS.lookups)throw Error('Keep up to 20 reference lists per template.');
  for(const l of t.lookups){
   if(!l||!text(l.id,100)||!l.id||references.has(l.id)||!text(l.name,120)||!l.name.trim()||!Array.isArray(l.headers)||!l.headers.length||l.headers.length>30||l.headers.some(h=>!text(h,120)||!h.trim())||new Set(l.headers.map(h=>h.toLowerCase())).size!==l.headers.length||!Array.isArray(l.rows)||l.rows.length>LIMITS.referenceRows||l.rows.some(row=>!Array.isArray(row)||row.length>l.headers.length||row.some(v=>!text(v,2000))))throw Error('Check reference names, unique headers and reference values (up to 2,000 rows).');
+  if(l.codeColumn!==undefined&&(!text(l.codeColumn,120)||!l.headers.includes(l.codeColumn)))throw Error('Choose the reference code column.');
+  if(l.nameColumn!==undefined&&(!text(l.nameColumn,120)||l.nameColumn&&!l.headers.includes(l.nameColumn)))throw Error('Choose an existing reference display-name column.');
+  if(l.descriptionColumns!==undefined&&(!Array.isArray(l.descriptionColumns)||l.descriptionColumns.length>5||new Set(l.descriptionColumns).size!==l.descriptionColumns.length||l.descriptionColumns.some(k=>!l.headers.includes(k))))throw Error('Choose up to five existing reference description columns.');
   references.set(l.id,l);
  }
  if(!Array.isArray(t.rules)||t.rules.length>LIMITS.rules)throw Error('Keep up to 100 conditions per template.');
@@ -40,6 +43,7 @@ function checkSchema(t,allowEmpty=false){
   if(!c||!has(c.field)||!Object.hasOwn(OPS,c.operator)||!text(c.value||'',8000)||!text(c.otherField||'',64))throw Error('Every condition needs an existing field and a supported operator.');
   if(c.operator.startsWith('field')&&!has(c.otherField))throw Error('Choose the other field for a field comparison.');
   if(c.operator==='lookup'&&(!references.has(c.lookupId)||!references.get(c.lookupId).headers.includes(c.lookupColumn)))throw Error('Choose an existing reference list and reference column.');
+  if(c.operator==='lookupTuple'){const l=references.get(c.lookupId);if(!l||!Array.isArray(c.pairs)||c.pairs.some(p=>!p||typeof p!=='object')||c.pairs.length<2||c.pairs.length>10||new Set(c.pairs.map(p=>p.field)).size!==c.pairs.length||new Set(c.pairs.map(p=>p.referenceColumn)).size!==c.pairs.length||c.pairs.some(p=>!p||!has(p.field)||!l.headers.includes(p.referenceColumn))||!c.pairs.some(p=>p.field===c.field))throw Error('Map two to ten different upload fields to different reference columns, including the highlighted field.');}
   if(c.operator==='pattern'&&!Object.hasOwn(FORMATS,c.value))throw Error('Choose a supported format.');
   const field=t.columns.find(f=>f.key===c.field);if(['eq','neq','gt','gte','lt','lte'].includes(c.operator)&&!blank(c.value)&&comparable(c.value,field)===null)throw Error('Use a valid '+field.type+' value in the condition.');
   if(['in','notIn'].includes(c.operator)&&(!tokens(c.value).length||tokens(c.value).some(v=>comparable(v,field)===null)))throw Error('Provide valid values for the condition list.');
@@ -86,11 +90,36 @@ function testCondition(c,row,t,cache){
   case 'fieldLte':return a!==null&&b!==null&&a<=b;
   case 'pattern':return!blank(raw)&&FORMATS[c.value].test(normalized(raw,field));
   case 'lookup':{const l=t.lookups.find(x=>x.id===c.lookupId),i=l?.headers.indexOf(c.lookupColumn);if(!l||i<0)return false;if(!cache)return l.rows.some(r=>comparable(r[i],field)===a);const key=JSON.stringify([l.id,i,field.key]);if(!cache.has(key))cache.set(key,new Set(l.rows.map(r=>JSON.stringify(comparable(r[i],field)))));return cache.get(key).has(JSON.stringify(a));}
+  case 'lookupTuple':return referenceRows(c,row,t,cache).count>0;
   default:return false;
  }
 }
+
+function referenceRows(c,row,t,cache=new Map()){
+ const l=t.lookups.find(l=>l.id===c.lookupId);if(!l)return{rows:[],count:0};
+ const pairs=c.operator==='lookupTuple'?c.pairs:[{field:c.field,referenceColumn:c.lookupColumn}];if(!Array.isArray(pairs)||!pairs.length)return{rows:[],count:0};
+ const mapping=pairs.map(p=>({field:t.columns.find(f=>f.key===p.field),index:l.headers.indexOf(p.referenceColumn)}));if(mapping.some(m=>!m.field||m.index<0))return{rows:[],count:0};
+ const key=JSON.stringify(['reference-details',l.id,pairs]);
+ if(!cache.has(key)){
+  const index=new Map();l.rows.forEach((r,i)=>{const values=mapping.map(m=>comparable(r[m.index],m.field));if(values.some(v=>v===null))return;const key=JSON.stringify(values);if(!index.has(key))index.set(key,{rows:[],count:0});const match=index.get(key);match.count++;if(match.rows.length<5)match.rows.push({values:r,sourceRow:i+2});});cache.set(key,index);
+ }
+ const values=mapping.map(m=>comparable(own(row,m.field.key),m.field));if(values.some(v=>v===null))return{rows:[],count:0};return cache.get(key).get(JSON.stringify(values))||{rows:[],count:0};
+}
+function referenceDetails(t,row,cache=new Map()){
+ const conditions=[],seen=new Set(),out=[];
+ const walk=g=>{conditions.push(...g.conditions);g.groups.forEach(walk);};
+ for(const r of t.rules)if(r.enabled){walk(r.when);conditions.push(r.assertion);}
+ for(const c of conditions){
+  if(!['lookup','lookupTuple'].includes(c.operator))continue;const l=t.lookups.find(l=>l.id===c.lookupId);if(!l||!l.nameColumn&&!l.descriptionColumns?.length)continue;
+  const signature=JSON.stringify([c.lookupId,c.operator,c.field,c.lookupColumn,c.pairs]);if(seen.has(signature))continue;seen.add(signature);
+  const match=referenceRows(c,row,t,cache),get=(r,k)=>k?String(r[l.headers.indexOf(k)]??''):'';
+  for(const ref of match.rows)out.push({reference:l.name,code:get(ref.values,l.codeColumn||c.lookupColumn||c.pairs?.[0]?.referenceColumn),displayName:get(ref.values,l.nameColumn),description:(l.descriptionColumns||[]).map(k=>k+': '+get(ref.values,k)).join('\n'),sourceRow:ref.sourceRow,matchCount:match.count,fields:(c.operator==='lookupTuple'?c.pairs.map(p=>p.field):[c.field]).map(k=>t.columns.find(f=>f.key===k)?.label||k)});
+ }
+ return out;
+}
+
 function testGroup(g,row,t,cache){const checks=[...g.conditions.map(c=>testCondition(c,row,t,cache)),...g.groups.map(child=>testGroup(child,row,t,cache))];return(!checks.length||g.join==='all')?checks.every(Boolean):checks.some(Boolean);}
-function describe(c,t){const label=t.columns.find(f=>f.key===c.field)?.label||c.field;return label+' '+(OPS[c.operator]||c.operator)+(['empty','notEmpty'].includes(c.operator)?'':c.operator.startsWith('field')?' '+(t.columns.find(f=>f.key===c.otherField)?.label||c.otherField):c.operator==='lookup'?' '+(t.lookups.find(l=>l.id===c.lookupId)?.name||'reference'):' '+(c.value||'…'));}
+function describe(c,t){const label=t.columns.find(f=>f.key===c.field)?.label||c.field;return label+' '+(OPS[c.operator]||c.operator)+(['empty','notEmpty'].includes(c.operator)?'':c.operator.startsWith('field')?' '+(t.columns.find(f=>f.key===c.otherField)?.label||c.otherField):['lookup','lookupTuple'].includes(c.operator)?' '+(c.operator==='lookupTuple'?c.pairs.map(p=>(t.columns.find(f=>f.key===p.field)?.label||p.field)+' → '+p.referenceColumn).join(' + ')+' in ':'')+(t.lookups.find(l=>l.id===c.lookupId)?.name||'reference'):' '+(c.value||'…'));}
 function validateRows(t,rows){
  checkSchema(t);if(!Array.isArray(rows)||rows.length>LIMITS.rows||rows.length*t.columns.length>LIMITS.cells)throw Error('Validate up to 5,000 rows and 200,000 cells at a time.');
  const issues=[],status=rows.map(()=>({errors:0,warnings:0})),cache=new Map();let totalIssues=0;
@@ -158,5 +187,5 @@ function prepare(next,previous,restoring=false){
  if(restoring)return;
  for(const t of next.workhub?.validator?.templates||[]){const old=previous?.workhub?.validator?.templates.find(p=>p.id===t.id);if(!old)continue;for(const release of old.releases){const retained=t.releases.find(r=>r.version===release.version);if(!retained||JSON.stringify(retained)!==JSON.stringify(release))throw Error('Published versions are frozen. Copy a version into the draft to make changes.');}}
 }
-root.WorkHubValidatorEngine=Object.freeze({TYPES,OPS,FORMATS,LIMITS,uid,copy,column,create,condition,group,rule,schema,checkSchema,upgrade,validateState,prepare,validateRows,testCondition,testGroup,describe,headerKey,autoMap,mapRows,parseCSV,csv,example,blank,tokens});
+root.WorkHubValidatorEngine=Object.freeze({TYPES,OPS,FORMATS,LIMITS,uid,copy,column,create,condition,group,rule,schema,checkSchema,upgrade,validateState,prepare,validateRows,testCondition,testGroup,referenceRows,referenceDetails,describe,headerKey,autoMap,mapRows,parseCSV,csv,example,blank,tokens});
 })(typeof window!=='undefined'?window:globalThis);
