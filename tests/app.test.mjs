@@ -23,7 +23,7 @@ async function app(t,{storage={},rpcError=null,remote=null,login=true,styles=fal
  const intervals=[],frames=new Map();let nextFrame=1;
  window.setTimeout=()=>0;window.setInterval=(callback,ms)=>{intervals.push({callback,ms});return intervals.length;};
  window.requestAnimationFrame=callback=>{const id=nextFrame++;frames.set(id,callback);return id;};window.cancelAnimationFrame=id=>frames.delete(id);
- if(styles){const style=window.document.createElement('style');style.textContent=['studio.css','music.css','atmosphere.css','workbench.css','lab-workshop.css','soundscape.css','momo-moments.css','workspace-upgrades.css','workspace-features.css','momo-anime.css','validator-studio.css'].map(file=>readFileSync(new URL('../'+file,import.meta.url),'utf8')).join('\n');window.document.head.append(style);}
+ if(styles){const style=window.document.createElement('style');style.textContent=['studio.css','music.css','atmosphere.css','workbench.css','lab-workshop.css','soundscape.css','momo-moments.css','workspace-upgrades.css','workspace-features.css','momo-anime.css','validator-studio.css','batch-a.css'].map(file=>readFileSync(new URL('../'+file,import.meta.url),'utf8')).join('\n');window.document.head.append(style);}
  window.HTMLDialogElement.prototype.showModal=function(){this.setAttribute('open','');};
  window.HTMLDialogElement.prototype.close=function(){this.removeAttribute('open');};
  window.confirm=()=>true;
@@ -42,7 +42,7 @@ async function app(t,{storage={},rpcError=null,remote=null,login=true,styles=fal
   }
  };
  window.MMTrackerSupabase={createClient:()=>client};
- for(const file of ['sync-merge.js','momo-art.js','momo-life.js','music.js','atmosphere.js','lab-workshop.js','workspace-upgrades.js','workspace-features.js','workbench.js','lofi-engine.js','soundscape.js','momo-moments.js','reminders.js','reports.js','validator-engine.js','validator-files.js','validator-studio.js','studio.js'])window.eval(readFileSync(new URL('../'+file,import.meta.url),'utf8'));
+ for(const file of ['sync-merge.js','momo-art.js','momo-life.js','music.js','atmosphere.js','lab-workshop.js','workspace-upgrades.js','workspace-features.js','workbench.js','lofi-engine.js','soundscape.js','momo-moments.js','reminders.js','reports.js','validator-engine.js','validator-files.js','validator-studio.js','batch-a-engine.js','batch-a.js','studio.js'])window.eval(readFileSync(new URL('../'+file,import.meta.url),'utf8'));
  const script=[...window.document.scripts].find(script=>script.textContent.includes("'use strict'"));
  window.eval(script.textContent+`\nwindow.api={
   hub,queueCloudReview,state:()=>state,steps:()=>STEPS,cloud,KEY,payload,parseBackup,emptyState,validate,mutate,loadCloud,flushCloud,refreshCloud,retryCloud,closeModal,
@@ -81,6 +81,91 @@ function addBooking(api,document,start,end,{date='2026-10-16',endDate=date,text=
  api.openRangeEditor(date,start,'',true);const form=document.getElementById('scheduleForm');
  form.elements.namedItem('endDate').value=endDate;form.elements.namedItem('endTime').value=end;form.elements.namedItem('text').value=text;api.saveRange(form);
 }
+
+test('Batch A context survives base editors, cloud reopen and JSON backup restore',async t=>{
+ const {api,document,window,db}=await app(t),ui=api.hub.batchA,E=window.WorkHubBatchEngine;
+ ui.settings();let form=document.getElementById('batchLabel');form.elements.namedItem('name').value='Client discussion';ui.submit(form);
+ const label=api.state().workhub.batchA.labels[0].id;
+ api.editRecord('tasks');form=document.getElementById('editForm');form.elements.namedItem('task').value='Confirm design';form.elements.namedItem('batchEnvironment').value='qas';form.elements.namedItem('batchSystem').value='S4Q';form.elements.namedItem('batchClient').value='200';form.elements.namedItem('batchLabel').checked=true;api.saveEdit(form);await settle();
+ const id=api.state().tasks[0].id;assert.deepEqual(copy(E.meta(api.state(),'tasks',id).labelIds),[label]);assert.equal(E.meta(api.state(),'tasks',id).client,'200');
+ api.editRecord('tasks',id);form=document.getElementById('editForm');form.elements.namedItem('task').value='Confirm revised design';assert.equal(form.elements.namedItem('batchSystem').value,'S4Q');form.elements.namedItem('done').checked=true;form.elements.namedItem('batchOutcome').value='workaround';form.elements.namedItem('batchOutcomeNote').value='Approved interim approach';api.saveEdit(form);await settle();
+ assert.equal(E.meta(api.state(),'tasks',id).outcome,'workaround');assert.equal(E.meta(api.state(),'tasks',id).environmentId,'qas');
+ const restored=api.parseBackup(api.payload(api.state()));assert.equal(restored.workhub.batchA.records.find(x=>x.recordId===id).outcomeNote,'Approved interim approach');
+ const reopened=await app(t,{remote:copy(db.row),login:false});await reopened.api.loadCloud(sessionUser);await settle();assert.equal(reopened.api.state().workhub.batchA.records.find(x=>x.recordId===id).environmentId,'qas');
+});
+
+test('Batch A shared-label filters affect list, board and knowledge while preserving normal filters',async t=>{
+ const {api,document,window}=await app(t),ui=api.hub.batchA,E=window.WorkHubBatchEngine;
+ const a=addMainTask(api,document,'Labelled work'),b=addMainTask(api,document,'Other work');
+ api.mutate(d=>{d.workhub.batchA.labels.push({id:'label',name:'Urgent clarification'});E.patch(d,'tasks',a,{labelIds:['label'],environmentId:'dev'});});
+ api.showTab('tasks');let filter=document.querySelector('[name="batchFilterLabel"]');filter.value='label';filter.dispatchEvent(new window.Event('change',{bubbles:true}));
+ assert.equal(document.querySelectorAll('.task-main-card').length,1);assert.match(document.querySelector('.task-main-card').textContent,/Labelled work/);
+ api.hub.setBoard(true);api.showTab('tasks');assert.equal(document.querySelectorAll('[data-task-card]').length,1);assert.equal(document.querySelector('[data-task-card]').dataset.taskCard,a);
+ api.hub.setBoard(false);await api.hub.handle({dataset:{hub:'note-edit'}});let form=document.getElementById('hubNote');form.elements.namedItem('title').value='One definition';form.elements.namedItem('body').value='A reusable note';form.elements.namedItem('batchLabel').checked=true;api.hub.submit(form);
+ assert.deepEqual(copy(E.meta(api.state(),'notes',api.state().workhub.notes[0].id).labelIds),['label']);
+ api.showTab('knowledge');filter=document.querySelector('[name="batchFilterLabel"]');filter.value='label';filter.dispatchEvent(new window.Event('change',{bubbles:true}));assert.match(document.getElementById('view').textContent,/One definition/);
+ assert.equal(api.state().tasks.find(x=>x.id===b).task,'Other work');api.validate(api.state());
+});
+
+test('Batch A dependencies update from completion and a rejected cycle leaves saved state untouched',async t=>{
+ const {api,document,window}=await app(t),ui=api.hub.batchA,E=window.WorkHubBatchEngine,a=addMainTask(api,document,'Build'),b=addMainTask(api,document,'Approve');
+ ui.dependencies(a);let form=document.getElementById('batchDependency');form.elements.namedItem('targetId').value=b;ui.submit(form);assert.equal(E.blockers(api.state(),a).length,1);
+ ui.dependencies(b);form=document.getElementById('batchDependency');form.elements.namedItem('targetId').value=a;assert.throws(()=>ui.submit(form),/loop/);assert.equal(E.meta(api.state(),'tasks',b).dependencies.length,0);
+ api.hub.moveTask(b,'done');assert.equal(E.blockers(api.state(),a).length,0);
+ ui.dependencies(a);form=document.getElementById('batchDependency');form.elements.namedItem('type').value='document';form.elements.namedItem('title').value='Signed design';ui.submit(form);assert.equal(E.blockers(api.state(),a).length,1);
+ const dep=E.meta(api.state(),'tasks',a).dependencies.find(x=>x.type==='document');await ui.handle({dataset:{batch:'dependency-toggle',id:a,dependency:dep.id}});assert.equal(E.blockers(api.state(),a).length,0);
+});
+
+test('Batch A splitting copies task context and links and retains the original task and subtasks',async t=>{
+ const {api,document,window}=await app(t),ui=api.hub.batchA,E=window.WorkHubBatchEngine,id=addMainTask(api,document,'Large deliverable');
+ addTaskSub(api,document,id,'Existing step','Child notes','Child feedback');
+ api.editRecord('tasks',id);let form=document.getElementById('editForm');form.elements.namedItem('remarks').value='Original notes';form.elements.namedItem('feedback').value='Owner feedback';form.elements.namedItem('customLink').value='https://example.com/design';form.elements.namedItem('batchEnvironment').value='dev';api.saveEdit(form);
+ const original=copy(api.state().tasks[0]);await ui.handle({dataset:{batch:'split',id}});form=document.getElementById('batchSplit');form.elements.namedItem('titles').value='Prepare the change\nTest the change';ui.submit(form);
+ assert.equal(api.state().tasks.length,3);assert.deepEqual(copy(api.state().tasks[0]),original);
+ for(const task of api.state().tasks.slice(1)){assert.equal(task.remarks,'Original notes');assert.equal(task.feedback,'Owner feedback');assert.equal(task.customLink,'https://example.com/design');assert.equal(task.subTasks.length,0);assert.equal(E.meta(api.state(),'tasks',task.id).environmentId,'dev');}
+});
+
+test('Batch A glossary searches escaped text, rejects duplicates, and supports undo',async t=>{
+ const {api,document,window}=await app(t),ui=api.hub.batchA;
+ ui.glossaryForm();let form=document.getElementById('batchGlossary');form.elements.namedItem('term').value='BP <img src=x>';form.elements.namedItem('meaning').value='Business partner';form.elements.namedItem('aliases').value='Supplier';ui.submit(form);
+ assert.equal(document.querySelector('.batch-term img'),null);const search=document.getElementById('batchGlossarySearch');search.value='supplier';search.dispatchEvent(new window.Event('input',{bubbles:true}));assert.equal(document.querySelectorAll('.batch-term').length,1);
+ ui.glossaryForm();form=document.getElementById('batchGlossary');form.elements.namedItem('term').value='bp <img src=x>';form.elements.namedItem('meaning').value='A duplicate';assert.throws(()=>ui.submit(form),/unique glossary/);assert.equal(api.state().workhub.batchA.glossary.length,1);
+ const id=api.state().workhub.batchA.glossary[0].id;await ui.handle({dataset:{batch:'glossary-remove',id}});assert.equal(api.state().workhub.batchA.glossary.length,0);await ui.handle({dataset:{batch:'undo-glossary'}});assert.equal(api.state().workhub.batchA.glossary[0].id,id);
+});
+
+test('Batch A stale review and reading mode are explicit and navigation creates no cloud writes',async t=>{
+ const {api,document,window,db}=await app(t),ui=api.hub.batchA,E=window.WorkHubBatchEngine,id=addMainTask(api,document,'Review this older task');
+ api.mutate(d=>{const m=E.touch(d,'tasks',id);m.updatedAt='2020-01-01T00:00:00Z';m.createdAt=m.updatedAt;});await settle();
+ assert.equal(E.stale(api.state(),new Date().toISOString().slice(0,10)).items.length,1);
+ const before=db.calls.length;api.showTab('home');ui.staleView();assert.match(document.getElementById('modalBody').textContent,/Review this older task/);ui.recordView('tasks',id,true);assert.equal(document.getElementById('modal').classList.contains('batch-reading'),true);api.closeModal();api.showTab('tasks');await settle();assert.equal(db.calls.length,before);
+ await ui.handle({dataset:{batch:'reviewed',kind:'tasks',id}});assert.equal(E.stale(api.state(),new Date().toISOString().slice(0,10)).items.length,0);
+});
+
+test('Batch A stopwatch pause and wrap-up persist a useful resume thread with the saved session',async t=>{
+ const {api,document,window,db}=await app(t),ui=api.hub.batchA,E=window.WorkHubBatchEngine,id=addMainTask(api,document,'Investigate mapping');
+ api.hub.startTimer({kind:'task',linkId:id});const timer=api.hub.timer();timer.started=new Date(Date.now()-120000).toISOString();timer.runningSince=timer.started;
+ await api.hub.handle({dataset:{hub:'timer-pause'}});let form=document.getElementById('batchTimerPause');form.elements.namedItem('reason').value='approval';form.elements.namedItem('notes').value='Owner needs to confirm';form.elements.namedItem('nextStep').value='Check the signed design';ui.submit(form);
+ assert.equal(api.hub.timer().runningSince,null);assert.equal(E.meta(api.state(),'tasks',id).pause.active,true);api.showTab('home');assert.match(document.querySelector('.batch-resume').textContent,/Check the signed design/);
+ await settle();const storage=Object.fromEntries(Array.from({length:window.localStorage.length},(_,i)=>{const key=window.localStorage.key(i);return[key,window.localStorage.getItem(key)];})),reopened=await app(t,{remote:copy(db.row),storage,login:false});await reopened.api.loadCloud(sessionUser);await settle();assert.equal(reopened.api.hub.timer().pauseReason,'approval');assert.equal(reopened.api.hub.timer().nextStep,'Check the signed design');
+ await api.hub.handle({dataset:{hub:'timer-stop'}});form=document.getElementById('batchTimerWrap');form.elements.namedItem('completedWork').value='Compared both mappings';form.elements.namedItem('nextStep').value='Apply the approved change';ui.submit(form);await settle();
+ assert.equal(api.hub.timer(),null);assert.equal(api.state().workhub.sessions.length,1);const session=api.state().workhub.sessions[0];assert.equal(session.completedWork,'Compared both mappings');assert.equal(session.pauseReason,'approval');assert.equal(session.nextStep,'Apply the approved change');assert.equal(E.meta(api.state(),'tasks',id).lastSessionId,session.id);assert.equal(E.meta(api.state(),'tasks',id).pause.active,false);
+ api.showTab('home');assert.match(document.querySelector('.batch-resume').textContent,/Compared both mappings/);api.hub.setTool('sessions');api.showTab('studio');assert.match(document.querySelector('.batch-session-summary').textContent,/Apply the approved change/);
+ api.hub.startTimer({kind:'task',linkId:id});assert.equal(E.meta(api.state(),'tasks',id).nextStep,'');assert.equal(api.hub.timer().previousNextStep,'Apply the approved change');
+});
+
+test('Batch A location overview derives exact periods and environment maintenance keeps assigned IDs',async t=>{
+ const {api,document,window,db}=await app(t),ui=api.hub.batchA,E=window.WorkHubBatchEngine,id=addMainTask(api,document,'System check');
+ api.mutate(d=>E.patch(d,'tasks',id,{environmentId:'qas',systemId:'S4Q',client:'200'}));ui.settings();let form=document.querySelector('[data-batch-environment="qas"]');form.elements.namedItem('name').value='QUALITY';ui.submit(form);assert.equal(E.meta(api.state(),'tasks',id).environmentId,'qas');
+ addBooking(api,document,'09:15','10:45',{date:'2026-10-16'});await settle();const writes=db.calls.length;ui.locationView('2026-10-01','2026-10-31');assert.match(document.querySelector('.batch-location-totals').textContent,/1h 30m/);assert.match(document.querySelector('.batch-location-list').textContent,/Location not set/);await settle();assert.equal(db.calls.length,writes);
+ api.editProject(api.state().activeProjectId);form=document.getElementById('projectForm');form.elements.namedItem('batchEnvironment').value='prd';api.saveProject(form);assert.equal(E.meta(api.state(),'projects',api.state().activeProjectId).environmentId,'prd');
+ api.editRecord('specs');form=document.getElementById('editForm');form.elements.namedItem('description').value='A linked item';form.elements.namedItem('batchEnvironment').value='dev';api.saveEdit(form);assert.equal(E.meta(api.state(),'specs',api.state().specs[0].id).environmentId,'dev');
+});
+
+test('Batch A account changes clear filters and glossary undo context',async t=>{
+ const {api,document,window}=await app(t),ui=api.hub.batchA;addMainTask(api,document,'Private work');api.showTab('tasks');
+ const filter=document.querySelector('[name="batchFilterEnvironment"]');filter.value='dev';filter.dispatchEvent(new window.Event('change',{bubbles:true}));assert.equal(ui.filters().tasks.environment,'dev');
+ api.cloud.user=null;api.cloud.ready=false;api.showTab('home');assert.deepEqual(copy(ui.filters()),{});assert.equal(document.getElementById('batchUndo'),null);assert.throws(()=>ui.settings(),/Sign in/);
+});
 
 test('project sub-item remarks persist through editing, cloud saving and backup restore',async t=>{
  const {api,document,db}=await app(t);api.editRecord('specs');let form=document.getElementById('editForm');form.elements.namedItem('description').value='Project deliverable';api.saveEdit(form);await settle();
