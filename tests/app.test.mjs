@@ -15,7 +15,7 @@ async function atmosphereChoices(ctx,values={},meet=false){
  const submitter=form.querySelector('[value="'+(meet?'visit':'save')+'"]');form.dispatchEvent(new window.SubmitEvent('submit',{bubbles:true,cancelable:true,submitter}));await settle();
 }
 
-async function app(t,{storage={},rpcError=null,remote=null,login=true,styles=false}={}){
+async function app(t,{storage={},rpcError=null,remote=null,login=true,styles=false,adventures=false}={}){
  const dom=new JSDOM(html,{url:'https://losthaidid.github.io/mm-tracker/',runScripts:'outside-only',pretendToBeVisual:true});
  const {window}=dom;
  t.after(()=>window.close());
@@ -23,10 +23,11 @@ async function app(t,{storage={},rpcError=null,remote=null,login=true,styles=fal
  const intervals=[],frames=new Map();let nextFrame=1;
  window.setTimeout=()=>0;window.setInterval=(callback,ms)=>{intervals.push({callback,ms});return intervals.length;};
  window.requestAnimationFrame=callback=>{const id=nextFrame++;frames.set(id,callback);return id;};window.cancelAnimationFrame=id=>frames.delete(id);
- if(styles){const style=window.document.createElement('style');style.textContent=['studio.css','music.css','atmosphere.css','workbench.css','lab-workshop.css','soundscape.css','momo-moments.css','workspace-upgrades.css','workspace-features.css','momo-anime.css','validator-studio.css','batch-a.css','work-library.css','ticket-workspace.css','task-workspace.css','focus-panel.css'].map(file=>readFileSync(new URL('../'+file,import.meta.url),'utf8')).join('\n');window.document.head.append(style);}
+ if(styles){const style=window.document.createElement('style');style.textContent=['studio.css','music.css','atmosphere.css','workbench.css','lab-workshop.css','soundscape.css','momo-moments.css','workspace-upgrades.css','workspace-features.css','momo-anime.css','validator-studio.css','batch-a.css','work-library.css','ticket-workspace.css','task-workspace.css','focus-panel.css','momo-world.css'].map(file=>readFileSync(new URL('../'+file,import.meta.url),'utf8')).join('\n');window.document.head.append(style);}
  window.HTMLDialogElement.prototype.showModal=function(){this.setAttribute('open','');};
  window.HTMLDialogElement.prototype.close=function(){this.removeAttribute('open');};
  window.confirm=()=>true;
+ if(!adventures&&!storage['mm-tracker.momo-adventures.v1'])window.localStorage.setItem('mm-tracker.momo-adventures.v1',JSON.stringify({greetings:false,antics:false,reminders:false,chases:false}));
  for(const [key,value]of Object.entries(storage))window.localStorage.setItem(key,value);
  const db={row:remote,calls:[],error:rpcError,read:null,selects:[]};
  const client={
@@ -42,7 +43,7 @@ async function app(t,{storage={},rpcError=null,remote=null,login=true,styles=fal
   }
  };
  window.MMTrackerSupabase={createClient:()=>client};
- for(const file of ['sync-merge.js','momo-art.js','momo-life.js','music.js','atmosphere.js','lab-workshop.js','workspace-upgrades.js','workspace-features.js','workbench.js','lofi-engine.js','soundscape.js','momo-moments.js','reminders.js','reports.js','validator-engine.js','validator-files.js','validator-studio.js','batch-a-engine.js','batch-a.js','work-library-engine.js','work-library.js','ticket-workspace.js','focus-panel.js','studio.js'])window.eval(readFileSync(new URL('../'+file,import.meta.url),'utf8'));
+ for(const file of ['sync-merge.js','momo-art.js','momo-life.js','music.js','momo-world-art.js','atmosphere.js','lab-workshop.js','workspace-upgrades.js','workspace-features.js','workbench.js','lofi-engine.js','soundscape.js','momo-moments.js','reminders.js','reports.js','validator-engine.js','validator-files.js','validator-studio.js','batch-a-engine.js','batch-a.js','work-library-engine.js','work-library.js','ticket-workspace.js','focus-panel.js','momo-adventures.js','studio.js'])window.eval(readFileSync(new URL('../'+file,import.meta.url),'utf8'));
  const script=[...window.document.scripts].find(script=>script.textContent.includes("'use strict'"));
  window.eval(script.textContent+`\nwindow.api={
   hub,queueCloudReview,state:()=>state,steps:()=>STEPS,cloud,KEY,payload,parseBackup,emptyState,validate,mutate,loadCloud,flushCloud,refreshCloud,retryCloud,closeModal,
@@ -1205,7 +1206,7 @@ test('Momo unfolds a chair, settles, whistles, folds it away and keeps live pupi
 });
 
 test('Momo randomly nods off and wakes himself, while a requested home nap lasts until woken',async t=>{
- const {api,document,window,frames,db}=await app(t,{styles:true,storage:{'mm-tracker.momo-chatter.v1':'quiet'}}),pet=document.getElementById('hubPet'),life=api.hub.life;let now=window.Date.now();window.Date.now=()=>now;window.Math.random=()=>.64;
+ const {api,document,window,frames,db}=await app(t,{styles:true,storage:{'mm-tracker.momo-chatter.v1':'quiet'}}),pet=document.getElementById('hubPet'),life=api.hub.life;let now=window.Date.now();window.Date.now=()=>now;window.Math.random=()=>.36;
  now+=120000;life.tick();assert.equal(life.gestureState(),'sleep');assert.equal(pet.dataset.pose,'idle-sleep');assert.equal(window.getComputedStyle(pet.querySelector('.momo-eye-lids')).opacity,'1');now+=16000;life.tick();assert.equal(pet.dataset.pose,'stretch');now+=2100;life.tick();assert.equal(life.gestureState(),null);assert.equal(pet.dataset.pose,'idle');
  life.goHome();for(const [id,fn]of [...frames]){frames.delete(id);fn(window.performance.now()+10000);}assert.equal(pet.dataset.pose,'nap');now+=3600000;life.tick();assert.equal(pet.dataset.pose,'nap');life.wake();assert.equal(pet.dataset.pose,'stretch');now+=3500;life.tick();assert.notEqual(pet.dataset.pose,'nap');assert.equal(db.calls.length,0);
 });
@@ -1251,4 +1252,112 @@ test('floating Focus clamps dragging, supports keyboard movement and clears priv
 });
 test('floating Focus hides behind dialogs and cancels pending sound when the source changes',async t=>{
  const {api,document,window}=await app(t),audio=mockAmbientAudio(window,{pending:true});document.getElementById('focusModeButton').click();document.getElementById('fpSoundPlay').click();await settle();assert.equal(audio.length,1);document.querySelector('[data-focus="source"][data-source="music"]').click();audio[0].finishResume();await settle();assert.equal(api.hub.soundscape.snapshot().playing,false);assert.equal(document.getElementById('soundscapeDock'),null);api.editRecord('tasks');await settle();assert.equal(document.getElementById('focusPanel').hidden,true);api.closeModal();await settle();assert.equal(document.getElementById('focusPanel').hidden,false);await api.hub.handle({dataset:{hub:'privacy'}});await settle();assert.equal(document.getElementById('focusPanel').hidden,true);await api.hub.handle({dataset:{hub:'privacy'}});await settle();assert.equal(document.getElementById('focusPanel').hidden,false);
+});
+
+const adventureChoices={greetings:false,antics:false,reminders:false,chases:true};
+const adventureStorage=values=>({'mm-tracker.momo-adventures.v1':JSON.stringify({...adventureChoices,...values})});
+function submitLocal(window,form){form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));}
+function rect(left,top,width,height){return{left,top,width,height,right:left+width,bottom:top+height,x:left,y:top};}
+
+test('Momo world: rename follows account, backup and controls without treating names as markup',async t=>{
+ const {api,document,window,db}=await app(t),ui=api.hub.adventures;
+ ui.renameForm();let f=document.getElementById('momoNameForm');f.elements.namedItem('mascotName').value='<b>Mini</b>';submitLocal(window,f);await settle();
+ assert.equal(api.state().workhub.preferences.mascotName,'<b>Mini</b>');assert.equal(db.calls.length,1);assert.equal(db.row.document.data.workhub.preferences.mascotName,'<b>Mini</b>');
+ assert.equal(api.parseBackup(api.payload(api.state())).workhub.preferences.mascotName,'<b>Mini</b>');
+ api.hub.life.menu();const menu=document.getElementById('hubMomoMenu');assert.equal(menu.querySelector('strong').textContent,'A little time with <b>Mini</b>');assert.equal(menu.querySelector('b'),null);assert.match(document.querySelector('#hubPet>button').getAttribute('aria-label'),/^<b>Mini<\/b>,/);
+ menu.querySelector('[data-adventure="rename"]').click();f=document.getElementById('momoNameForm');assert.equal(f.elements.namedItem('mascotName').value,'<b>Mini</b>');assert.equal(f.querySelector('b'),null);f.elements.namedItem('mascotName').value='x'.repeat(33);submitLocal(window,f);assert.equal(api.state().workhub.preferences.mascotName,'<b>Mini</b>');assert.match(document.getElementById('toast').textContent,/1–32/);api.closeModal();
+ api.hub.moments.settings();assert.match(document.getElementById('momentsSettingsForm').textContent,/<b>Mini<\/b>/);assert.equal(document.querySelector('#momentsSettingsForm b'),null);api.closeModal();
+ api.hub.setTool('theme');api.showTab('studio');assert.match(document.getElementById('hubTheme').textContent,/Show <b>Mini<\/b>/);assert.equal(document.querySelector('#hubTheme label b'),null);
+ const reopened=await app(t,{remote:copy(db.row),login:false});await reopened.api.loadCloud(sessionUser);await settle();assert.equal(reopened.api.hub.adventures.snapshot().name,'<b>Mini</b>');
+ const bad=copy(api.state());bad.workhub.preferences.mascotName='bad\nname';assert.throws(()=>api.validate(bad),/companion name/);
+});
+
+test('Momo world: opening greeting waits for forms, waves once, and resets for the next account',async t=>{
+ const {api,document,window,db}=await app(t,{adventures:true,styles:true}),ui=api.hub.adventures;let clock=window.Date.now();window.Date.now=()=>clock;
+ api.editRecord('tasks');clock+=6000;ui.tick();assert.equal(ui.snapshot().pendingGreeting,true);assert.equal(document.getElementById('hubPet').dataset.adventure,undefined);
+ api.closeModal();document.activeElement?.blur();ui.tick();assert.equal(ui.snapshot().active.kind,'greeting');assert.equal(document.getElementById('hubPet').dataset.pose,'idle-wave');assert.match(window.getComputedStyle(document.querySelector('#hubPet .momo-arm-right')).animation,/world-wave/);assert.match(document.getElementById('hubPetBubble').textContent,/Haidid/);assert.equal(ui.snapshot().pendingGreeting,false);
+ clock+=7000;ui.tick();assert.equal(ui.snapshot().active,null);api.showTab('tickets');ui.tick();assert.equal(ui.snapshot().pendingGreeting,false);assert.notEqual(ui.snapshot().active?.kind,'greeting');
+ api.cloud.user={id:'22222222-2222-4222-8222-222222222222'};ui.mount();assert.equal(ui.snapshot().pendingGreeting,true);assert.equal(document.getElementById('hubPetBubble').hidden,true);assert.equal(db.calls.length,0);
+});
+
+test('Momo world: quiet time defers greetings and reduced motion delivers a still greeting',async t=>{
+ const {api,window,document}=await app(t,{adventures:true,storage:{'mm-tracker.momo-chatter.v1':'quiet'}}),ui=api.hub.adventures;const clock=window.Date.now()+6000;window.Date.now=()=>clock;ui.tick();assert.equal(ui.snapshot().pendingGreeting,true);
+ window.localStorage.removeItem('mm-tracker.momo-chatter.v1');window.matchMedia=()=>({matches:true});ui.tick();assert.equal(ui.snapshot().pendingGreeting,false);assert.equal(ui.snapshot().active,null);assert.match(document.getElementById('hubPetBubble').textContent,/Haidid/);assert.notEqual(document.getElementById('hubPet').dataset.pose,'idle-wave');
+});
+
+test('Momo world: all fourteen additional visitors have artwork and survive scrolling',async t=>{
+ const {api,document,window,db}=await app(t),world=api.hub.atmosphere;const old=['butterfly','bird','firefly'],added=world.visitorKinds.filter(k=>!old.includes(k));assert.equal(added.length,14);assert.equal(new Set(added).size,14);
+ for(const kind of added){assert.equal(world.invite(kind),true,kind);const visitor=document.querySelector('.hub-visitor');assert.equal(visitor.dataset.visitor,kind);assert.ok(visitor.querySelector('svg path'));window.dispatchEvent(new window.Event('scroll'));world.sync();assert.equal(document.querySelector('.hub-visitor'),visitor);world.clearVisitor();}
+ assert.equal(world.invite('rabbit'),true);const visitor=document.querySelector('.hub-visitor');world.positionVisitor(80,160);visitor.click();assert.equal(visitor.style.left,'80px');assert.equal(visitor.style.top,'160px');assert.equal(visitor.classList.contains('is-greeted'),true);assert.equal(db.calls.length,0);
+});
+
+test('Momo world: eight landscapes and weathers preview locally and rotate without changing records',async t=>{
+ const ctx=await app(t,{styles:true}),{api,window,document,db}=ctx,world=api.hub.atmosphere,before=JSON.stringify(api.state());assert.equal(Object.keys(world.scenes).length,8);assert.equal(Object.keys(world.weathers).length,8);
+ await atmosphereChoices(ctx,{scenery:'coast',weather:'snow'});assert.equal(world.snapshot().scenery,'coast');assert.equal(document.body.dataset.weather,'snow');assert.equal(window.getComputedStyle(document.querySelector('#hubAtmosphereCard .world-snow')).display,'inline');assert.equal(window.getComputedStyle(document.querySelector('#hubAtmosphereCard .world-rain')).display,'none');assert.equal(window.getComputedStyle(document.querySelector('#hubAtmosphereCard .world-scene-coast')).display,'inline');assert.equal(window.getComputedStyle(document.querySelector('#hubAtmosphereCard .world-scene-forest')).display,'none');
+ world.settings();let f=document.getElementById('atmosphereForm');f.elements.namedItem('scenery').value='forest';f.elements.namedItem('scenery').dispatchEvent(new window.Event('change',{bubbles:true}));assert.equal(document.getElementById('atmospherePreview').dataset.scenery,'forest');assert.equal(window.getComputedStyle(document.querySelector('#atmospherePreview .world-scene-coast')).display,'none');assert.equal(world.snapshot().scenery,'coast');api.closeModal();
+ await atmosphereChoices(ctx,{scenery:'random',weather:'random'});const current=world.snapshot(),clock=window.Date.now();window.Date.now=()=>clock+600000;world.tick();assert.notEqual(world.snapshot().scenery,current.scenery);assert.notEqual(world.snapshot().weather,current.weather);assert.equal(JSON.stringify(api.state()),before);assert.equal(db.calls.length,0);
+});
+
+test('Momo world: umbrella reserves headroom, holds steady and cleans up across scenes and small screens',async t=>{
+ const {api,document,window,frames,db}=await app(t,{styles:true}),life=api.hub.life,pet=document.getElementById('hubPet');
+ Object.defineProperty(window,'innerWidth',{configurable:true,value:375});Object.defineProperty(window,'innerHeight',{configurable:true,value:220});pet.style.left='900px';pet.style.top='0px';assert.equal(life.umbrella(),true);
+ let size=parseFloat(pet.style.width);assert.ok(parseFloat(pet.style.top)-size*.48>=11.99);assert.ok(parseFloat(pet.style.left)+size*1.08<=363.01);assert.ok(parseFloat(pet.style.top)+size<=208.01);assert.equal(pet.dataset.pose,'umbrella-walk');assert.equal(window.getComputedStyle(document.getElementById('hubMomoUmbrella')).left,'10%');
+ for(const [id,fn]of [...frames]){frames.delete(id);fn(window.performance.now()+4000);}assert.equal(pet.dataset.pose,'umbrella-walk');size=parseFloat(pet.style.width);assert.ok(parseFloat(pet.style.top)-size*.48>=11.99);
+ life.scene({pose:'theatre'});assert.equal(document.getElementById('hubMomoUmbrella'),null);assert.equal(pet.hasAttribute('data-umbrella'),false);life.scene(null);api.editRecord('tasks');assert.equal(life.umbrella(),false);assert.equal(db.calls.length,0);
+});
+
+test('Momo world: visitor chase crosses the viewport, survives scrolling, and yields to a form',async t=>{
+ const {api,document,window,db}=await app(t,{adventures:true,storage:adventureStorage({})}),ui=api.hub.adventures,world=api.hub.atmosphere;let clock=window.Date.now();window.Date.now=()=>clock;window.Math.random=()=>0;
+ assert.equal(world.invite('fox'),true);clock+=4500;ui.tick();assert.equal(ui.snapshot().active.kind,'chase');assert.equal(api.hub.moments.snapshot().active,null);assert.equal(document.getElementById('hubPet').dataset.pose,'run');const visitor=document.querySelector('.hub-visitor');
+ clock+=2500;ui.tick();const first=world.visitorPoint();clock+=3000;ui.tick();const second=world.visitorPoint();assert.ok(Math.abs(first.x-second.x)>150);window.dispatchEvent(new window.Event('scroll'));assert.equal(document.querySelector('.hub-visitor'),visitor);assert.equal(ui.snapshot().active.kind,'chase');
+ api.editRecord('tasks');await settle();assert.equal(ui.snapshot().active,null);assert.equal(document.querySelector('.hub-visitor'),null);assert.equal(db.calls.length,0);
+});
+
+test('Momo world: fast sprint is finite, bounded, read only and unavailable during Focus or reduced motion',async t=>{
+ const {api,document,window,frames,db}=await app(t),ui=api.hub.adventures,pet=document.getElementById('hubPet');const before=JSON.stringify(api.state()),left=pet.style.left;
+ assert.equal(ui.sprint(),true);assert.ok(ui.snapshot().active.duration<=1550);assert.equal(pet.dataset.pose,'run');for(const [id,fn]of [...frames]){frames.delete(id);fn(window.performance.now()+1800);}assert.equal(ui.snapshot().active,null);assert.notEqual(pet.style.left,left);assert.ok(parseFloat(pet.style.left)>=12);assert.ok(parseFloat(pet.style.left)+parseFloat(pet.style.width)<=window.innerWidth-12);
+ document.body.classList.add('hub-focus');assert.equal(ui.sprint(),false);document.body.classList.remove('hub-focus');window.matchMedia=()=>({matches:true});assert.equal(ui.sprint(),false);assert.equal(JSON.stringify(api.state()),before);assert.equal(db.calls.length,0);
+});
+
+test('Momo world: a section stretches visually while the real section, controls and records stay intact',async t=>{
+ const {api,document,window,db}=await app(t,{styles:true}),ui=api.hub.adventures,card=document.querySelector('#view .hub-card');assert.ok(card);card.getBoundingClientRect=()=>rect(220,180,300,150);const markup=card.outerHTML,before=JSON.stringify(api.state());
+ assert.equal(ui.pullSection(),true);const copyCard=document.getElementById('momoElasticCard');assert.ok(copyCard);assert.equal(copyCard.getAttribute('aria-hidden'),'true');assert.equal(copyCard.hasAttribute('inert'),true);assert.equal(copyCard.querySelector('[data-hub],[data-action],[id]'),null);for(const b of copyCard.querySelectorAll('button'))assert.equal(b.disabled,true);assert.equal(card.outerHTML,markup);assert.equal(JSON.stringify(api.state()),before);
+ window.dispatchEvent(new window.Event('scroll'));assert.equal(document.getElementById('momoElasticCard'),null);assert.equal(ui.snapshot().active,null);assert.equal(card.outerHTML,markup);assert.equal(db.calls.length,0);
+});
+
+test('Momo world: window watching uses the visible window and cancels when the page moves',async t=>{
+ const {api,document,window,db}=await app(t),ui=api.hub.adventures,card=document.getElementById('hubAtmosphereCard');card.getBoundingClientRect=()=>rect(20,260,180,125);
+ assert.equal(ui.watchWindow(),true);assert.equal(document.getElementById('hubPet').dataset.pose,'window-watch');assert.equal(ui.snapshot().active.kind,'window');window.dispatchEvent(new window.Event('scroll'));assert.equal(ui.snapshot().active,null);card.hidden=true;assert.equal(ui.watchWindow(),false);assert.equal(db.calls.length,0);
+});
+
+test('Momo world: work nudges use real open items, skip snoozed and completed work, and open the correct task',async t=>{
+ const {api,document,window,db}=await app(t),ui=api.hub.adventures,id=addMainTask(api,document,'Review Momo <img src=x> design'),done=addMainTask(api,document,'Already complete'),snoozed=addMainTask(api,document,'Later please');
+ api.mutate(d=>{d.tasks.find(x=>x.id===done).done=true;d.workhub.reminders.push({id:'tasks:'+snoozed,kind:'tasks',recordId:snoozed,until:'2099-01-01',note:'later',updatedAt:new Date().toISOString()});});await settle();const before=JSON.stringify(api.state()),calls=db.calls.length;window.Math.random=()=>0;
+ const list=ui.reminderCandidates();assert.ok(list.some(x=>x.id===id));assert.ok(!list.some(x=>x.id===done||x.id===snoozed));assert.equal(ui.nudge(),true);const bubble=document.getElementById('hubPetBubble');assert.match(bubble.textContent,/Haidid/);assert.match(bubble.textContent,/Review Momo <img src=x> design/);assert.equal(bubble.querySelector('img'),null);bubble.querySelector('[data-adventure="open-record"]').click();assert.match(document.getElementById('modal').textContent,/Review Momo <img src=x> design/);api.closeModal();document.body.classList.add('hub-private');assert.equal(ui.nudge(),false);await settle();assert.equal(JSON.stringify(api.state()),before);assert.equal(db.calls.length,calls);
+});
+
+test('Momo world: soccer counts requested kicks and cycles through eight surprises without repeats',async t=>{
+ const {api,document,window,db}=await app(t),ui=api.hub.adventures;let clock=window.Date.now();window.Date.now=()=>clock;const before=JSON.stringify(api.state()),seen=[];
+ ui.trickForm();let form=document.getElementById('momoJuggleForm');form.elements.namedItem('count').value='3';submitLocal(window,form);assert.equal(ui.snapshot().active.kind,'juggle');clock+=1300;ui.tick();assert.equal(document.getElementById('momoJuggleCount').textContent,'2 / 3');clock+=650;ui.tick();assert.equal(document.getElementById('momoJuggleCount').textContent,'3 / 3');assert.equal(ui.snapshot().active.finalised,true);seen.push(ui.snapshot().finale);assert.equal(document.querySelectorAll('#momoFinale span').length,12);ui.finish();
+ for(let i=1;i<8;i++){assert.equal(ui.juggle(i+1),true);clock+=(i+1)*650;ui.tick();seen.push(ui.snapshot().finale);assert.equal(ui.snapshot().active.kicks,i+1);ui.finish();}
+ assert.equal(new Set(seen).size,8);assert.equal(ui.snapshot().finalesRemaining,0);assert.equal(ui.juggle(1),true);clock+=650;ui.tick();assert.notEqual(ui.snapshot().finale,seen.at(-1));clock+=5000;ui.tick();assert.equal(ui.snapshot().active,null);assert.equal(document.getElementById('momoSoccerStage'),null);assert.equal(JSON.stringify(api.state()),before);assert.equal(db.calls.length,0);
+ for(const invalid of [0,51,2.5,NaN])assert.throws(()=>ui.juggle(invalid),/whole number/);
+});
+
+test('Momo world: adventures yield immediately to pickup, Escape, hidden pages and account changes',async t=>{
+ const {api,document,window,db}=await app(t),ui=api.hub.adventures;assert.equal(ui.juggle(50),true);document.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(ui.snapshot().active,null);
+ assert.equal(ui.juggle(2),true);pointer(window,document.querySelector('#hubPet>button'),'pointerdown',600,300,21);assert.equal(ui.snapshot().active,null);pointer(window,document.querySelector('#hubPet>button'),'pointerup',600,300,21);
+ assert.equal(ui.juggle(2),true);Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new window.Event('visibilitychange'));assert.equal(ui.snapshot().active,null);assert.equal(document.getElementById('momoSoccerStage'),null);Object.defineProperty(document,'hidden',{configurable:true,value:false});
+ assert.equal(ui.juggle(2),true);api.cloud.ready=false;ui.mount();assert.equal(ui.snapshot().active,null);assert.equal(document.getElementById('hubPetBubble').hidden,true);assert.equal(db.calls.length,0);
+});
+
+test('Momo world: a soccer invitation waits for a click before asking for a kick count',async t=>{
+ const {api,document,window,db}=await app(t),ui=api.hub.adventures;assert.equal(ui.offerTrick(),true);assert.equal(document.getElementById('momoJuggleForm'),null);assert.equal(document.querySelector('dialog[open]'),null);document.querySelector('#hubPetBubble [data-adventure="trick"]').click();assert.ok(document.getElementById('momoJuggleForm'));assert.equal(ui.snapshot().active,null);assert.equal(db.calls.length,0);
+ const f=document.getElementById('momoJuggleForm');f.elements.namedItem('count').value='2.5';submitLocal(window,f);assert.equal(ui.snapshot().active,null);assert.ok(document.querySelector('dialog[open]'));assert.match(document.getElementById('toast').textContent,/whole number/);
+});
+
+test('Momo world: new idle moves finish on time and linked project snoozes suppress work nudges',async t=>{
+ const {api,document,window,db}=await app(t),life=api.hub.life;let clock=window.Date.now();window.Date.now=()=>clock;
+ for(const kind of ['hop','tiptoe','hand-heart','peek','shadow-box','toe-spin','leaf-catch','pocket-search']){assert.equal(life.gesture(kind),true);assert.equal(document.getElementById('hubPet').dataset.pose,'idle-'+kind);clock+=4100;life.tick();assert.equal(life.gestureState(),null);}
+ const id=addMainTask(api,document,'Project work'),project=api.state().projects[0].id;api.mutate(d=>{d.tasks.find(x=>x.id===id).taskType='Project';d.tasks.find(x=>x.id===id).linkId=project;d.workhub.reminders.push({id:'projects:'+project,kind:'projects',recordId:project,until:'2099-01-01',note:'later',updatedAt:new Date().toISOString()});});await settle();const calls=db.calls.length;assert.equal(api.hub.adventures.reminderCandidates().some(x=>x.id===id||x.id===project),false);assert.equal(db.calls.length,calls);
 });
