@@ -47,7 +47,7 @@ function validate(d){
  for(const t of d.tasks||[])if(!Object.hasOwn(BOARD,t.boardStatus))throw Error('Check the task board status.');
 }
 function install(a){
- let batchA=null,validator=null,library=null,focusPanel=null,life=null,music=null,atmosphere=null,workbench=null,soundscape=null,moments=null,adventures=null,claims=null,recipients=null,projectDates=null,processDeck=null,chromeUX=null;
+ let batchA=null,validator=null,library=null,focusPanel=null,life=null,music=null,atmosphere=null,workbench=null,soundscape=null,moments=null,adventures=null,claims=null,recipients=null,settingsPanel=null,projectDates=null,processDeck=null,chromeUX=null;
  const reminders=root.WorkHubReminders?.install({...a,hubAction:el=>handle(el),react:(...args)=>react(...args)});
  const $=id=>document.getElementById(id),data=()=>a.state().workhub,prefs=()=>data().preferences;
  let currentTool='theme',processId='',stepId='',processArchive=false,sessionView='active',search='',board=false,dragId='',walkTimer=0,focus=null,petTimer=0,timerDraft=null,timerOwner='',viewTab='home',simulatorDraft=null,themePreview=null;
@@ -336,7 +336,7 @@ function install(a){
  }
  function afterRender(tab){batchA?.sync();validator?.sync();library?.sync();if(tab!=='studio'||currentTool!=='theme')themePreview=null;if(sorting&&!sorting.source.isConnected)clearSort();if(tab!=='processhub')clearTimeout(walkTimer);viewTab=tab;mountChrome();chromeUX?.mount();reminders?.decorate(tab);projectDates?.decorate();batchA?.mount(tab);library?.mount();mountUndo();document.body.classList.toggle('hub-focus',!!focus);const extra=$('hubBoardToggle');if(extra)extra.remove();if(tab==='tasks'&&!board){const target=$('view').querySelector('.workspace-heading .actions,.workspace-heading,.panel-top');if(target){const b=document.createElement('button');b.id='hubBoardToggle';b.dataset.hub='toggle-board';b.textContent='▥ Board view';target.append(b);}}
   if(['tickets','tasks','specs'].includes(tab)){const cards=$('view').querySelectorAll(tab==='tasks'?'.task-main-card':tab==='tickets'?'.ticket-card':'.item-card');for(const card of cards){const edit=card.querySelector('[data-action="edit"]');if(!edit)continue;const timer=document.createElement('button');timer.type='button';timer.className='small hub-private-only';timer.dataset.hub='timer-new';timer.dataset.kind=tab==='tasks'?'task':tab==='tickets'?'ticket':'project';timer.dataset.id=tab==='specs'?a.state().specs.find(x=>x.id===edit.dataset.id)?.projectId||'':edit.dataset.id;if(tab==='specs')timer.dataset.item=edit.dataset.id;timer.textContent='◷ Track time';card.append(timer);}}
-  if(tab==='tasks')arrangeTaskActions();focusPanel?.mount();adventures?.mount();claims?.mount(tab);recipients?.mount(tab);
+  if(tab==='tasks')arrangeTaskActions();focusPanel?.mount();adventures?.mount();claims?.mount(tab);recipients?.mount(tab);settingsPanel?.mount();
  }
  const renderers={home:dashboard,knowledge,processhub:processHub,waiting,studio,lab:()=>workbench?.render(),validator:()=>validator?.render(),snippets:()=>library?.render()};
  function render(tab){if(viewTab!==tab)search='';viewTab=tab;return tab==='tasks'&&board?taskBoard():renderers[tab]?.();}
@@ -463,7 +463,8 @@ function install(a){
  adventures=root.WorkHubMomoAdventures?.install({...a,ready:()=>a.cloud().ready,owner:()=>a.cloud().user?.id||'',prefs:()=>themePreview||prefs(),life:()=>life,moments:()=>moments,atmosphere:()=>atmosphere,workbench:()=>workbench,move:positionCompanion,stop:stopCompanionWalk,react});
  claims=root.WorkHubClaims.install({...a,ready:()=>a.cloud().ready,owner:()=>a.cloud().user?.id||''});
  recipients=root.WorkHubRecipients.install({...a,ready:()=>a.cloud().ready,owner:()=>a.cloud().user?.id||''});
- return{recipients,claims,adventures,batchA,validator,library,focusPanel,focusSnapshot,reminders,life,music,atmosphere,workbench,soundscape,moments,projectDates,processDeck,chromeUX,render,afterRender,prepare,saved,handle,submit,upgrade,validate,moveTask,simulationValues,sessionRanges,scheduleSession,startTimer,pauseTimer,resumeTimer,finishTimer,timer:()=>timerDraft,importTheme,themeValues,setBoard(value){board=value;},setTool(value){currentTool=value;},refreshTheme:applyTheme};
+ settingsPanel=root.WorkHubSettings.install({...a,ready:()=>a.cloud().ready,owner:()=>a.cloud().user?.id||''});
+ return{settingsPanel,recipients,claims,adventures,batchA,validator,library,focusPanel,focusSnapshot,reminders,life,music,atmosphere,workbench,soundscape,moments,projectDates,processDeck,chromeUX,render,afterRender,prepare,saved,handle,submit,upgrade,validate,moveTask,simulationValues,sessionRanges,scheduleSession,startTimer,pauseTimer,resumeTimer,finishTimer,timer:()=>timerDraft,importTheme,themeValues,setBoard(value){board=value;},setTool(value){currentTool=value;},refreshTheme:applyTheme};
 }
 root.WorkHubStudio={upgrade,validate,install,DEFAULTS,WIDGETS,subtaskCompletionButton};
 })(window);
