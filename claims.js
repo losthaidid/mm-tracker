@@ -320,6 +320,7 @@
         amount = number(form, 'amount', 2, 0.01, 1000000, 'a positive expense amount'),
         now = new Date().toISOString(),
         row = {
+          ...(old?.tngSource ? { tngSource: old.tngSource } : {}),
           id,
           date: value('date'),
           category: value('category'),
@@ -366,7 +367,7 @@
       return rows
         .map(
           e =>
-            `<article class="claim-expense-row${e.claimable ? '' : ' is-excluded'}"><div class="claim-date-chip"><strong>${Number(e.date.slice(8))}</strong><span>${esc(new Date(e.date + 'T12:00:00').toLocaleDateString('en-MY', { month: 'short' }))}</span></div><div class="claim-expense-copy"><span class="claim-category">${E.CATEGORIES[e.category]}${e.claimable ? '' : ' · excluded'}</span><strong class="hub-sensitive">${esc(e.description)}</strong><small>${esc([e.locationName, e.payment, e.reference].filter(Boolean).join(' · '))}</small></div><strong class="claim-expense-amount hub-sensitive">${E.money(e.amountCents)}</strong><div class="actions"><button type="button" class="small" data-claim="edit-expense" data-id="${esc(e.id)}" aria-label="Edit ${esc(e.description)}">Edit</button><button type="button" class="small" data-claim="delete-expense" data-id="${esc(e.id)}" aria-label="Delete ${esc(e.description)}">Delete</button></div></article>`
+            `<article class="claim-expense-row${e.claimable ? '' : ' is-excluded'}"><div class="claim-date-chip"><strong>${Number(e.date.slice(8))}</strong><span>${esc(new Date(e.date + 'T12:00:00').toLocaleDateString('en-MY', { month: 'short' }))}</span></div><div class="claim-expense-copy"><span class="claim-category">${E.CATEGORIES[e.category]}${e.claimable ? '' : ' · excluded'}</span><strong class="hub-sensitive">${esc(e.description)}</strong><small>${esc([e.locationName, e.payment, e.reference].filter(Boolean).join(' · '))}</small></div><strong class="claim-expense-amount hub-sensitive">${E.money(e.amountCents)}</strong><div class="actions"><button type="button" class="small" data-claim="edit-expense" data-id="${esc(e.id)}" aria-label="Edit ${esc(e.description)}">Edit</button>${e.tngSource ? `<button type="button" class="small" data-tng="open-source" data-id="${esc(e.id)}">PDF evidence</button>` : ''}<button type="button" class="small" data-claim="delete-expense" data-id="${esc(e.id)}" aria-label="Delete ${esc(e.description)}">Delete</button></div></article>`
         )
         .join('');
     }

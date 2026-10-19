@@ -260,6 +260,7 @@
       moments = null,
       adventures = null,
       claims = null,
+      tng = null,
       recipients = null,
       settingsPanel = null,
       projectDates = null,
@@ -2451,6 +2452,7 @@
       focusPanel?.mount();
       adventures?.mount();
       claims?.mount(tab);
+      tng?.mount(tab);
       recipients?.mount(tab);
       settingsPanel?.mount();
     }
@@ -3635,6 +3637,11 @@
       ready: () => a.cloud().ready,
       owner: () => a.cloud().user?.id || '',
     });
+    tng = root.WorkHubTng.install({
+      ...a,
+      ready: () => a.cloud().ready,
+      owner: () => a.cloud().user?.id || '',
+    });
     recipients = root.WorkHubRecipients.install({
       ...a,
       ready: () => a.cloud().ready,
@@ -3649,6 +3656,7 @@
       settingsPanel,
       recipients,
       claims,
+      tng,
       adventures,
       batchA,
       validator,

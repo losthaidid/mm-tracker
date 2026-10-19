@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>TNG and Lab — synthetic preview</title>
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; worker-src 'self' blob:; font-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; base-uri 'self'"
+    />
+    <link rel="stylesheet" href="../base.css" />
+    <link rel="stylesheet" href="../studio.css" />
+    <link rel="stylesheet" href="../lab-workshop.css" />
+    <link rel="stylesheet" href="../tng.css" />
+    <style>
+      body { padding: 20px; background: #f7f7f1; }
+      .preview-head { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+      .preview-head h1 { font-size: 20px; margin: 0 auto 0 0; }
+      .preview-note { padding: 12px; background: #eef3e8; border-radius: 10px; margin-bottom: 15px; }
+      #view { max-width: 1400px; margin: auto; }
+      body.preview-phone #modal { width: 390px; max-width: 95vw; }
+      /* A narrow dialog alone does not trigger viewport media queries. */
+      body.preview-phone .tng-main { grid-template-columns: 1fr; }
+      body.preview-phone .tng-preview { position: relative; }
+      body.preview-phone .tng-summary, body.preview-phone .tng-filters { grid-template-columns: 1fr 1fr; }
+      body.preview-phone .tng-picked { grid-column: 1 / -1; }
+      body.preview-phone .tng-upload { flex-wrap: wrap; }
+      #previewStatus { font-size: 13px; }
+      .modal { max-height: 95vh; }
+    </style>
+  </head>
+  <body>
+    <div class="preview-head">
+      <h1>WorkHub · feature preview</h1>
+      <button id="openTng">TNG desk</button><button id="demoTng">Open synthetic statement</button
+      ><button id="openLab">Saved Lab case</button><button id="phoneWidth">Phone width</button>
+    </div>
+    <p class="preview-note">
+      Synthetic records only. This preview has no account connection. Expense saves stay in memory
+      and reset on reload.
+    </p>
+    <p id="previewStatus" role="status"></p>
+    <div id="view"></div>
+    <dialog id="modal" class="modal">
+      <div class="modal-head">
+        <h2 id="modalTitle"></h2>
+        <button id="closeModal">Close</button>
+      </div>
+      <div id="modalBody" class="modal-body"></div>
+    </dialog>
+    <script src="../vendor/jszip.min.js"></script>
+    <script src="../claims-engine.js"></script>
+    <script src="../tng-engine.js"></script>
+    <script src="../tng-files.js"></script>
+    <script src="../tng.js"></script>
+    <script src="../lab-workshop.js"></script>
+    <script src="tng-lab-preview.js"></script>
+  </body>
+</html>

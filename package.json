@@ -8,7 +8,9 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "2.117.2",
-    "esbuild": "0.28.2"
+    "esbuild": "0.28.2",
+    "pdfjs-dist": "6.4.299",
+    "pdf-lib": "1.17.1"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.10",

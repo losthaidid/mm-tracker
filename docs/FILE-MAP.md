@@ -42,6 +42,9 @@ CSS (`.css`) controls appearance; HTML supplies the initial page structure.
 | [app.js](../app.js), [base.css](../base.css) | Schedule views, exact minute intervals, bookings, project-calendar links and the original form layouts. |
 | [claims-engine.js](../claims-engine.js) | Location/rate rules, booking travel snapshots, integer-sen calculations, monthly totals and CSV output. |
 | [claims.js](../claims.js), [claims.css](../claims.css) | Maintainable mileage locations, travel fields, monthly summary and other-expense ledger. |
+| [tng-engine.js](../tng-engine.js) | Positioned statement-table parsing, integer-sen amounts, on-site suggestions, duplicate identities and confirmed expense/source validation. No PDF library or account writes. |
+| [tng-files.js](../tng-files.js) | Lazy local PDF.js loading, source-page rendering, faithful row crops and PNG/PDF/ZIP evidence generation. PDF bytes stay in memory. |
+| [tng.js](../tng.js), [tng.css](../tng.css) | Schedule's TNG review desk, date filters, manual drafts, visit allocation, bounded crop controls and explicit expense saves. |
 | [recipients-engine.js](../recipients-engine.js) | Email validation, bulk parsing, duplicates, To/Cc/Bcc grouping and plain address output. |
 | [recipients.js](../recipients.js), [recipients.css](../recipients.css) | Company/contact forms, list search, undo, copy preview and clipboard fallback. |
 | [company-process-template.xlsx](../company-process-template.xlsx) | Downloadable company/process import template. Import parsing is in `app.js`. |
@@ -51,7 +54,7 @@ CSS (`.css`) controls appearance; HTML supplies the initial page structure.
 | Files | What they control |
 | --- | --- |
 | [workbench.js](../workbench.js), [workbench.css](../workbench.css) | Quick status actions, record previews and troubleshooting case records. |
-| [lab-workshop.js](../lab-workshop.js), [lab-workshop.css](../lab-workshop.css) | Visual investigation board, experiments, gestures and reactions. |
+| [lab-workshop.js](../lab-workshop.js), [lab-workshop.css](../lab-workshop.css) | Visual investigation board, experiments, gestures and reactions; automatic saved-result loops and local Pause/Stop/speed controls. |
 | [validator-engine.js](../validator-engine.js) | Template/field/rule definitions, schema checks, row validation, lookup checks and CSV helpers. |
 | [validator-files.js](../validator-files.js) | Local CSV/TSV/XLSX reading and template/results workbook exports. |
 | [validator-studio.js](../validator-studio.js), [validator-studio.css](../validator-studio.css) | Template designer, upload mapping and results screens. Uploaded rows remain in memory. |
@@ -80,6 +83,7 @@ CSS (`.css`) controls appearance; HTML supplies the initial page structure.
 | [cloud-entry.js](../cloud-entry.js) | Small source entry used to generate the Supabase browser bundle. |
 | [supabase-client.js](../supabase-client.js) | Generated Supabase library. Rebuild from `cloud-entry.js`; do not manually reformat/edit this bundle. |
 | [vendor/jszip.min.js](../vendor/jszip.min.js) | Supplied JSZip 3.10.1 library, moved unchanged out of the page. Reads compressed Excel uploads. Production and preview tests now share one copy. |
+| [vendor/pdfjs/](../vendor/pdfjs/), [vendor/pdf-lib/](../vendor/pdf-lib/) | Unmodified PDF.js 6.4.299 legacy reader/worker and pdf-lib 1.17.1 export module with their licences. Loaded only when needed; keep each reader and its worker on the same version. |
 | [cloud-schema.sql](../cloud-schema.sql) | Initial database setup for a fresh installation, including private-record policies and revision-based saves. |
 | [supabase/migrations/](../supabase/migrations/) | Existing database format updates: version 5–7 support; precise schedules/subtask notes; workspace document version support. Ordinary wording/CSS edits need no SQL migration. |
 | [THIRD-PARTY-LICENSES.txt](../THIRD-PARTY-LICENSES.txt) | Supplied library licence notices. JSZip also retains its original licence header. |
@@ -91,11 +95,13 @@ CSS (`.css`) controls appearance; HTML supplies the initial page structure.
 | [tests/app.test.mjs](../tests/app.test.mjs) | Runs the production page/modules in a simulated browser, with fake account/network state. Checks editors, cloud saving, integrations and selected computed styles. |
 | [tests/database.test.mjs](../tests/database.test.mjs) | Database/schema/migration checks using an isolated test database. |
 | [tests/batch-a.test.mjs](../tests/batch-a.test.mjs), [tests/claims.test.mjs](../tests/claims.test.mjs), [tests/recipients.test.mjs](../tests/recipients.test.mjs) | Focused workflow, expense and recipient rule tests. |
+| [tests/tng.test.mjs](../tests/tng.test.mjs) | Synthetic offline/online statement parsing, amount/date rules, Schedule matching, duplicate prevention and bounded evidence provenance. No private statement fixture. |
 | [tests/validator.test.mjs](../tests/validator.test.mjs), [tests/work-library.test.mjs](../tests/work-library.test.mjs) | Validation and reusable-library tests. |
 | [tests/source-layout.test.mjs](../tests/source-layout.test.mjs) | Checks production asset paths/order and the protected vendor/empty-seed layout after extraction. |
 | `tests/*-preview.html` | Manual feature preview pages for Momo, Batch A, Validation Studio and wishlist tools. These are development previews, not extra live application pages. |
 | [README.md](../README.md) | Setup, deployment, cloud saving and feature usage. |
 | [BATCH-A.md](../BATCH-A.md), [WISHLIST.md](../WISHLIST.md), [VALIDATION-STUDIO.md](../VALIDATION-STUDIO.md) | Implemented feature instructions. |
+| [BATCH-B.md](../BATCH-B.md), [docs/TNG-AND-LAB.md](TNG-AND-LAB.md) | Deferred Momo behaviour batch; TNG review/export and saved Lab playback instructions. |
 | [docs/EDITING-GUIDE.md](EDITING-GUIDE.md) | Beginner editing steps, examples and explanation of the application flow. |
 | [docs/SOURCE-CLEANUP.md](SOURCE-CLEANUP.md) | What this cleanup changed and why some compatibility code remains. |
 | [package.json](../package.json), [package-lock.json](../package-lock.json) | Developer commands and pinned tool/library versions. Not needed to run the published site. |

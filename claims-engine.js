@@ -132,6 +132,11 @@
       )
         throw Error('Check the expense date, description and positive RM amount.');
       expenseIds.add(e.id);
+      if (e.tngSource !== undefined) {
+        if (!root.WorkHubTngEngine)
+          throw Error('Reload the TNG reader before restoring these expense sources.');
+        root.WorkHubTngEngine.validateSource(e.tngSource);
+      }
     }
     const bookings = new Map();
     for (const s of d.schedule || []) {
