@@ -15,7 +15,7 @@ function upgrade(d){
  if(!d.workhub)d.workhub={};const h=d.workhub;
  for(const key of ['notes','processes','waiting','sessions','scrapbook'])if(h[key]===undefined)h[key]=[];
  if(h.preferences===undefined)h.preferences={...DEFAULTS};else h.preferences={...DEFAULTS,...h.preferences};
- root.WorkHubAppearance.upgrade(h.preferences);root.WorkHubProjectDates.upgrade(d);root.WorkHubLeave.upgrade(d);
+ root.WorkHubAppearance.upgrade(h.preferences);root.WorkHubProjectDates.upgrade(d);root.WorkHubLeave.upgrade(d);root.WorkHubClaimsEngine.upgrade(d);
  if(h.widgets===undefined)h.widgets=DEFAULT_WIDGETS.map(id=>({id,span:['today','journey'].includes(id)?'wide':'normal'}));
  if(h.ticketClosures===undefined)h.ticketClosures=[];
  root.WorkHubReminders?.upgrade(d);
@@ -28,7 +28,7 @@ function upgrade(d){
 function validate(d){
  root.WorkHubWorkbench?.validate(d);root.WorkHubValidatorEngine?.validateState(d);root.WorkHubBatchEngine?.validate(d);root.WorkHubWorkLibraryEngine?.validate(d);
  root.WorkHubReminders?.validate(d);
- root.WorkHubProjectDates.validate(d);root.WorkHubLeave.validate(d);
+ root.WorkHubProjectDates.validate(d);root.WorkHubLeave.validate(d);root.WorkHubClaimsEngine.validate(d);
  const h=d.workhub;if(!h||typeof h!=='object'||Array.isArray(h))throw Error('Check the workspace records.');
  function text(v,max=32767){return typeof v==='string'&&v.length<=max&&!/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(v);}
  for(const k of ['notes','processes','waiting','sessions','scrapbook']){
@@ -47,7 +47,7 @@ function validate(d){
  for(const t of d.tasks||[])if(!Object.hasOwn(BOARD,t.boardStatus))throw Error('Check the task board status.');
 }
 function install(a){
- let batchA=null,validator=null,library=null,focusPanel=null,life=null,music=null,atmosphere=null,workbench=null,soundscape=null,moments=null,adventures=null,projectDates=null,processDeck=null,chromeUX=null;
+ let batchA=null,validator=null,library=null,focusPanel=null,life=null,music=null,atmosphere=null,workbench=null,soundscape=null,moments=null,adventures=null,claims=null,projectDates=null,processDeck=null,chromeUX=null;
  const reminders=root.WorkHubReminders?.install({...a,hubAction:el=>handle(el),react:(...args)=>react(...args)});
  const $=id=>document.getElementById(id),data=()=>a.state().workhub,prefs=()=>data().preferences;
  let currentTool='theme',processId='',stepId='',processArchive=false,sessionView='active',search='',board=false,dragId='',walkTimer=0,focus=null,petTimer=0,timerDraft=null,timerOwner='',viewTab='home',simulatorDraft=null,themePreview=null;
@@ -320,7 +320,7 @@ function install(a){
  function navigate(t){search='';viewTab=t;a.navigate(t);}
  function exportTheme(){a.download(JSON.stringify({app:'mm-tracker-theme',version:1,preferences:prefs()},null,2),'workhub-theme.json','application/json');}
  async function importTheme(file){if(!file)return;if(file.size>20000)throw Error('Theme files must be smaller than 20 KB.');const x=JSON.parse(await file.text());if(x.app!=='mm-tracker-theme'||x.version!==1)throw Error('Choose a WorkHub theme file.');const d=copy(a.state());d.workhub.preferences={...DEFAULTS,...x.preferences};root.WorkHubAppearance.upgrade(d.workhub.preferences);validate(d);themePreview=null;save(h=>h.preferences=d.workhub.preferences,'Theme imported.');}
- function prepare(next,previous,restoring=false){upgrade(next);root.WorkHubValidatorEngine?.prepare(next,previous,restoring);root.WorkHubProjectDates.prepare(next,previous,today(),restoring);const h=next.workhub;for(const t of next.tickets){const old=previous?.tickets.find(x=>x.id===t.id),closed=x=>['Closed','Completed'].includes(x?.status),i=h.ticketClosures.findIndex(x=>x.id===t.id);if(closed(t)&&old&&!closed(old)){const entry={id:t.id,date:today()};if(i<0)h.ticketClosures.push(entry);else h.ticketClosures[i]=entry;}if(!closed(t)&&i>=0)h.ticketClosures.splice(i,1);}for(const p of next.projects){const old=previous?.projects.find(x=>x.id===p.id);if(old&&old.phase!==p.phase){h.scrapbook.push({id:uid(),title:p.name+' · '+p.phase,date:today(),notes:'Project phase advanced from '+old.phase+'.',projectId:p.id});if(h.scrapbook.length>2000)h.scrapbook.shift();}}const oldTasks=new Map((previous?.tasks||[]).map(t=>[t.id,t]));for(const t of next.tasks){if(t.done){t.boardStatus='done';if(!oldTasks.get(t.id)?.done){const completedAt=now();for(const sub of t.subTasks)if(sub.status!=='Completed'){sub.status='Completed';sub.updatedAt=completedAt;}}}else if(t.boardStatus==='done')t.boardStatus='todo';}root.WorkHubBatchEngine?.prepare(next,previous,restoring);root.WorkHubWorkLibraryEngine?.prepare(next,previous,restoring);}
+ function prepare(next,previous,restoring=false){upgrade(next);root.WorkHubClaimsEngine.prepare(next,previous,restoring);root.WorkHubValidatorEngine?.prepare(next,previous,restoring);root.WorkHubProjectDates.prepare(next,previous,today(),restoring);const h=next.workhub;for(const t of next.tickets){const old=previous?.tickets.find(x=>x.id===t.id),closed=x=>['Closed','Completed'].includes(x?.status),i=h.ticketClosures.findIndex(x=>x.id===t.id);if(closed(t)&&old&&!closed(old)){const entry={id:t.id,date:today()};if(i<0)h.ticketClosures.push(entry);else h.ticketClosures[i]=entry;}if(!closed(t)&&i>=0)h.ticketClosures.splice(i,1);}for(const p of next.projects){const old=previous?.projects.find(x=>x.id===p.id);if(old&&old.phase!==p.phase){h.scrapbook.push({id:uid(),title:p.name+' · '+p.phase,date:today(),notes:'Project phase advanced from '+old.phase+'.',projectId:p.id});if(h.scrapbook.length>2000)h.scrapbook.shift();}}const oldTasks=new Map((previous?.tasks||[]).map(t=>[t.id,t]));for(const t of next.tasks){if(t.done){t.boardStatus='done';if(!oldTasks.get(t.id)?.done){const completedAt=now();for(const sub of t.subTasks)if(sub.status!=='Completed'){sub.status='Completed';sub.updatedAt=completedAt;}}}else if(t.boardStatus==='done')t.boardStatus='todo';}root.WorkHubBatchEngine?.prepare(next,previous,restoring);root.WorkHubWorkLibraryEngine?.prepare(next,previous,restoring);}
  function saved(previous,next){const before=previous.tasks.filter(t=>t.done).length,after=next.tasks.filter(t=>t.done).length,sub=d=>d.tasks.reduce((n,t)=>n+t.subTasks.filter(s=>s.status==='Completed').length,0),phase=next.projects.some(p=>previous.projects.find(x=>x.id===p.id)?.phase!==p.phase);if(after>before||sub(next)>sub(previous)||phase)confetti();else react('busy');}
  function arrangeTaskActions(){
   const art={edit:'M15 5l4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15v5Z',archive:'M4 8h16v12H4V8M3 3h18v5H3V3M9 12h6',reminder:'M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4',timer:'M12 8v5l3 2M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0'};
@@ -336,7 +336,7 @@ function install(a){
  }
  function afterRender(tab){batchA?.sync();validator?.sync();library?.sync();if(tab!=='studio'||currentTool!=='theme')themePreview=null;if(sorting&&!sorting.source.isConnected)clearSort();if(tab!=='processhub')clearTimeout(walkTimer);viewTab=tab;mountChrome();chromeUX?.mount();reminders?.decorate(tab);projectDates?.decorate();batchA?.mount(tab);library?.mount();mountUndo();document.body.classList.toggle('hub-focus',!!focus);const extra=$('hubBoardToggle');if(extra)extra.remove();if(tab==='tasks'&&!board){const target=$('view').querySelector('.workspace-heading .actions,.workspace-heading,.panel-top');if(target){const b=document.createElement('button');b.id='hubBoardToggle';b.dataset.hub='toggle-board';b.textContent='▥ Board view';target.append(b);}}
   if(['tickets','tasks','specs'].includes(tab)){const cards=$('view').querySelectorAll(tab==='tasks'?'.task-main-card':tab==='tickets'?'.ticket-card':'.item-card');for(const card of cards){const edit=card.querySelector('[data-action="edit"]');if(!edit)continue;const timer=document.createElement('button');timer.type='button';timer.className='small hub-private-only';timer.dataset.hub='timer-new';timer.dataset.kind=tab==='tasks'?'task':tab==='tickets'?'ticket':'project';timer.dataset.id=tab==='specs'?a.state().specs.find(x=>x.id===edit.dataset.id)?.projectId||'':edit.dataset.id;if(tab==='specs')timer.dataset.item=edit.dataset.id;timer.textContent='◷ Track time';card.append(timer);}}
-  if(tab==='tasks')arrangeTaskActions();focusPanel?.mount();adventures?.mount();
+  if(tab==='tasks')arrangeTaskActions();focusPanel?.mount();adventures?.mount();claims?.mount(tab);
  }
  const renderers={home:dashboard,knowledge,processhub:processHub,waiting,studio,lab:()=>workbench?.render(),validator:()=>validator?.render(),snippets:()=>library?.render()};
  function render(tab){if(viewTab!==tab)search='';viewTab=tab;return tab==='tasks'&&board?taskBoard():renderers[tab]?.();}
@@ -461,7 +461,8 @@ function install(a){
  moments=root.WorkHubMomoMoments?.install({...a,ready:()=>a.cloud().ready,owner:()=>a.cloud().user?.id||'',prefs:()=>themePreview||prefs(),life:()=>life,workbench:()=>workbench,move:positionCompanion,react});
  focusPanel=root.WorkHubFocusPanel?.install({ready:()=>a.cloud().ready,owner:()=>a.cloud().user?.id||'',tasks:()=>a.state().tasks.filter(t=>!t.done&&!t.archived),focus:focusSnapshot,start:(minutes,task)=>startFocus({elements:{namedItem:k=>({value:k==='minutes'?String(minutes):task})}}),pause:pauseFocus,end:endFocus,reset:endFocus,soundscape:()=>soundscape,music:()=>music,tell:a.tell});
  adventures=root.WorkHubMomoAdventures?.install({...a,ready:()=>a.cloud().ready,owner:()=>a.cloud().user?.id||'',prefs:()=>themePreview||prefs(),life:()=>life,moments:()=>moments,atmosphere:()=>atmosphere,workbench:()=>workbench,move:positionCompanion,stop:stopCompanionWalk,react});
- return{adventures,batchA,validator,library,focusPanel,focusSnapshot,reminders,life,music,atmosphere,workbench,soundscape,moments,projectDates,processDeck,chromeUX,render,afterRender,prepare,saved,handle,submit,upgrade,validate,moveTask,simulationValues,sessionRanges,scheduleSession,startTimer,pauseTimer,resumeTimer,finishTimer,timer:()=>timerDraft,importTheme,themeValues,setBoard(value){board=value;},setTool(value){currentTool=value;},refreshTheme:applyTheme};
+ claims=root.WorkHubClaims.install({...a,ready:()=>a.cloud().ready,owner:()=>a.cloud().user?.id||''});
+ return{claims,adventures,batchA,validator,library,focusPanel,focusSnapshot,reminders,life,music,atmosphere,workbench,soundscape,moments,projectDates,processDeck,chromeUX,render,afterRender,prepare,saved,handle,submit,upgrade,validate,moveTask,simulationValues,sessionRanges,scheduleSession,startTimer,pauseTimer,resumeTimer,finishTimer,timer:()=>timerDraft,importTheme,themeValues,setBoard(value){board=value;},setTool(value){currentTool=value;},refreshTheme:applyTheme};
 }
 root.WorkHubStudio={upgrade,validate,install,DEFAULTS,WIDGETS,subtaskCompletionButton};
 })(window);
