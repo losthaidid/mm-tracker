@@ -26,6 +26,35 @@
     const hash = await root.crypto.subtle.digest('SHA-256', bytes);
     return Array.from(new Uint8Array(hash), b => b.toString(16).padStart(2, '0')).join('');
   }
+  /** Safari streams support getReader(), but may not support PDF.js's for-await loop.
+   * Read the chunks directly, and always release/cancel the reader on exit.
+   * See mozilla/pdf.js#21557. Keep this workaround outside the supplied library.
+   */
+  async function readTextItems(page, alive = () => true) {
+    const reader = page.streamTextContent().getReader(),
+      items = [];
+    let complete = false;
+    try {
+      for (;;) {
+        if (!alive()) throw Error('Import cancelled.');
+        const chunk = await reader.read();
+        if (!alive()) throw Error('Import cancelled.');
+        if (chunk.done) {
+          complete = true;
+          return items;
+        }
+        for (const item of chunk.value.items) items.push(item);
+      }
+    } finally {
+      try {
+        if (!complete) await reader.cancel();
+      } catch {
+        // Preserve the original read/cancellation error if an errored stream rejects cancel.
+      } finally {
+        reader.releaseLock();
+      }
+    }
+  }
   /** Read actual horizontal table borders so tall, wrapped records never crop their neighbour. */
   function borders(ops, lib, viewport) {
     const combined = new Map();
@@ -72,9 +101,9 @@
           v = page.getViewport({ scale: 1 });
         if (v.rotation !== 0)
           throw Error('This statement has rotated pages. Use the original upright TNG export.');
-        const text = await page.getTextContent(),
+        const text = await readTextItems(page, alive),
           ops = await page.getOperatorList();
-        const items = text.items
+        const items = text
           .filter(i => i.str)
           .map(i => {
             const point = v.convertToViewportPoint(i.transform[4], i.transform[5]);
@@ -240,5 +269,5 @@
     if (!alive()) throw Error('Export cancelled.');
     return new Blob([bytes], { type: 'application/zip' });
   }
-  root.WorkHubTngFiles = { read, crop, png, filename, pdfPack, zipPack, borders };
+  root.WorkHubTngFiles = { read, crop, png, filename, pdfPack, zipPack, borders, readTextItems };
 })(window);
