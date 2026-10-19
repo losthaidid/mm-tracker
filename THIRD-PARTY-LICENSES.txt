@@ -1,3 +1,18 @@
+TNG evidence tools (unmodified npm distribution files)
+
+PDF.js / pdfjs-dist 6.4.299 — Apache License 2.0.
+Source: https://github.com/mozilla/pdf.js
+Files: vendor/pdfjs/pdf.min.mjs and vendor/pdfjs/pdf.worker.min.mjs,
+copied from pdfjs-dist/legacy/build for broader JavaScript compatibility.
+Full licence: vendor/pdfjs/LICENSE.
+
+pdf-lib 1.17.1 — MIT License.
+Source: https://github.com/Hopding/pdf-lib
+File: vendor/pdf-lib/pdf-lib.esm.min.js, copied from pdf-lib/dist.
+Full licence: vendor/pdf-lib/LICENSE.md.
+
+These modules are loaded locally and on demand. No PDF parsing service is used.
+
 auth-js
 MIT License
 

@@ -794,7 +794,7 @@ test('Momo watches from a reserved seat and randomly dances only during visible 
 
 test('YouTube API loading errors are recoverable and the live policy allows only required integration origins',async t=>{
  const {api,document,window}=await app(t,{styles:true});api.hub.music.open();await api.hub.music.search('M7lc1UVf-VE');const script=document.getElementById('musicYouTubeAPI');assert.equal(script.src,'https://www.youtube.com/iframe_api');script.dispatchEvent(new window.Event('error'));assert.match(api.hub.music.snapshot().status,/could not load/);api.hub.music.close();api.hub.music.open();assert.equal(document.querySelectorAll('#musicYouTubeAPI').length,1);const instances=mockYouTube(window);window.onYouTubeIframeAPIReady();assert.equal(instances.length,1);instances[0].events.onError({data:150});assert.match(api.hub.music.snapshot().status,/cannot play on other websites/);
- const csp=document.querySelector('meta[http-equiv="Content-Security-Policy"]').content;assert.match(csp,/frame-src https:\/\/www.youtube-nocookie.com https:\/\/www.youtube.com/);assert.match(csp,/connect-src https:\/\/aaotojqkiewbhtnrlcur.supabase.co https:\/\/www.googleapis.com/);assert.equal(csp.includes('https://*'),false);const playerStyle=window.getComputedStyle(document.querySelector('#musicCorner iframe'));assert.equal(playerStyle.minWidth,'200px');assert.equal(playerStyle.minHeight,'200px');
+ const csp=document.querySelector('meta[http-equiv="Content-Security-Policy"]').content;assert.match(csp,/frame-src https:\/\/www.youtube-nocookie.com https:\/\/www.youtube.com/);assert.match(csp,/connect-src 'self' https:\/\/aaotojqkiewbhtnrlcur.supabase.co https:\/\/www.googleapis.com/);assert.equal(csp.includes('https://*'),false);const playerStyle=window.getComputedStyle(document.querySelector('#musicCorner iframe'));assert.equal(playerStyle.minWidth,'200px');assert.equal(playerStyle.minHeight,'200px');
 });
 
 test('the music corner defaults to only a small video screen and keeps Momo outside it',async t=>{
@@ -1507,6 +1507,62 @@ test('grouped Settings: later launchers and sync visibility update without cloni
 test('grouped Settings: sign-out clears the search and hides account-owned options while sign-in remains available',async t=>{
  const {api,document,window,db}=await app(t),search=document.getElementById('settingsSearch');search.value='company';search.dispatchEvent(new window.Event('input',{bubbles:true}));api.cloud.ready=false;api.cloud.user=null;api.notice();api.showTab('home');await settle();assert.equal(search.value,'');assert.equal(document.getElementById('settingsTab-work').hidden,true);assert.equal(document.getElementById('settingsTab-companion').hidden,true);assert.equal(document.getElementById('hubSettingsHeader').closest('.settings-entry').hidden,true);assert.equal(document.getElementById('recipientSettingsButton').closest('.settings-entry').hidden,true);assert.equal(document.getElementById('cloudAccountButton').hidden,false);assert.equal(document.getElementById('cloudAccountButton').textContent,'Sign in');assert.equal(api.hub.settingsPanel.snapshot().active,'account');
  api.login();await settle();assert.equal(document.getElementById('settingsTab-work').hidden,false);assert.equal(document.getElementById('hubSettingsHeader').closest('.settings-entry').hidden,false);assert.equal(api.hub.settingsPanel.snapshot().active,'workspace');assert.equal(db.calls.length,0);
+});
+
+function tngFixtureRow(patch={}){return {id:'t1',transactionNo:'0001',section:'offline',page:1,width:595,height:842,date:'2026-10-09',postedDate:'2026-10-10',time:'09:00:00',type:'Fare Usage - Toll/Bus',sector:'TOLL',entry:'Demo entry',exit:'Demo exit',amountCents:166,kind:'toll',category:'toll',rect:{x:20,y:60,w:555,h:30},originalRect:{x:20,y:60,w:555,h:30},headerRect:{x:20,y:20,w:555,h:30},errors:[],manual:false,selected:false,bookingKey:'',description:'Demo toll',...patch};}
+function mockTngReader(window,rows){window.HTMLCanvasElement.prototype.getContext=()=>({drawImage(){}});let closed=0;const result={rows:copy(rows),warnings:[],source:{fileHash:'a'.repeat(64),cardKey:'b'.repeat(64),fileName:'fixture.pdf',pages:1},close(){closed++;},renderPage:async()=>{const canvas=window.document.createElement('canvas');canvas.width=1190;canvas.height=1684;return canvas;}};window.WorkHubTngFiles.read=async()=>result;return{result,closed:()=>closed};}
+
+test('TNG desk: date filtering, on-site suggestions and confirmed saves update claims exactly once',async t=>{
+ const {api,document,window,db}=await app(t);api.setMonth('2026-10');addBooking(api,document,'09:00','10:00',{date:'2026-10-09'});api.mutate(d=>d.schedule.forEach(s=>s.location='Client site'));await settle();api.showTab('schedule');assert.ok(document.querySelector('[data-tng="open"]'));const ui=api.hub.tng;ui.open();mockTngReader(window,[tngFixtureRow(),tngFixtureRow({id:'reload',transactionNo:'0002',kind:'reload',amountCents:2000}),tngFixtureRow({id:'other',transactionNo:'0003',date:'2026-10-08',postedDate:'2026-10-08',amountCents:250})]);const calls=db.calls.length;await ui.loadFile({name:'fixture.pdf'});ui.matchVisits();assert.equal(ui.snapshot().selected,1);assert.equal(ui.snapshot().rows[0].bookingKey,api.state().schedule[0].bookingId);assert.equal(db.calls.length,calls);ui.save();await settle();assert.equal(db.calls.length,calls+1);assert.equal(api.hub.claims.summary().tollCents,166);assert.equal(api.state().workhub.claims.expenses.length,1);assert.equal(ui.snapshot().selected,0);assert.equal(ui.snapshot().rows[0].selected,true,'Keep saved PDF rows available for evidence.');assert.throws(()=>ui.save(),/at least one/);assert.equal(api.state().workhub.claims.expenses.length,1);const restored=api.parseBackup(api.payload(api.state()));assert.equal(restored.workhub.claims.expenses[0].tngSource.transactionNo,'0001');assert.ok(document.querySelector('[data-tng="open-source"]'));
+ const basis=document.getElementById('tngBasis');basis.value='posted';basis.dispatchEvent(new window.Event('change',{bubbles:true}));assert.equal(ui.snapshot().basis,'posted');ui.matchVisits();assert.equal(ui.snapshot().selected,0);
+});
+test('TNG desk: manual expenses are explicit drafts and existing source metadata survives ledger edits',async t=>{
+ const {api,document,window,db}=await app(t),ui=api.hub.tng;api.setMonth('2026-10');api.showTab('schedule');ui.open();document.querySelector('[data-tng="manual"]').click();let f=document.getElementById('tngRowForm');fill(f,{date:'2026-10-09',postedDate:'2026-10-09',amount:'4.50',description:'Parking after workshop',category:'parking',notes:'Manual receipt'});ui.rowForm(f);await settle();assert.equal(api.state().workhub.claims.expenses.length,0);ui.save();await settle();assert.equal(api.hub.claims.summary().otherCents,450);assert.equal(api.state().workhub.claims.expenses[0].tngSource,undefined);assert.equal(ui.snapshot().selected,0);
+ mockTngReader(window,[tngFixtureRow()]);await ui.loadFile({name:'fixture.pdf'});document.querySelector('[data-tng="select-visible"]').click();ui.save();await settle();const e=api.state().workhub.claims.expenses.find(e=>e.tngSource),source=copy(e.tngSource);api.hub.claims.expenseForm(e.id);f=document.getElementById('claimExpenseForm');fill(f,{description:'Reviewed toll'});api.hub.claims.saveExpense(f);await settle();assert.deepEqual(copy(api.state().workhub.claims.expenses.find(x=>x.id===e.id).tngSource),source);ui.openSource(e.id);assert.match(document.getElementById('modalTitle').textContent,/TNG/);assert.equal(ui.snapshot().rows[0].selected,true);
+});
+test('TNG desk: late PDF reads are discarded after account changes',async t=>{
+ const {api,document,window,db}=await app(t),ui=api.hub.tng;ui.open();let finish;window.WorkHubTngFiles.read=()=>new Promise(resolve=>finish=resolve);const pending=ui.loadFile({name:'fixture.pdf'});await settle();api.cloud.ready=false;api.cloud.user=null;api.showTab('home');let closed=false;finish({rows:[tngFixtureRow()],warnings:[],source:{fileHash:'a'.repeat(64),cardKey:'b'.repeat(64),fileName:'fixture.pdf',pages:1},close(){closed=true;}});await pending;assert.equal(ui.snapshot().rows.length,0);assert.equal(closed,true);assert.equal(db.calls.length,0);
+});
+test('TNG desk: late exports and stale manual forms cannot cross accounts',async t=>{
+ const {api,document,window,db}=await app(t),ui=api.hub.tng;
+ let downloads=0,finish;
+ window.URL.createObjectURL=()=>{downloads++;return 'blob:fixture';};
+ window.URL.revokeObjectURL=()=>{};
+ window.HTMLAnchorElement.prototype.click=()=>{};
+ ui.open();
+ const reader=mockTngReader(window,[tngFixtureRow()]);
+ await ui.loadFile({name:'fixture.pdf'});
+ document.querySelector('[data-tng="select-visible"]').click();
+ window.WorkHubTngFiles.pdfPack=()=>new Promise(resolve=>finish=resolve);
+ const pending=ui.download('pdf');
+ await settle();
+ api.cloud.user={id:'22222222-2222-4222-8222-222222222222',email:'other@example.com'};
+ ui.sync();
+ finish(new Blob(['pdf'],{type:'application/pdf'}));
+ await pending;
+ assert.equal(downloads,0);
+ assert.equal(reader.closed(),1);
+ assert.equal(ui.snapshot().rows.length,0);
+ assert.equal(document.getElementById('modal').open,false);
+ ui.open();
+ document.querySelector('[data-tng="manual"]').click();
+ const stale=document.getElementById('tngRowForm');
+ fill(stale,{date:'2026-10-09',postedDate:'2026-10-09',amount:'4.50',description:'Private draft',category:'parking',notes:''});
+ api.cloud.user={id:'33333333-3333-4333-8333-333333333333',email:'third@example.com'};
+ assert.throws(()=>ui.rowForm(stale),/Reopen the review/);
+ assert.equal(ui.snapshot().rows.length,0);
+ assert.equal(api.state().workhub.claims.expenses.length,0);
+ assert.equal(db.calls.length,0);
+});
+test('TNG desk: keyboard crop edits are bounded and evidence export uses the edited crop without saving records',async t=>{
+ const {api,document,window,db}=await app(t),ui=api.hub.tng;window.HTMLCanvasElement.prototype.getContext=()=>({drawImage(){}});let downloads=0;window.URL.createObjectURL=()=>{downloads++;return'blob:fixture';};window.URL.revokeObjectURL=()=>{};window.HTMLAnchorElement.prototype.click=()=>{};ui.open();mockTngReader(window,[tngFixtureRow()]);await ui.loadFile({name:'fixture.pdf'});document.querySelector('[data-tng="preview"]').click();await settle();const before=ui.snapshot().rows[0].rect.x;document.getElementById('tngCropFrame').dispatchEvent(new window.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true}));assert.equal(ui.snapshot().rows[0].rect.x,before+1);let used;window.WorkHubTngFiles.crop=async(_s,r,header)=>{used={r:copy(r),header};return{};};window.WorkHubTngFiles.png=async()=>new Blob(['png'],{type:'image/png'});await ui.download('png');assert.equal(used.r.rect.x,before+1);assert.equal(used.header,true);assert.equal(downloads,1);assert.equal(db.calls.length,0);
+});
+test('saved Lab results autoplay indefinitely, pause/stop locally, and restart automatically on returning',async t=>{
+ const ctx=await app(t,{styles:true}),{api,document,window,db}=ctx,id=addLabCase(api,document);addExperiment(ctx,id,'Passed check',{outcome:'Passed',result:'Confirmed'});addExperiment(ctx,id,'Failed check',{outcome:'Failed',result:'Not resolved'});await settle();api.showTab('home');api.showTab('lab');const ws=api.hub.workbench.workshop,host=()=>document.querySelector('.lab-case'),calls=db.calls.length,before=copy(api.state().workhub.lab);assert.equal(host().dataset.playback,'running');assert.ok(document.querySelector('[data-outcome="Passed"] .lab-result-motion'));assert.ok(document.querySelector('[data-outcome="Failed"] .lab-result-motion'));const original=window.Date.now;window.Date.now=()=>original()+600000;ws.tick();assert.equal(host().dataset.playback,'running');assert.match(window.getComputedStyle(document.querySelector('.lab-result-motion b')).animation,/infinite/);document.querySelector('[data-workshop="playback-toggle"]').click();assert.equal(host().dataset.playback,'paused');document.querySelector('[data-workshop="playback-toggle"]').click();assert.equal(host().dataset.playback,'running');const speed=document.getElementById('labPlaybackSpeed');speed.value='2';speed.dispatchEvent(new window.Event('change',{bubbles:true}));assert.equal(host().style.getPropertyValue('--lab-loop-duration'),'2s');document.querySelector('[data-workshop="playback-stop"]').click();assert.equal(host().dataset.playback,'stopped');api.showTab('home');api.showTab('lab');assert.equal(host().dataset.playback,'running');await settle();assert.equal(db.calls.length,calls);assert.deepEqual(copy(api.state().workhub.lab),before);
+});
+test('saved solved Lab cases animate on reopen and motion/privacy preferences suspend playback without writes',async t=>{
+ const {api,document,window,db}=await app(t),id=addLabCase(api,document,{status:'Solved',solution:'Verified answer'});await settle();api.showTab('lab');assert.equal(document.querySelector('.lab-case').dataset.playback,'running');assert.ok(document.querySelector('.lab-issue .lab-result-motion'));const calls=db.calls.length;window.matchMedia=()=>({matches:true});api.hub.workbench.tick();assert.equal(document.querySelector('.lab-case').dataset.playback,'paused');window.matchMedia=()=>({matches:false});api.hub.workbench.tick();assert.equal(document.querySelector('.lab-case').dataset.playback,'running');document.body.classList.add('hub-private');await settle();assert.equal(document.querySelector('.lab-case').dataset.playback,'paused');document.body.classList.remove('hub-private');api.hub.workbench.tick();assert.equal(document.querySelector('.lab-case').dataset.playback,'running');api.openMMAreaManager();api.hub.workbench.tick();assert.equal(document.querySelector('.lab-case').dataset.playback,'paused');api.closeModal();api.hub.workbench.tick();assert.equal(document.querySelector('.lab-case').dataset.playback,'running');assert.equal(db.calls.length,calls);
+ const reopened=await app(t,{remote:copy(db.row),login:false});await reopened.api.loadCloud(sessionUser);reopened.api.showTab('lab');assert.equal(reopened.document.querySelector('.lab-case').dataset.playback,'running');
 });
 
 test('grouped Settings: option spacing overrides header button styles and hidden sections stay hidden',async t=>{

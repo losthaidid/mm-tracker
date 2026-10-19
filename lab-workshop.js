@@ -140,7 +140,10 @@
       pendingScroll = null,
       suppressClick = 0,
       undo = null,
-      preserveCanvas = false;
+      preserveCanvas = false,
+      playbackCase = '',
+      playback = 'running',
+      playbackSpeed = 1;
     try {
       const p = JSON.parse(localStorage.getItem('mm-tracker.lab-workshop.v1') || 'null');
       if (['board', 'list'].includes(p?.mode)) mode = p.mode;
@@ -210,6 +213,8 @@
         cancelDrag();
         clearReaction();
         effect = null;
+        playbackCase = '';
+        playback = 'running';
         $('labUndo')?.remove();
       }
     }
@@ -741,6 +746,7 @@
       }
     }
     function tick() {
+      syncPlayback();
       if (reaction) {
         if (
           Date.now() >= reaction.until ||
@@ -769,12 +775,98 @@
         effect = null;
       }
     }
+    /** Repeat saved outcomes visually, without rerunning or saving experiments. */
+    function syncPlayback() {
+      const host = document.querySelector('.lab-case'),
+        c = host && find(host.dataset.case);
+      if (!host || !c || !a.ready()) {
+        playbackCase = '';
+        return;
+      }
+      if (playbackCase !== c.id) {
+        playbackCase = c.id;
+        playback = 'running';
+      }
+      const results = c.attempts.filter(p => ['Passed', 'Failed'].includes(p.outcome));
+      let controls = host.querySelector('.lab-playback-controls');
+      if (!results.length && c.status !== 'Solved') {
+        controls?.remove();
+        host.removeAttribute('data-playback');
+        return;
+      }
+      if (!controls) {
+        controls = document.createElement('div');
+        controls.className = 'lab-playback-controls';
+        controls.innerHTML =
+          '<div><span class="lab-loop-icon" aria-hidden="true">↻</span><strong>Live results</strong><small id="labPlaybackStatus"></small></div><div class="actions">' +
+          button('playback-toggle', 'Pause', 'aria-label="Pause result animations"') +
+          button('playback-stop', 'Stop', 'aria-label="Stop result animations"') +
+          '<label>Speed <select id="labPlaybackSpeed" aria-label="Result animation speed"><option value="0.5">0.5×</option><option value="1">1×</option><option value="1.5">1.5×</option><option value="2">2×</option></select></label></div>';
+        host.querySelector('.lab-workspace-toolbar')?.after(controls);
+      }
+      const cards = [
+        ...host.querySelectorAll(
+          '[data-experiment][data-outcome="Passed"], [data-experiment][data-outcome="Failed"]'
+        ),
+      ];
+      const issue = host.querySelector('.lab-issue');
+      if (issue && c.status === 'Solved') {
+        issue.dataset.savedResult = 'Passed';
+        cards.push(issue);
+      } else issue?.removeAttribute('data-saved-result');
+      for (const card of cards) {
+        if (!card.querySelector('.lab-result-motion')) {
+          const layer = document.createElement('span');
+          layer.className = 'lab-result-motion';
+          layer.setAttribute('aria-hidden', 'true');
+          layer.innerHTML = '<i></i><i></i><i></i><b></b>';
+          card.append(layer);
+        }
+      }
+      const suspended =
+        document.hidden ||
+        !motion() ||
+        !!drag ||
+        !!document.querySelector('dialog[open]') ||
+        document.body.matches('.hub-private,.hub-present');
+      const state =
+        playback === 'stopped'
+          ? 'stopped'
+          : suspended || playback === 'paused'
+            ? 'paused'
+            : 'running';
+      if (host.dataset.playback !== state) host.dataset.playback = state;
+      const duration = 4 / playbackSpeed + 's';
+      if (host.style.getPropertyValue('--lab-loop-duration') !== duration)
+        host.style.setProperty('--lab-loop-duration', duration);
+      const toggle = controls.querySelector('[data-workshop="playback-toggle"]');
+      const caption = playback === 'running' ? 'Pause' : 'Resume';
+      if (toggle.textContent !== caption) toggle.textContent = caption;
+      toggle.setAttribute(
+        'aria-label',
+        (playback === 'running' ? 'Pause' : 'Resume') + ' result animations'
+      );
+      controls.querySelector('select').value = String(playbackSpeed);
+      controls.querySelector('[data-workshop="playback-stop"]').disabled = playback === 'stopped';
+      const status = !motion()
+        ? 'Motion is off in your preferences'
+        : suspended
+          ? 'Paused while the workspace is busy'
+          : playback === 'running'
+            ? 'Saved successes and failures repeat automatically'
+            : playback === 'paused'
+              ? 'Animations paused'
+              : 'Animations stopped';
+      if (controls.querySelector('#labPlaybackStatus').textContent !== status)
+        controls.querySelector('#labPlaybackStatus').textContent = status;
+    }
     function mount() {
       syncOwner();
       mountUndo();
       if (drag && !drag.el.isConnected) cancelDrag();
       if (!document.querySelector('.lab-workshop')) {
         clearReaction();
+        playbackCase = '';
         return;
       }
       const s = $('labBoardScroll'),
@@ -1203,7 +1295,14 @@
         const x = b.dataset,
           c = find(x.case || current);
         saveScroll();
-        if (x.workshop === 'view') {
+        if (x.workshop === 'playback-toggle') {
+          playback = playback === 'running' ? 'paused' : 'running';
+          syncPlayback();
+        } else if (x.workshop === 'playback-stop') {
+          playback = 'stopped';
+          clearReaction();
+          syncPlayback();
+        } else if (x.workshop === 'view') {
           cancelDrag();
           mode = x.value;
           remember();
@@ -1292,7 +1391,15 @@
         a.tell(e.message, true);
       }
     });
+    document.addEventListener('change', event => {
+      if (event.target.id === 'labPlaybackSpeed') {
+        const speed = Number(event.target.value);
+        if ([0.5, 1, 1.5, 2].includes(speed)) playbackSpeed = speed;
+        syncPlayback();
+      }
+    });
     const suspend = () => {
+      syncPlayback();
       if (document.hidden || !a.ready() || document.body.matches('.hub-private,.hub-present')) {
         cancelDrag();
         clearReaction();
@@ -1337,6 +1444,8 @@
         inspect,
         dragging: !!drag,
         reaction: reaction?.type || null,
+        playback,
+        playbackSpeed,
         canUndo: !!undo,
       }),
       connected: (id, p) => connected(find(id), p),

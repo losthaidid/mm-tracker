@@ -9,7 +9,7 @@
     />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; script-src 'self' 'unsafe-inline' https://www.youtube.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://i.ytimg.com; connect-src https://aaotojqkiewbhtnrlcur.supabase.co https://www.googleapis.com; frame-src https://www.youtube-nocookie.com https://www.youtube.com; base-uri 'none'; form-action 'none'"
+      content="default-src 'none'; script-src 'self' 'unsafe-inline' https://www.youtube.com; worker-src 'self' blob:; font-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://i.ytimg.com; connect-src 'self' https://aaotojqkiewbhtnrlcur.supabase.co https://www.googleapis.com; frame-src https://www.youtube-nocookie.com https://www.youtube.com; base-uri 'none'; form-action 'none'"
     />
     <title>SAP MM WorkHub</title>
     <link
@@ -23,7 +23,7 @@
     <link rel="stylesheet" href="./music.css?v=20261019-source-1" />
     <link rel="stylesheet" href="./atmosphere.css?v=20261019-source-1" />
     <link rel="stylesheet" href="./workbench.css?v=20261019-source-1" />
-    <link rel="stylesheet" href="./lab-workshop.css?v=20261019-source-1" />
+    <link rel="stylesheet" href="./lab-workshop.css?v=20261020-tng-lab-1" />
     <link rel="stylesheet" href="./soundscape.css?v=20261019-source-1" />
     <link rel="stylesheet" href="./momo-moments.css?v=20261019-source-1" />
     <link rel="stylesheet" href="./workspace-upgrades.css?v=20261019-source-1" />
@@ -36,6 +36,7 @@
     <link rel="stylesheet" href="./task-workspace.css?v=20261019-source-1" />
     <link rel="stylesheet" href="./momo-world.css?v=20261019-source-1" />
     <link rel="stylesheet" href="./claims.css?v=20261019-source-1" />
+    <link rel="stylesheet" href="./tng.css?v=20261020-tng-lab-1" />
     <link rel="stylesheet" href="./recipients.css?v=20261019-source-1" />
     <link rel="stylesheet" href="./focus-panel.css?v=20261019-source-1" />
     <link rel="stylesheet" href="./settings-panel.css?v=20261019-source-1" />
@@ -196,7 +197,7 @@
     <script src="./music.js?v=20261019-source-1"></script>
     <script src="./momo-world-art.js?v=20261019-source-1"></script>
     <script src="./atmosphere.js?v=20261019-source-1"></script>
-    <script src="./lab-workshop.js?v=20261019-source-1"></script>
+    <script src="./lab-workshop.js?v=20261020-tng-lab-1"></script>
     <script src="./workspace-upgrades.js?v=20261019-source-1"></script>
     <script src="./workspace-features.js?v=20261019-source-1"></script>
     <script src="./workbench.js?v=20261019-source-1"></script>
@@ -216,12 +217,15 @@
     <script src="./focus-panel.js?v=20261019-source-1"></script>
     <script src="./momo-adventures.js?v=20261019-source-1"></script>
     <!-- Expenses, company recipients and Settings. Engines load before their interfaces. -->
-    <script src="./claims-engine.js?v=20261019-source-1"></script>
-    <script src="./claims.js?v=20261019-source-1"></script>
+    <script src="./claims-engine.js?v=20261020-tng-lab-1"></script>
+    <script src="./tng-engine.js?v=20261020-tng-lab-1"></script>
+    <script src="./tng-files.js?v=20261020-tng-lab-1"></script>
+    <script src="./tng.js?v=20261020-tng-lab-1"></script>
+    <script src="./claims.js?v=20261020-tng-lab-1"></script>
     <script src="./recipients-engine.js?v=20261019-source-1"></script>
     <script src="./recipients.js?v=20261019-source-1"></script>
     <script src="./settings-panel.js?v=20261019-source-1"></script>
-    <script src="./studio.js?v=20261019-source-1"></script>
+    <script src="./studio.js?v=20261020-tng-lab-1"></script>
     <!-- Empty starter records and default lists; this is not your saved account data. -->
     <script id="seedData" type="application/json">
       {

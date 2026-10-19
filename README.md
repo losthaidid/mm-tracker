@@ -12,6 +12,8 @@ The selected Batch A workflow enhancements are documented in [BATCH-A.md](BATCH-
 
 The seven selected wishlist items and refreshed ticket screens are documented in [WISHLIST.md](WISHLIST.md), including snippets, bundles, timelines, reusable fields, reference combinations, reference descriptions and copy formats.
 
+The TNG statement extractor and automatically looping Troubleshooting Lab results are documented in [the TNG and playback guide](docs/TNG-AND-LAB.md). The next Momo behaviour improvements are kept separately in [Batch B](BATCH-B.md); they are not included in this release.
+
 ## Publish using GitHub Pages
 
 1. Create a repository named `mm-tracker`. GitHub Pages on a free personal account requires a public repository.
@@ -176,6 +178,8 @@ Drag cards by **Move**, scroll to pan and use the zoom controls or **Start** to 
 Add an experiment with an action and expected result. **Record result** requires an observed result/evidence. Successful experiments snap into an available space and connect to the issue or another successful source; a short electric pulse follows powered paths. Branches are allowed and loops are rejected. An inconclusive result has a dotted connection and cannot power downstream work. Failed attempts remain movable on the board and are also listed on the ruled-out shelf with their observations intact, disconnecting their outgoing links. **Try another approach** creates a separate experiment while keeping the failed evidence.
 
 Brief local sparks and smoke accompany a failure; Momo startles, covers his eyes and peeks out again. Success brings a little celebration, inconclusive results a magnifying glass, and resolution a Verified stamp. Device reduced motion, Animations Off, Privacy and presentation are respected; there is no rapid flashing or extra sound. These effects use CSS/SVG, without downloaded videos or cloud animation writes.
+
+Successful and failed experiment cards now keep repeating their gentle result animations, with current travelling along powered connections. Saved results, including resolved cases, start automatically when their investigation opens. **Live results** provides Pause/Resume, Stop and 0.5×–2× speed. Reopening the investigation starts playback again. These loops never rerun experiments or save records. They pause for dialogs, dragging, hidden pages, Privacy/presentation and motion preferences; Momo's brief reaction to a newly recorded result remains separate.
 
 **Resolve & save** opens an evidence review with connected successful steps and the failed-attempt count. Maintain the confirmed cause, verified fix and verification, then confirm the review. Saving resolves the case and creates or updates its single linked Knowledge note in the same private save. The note includes the process, expected/actual behaviour, resolution, verification and investigation trail, and has a **Return to investigation board** link. Editing a case to Solved also saves its Knowledge note. Reopen a solved case before running more experiments; the previously published Knowledge snapshot remains available until republishing.
 

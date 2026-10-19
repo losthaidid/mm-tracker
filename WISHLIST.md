@@ -1,5 +1,13 @@
 # Wishlist and ticket workspace
 
+## Latest wishlist batch
+
+The two prioritised items are implemented: **TNG PDF extraction and cropped evidence downloads**, and **continuous Troubleshooting Lab result animations with saved-result autoplay**. See [the usage guide](docs/TNG-AND-LAB.md).
+
+The Momo behaviour suggestions (51–60) are kept in [Batch B](BATCH-B.md), for later implementation. Request inbox, End-of-day ritual, Personal learning roadmap and Show-me-how walkthroughs also remain deferred. This release does not implement those deferred items.
+
+## Earlier completed selections
+
 The seven selected items are now part of the existing account document. The tracker keeps its current sign-in, saving, backup and restore workflows. No database migration is needed.
 
 | Selection | Where to use it |

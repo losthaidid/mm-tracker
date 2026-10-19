@@ -1,5 +1,189 @@
 /* lab-workshop.css — Investigation workshop board, draggable tools and experiment states.
    See docs/FILE-MAP.md. Keep rule order: later selectors can override earlier ones. */
+/* Saved-result playback is visual only; every animation has a pause/stop state. */
+.lab-playback-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 0 0 18px;
+  padding: 13px 16px;
+  border: 1px solid var(--lab-line);
+  border-radius: 14px;
+  background: var(--lab-paper);
+}
+.lab-playback-controls > div:first-child {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.lab-playback-controls small {
+  color: var(--lab-muted);
+  font-size: 0.73rem;
+}
+.lab-playback-controls label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+}
+.lab-playback-controls select {
+  width: auto;
+  padding: 5px 8px;
+}
+.lab-loop-icon {
+  color: var(--lab-green);
+  font-size: 1.4rem;
+}
+.lab-result-motion {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  overflow: hidden;
+}
+.lab-result-motion b {
+  position: absolute;
+  right: 12px;
+  top: 38px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #71b796;
+}
+.lab-result-motion i {
+  position: absolute;
+  right: 14px;
+  top: 45px;
+  width: 4px;
+  height: 4px;
+  opacity: 0;
+  border-radius: 50%;
+  background: #78be96;
+}
+.lab-case[data-playback] .lab-result-motion b {
+  animation: lab-result-beacon var(--lab-loop-duration, 4s) ease-in-out infinite;
+}
+.lab-case[data-playback] .lab-result-motion i {
+  animation: lab-result-dust var(--lab-loop-duration, 4s) ease-out infinite;
+}
+.lab-result-motion i:nth-child(2) {
+  --result-drift: 18px;
+  animation-delay: 0.25s !important;
+}
+.lab-result-motion i:nth-child(3) {
+  --result-drift: -14px;
+  animation-delay: 0.5s !important;
+}
+.lab-case [data-outcome='Failed'] .lab-result-motion :is(b, i) {
+  background: #d28b74;
+}
+.lab-case [data-outcome='Failed'] .lab-result-motion i {
+  width: 11px;
+  height: 11px;
+  filter: blur(2px);
+}
+.lab-case[data-playback] [data-wire-state='powered'] .lab-wire-pulse {
+  animation: lab-current var(--lab-loop-duration, 4s) linear infinite;
+  animation-delay: calc(var(--wire-order) * 0.15s);
+}
+.lab-case[data-playback='paused'] :is(.lab-result-motion b, .lab-result-motion i, .lab-wire-pulse) {
+  animation-play-state: paused;
+}
+.lab-case[data-playback='stopped']
+  :is(.lab-result-motion b, .lab-result-motion i, .lab-wire-pulse) {
+  animation: none;
+  opacity: 0;
+}
+.lab-failed-list > article {
+  position: relative;
+}
+@keyframes lab-result-beacon {
+  0%,
+  100% {
+    transform: scale(0.8);
+    opacity: 0.45;
+    box-shadow: 0 0 0 0 #88bd9322;
+  }
+  35% {
+    transform: scale(1.2);
+    opacity: 1;
+    box-shadow: 0 0 0 9px #88bd9311;
+  }
+}
+@keyframes lab-result-dust {
+  0%,
+  12% {
+    transform: translate(0, 0);
+    opacity: 0;
+  }
+  25% {
+    opacity: 0.8;
+  }
+  70%,
+  100% {
+    transform: translate(var(--result-drift, 6px), -34px);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lab-case[data-playback] :is(.lab-result-motion b, .lab-result-motion i, .lab-wire-pulse) {
+    animation: none;
+  }
+}
+body[data-motion='off']
+  .lab-case[data-playback]
+  :is(.lab-result-motion b, .lab-result-motion i, .lab-wire-pulse) {
+  animation: none;
+}
+.lab-case[data-playback] .lab-experiment[data-outcome='Failed'] {
+  animation: lab-result-failure var(--lab-loop-duration, 4s) ease-in-out infinite;
+}
+.lab-case[data-playback] .lab-experiment[data-outcome='Passed'],
+.lab-case[data-playback] [data-saved-result='Passed'] {
+  animation: lab-result-success var(--lab-loop-duration, 4s) ease-in-out infinite;
+}
+.lab-case[data-playback='paused'] :is(.lab-experiment, [data-saved-result]) {
+  animation-play-state: paused;
+}
+.lab-case[data-playback='stopped'] :is(.lab-experiment, [data-saved-result]) {
+  animation: none;
+}
+@keyframes lab-result-failure {
+  0%,
+  12%,
+  100% {
+    transform: translateX(0);
+  }
+  3%,
+  9% {
+    transform: translateX(-2px);
+  }
+  6% {
+    transform: translateX(2px);
+  }
+}
+@keyframes lab-result-success {
+  0%,
+  100% {
+    box-shadow: 0 3px 12px #436f4510;
+  }
+  35% {
+    box-shadow:
+      0 0 0 2px #81be9145,
+      0 4px 18px #76b78a25;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lab-case[data-playback] :is(.lab-experiment, [data-saved-result]) {
+    animation: none;
+  }
+}
+body[data-motion='off'] .lab-case[data-playback] :is(.lab-experiment, [data-saved-result]) {
+  animation: none;
+}
 /* Warm paper, little magnets and copper circuits. No image or animation downloads. */
 .lab-workshop {
   --lab-paper: #fffdf7;
