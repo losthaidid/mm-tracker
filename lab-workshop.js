@@ -1,148 +1,1354 @@
+/**
+ * lab-workshop.js
+ * Interactive investigation board and experiment presentation.
+ * Extends troubleshooting case records; gestures, visual reactions and artwork stay local.
+ * Keep drag state separate from saved changes; save only at the end of a deliberate edit.
+ * File map: docs/FILE-MAP.md
+ */
 /* A magnetic investigation board. Artwork, gestures and reactions stay in the browser. */
-(function(root){
-'use strict';
-const ORIGIN='@issue',LIMIT=20000,CARD={w:244,h:244},ISSUE={w:272,h:300};
-const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const uid=()=>root.crypto?.randomUUID?.()||'lab-'+Date.now().toString(36)+Math.random().toString(36).slice(2);
-const initialPosition=i=>({x:410+(i%3)*302,y:104+Math.floor(i/3)*282});
-const position=p=>!!p&&typeof p==='object'&&!Array.isArray(p)&&['x','y'].every(k=>Number.isFinite(p[k])&&p[k]>=0&&p[k]<=LIMIT);
-const outcomeName=o=>({Trying:'In progress',Passed:'Successful',Failed:'Failed',Inconclusive:'Inconclusive'})[o]||o;
-function upgrade(d){
- for(const c of Array.isArray(d.workhub?.lab)?d.workhub.lab:[]){if(!c||typeof c!=='object')continue;
-  for(const k of ['process','expected','actual','verification','resolvedAt'])if(c[k]===undefined)c[k]='';
-  if(c.position===undefined)c.position={x:54,y:158};
-  for(const [i,p]of (Array.isArray(c.attempts)?c.attempts:[]).entries()){if(!p||typeof p!=='object')continue;if(p.expected===undefined)p.expected='';if(p.parentId===undefined)p.parentId='';if(p.position===undefined)p.position=initialPosition(i);}
- }return d;
-}
-function validate(d){
- const text=v=>typeof v==='string'&&v.length<=32767&&!/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(v);
- for(const c of d.workhub.lab){
-  if(!['process','expected','actual','verification','resolvedAt'].every(k=>text(c[k]))||!position(c.position)||c.resolvedAt&&!Number.isFinite(Date.parse(c.resolvedAt)))throw Error('Check the workshop process, results and card positions.');
-  const map=new Map(c.attempts.map(p=>[p.id,p]));
-  for(const p of c.attempts){
-   if(p.id===ORIGIN||!text(p.expected)||!position(p.position)||typeof p.parentId!=='string'||p.parentId.length>100||p.parentId===p.id||p.parentId&&(!['Passed','Inconclusive'].includes(p.outcome)||p.parentId!==ORIGIN&&map.get(p.parentId)?.outcome!=='Passed'))throw Error('Workshop connections need a successful source and a successful or inconclusive experiment.');
-   const visited=new Set([p.id]);let parent=p.parentId;while(parent&&parent!==ORIGIN){if(visited.has(parent))throw Error('Workshop connections cannot form a loop.');visited.add(parent);parent=map.get(parent)?.parentId;}
+(function (root) {
+  'use strict';
+  const ORIGIN = '@issue',
+    LIMIT = 20000,
+    CARD = { w: 244, h: 244 },
+    ISSUE = { w: 272, h: 300 };
+  const esc = v =>
+    String(v ?? '').replace(
+      /[&<>"']/g,
+      c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
+    );
+  const uid = () =>
+    root.crypto?.randomUUID?.() ||
+    'lab-' + Date.now().toString(36) + Math.random().toString(36).slice(2);
+  const initialPosition = i => ({ x: 410 + (i % 3) * 302, y: 104 + Math.floor(i / 3) * 282 });
+  const position = p =>
+    !!p &&
+    typeof p === 'object' &&
+    !Array.isArray(p) &&
+    ['x', 'y'].every(k => Number.isFinite(p[k]) && p[k] >= 0 && p[k] <= LIMIT);
+  const outcomeName = o =>
+    ({
+      Trying: 'In progress',
+      Passed: 'Successful',
+      Failed: 'Failed',
+      Inconclusive: 'Inconclusive',
+    })[o] || o;
+  function upgrade(d) {
+    for (const c of Array.isArray(d.workhub?.lab) ? d.workhub.lab : []) {
+      if (!c || typeof c !== 'object') continue;
+      for (const k of ['process', 'expected', 'actual', 'verification', 'resolvedAt'])
+        if (c[k] === undefined) c[k] = '';
+      if (c.position === undefined) c.position = { x: 54, y: 158 };
+      for (const [i, p] of (Array.isArray(c.attempts) ? c.attempts : []).entries()) {
+        if (!p || typeof p !== 'object') continue;
+        if (p.expected === undefined) p.expected = '';
+        if (p.parentId === undefined) p.parentId = '';
+        if (p.position === undefined) p.position = initialPosition(i);
+      }
+    }
+    return d;
   }
- }
-}
-function connected(c,id){if(!c)return false;const map=new Map(c.attempts.map(p=>[p.id,p]));let p=map.get(id);const seen=new Set();while(p?.outcome==='Passed'&&!seen.has(p.id)){seen.add(p.id);if(p.parentId===ORIGIN)return true;p=map.get(p.parentId);}return false;}
-function eligible(c,id){return[{id:ORIGIN,title:'The issue · starting point'},...c.attempts.filter(p=>p.id!==id&&p.outcome==='Passed').filter(p=>{const seen=new Set([id]);let x=p;while(x){if(seen.has(x.id))return false;seen.add(x.id);x=c.attempts.find(q=>q.id===x.parentId);}return true;}).map(p=>({id:p.id,title:p.title}))];}
-const ART='<svg viewBox="0 0 250 180" fill="none" aria-hidden="true"><ellipse cx="132" cy="155" rx="100" ry="12" fill="#c4b29b" opacity=".22"/><path d="M49 118h75q19 0 19-20V70" stroke="#b9815f" stroke-width="8" stroke-linecap="round"/><path d="M49 116h75q17 0 17-18V70" stroke="#f6c596" stroke-width="2" stroke-linecap="round"/><g transform="rotate(-10 64 88)"><rect x="22" y="38" width="91" height="104" rx="16" fill="#e5d7c3"/><rect x="22" y="31" width="91" height="104" rx="16" fill="#fffdf6" stroke="#bcb5a5"/><rect x="35" y="47" width="28" height="7" rx="3.5" fill="#dfb18e"/><path d="M37 71h58M37 84h39M37 97h49" stroke="#d8d5c6" stroke-width="5" stroke-linecap="round"/><circle cx="106" cy="80" r="7" fill="#70b8a8" stroke="#fffdf6" stroke-width="3"/></g><g transform="rotate(9 176 100)"><rect x="136" y="67" width="90" height="83" rx="16" fill="#bdd1c2"/><rect x="136" y="59" width="90" height="83" rx="16" fill="#e4f1e8" stroke="#9ebfae"/><path d="m157 97 13 13 26-30" stroke="#4b8c75" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="139" cy="103" r="7" fill="#70b8a8" stroke="#e4f1e8" stroke-width="3"/></g><path d="M162 26a19 19 0 1 0 34 12c0-21-32-28-35-9" fill="#ffe7a2" stroke="#b59a52" stroke-width="2"/><path d="M174 53h14m-12 5h10m-7-10-3-14 6 4 6-4-3 14M178 8V2m27 20 6-4m-52-1-6-5" stroke="#b59a52" stroke-width="2" stroke-linecap="round"/><path d="m117 25 3-8 3 8 8 3-8 3-3 8-3-8-8-3Z" fill="#b9a7d3"/><circle cx="40" cy="20" r="3" fill="#b9a7d3"/></svg>';
-function install(a){
- const $=id=>document.getElementById(id),all=()=>a.state().workhub.lab,find=id=>all().find(c=>c.id===id),stamp=()=>new Date().toISOString();
- const wb=(action,label,attrs='',cls='')=>`<button type="button" class="${cls}" data-bench="${action}" ${attrs}>${label}</button>`;
- const button=(action,label,attrs='',cls='')=>`<button type="button" class="${cls}" data-workshop="${action}" ${attrs}>${label}</button>`;
- const ids=(c,p='')=>`data-case="${esc(c)}" data-id="${esc(p)}"`;
- let mode='board',zoom=1,inspect='',current='',owner='',drag=null,reaction=null,effect=null,scrolls=new Map(),pendingScroll=null,suppressClick=0,undo=null,preserveCanvas=false;
- try{const p=JSON.parse(localStorage.getItem('mm-tracker.lab-workshop.v1')||'null');if(['board','list'].includes(p?.mode))mode=p.mode;if(Number.isFinite(p?.zoom))zoom=Math.min(1.25,Math.max(.35,p.zoom));}catch{}
- const motion=()=>a.prefs().motion!=='off'&&!root.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
- const locked=c=>c.archived||c.status==='Solved';
- function ensureEditable(c){if(!c)throw Error('This investigation no longer exists.');if(c.archived)throw Error('Restore this case before changing its experiments.');if(c.status==='Solved')throw Error('Reopen this investigation before changing its experiments.');}
- function remember(){try{localStorage.setItem('mm-tracker.lab-workshop.v1',JSON.stringify({mode,zoom}));}catch{}}
- function saveScroll(){const s=$('labBoardScroll');if(s&&current)scrolls.set(current,{x:s.scrollLeft,y:s.scrollTop});}
- function reveal(caseId,id){
-  const c=find(caseId),p=id===ORIGIN?c:c?.attempts.find(p=>p.id===id);if(!c||!p)return;if(current!==caseId||!document.querySelector('.lab-case'))a.openRecord('lab',caseId);if(inspect!==id){inspect=id;a.render();}
-  const sc=$('labBoardScroll'),world=$('labBoardWorld');if(sc&&world){const w=sc.clientWidth||Math.max(280,Math.min(root.innerWidth-48,800)),h=sc.clientHeight||440;sc.scrollLeft=Math.max(0,Math.min(Number(world.dataset.width)*zoom-w,(p.position.x+(id===ORIGIN?ISSUE.w:CARD.w)/2)*zoom-w/2));sc.scrollTop=Math.max(0,Math.min(Number(world.dataset.height)*zoom-h,(p.position.y+CARD.h/2)*zoom-h/2));saveScroll();}else if(p.outcome==='Failed')[...document.querySelectorAll('.lab-failed-list [data-experiment]')].find(el=>el.dataset.experiment===id)?.scrollIntoView?.({block:'nearest',behavior:motion()?'smooth':'auto'});
- }
- function syncOwner(){const next=a.owner();if(next!==owner){owner=next;inspect='';current='';undo=null;scrolls.clear();pendingScroll=null;cancelDrag();clearReaction();effect=null;$('labUndo')?.remove();}}
- function statusTag(outcome){return`<span class="lab-outcome" data-outcome="${esc(outcome)}"><i aria-hidden="true"></i>${esc(outcomeName(outcome))}</span>`;}
- function recordFields(c){return[['Business process',c.process],['What failed',c.error],['Expected result',c.expected],['Actual result',c.actual],['Cause',c.cause],['Investigation notes',c.notes],['Verified solution',c.solution],['Verification',c.verification]].map(([label,value])=>`<section><h4>${label}</h4><p class="prewrap hub-sensitive">${esc(value)||'Not recorded yet.'}</p></section>`).join('');}
- function experimentFields(p){return[['What to try',p.action],['Expected result',p.expected],['Observed result',p.result]].map(([label,value])=>`<section><h4>${label}</h4><p class="prewrap hub-sensitive">${esc(value)||'Not recorded yet.'}</p></section>`).join('');}
- function handle(c,id,title,disabled){return`<button type="button" class="lab-drag-handle" data-lab-drag="${esc(id)}" data-case="${esc(c.id)}" aria-label="Move ${esc(title)}. Press Enter, use arrow keys, then Enter to place or Escape to cancel." aria-describedby="labBoardHelp"${disabled?' disabled':''}><span aria-hidden="true">⠿</span><span>Move</span></button>`;}
- function experiment(c,p,stacked=false){
-  const off=locked(c),live=connected(c,p.id);return`<article class="lab-experiment${stacked?' lab-stacked-card':''}" data-experiment="${esc(p.id)}" data-outcome="${p.outcome}" data-powered="${live}"${stacked?'':` style="left:${p.position.x}px;top:${p.position.y}px"`}><div class="lab-card-top">${stacked?'<span class="lab-card-number">EXPERIMENT</span>':handle(c,p.id,p.title,off)}${statusTag(p.outcome)}</div>${stacked?'':'<span class="lab-port lab-port-in" aria-hidden="true"></span><span class="lab-port lab-port-out" aria-hidden="true"></span>'}<h4 class="hub-sensitive">${esc(p.title)}</h4><p class="lab-card-description hub-sensitive">${esc(p.action)||'Add what you want to try.'}</p><div class="lab-expected"><span>EXPECTED</span><p class="hub-sensitive">${esc(p.expected)||'Add the result you expect.'}</p></div><div class="lab-card-footer">${button('inspect','Details',ids(c.id,p.id))}${p.outcome==='Trying'?button('result','Record result',ids(c.id,p.id),'lab-button-dark'):button('connect',live?'Connected ↗':'Connect to…',ids(c.id,p.id)+(off||!['Passed','Inconclusive'].includes(p.outcome)?' disabled':''),'lab-button-dark')}</div></article>`;
- }
- function geometry(c,override){const positions=new Map([[ORIGIN,c.position],...c.attempts.map(p=>[p.id,p.position])]);if(override)positions.set(override.id,override.point);return positions;}
- function wires(c,override){const points=geometry(c,override);return c.attempts.filter(p=>p.parentId&&p.outcome!=='Failed').map((p,i)=>{const from=points.get(p.parentId),to=points.get(p.id);if(!from||!to)return'';const sx=from.x+(p.parentId===ORIGIN?ISSUE.w:CARD.w),sy=from.y+58,tx=to.x,ty=to.y+58,bend=Math.max(45,Math.abs(tx-sx)*.45),d=`M${sx} ${sy}C${sx+bend} ${sy} ${tx-bend} ${ty} ${tx} ${ty}`,powered=connected(c,p.id),state=powered?'powered':p.outcome==='Inconclusive'?'uncertain':'waiting';return`<g data-wire="${esc(p.id)}" data-wire-state="${state}" style="--wire-order:${i%12}"><path class="lab-wire-shadow" d="${d}"/><path class="lab-wire" d="${d}"/><path class="lab-wire-pulse" d="${d}" pathLength="100"/></g>`;}).join('');}
- function issueCard(c){return`<article class="lab-issue" data-experiment="${ORIGIN}" style="left:${c.position.x}px;top:${c.position.y}px"><div class="lab-card-top">${handle(c,ORIGIN,'the issue',locked(c))}<span class="lab-issue-label">START HERE</span></div><span class="lab-port lab-port-out" aria-hidden="true"></span><div class="lab-issue-icon" aria-hidden="true">⌁</div><h4 class="hub-sensitive">${esc(c.title)}</h4><p class="lab-card-description hub-sensitive">${esc(c.error)||'Describe the failure in case details.'}</p><div class="lab-expected"><span>EXPECTED</span><p class="hub-sensitive">${esc(c.expected)||'What should have happened?'}</p></div><div class="lab-card-footer">${button('inspect','Issue details',ids(c.id,ORIGIN))}${wb('case-edit','Edit',`data-id="${esc(c.id)}"`)}</div></article>`;}
- function board(c){
-  const active=c.attempts,positions=[c.position,...active.map(p=>p.position)],width=Math.max(1240,...positions.map(p=>p.x+540)),height=Math.max(680,...positions.map(p=>p.y+350));
-  return`<div class="lab-board-shell"><div class="lab-board-tools"><span><i class="lab-power-lamp${c.status==='Solved'?' is-on':''}"></i>${c.status==='Solved'?'Verified circuit':'Investigation circuit'}</span><div class="actions">${button('zoom-out','−','aria-label="Zoom out"')}<output id="labZoomValue">${Math.round(zoom*100)}%</output>${button('zoom-in','＋','aria-label="Zoom in"')}${button('fit','Fit','aria-label="Fit investigation in view"')}${button('origin','Start','aria-label="Return to the issue card"')}${button('arrange','Arrange','aria-label="Arrange cards side by side"'+(locked(c)?' disabled':''))}</div></div><div class="lab-board-scroll" id="labBoardScroll" tabindex="0" aria-label="Investigation canvas. Scroll to pan; use Move handles to move cards."><div class="lab-world-size" style="width:${width*zoom}px;height:${height*zoom}px"><div class="lab-board-world" id="labBoardWorld" style="width:${width}px;height:${height}px;transform:scale(${zoom})" data-width="${width}" data-height="${height}"><div class="lab-board-watermark" aria-hidden="true"><span>THE POSSIBILITY DEPARTMENT</span><strong>Good questions.<br>Small experiments.</strong><small>Every ruled-out idea brings you closer.</small></div><svg id="labWires" class="lab-wires" width="${width}" height="${height}" aria-hidden="true">${wires(c)}</svg>${issueCard(c)}${active.map(p=>experiment(c,p)).join('')}<div class="lab-magnet-hint" id="labMagnetHint" hidden><span aria-hidden="true">🧲</span>Release to connect</div></div></div></div><div class="lab-board-key" id="labBoardHelp"><span><i class="lab-key-live"></i>Successful connection</span><span><i class="lab-key-dotted"></i>Inconclusive / unpowered</span><small>Drag by Move. Near a successful source, release to snap. Keyboard: Enter → arrows → Enter; Escape cancels.</small></div></div>`;
- }
- function inspector(c){const p=c.attempts.find(p=>p.id===inspect),off=locked(c);return`<aside class="lab-inspector" id="labInspector"><div class="lab-inspector-top"><span class="lab-eyebrow">${p?'EXPERIMENT NOTES':'CASE NOTEBOOK'}</span>${p?button('inspect','← Issue',ids(c.id,ORIGIN)):''}</div><h3 tabindex="-1" class="hub-sensitive">${esc(p?.title||c.title)}</h3>${p?statusTag(p.outcome):'<span class="lab-process hub-sensitive">'+esc(c.process||'Add your business process')+'</span>'}${p?experimentFields(p):recordFields(c)}${!p?'<div class="actions">'+(c.projectId&&a.state().projects.some(x=>x.id===c.projectId)?wb('open','Open project',`data-kind="projects" data-id="${esc(c.projectId)}"`):'')+(c.ticketId&&a.state().tickets.some(x=>x.id===c.ticketId)?wb('open','Open ticket',`data-kind="tickets" data-id="${esc(c.ticketId)}"`):'')+'</div>':''}<div class="lab-inspector-actions">${p?wb('attempt-edit','Edit experiment',ids(c.id,p.id)+(off?' disabled':''))+(off?'':`<div class="lab-result-options">${['Passed','Failed','Inconclusive'].map(o=>button('result',o==='Passed'?'✓ Worked':o==='Failed'?'× Failed':'? Unsure',ids(c.id,p.id)+` data-outcome="${o}"`)).join('')}</div>`)+button('connect','Connect to…',ids(c.id,p.id)+(off||!['Passed','Inconclusive'].includes(p.outcome)?' disabled':'')):wb('case-edit','Edit case details',`data-id="${esc(c.id)}"`)}${p?.outcome==='Failed'?button('retry','Try another approach',ids(c.id,p.id)+(off?' disabled':'')):''}${p?button('delete-attempt','Delete experiment',ids(c.id,p.id),'lab-delete'):button('delete-case','Delete investigation',ids(c.id),'lab-delete')}</div></aside>`;}
- function ruledOut(c){const failed=c.attempts.filter(p=>p.outcome==='Failed');return`<section class="lab-ruled-out"><div class="lab-shelf-heading"><div><span class="lab-eyebrow">USEFUL THINGS WE LEARNED</span><h3>What we ruled out <span>${failed.length}</span></h3></div><span class="lab-shelf-note">A failed test is still a clue.</span></div><div class="lab-failed-list">${failed.map(p=>`<article data-experiment="${esc(p.id)}" data-outcome="Failed"><span class="lab-failed-icon" aria-hidden="true">⌁</span><div><strong class="hub-sensitive">${esc(p.title)}</strong><p class="hub-sensitive">${esc(p.result)||'Record what happened.'}</p></div><div class="actions">${button('inspect','Details',ids(c.id,p.id))}${button('retry','Try another approach',ids(c.id,p.id)+(locked(c)?' disabled':''))}${button('delete-attempt','Delete',ids(c.id,p.id),'lab-delete')}</div></article>`).join('')||'<p class="lab-shelf-empty">Unsuccessful experiments will land here, with their notes intact.</p>'}</div></section>`;}
- function render(c,{rows,query,view}){
-  syncOwner();saveScroll();if(c?.id!==current){inspect='';current=c?.id||'';}const stats=['Investigating','Testing','Solved'],hasKnowledge=!!c?.knowledgeId&&a.state().workhub.notes.some(n=>n.id===c.knowledgeId);
-  return`<section class="hub bench-lab lab-workshop"><div class="lab-hero"><div><span class="lab-eyebrow">A SMALL WORKSHOP FOR BIG “AHA!” MOMENTS</span><h2>Troubleshooting lab<span aria-hidden="true">✦</span></h2><p>Make a guess. Try a fix. Connect what works.</p>${wb('case-new','＋ New investigation','','primary')}</div><div class="lab-hero-art">${ART}</div><div class="lab-hero-stats">${stats.map(s=>`<span><strong>${all().filter(c=>!c.archived&&c.status===s).length}</strong>${s}</span>`).join('')}</div></div><div class="hub-toolbar lab-case-toolbar"><input id="benchLabSearch" type="search" value="${esc(query)}" aria-label="Search troubleshooting cases" placeholder="Find a case, process or T-code…"><select id="benchLabView" aria-label="Case view">${['active',...stats,'archived'].map(s=>`<option value="${s}"${view===s?' selected':''}>${s==='active'?'All active cases':s==='archived'?'Archived cases':s}</option>`).join('')}</select></div><div class="bench-case-list lab-case-tabs" aria-label="Investigations">${rows.map(r=>wb('case-open',`<span class="lab-case-dot" data-status="${r.status}"></span><strong class="hub-sensitive">${esc(r.title)}</strong><small>${r.attempts.length} experiments</small>`,`data-id="${esc(r.id)}" aria-pressed="${c?.id===r.id}"`)).join('')}</div>${c?`<article class="bench-case-detail lab-case" data-case="${esc(c.id)}"><div class="lab-case-heading"><div><span class="lab-eyebrow">${esc(c.status)}${c.archived?' · ARCHIVED':''}</span><h3 class="hub-sensitive">${esc(c.title)}</h3><p class="hub-sensitive">${esc([c.system,c.tcodes,c.process].filter(Boolean).join(' · '))||'An investigation waiting for its first clue.'}</p></div><div class="actions">${wb('case-edit','Edit',`data-id="${esc(c.id)}"`)}${wb('case-archive',c.archived?'Restore':'Archive',`data-id="${esc(c.id)}"`)}${button('delete-case','Delete',ids(c.id),'lab-delete')}${c.status==='Solved'?button('reopen','Reopen',ids(c.id)+(c.archived?' disabled':'')):button('resolve','Resolve & save',ids(c.id)+(c.archived?' disabled':''),'lab-button-dark')}</div></div><div class="lab-workspace-toolbar"><div class="lab-view-switch" role="group" aria-label="Investigation view">${button('view','🧲 Board','data-value="board" aria-pressed="'+(mode==='board')+'"')}${button('view','☷ Notes','data-value="list" aria-pressed="'+(mode==='list')+'"')}</div><span class="lab-workspace-count">${c.attempts.filter(p=>connected(c,p.id)).length} powered · ${c.attempts.filter(p=>p.outcome==='Trying').length} in progress</span>${wb('attempt-new','＋ Add experiment',`data-case="${esc(c.id)}"${locked(c)?' disabled':''}`,'primary')}</div>${c.status==='Solved'?`<div class="lab-verified-banner"><span aria-hidden="true">✓</span><div><strong>${hasKnowledge?'Solution verified. Knowledge kept.':'Solution verified. Ready for Knowledge.'}</strong><p class="hub-sensitive">${esc(c.solution)}</p></div><div class="actions">${hasKnowledge?wb('open','Read Knowledge note',`data-kind="notes" data-id="${esc(c.knowledgeId)}"`):''}${wb('case-knowledge',hasKnowledge?'Update linked Knowledge note':'Save solution to Knowledge',`data-id="${esc(c.id)}"`)}</div></div>`:''}<div class="lab-work-area">${mode==='board'?board(c):`<div class="lab-notes-view"><div class="lab-note-issue"><span class="lab-eyebrow">THE ISSUE</span>${recordFields(c)}</div><div class="lab-stacked-experiments">${c.attempts.filter(p=>p.outcome!=='Failed').map(p=>experiment(c,p,true)).join('')||'<p>Add your first experiment to start the investigation.</p>'}</div></div>`}${inspector(c)}</div>${ruledOut(c)}<p class="lab-status" id="labAnnouncement" role="status" aria-live="polite">${c.archived?'Archived case. Restore it to continue.':c.status==='Solved'?'Reopen the case to run more experiments.':'You decide the outcome from your observed results. The board keeps the story.'}</p></article>`:`<div class="lab-empty"><div class="lab-empty-art">${ART}</div><span class="lab-eyebrow">YOUR NEXT “AHA!” STARTS HERE</span><h3>A place for the problem.<br>And every possibility.</h3><p>Create an investigation, describe the expected result, then add experiments to your magnetic board.</p>${wb('case-new','Create an investigation','','primary')}</div>`}</section>`;
- }
- function publish(d,c){
-  if(c.status!=='Solved'||!c.solution.trim())throw Error('Add a verified solution before saving to Knowledge.');
-  const id=c.knowledgeId&&d.workhub.notes.some(n=>n.id===c.knowledgeId)?c.knowledgeId:uid(),index=d.workhub.notes.findIndex(n=>n.id===id),old=d.workhub.notes[index];
-  const body=[['Business process',c.process],['Symptoms',c.error],['Expected result',c.expected],['Actual result',c.actual],['Confirmed cause',c.cause],['Verified solution',c.solution],['Verification',c.verification]].filter(([,v])=>v).map(([k,v])=>k+'\n'+v).join('\n\n');
-  const testing=c.attempts.map((p,i)=>`${i+1}. ${p.title} · ${outcomeName(p.outcome)}${connected(c,p.id)?' · Connected solution step':''}\nAction: ${p.action}\nExpected: ${p.expected||'Not recorded'}\nObserved: ${p.result||'Not recorded'}`).join('\n\n');
-  if(body.length>32767||testing.length>32767)throw Error('The Knowledge summary is too long. Shorten the case summary or experiment notes before publishing.');
-  const n={...old,id,title:c.title,body,tags:old?.tags||'Troubleshooting, Verified',tcodes:c.tcodes,configuration:old?.configuration||'',errors:c.error,testing,projectId:c.projectId,ticketId:c.ticketId,itemId:old?.itemId||'',labCaseId:c.id,updatedAt:stamp()};if(index<0)d.workhub.notes.push(n);else d.workhub.notes[index]=n;c.knowledgeId=id;c.updatedAt=n.updatedAt;return n;
- }
- function toKnowledge(id){const c=find(id);if(!c)throw Error('This investigation no longer exists.');if(a.mutate(d=>publish(d,d.workhub.lab.find(x=>x.id===id))))a.tell(c.knowledgeId?'Linked Knowledge note updated.':'Solution saved to Knowledge.');}
- const area=(name,label,value='',required=false)=>`<div class="wide"><label for="labw-${name}">${label}</label><textarea id="labw-${name}" name="${name}" maxlength="32767"${required?' required':''}>${esc(value)}</textarea></div>`;
- function resultForm(caseId,id,outcome){const c=find(caseId);ensureEditable(c);const p=c.attempts.find(p=>p.id===id);if(!p)throw Error('Experiment no longer exists.');a.openModal('Record experiment result',`<form id="labResultForm" data-case="${esc(caseId)}" data-id="${esc(id)}"><span class="lab-eyebrow">WHAT DID YOU OBSERVE?</span><h3>${esc(p.title)}</h3><label for="labw-outcome">Outcome</label><select id="labw-outcome" name="outcome">${['Passed','Failed','Inconclusive'].map(o=>`<option value="${o}"${(outcome||p.outcome)===o?' selected':''}>${outcomeName(o)}</option>`).join('')}</select>${area('result','Actual result / evidence *',p.result,true)}<p class="hub-meta">Successful experiments can connect. Failed ones keep their notes on the ruled-out shelf.</p><div class="modal-actions">${wb('cancel','Cancel')}<button type="submit" class="primary">Save result</button></div></form>`);}
- function disconnectChildren(c,id){for(const p of c.attempts)if(p.parentId===id)p.parentId='';}
- function rectangles(c,id){return [{id:ORIGIN,position:c.position,w:ISSUE.w,h:ISSUE.h},...c.attempts.map(p=>({...p,w:CARD.w,h:CARD.h}))].filter(p=>p.id!==id);}
- function overlapsCard(c,id,p){const w=id===ORIGIN?ISSUE.w:CARD.w,h=id===ORIGIN?ISSUE.h:CARD.h;return rectangles(c,id).some(q=>p.x<q.position.x+q.w+20&&p.x+w+20>q.position.x&&p.y<q.position.y+q.h+20&&p.y+h+20>q.position.y);}
- function freePoint(c,id,point){const base={x:Math.round(Math.min(LIMIT,Math.max(12,point.x))),y:Math.round(Math.min(LIMIT,Math.max(12,point.y)))};if(!overlapsCard(c,id,base))return base;for(let ring=1;ring<=80;ring++)for(const [dx,dy]of [[ring,0],[-ring,0],[0,ring],[0,-ring],[ring,ring],[-ring,ring],[ring,-ring],[-ring,-ring]]){const p={x:base.x+dx*282,y:base.y+dy*282};if(p.x>=12&&p.x<=LIMIT&&p.y>=12&&p.y<=LIMIT&&!overlapsCard(c,id,p))return p;}throw Error('Make some room on the board before placing this card.');}
- function dockPoint(c,parentId,id){
-  const source=parentId===ORIGIN?c:c.attempts.find(p=>p.id===parentId);if(!source)throw Error('The connection source no longer exists.');const x=source.position.x+(parentId===ORIGIN?ISSUE.w:CARD.w)+48;
-  for(let i=0;i<70;i++){const point={x,y:source.position.y+i*282};if(x<=LIMIT&&point.y<=LIMIT&&!overlapsCard(c,id,point))return point;}throw Error('Move the source card to make room for this connection.');
- }
- function patchRender(){if(!preserveCanvas)return false;const c=find(current),world=$('labBoardWorld');if(!c||!world||document.querySelector('.lab-case')?.dataset.case!==c.id)return false;for(const el of world.querySelectorAll('[data-experiment]')){const p=el.dataset.experiment===ORIGIN?c:c.attempts.find(p=>p.id===el.dataset.experiment);if(p){el.style.left=p.position.x+'px';el.style.top=p.position.y+'px';if(p.outcome){const live=connected(c,p.id);el.dataset.powered=String(live);const b=el.querySelector('[data-workshop="connect"]');if(b)b.textContent=live?'Connected ↗':'Connect to…';}}}const width=Math.max(1240,c.position.x+540,...c.attempts.map(p=>p.position.x+540)),height=Math.max(680,c.position.y+350,...c.attempts.map(p=>p.position.y+350));world.dataset.width=width;world.dataset.height=height;world.style.width=width+'px';world.style.height=height+'px';world.parentElement.style.width=width*zoom+'px';world.parentElement.style.height=height*zoom+'px';const svg=$('labWires');svg.innerHTML=wires(c);svg.setAttribute('width',width);svg.setAttribute('height',height);const count=document.querySelector('.lab-workspace-count');if(count)count.textContent=c.attempts.filter(p=>connected(c,p.id)).length+' powered · '+c.attempts.filter(p=>p.outcome==='Trying').length+' in progress';return true;}
- function arrange(c){ensureEditable(c);a.mutate(d=>{const target=d.workhub.lab.find(p=>p.id===c.id);target.position={x:54,y:158};for(let i=0;i<target.attempts.length;i++){const p=target.attempts[i];p.position={x:1000+(i%3)*302,y:158+Math.floor(i/3)*282};}const visited=new Set();function place(p){if(visited.has(p.id))return;visited.add(p.id);if(p.parentId&&p.parentId!==ORIGIN){const parent=target.attempts.find(x=>x.id===p.parentId);if(parent)place(parent);}if(p.parentId)dock(target,p.id,p.parentId);else p.position=freePoint(target,p.id,p.position);}for(const p of target.attempts)place(p);target.updatedAt=stamp();});a.tell('Cards arranged side by side. Your results and connections are kept.');}
- function dock(c,id,parentId){const p=c.attempts.find(p=>p.id===id);if(p&&parentId)p.position=dockPoint(c,parentId,id);}
- function recordResult(caseId,id,outcome,result){
-  const c=find(caseId);ensureEditable(c);if(!['Passed','Failed','Inconclusive'].includes(outcome)||!result.trim())throw Error('Choose an outcome and record what actually happened.');
-  if(a.mutate(d=>{const target=d.workhub.lab.find(x=>x.id===caseId),p=target.attempts.find(x=>x.id===id);if(!p)throw Error('Experiment no longer exists.');const changed=p.outcome!==outcome||!p.parentId;p.outcome=outcome;p.result=result.trim();p.updatedAt=stamp();if(outcome!=='Passed')disconnectChildren(target,id);p.parentId=outcome==='Failed'?'':p.parentId||ORIGIN;if(outcome==='Passed'&&changed)dock(target,id,p.parentId);target.status='Testing';target.updatedAt=p.updatedAt;})){a.closeModal();inspect=id;a.render();reveal(caseId,id);feedback(caseId,outcome==='Passed'?'success':outcome==='Failed'?'failed':'uncertain',id);a.tell('Experiment result saved.');return true;}return false;
- }
- function connectForm(caseId,id){const c=find(caseId);ensureEditable(c);const p=c.attempts.find(p=>p.id===id);if(!p||!['Passed','Inconclusive'].includes(p.outcome))throw Error('Record a successful or inconclusive result before connecting.');a.openModal('Connect experiment',`<form id="labConnectForm" data-case="${esc(caseId)}" data-id="${esc(id)}"><h3>${esc(p.title)}</h3><label for="labw-parentId">Connect after</label><select id="labw-parentId" name="parentId"><option value="">No connection</option>${eligible(c,id).map(x=>`<option value="${esc(x.id)}"${x.id===p.parentId?' selected':''}>${esc(x.title)}</option>`).join('')}</select><label class="check-label"><input type="checkbox" name="snap" checked>Place the card beside its source</label><p class="hub-meta">A successful source can feed several experiments. Loops are not allowed.</p><div class="modal-actions">${wb('cancel','Cancel')}<button type="submit" class="primary">Save connection</button></div></form>`);}
- function connect(caseId,id,parentId,snap=true){
-  const c=find(caseId);ensureEditable(c);const p=c.attempts.find(x=>x.id===id);if(!p||!['Passed','Inconclusive'].includes(p.outcome))throw Error('Only successful or inconclusive experiments can connect.');if(parentId&&!eligible(c,id).some(x=>x.id===parentId))throw Error('Choose a successful source without creating a loop.');
-  if(a.mutate(d=>{const target=d.workhub.lab.find(x=>x.id===caseId),p=target.attempts.find(x=>x.id===id);p.parentId=parentId;if(parentId&&snap)dock(target,id,parentId);p.updatedAt=stamp();target.updatedAt=p.updatedAt;})){a.closeModal();a.render();reveal(caseId,id);if(parentId)feedback(caseId,p.outcome==='Passed'?'success':'uncertain',id);return true;}return false;
- }
- function resolutionForm(id){const c=find(id);if(!c||c.archived)throw Error('Restore this investigation before resolving it.');const path=c.attempts.filter(p=>connected(c,p.id));a.openModal('Review solution & save to Knowledge',`<form id="labResolveForm" data-case="${esc(id)}"><div class="lab-resolution-intro"><span aria-hidden="true">⚡</span><div><span class="lab-eyebrow">KEEP THE ANSWER THAT WORKED</span><h3>${esc(c.title)}</h3><p>Review the fix and its evidence before marking this issue resolved.</p></div></div><details class="lab-resolution-review" open><summary>Investigation summary · ${c.attempts.length} experiments</summary><p><strong>Process:</strong> ${esc(c.process)||'Not recorded'}</p><p><strong>Expected:</strong> ${esc(c.expected)||'Not recorded'}</p><p><strong>Actual:</strong> ${esc(c.actual)||'Not recorded'}</p><h4>Connected successful steps</h4><ol>${path.map(p=>'<li>'+esc(p.title)+' — '+esc(p.result)+'</li>').join('')||'<li>No connected experiments. Explain your verification below.</li>'}</ol><p>${c.attempts.filter(p=>p.outcome==='Failed').length} failed attempts will be preserved in the Knowledge investigation trail.</p></details>${area('cause','Confirmed root cause *',c.cause,true)}${area('solution','Verified fix / resolution *',c.solution,true)}${area('verification','How did you confirm the issue is resolved? *',c.verification,true)}<label class="check-label lab-review-check"><input type="checkbox" name="reviewed" required>I reviewed the results and verified this resolution.</label><p class="hub-meta">This saves the case and its ${c.knowledgeId?'linked':'new'} Knowledge note together. You can return from the note to this board.</p><div class="modal-actions">${wb('cancel','Cancel')}<button type="submit" class="primary">Resolve & save to Knowledge</button></div></form>`);}
- function saveResolution(form){const id=form.dataset.case,c=find(id);if(!c||c.archived)throw Error('Restore this investigation before resolving it.');const v=Object.fromEntries(new FormData(form));if(!v.reviewed||!v.cause?.trim()||!v.solution?.trim()||!v.verification?.trim())throw Error('Add the cause, verified fix and verification, then confirm your review.');if(a.mutate(d=>{const target=d.workhub.lab.find(x=>x.id===id);for(const k of ['cause','solution','verification'])target[k]=v[k].trim();target.status='Solved';target.resolvedAt=stamp();publish(d,target);})){a.closeModal();a.render();feedback(id,'solved');a.tell('Issue resolved. Its verified solution is saved to Knowledge.');return true;}return false;}
- function announce(message){if($('labAnnouncement'))$('labAnnouncement').textContent=message;}
- function clearReaction(){if(reaction){reaction=null;a.life()?.scene(null);}$('labMomoProp')?.remove();}
- function feedback(caseId,type,id=''){
-  const c=find(caseId);if(!c)return;document.querySelectorAll('.lab-sparks').forEach(el=>el.remove());effect={caseId,type,id,until:Date.now()+4400};const host=document.querySelector('.lab-case');if(host?.dataset.case===caseId){host.dataset.effect=type;let target=[...host.querySelectorAll('[data-experiment]')].find(el=>el.dataset.experiment===id);if(target){target.dataset.feedback=type;if(motion()&&!document.hidden&&!document.body.matches('.hub-private,.hub-present')){document.querySelectorAll('.lab-sparks').forEach(el=>el.remove());const fx=document.createElement('span'),r=target.getBoundingClientRect(),v=root.visualViewport,w=v?.width||root.innerWidth,h=v?.height||root.innerHeight;fx.className='lab-sparks lab-screen-effects';fx.dataset.kind=type;fx.setAttribute('aria-hidden','true');fx.style.left=Math.max(60,Math.min(w-60,r.width?r.left+r.width/2:w*.55))+'px';fx.style.top=Math.max(80,Math.min(h-80,r.height?r.top+r.height*.36:h*.5))+'px';fx.innerHTML=Array.from({length:type==='failed'?9:6},(_,i)=>`<i style="--sx:${Math.cos(i*2.399)*100}px;--sy:${Math.sin(i*2.399)*85}px;--sr:${i*37}deg;--delay:${i*24}ms"></i>`).join('')+(type==='failed'?'<b class="lab-smoke"></b><b class="lab-smoke" style="--smoke-x:24px;--delay:140ms"></b><b class="lab-smoke" style="--smoke-x:-25px;--delay:280ms"></b>':'');document.body.append(fx);}}announce(type==='failed'?'Failed experiment saved on the ruled-out shelf.':type==='solved'?'Verified solution saved to Knowledge.':type==='uncertain'?'Inconclusive result saved. More checking is needed.':'Successful result saved. Follow the powered connections.');}
-  if(!a.ready()||!a.prefs().mascot||document.hidden||document.body.matches('.hub-private,.hub-present,.hub-focus')||document.querySelector('dialog[open]')||a.life()?.sceneAvailable?.()===false)return;
-  a.moments()?.finish(false);clearReaction();const line=type==='failed'?'Eep! A tiny spark. A useful clue. I’m okay!':type==='solved'?'Verified! I’m putting this bright idea somewhere safe.':type==='uncertain'?'Hmm. One clue, several possibilities. Let’s look closer.':'It clicked! I knew those little magnets had potential.';
-  a.react(type==='failed'?'busy':'happy',line,4000);const pose=type==='failed'?'lab-cower':type==='solved'?'lab-verified':type==='uncertain'?'lab-inspect':'lab-celebrate',expression=type==='failed'?'afraid':type==='uncertain'?'curious':'delighted';a.life()?.scene({pose:motion()?pose:'idle',expression});reaction={type,start:Date.now(),until:Date.now()+4000};
-  if(type==='uncertain'||type==='solved'){const p=document.createElement('span');p.id='labMomoProp';p.setAttribute('aria-hidden','true');p.innerHTML=type==='solved'?'<span class="lab-momo-stamp">✓<small>VERIFIED</small></span>':'<svg viewBox="0 0 60 70"><circle cx="24" cy="25" r="17" fill="#dff8f0aa" stroke="#b58a60" stroke-width="5"/><path d="m37 39 17 22" stroke="#87634b" stroke-width="9" stroke-linecap="round"/><path d="M15 20q3-7 10-6" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg>';$('hubPet')?.append(p);}
- }
- function tick(){
-  if(reaction){if(Date.now()>=reaction.until||!a.ready()||document.hidden||document.body.matches('.hub-private,.hub-present,.hub-focus')||!document.querySelector('.lab-workshop')||document.querySelector('dialog[open]'))clearReaction();else if(reaction.type==='failed'&&Date.now()-reaction.start>1500&&motion())a.life()?.scene({pose:'lab-peek',expression:'shy'});}
-  if(effect&&(Date.now()>=effect.until||!motion()||document.hidden||document.body.matches('.hub-private,.hub-present')||!document.querySelector('.lab-workshop'))){document.querySelector('.lab-case')?.removeAttribute('data-effect');for(const el of document.querySelectorAll('[data-feedback]'))el.removeAttribute('data-feedback');for(const el of document.querySelectorAll('.lab-sparks'))el.remove();effect=null;}
- }
- function mount(){
-  syncOwner();mountUndo();
-  if(drag&&!drag.el.isConnected)cancelDrag();if(!document.querySelector('.lab-workshop')){clearReaction();return;}
-  const s=$('labBoardScroll'),saved=pendingScroll||scrolls.get(current);if(s&&saved){s.scrollLeft=saved.x;s.scrollTop=saved.y;}pendingScroll=null;if(s&&!s.dataset.watching){s.dataset.watching='true';s.addEventListener('scroll',saveScroll,{passive:true});}tick();
- }
- function magnet(c,id,point){const p=c.attempts.find(p=>p.id===id);if(!p||!['Passed','Inconclusive'].includes(p.outcome))return null;let best=null;for(const source of eligible(c,id)){const from=source.id===ORIGIN?c:c.attempts.find(p=>p.id===source.id),x=from.position.x+(source.id===ORIGIN?ISSUE.w:CARD.w),y=from.position.y+58,d=Math.hypot(point.x-x,point.y+58-y);if(d<=86&&(!best||d<best.distance)){try{best={id:source.id,distance:d,point:dockPoint(c,source.id,id)};}catch{}}}return best;}
- function mountUndo(){let b=$('labUndo');if(undo&&a.ready()&&undo.owner===a.owner()){if(!b){b=document.createElement('button');b.type='button';b.id='labUndo';b.dataset.workshop='undo';b.textContent='↶ Undo Lab deletion';$('hubToolbar')?.append(b);}}else b?.remove();}
- function remove(caseId,id=''){
-  const c=find(caseId),p=id?c?.attempts.find(p=>p.id===id):null;if(!c||id&&!p)throw Error('This Lab item no longer exists.');
-  const label=p?'experiment “'+p.title+'”':'investigation “'+c.title+'”';if(!root.confirm('Delete '+label+'? '+(p?'Its connections will be removed. '+(c.status==='Solved'?'The case will reopen for review. ':''):'Its experiments and board will also be deleted. ')+'Linked Knowledge notes are kept. You can Undo this deletion until the next Lab deletion or account change.'))return false;
-  cancelDrag();clearReaction();const snapshot={owner:a.owner(),caseId,id,record:JSON.parse(JSON.stringify(p||c)),index:p?c.attempts.findIndex(x=>x.id===id):all().findIndex(x=>x.id===caseId),caseStatus:c.status,caseUpdatedAt:c.updatedAt,children:p?c.attempts.filter(x=>x.parentId===id).map(x=>x.id):[]};
-  if(a.mutate(d=>{if(!id)d.workhub.lab=d.workhub.lab.filter(x=>x.id!==caseId);else{const target=d.workhub.lab.find(x=>x.id===caseId);target.attempts=target.attempts.filter(x=>x.id!==id);disconnectChildren(target,id);if(target.status==='Solved')target.status='Investigating';target.updatedAt=stamp();}})){snapshot.afterCase=id?JSON.parse(JSON.stringify(find(caseId))):null;undo=snapshot;inspect='';a.closeModal();mountUndo();a.tell('Lab item deleted. Use Undo Lab deletion to restore it.');return true;}return false;
- }
- function restore(){
-  syncOwner();if(!undo||!a.ready())return false;const saved=undo;if(saved.id&&!find(saved.caseId))throw Error('Restore the investigation before restoring this experiment.');
-  if(a.mutate(d=>{if(!saved.id){if(d.workhub.lab.some(c=>c.id===saved.caseId))throw Error('That investigation already exists.');d.workhub.lab.splice(saved.index,0,JSON.parse(JSON.stringify(saved.record)));}else{const c=d.workhub.lab.find(c=>c.id===saved.caseId);if(c.attempts.some(p=>p.id===saved.id))throw Error('That experiment already exists.');const unchanged=root.MMTrackerMerge.equal(c,saved.afterCase),p=JSON.parse(JSON.stringify(saved.record));if(p.parentId&&!eligible(c,p.id).some(x=>x.id===p.parentId))p.parentId='';c.attempts.splice(saved.index,0,p);if(p.outcome==='Passed')for(const id of saved.children){const child=c.attempts.find(p=>p.id===id);if(child&&!child.parentId&&['Passed','Inconclusive'].includes(child.outcome)&&eligible(c,id).some(x=>x.id===p.id))child.parentId=p.id;}if(unchanged)c.status=saved.caseStatus;else if(c.status==='Solved')c.status='Investigating';c.updatedAt=unchanged?saved.caseUpdatedAt:stamp();}})){undo=null;mountUndo();a.openRecord('lab',saved.caseId);a.tell('Lab item restored.');return true;}return false;
- }
- function repel(c,id,point){const moving=id===ORIGIN?c:c.attempts.find(p=>p.id===id);if(!moving)return point;let out={...point},repelled=false;for(const q of rectangles(c,id)){const other=q.id===ORIGIN?c:q,compatible=moving.outcome!=='Failed'&&other.outcome!=='Failed'&&(id!==ORIGIN&&eligible(c,id).some(p=>p.id===q.id));if(compatible)continue;const w=id===ORIGIN?ISSUE.w:CARD.w,h=id===ORIGIN?ISSUE.h:CARD.h,dx=point.x+w/2-(q.position.x+q.w/2),dy=point.y+h/2-(q.position.y+q.h/2),nx=Math.abs(dx)/(w/2+q.w/2+44),ny=Math.abs(dy)/(h/2+q.h/2+44);if(nx<1&&ny<1){repelled=true;if(nx>ny)out.x+=(dx>=0?1:-1)*(1-nx)*68;else out.y+=(dy>=0?1:-1)*(1-ny)*68;}}drag.el.dataset.repelling=String(repelled);return{x:Math.max(12,Math.min(LIMIT,out.x)),y:Math.max(12,Math.min(LIMIT,out.y))};}
- function paintDrag(){if(!drag)return;const c=find(drag.caseId);if(!c)return;drag.candidate=magnet(c,drag.id,drag.point);let point=repel(c,drag.id,drag.point);if(drag.candidate&&motion()){const q=drag.candidate.point,pull=.22+.4*(1-drag.candidate.distance/86);point={x:point.x+(q.x-point.x)*pull,y:point.y+(q.y-point.y)*pull};}drag.displayPoint=point;Object.assign(drag.el.style,{left:point.x+'px',top:point.y+'px'});drag.el.classList.add('lab-dragging');drag.el.dataset.magnetic=String(!!drag.candidate);const svg=$('labWires');if(svg)svg.innerHTML=wires(c,{id:drag.id,point});const hint=$('labMagnetHint');if(hint){hint.hidden=!drag.candidate&&!drag.el.matches('[data-repelling="true"]');hint.textContent=drag.candidate?'🧲 Release to connect':'↔ These magnets repel';const target=drag.candidate?.point||point;Object.assign(hint.style,{left:target.x+'px',top:Math.max(8,target.y-44)+'px'});}for(const el of document.querySelectorAll('.lab-magnet-source'))el.classList.remove('lab-magnet-source');if(drag.candidate)[...document.querySelectorAll('#labBoardWorld [data-experiment]')].find(el=>el.dataset.experiment===drag.candidate.id)?.classList.add('lab-magnet-source');}
- function beginDrag(handle,event,keyboard=false){if(drag)cancelDrag();const c=find(handle.dataset.case);ensureEditable(c);saveScroll();const id=handle.dataset.labDrag,p=id===ORIGIN?c:c.attempts.find(p=>p.id===id),el=handle.closest('[data-experiment]');if(!p||!el)return;drag={caseId:c.id,id,el,handle,point:{...p.position},original:{...p.position},x:event.clientX||0,y:event.clientY||0,scrollX:$('labBoardScroll')?.scrollLeft||0,scrollY:$('labBoardScroll')?.scrollTop||0,pointerId:event.pointerId,keyboard,moved:false,owner:a.owner(),candidate:null};document.body.classList.add('lab-drag-active');handle.setAttribute('aria-pressed','true');if(!keyboard)try{handle.setPointerCapture?.(event.pointerId);}catch{}announce('Move the card. Release to place, or Escape to cancel.');}
- function cancelDrag(reset=true){if(!drag)return;const old=drag;drag=null;document.body.classList.remove('lab-drag-active');old.handle.removeAttribute('aria-pressed');old.el.classList.remove('lab-dragging');delete old.el.dataset.magnetic;delete old.el.dataset.repelling;for(const el of document.querySelectorAll('.lab-magnet-source'))el.classList.remove('lab-magnet-source');if($('labMagnetHint'))$('labMagnetHint').hidden=true;if(reset)Object.assign(old.el.style,{left:old.original.x+'px',top:old.original.y+'px'});const c=find(old.caseId);if(reset&&c&&$('labWires'))$('labWires').innerHTML=wires(c);}
- function drop(){if(!drag)return;const g=drag,c=find(g.caseId);if(!g.moved||!a.ready()||g.owner!==a.owner()||!c||locked(c)||!g.el.isConnected){cancelDrag();return;}const point=g.candidate?.point||freePoint(c,g.id,g.displayPoint||g.point),parent=g.candidate?.id;cancelDrag(false);if(point.x===g.original.x&&point.y===g.original.y&&!parent)return;suppressClick=Date.now()+600;preserveCanvas=true;let saved=false;try{saved=a.mutate(d=>{const target=d.workhub.lab.find(c=>c.id===g.caseId),p=g.id===ORIGIN?target:target?.attempts.find(p=>p.id===g.id);ensureEditable(target);if(!p)throw Error('Experiment no longer exists.');if(parent&&!eligible(target,g.id).some(x=>x.id===parent))throw Error('The connection changed. Try moving the card again.');p.position={x:Math.round(Math.min(LIMIT,Math.max(0,point.x))),y:Math.round(Math.min(LIMIT,Math.max(0,point.y)))};if(parent)p.parentId=parent;p.updatedAt=stamp();target.updatedAt=p.updatedAt;});}finally{preserveCanvas=false;}if(saved){if(parent)feedback(g.caseId,g.id!==ORIGIN&&find(g.caseId).attempts.find(p=>p.id===g.id)?.outcome==='Inconclusive'?'uncertain':'success',g.id);announce(parent?'Magnetic connection saved.':'Card position saved.');const h=[...document.querySelectorAll('[data-lab-drag]')].find(h=>h.dataset.labDrag===g.id);h?.focus({preventScroll:true});}
- }
- document.addEventListener('pointerdown',event=>{if(reaction&&event.target.closest?.('#hubPet button'))clearReaction();const h=event.target.closest?.('[data-lab-drag]');if(!h||h.disabled||event.button>0||drag&&!drag.keyboard)return;try{event.preventDefault();beginDrag(h,event);}catch(e){a.tell(e.message,true);}},{passive:false});
- document.addEventListener('pointermove',event=>{if(!drag||drag.keyboard||event.pointerId!==drag.pointerId)return;event.preventDefault();const sc=$('labBoardScroll'),r=sc.getBoundingClientRect();if(r.width){if(event.clientX<r.left+30)sc.scrollLeft-=14;else if(event.clientX>r.right-30)sc.scrollLeft+=14;if(event.clientY<r.top+30)sc.scrollTop-=14;else if(event.clientY>r.bottom-30)sc.scrollTop+=14;}const dx=(event.clientX-drag.x+sc.scrollLeft-drag.scrollX)/zoom,dy=(event.clientY-drag.y+sc.scrollTop-drag.scrollY)/zoom;if(Math.hypot(dx,dy)<5&&!drag.moved)return;drag.moved=true;const world=$('labBoardWorld');drag.point={x:Math.max(12,Math.min(Number(world.dataset.width)-CARD.w-24,drag.original.x+dx)),y:Math.max(12,Math.min(Number(world.dataset.height)-CARD.h-24,drag.original.y+dy))};paintDrag();},{passive:false});
- document.addEventListener('pointerup',event=>{if(drag&&!drag.keyboard&&event.pointerId===drag.pointerId)try{drop();}catch(e){cancelDrag();a.tell(e.message,true);}});document.addEventListener('pointercancel',cancelDrag);document.addEventListener('focusin',event=>{if(drag?.keyboard&&event.target!==drag.handle)cancelDrag();});document.addEventListener('lostpointercapture',event=>{if(drag&&!drag.keyboard&&event.pointerId===drag.pointerId)cancelDrag();});
- document.addEventListener('keydown',event=>{if(event.key==='Escape'){cancelDrag();clearReaction();}const handle=event.target.closest?.('[data-lab-drag]');if(!handle||handle.disabled)return;try{if(['Enter',' '].includes(event.key)){event.preventDefault();if(drag?.keyboard)drop();else beginDrag(handle,event,true);}else if(drag?.keyboard&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.key)){event.preventDefault();const step=event.shiftKey?48:12;drag.point.x=Math.max(12,Math.min(LIMIT,drag.point.x+(event.key==='ArrowLeft'?-step:event.key==='ArrowRight'?step:0)));drag.point.y=Math.max(12,Math.min(LIMIT,drag.point.y+(event.key==='ArrowUp'?-step:event.key==='ArrowDown'?step:0)));drag.moved=true;paintDrag();}}catch(e){cancelDrag();a.tell(e.message,true);}});
- document.addEventListener('click',event=>{if(Date.now()<suppressClick&&event.target.closest?.('[data-lab-drag]')){event.preventDefault();event.stopImmediatePropagation();}},true);
- document.addEventListener('click',event=>{const b=event.target.closest?.('[data-workshop]');if(!b||b.disabled)return;try{const x=b.dataset,c=find(x.case||current);saveScroll();if(x.workshop==='view'){cancelDrag();mode=x.value;remember();a.render();}else if(x.workshop==='zoom-in'||x.workshop==='zoom-out'||x.workshop==='fit'){const s=$('labBoardScroll'),world=$('labBoardWorld'),old=zoom;if(!s||!world)return;zoom=x.workshop==='fit'?Math.max(.35,Math.min(1,s.clientWidth/Number(world.dataset.width))):Math.max(.35,Math.min(1.25,Math.round((zoom+(x.workshop==='zoom-in'?.1:-.1))*100)/100));pendingScroll={x:s.scrollLeft*zoom/old,y:s.scrollTop*zoom/old};remember();a.render();}else if(x.workshop==='arrange'){arrange(c);}else if(x.workshop==='origin'){const s=$('labBoardScroll');if(s){s.scrollLeft=Math.max(0,c.position.x*zoom-24);s.scrollTop=Math.max(0,c.position.y*zoom-24);}}else if(x.workshop==='inspect'){inspect=x.id;a.render();const h=$('labInspector')?.querySelector('h3');h?.focus({preventScroll:true});if(root.innerWidth<1000)$('labInspector')?.scrollIntoView?.({block:'nearest',behavior:motion()?'smooth':'auto'});}else if(x.workshop==='result')resultForm(c.id,x.id,x.outcome);else if(x.workshop==='connect')connectForm(c.id,x.id);else if(x.workshop==='resolve')resolutionForm(c.id);else if(x.workshop==='delete-case')remove(c.id);else if(x.workshop==='delete-attempt')remove(c.id,x.id);else if(x.workshop==='undo')restore();else if(x.workshop==='retry'){ensureEditable(c);const p=c.attempts.find(p=>p.id===x.id);a.attemptForm(c.id,'',{title:'Another approach · '+p.title.slice(0,470),action:p.action,expected:p.expected});}else if(x.workshop==='reopen'){if(c.archived)throw Error('Restore this case first.');if(a.mutate(d=>{const r=d.workhub.lab.find(r=>r.id===c.id);r.status='Investigating';r.updatedAt=stamp();})){a.tell('Investigation reopened. The previous Knowledge solution is kept until you publish again.');}}}catch(e){a.tell(e.message,true);}});
- document.addEventListener('submit',event=>{const f=event.target;if(!['labResultForm','labConnectForm','labResolveForm'].includes(f.id))return;event.preventDefault();try{if(f.id==='labResolveForm')saveResolution(f);else{const v=Object.fromEntries(new FormData(f));if(f.id==='labResultForm')recordResult(f.dataset.case,f.dataset.id,v.outcome,v.result);else connect(f.dataset.case,f.dataset.id,v.parentId,v.snap==='on');}}catch(e){a.tell(e.message,true);}});
- const suspend=()=>{if(document.hidden||!a.ready()||document.body.matches('.hub-private,.hub-present')){cancelDrag();clearReaction();}};document.addEventListener('visibilitychange',suspend);new root.MutationObserver(suspend).observe(document.body,{attributes:true,attributeFilter:['class','data-motion']});root.addEventListener('resize',cancelDrag);root.visualViewport?.addEventListener('resize',cancelDrag);root.addEventListener('pagehide',()=>{cancelDrag();clearReaction();});
- return{render,mount,tick,publish,toKnowledge,recordResult,resultForm,connect,connectForm,resolutionForm,saveResolution,ensureEditable,feedback,cancelDrag,drop,dock,remove,restore,reveal,patchRender,arrange,snapshot:()=>({mode,zoom,inspect,dragging:!!drag,reaction:reaction?.type||null,canUndo:!!undo}),connected:(id,p)=>connected(find(id),p)};
-}
-root.WorkHubLabWorkshop={upgrade,validate,install,ORIGIN,initialPosition,connected,eligible};
+  function validate(d) {
+    const text = v =>
+      typeof v === 'string' &&
+      v.length <= 32767 &&
+      !/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(v);
+    for (const c of d.workhub.lab) {
+      if (
+        !['process', 'expected', 'actual', 'verification', 'resolvedAt'].every(k => text(c[k])) ||
+        !position(c.position) ||
+        (c.resolvedAt && !Number.isFinite(Date.parse(c.resolvedAt)))
+      )
+        throw Error('Check the workshop process, results and card positions.');
+      const map = new Map(c.attempts.map(p => [p.id, p]));
+      for (const p of c.attempts) {
+        if (
+          p.id === ORIGIN ||
+          !text(p.expected) ||
+          !position(p.position) ||
+          typeof p.parentId !== 'string' ||
+          p.parentId.length > 100 ||
+          p.parentId === p.id ||
+          (p.parentId &&
+            (!['Passed', 'Inconclusive'].includes(p.outcome) ||
+              (p.parentId !== ORIGIN && map.get(p.parentId)?.outcome !== 'Passed')))
+        )
+          throw Error(
+            'Workshop connections need a successful source and a successful or inconclusive experiment.'
+          );
+        const visited = new Set([p.id]);
+        let parent = p.parentId;
+        while (parent && parent !== ORIGIN) {
+          if (visited.has(parent)) throw Error('Workshop connections cannot form a loop.');
+          visited.add(parent);
+          parent = map.get(parent)?.parentId;
+        }
+      }
+    }
+  }
+  function connected(c, id) {
+    if (!c) return false;
+    const map = new Map(c.attempts.map(p => [p.id, p]));
+    let p = map.get(id);
+    const seen = new Set();
+    while (p?.outcome === 'Passed' && !seen.has(p.id)) {
+      seen.add(p.id);
+      if (p.parentId === ORIGIN) return true;
+      p = map.get(p.parentId);
+    }
+    return false;
+  }
+  function eligible(c, id) {
+    return [
+      { id: ORIGIN, title: 'The issue · starting point' },
+      ...c.attempts
+        .filter(p => p.id !== id && p.outcome === 'Passed')
+        .filter(p => {
+          const seen = new Set([id]);
+          let x = p;
+          while (x) {
+            if (seen.has(x.id)) return false;
+            seen.add(x.id);
+            x = c.attempts.find(q => q.id === x.parentId);
+          }
+          return true;
+        })
+        .map(p => ({ id: p.id, title: p.title })),
+    ];
+  }
+  const ART =
+    '<svg viewBox="0 0 250 180" fill="none" aria-hidden="true"><ellipse cx="132" cy="155" rx="100" ry="12" fill="#c4b29b" opacity=".22"/><path d="M49 118h75q19 0 19-20V70" stroke="#b9815f" stroke-width="8" stroke-linecap="round"/><path d="M49 116h75q17 0 17-18V70" stroke="#f6c596" stroke-width="2" stroke-linecap="round"/><g transform="rotate(-10 64 88)"><rect x="22" y="38" width="91" height="104" rx="16" fill="#e5d7c3"/><rect x="22" y="31" width="91" height="104" rx="16" fill="#fffdf6" stroke="#bcb5a5"/><rect x="35" y="47" width="28" height="7" rx="3.5" fill="#dfb18e"/><path d="M37 71h58M37 84h39M37 97h49" stroke="#d8d5c6" stroke-width="5" stroke-linecap="round"/><circle cx="106" cy="80" r="7" fill="#70b8a8" stroke="#fffdf6" stroke-width="3"/></g><g transform="rotate(9 176 100)"><rect x="136" y="67" width="90" height="83" rx="16" fill="#bdd1c2"/><rect x="136" y="59" width="90" height="83" rx="16" fill="#e4f1e8" stroke="#9ebfae"/><path d="m157 97 13 13 26-30" stroke="#4b8c75" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="139" cy="103" r="7" fill="#70b8a8" stroke="#e4f1e8" stroke-width="3"/></g><path d="M162 26a19 19 0 1 0 34 12c0-21-32-28-35-9" fill="#ffe7a2" stroke="#b59a52" stroke-width="2"/><path d="M174 53h14m-12 5h10m-7-10-3-14 6 4 6-4-3 14M178 8V2m27 20 6-4m-52-1-6-5" stroke="#b59a52" stroke-width="2" stroke-linecap="round"/><path d="m117 25 3-8 3 8 8 3-8 3-3 8-3-8-8-3Z" fill="#b9a7d3"/><circle cx="40" cy="20" r="3" fill="#b9a7d3"/></svg>';
+  function install(a) {
+    const $ = id => document.getElementById(id),
+      all = () => a.state().workhub.lab,
+      find = id => all().find(c => c.id === id),
+      stamp = () => new Date().toISOString();
+    const wb = (action, label, attrs = '', cls = '') =>
+      `<button type="button" class="${cls}" data-bench="${action}" ${attrs}>${label}</button>`;
+    const button = (action, label, attrs = '', cls = '') =>
+      `<button type="button" class="${cls}" data-workshop="${action}" ${attrs}>${label}</button>`;
+    const ids = (c, p = '') => `data-case="${esc(c)}" data-id="${esc(p)}"`;
+    let mode = 'board',
+      zoom = 1,
+      inspect = '',
+      current = '',
+      owner = '',
+      drag = null,
+      reaction = null,
+      effect = null,
+      scrolls = new Map(),
+      pendingScroll = null,
+      suppressClick = 0,
+      undo = null,
+      preserveCanvas = false;
+    try {
+      const p = JSON.parse(localStorage.getItem('mm-tracker.lab-workshop.v1') || 'null');
+      if (['board', 'list'].includes(p?.mode)) mode = p.mode;
+      if (Number.isFinite(p?.zoom)) zoom = Math.min(1.25, Math.max(0.35, p.zoom));
+    } catch {}
+    const motion = () =>
+      a.prefs().motion !== 'off' && !root.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const locked = c => c.archived || c.status === 'Solved';
+    function ensureEditable(c) {
+      if (!c) throw Error('This investigation no longer exists.');
+      if (c.archived) throw Error('Restore this case before changing its experiments.');
+      if (c.status === 'Solved')
+        throw Error('Reopen this investigation before changing its experiments.');
+    }
+    function remember() {
+      try {
+        localStorage.setItem('mm-tracker.lab-workshop.v1', JSON.stringify({ mode, zoom }));
+      } catch {}
+    }
+    function saveScroll() {
+      const s = $('labBoardScroll');
+      if (s && current) scrolls.set(current, { x: s.scrollLeft, y: s.scrollTop });
+    }
+    function reveal(caseId, id) {
+      const c = find(caseId),
+        p = id === ORIGIN ? c : c?.attempts.find(p => p.id === id);
+      if (!c || !p) return;
+      if (current !== caseId || !document.querySelector('.lab-case')) a.openRecord('lab', caseId);
+      if (inspect !== id) {
+        inspect = id;
+        a.render();
+      }
+      const sc = $('labBoardScroll'),
+        world = $('labBoardWorld');
+      if (sc && world) {
+        const w = sc.clientWidth || Math.max(280, Math.min(root.innerWidth - 48, 800)),
+          h = sc.clientHeight || 440;
+        sc.scrollLeft = Math.max(
+          0,
+          Math.min(
+            Number(world.dataset.width) * zoom - w,
+            (p.position.x + (id === ORIGIN ? ISSUE.w : CARD.w) / 2) * zoom - w / 2
+          )
+        );
+        sc.scrollTop = Math.max(
+          0,
+          Math.min(
+            Number(world.dataset.height) * zoom - h,
+            (p.position.y + CARD.h / 2) * zoom - h / 2
+          )
+        );
+        saveScroll();
+      } else if (p.outcome === 'Failed')
+        [...document.querySelectorAll('.lab-failed-list [data-experiment]')]
+          .find(el => el.dataset.experiment === id)
+          ?.scrollIntoView?.({ block: 'nearest', behavior: motion() ? 'smooth' : 'auto' });
+    }
+    function syncOwner() {
+      const next = a.owner();
+      if (next !== owner) {
+        owner = next;
+        inspect = '';
+        current = '';
+        undo = null;
+        scrolls.clear();
+        pendingScroll = null;
+        cancelDrag();
+        clearReaction();
+        effect = null;
+        $('labUndo')?.remove();
+      }
+    }
+    function statusTag(outcome) {
+      return `<span class="lab-outcome" data-outcome="${esc(outcome)}"><i aria-hidden="true"></i>${esc(outcomeName(outcome))}</span>`;
+    }
+    function recordFields(c) {
+      return [
+        ['Business process', c.process],
+        ['What failed', c.error],
+        ['Expected result', c.expected],
+        ['Actual result', c.actual],
+        ['Cause', c.cause],
+        ['Investigation notes', c.notes],
+        ['Verified solution', c.solution],
+        ['Verification', c.verification],
+      ]
+        .map(
+          ([label, value]) =>
+            `<section><h4>${label}</h4><p class="prewrap hub-sensitive">${esc(value) || 'Not recorded yet.'}</p></section>`
+        )
+        .join('');
+    }
+    function experimentFields(p) {
+      return [
+        ['What to try', p.action],
+        ['Expected result', p.expected],
+        ['Observed result', p.result],
+      ]
+        .map(
+          ([label, value]) =>
+            `<section><h4>${label}</h4><p class="prewrap hub-sensitive">${esc(value) || 'Not recorded yet.'}</p></section>`
+        )
+        .join('');
+    }
+    function handle(c, id, title, disabled) {
+      return `<button type="button" class="lab-drag-handle" data-lab-drag="${esc(id)}" data-case="${esc(c.id)}" aria-label="Move ${esc(title)}. Press Enter, use arrow keys, then Enter to place or Escape to cancel." aria-describedby="labBoardHelp"${disabled ? ' disabled' : ''}><span aria-hidden="true">⠿</span><span>Move</span></button>`;
+    }
+    function experiment(c, p, stacked = false) {
+      const off = locked(c),
+        live = connected(c, p.id);
+      return `<article class="lab-experiment${stacked ? ' lab-stacked-card' : ''}" data-experiment="${esc(p.id)}" data-outcome="${p.outcome}" data-powered="${live}"${stacked ? '' : ` style="left:${p.position.x}px;top:${p.position.y}px"`}><div class="lab-card-top">${stacked ? '<span class="lab-card-number">EXPERIMENT</span>' : handle(c, p.id, p.title, off)}${statusTag(p.outcome)}</div>${stacked ? '' : '<span class="lab-port lab-port-in" aria-hidden="true"></span><span class="lab-port lab-port-out" aria-hidden="true"></span>'}<h4 class="hub-sensitive">${esc(p.title)}</h4><p class="lab-card-description hub-sensitive">${esc(p.action) || 'Add what you want to try.'}</p><div class="lab-expected"><span>EXPECTED</span><p class="hub-sensitive">${esc(p.expected) || 'Add the result you expect.'}</p></div><div class="lab-card-footer">${button('inspect', 'Details', ids(c.id, p.id))}${p.outcome === 'Trying' ? button('result', 'Record result', ids(c.id, p.id), 'lab-button-dark') : button('connect', live ? 'Connected ↗' : 'Connect to…', ids(c.id, p.id) + (off || !['Passed', 'Inconclusive'].includes(p.outcome) ? ' disabled' : ''), 'lab-button-dark')}</div></article>`;
+    }
+    function geometry(c, override) {
+      const positions = new Map([[ORIGIN, c.position], ...c.attempts.map(p => [p.id, p.position])]);
+      if (override) positions.set(override.id, override.point);
+      return positions;
+    }
+    function wires(c, override) {
+      const points = geometry(c, override);
+      return c.attempts
+        .filter(p => p.parentId && p.outcome !== 'Failed')
+        .map((p, i) => {
+          const from = points.get(p.parentId),
+            to = points.get(p.id);
+          if (!from || !to) return '';
+          const sx = from.x + (p.parentId === ORIGIN ? ISSUE.w : CARD.w),
+            sy = from.y + 58,
+            tx = to.x,
+            ty = to.y + 58,
+            bend = Math.max(45, Math.abs(tx - sx) * 0.45),
+            d = `M${sx} ${sy}C${sx + bend} ${sy} ${tx - bend} ${ty} ${tx} ${ty}`,
+            powered = connected(c, p.id),
+            state = powered ? 'powered' : p.outcome === 'Inconclusive' ? 'uncertain' : 'waiting';
+          return `<g data-wire="${esc(p.id)}" data-wire-state="${state}" style="--wire-order:${i % 12}"><path class="lab-wire-shadow" d="${d}"/><path class="lab-wire" d="${d}"/><path class="lab-wire-pulse" d="${d}" pathLength="100"/></g>`;
+        })
+        .join('');
+    }
+    function issueCard(c) {
+      return `<article class="lab-issue" data-experiment="${ORIGIN}" style="left:${c.position.x}px;top:${c.position.y}px"><div class="lab-card-top">${handle(c, ORIGIN, 'the issue', locked(c))}<span class="lab-issue-label">START HERE</span></div><span class="lab-port lab-port-out" aria-hidden="true"></span><div class="lab-issue-icon" aria-hidden="true">⌁</div><h4 class="hub-sensitive">${esc(c.title)}</h4><p class="lab-card-description hub-sensitive">${esc(c.error) || 'Describe the failure in case details.'}</p><div class="lab-expected"><span>EXPECTED</span><p class="hub-sensitive">${esc(c.expected) || 'What should have happened?'}</p></div><div class="lab-card-footer">${button('inspect', 'Issue details', ids(c.id, ORIGIN))}${wb('case-edit', 'Edit', `data-id="${esc(c.id)}"`)}</div></article>`;
+    }
+    function board(c) {
+      const active = c.attempts,
+        positions = [c.position, ...active.map(p => p.position)],
+        width = Math.max(1240, ...positions.map(p => p.x + 540)),
+        height = Math.max(680, ...positions.map(p => p.y + 350));
+      return `<div class="lab-board-shell"><div class="lab-board-tools"><span><i class="lab-power-lamp${c.status === 'Solved' ? ' is-on' : ''}"></i>${c.status === 'Solved' ? 'Verified circuit' : 'Investigation circuit'}</span><div class="actions">${button('zoom-out', '−', 'aria-label="Zoom out"')}<output id="labZoomValue">${Math.round(zoom * 100)}%</output>${button('zoom-in', '＋', 'aria-label="Zoom in"')}${button('fit', 'Fit', 'aria-label="Fit investigation in view"')}${button('origin', 'Start', 'aria-label="Return to the issue card"')}${button('arrange', 'Arrange', 'aria-label="Arrange cards side by side"' + (locked(c) ? ' disabled' : ''))}</div></div><div class="lab-board-scroll" id="labBoardScroll" tabindex="0" aria-label="Investigation canvas. Scroll to pan; use Move handles to move cards."><div class="lab-world-size" style="width:${width * zoom}px;height:${height * zoom}px"><div class="lab-board-world" id="labBoardWorld" style="width:${width}px;height:${height}px;transform:scale(${zoom})" data-width="${width}" data-height="${height}"><div class="lab-board-watermark" aria-hidden="true"><span>THE POSSIBILITY DEPARTMENT</span><strong>Good questions.<br>Small experiments.</strong><small>Every ruled-out idea brings you closer.</small></div><svg id="labWires" class="lab-wires" width="${width}" height="${height}" aria-hidden="true">${wires(c)}</svg>${issueCard(c)}${active.map(p => experiment(c, p)).join('')}<div class="lab-magnet-hint" id="labMagnetHint" hidden><span aria-hidden="true">🧲</span>Release to connect</div></div></div></div><div class="lab-board-key" id="labBoardHelp"><span><i class="lab-key-live"></i>Successful connection</span><span><i class="lab-key-dotted"></i>Inconclusive / unpowered</span><small>Drag by Move. Near a successful source, release to snap. Keyboard: Enter → arrows → Enter; Escape cancels.</small></div></div>`;
+    }
+    function inspector(c) {
+      const p = c.attempts.find(p => p.id === inspect),
+        off = locked(c);
+      return `<aside class="lab-inspector" id="labInspector"><div class="lab-inspector-top"><span class="lab-eyebrow">${p ? 'EXPERIMENT NOTES' : 'CASE NOTEBOOK'}</span>${p ? button('inspect', '← Issue', ids(c.id, ORIGIN)) : ''}</div><h3 tabindex="-1" class="hub-sensitive">${esc(p?.title || c.title)}</h3>${p ? statusTag(p.outcome) : '<span class="lab-process hub-sensitive">' + esc(c.process || 'Add your business process') + '</span>'}${p ? experimentFields(p) : recordFields(c)}${!p ? '<div class="actions">' + (c.projectId && a.state().projects.some(x => x.id === c.projectId) ? wb('open', 'Open project', `data-kind="projects" data-id="${esc(c.projectId)}"`) : '') + (c.ticketId && a.state().tickets.some(x => x.id === c.ticketId) ? wb('open', 'Open ticket', `data-kind="tickets" data-id="${esc(c.ticketId)}"`) : '') + '</div>' : ''}<div class="lab-inspector-actions">${p ? wb('attempt-edit', 'Edit experiment', ids(c.id, p.id) + (off ? ' disabled' : '')) + (off ? '' : `<div class="lab-result-options">${['Passed', 'Failed', 'Inconclusive'].map(o => button('result', o === 'Passed' ? '✓ Worked' : o === 'Failed' ? '× Failed' : '? Unsure', ids(c.id, p.id) + ` data-outcome="${o}"`)).join('')}</div>`) + button('connect', 'Connect to…', ids(c.id, p.id) + (off || !['Passed', 'Inconclusive'].includes(p.outcome) ? ' disabled' : '')) : wb('case-edit', 'Edit case details', `data-id="${esc(c.id)}"`)}${p?.outcome === 'Failed' ? button('retry', 'Try another approach', ids(c.id, p.id) + (off ? ' disabled' : '')) : ''}${p ? button('delete-attempt', 'Delete experiment', ids(c.id, p.id), 'lab-delete') : button('delete-case', 'Delete investigation', ids(c.id), 'lab-delete')}</div></aside>`;
+    }
+    function ruledOut(c) {
+      const failed = c.attempts.filter(p => p.outcome === 'Failed');
+      return `<section class="lab-ruled-out"><div class="lab-shelf-heading"><div><span class="lab-eyebrow">USEFUL THINGS WE LEARNED</span><h3>What we ruled out <span>${failed.length}</span></h3></div><span class="lab-shelf-note">A failed test is still a clue.</span></div><div class="lab-failed-list">${failed.map(p => `<article data-experiment="${esc(p.id)}" data-outcome="Failed"><span class="lab-failed-icon" aria-hidden="true">⌁</span><div><strong class="hub-sensitive">${esc(p.title)}</strong><p class="hub-sensitive">${esc(p.result) || 'Record what happened.'}</p></div><div class="actions">${button('inspect', 'Details', ids(c.id, p.id))}${button('retry', 'Try another approach', ids(c.id, p.id) + (locked(c) ? ' disabled' : ''))}${button('delete-attempt', 'Delete', ids(c.id, p.id), 'lab-delete')}</div></article>`).join('') || '<p class="lab-shelf-empty">Unsuccessful experiments will land here, with their notes intact.</p>'}</div></section>`;
+    }
+    function render(c, { rows, query, view }) {
+      syncOwner();
+      saveScroll();
+      if (c?.id !== current) {
+        inspect = '';
+        current = c?.id || '';
+      }
+      const stats = ['Investigating', 'Testing', 'Solved'],
+        hasKnowledge =
+          !!c?.knowledgeId && a.state().workhub.notes.some(n => n.id === c.knowledgeId);
+      return `<section class="hub bench-lab lab-workshop"><div class="lab-hero"><div><span class="lab-eyebrow">A SMALL WORKSHOP FOR BIG “AHA!” MOMENTS</span><h2>Troubleshooting lab<span aria-hidden="true">✦</span></h2><p>Make a guess. Try a fix. Connect what works.</p>${wb('case-new', '＋ New investigation', '', 'primary')}</div><div class="lab-hero-art">${ART}</div><div class="lab-hero-stats">${stats.map(s => `<span><strong>${all().filter(c => !c.archived && c.status === s).length}</strong>${s}</span>`).join('')}</div></div><div class="hub-toolbar lab-case-toolbar"><input id="benchLabSearch" type="search" value="${esc(query)}" aria-label="Search troubleshooting cases" placeholder="Find a case, process or T-code…"><select id="benchLabView" aria-label="Case view">${['active', ...stats, 'archived'].map(s => `<option value="${s}"${view === s ? ' selected' : ''}>${s === 'active' ? 'All active cases' : s === 'archived' ? 'Archived cases' : s}</option>`).join('')}</select></div><div class="bench-case-list lab-case-tabs" aria-label="Investigations">${rows.map(r => wb('case-open', `<span class="lab-case-dot" data-status="${r.status}"></span><strong class="hub-sensitive">${esc(r.title)}</strong><small>${r.attempts.length} experiments</small>`, `data-id="${esc(r.id)}" aria-pressed="${c?.id === r.id}"`)).join('')}</div>${
+        c
+          ? `<article class="bench-case-detail lab-case" data-case="${esc(c.id)}"><div class="lab-case-heading"><div><span class="lab-eyebrow">${esc(c.status)}${c.archived ? ' · ARCHIVED' : ''}</span><h3 class="hub-sensitive">${esc(c.title)}</h3><p class="hub-sensitive">${esc([c.system, c.tcodes, c.process].filter(Boolean).join(' · ')) || 'An investigation waiting for its first clue.'}</p></div><div class="actions">${wb('case-edit', 'Edit', `data-id="${esc(c.id)}"`)}${wb('case-archive', c.archived ? 'Restore' : 'Archive', `data-id="${esc(c.id)}"`)}${button('delete-case', 'Delete', ids(c.id), 'lab-delete')}${c.status === 'Solved' ? button('reopen', 'Reopen', ids(c.id) + (c.archived ? ' disabled' : '')) : button('resolve', 'Resolve & save', ids(c.id) + (c.archived ? ' disabled' : ''), 'lab-button-dark')}</div></div><div class="lab-workspace-toolbar"><div class="lab-view-switch" role="group" aria-label="Investigation view">${button('view', '🧲 Board', 'data-value="board" aria-pressed="' + (mode === 'board') + '"')}${button('view', '☷ Notes', 'data-value="list" aria-pressed="' + (mode === 'list') + '"')}</div><span class="lab-workspace-count">${c.attempts.filter(p => connected(c, p.id)).length} powered · ${c.attempts.filter(p => p.outcome === 'Trying').length} in progress</span>${wb('attempt-new', '＋ Add experiment', `data-case="${esc(c.id)}"${locked(c) ? ' disabled' : ''}`, 'primary')}</div>${c.status === 'Solved' ? `<div class="lab-verified-banner"><span aria-hidden="true">✓</span><div><strong>${hasKnowledge ? 'Solution verified. Knowledge kept.' : 'Solution verified. Ready for Knowledge.'}</strong><p class="hub-sensitive">${esc(c.solution)}</p></div><div class="actions">${hasKnowledge ? wb('open', 'Read Knowledge note', `data-kind="notes" data-id="${esc(c.knowledgeId)}"`) : ''}${wb('case-knowledge', hasKnowledge ? 'Update linked Knowledge note' : 'Save solution to Knowledge', `data-id="${esc(c.id)}"`)}</div></div>` : ''}<div class="lab-work-area">${
+              mode === 'board'
+                ? board(c)
+                : `<div class="lab-notes-view"><div class="lab-note-issue"><span class="lab-eyebrow">THE ISSUE</span>${recordFields(c)}</div><div class="lab-stacked-experiments">${
+                    c.attempts
+                      .filter(p => p.outcome !== 'Failed')
+                      .map(p => experiment(c, p, true))
+                      .join('') || '<p>Add your first experiment to start the investigation.</p>'
+                  }</div></div>`
+            }${inspector(c)}</div>${ruledOut(c)}<p class="lab-status" id="labAnnouncement" role="status" aria-live="polite">${c.archived ? 'Archived case. Restore it to continue.' : c.status === 'Solved' ? 'Reopen the case to run more experiments.' : 'You decide the outcome from your observed results. The board keeps the story.'}</p></article>`
+          : `<div class="lab-empty"><div class="lab-empty-art">${ART}</div><span class="lab-eyebrow">YOUR NEXT “AHA!” STARTS HERE</span><h3>A place for the problem.<br>And every possibility.</h3><p>Create an investigation, describe the expected result, then add experiments to your magnetic board.</p>${wb('case-new', 'Create an investigation', '', 'primary')}</div>`
+      }</section>`;
+    }
+    function publish(d, c) {
+      if (c.status !== 'Solved' || !c.solution.trim())
+        throw Error('Add a verified solution before saving to Knowledge.');
+      const id =
+          c.knowledgeId && d.workhub.notes.some(n => n.id === c.knowledgeId)
+            ? c.knowledgeId
+            : uid(),
+        index = d.workhub.notes.findIndex(n => n.id === id),
+        old = d.workhub.notes[index];
+      const body = [
+        ['Business process', c.process],
+        ['Symptoms', c.error],
+        ['Expected result', c.expected],
+        ['Actual result', c.actual],
+        ['Confirmed cause', c.cause],
+        ['Verified solution', c.solution],
+        ['Verification', c.verification],
+      ]
+        .filter(([, v]) => v)
+        .map(([k, v]) => k + '\n' + v)
+        .join('\n\n');
+      const testing = c.attempts
+        .map(
+          (p, i) =>
+            `${i + 1}. ${p.title} · ${outcomeName(p.outcome)}${connected(c, p.id) ? ' · Connected solution step' : ''}\nAction: ${p.action}\nExpected: ${p.expected || 'Not recorded'}\nObserved: ${p.result || 'Not recorded'}`
+        )
+        .join('\n\n');
+      if (body.length > 32767 || testing.length > 32767)
+        throw Error(
+          'The Knowledge summary is too long. Shorten the case summary or experiment notes before publishing.'
+        );
+      const n = {
+        ...old,
+        id,
+        title: c.title,
+        body,
+        tags: old?.tags || 'Troubleshooting, Verified',
+        tcodes: c.tcodes,
+        configuration: old?.configuration || '',
+        errors: c.error,
+        testing,
+        projectId: c.projectId,
+        ticketId: c.ticketId,
+        itemId: old?.itemId || '',
+        labCaseId: c.id,
+        updatedAt: stamp(),
+      };
+      if (index < 0) d.workhub.notes.push(n);
+      else d.workhub.notes[index] = n;
+      c.knowledgeId = id;
+      c.updatedAt = n.updatedAt;
+      return n;
+    }
+    function toKnowledge(id) {
+      const c = find(id);
+      if (!c) throw Error('This investigation no longer exists.');
+      if (
+        a.mutate(d =>
+          publish(
+            d,
+            d.workhub.lab.find(x => x.id === id)
+          )
+        )
+      )
+        a.tell(c.knowledgeId ? 'Linked Knowledge note updated.' : 'Solution saved to Knowledge.');
+    }
+    const area = (name, label, value = '', required = false) =>
+      `<div class="wide"><label for="labw-${name}">${label}</label><textarea id="labw-${name}" name="${name}" maxlength="32767"${required ? ' required' : ''}>${esc(value)}</textarea></div>`;
+    function resultForm(caseId, id, outcome) {
+      const c = find(caseId);
+      ensureEditable(c);
+      const p = c.attempts.find(p => p.id === id);
+      if (!p) throw Error('Experiment no longer exists.');
+      a.openModal(
+        'Record experiment result',
+        `<form id="labResultForm" data-case="${esc(caseId)}" data-id="${esc(id)}"><span class="lab-eyebrow">WHAT DID YOU OBSERVE?</span><h3>${esc(p.title)}</h3><label for="labw-outcome">Outcome</label><select id="labw-outcome" name="outcome">${['Passed', 'Failed', 'Inconclusive'].map(o => `<option value="${o}"${(outcome || p.outcome) === o ? ' selected' : ''}>${outcomeName(o)}</option>`).join('')}</select>${area('result', 'Actual result / evidence *', p.result, true)}<p class="hub-meta">Successful experiments can connect. Failed ones keep their notes on the ruled-out shelf.</p><div class="modal-actions">${wb('cancel', 'Cancel')}<button type="submit" class="primary">Save result</button></div></form>`
+      );
+    }
+    function disconnectChildren(c, id) {
+      for (const p of c.attempts) if (p.parentId === id) p.parentId = '';
+    }
+    function rectangles(c, id) {
+      return [
+        { id: ORIGIN, position: c.position, w: ISSUE.w, h: ISSUE.h },
+        ...c.attempts.map(p => ({ ...p, w: CARD.w, h: CARD.h })),
+      ].filter(p => p.id !== id);
+    }
+    function overlapsCard(c, id, p) {
+      const w = id === ORIGIN ? ISSUE.w : CARD.w,
+        h = id === ORIGIN ? ISSUE.h : CARD.h;
+      return rectangles(c, id).some(
+        q =>
+          p.x < q.position.x + q.w + 20 &&
+          p.x + w + 20 > q.position.x &&
+          p.y < q.position.y + q.h + 20 &&
+          p.y + h + 20 > q.position.y
+      );
+    }
+    function freePoint(c, id, point) {
+      const base = {
+        x: Math.round(Math.min(LIMIT, Math.max(12, point.x))),
+        y: Math.round(Math.min(LIMIT, Math.max(12, point.y))),
+      };
+      if (!overlapsCard(c, id, base)) return base;
+      for (let ring = 1; ring <= 80; ring++)
+        for (const [dx, dy] of [
+          [ring, 0],
+          [-ring, 0],
+          [0, ring],
+          [0, -ring],
+          [ring, ring],
+          [-ring, ring],
+          [ring, -ring],
+          [-ring, -ring],
+        ]) {
+          const p = { x: base.x + dx * 282, y: base.y + dy * 282 };
+          if (p.x >= 12 && p.x <= LIMIT && p.y >= 12 && p.y <= LIMIT && !overlapsCard(c, id, p))
+            return p;
+        }
+      throw Error('Make some room on the board before placing this card.');
+    }
+    function dockPoint(c, parentId, id) {
+      const source = parentId === ORIGIN ? c : c.attempts.find(p => p.id === parentId);
+      if (!source) throw Error('The connection source no longer exists.');
+      const x = source.position.x + (parentId === ORIGIN ? ISSUE.w : CARD.w) + 48;
+      for (let i = 0; i < 70; i++) {
+        const point = { x, y: source.position.y + i * 282 };
+        if (x <= LIMIT && point.y <= LIMIT && !overlapsCard(c, id, point)) return point;
+      }
+      throw Error('Move the source card to make room for this connection.');
+    }
+    function patchRender() {
+      if (!preserveCanvas) return false;
+      const c = find(current),
+        world = $('labBoardWorld');
+      if (!c || !world || document.querySelector('.lab-case')?.dataset.case !== c.id) return false;
+      for (const el of world.querySelectorAll('[data-experiment]')) {
+        const p =
+          el.dataset.experiment === ORIGIN
+            ? c
+            : c.attempts.find(p => p.id === el.dataset.experiment);
+        if (p) {
+          el.style.left = p.position.x + 'px';
+          el.style.top = p.position.y + 'px';
+          if (p.outcome) {
+            const live = connected(c, p.id);
+            el.dataset.powered = String(live);
+            const b = el.querySelector('[data-workshop="connect"]');
+            if (b) b.textContent = live ? 'Connected ↗' : 'Connect to…';
+          }
+        }
+      }
+      const width = Math.max(1240, c.position.x + 540, ...c.attempts.map(p => p.position.x + 540)),
+        height = Math.max(680, c.position.y + 350, ...c.attempts.map(p => p.position.y + 350));
+      world.dataset.width = width;
+      world.dataset.height = height;
+      world.style.width = width + 'px';
+      world.style.height = height + 'px';
+      world.parentElement.style.width = width * zoom + 'px';
+      world.parentElement.style.height = height * zoom + 'px';
+      const svg = $('labWires');
+      svg.innerHTML = wires(c);
+      svg.setAttribute('width', width);
+      svg.setAttribute('height', height);
+      const count = document.querySelector('.lab-workspace-count');
+      if (count)
+        count.textContent =
+          c.attempts.filter(p => connected(c, p.id)).length +
+          ' powered · ' +
+          c.attempts.filter(p => p.outcome === 'Trying').length +
+          ' in progress';
+      return true;
+    }
+    function arrange(c) {
+      ensureEditable(c);
+      a.mutate(d => {
+        const target = d.workhub.lab.find(p => p.id === c.id);
+        target.position = { x: 54, y: 158 };
+        for (let i = 0; i < target.attempts.length; i++) {
+          const p = target.attempts[i];
+          p.position = { x: 1000 + (i % 3) * 302, y: 158 + Math.floor(i / 3) * 282 };
+        }
+        const visited = new Set();
+        function place(p) {
+          if (visited.has(p.id)) return;
+          visited.add(p.id);
+          if (p.parentId && p.parentId !== ORIGIN) {
+            const parent = target.attempts.find(x => x.id === p.parentId);
+            if (parent) place(parent);
+          }
+          if (p.parentId) dock(target, p.id, p.parentId);
+          else p.position = freePoint(target, p.id, p.position);
+        }
+        for (const p of target.attempts) place(p);
+        target.updatedAt = stamp();
+      });
+      a.tell('Cards arranged side by side. Your results and connections are kept.');
+    }
+    function dock(c, id, parentId) {
+      const p = c.attempts.find(p => p.id === id);
+      if (p && parentId) p.position = dockPoint(c, parentId, id);
+    }
+    function recordResult(caseId, id, outcome, result) {
+      const c = find(caseId);
+      ensureEditable(c);
+      if (!['Passed', 'Failed', 'Inconclusive'].includes(outcome) || !result.trim())
+        throw Error('Choose an outcome and record what actually happened.');
+      if (
+        a.mutate(d => {
+          const target = d.workhub.lab.find(x => x.id === caseId),
+            p = target.attempts.find(x => x.id === id);
+          if (!p) throw Error('Experiment no longer exists.');
+          const changed = p.outcome !== outcome || !p.parentId;
+          p.outcome = outcome;
+          p.result = result.trim();
+          p.updatedAt = stamp();
+          if (outcome !== 'Passed') disconnectChildren(target, id);
+          p.parentId = outcome === 'Failed' ? '' : p.parentId || ORIGIN;
+          if (outcome === 'Passed' && changed) dock(target, id, p.parentId);
+          target.status = 'Testing';
+          target.updatedAt = p.updatedAt;
+        })
+      ) {
+        a.closeModal();
+        inspect = id;
+        a.render();
+        reveal(caseId, id);
+        feedback(
+          caseId,
+          outcome === 'Passed' ? 'success' : outcome === 'Failed' ? 'failed' : 'uncertain',
+          id
+        );
+        a.tell('Experiment result saved.');
+        return true;
+      }
+      return false;
+    }
+    function connectForm(caseId, id) {
+      const c = find(caseId);
+      ensureEditable(c);
+      const p = c.attempts.find(p => p.id === id);
+      if (!p || !['Passed', 'Inconclusive'].includes(p.outcome))
+        throw Error('Record a successful or inconclusive result before connecting.');
+      a.openModal(
+        'Connect experiment',
+        `<form id="labConnectForm" data-case="${esc(caseId)}" data-id="${esc(id)}"><h3>${esc(p.title)}</h3><label for="labw-parentId">Connect after</label><select id="labw-parentId" name="parentId"><option value="">No connection</option>${eligible(
+          c,
+          id
+        )
+          .map(
+            x =>
+              `<option value="${esc(x.id)}"${x.id === p.parentId ? ' selected' : ''}>${esc(x.title)}</option>`
+          )
+          .join(
+            ''
+          )}</select><label class="check-label"><input type="checkbox" name="snap" checked>Place the card beside its source</label><p class="hub-meta">A successful source can feed several experiments. Loops are not allowed.</p><div class="modal-actions">${wb('cancel', 'Cancel')}<button type="submit" class="primary">Save connection</button></div></form>`
+      );
+    }
+    function connect(caseId, id, parentId, snap = true) {
+      const c = find(caseId);
+      ensureEditable(c);
+      const p = c.attempts.find(x => x.id === id);
+      if (!p || !['Passed', 'Inconclusive'].includes(p.outcome))
+        throw Error('Only successful or inconclusive experiments can connect.');
+      if (parentId && !eligible(c, id).some(x => x.id === parentId))
+        throw Error('Choose a successful source without creating a loop.');
+      if (
+        a.mutate(d => {
+          const target = d.workhub.lab.find(x => x.id === caseId),
+            p = target.attempts.find(x => x.id === id);
+          p.parentId = parentId;
+          if (parentId && snap) dock(target, id, parentId);
+          p.updatedAt = stamp();
+          target.updatedAt = p.updatedAt;
+        })
+      ) {
+        a.closeModal();
+        a.render();
+        reveal(caseId, id);
+        if (parentId) feedback(caseId, p.outcome === 'Passed' ? 'success' : 'uncertain', id);
+        return true;
+      }
+      return false;
+    }
+    function resolutionForm(id) {
+      const c = find(id);
+      if (!c || c.archived) throw Error('Restore this investigation before resolving it.');
+      const path = c.attempts.filter(p => connected(c, p.id));
+      a.openModal(
+        'Review solution & save to Knowledge',
+        `<form id="labResolveForm" data-case="${esc(id)}"><div class="lab-resolution-intro"><span aria-hidden="true">⚡</span><div><span class="lab-eyebrow">KEEP THE ANSWER THAT WORKED</span><h3>${esc(c.title)}</h3><p>Review the fix and its evidence before marking this issue resolved.</p></div></div><details class="lab-resolution-review" open><summary>Investigation summary · ${c.attempts.length} experiments</summary><p><strong>Process:</strong> ${esc(c.process) || 'Not recorded'}</p><p><strong>Expected:</strong> ${esc(c.expected) || 'Not recorded'}</p><p><strong>Actual:</strong> ${esc(c.actual) || 'Not recorded'}</p><h4>Connected successful steps</h4><ol>${path.map(p => '<li>' + esc(p.title) + ' — ' + esc(p.result) + '</li>').join('') || '<li>No connected experiments. Explain your verification below.</li>'}</ol><p>${c.attempts.filter(p => p.outcome === 'Failed').length} failed attempts will be preserved in the Knowledge investigation trail.</p></details>${area('cause', 'Confirmed root cause *', c.cause, true)}${area('solution', 'Verified fix / resolution *', c.solution, true)}${area('verification', 'How did you confirm the issue is resolved? *', c.verification, true)}<label class="check-label lab-review-check"><input type="checkbox" name="reviewed" required>I reviewed the results and verified this resolution.</label><p class="hub-meta">This saves the case and its ${c.knowledgeId ? 'linked' : 'new'} Knowledge note together. You can return from the note to this board.</p><div class="modal-actions">${wb('cancel', 'Cancel')}<button type="submit" class="primary">Resolve & save to Knowledge</button></div></form>`
+      );
+    }
+    function saveResolution(form) {
+      const id = form.dataset.case,
+        c = find(id);
+      if (!c || c.archived) throw Error('Restore this investigation before resolving it.');
+      const v = Object.fromEntries(new FormData(form));
+      if (!v.reviewed || !v.cause?.trim() || !v.solution?.trim() || !v.verification?.trim())
+        throw Error('Add the cause, verified fix and verification, then confirm your review.');
+      if (
+        a.mutate(d => {
+          const target = d.workhub.lab.find(x => x.id === id);
+          for (const k of ['cause', 'solution', 'verification']) target[k] = v[k].trim();
+          target.status = 'Solved';
+          target.resolvedAt = stamp();
+          publish(d, target);
+        })
+      ) {
+        a.closeModal();
+        a.render();
+        feedback(id, 'solved');
+        a.tell('Issue resolved. Its verified solution is saved to Knowledge.');
+        return true;
+      }
+      return false;
+    }
+    function announce(message) {
+      if ($('labAnnouncement')) $('labAnnouncement').textContent = message;
+    }
+    function clearReaction() {
+      if (reaction) {
+        reaction = null;
+        a.life()?.scene(null);
+      }
+      $('labMomoProp')?.remove();
+    }
+    function feedback(caseId, type, id = '') {
+      const c = find(caseId);
+      if (!c) return;
+      document.querySelectorAll('.lab-sparks').forEach(el => el.remove());
+      effect = { caseId, type, id, until: Date.now() + 4400 };
+      const host = document.querySelector('.lab-case');
+      if (host?.dataset.case === caseId) {
+        host.dataset.effect = type;
+        let target = [...host.querySelectorAll('[data-experiment]')].find(
+          el => el.dataset.experiment === id
+        );
+        if (target) {
+          target.dataset.feedback = type;
+          if (motion() && !document.hidden && !document.body.matches('.hub-private,.hub-present')) {
+            document.querySelectorAll('.lab-sparks').forEach(el => el.remove());
+            const fx = document.createElement('span'),
+              r = target.getBoundingClientRect(),
+              v = root.visualViewport,
+              w = v?.width || root.innerWidth,
+              h = v?.height || root.innerHeight;
+            fx.className = 'lab-sparks lab-screen-effects';
+            fx.dataset.kind = type;
+            fx.setAttribute('aria-hidden', 'true');
+            fx.style.left =
+              Math.max(60, Math.min(w - 60, r.width ? r.left + r.width / 2 : w * 0.55)) + 'px';
+            fx.style.top =
+              Math.max(80, Math.min(h - 80, r.height ? r.top + r.height * 0.36 : h * 0.5)) + 'px';
+            fx.innerHTML =
+              Array.from(
+                { length: type === 'failed' ? 9 : 6 },
+                (_, i) =>
+                  `<i style="--sx:${Math.cos(i * 2.399) * 100}px;--sy:${Math.sin(i * 2.399) * 85}px;--sr:${i * 37}deg;--delay:${i * 24}ms"></i>`
+              ).join('') +
+              (type === 'failed'
+                ? '<b class="lab-smoke"></b><b class="lab-smoke" style="--smoke-x:24px;--delay:140ms"></b><b class="lab-smoke" style="--smoke-x:-25px;--delay:280ms"></b>'
+                : '');
+            document.body.append(fx);
+          }
+        }
+        announce(
+          type === 'failed'
+            ? 'Failed experiment saved on the ruled-out shelf.'
+            : type === 'solved'
+              ? 'Verified solution saved to Knowledge.'
+              : type === 'uncertain'
+                ? 'Inconclusive result saved. More checking is needed.'
+                : 'Successful result saved. Follow the powered connections.'
+        );
+      }
+      if (
+        !a.ready() ||
+        !a.prefs().mascot ||
+        document.hidden ||
+        document.body.matches('.hub-private,.hub-present,.hub-focus') ||
+        document.querySelector('dialog[open]') ||
+        a.life()?.sceneAvailable?.() === false
+      )
+        return;
+      a.moments()?.finish(false);
+      clearReaction();
+      const line =
+        type === 'failed'
+          ? 'Eep! A tiny spark. A useful clue. I’m okay!'
+          : type === 'solved'
+            ? 'Verified! I’m putting this bright idea somewhere safe.'
+            : type === 'uncertain'
+              ? 'Hmm. One clue, several possibilities. Let’s look closer.'
+              : 'It clicked! I knew those little magnets had potential.';
+      a.react(type === 'failed' ? 'busy' : 'happy', line, 4000);
+      const pose =
+          type === 'failed'
+            ? 'lab-cower'
+            : type === 'solved'
+              ? 'lab-verified'
+              : type === 'uncertain'
+                ? 'lab-inspect'
+                : 'lab-celebrate',
+        expression = type === 'failed' ? 'afraid' : type === 'uncertain' ? 'curious' : 'delighted';
+      a.life()?.scene({ pose: motion() ? pose : 'idle', expression });
+      reaction = { type, start: Date.now(), until: Date.now() + 4000 };
+      if (type === 'uncertain' || type === 'solved') {
+        const p = document.createElement('span');
+        p.id = 'labMomoProp';
+        p.setAttribute('aria-hidden', 'true');
+        p.innerHTML =
+          type === 'solved'
+            ? '<span class="lab-momo-stamp">✓<small>VERIFIED</small></span>'
+            : '<svg viewBox="0 0 60 70"><circle cx="24" cy="25" r="17" fill="#dff8f0aa" stroke="#b58a60" stroke-width="5"/><path d="m37 39 17 22" stroke="#87634b" stroke-width="9" stroke-linecap="round"/><path d="M15 20q3-7 10-6" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg>';
+        $('hubPet')?.append(p);
+      }
+    }
+    function tick() {
+      if (reaction) {
+        if (
+          Date.now() >= reaction.until ||
+          !a.ready() ||
+          document.hidden ||
+          document.body.matches('.hub-private,.hub-present,.hub-focus') ||
+          !document.querySelector('.lab-workshop') ||
+          document.querySelector('dialog[open]')
+        )
+          clearReaction();
+        else if (reaction.type === 'failed' && Date.now() - reaction.start > 1500 && motion())
+          a.life()?.scene({ pose: 'lab-peek', expression: 'shy' });
+      }
+      if (
+        effect &&
+        (Date.now() >= effect.until ||
+          !motion() ||
+          document.hidden ||
+          document.body.matches('.hub-private,.hub-present') ||
+          !document.querySelector('.lab-workshop'))
+      ) {
+        document.querySelector('.lab-case')?.removeAttribute('data-effect');
+        for (const el of document.querySelectorAll('[data-feedback]'))
+          el.removeAttribute('data-feedback');
+        for (const el of document.querySelectorAll('.lab-sparks')) el.remove();
+        effect = null;
+      }
+    }
+    function mount() {
+      syncOwner();
+      mountUndo();
+      if (drag && !drag.el.isConnected) cancelDrag();
+      if (!document.querySelector('.lab-workshop')) {
+        clearReaction();
+        return;
+      }
+      const s = $('labBoardScroll'),
+        saved = pendingScroll || scrolls.get(current);
+      if (s && saved) {
+        s.scrollLeft = saved.x;
+        s.scrollTop = saved.y;
+      }
+      pendingScroll = null;
+      if (s && !s.dataset.watching) {
+        s.dataset.watching = 'true';
+        s.addEventListener('scroll', saveScroll, { passive: true });
+      }
+      tick();
+    }
+    function magnet(c, id, point) {
+      const p = c.attempts.find(p => p.id === id);
+      if (!p || !['Passed', 'Inconclusive'].includes(p.outcome)) return null;
+      let best = null;
+      for (const source of eligible(c, id)) {
+        const from = source.id === ORIGIN ? c : c.attempts.find(p => p.id === source.id),
+          x = from.position.x + (source.id === ORIGIN ? ISSUE.w : CARD.w),
+          y = from.position.y + 58,
+          d = Math.hypot(point.x - x, point.y + 58 - y);
+        if (d <= 86 && (!best || d < best.distance)) {
+          try {
+            best = { id: source.id, distance: d, point: dockPoint(c, source.id, id) };
+          } catch {}
+        }
+      }
+      return best;
+    }
+    function mountUndo() {
+      let b = $('labUndo');
+      if (undo && a.ready() && undo.owner === a.owner()) {
+        if (!b) {
+          b = document.createElement('button');
+          b.type = 'button';
+          b.id = 'labUndo';
+          b.dataset.workshop = 'undo';
+          b.textContent = '↶ Undo Lab deletion';
+          $('hubToolbar')?.append(b);
+        }
+      } else b?.remove();
+    }
+    function remove(caseId, id = '') {
+      const c = find(caseId),
+        p = id ? c?.attempts.find(p => p.id === id) : null;
+      if (!c || (id && !p)) throw Error('This Lab item no longer exists.');
+      const label = p ? 'experiment “' + p.title + '”' : 'investigation “' + c.title + '”';
+      if (
+        !root.confirm(
+          'Delete ' +
+            label +
+            '? ' +
+            (p
+              ? 'Its connections will be removed. ' +
+                (c.status === 'Solved' ? 'The case will reopen for review. ' : '')
+              : 'Its experiments and board will also be deleted. ') +
+            'Linked Knowledge notes are kept. You can Undo this deletion until the next Lab deletion or account change.'
+        )
+      )
+        return false;
+      cancelDrag();
+      clearReaction();
+      const snapshot = {
+        owner: a.owner(),
+        caseId,
+        id,
+        record: JSON.parse(JSON.stringify(p || c)),
+        index: p ? c.attempts.findIndex(x => x.id === id) : all().findIndex(x => x.id === caseId),
+        caseStatus: c.status,
+        caseUpdatedAt: c.updatedAt,
+        children: p ? c.attempts.filter(x => x.parentId === id).map(x => x.id) : [],
+      };
+      if (
+        a.mutate(d => {
+          if (!id) d.workhub.lab = d.workhub.lab.filter(x => x.id !== caseId);
+          else {
+            const target = d.workhub.lab.find(x => x.id === caseId);
+            target.attempts = target.attempts.filter(x => x.id !== id);
+            disconnectChildren(target, id);
+            if (target.status === 'Solved') target.status = 'Investigating';
+            target.updatedAt = stamp();
+          }
+        })
+      ) {
+        snapshot.afterCase = id ? JSON.parse(JSON.stringify(find(caseId))) : null;
+        undo = snapshot;
+        inspect = '';
+        a.closeModal();
+        mountUndo();
+        a.tell('Lab item deleted. Use Undo Lab deletion to restore it.');
+        return true;
+      }
+      return false;
+    }
+    function restore() {
+      syncOwner();
+      if (!undo || !a.ready()) return false;
+      const saved = undo;
+      if (saved.id && !find(saved.caseId))
+        throw Error('Restore the investigation before restoring this experiment.');
+      if (
+        a.mutate(d => {
+          if (!saved.id) {
+            if (d.workhub.lab.some(c => c.id === saved.caseId))
+              throw Error('That investigation already exists.');
+            d.workhub.lab.splice(saved.index, 0, JSON.parse(JSON.stringify(saved.record)));
+          } else {
+            const c = d.workhub.lab.find(c => c.id === saved.caseId);
+            if (c.attempts.some(p => p.id === saved.id))
+              throw Error('That experiment already exists.');
+            const unchanged = root.MMTrackerMerge.equal(c, saved.afterCase),
+              p = JSON.parse(JSON.stringify(saved.record));
+            if (p.parentId && !eligible(c, p.id).some(x => x.id === p.parentId)) p.parentId = '';
+            c.attempts.splice(saved.index, 0, p);
+            if (p.outcome === 'Passed')
+              for (const id of saved.children) {
+                const child = c.attempts.find(p => p.id === id);
+                if (
+                  child &&
+                  !child.parentId &&
+                  ['Passed', 'Inconclusive'].includes(child.outcome) &&
+                  eligible(c, id).some(x => x.id === p.id)
+                )
+                  child.parentId = p.id;
+              }
+            if (unchanged) c.status = saved.caseStatus;
+            else if (c.status === 'Solved') c.status = 'Investigating';
+            c.updatedAt = unchanged ? saved.caseUpdatedAt : stamp();
+          }
+        })
+      ) {
+        undo = null;
+        mountUndo();
+        a.openRecord('lab', saved.caseId);
+        a.tell('Lab item restored.');
+        return true;
+      }
+      return false;
+    }
+    function repel(c, id, point) {
+      const moving = id === ORIGIN ? c : c.attempts.find(p => p.id === id);
+      if (!moving) return point;
+      let out = { ...point },
+        repelled = false;
+      for (const q of rectangles(c, id)) {
+        const other = q.id === ORIGIN ? c : q,
+          compatible =
+            moving.outcome !== 'Failed' &&
+            other.outcome !== 'Failed' &&
+            id !== ORIGIN &&
+            eligible(c, id).some(p => p.id === q.id);
+        if (compatible) continue;
+        const w = id === ORIGIN ? ISSUE.w : CARD.w,
+          h = id === ORIGIN ? ISSUE.h : CARD.h,
+          dx = point.x + w / 2 - (q.position.x + q.w / 2),
+          dy = point.y + h / 2 - (q.position.y + q.h / 2),
+          nx = Math.abs(dx) / (w / 2 + q.w / 2 + 44),
+          ny = Math.abs(dy) / (h / 2 + q.h / 2 + 44);
+        if (nx < 1 && ny < 1) {
+          repelled = true;
+          if (nx > ny) out.x += (dx >= 0 ? 1 : -1) * (1 - nx) * 68;
+          else out.y += (dy >= 0 ? 1 : -1) * (1 - ny) * 68;
+        }
+      }
+      drag.el.dataset.repelling = String(repelled);
+      return { x: Math.max(12, Math.min(LIMIT, out.x)), y: Math.max(12, Math.min(LIMIT, out.y)) };
+    }
+    function paintDrag() {
+      if (!drag) return;
+      const c = find(drag.caseId);
+      if (!c) return;
+      drag.candidate = magnet(c, drag.id, drag.point);
+      let point = repel(c, drag.id, drag.point);
+      if (drag.candidate && motion()) {
+        const q = drag.candidate.point,
+          pull = 0.22 + 0.4 * (1 - drag.candidate.distance / 86);
+        point = { x: point.x + (q.x - point.x) * pull, y: point.y + (q.y - point.y) * pull };
+      }
+      drag.displayPoint = point;
+      Object.assign(drag.el.style, { left: point.x + 'px', top: point.y + 'px' });
+      drag.el.classList.add('lab-dragging');
+      drag.el.dataset.magnetic = String(!!drag.candidate);
+      const svg = $('labWires');
+      if (svg) svg.innerHTML = wires(c, { id: drag.id, point });
+      const hint = $('labMagnetHint');
+      if (hint) {
+        hint.hidden = !drag.candidate && !drag.el.matches('[data-repelling="true"]');
+        hint.textContent = drag.candidate ? '🧲 Release to connect' : '↔ These magnets repel';
+        const target = drag.candidate?.point || point;
+        Object.assign(hint.style, {
+          left: target.x + 'px',
+          top: Math.max(8, target.y - 44) + 'px',
+        });
+      }
+      for (const el of document.querySelectorAll('.lab-magnet-source'))
+        el.classList.remove('lab-magnet-source');
+      if (drag.candidate)
+        [...document.querySelectorAll('#labBoardWorld [data-experiment]')]
+          .find(el => el.dataset.experiment === drag.candidate.id)
+          ?.classList.add('lab-magnet-source');
+    }
+    function beginDrag(handle, event, keyboard = false) {
+      if (drag) cancelDrag();
+      const c = find(handle.dataset.case);
+      ensureEditable(c);
+      saveScroll();
+      const id = handle.dataset.labDrag,
+        p = id === ORIGIN ? c : c.attempts.find(p => p.id === id),
+        el = handle.closest('[data-experiment]');
+      if (!p || !el) return;
+      drag = {
+        caseId: c.id,
+        id,
+        el,
+        handle,
+        point: { ...p.position },
+        original: { ...p.position },
+        x: event.clientX || 0,
+        y: event.clientY || 0,
+        scrollX: $('labBoardScroll')?.scrollLeft || 0,
+        scrollY: $('labBoardScroll')?.scrollTop || 0,
+        pointerId: event.pointerId,
+        keyboard,
+        moved: false,
+        owner: a.owner(),
+        candidate: null,
+      };
+      document.body.classList.add('lab-drag-active');
+      handle.setAttribute('aria-pressed', 'true');
+      if (!keyboard)
+        try {
+          handle.setPointerCapture?.(event.pointerId);
+        } catch {}
+      announce('Move the card. Release to place, or Escape to cancel.');
+    }
+    function cancelDrag(reset = true) {
+      if (!drag) return;
+      const old = drag;
+      drag = null;
+      document.body.classList.remove('lab-drag-active');
+      old.handle.removeAttribute('aria-pressed');
+      old.el.classList.remove('lab-dragging');
+      delete old.el.dataset.magnetic;
+      delete old.el.dataset.repelling;
+      for (const el of document.querySelectorAll('.lab-magnet-source'))
+        el.classList.remove('lab-magnet-source');
+      if ($('labMagnetHint')) $('labMagnetHint').hidden = true;
+      if (reset)
+        Object.assign(old.el.style, { left: old.original.x + 'px', top: old.original.y + 'px' });
+      const c = find(old.caseId);
+      if (reset && c && $('labWires')) $('labWires').innerHTML = wires(c);
+    }
+    function drop() {
+      if (!drag) return;
+      const g = drag,
+        c = find(g.caseId);
+      if (!g.moved || !a.ready() || g.owner !== a.owner() || !c || locked(c) || !g.el.isConnected) {
+        cancelDrag();
+        return;
+      }
+      const point = g.candidate?.point || freePoint(c, g.id, g.displayPoint || g.point),
+        parent = g.candidate?.id;
+      cancelDrag(false);
+      if (point.x === g.original.x && point.y === g.original.y && !parent) return;
+      suppressClick = Date.now() + 600;
+      preserveCanvas = true;
+      let saved = false;
+      try {
+        saved = a.mutate(d => {
+          const target = d.workhub.lab.find(c => c.id === g.caseId),
+            p = g.id === ORIGIN ? target : target?.attempts.find(p => p.id === g.id);
+          ensureEditable(target);
+          if (!p) throw Error('Experiment no longer exists.');
+          if (parent && !eligible(target, g.id).some(x => x.id === parent))
+            throw Error('The connection changed. Try moving the card again.');
+          p.position = {
+            x: Math.round(Math.min(LIMIT, Math.max(0, point.x))),
+            y: Math.round(Math.min(LIMIT, Math.max(0, point.y))),
+          };
+          if (parent) p.parentId = parent;
+          p.updatedAt = stamp();
+          target.updatedAt = p.updatedAt;
+        });
+      } finally {
+        preserveCanvas = false;
+      }
+      if (saved) {
+        if (parent)
+          feedback(
+            g.caseId,
+            g.id !== ORIGIN &&
+              find(g.caseId).attempts.find(p => p.id === g.id)?.outcome === 'Inconclusive'
+              ? 'uncertain'
+              : 'success',
+            g.id
+          );
+        announce(parent ? 'Magnetic connection saved.' : 'Card position saved.');
+        const h = [...document.querySelectorAll('[data-lab-drag]')].find(
+          h => h.dataset.labDrag === g.id
+        );
+        h?.focus({ preventScroll: true });
+      }
+    }
+    document.addEventListener(
+      'pointerdown',
+      event => {
+        if (reaction && event.target.closest?.('#hubPet button')) clearReaction();
+        const h = event.target.closest?.('[data-lab-drag]');
+        if (!h || h.disabled || event.button > 0 || (drag && !drag.keyboard)) return;
+        try {
+          event.preventDefault();
+          beginDrag(h, event);
+        } catch (e) {
+          a.tell(e.message, true);
+        }
+      },
+      { passive: false }
+    );
+    document.addEventListener(
+      'pointermove',
+      event => {
+        if (!drag || drag.keyboard || event.pointerId !== drag.pointerId) return;
+        event.preventDefault();
+        const sc = $('labBoardScroll'),
+          r = sc.getBoundingClientRect();
+        if (r.width) {
+          if (event.clientX < r.left + 30) sc.scrollLeft -= 14;
+          else if (event.clientX > r.right - 30) sc.scrollLeft += 14;
+          if (event.clientY < r.top + 30) sc.scrollTop -= 14;
+          else if (event.clientY > r.bottom - 30) sc.scrollTop += 14;
+        }
+        const dx = (event.clientX - drag.x + sc.scrollLeft - drag.scrollX) / zoom,
+          dy = (event.clientY - drag.y + sc.scrollTop - drag.scrollY) / zoom;
+        if (Math.hypot(dx, dy) < 5 && !drag.moved) return;
+        drag.moved = true;
+        const world = $('labBoardWorld');
+        drag.point = {
+          x: Math.max(
+            12,
+            Math.min(Number(world.dataset.width) - CARD.w - 24, drag.original.x + dx)
+          ),
+          y: Math.max(
+            12,
+            Math.min(Number(world.dataset.height) - CARD.h - 24, drag.original.y + dy)
+          ),
+        };
+        paintDrag();
+      },
+      { passive: false }
+    );
+    document.addEventListener('pointerup', event => {
+      if (drag && !drag.keyboard && event.pointerId === drag.pointerId)
+        try {
+          drop();
+        } catch (e) {
+          cancelDrag();
+          a.tell(e.message, true);
+        }
+    });
+    document.addEventListener('pointercancel', cancelDrag);
+    document.addEventListener('focusin', event => {
+      if (drag?.keyboard && event.target !== drag.handle) cancelDrag();
+    });
+    document.addEventListener('lostpointercapture', event => {
+      if (drag && !drag.keyboard && event.pointerId === drag.pointerId) cancelDrag();
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') {
+        cancelDrag();
+        clearReaction();
+      }
+      const handle = event.target.closest?.('[data-lab-drag]');
+      if (!handle || handle.disabled) return;
+      try {
+        if (['Enter', ' '].includes(event.key)) {
+          event.preventDefault();
+          if (drag?.keyboard) drop();
+          else beginDrag(handle, event, true);
+        } else if (
+          drag?.keyboard &&
+          ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)
+        ) {
+          event.preventDefault();
+          const step = event.shiftKey ? 48 : 12;
+          drag.point.x = Math.max(
+            12,
+            Math.min(
+              LIMIT,
+              drag.point.x +
+                (event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0)
+            )
+          );
+          drag.point.y = Math.max(
+            12,
+            Math.min(
+              LIMIT,
+              drag.point.y +
+                (event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0)
+            )
+          );
+          drag.moved = true;
+          paintDrag();
+        }
+      } catch (e) {
+        cancelDrag();
+        a.tell(e.message, true);
+      }
+    });
+    document.addEventListener(
+      'click',
+      event => {
+        if (Date.now() < suppressClick && event.target.closest?.('[data-lab-drag]')) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+        }
+      },
+      true
+    );
+    document.addEventListener('click', event => {
+      const b = event.target.closest?.('[data-workshop]');
+      if (!b || b.disabled) return;
+      try {
+        const x = b.dataset,
+          c = find(x.case || current);
+        saveScroll();
+        if (x.workshop === 'view') {
+          cancelDrag();
+          mode = x.value;
+          remember();
+          a.render();
+        } else if (x.workshop === 'zoom-in' || x.workshop === 'zoom-out' || x.workshop === 'fit') {
+          const s = $('labBoardScroll'),
+            world = $('labBoardWorld'),
+            old = zoom;
+          if (!s || !world) return;
+          zoom =
+            x.workshop === 'fit'
+              ? Math.max(0.35, Math.min(1, s.clientWidth / Number(world.dataset.width)))
+              : Math.max(
+                  0.35,
+                  Math.min(
+                    1.25,
+                    Math.round((zoom + (x.workshop === 'zoom-in' ? 0.1 : -0.1)) * 100) / 100
+                  )
+                );
+          pendingScroll = { x: (s.scrollLeft * zoom) / old, y: (s.scrollTop * zoom) / old };
+          remember();
+          a.render();
+        } else if (x.workshop === 'arrange') {
+          arrange(c);
+        } else if (x.workshop === 'origin') {
+          const s = $('labBoardScroll');
+          if (s) {
+            s.scrollLeft = Math.max(0, c.position.x * zoom - 24);
+            s.scrollTop = Math.max(0, c.position.y * zoom - 24);
+          }
+        } else if (x.workshop === 'inspect') {
+          inspect = x.id;
+          a.render();
+          const h = $('labInspector')?.querySelector('h3');
+          h?.focus({ preventScroll: true });
+          if (root.innerWidth < 1000)
+            $('labInspector')?.scrollIntoView?.({
+              block: 'nearest',
+              behavior: motion() ? 'smooth' : 'auto',
+            });
+        } else if (x.workshop === 'result') resultForm(c.id, x.id, x.outcome);
+        else if (x.workshop === 'connect') connectForm(c.id, x.id);
+        else if (x.workshop === 'resolve') resolutionForm(c.id);
+        else if (x.workshop === 'delete-case') remove(c.id);
+        else if (x.workshop === 'delete-attempt') remove(c.id, x.id);
+        else if (x.workshop === 'undo') restore();
+        else if (x.workshop === 'retry') {
+          ensureEditable(c);
+          const p = c.attempts.find(p => p.id === x.id);
+          a.attemptForm(c.id, '', {
+            title: 'Another approach · ' + p.title.slice(0, 470),
+            action: p.action,
+            expected: p.expected,
+          });
+        } else if (x.workshop === 'reopen') {
+          if (c.archived) throw Error('Restore this case first.');
+          if (
+            a.mutate(d => {
+              const r = d.workhub.lab.find(r => r.id === c.id);
+              r.status = 'Investigating';
+              r.updatedAt = stamp();
+            })
+          ) {
+            a.tell(
+              'Investigation reopened. The previous Knowledge solution is kept until you publish again.'
+            );
+          }
+        }
+      } catch (e) {
+        a.tell(e.message, true);
+      }
+    });
+    document.addEventListener('submit', event => {
+      const f = event.target;
+      if (!['labResultForm', 'labConnectForm', 'labResolveForm'].includes(f.id)) return;
+      event.preventDefault();
+      try {
+        if (f.id === 'labResolveForm') saveResolution(f);
+        else {
+          const v = Object.fromEntries(new FormData(f));
+          if (f.id === 'labResultForm')
+            recordResult(f.dataset.case, f.dataset.id, v.outcome, v.result);
+          else connect(f.dataset.case, f.dataset.id, v.parentId, v.snap === 'on');
+        }
+      } catch (e) {
+        a.tell(e.message, true);
+      }
+    });
+    const suspend = () => {
+      if (document.hidden || !a.ready() || document.body.matches('.hub-private,.hub-present')) {
+        cancelDrag();
+        clearReaction();
+      }
+    };
+    document.addEventListener('visibilitychange', suspend);
+    new root.MutationObserver(suspend).observe(document.body, {
+      attributes: true,
+      attributeFilter: ['class', 'data-motion'],
+    });
+    root.addEventListener('resize', cancelDrag);
+    root.visualViewport?.addEventListener('resize', cancelDrag);
+    root.addEventListener('pagehide', () => {
+      cancelDrag();
+      clearReaction();
+    });
+    return {
+      render,
+      mount,
+      tick,
+      publish,
+      toKnowledge,
+      recordResult,
+      resultForm,
+      connect,
+      connectForm,
+      resolutionForm,
+      saveResolution,
+      ensureEditable,
+      feedback,
+      cancelDrag,
+      drop,
+      dock,
+      remove,
+      restore,
+      reveal,
+      patchRender,
+      arrange,
+      snapshot: () => ({
+        mode,
+        zoom,
+        inspect,
+        dragging: !!drag,
+        reaction: reaction?.type || null,
+        canUndo: !!undo,
+      }),
+      connected: (id, p) => connected(find(id), p),
+    };
+  }
+  root.WorkHubLabWorkshop = {
+    upgrade,
+    validate,
+    install,
+    ORIGIN,
+    initialPosition,
+    connected,
+    eligible,
+  };
 })(window);

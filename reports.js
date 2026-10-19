@@ -1,116 +1,1214 @@
+/**
+ * reports.js
+ * Current Excel report builder and report options interface.
+ * Reads the supplied document; writes OOXML files through app.js zip(). No account edits.
+ * Worksheet definitions and column captions belong here; preserve XML escaping and formula handling.
+ * File map: docs/FILE-MAP.md
+ */
 /* Reader-facing Excel reports, generated offline in the existing browser ZIP writer. */
-(function(root){
-'use strict';
-const NS='http://schemas.openxmlformats.org/spreadsheetml/2006/main',REL='http://schemas.openxmlformats.org/officeDocument/2006/relationships',PKG='http://schemas.openxmlformats.org/package/2006/relationships';
-const XML='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c])).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,'');
-const col=n=>{let s='';for(n++;n;n=Math.floor((n-1)/26))s=String.fromCharCode(65+(n-1)%26)+s;return s;};
-const date=s=>s?Math.round((Date.parse(s.slice(0,10)+'T00:00:00Z')-Date.UTC(1899,11,31))/86400000)+(s.slice(0,10)>='1900-03-01'?1:0):'';
-const localDate=d=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
-const shift=(s,n)=>{const d=new Date(s+'T12:00:00');d.setDate(d.getDate()+n);return localDate(d);};
-const closed=t=>['Closed','Completed'].includes(t.status);
-const formula=(f,value)=>({formula:f,value});
-const latest=t=>(t.history||'').trim().split(/\r?\n(?=\s*-\s)/).at(-1)||'';
-const numberTime=s=>{const [h,m]=String(s||'00:00').split(':').map(Number);return(h*60+m)/1440;};
-const C=(label,width=20,kind='text')=>({label,width,kind});
-function options(o={}){const asOf=o.asOf||localDate(new Date()),to=o.to||asOf,from=o.from||shift(to,-29),days=Number(o.closedDays??30);if(!root.WorkHubReminders.validDate(asOf)||!root.WorkHubReminders.validDate(from)||!root.WorkHubReminders.validDate(to)||from<'1900-01-01'||from>to||to>asOf||!Number.isInteger(days)||days<0||days>3650)throw Error('Check the report dates and closed-ticket window.');return{asOf,from,to,closedDays:days,includeArchive:!!o.includeArchive};}
-function closing(t,d){const tracked=d.workhub?.ticketClosures?.find(x=>x.id===t.id)?.date;return tracked||t.closedDate||t.closedAt?.slice(0,10)||t.historyDate||'';}
-function sections(d,o){
- const cutoff=shift(o.asOf,-o.closedDays),active=d.tickets.filter(t=>!closed(t)),recent=d.tickets.filter(t=>closed(t)&&(!closing(t,d)||closing(t,d)>=cutoff)),archive=d.tickets.filter(t=>closed(t)&&closing(t,d)&&closing(t,d)<cutoff);
- return{active,recent,archive,tickets:[...active,...recent],cutoff};
-}
-function build(d,input={}){
- const o=options(input),scope=sections(d,o),sheets=[],inPeriod=s=>!!s&&s>=o.from&&s<=o.to,pname=id=>d.projects.find(p=>p.id===id)?.name||'Unlinked project',tname=id=>{const t=d.tickets.find(t=>t.id===id);return t?[t.ticket,t.description].filter(Boolean).join(' · '):'Unlinked ticket';};
- const reminder=(kind,id)=>d.workhub?.reminders?.find(r=>r.kind===kind&&r.recordId===id)?.until||'';
- const sheet=(name,title,columns,rows,extra={})=>{const x={name,title,columns,rows,...extra};sheets.push(x);return x;};
- const ticketRows=tickets=>tickets.map(t=>({values:[t.ticket,t.description,t.status,t.priority,t.pic||'Unassigned',date(t.historyDate),date(closed(t)?closing(t,d):''),date(reminder('tickets',t.id)),t.jira||''],record:1}));
- const tickets=sheet('Tickets','Tickets · current queue and recent closures',[C('Ticket',19),C('Description',48),C('Status',21),C('Priority',13),C('Responsible person',23),C('Last update',16,'date'),C('Closed on',16,'date'),C('Revisit on',16,'date'),C('Charge code',21)],ticketRows(scope.tickets),{status:2,priority:3,note:`Open tickets first. Closed tickets older than ${o.closedDays} days are excluded. Undated closures stay visible. Older closure dates may use the last-update date.`});
- const history=tickets=>tickets.flatMap(t=>(t.history||'').trim().split(/\r?\n(?=\s*-\s)/).filter(Boolean).map((v,i)=>({values:[t.ticket,t.description,i+1,v],record:0})));
- sheet('Ticket updates','Ticket updates',[C('Ticket',19),C('Description',40),C('Update number',15,'number'),C('Update',100)],history(scope.tickets),{note:'Full updates for the tickets included in the main report, in their recorded order.'});
- const milestones=scope.tickets.flatMap(t=>{const tracker=d.trackers.find(x=>x.ticket===t.ticket);return tracker?(d.lists.milestones||[]).map((step,i)=>({values:[t.ticket,step,tracker.steps[i]?'Completed':tracker.onHold?'On hold':'Pending',i===0?tracker.remarks||'':''],record:0})):[];});
- sheet('Ticket milestones','Ticket milestone checklist',[C('Ticket',19),C('Milestone',34),C('State',20),C('Tracker remarks',80)],milestones,{status:2,note:'Milestone names and completion states, without internal record identifiers.'});
- const taskRows=[],taskNotes=[];
- for(const t of d.tasks){const related=t.taskType==='Project'?pname(t.linkId):t.taskType==='Ticket'?tname(t.linkId):t.customLink||'General work',status=t.archived?'Archived':t.done?'Completed':t.dueDate&&t.dueDate<o.asOf?'Overdue':({doing:'In progress',blocked:'Blocked',todo:'Open'}[t.boardStatus]||'Open');taskRows.push({values:[t.task,'Main task',status,t.priority,date(t.dueDate),related,date(reminder('tasks',t.id))],record:1,parent:true});if(t.remarks||t.feedback)taskNotes.push({values:[t.task,'Main task',t.remarks||'',t.feedback||''],record:0});for(const sub of t.subTasks||[]){taskRows.push({values:[sub.title,'Subtask',sub.status,'',date(sub.dueDate||''),t.task,''],record:0,level:1});if(sub.remarks||sub.feedback)taskNotes.push({values:[t.task,sub.title,sub.remarks||'',sub.feedback||''],record:0,level:1});}}
- const tasks=sheet('Tasks','Tasks and their subtasks',[C('Work item',51),C('Level',16),C('Status',21),C('Priority',13),C('Due date',16,'date'),C('Related work / main task',40),C('Revisit on',16,'date')],taskRows,{status:2,priority:3,note:'Main tasks are shaded. Their subtasks sit directly underneath and can be collapsed. Remarks and feedback are in Task notes.'});
- sheet('Task notes','Task remarks and feedback',[C('Main task',42),C('Subtask / level',35),C('Remarks',75),C('Feedback',75)],taskNotes,{note:'Each row keeps remarks and feedback attached to the correct main task or subtask.'});
- const projectRows=d.projects.map(p=>{const items=d.specs.filter(x=>x.projectId===p.id),done=items.filter(x=>x.status==='Completed').length;return{values:[p.name,p.phase||'',p.health||'',date(p.goLiveDate),items.length,done,items.length?done/items.length:0,p.nextMilestone||'',date(reminder('projects',p.id))],record:1};});
- sheet('Projects','Project overview',[C('Project',36),C('Current phase',27),C('Health',17),C('Go-live date',16,'date'),C('Items',11,'number'),C('Completed',13,'number'),C('Completion',15,'percent'),C('Next milestone',48),C('Revisit on',16,'date')],projectRows,{status:2,note:'Project completion is completed project items divided by all project items. Statuses are the current saved snapshot.'});
- const itemRows=[];for(const p of d.projects)for(const item of d.specs.filter(x=>x.projectId===p.id)){const ref=[item.itemType||'Item',item.itemId??item.ricefw??''].filter(Boolean).join(' ');itemRows.push({values:[p.name,ref,item.description,item.status,item.priority,date(item.dueDate||item.expectedDate),item.remarks||''],record:1,parent:true});for(const sub of item.subItems||[])itemRows.push({values:[p.name,'Sub-item',sub.title,sub.status,sub.owner||'',date(sub.dueDate),sub.remarks||''],record:0,level:1});}
- const items=sheet('Project items','Project items and sub-items',[C('Project',30),C('Reference / level',23),C('Work item',48),C('Status',22),C('Priority / sub-item owner',25),C('Due date',16,'date'),C('Remarks',65)],itemRows,{status:3,note:'Sub-items follow their parent item. Their owner and remarks are retained on their own row.'});
- const projectNotes=[];const addNote=(project,section,subject,detail)=>{if(detail)projectNotes.push({values:[project,section,subject,detail],record:0});};
- for(const c of d.projectCompanies||[])addNote(pname(c.projectId),'Company',c.name,[c.role,c.notes,c.organization,c.masterData].filter(Boolean).join('\n'));
- for(const m of d.projectProcessMappings||[])addNote(pname(m.projectId),'SAP process',[m.area,m.code,m.item].filter(Boolean).join(' · '),[d.projectCompanies.find(c=>c.id===m.companyId)?.name,m.description,'Department: '+(m.department||'Not specified'),'Decision: '+(m.decision||'Not specified')].filter(Boolean).join('\n'));
- for(const g of d.phaseGates||[])addNote(pname(g.projectId),'Phase gate',g.text,[g.phase,g.status||(g.done?'Completed':'Pending'),g.owner,g.targetDate,g.skipReason].filter(Boolean).join('\n'));
- for(const f of d.projectFeedback||[])addNote(pname(f.projectId),'Phase feedback',f.summary,[f.phase,f.status,f.details,f.resolution,...(f.links||[]).map(x=>x.type+': '+x.label)].filter(Boolean).join('\n'));
- for(const x of d.projectDecisions||[])addNote(pname(x.projectId),'Decision',x.category,[x.decision,x.status,x.owner,x.date].filter(Boolean).join('\n'));
- for(const p of d.projectPlans||[])if(inPeriod(p.date)||(p.endDate||p.date)>=o.from&&p.date<=o.to)addNote(pname(p.projectId),'Project activity',p.title,[p.date+' '+p.time+'–'+p.endTime,p.status,p.activity,p.text,p.actualTask,p.location].filter(Boolean).join('\n'));
- sheet('Project notes','Project processes, decisions and notes',[C('Project',32),C('Section',23),C('Subject',45),C('Details',100)],projectNotes,{note:'Readable company names, process decisions, phase gates, feedback and planned activities.'});
- const bookings=[];for(const slot of d.schedule.slice().filter(x=>inPeriod(x.date)).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time))){const key=[slot.date,slot.bookingId||'',slot.kind,slot.linkId,slot.text,slot.location,slot.planId||''].join('|'),end=slot.endTime||String(Number(slot.time.slice(0,2))+1).padStart(2,'0')+':00',prior=bookings.at(-1);if(prior&&prior.key===key&&prior.end===slot.time)prior.end=end;else bookings.push({key,slot,start:slot.time,end});}
- const scheduleRows=bookings.map(({slot:s,start,end})=>{const plan=d.projectPlans.find(p=>p.id===s.planId),leave=root.WorkHubLeave?.isLeave(s.kind),linked=leave?root.WorkHubLeave.TYPES[s.kind]:s.kind==='project'?pname(s.linkId):s.kind==='task'?d.tasks.find(t=>t.id===s.linkId)?.task||'Unlinked task':s.kind==='ticket'?tname(s.linkId):'General activity';return{values:[date(s.date),numberTime(start),numberTime(end),numberTime(end)-numberTime(start),leave?[s.title||linked,s.text,s.leave.contact?'Cover: '+s.leave.contact:'',s.kind==='medical-leave'?(s.leave.mcSubmitted?'MC submitted to HR: '+s.leave.mcSubmittedDate:'MC not yet submitted to HR'):''].filter(Boolean).join('\n'):s.text||plan?.title||linked,linked,s.location||'',leave?s.leave.status:plan?.status||'Planned'],record:1};});
- const schedule=sheet('Schedule','Schedule and planned time',[C('Date',16,'date'),C('Start',12,'time'),C('End',12,'time'),C('Duration',22,'duration'),C('Activity',54),C('Related work',39),C('Location',23),C('Status',21)],scheduleRows,{status:7,total:{col:3,value:scheduleRows.reduce((n,r)=>n+r.values[3],0)},note:'Consecutive slots from the same booking are combined. Pauses and separate dates remain separate. Durations are numeric Excel values.'});
- const sessionsRows=(d.workhub?.sessions||[]).filter(s=>inPeriod(localDate(new Date(s.start)))).map(s=>({values:[date(localDate(new Date(s.start))),s.title,s.projectId?pname(s.projectId):s.kind==='ticket'?tname(s.linkId):'General work',s.seconds/86400,s.chargeCode||'',s.notes||'',s.scheduled?'Scheduled':'Needs calendar review',s.archived?'Archived':'Active'],record:1}));
- const sessions=sheet('Work sessions','Recorded work sessions',[C('Started on',16,'date'),C('Session',48),C('Related project / work',34),C('Active duration',24,'seconds'),C('Charge code',23),C('Remarks',70),C('Calendar',25),C('Record',17)],sessionsRows,{total:{col:3,value:sessionsRows.reduce((n,r)=>n+r.values[3],0)},note:'Active time excludes pauses. Archived sessions remain part of the recorded-time history. Filter Record to hide them. A running timer is not included.'});
- const waitingRows=(d.workhub?.waiting||[]).map(w=>({values:[w.title,w.person||'Not specified',w.projectId?pname(w.projectId):'General',date(w.followUp),w.resolved?'Received':w.followUp&&w.followUp<o.asOf?'Follow up now':'Waiting',w.notes||''],record:1}));
- sheet('Follow-ups','Waiting on other people',[C('What is needed',45),C('Person / team',28),C('Project',30),C('Follow-up date',18,'date'),C('Status',22),C('Notes / next step',70)],waitingRows,{status:4,note:'Received items remain visible for context. Filter the Status column to focus on outstanding follow-ups.'});
- const reminders=root.WorkHubReminders.records(d,o.asOf);sheet('Reminders','Items set aside for another look',[C('Type',16),C('Item',60),C('Revisit on',18,'date'),C('State',23),C('Reminder note',80)],reminders.map(r=>({values:[r.kind==='tickets'?'Ticket':r.kind==='tasks'?'Task':'Project',r.title,date(r.until),r.due?'Time to revisit':'Snoozed',r.note],record:1})),{status:3,note:'Snoozing does not change original statuses or deadlines.'});
- if(o.includeArchive)sheet('Closed archive','Older closed tickets',[...tickets.columns],ticketRows(scope.archive),{status:2,priority:3,note:`Closed before ${scope.cutoff}. These tickets do not feed the current-work Dashboard or Tickets sheet.`});
- if(o.includeArchive)sheet('Archive updates','Updates for older closed tickets',[C('Ticket',19),C('Description',40),C('Update number',15,'number'),C('Update',100)],history(scope.archive),{note:'Historical updates kept separate from the main report.'});
- const metrics={openTickets:scope.active.length,closedInPeriod:scope.recent.filter(t=>inPeriod(closing(t,d))).length,overdueTasks:d.tasks.filter(t=>!t.done&&!t.archived&&t.dueDate&&t.dueDate<o.asOf).length,recordedHours:sessionsRows.reduce((n,r)=>n+r.values[3]*24,0),projectCompletion:d.specs.length?d.specs.filter(s=>s.status==='Completed').length/d.specs.length:0,dueReminders:reminders.filter(r=>r.due).length,archivedTickets:scope.archive.length};
- return{o,scope,sheets,metrics,bookings};
-}
-function chunk(value,width){if(typeof value!=='string')return[value];const max=Math.max(12,Math.floor(width)-3),out=[];let current='',lines=0;for(const para of value.split(/(?<=\n)/)){let remaining=para;while(remaining.length){const n=Math.min(max,remaining.length),part=remaining.slice(0,n);current+=part;remaining=remaining.slice(n);lines++;if(lines===8){out.push(current);current='';lines=0;}}}if(current||!out.length)out.push(current);return out;}
-function expand(s){const rows=[];for(const r of s.rows){const parts=r.values.map((v,i)=>chunk(v,s.columns[i].width)),n=Math.max(1,...parts.map(x=>x.length));for(let k=0;k<n;k++){const values=parts.map((p,i)=>p[k]??(k&&i<2&&typeof r.values[i]==='string'?r.values[i]:''));rows.push({...r,values,record:k?0:r.record,continuation:k>0});}}return rows;}
-function cell(value,c,r,style){const ref=col(c)+r,o=value&&typeof value==='object'?value:{value},v=o.value??'',attrs=`r="${ref}" s="${style}"`;if(o.formula)return`<c ${attrs}${typeof v==='string'?' t="str"':''}><f>${esc(o.formula)}</f><v>${esc(v)}</v></c>`;if(typeof v==='number')return`<c ${attrs}><v>${Number.isFinite(v)?v:0}</v></c>`;return`<c ${attrs} t="inlineStr"><is><t xml:space="preserve">${esc(v)}</t></is></c>`;}
-function styles(){
- const fonts=[['Arial',11,'243449',false],['Arial',16,'243449',true],['Arial',10,'66748A',false],['Arial',11,'FFFFFF',true],['Arial',11,'243449',true],['Arial',23,'244D86',true],['Arial',11,'2563EB',false]].map(([name,size,color,bold])=>`<font><sz val="${size}"/><color rgb="FF${color}"/><name val="${name}"/>${bold?'<b/>':''}</font>`).join('');
- const fills=['none','gray125','244469','FFFFFF','F4F7FB','E4EDF9','E5F3EB','FFF0D7','FBE4E5','EAF0FF'].map((x,i)=>i<2?`<fill><patternFill patternType="${x}"/></fill>`:`<fill><patternFill patternType="solid"><fgColor rgb="FF${x}"/><bgColor indexed="64"/></patternFill></fill>`).join('');
- const specs=[[0,0,0],[1,0,0],[2,0,0],[3,2,0],[0,3,0],[0,4,0],[0,3,164],[0,4,164],[0,3,165],[0,4,165],[0,3,166],[0,4,166],[0,3,9],[0,4,9],[0,3,1],[0,4,1],[4,5,0],[5,0,0],[4,0,0],[2,0,0],[6,0,0],[0,3,2],[0,4,2],[0,3,167],[0,4,167],[5,5,0],[4,5,0],[5,5,2],[5,5,9]];
- const xfs=specs.map(([font,fill,num],i)=>`<xf numFmtId="${num}" fontId="${font}" fillId="${fill}" borderId="0" xfId="0" applyFont="1" applyFill="1" applyNumberFormat="1" applyAlignment="1"><alignment vertical="${i===3?'center':'top'}" horizontal="${i===3||[165,166,167].includes(num)?'center':font===5?'left':num?'right':'left'}"${i>=4&&font!==5?' indent="1"':''} wrapText="1"/></xf>`).join('');
- const dxfs=[['E5F3EB','226543'],['FFF0D7','885A16'],['FBE4E5','A9343F'],['EAF0FF','244D86']].map(([fill,color])=>`<dxf><font><color rgb="FF${color}"/><b/></font><fill><patternFill patternType="solid"><fgColor rgb="FF${fill}"/><bgColor indexed="64"/></patternFill></fill></dxf>`).join('');
- return XML+`<styleSheet xmlns="${NS}"><numFmts count="4"><numFmt numFmtId="164" formatCode="dd mmm yyyy"/><numFmt numFmtId="165" formatCode="[h]:mm"/><numFmt numFmtId="166" formatCode="[h]&quot; hr &quot;mm&quot; min&quot;"/><numFmt numFmtId="167" formatCode="[h]:mm:ss"/></numFmts><fonts count="7">${fonts}</fonts><fills count="10">${fills}</fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="${specs.length}">${xfs}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="4">${dxfs}</dxfs></styleSheet>`;
-}
-function detailXML(s,o){
- const rows=expand(s),cols=s.columns,n=cols.length,last=col(n-1),end=Math.max(8,7+rows.length),allEnd=s.total?end+2:end;if(allEnd>1048576)throw Error('The report exceeds Excel’s row limit. Choose a shorter reporting period.');s.expanded=rows;s.end=end;s.helper=col(n);
- const row=(r,cells,ht=28,level=0)=>`<row r="${r}" ht="${ht}" customHeight="1"${level?' outlineLevel="1"':''}>${cells}</row>`;
- let data=row(2,cell(s.title,0,2,1),32)+row(3,cell(`Activity period: ${o.from} to ${o.to}. Status snapshot: ${o.asOf}.`,0,3,2),25)+row(4,cell(s.note||'',0,4,19),36)+row(5,cell('Back to Dashboard',0,5,20),24);
- data+=row(7,[...cols.map((c,i)=>cell(c.label,i,7,3)),cell('Record count (report calculation)',n,7,3)].join(''),40);
- if(!rows.length)data+=row(8,cell('No records in this view.',0,8,19),30);
- rows.forEach((r,i)=>{const y=i+8,alt=i%2,ht=Math.min(150,Math.max(28,...r.values.map((v,j)=>{const text=String(v&&typeof v==='object'?v.value??'':v??'');return Math.max(1,...text.split('\n').map(x=>Math.ceil(x.length/Math.max(10,cols[j].width-3))))*15+12;})));const content=r.values.map((v,j)=>{const kind=cols[j].kind,style=kind==='date'?6+alt:kind==='time'?8+alt:kind==='duration'?10+alt:kind==='seconds'?23+alt:kind==='percent'?12+alt:kind==='number'?14+alt:kind==='decimal'?21+alt:r.parent?16:4+alt;return cell(v,j,y,style);}).join('')+cell(r.record||0,n,y,14);data+=row(y,content,ht,r.level);});
- if(s.total)data+=row(end+2,cell('Total',Math.max(0,s.total.col-1),end+2,18)+cell(formula(`SUM(${col(s.total.col)}8:${col(s.total.col)}${end})`,s.total.value),s.total.col,end+2,cols[s.total.col].kind==='seconds'?23:10),32);
- let cf='';if(s.status!==undefined){const c=col(s.status);cf=`<conditionalFormatting sqref="${c}8:${c}${end}"><cfRule type="expression" dxfId="0" priority="1"><formula>OR(${c}8="Completed",${c}8="Closed",${c}8="Received",${c}8="On track")</formula></cfRule><cfRule type="expression" dxfId="2" priority="2"><formula>OR(${c}8="Overdue",${c}8="Blocked",${c}8="At risk",${c}8="Follow up now",${c}8="Time to revisit")</formula></cfRule><cfRule type="expression" dxfId="1" priority="3"><formula>OR(${c}8="Pending",${c}8="On Hold",${c}8="On hold",${c}8="In Progress",${c}8="In progress",${c}8="Waiting")</formula></cfRule></conditionalFormatting>`;}
- return XML+`<worksheet xmlns="${NS}" xmlns:r="${REL}"><sheetPr><tabColor rgb="FF54749A"/><outlinePr summaryBelow="0"/><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${col(n)}${allEnd}"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"><pane xSplit="1" ySplit="7" topLeftCell="B8" activePane="bottomRight" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="28"/><cols>${cols.map((c,i)=>`<col min="${i+1}" max="${i+1}" width="${c.width}" customWidth="1"/>`).join('')}<col min="${n+1}" max="${n+1}" width="2" hidden="1" customWidth="1"/></cols><sheetData>${data}</sheetData><autoFilter ref="A7:${last}${end}"/><mergeCells count="3"><mergeCell ref="A2:${last}2"/><mergeCell ref="A3:${last}3"/><mergeCell ref="A4:${last}4"/></mergeCells>${cf}<hyperlinks><hyperlink ref="A5" location="'Dashboard'!A1" display="Back to Dashboard"/></hyperlinks><printOptions horizontalCentered="1"/><pageMargins left="0.3" right="0.3" top="0.45" bottom="0.45" header="0.2" footer="0.2"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="${cols.reduce((n,c)=>n+c.width,0)>190?2:1}" fitToHeight="0"/><headerFooter><oddFooter>&amp;L${esc(s.name)}&amp;RPage &amp;P of &amp;N</oddFooter></headerFooter></worksheet>`;
-}
-function chartXML(title,start,end,color,categories=[],values=[],hours=false,catColumn='A'){const catCache='<c:strCache>',catTag='str',cache=catCache+'<c:ptCount val="'+categories.length+'"/>'+categories.map((v,i)=>'<c:pt idx="'+i+'"><c:v>'+esc(v)+'</c:v></c:pt>').join('')+'</c:'+catTag+'Cache>',nums='<c:numCache><c:formatCode>0.0</c:formatCode><c:ptCount val="'+values.length+'"/>'+values.map((v,i)=>'<c:pt idx="'+i+'"><c:v>'+v+'</c:v></c:pt>').join('')+'</c:numCache>'; return XML+`<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><c:chart><c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1100"/></a:pPr><a:r><a:t>${esc(title)}</a:t></a:r></a:p></c:rich></c:tx></c:title><c:plotArea><c:layout/><c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:ser><c:idx val="0"/><c:order val="0"/><c:spPr><a:solidFill><a:srgbClr val="${color}"/></a:solidFill></c:spPr><c:cat><c:${catTag}Ref><c:f>Dashboard!$${catColumn}$${start}:$${catColumn}$${end}</c:f>${cache}</c:${catTag}Ref></c:cat><c:val><c:numRef><c:f>Dashboard!$B$${start}:$B$${end}</c:f>${nums}</c:numRef></c:val></c:ser><c:gapWidth val="65"/><c:axId val="101"/><c:axId val="102"/></c:barChart><c:catAx><c:axId val="101"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:tickLblPos val="nextTo"/><c:crossAx val="102"/><c:crosses val="autoZero"/></c:catAx><c:valAx><c:axId val="102"/><c:scaling><c:orientation val="minMax"/><c:min val="0"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:numFmt formatCode="${hours?'0.0':'0'}" sourceLinked="0"/><c:tickLblPos val="nextTo"/><c:crossAx val="101"/><c:crosses val="autoZero"/><c:crossBetween val="between"/>${hours?'':'<c:majorUnit val="1"/>'}</c:valAx></c:plotArea><c:plotVisOnly val="1"/></c:chart></c:chartSpace>`;}
-function dashboard(model){
- const {o,metrics:m,scope,sheets}=model,find=n=>sheets.find(s=>s.name===n),range=(n,i)=>`'${n}'!$${col(i)}$8:$${col(i)}$${find(n).end}`,countRange=n=>`'${n}'!$${find(n).helper}$8:$${find(n).helper}$${find(n).end}`,cells=new Map(),merges=[];
- const put=(ref,value,style=4)=>{const x=ref.match(/^([A-Z]+)(\d+)$/);let c=0;for(const a of x[1])c=c*26+a.charCodeAt(0)-64;cells.set(ref,{c:c-1,r:+x[2],value,style});};
- put('A2','WorkHub report',1);merges.push('A2:L2');put('A3',`Activity period: ${o.from} to ${o.to}. Current status snapshot: ${o.asOf}.`,2);merges.push('A3:L3');put('A4',`Older closed tickets: ${m.archivedTickets} ${o.includeArchive?'included in Closed archive':'excluded; include the optional archive when exporting'}.`,19);merges.push('A4:L4');
- const kpis=[['A6:C6','A7:C9','Open tickets',formula(`SUMIFS(${countRange('Tickets')},${range('Tickets',2)},"<>Closed",${range('Tickets',2)},"<>Completed")`,m.openTickets),17],['E6:G6','E7:G9','Overdue main tasks',formula(`SUMIFS(${countRange('Tasks')},${range('Tasks',2)},"Overdue")`,m.overdueTasks),17],['I6:L6','I7:L9','Recorded hours',formula(`SUM(${range('Work sessions',3)})*24`,m.recordedHours),21],['A11:C11','A12:C14','Recent closures in period',formula(`SUMIFS(${countRange('Tickets')},${range('Tickets',2)},"Closed",${range('Tickets',6)},">="&${date(o.from)},${range('Tickets',6)},"<="&${date(o.to)})+SUMIFS(${countRange('Tickets')},${range('Tickets',2)},"Completed",${range('Tickets',6)},">="&${date(o.from)},${range('Tickets',6)},"<="&${date(o.to)})`,m.closedInPeriod),17],['E11:G11','E12:G14','Reminders ready',formula(`SUMIFS(${countRange('Reminders')},${range('Reminders',3)},"Time to revisit")`,m.dueReminders),17],['I11:L11','I12:L14','Project items complete',formula(`IFERROR(SUMIFS(${countRange('Project items')},${range('Project items',3)},"Completed")/SUM(${countRange('Project items')}),0)`,m.projectCompletion),12]];
- kpis.forEach(([label,number,text,value,style])=>{merges.push(label,number);put(label.split(':')[0],text,26);put(number.split(':')[0],value,style===21?27:style===12?28:25);});
- put('A17','Ticket workload',18);merges.push('A17:D17');put('A18','Status',3);put('B18','Tickets',3);const states=[...new Set(scope.tickets.map(t=>t.status))].sort();if(!states.length)states.push('No tickets');states.slice(0,10).forEach((s,i)=>{put('A'+(19+i),s,4);put('B'+(19+i),formula(`SUMIFS(${countRange('Tickets')},${range('Tickets',2)},A${19+i})`,scope.tickets.filter(t=>t.status===s).length),14);});
- put('A31','Scheduled hours · recent days in period',18);merges.push('A31:D31');const dayCount=Math.min(7,Math.round((Date.parse(o.to)-Date.parse(o.from))/86400000)+1);for(let i=0;i<dayCount;i++){const day=shift(o.to,i-dayCount+1),hours=model.bookings.filter(x=>x.slot.date===day).reduce((n,x)=>n+(numberTime(x.end)-numberTime(x.start))*24,0);put('A'+(33+i),date(day),6);put('M'+(33+i),formula(`TEXT(A${33+i},"dd mmm")`,new Date(day+'T12:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'})),2);put('B'+(33+i),formula(`SUMIFS(${range('Schedule',3)},${range('Schedule',0)},A${33+i})*24`,hours),21);}
- put('A43','Attention needed',18);merges.push('A43:L43');put('A44','Type',3);put('C44','Item',3);put('I44','Why it appears',3);merges.push('A44:B44','C44:H44','I44:L44');const attention=[...model.sheets.find(x=>x.name==='Tasks').rows.filter(r=>r.record&&['Overdue','Blocked'].includes(r.values[2])).map(r=>['Task',r.values[0],r.values[2]]),...root.WorkHubReminders.records(model.data,o.asOf).filter(r=>r.due).map(r=>['Reminder',r.title,'Time to revisit']),...(model.data.workhub?.waiting||[]).filter(w=>!w.resolved&&w.followUp&&w.followUp<=o.asOf).map(w=>['Follow-up',w.title,w.followUp])];if(!attention.length)attention.push(['','No overdue tasks or due follow-ups.','']);attention.slice(0,10).forEach(([kind,title,reason],i)=>{const r=45+i;put('A'+r,kind,4);put('C'+r,title,4);put('I'+r,reason,4);merges.push(`A${r}:B${r}`,`C${r}:H${r}`,`I${r}:L${r}`);});
- const navRow=57;put('A'+navRow,'Explore the report',18);merges.push(`A${navRow}:L${navRow}`);const links=sheets.map((s,i)=>{const r=navRow+1+i;put('A'+r,s.name,20);put('D'+r,s.title,19);merges.push(`A${r}:C${r}`,`D${r}:L${r}`);return`<hyperlink ref="A${r}" location="'${esc(s.name)}'!A1" display="${esc(s.name)}"/>`;});
- const byRow=new Map();for(const x of cells.values())(byRow.get(x.r)||byRow.set(x.r,[]).get(x.r)).push(x);const data=[...byRow].sort((a,b)=>a[0]-b[0]).map(([r,xs])=>`<row r="${r}" ht="${r===2?32:r>=45&&r<55?42:26}" customHeight="1">${xs.sort((a,b)=>a.c-b.c).map(x=>cell(x.value,x.c,r,x.style)).join('')}</row>`).join('');
- const xml=XML+`<worksheet xmlns="${NS}" xmlns:r="${REL}"><sheetPr><tabColor rgb="FF244469"/><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:M${navRow+sheets.length}"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"/></sheetViews><cols><col min="1" max="12" width="12" customWidth="1"/><col min="13" max="13" width="12" hidden="1" customWidth="1"/></cols><sheetData>${data}</sheetData><mergeCells count="${merges.length}">${merges.map(r=>`<mergeCell ref="${r}"/>`).join('')}</mergeCells><hyperlinks>${links.join('')}</hyperlinks><pageMargins left="0.3" right="0.3" top="0.45" bottom="0.45" header="0.2" footer="0.2"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/><drawing r:id="rId1"/></worksheet>`;
- return{xml,states:states.length,categories:states.slice(0,10),ticketValues:states.slice(0,10).map(s=>scope.tickets.filter(t=>t.status===s).length),days:Array.from({length:dayCount},(_,i)=>new Date(shift(o.to,i-dayCount+1)+'T12:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'})),hours:Array.from({length:dayCount},(_,i)=>{const day=shift(o.to,i-dayCount+1);return model.bookings.filter(x=>x.slot.date===day).reduce((n,x)=>n+(numberTime(x.end)-numberTime(x.start))*24,0);})};
-}
-function files(d,input={}){
- const model=build(d,input),out={'xl/styles.xml':styles()};model.data=d;model.sheets.forEach((s,i)=>out[`xl/worksheets/sheet${i+2}.xml`]=detailXML(s,model.o));const dash=dashboard(model);out['xl/worksheets/sheet1.xml']=dash.xml;
- const names=['Dashboard',...model.sheets.map(s=>s.name)];out['xl/workbook.xml']=XML+`<workbook xmlns="${NS}" xmlns:r="${REL}"><bookViews><workbookView activeTab="0"/></bookViews><sheets>${names.map((n,i)=>`<sheet name="${esc(n)}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join('')}</sheets><definedNames>${model.sheets.map((s,i)=>`<definedName name="_xlnm.Print_Titles" localSheetId="${i+1}">'${esc(s.name)}'!$1:$7</definedName><definedName name="_xlnm.Print_Area" localSheetId="${i+1}">'${esc(s.name)}'!$A$1:$${col(s.columns.length-1)}$${s.end+(s.total?2:0)}</definedName>`).join('')}</definedNames><calcPr calcId="191029" fullCalcOnLoad="1" forceFullCalc="1"/></workbook>`;
- out['xl/_rels/workbook.xml.rels']=XML+`<Relationships xmlns="${PKG}">${names.map((_,i)=>`<Relationship Id="rId${i+1}" Type="${REL}/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join('')}<Relationship Id="rId${names.length+1}" Type="${REL}/styles" Target="styles.xml"/></Relationships>`;
- out['_rels/.rels']=XML+`<Relationships xmlns="${PKG}"><Relationship Id="rId1" Type="${REL}/officeDocument" Target="xl/workbook.xml"/><Relationship Id="rId2" Type="${PKG}/metadata/core-properties" Target="docProps/core.xml"/></Relationships>`;
- out['docProps/core.xml']=XML+`<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>WorkHub report</dc:title><dc:creator>WorkHub</dc:creator><dc:description>Current status snapshot ${model.o.asOf}. Activity period ${model.o.from} to ${model.o.to}.</dc:description></cp:coreProperties>`;
- out['xl/worksheets/_rels/sheet1.xml.rels']=XML+`<Relationships xmlns="${PKG}"><Relationship Id="rId1" Type="${REL}/drawing" Target="../drawings/drawing1.xml"/></Relationships>`;
- const anchor=(id,row)=>`<xdr:twoCellAnchor><xdr:from><xdr:col>5</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${row}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>12</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${row+11}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="${id}" name="Chart ${id}"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="${REL}" r:id="rId${id}"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor>`;
- out['xl/drawings/drawing1.xml']=XML+`<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">${anchor(1,16)}${anchor(2,30)}</xdr:wsDr>`;
- out['xl/drawings/_rels/drawing1.xml.rels']=XML+`<Relationships xmlns="${PKG}"><Relationship Id="rId1" Type="${REL}/chart" Target="../charts/chart1.xml"/><Relationship Id="rId2" Type="${REL}/chart" Target="../charts/chart2.xml"/></Relationships>`;
- out['xl/charts/chart1.xml']=chartXML('Ticket status',19,18+Math.min(10,dash.states),'5479B7',dash.categories,dash.ticketValues);out['xl/charts/chart2.xml']=chartXML('Scheduled hours',33,32+dash.days.length,'4F9B88',dash.days,dash.hours,true,'M');
- out['[Content_Types].xml']=XML+`<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>${names.map((_,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/><Override PartName="/xl/charts/chart1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/><Override PartName="/xl/charts/chart2.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/></Types>`;
- return{files:out,model};
-}
-function install(a){const button=document.getElementById('exportButton');button.addEventListener('click',event=>{event.preventDefault();event.stopImmediatePropagation();const day=a.today(),from=shift(day,-29);a.openModal('Export a clearer Excel report',`<form id="reportExportForm"><div class="report-export-intro"><span class="hub-kicker">A REPORT YOU CAN READ</span><h3>Your work, clearly presented</h3><p>Current work first, with names, readable notes, grouped subtasks and precise time totals.</p></div><div class="form-grid"><div><label for="reportFrom">Activity period starts</label><input id="reportFrom" name="from" type="date" min="1900-01-01" value="${from}" max="${day}" required></div><div><label for="reportTo">Activity period ends</label><input id="reportTo" name="to" type="date" min="1900-01-01" value="${day}" max="${day}" required></div><div><label for="reportClosedDays">Keep recently closed tickets for</label><select id="reportClosedDays" name="closedDays"><option value="7">7 days</option><option value="30" selected>30 days</option><option value="90">90 days</option><option value="3650">10 years</option></select></div><div class="wide"><label class="check-label"><input type="checkbox" name="includeArchive">Include a separate archive of older closed tickets and their updates</label></div></div><p class="hub-meta">The period filters scheduled activities and work sessions. Statuses reflect your current records. Older closed tickets stay out of the main Dashboard and Tickets view.</p><div class="modal-actions"><button type="button" data-action="cancel">Cancel</button><button class="primary" type="submit">Download Excel report</button></div></form>`);},true);
- document.addEventListener('submit',event=>{if(event.target.id!=='reportExportForm')return;event.preventDefault();event.stopImmediatePropagation();try{const f=event.target,o={asOf:a.today(),from:f.elements.namedItem('from').value,to:f.elements.namedItem('to').value,closedDays:Number(f.elements.namedItem('closedDays').value),includeArchive:f.elements.namedItem('includeArchive').checked};a.validate(a.state());const result=files(a.state(),o);a.download(a.zip(result.files),'WorkHub-Report-'+o.asOf+'.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');a.closeModal();a.tell('Excel report downloaded. Older closed tickets '+(o.includeArchive?'are in the separate archive.':'were excluded.'));}catch(error){a.tell('Report failed: '+error.message,true);}},true);
-}
-root.WorkHubReports={options,build,files,closing,install,export:(d,o,zip)=>zip(files(d,o).files)};
+(function (root) {
+  'use strict';
+  const NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main',
+    REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships',
+    PKG = 'http://schemas.openxmlformats.org/package/2006/relationships';
+  const XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+  const esc = s =>
+    String(s ?? '')
+      .replace(
+        /[&<>"']/g,
+        c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[c]
+      )
+      .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '');
+  const col = n => {
+    let s = '';
+    for (n++; n; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + ((n - 1) % 26)) + s;
+    return s;
+  };
+  const date = s =>
+    s
+      ? Math.round(
+          (Date.parse(s.slice(0, 10) + 'T00:00:00Z') - Date.UTC(1899, 11, 31)) / 86400000
+        ) + (s.slice(0, 10) >= '1900-03-01' ? 1 : 0)
+      : '';
+  const localDate = d =>
+    [
+      d.getFullYear(),
+      String(d.getMonth() + 1).padStart(2, '0'),
+      String(d.getDate()).padStart(2, '0'),
+    ].join('-');
+  const shift = (s, n) => {
+    const d = new Date(s + 'T12:00:00');
+    d.setDate(d.getDate() + n);
+    return localDate(d);
+  };
+  const closed = t => ['Closed', 'Completed'].includes(t.status);
+  const formula = (f, value) => ({ formula: f, value });
+  const latest = t =>
+    (t.history || '')
+      .trim()
+      .split(/\r?\n(?=\s*-\s)/)
+      .at(-1) || '';
+  const numberTime = s => {
+    const [h, m] = String(s || '00:00')
+      .split(':')
+      .map(Number);
+    return (h * 60 + m) / 1440;
+  };
+  const C = (label, width = 20, kind = 'text') => ({ label, width, kind });
+  function options(o = {}) {
+    const asOf = o.asOf || localDate(new Date()),
+      to = o.to || asOf,
+      from = o.from || shift(to, -29),
+      days = Number(o.closedDays ?? 30);
+    if (
+      !root.WorkHubReminders.validDate(asOf) ||
+      !root.WorkHubReminders.validDate(from) ||
+      !root.WorkHubReminders.validDate(to) ||
+      from < '1900-01-01' ||
+      from > to ||
+      to > asOf ||
+      !Number.isInteger(days) ||
+      days < 0 ||
+      days > 3650
+    )
+      throw Error('Check the report dates and closed-ticket window.');
+    return { asOf, from, to, closedDays: days, includeArchive: !!o.includeArchive };
+  }
+  function closing(t, d) {
+    const tracked = d.workhub?.ticketClosures?.find(x => x.id === t.id)?.date;
+    return tracked || t.closedDate || t.closedAt?.slice(0, 10) || t.historyDate || '';
+  }
+  function sections(d, o) {
+    const cutoff = shift(o.asOf, -o.closedDays),
+      active = d.tickets.filter(t => !closed(t)),
+      recent = d.tickets.filter(t => closed(t) && (!closing(t, d) || closing(t, d) >= cutoff)),
+      archive = d.tickets.filter(t => closed(t) && closing(t, d) && closing(t, d) < cutoff);
+    return { active, recent, archive, tickets: [...active, ...recent], cutoff };
+  }
+  function build(d, input = {}) {
+    const o = options(input),
+      scope = sections(d, o),
+      sheets = [],
+      inPeriod = s => !!s && s >= o.from && s <= o.to,
+      pname = id => d.projects.find(p => p.id === id)?.name || 'Unlinked project',
+      tname = id => {
+        const t = d.tickets.find(t => t.id === id);
+        return t ? [t.ticket, t.description].filter(Boolean).join(' · ') : 'Unlinked ticket';
+      };
+    const reminder = (kind, id) =>
+      d.workhub?.reminders?.find(r => r.kind === kind && r.recordId === id)?.until || '';
+    const sheet = (name, title, columns, rows, extra = {}) => {
+      const x = { name, title, columns, rows, ...extra };
+      sheets.push(x);
+      return x;
+    };
+    const ticketRows = tickets =>
+      tickets.map(t => ({
+        values: [
+          t.ticket,
+          t.description,
+          t.status,
+          t.priority,
+          t.pic || 'Unassigned',
+          date(t.historyDate),
+          date(closed(t) ? closing(t, d) : ''),
+          date(reminder('tickets', t.id)),
+          t.jira || '',
+        ],
+        record: 1,
+      }));
+    const tickets = sheet(
+      'Tickets',
+      'Tickets · current queue and recent closures',
+      [
+        C('Ticket', 19),
+        C('Description', 48),
+        C('Status', 21),
+        C('Priority', 13),
+        C('Responsible person', 23),
+        C('Last update', 16, 'date'),
+        C('Closed on', 16, 'date'),
+        C('Revisit on', 16, 'date'),
+        C('Charge code', 21),
+      ],
+      ticketRows(scope.tickets),
+      {
+        status: 2,
+        priority: 3,
+        note: `Open tickets first. Closed tickets older than ${o.closedDays} days are excluded. Undated closures stay visible. Older closure dates may use the last-update date.`,
+      }
+    );
+    const history = tickets =>
+      tickets.flatMap(t =>
+        (t.history || '')
+          .trim()
+          .split(/\r?\n(?=\s*-\s)/)
+          .filter(Boolean)
+          .map((v, i) => ({ values: [t.ticket, t.description, i + 1, v], record: 0 }))
+      );
+    sheet(
+      'Ticket updates',
+      'Ticket updates',
+      [C('Ticket', 19), C('Description', 40), C('Update number', 15, 'number'), C('Update', 100)],
+      history(scope.tickets),
+      { note: 'Full updates for the tickets included in the main report, in their recorded order.' }
+    );
+    const milestones = scope.tickets.flatMap(t => {
+      const tracker = d.trackers.find(x => x.ticket === t.ticket);
+      return tracker
+        ? (d.lists.milestones || []).map((step, i) => ({
+            values: [
+              t.ticket,
+              step,
+              tracker.steps[i] ? 'Completed' : tracker.onHold ? 'On hold' : 'Pending',
+              i === 0 ? tracker.remarks || '' : '',
+            ],
+            record: 0,
+          }))
+        : [];
+    });
+    sheet(
+      'Ticket milestones',
+      'Ticket milestone checklist',
+      [C('Ticket', 19), C('Milestone', 34), C('State', 20), C('Tracker remarks', 80)],
+      milestones,
+      {
+        status: 2,
+        note: 'Milestone names and completion states, without internal record identifiers.',
+      }
+    );
+    const taskRows = [],
+      taskNotes = [];
+    for (const t of d.tasks) {
+      const related =
+          t.taskType === 'Project'
+            ? pname(t.linkId)
+            : t.taskType === 'Ticket'
+              ? tname(t.linkId)
+              : t.customLink || 'General work',
+        status = t.archived
+          ? 'Archived'
+          : t.done
+            ? 'Completed'
+            : t.dueDate && t.dueDate < o.asOf
+              ? 'Overdue'
+              : { doing: 'In progress', blocked: 'Blocked', todo: 'Open' }[t.boardStatus] || 'Open';
+      taskRows.push({
+        values: [
+          t.task,
+          'Main task',
+          status,
+          t.priority,
+          date(t.dueDate),
+          related,
+          date(reminder('tasks', t.id)),
+        ],
+        record: 1,
+        parent: true,
+      });
+      if (t.remarks || t.feedback)
+        taskNotes.push({
+          values: [t.task, 'Main task', t.remarks || '', t.feedback || ''],
+          record: 0,
+        });
+      for (const sub of t.subTasks || []) {
+        taskRows.push({
+          values: [sub.title, 'Subtask', sub.status, '', date(sub.dueDate || ''), t.task, ''],
+          record: 0,
+          level: 1,
+        });
+        if (sub.remarks || sub.feedback)
+          taskNotes.push({
+            values: [t.task, sub.title, sub.remarks || '', sub.feedback || ''],
+            record: 0,
+            level: 1,
+          });
+      }
+    }
+    const tasks = sheet(
+      'Tasks',
+      'Tasks and their subtasks',
+      [
+        C('Work item', 51),
+        C('Level', 16),
+        C('Status', 21),
+        C('Priority', 13),
+        C('Due date', 16, 'date'),
+        C('Related work / main task', 40),
+        C('Revisit on', 16, 'date'),
+      ],
+      taskRows,
+      {
+        status: 2,
+        priority: 3,
+        note: 'Main tasks are shaded. Their subtasks sit directly underneath and can be collapsed. Remarks and feedback are in Task notes.',
+      }
+    );
+    sheet(
+      'Task notes',
+      'Task remarks and feedback',
+      [C('Main task', 42), C('Subtask / level', 35), C('Remarks', 75), C('Feedback', 75)],
+      taskNotes,
+      { note: 'Each row keeps remarks and feedback attached to the correct main task or subtask.' }
+    );
+    const projectRows = d.projects.map(p => {
+      const items = d.specs.filter(x => x.projectId === p.id),
+        done = items.filter(x => x.status === 'Completed').length;
+      return {
+        values: [
+          p.name,
+          p.phase || '',
+          p.health || '',
+          date(p.goLiveDate),
+          items.length,
+          done,
+          items.length ? done / items.length : 0,
+          p.nextMilestone || '',
+          date(reminder('projects', p.id)),
+        ],
+        record: 1,
+      };
+    });
+    sheet(
+      'Projects',
+      'Project overview',
+      [
+        C('Project', 36),
+        C('Current phase', 27),
+        C('Health', 17),
+        C('Go-live date', 16, 'date'),
+        C('Items', 11, 'number'),
+        C('Completed', 13, 'number'),
+        C('Completion', 15, 'percent'),
+        C('Next milestone', 48),
+        C('Revisit on', 16, 'date'),
+      ],
+      projectRows,
+      {
+        status: 2,
+        note: 'Project completion is completed project items divided by all project items. Statuses are the current saved snapshot.',
+      }
+    );
+    const itemRows = [];
+    for (const p of d.projects)
+      for (const item of d.specs.filter(x => x.projectId === p.id)) {
+        const ref = [item.itemType || 'Item', item.itemId ?? item.ricefw ?? '']
+          .filter(Boolean)
+          .join(' ');
+        itemRows.push({
+          values: [
+            p.name,
+            ref,
+            item.description,
+            item.status,
+            item.priority,
+            date(item.dueDate || item.expectedDate),
+            item.remarks || '',
+          ],
+          record: 1,
+          parent: true,
+        });
+        for (const sub of item.subItems || [])
+          itemRows.push({
+            values: [
+              p.name,
+              'Sub-item',
+              sub.title,
+              sub.status,
+              sub.owner || '',
+              date(sub.dueDate),
+              sub.remarks || '',
+            ],
+            record: 0,
+            level: 1,
+          });
+      }
+    const items = sheet(
+      'Project items',
+      'Project items and sub-items',
+      [
+        C('Project', 30),
+        C('Reference / level', 23),
+        C('Work item', 48),
+        C('Status', 22),
+        C('Priority / sub-item owner', 25),
+        C('Due date', 16, 'date'),
+        C('Remarks', 65),
+      ],
+      itemRows,
+      {
+        status: 3,
+        note: 'Sub-items follow their parent item. Their owner and remarks are retained on their own row.',
+      }
+    );
+    const projectNotes = [];
+    const addNote = (project, section, subject, detail) => {
+      if (detail) projectNotes.push({ values: [project, section, subject, detail], record: 0 });
+    };
+    for (const c of d.projectCompanies || [])
+      addNote(
+        pname(c.projectId),
+        'Company',
+        c.name,
+        [c.role, c.notes, c.organization, c.masterData].filter(Boolean).join('\n')
+      );
+    for (const m of d.projectProcessMappings || [])
+      addNote(
+        pname(m.projectId),
+        'SAP process',
+        [m.area, m.code, m.item].filter(Boolean).join(' · '),
+        [
+          d.projectCompanies.find(c => c.id === m.companyId)?.name,
+          m.description,
+          'Department: ' + (m.department || 'Not specified'),
+          'Decision: ' + (m.decision || 'Not specified'),
+        ]
+          .filter(Boolean)
+          .join('\n')
+      );
+    for (const g of d.phaseGates || [])
+      addNote(
+        pname(g.projectId),
+        'Phase gate',
+        g.text,
+        [
+          g.phase,
+          g.status || (g.done ? 'Completed' : 'Pending'),
+          g.owner,
+          g.targetDate,
+          g.skipReason,
+        ]
+          .filter(Boolean)
+          .join('\n')
+      );
+    for (const f of d.projectFeedback || [])
+      addNote(
+        pname(f.projectId),
+        'Phase feedback',
+        f.summary,
+        [
+          f.phase,
+          f.status,
+          f.details,
+          f.resolution,
+          ...(f.links || []).map(x => x.type + ': ' + x.label),
+        ]
+          .filter(Boolean)
+          .join('\n')
+      );
+    for (const x of d.projectDecisions || [])
+      addNote(
+        pname(x.projectId),
+        'Decision',
+        x.category,
+        [x.decision, x.status, x.owner, x.date].filter(Boolean).join('\n')
+      );
+    for (const p of d.projectPlans || [])
+      if (inPeriod(p.date) || ((p.endDate || p.date) >= o.from && p.date <= o.to))
+        addNote(
+          pname(p.projectId),
+          'Project activity',
+          p.title,
+          [
+            p.date + ' ' + p.time + '–' + p.endTime,
+            p.status,
+            p.activity,
+            p.text,
+            p.actualTask,
+            p.location,
+          ]
+            .filter(Boolean)
+            .join('\n')
+        );
+    sheet(
+      'Project notes',
+      'Project processes, decisions and notes',
+      [C('Project', 32), C('Section', 23), C('Subject', 45), C('Details', 100)],
+      projectNotes,
+      {
+        note: 'Readable company names, process decisions, phase gates, feedback and planned activities.',
+      }
+    );
+    const bookings = [];
+    for (const slot of d.schedule
+      .slice()
+      .filter(x => inPeriod(x.date))
+      .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))) {
+      const key = [
+          slot.date,
+          slot.bookingId || '',
+          slot.kind,
+          slot.linkId,
+          slot.text,
+          slot.location,
+          slot.planId || '',
+        ].join('|'),
+        end = slot.endTime || String(Number(slot.time.slice(0, 2)) + 1).padStart(2, '0') + ':00',
+        prior = bookings.at(-1);
+      if (prior && prior.key === key && prior.end === slot.time) prior.end = end;
+      else bookings.push({ key, slot, start: slot.time, end });
+    }
+    const scheduleRows = bookings.map(({ slot: s, start, end }) => {
+      const plan = d.projectPlans.find(p => p.id === s.planId),
+        leave = root.WorkHubLeave?.isLeave(s.kind),
+        linked = leave
+          ? root.WorkHubLeave.TYPES[s.kind]
+          : s.kind === 'project'
+            ? pname(s.linkId)
+            : s.kind === 'task'
+              ? d.tasks.find(t => t.id === s.linkId)?.task || 'Unlinked task'
+              : s.kind === 'ticket'
+                ? tname(s.linkId)
+                : 'General activity';
+      return {
+        values: [
+          date(s.date),
+          numberTime(start),
+          numberTime(end),
+          numberTime(end) - numberTime(start),
+          leave
+            ? [
+                s.title || linked,
+                s.text,
+                s.leave.contact ? 'Cover: ' + s.leave.contact : '',
+                s.kind === 'medical-leave'
+                  ? s.leave.mcSubmitted
+                    ? 'MC submitted to HR: ' + s.leave.mcSubmittedDate
+                    : 'MC not yet submitted to HR'
+                  : '',
+              ]
+                .filter(Boolean)
+                .join('\n')
+            : s.text || plan?.title || linked,
+          linked,
+          s.location || '',
+          leave ? s.leave.status : plan?.status || 'Planned',
+        ],
+        record: 1,
+      };
+    });
+    const schedule = sheet(
+      'Schedule',
+      'Schedule and planned time',
+      [
+        C('Date', 16, 'date'),
+        C('Start', 12, 'time'),
+        C('End', 12, 'time'),
+        C('Duration', 22, 'duration'),
+        C('Activity', 54),
+        C('Related work', 39),
+        C('Location', 23),
+        C('Status', 21),
+      ],
+      scheduleRows,
+      {
+        status: 7,
+        total: { col: 3, value: scheduleRows.reduce((n, r) => n + r.values[3], 0) },
+        note: 'Consecutive slots from the same booking are combined. Pauses and separate dates remain separate. Durations are numeric Excel values.',
+      }
+    );
+    const sessionsRows = (d.workhub?.sessions || [])
+      .filter(s => inPeriod(localDate(new Date(s.start))))
+      .map(s => ({
+        values: [
+          date(localDate(new Date(s.start))),
+          s.title,
+          s.projectId ? pname(s.projectId) : s.kind === 'ticket' ? tname(s.linkId) : 'General work',
+          s.seconds / 86400,
+          s.chargeCode || '',
+          s.notes || '',
+          s.scheduled ? 'Scheduled' : 'Needs calendar review',
+          s.archived ? 'Archived' : 'Active',
+        ],
+        record: 1,
+      }));
+    const sessions = sheet(
+      'Work sessions',
+      'Recorded work sessions',
+      [
+        C('Started on', 16, 'date'),
+        C('Session', 48),
+        C('Related project / work', 34),
+        C('Active duration', 24, 'seconds'),
+        C('Charge code', 23),
+        C('Remarks', 70),
+        C('Calendar', 25),
+        C('Record', 17),
+      ],
+      sessionsRows,
+      {
+        total: { col: 3, value: sessionsRows.reduce((n, r) => n + r.values[3], 0) },
+        note: 'Active time excludes pauses. Archived sessions remain part of the recorded-time history. Filter Record to hide them. A running timer is not included.',
+      }
+    );
+    const waitingRows = (d.workhub?.waiting || []).map(w => ({
+      values: [
+        w.title,
+        w.person || 'Not specified',
+        w.projectId ? pname(w.projectId) : 'General',
+        date(w.followUp),
+        w.resolved ? 'Received' : w.followUp && w.followUp < o.asOf ? 'Follow up now' : 'Waiting',
+        w.notes || '',
+      ],
+      record: 1,
+    }));
+    sheet(
+      'Follow-ups',
+      'Waiting on other people',
+      [
+        C('What is needed', 45),
+        C('Person / team', 28),
+        C('Project', 30),
+        C('Follow-up date', 18, 'date'),
+        C('Status', 22),
+        C('Notes / next step', 70),
+      ],
+      waitingRows,
+      {
+        status: 4,
+        note: 'Received items remain visible for context. Filter the Status column to focus on outstanding follow-ups.',
+      }
+    );
+    const reminders = root.WorkHubReminders.records(d, o.asOf);
+    sheet(
+      'Reminders',
+      'Items set aside for another look',
+      [
+        C('Type', 16),
+        C('Item', 60),
+        C('Revisit on', 18, 'date'),
+        C('State', 23),
+        C('Reminder note', 80),
+      ],
+      reminders.map(r => ({
+        values: [
+          r.kind === 'tickets' ? 'Ticket' : r.kind === 'tasks' ? 'Task' : 'Project',
+          r.title,
+          date(r.until),
+          r.due ? 'Time to revisit' : 'Snoozed',
+          r.note,
+        ],
+        record: 1,
+      })),
+      { status: 3, note: 'Snoozing does not change original statuses or deadlines.' }
+    );
+    if (o.includeArchive)
+      sheet(
+        'Closed archive',
+        'Older closed tickets',
+        [...tickets.columns],
+        ticketRows(scope.archive),
+        {
+          status: 2,
+          priority: 3,
+          note: `Closed before ${scope.cutoff}. These tickets do not feed the current-work Dashboard or Tickets sheet.`,
+        }
+      );
+    if (o.includeArchive)
+      sheet(
+        'Archive updates',
+        'Updates for older closed tickets',
+        [C('Ticket', 19), C('Description', 40), C('Update number', 15, 'number'), C('Update', 100)],
+        history(scope.archive),
+        { note: 'Historical updates kept separate from the main report.' }
+      );
+    const metrics = {
+      openTickets: scope.active.length,
+      closedInPeriod: scope.recent.filter(t => inPeriod(closing(t, d))).length,
+      overdueTasks: d.tasks.filter(t => !t.done && !t.archived && t.dueDate && t.dueDate < o.asOf)
+        .length,
+      recordedHours: sessionsRows.reduce((n, r) => n + r.values[3] * 24, 0),
+      projectCompletion: d.specs.length
+        ? d.specs.filter(s => s.status === 'Completed').length / d.specs.length
+        : 0,
+      dueReminders: reminders.filter(r => r.due).length,
+      archivedTickets: scope.archive.length,
+    };
+    return { o, scope, sheets, metrics, bookings };
+  }
+  function chunk(value, width) {
+    if (typeof value !== 'string') return [value];
+    const max = Math.max(12, Math.floor(width) - 3),
+      out = [];
+    let current = '',
+      lines = 0;
+    for (const para of value.split(/(?<=\n)/)) {
+      let remaining = para;
+      while (remaining.length) {
+        const n = Math.min(max, remaining.length),
+          part = remaining.slice(0, n);
+        current += part;
+        remaining = remaining.slice(n);
+        lines++;
+        if (lines === 8) {
+          out.push(current);
+          current = '';
+          lines = 0;
+        }
+      }
+    }
+    if (current || !out.length) out.push(current);
+    return out;
+  }
+  function expand(s) {
+    const rows = [];
+    for (const r of s.rows) {
+      const parts = r.values.map((v, i) => chunk(v, s.columns[i].width)),
+        n = Math.max(1, ...parts.map(x => x.length));
+      for (let k = 0; k < n; k++) {
+        const values = parts.map(
+          (p, i) => p[k] ?? (k && i < 2 && typeof r.values[i] === 'string' ? r.values[i] : '')
+        );
+        rows.push({ ...r, values, record: k ? 0 : r.record, continuation: k > 0 });
+      }
+    }
+    return rows;
+  }
+  function cell(value, c, r, style) {
+    const ref = col(c) + r,
+      o = value && typeof value === 'object' ? value : { value },
+      v = o.value ?? '',
+      attrs = `r="${ref}" s="${style}"`;
+    if (o.formula)
+      return `<c ${attrs}${typeof v === 'string' ? ' t="str"' : ''}><f>${esc(o.formula)}</f><v>${esc(v)}</v></c>`;
+    if (typeof v === 'number') return `<c ${attrs}><v>${Number.isFinite(v) ? v : 0}</v></c>`;
+    return `<c ${attrs} t="inlineStr"><is><t xml:space="preserve">${esc(v)}</t></is></c>`;
+  }
+  function styles() {
+    const fonts = [
+      ['Arial', 11, '243449', false],
+      ['Arial', 16, '243449', true],
+      ['Arial', 10, '66748A', false],
+      ['Arial', 11, 'FFFFFF', true],
+      ['Arial', 11, '243449', true],
+      ['Arial', 23, '244D86', true],
+      ['Arial', 11, '2563EB', false],
+    ]
+      .map(
+        ([name, size, color, bold]) =>
+          `<font><sz val="${size}"/><color rgb="FF${color}"/><name val="${name}"/>${bold ? '<b/>' : ''}</font>`
+      )
+      .join('');
+    const fills = [
+      'none',
+      'gray125',
+      '244469',
+      'FFFFFF',
+      'F4F7FB',
+      'E4EDF9',
+      'E5F3EB',
+      'FFF0D7',
+      'FBE4E5',
+      'EAF0FF',
+    ]
+      .map((x, i) =>
+        i < 2
+          ? `<fill><patternFill patternType="${x}"/></fill>`
+          : `<fill><patternFill patternType="solid"><fgColor rgb="FF${x}"/><bgColor indexed="64"/></patternFill></fill>`
+      )
+      .join('');
+    const specs = [
+      [0, 0, 0],
+      [1, 0, 0],
+      [2, 0, 0],
+      [3, 2, 0],
+      [0, 3, 0],
+      [0, 4, 0],
+      [0, 3, 164],
+      [0, 4, 164],
+      [0, 3, 165],
+      [0, 4, 165],
+      [0, 3, 166],
+      [0, 4, 166],
+      [0, 3, 9],
+      [0, 4, 9],
+      [0, 3, 1],
+      [0, 4, 1],
+      [4, 5, 0],
+      [5, 0, 0],
+      [4, 0, 0],
+      [2, 0, 0],
+      [6, 0, 0],
+      [0, 3, 2],
+      [0, 4, 2],
+      [0, 3, 167],
+      [0, 4, 167],
+      [5, 5, 0],
+      [4, 5, 0],
+      [5, 5, 2],
+      [5, 5, 9],
+    ];
+    const xfs = specs
+      .map(
+        ([font, fill, num], i) =>
+          `<xf numFmtId="${num}" fontId="${font}" fillId="${fill}" borderId="0" xfId="0" applyFont="1" applyFill="1" applyNumberFormat="1" applyAlignment="1"><alignment vertical="${i === 3 ? 'center' : 'top'}" horizontal="${i === 3 || [165, 166, 167].includes(num) ? 'center' : font === 5 ? 'left' : num ? 'right' : 'left'}"${i >= 4 && font !== 5 ? ' indent="1"' : ''} wrapText="1"/></xf>`
+      )
+      .join('');
+    const dxfs = [
+      ['E5F3EB', '226543'],
+      ['FFF0D7', '885A16'],
+      ['FBE4E5', 'A9343F'],
+      ['EAF0FF', '244D86'],
+    ]
+      .map(
+        ([fill, color]) =>
+          `<dxf><font><color rgb="FF${color}"/><b/></font><fill><patternFill patternType="solid"><fgColor rgb="FF${fill}"/><bgColor indexed="64"/></patternFill></fill></dxf>`
+      )
+      .join('');
+    return (
+      XML +
+      `<styleSheet xmlns="${NS}"><numFmts count="4"><numFmt numFmtId="164" formatCode="dd mmm yyyy"/><numFmt numFmtId="165" formatCode="[h]:mm"/><numFmt numFmtId="166" formatCode="[h]&quot; hr &quot;mm&quot; min&quot;"/><numFmt numFmtId="167" formatCode="[h]:mm:ss"/></numFmts><fonts count="7">${fonts}</fonts><fills count="10">${fills}</fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="${specs.length}">${xfs}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="4">${dxfs}</dxfs></styleSheet>`
+    );
+  }
+  function detailXML(s, o) {
+    const rows = expand(s),
+      cols = s.columns,
+      n = cols.length,
+      last = col(n - 1),
+      end = Math.max(8, 7 + rows.length),
+      allEnd = s.total ? end + 2 : end;
+    if (allEnd > 1048576)
+      throw Error('The report exceeds Excel’s row limit. Choose a shorter reporting period.');
+    s.expanded = rows;
+    s.end = end;
+    s.helper = col(n);
+    const row = (r, cells, ht = 28, level = 0) =>
+      `<row r="${r}" ht="${ht}" customHeight="1"${level ? ' outlineLevel="1"' : ''}>${cells}</row>`;
+    let data =
+      row(2, cell(s.title, 0, 2, 1), 32) +
+      row(
+        3,
+        cell(`Activity period: ${o.from} to ${o.to}. Status snapshot: ${o.asOf}.`, 0, 3, 2),
+        25
+      ) +
+      row(4, cell(s.note || '', 0, 4, 19), 36) +
+      row(5, cell('Back to Dashboard', 0, 5, 20), 24);
+    data += row(
+      7,
+      [
+        ...cols.map((c, i) => cell(c.label, i, 7, 3)),
+        cell('Record count (report calculation)', n, 7, 3),
+      ].join(''),
+      40
+    );
+    if (!rows.length) data += row(8, cell('No records in this view.', 0, 8, 19), 30);
+    rows.forEach((r, i) => {
+      const y = i + 8,
+        alt = i % 2,
+        ht = Math.min(
+          150,
+          Math.max(
+            28,
+            ...r.values.map((v, j) => {
+              const text = String(v && typeof v === 'object' ? (v.value ?? '') : (v ?? ''));
+              return (
+                Math.max(
+                  1,
+                  ...text
+                    .split('\n')
+                    .map(x => Math.ceil(x.length / Math.max(10, cols[j].width - 3)))
+                ) *
+                  15 +
+                12
+              );
+            })
+          )
+        );
+      const content =
+        r.values
+          .map((v, j) => {
+            const kind = cols[j].kind,
+              style =
+                kind === 'date'
+                  ? 6 + alt
+                  : kind === 'time'
+                    ? 8 + alt
+                    : kind === 'duration'
+                      ? 10 + alt
+                      : kind === 'seconds'
+                        ? 23 + alt
+                        : kind === 'percent'
+                          ? 12 + alt
+                          : kind === 'number'
+                            ? 14 + alt
+                            : kind === 'decimal'
+                              ? 21 + alt
+                              : r.parent
+                                ? 16
+                                : 4 + alt;
+            return cell(v, j, y, style);
+          })
+          .join('') + cell(r.record || 0, n, y, 14);
+      data += row(y, content, ht, r.level);
+    });
+    if (s.total)
+      data += row(
+        end + 2,
+        cell('Total', Math.max(0, s.total.col - 1), end + 2, 18) +
+          cell(
+            formula(`SUM(${col(s.total.col)}8:${col(s.total.col)}${end})`, s.total.value),
+            s.total.col,
+            end + 2,
+            cols[s.total.col].kind === 'seconds' ? 23 : 10
+          ),
+        32
+      );
+    let cf = '';
+    if (s.status !== undefined) {
+      const c = col(s.status);
+      cf = `<conditionalFormatting sqref="${c}8:${c}${end}"><cfRule type="expression" dxfId="0" priority="1"><formula>OR(${c}8="Completed",${c}8="Closed",${c}8="Received",${c}8="On track")</formula></cfRule><cfRule type="expression" dxfId="2" priority="2"><formula>OR(${c}8="Overdue",${c}8="Blocked",${c}8="At risk",${c}8="Follow up now",${c}8="Time to revisit")</formula></cfRule><cfRule type="expression" dxfId="1" priority="3"><formula>OR(${c}8="Pending",${c}8="On Hold",${c}8="On hold",${c}8="In Progress",${c}8="In progress",${c}8="Waiting")</formula></cfRule></conditionalFormatting>`;
+    }
+    return (
+      XML +
+      `<worksheet xmlns="${NS}" xmlns:r="${REL}"><sheetPr><tabColor rgb="FF54749A"/><outlinePr summaryBelow="0"/><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${col(n)}${allEnd}"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"><pane xSplit="1" ySplit="7" topLeftCell="B8" activePane="bottomRight" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="28"/><cols>${cols.map((c, i) => `<col min="${i + 1}" max="${i + 1}" width="${c.width}" customWidth="1"/>`).join('')}<col min="${n + 1}" max="${n + 1}" width="2" hidden="1" customWidth="1"/></cols><sheetData>${data}</sheetData><autoFilter ref="A7:${last}${end}"/><mergeCells count="3"><mergeCell ref="A2:${last}2"/><mergeCell ref="A3:${last}3"/><mergeCell ref="A4:${last}4"/></mergeCells>${cf}<hyperlinks><hyperlink ref="A5" location="'Dashboard'!A1" display="Back to Dashboard"/></hyperlinks><printOptions horizontalCentered="1"/><pageMargins left="0.3" right="0.3" top="0.45" bottom="0.45" header="0.2" footer="0.2"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="${cols.reduce((n, c) => n + c.width, 0) > 190 ? 2 : 1}" fitToHeight="0"/><headerFooter><oddFooter>&amp;L${esc(s.name)}&amp;RPage &amp;P of &amp;N</oddFooter></headerFooter></worksheet>`
+    );
+  }
+  function chartXML(
+    title,
+    start,
+    end,
+    color,
+    categories = [],
+    values = [],
+    hours = false,
+    catColumn = 'A'
+  ) {
+    const catCache = '<c:strCache>',
+      catTag = 'str',
+      cache =
+        catCache +
+        '<c:ptCount val="' +
+        categories.length +
+        '"/>' +
+        categories
+          .map((v, i) => '<c:pt idx="' + i + '"><c:v>' + esc(v) + '</c:v></c:pt>')
+          .join('') +
+        '</c:' +
+        catTag +
+        'Cache>',
+      nums =
+        '<c:numCache><c:formatCode>0.0</c:formatCode><c:ptCount val="' +
+        values.length +
+        '"/>' +
+        values.map((v, i) => '<c:pt idx="' + i + '"><c:v>' + v + '</c:v></c:pt>').join('') +
+        '</c:numCache>';
+    return (
+      XML +
+      `<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><c:chart><c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1100"/></a:pPr><a:r><a:t>${esc(title)}</a:t></a:r></a:p></c:rich></c:tx></c:title><c:plotArea><c:layout/><c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:ser><c:idx val="0"/><c:order val="0"/><c:spPr><a:solidFill><a:srgbClr val="${color}"/></a:solidFill></c:spPr><c:cat><c:${catTag}Ref><c:f>Dashboard!$${catColumn}$${start}:$${catColumn}$${end}</c:f>${cache}</c:${catTag}Ref></c:cat><c:val><c:numRef><c:f>Dashboard!$B$${start}:$B$${end}</c:f>${nums}</c:numRef></c:val></c:ser><c:gapWidth val="65"/><c:axId val="101"/><c:axId val="102"/></c:barChart><c:catAx><c:axId val="101"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:tickLblPos val="nextTo"/><c:crossAx val="102"/><c:crosses val="autoZero"/></c:catAx><c:valAx><c:axId val="102"/><c:scaling><c:orientation val="minMax"/><c:min val="0"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:numFmt formatCode="${hours ? '0.0' : '0'}" sourceLinked="0"/><c:tickLblPos val="nextTo"/><c:crossAx val="101"/><c:crosses val="autoZero"/><c:crossBetween val="between"/>${hours ? '' : '<c:majorUnit val="1"/>'}</c:valAx></c:plotArea><c:plotVisOnly val="1"/></c:chart></c:chartSpace>`
+    );
+  }
+  function dashboard(model) {
+    const { o, metrics: m, scope, sheets } = model,
+      find = n => sheets.find(s => s.name === n),
+      range = (n, i) => `'${n}'!$${col(i)}$8:$${col(i)}$${find(n).end}`,
+      countRange = n => `'${n}'!$${find(n).helper}$8:$${find(n).helper}$${find(n).end}`,
+      cells = new Map(),
+      merges = [];
+    const put = (ref, value, style = 4) => {
+      const x = ref.match(/^([A-Z]+)(\d+)$/);
+      let c = 0;
+      for (const a of x[1]) c = c * 26 + a.charCodeAt(0) - 64;
+      cells.set(ref, { c: c - 1, r: +x[2], value, style });
+    };
+    put('A2', 'WorkHub report', 1);
+    merges.push('A2:L2');
+    put('A3', `Activity period: ${o.from} to ${o.to}. Current status snapshot: ${o.asOf}.`, 2);
+    merges.push('A3:L3');
+    put(
+      'A4',
+      `Older closed tickets: ${m.archivedTickets} ${o.includeArchive ? 'included in Closed archive' : 'excluded; include the optional archive when exporting'}.`,
+      19
+    );
+    merges.push('A4:L4');
+    const kpis = [
+      [
+        'A6:C6',
+        'A7:C9',
+        'Open tickets',
+        formula(
+          `SUMIFS(${countRange('Tickets')},${range('Tickets', 2)},"<>Closed",${range('Tickets', 2)},"<>Completed")`,
+          m.openTickets
+        ),
+        17,
+      ],
+      [
+        'E6:G6',
+        'E7:G9',
+        'Overdue main tasks',
+        formula(`SUMIFS(${countRange('Tasks')},${range('Tasks', 2)},"Overdue")`, m.overdueTasks),
+        17,
+      ],
+      [
+        'I6:L6',
+        'I7:L9',
+        'Recorded hours',
+        formula(`SUM(${range('Work sessions', 3)})*24`, m.recordedHours),
+        21,
+      ],
+      [
+        'A11:C11',
+        'A12:C14',
+        'Recent closures in period',
+        formula(
+          `SUMIFS(${countRange('Tickets')},${range('Tickets', 2)},"Closed",${range('Tickets', 6)},">="&${date(o.from)},${range('Tickets', 6)},"<="&${date(o.to)})+SUMIFS(${countRange('Tickets')},${range('Tickets', 2)},"Completed",${range('Tickets', 6)},">="&${date(o.from)},${range('Tickets', 6)},"<="&${date(o.to)})`,
+          m.closedInPeriod
+        ),
+        17,
+      ],
+      [
+        'E11:G11',
+        'E12:G14',
+        'Reminders ready',
+        formula(
+          `SUMIFS(${countRange('Reminders')},${range('Reminders', 3)},"Time to revisit")`,
+          m.dueReminders
+        ),
+        17,
+      ],
+      [
+        'I11:L11',
+        'I12:L14',
+        'Project items complete',
+        formula(
+          `IFERROR(SUMIFS(${countRange('Project items')},${range('Project items', 3)},"Completed")/SUM(${countRange('Project items')}),0)`,
+          m.projectCompletion
+        ),
+        12,
+      ],
+    ];
+    kpis.forEach(([label, number, text, value, style]) => {
+      merges.push(label, number);
+      put(label.split(':')[0], text, 26);
+      put(number.split(':')[0], value, style === 21 ? 27 : style === 12 ? 28 : 25);
+    });
+    put('A17', 'Ticket workload', 18);
+    merges.push('A17:D17');
+    put('A18', 'Status', 3);
+    put('B18', 'Tickets', 3);
+    const states = [...new Set(scope.tickets.map(t => t.status))].sort();
+    if (!states.length) states.push('No tickets');
+    states.slice(0, 10).forEach((s, i) => {
+      put('A' + (19 + i), s, 4);
+      put(
+        'B' + (19 + i),
+        formula(
+          `SUMIFS(${countRange('Tickets')},${range('Tickets', 2)},A${19 + i})`,
+          scope.tickets.filter(t => t.status === s).length
+        ),
+        14
+      );
+    });
+    put('A31', 'Scheduled hours · recent days in period', 18);
+    merges.push('A31:D31');
+    const dayCount = Math.min(
+      7,
+      Math.round((Date.parse(o.to) - Date.parse(o.from)) / 86400000) + 1
+    );
+    for (let i = 0; i < dayCount; i++) {
+      const day = shift(o.to, i - dayCount + 1),
+        hours = model.bookings
+          .filter(x => x.slot.date === day)
+          .reduce((n, x) => n + (numberTime(x.end) - numberTime(x.start)) * 24, 0);
+      put('A' + (33 + i), date(day), 6);
+      put(
+        'M' + (33 + i),
+        formula(
+          `TEXT(A${33 + i},"dd mmm")`,
+          new Date(day + 'T12:00:00').toLocaleDateString('en-GB', {
+            day: '2-digit',
+            month: 'short',
+          })
+        ),
+        2
+      );
+      put(
+        'B' + (33 + i),
+        formula(`SUMIFS(${range('Schedule', 3)},${range('Schedule', 0)},A${33 + i})*24`, hours),
+        21
+      );
+    }
+    put('A43', 'Attention needed', 18);
+    merges.push('A43:L43');
+    put('A44', 'Type', 3);
+    put('C44', 'Item', 3);
+    put('I44', 'Why it appears', 3);
+    merges.push('A44:B44', 'C44:H44', 'I44:L44');
+    const attention = [
+      ...model.sheets
+        .find(x => x.name === 'Tasks')
+        .rows.filter(r => r.record && ['Overdue', 'Blocked'].includes(r.values[2]))
+        .map(r => ['Task', r.values[0], r.values[2]]),
+      ...root.WorkHubReminders.records(model.data, o.asOf)
+        .filter(r => r.due)
+        .map(r => ['Reminder', r.title, 'Time to revisit']),
+      ...(model.data.workhub?.waiting || [])
+        .filter(w => !w.resolved && w.followUp && w.followUp <= o.asOf)
+        .map(w => ['Follow-up', w.title, w.followUp]),
+    ];
+    if (!attention.length) attention.push(['', 'No overdue tasks or due follow-ups.', '']);
+    attention.slice(0, 10).forEach(([kind, title, reason], i) => {
+      const r = 45 + i;
+      put('A' + r, kind, 4);
+      put('C' + r, title, 4);
+      put('I' + r, reason, 4);
+      merges.push(`A${r}:B${r}`, `C${r}:H${r}`, `I${r}:L${r}`);
+    });
+    const navRow = 57;
+    put('A' + navRow, 'Explore the report', 18);
+    merges.push(`A${navRow}:L${navRow}`);
+    const links = sheets.map((s, i) => {
+      const r = navRow + 1 + i;
+      put('A' + r, s.name, 20);
+      put('D' + r, s.title, 19);
+      merges.push(`A${r}:C${r}`, `D${r}:L${r}`);
+      return `<hyperlink ref="A${r}" location="'${esc(s.name)}'!A1" display="${esc(s.name)}"/>`;
+    });
+    const byRow = new Map();
+    for (const x of cells.values()) (byRow.get(x.r) || byRow.set(x.r, []).get(x.r)).push(x);
+    const data = [...byRow]
+      .sort((a, b) => a[0] - b[0])
+      .map(
+        ([r, xs]) =>
+          `<row r="${r}" ht="${r === 2 ? 32 : r >= 45 && r < 55 ? 42 : 26}" customHeight="1">${xs
+            .sort((a, b) => a.c - b.c)
+            .map(x => cell(x.value, x.c, r, x.style))
+            .join('')}</row>`
+      )
+      .join('');
+    const xml =
+      XML +
+      `<worksheet xmlns="${NS}" xmlns:r="${REL}"><sheetPr><tabColor rgb="FF244469"/><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:M${navRow + sheets.length}"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"/></sheetViews><cols><col min="1" max="12" width="12" customWidth="1"/><col min="13" max="13" width="12" hidden="1" customWidth="1"/></cols><sheetData>${data}</sheetData><mergeCells count="${merges.length}">${merges.map(r => `<mergeCell ref="${r}"/>`).join('')}</mergeCells><hyperlinks>${links.join('')}</hyperlinks><pageMargins left="0.3" right="0.3" top="0.45" bottom="0.45" header="0.2" footer="0.2"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/><drawing r:id="rId1"/></worksheet>`;
+    return {
+      xml,
+      states: states.length,
+      categories: states.slice(0, 10),
+      ticketValues: states.slice(0, 10).map(s => scope.tickets.filter(t => t.status === s).length),
+      days: Array.from({ length: dayCount }, (_, i) =>
+        new Date(shift(o.to, i - dayCount + 1) + 'T12:00:00').toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: 'short',
+        })
+      ),
+      hours: Array.from({ length: dayCount }, (_, i) => {
+        const day = shift(o.to, i - dayCount + 1);
+        return model.bookings
+          .filter(x => x.slot.date === day)
+          .reduce((n, x) => n + (numberTime(x.end) - numberTime(x.start)) * 24, 0);
+      }),
+    };
+  }
+  function files(d, input = {}) {
+    const model = build(d, input),
+      out = { 'xl/styles.xml': styles() };
+    model.data = d;
+    model.sheets.forEach(
+      (s, i) => (out[`xl/worksheets/sheet${i + 2}.xml`] = detailXML(s, model.o))
+    );
+    const dash = dashboard(model);
+    out['xl/worksheets/sheet1.xml'] = dash.xml;
+    const names = ['Dashboard', ...model.sheets.map(s => s.name)];
+    out['xl/workbook.xml'] =
+      XML +
+      `<workbook xmlns="${NS}" xmlns:r="${REL}"><bookViews><workbookView activeTab="0"/></bookViews><sheets>${names.map((n, i) => `<sheet name="${esc(n)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets><definedNames>${model.sheets.map((s, i) => `<definedName name="_xlnm.Print_Titles" localSheetId="${i + 1}">'${esc(s.name)}'!$1:$7</definedName><definedName name="_xlnm.Print_Area" localSheetId="${i + 1}">'${esc(s.name)}'!$A$1:$${col(s.columns.length - 1)}$${s.end + (s.total ? 2 : 0)}</definedName>`).join('')}</definedNames><calcPr calcId="191029" fullCalcOnLoad="1" forceFullCalc="1"/></workbook>`;
+    out['xl/_rels/workbook.xml.rels'] =
+      XML +
+      `<Relationships xmlns="${PKG}">${names.map((_, i) => `<Relationship Id="rId${i + 1}" Type="${REL}/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}<Relationship Id="rId${names.length + 1}" Type="${REL}/styles" Target="styles.xml"/></Relationships>`;
+    out['_rels/.rels'] =
+      XML +
+      `<Relationships xmlns="${PKG}"><Relationship Id="rId1" Type="${REL}/officeDocument" Target="xl/workbook.xml"/><Relationship Id="rId2" Type="${PKG}/metadata/core-properties" Target="docProps/core.xml"/></Relationships>`;
+    out['docProps/core.xml'] =
+      XML +
+      `<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>WorkHub report</dc:title><dc:creator>WorkHub</dc:creator><dc:description>Current status snapshot ${model.o.asOf}. Activity period ${model.o.from} to ${model.o.to}.</dc:description></cp:coreProperties>`;
+    out['xl/worksheets/_rels/sheet1.xml.rels'] =
+      XML +
+      `<Relationships xmlns="${PKG}"><Relationship Id="rId1" Type="${REL}/drawing" Target="../drawings/drawing1.xml"/></Relationships>`;
+    const anchor = (id, row) =>
+      `<xdr:twoCellAnchor><xdr:from><xdr:col>5</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${row}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>12</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${row + 11}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="${id}" name="Chart ${id}"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="${REL}" r:id="rId${id}"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor>`;
+    out['xl/drawings/drawing1.xml'] =
+      XML +
+      `<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">${anchor(1, 16)}${anchor(2, 30)}</xdr:wsDr>`;
+    out['xl/drawings/_rels/drawing1.xml.rels'] =
+      XML +
+      `<Relationships xmlns="${PKG}"><Relationship Id="rId1" Type="${REL}/chart" Target="../charts/chart1.xml"/><Relationship Id="rId2" Type="${REL}/chart" Target="../charts/chart2.xml"/></Relationships>`;
+    out['xl/charts/chart1.xml'] = chartXML(
+      'Ticket status',
+      19,
+      18 + Math.min(10, dash.states),
+      '5479B7',
+      dash.categories,
+      dash.ticketValues
+    );
+    out['xl/charts/chart2.xml'] = chartXML(
+      'Scheduled hours',
+      33,
+      32 + dash.days.length,
+      '4F9B88',
+      dash.days,
+      dash.hours,
+      true,
+      'M'
+    );
+    out['[Content_Types].xml'] =
+      XML +
+      `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>${names.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/><Override PartName="/xl/charts/chart1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/><Override PartName="/xl/charts/chart2.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/></Types>`;
+    return { files: out, model };
+  }
+  function install(a) {
+    const button = document.getElementById('exportButton');
+    button.addEventListener(
+      'click',
+      event => {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        const day = a.today(),
+          from = shift(day, -29);
+        a.openModal(
+          'Export a clearer Excel report',
+          `<form id="reportExportForm"><div class="report-export-intro"><span class="hub-kicker">A REPORT YOU CAN READ</span><h3>Your work, clearly presented</h3><p>Current work first, with names, readable notes, grouped subtasks and precise time totals.</p></div><div class="form-grid"><div><label for="reportFrom">Activity period starts</label><input id="reportFrom" name="from" type="date" min="1900-01-01" value="${from}" max="${day}" required></div><div><label for="reportTo">Activity period ends</label><input id="reportTo" name="to" type="date" min="1900-01-01" value="${day}" max="${day}" required></div><div><label for="reportClosedDays">Keep recently closed tickets for</label><select id="reportClosedDays" name="closedDays"><option value="7">7 days</option><option value="30" selected>30 days</option><option value="90">90 days</option><option value="3650">10 years</option></select></div><div class="wide"><label class="check-label"><input type="checkbox" name="includeArchive">Include a separate archive of older closed tickets and their updates</label></div></div><p class="hub-meta">The period filters scheduled activities and work sessions. Statuses reflect your current records. Older closed tickets stay out of the main Dashboard and Tickets view.</p><div class="modal-actions"><button type="button" data-action="cancel">Cancel</button><button class="primary" type="submit">Download Excel report</button></div></form>`
+        );
+      },
+      true
+    );
+    document.addEventListener(
+      'submit',
+      event => {
+        if (event.target.id !== 'reportExportForm') return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        try {
+          const f = event.target,
+            o = {
+              asOf: a.today(),
+              from: f.elements.namedItem('from').value,
+              to: f.elements.namedItem('to').value,
+              closedDays: Number(f.elements.namedItem('closedDays').value),
+              includeArchive: f.elements.namedItem('includeArchive').checked,
+            };
+          a.validate(a.state());
+          const result = files(a.state(), o);
+          a.download(
+            a.zip(result.files),
+            'WorkHub-Report-' + o.asOf + '.xlsx',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+          );
+          a.closeModal();
+          a.tell(
+            'Excel report downloaded. Older closed tickets ' +
+              (o.includeArchive ? 'are in the separate archive.' : 'were excluded.')
+          );
+        } catch (error) {
+          a.tell('Report failed: ' + error.message, true);
+        }
+      },
+      true
+    );
+  }
+  root.WorkHubReports = {
+    options,
+    build,
+    files,
+    closing,
+    install,
+    export: (d, o, zip) => zip(files(d, o).files),
+  };
 })(window);

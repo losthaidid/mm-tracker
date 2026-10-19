@@ -1,113 +1,554 @@
+/* momo-anime.css — Character rig layers, expressions, walk poses and reduced-motion behaviour.
+   See docs/FILE-MAP.md. Keep rule order: later selectors can override earlier ones. */
 /* The atlas supplies the soft 3D finish; the live rig supplies the personality. */
-.momo-anime-art[data-art-ready="false"] { opacity:0; }
-#hubPet > button > .momo-anime-art { filter:drop-shadow(0 3px 3px #30445018); overflow:visible; }
-#hubPet .momo-anime-art svg { display:block; pointer-events:none; }
-#hubPet .pet-body { transform-origin:70px 145px; transform-box:view-box; }
-#hubPet .momo-face { transform-origin:70px 77px; transform-box:view-box; transition:transform .35s ease; }
-#hubPet .momo-arm-left { transform-origin:50px 80px !important; transform-box:view-box; }
-#hubPet .momo-arm-right { transform-origin:90px 80px !important; transform-box:view-box; }
-#hubPet .momo-foot-left { transform-origin:59px 110px !important; transform-box:view-box; }
-#hubPet .momo-foot-right { transform-origin:81px 110px !important; transform-box:view-box; }
-#hubPet .pet-eye { transform-origin:70px 53px !important; transform:none; animation:none !important; }
-#hubPet .momo-eye-left { transform-origin:58.1px 53.4px; }
-#hubPet .momo-eye-right { transform-origin:80.6px 52.5px; }
-#hubPet .momo-pupils { transform:translate(var(--momo-look-x,0px),var(--momo-look-y,0px)); }
-#hubPet :is(.momo-eye-lids,.momo-mouth-cover,.momo-mouth-annoyed,.momo-annoyed-eyes,.momo-folding-chair,.momo-whistle-notes,.momo-sleep-marks,.momo-surprise-mark) { display:none; }
-#hubPet .pet-mouth { display:none; }
-body:not([data-motion="off"]) #hubPet:is(:not([data-pose]),[data-pose="idle"],[data-pose="focus"]) .pet-body { animation:momo-boy-breathe 5s ease-in-out infinite; }
-#hubPet .momo-eye-lids { display:inline; opacity:0; animation:momo-boy-blink 6.5s infinite; }
-#hubPet[data-expression="shy"] .pet-eye { transform:translateY(.7px) scale(.98,.94); }
-#hubPet:is([data-expression="surprised"],[data-expression="delighted"],[data-expression="dizzy"],[data-expression="annoyed"],[data-pose="idle-yawn"],[data-pose="idle-sit"],[data-pose="blep"]) .momo-mouth-cover { display:inline; }
-#hubPet[data-expression="surprised"] .pet-eye { transform:none; }
-#hubPet[data-expression="surprised"] .momo-sweat { display:inline; }
-#hubPet:is([data-pose="nap"],[data-pose="idle-sleep"],[data-pose="idle-yawn"],[data-pose="happy"]) .pet-eye { visibility:hidden; }
-#hubPet:is([data-pose="nap"],[data-pose="idle-sleep"],[data-pose="idle-yawn"],[data-pose="happy"]) .momo-eye-lids { display:inline; opacity:1; animation:none; }
-#hubPet:is([data-pose="nap"],[data-pose="idle-sleep"],[data-pose="happy"]) .momo-eye-smiles { display:inline; }
-#hubPet[data-expression="dizzy"] .momo-eye-lids { display:inline; opacity:1; animation:none; }
-#hubPet[data-pose="wink"] .momo-eye-lids { display:inline; opacity:1; animation:none; }
-#hubPet[data-pose="wink"] .momo-eye-lids > :first-child { display:none; }
-#hubPet[data-pose="idle-yawn"] .momo-mouth-yawn { transform-origin:70px 66px; }
-body:not([data-motion="off"]) #hubPet[data-pose="idle-yawn"] .momo-face { animation:momo-boy-yawn 4.5s ease-in-out both; }
-body:not([data-motion="off"]) #hubPet[data-pose="idle-yawn"] .momo-arm-right { animation:momo-boy-yawn-hand 4.5s ease-in-out both; }
+.momo-anime-art[data-art-ready='false'] {
+  opacity: 0;
+}
+#hubPet > button > .momo-anime-art {
+  filter: drop-shadow(0 3px 3px #30445018);
+  overflow: visible;
+}
+#hubPet .momo-anime-art svg {
+  display: block;
+  pointer-events: none;
+}
+#hubPet .pet-body {
+  transform-origin: 70px 145px;
+  transform-box: view-box;
+}
+#hubPet .momo-face {
+  transform-origin: 70px 77px;
+  transform-box: view-box;
+  transition: transform 0.35s ease;
+}
+#hubPet .momo-arm-left {
+  transform-origin: 50px 80px !important;
+  transform-box: view-box;
+}
+#hubPet .momo-arm-right {
+  transform-origin: 90px 80px !important;
+  transform-box: view-box;
+}
+#hubPet .momo-foot-left {
+  transform-origin: 59px 110px !important;
+  transform-box: view-box;
+}
+#hubPet .momo-foot-right {
+  transform-origin: 81px 110px !important;
+  transform-box: view-box;
+}
+#hubPet .pet-eye {
+  transform-origin: 70px 53px !important;
+  transform: none;
+  animation: none !important;
+}
+#hubPet .momo-eye-left {
+  transform-origin: 58.1px 53.4px;
+}
+#hubPet .momo-eye-right {
+  transform-origin: 80.6px 52.5px;
+}
+#hubPet .momo-pupils {
+  transform: translate(var(--momo-look-x, 0px), var(--momo-look-y, 0px));
+}
+#hubPet
+  :is(
+    .momo-eye-lids,
+    .momo-mouth-cover,
+    .momo-mouth-annoyed,
+    .momo-annoyed-eyes,
+    .momo-folding-chair,
+    .momo-whistle-notes,
+    .momo-sleep-marks,
+    .momo-surprise-mark
+  ) {
+  display: none;
+}
+#hubPet .pet-mouth {
+  display: none;
+}
+body:not([data-motion='off'])
+  #hubPet:is(:not([data-pose]), [data-pose='idle'], [data-pose='focus'])
+  .pet-body {
+  animation: momo-boy-breathe 5s ease-in-out infinite;
+}
+#hubPet .momo-eye-lids {
+  display: inline;
+  opacity: 0;
+  animation: momo-boy-blink 6.5s infinite;
+}
+#hubPet[data-expression='shy'] .pet-eye {
+  transform: translateY(0.7px) scale(0.98, 0.94);
+}
+#hubPet:is(
+    [data-expression='surprised'],
+    [data-expression='delighted'],
+    [data-expression='dizzy'],
+    [data-expression='annoyed'],
+    [data-pose='idle-yawn'],
+    [data-pose='idle-sit'],
+    [data-pose='blep']
+  )
+  .momo-mouth-cover {
+  display: inline;
+}
+#hubPet[data-expression='surprised'] .pet-eye {
+  transform: none;
+}
+#hubPet[data-expression='surprised'] .momo-sweat {
+  display: inline;
+}
+#hubPet:is(
+    [data-pose='nap'],
+    [data-pose='idle-sleep'],
+    [data-pose='idle-yawn'],
+    [data-pose='happy']
+  )
+  .pet-eye {
+  visibility: hidden;
+}
+#hubPet:is(
+    [data-pose='nap'],
+    [data-pose='idle-sleep'],
+    [data-pose='idle-yawn'],
+    [data-pose='happy']
+  )
+  .momo-eye-lids {
+  display: inline;
+  opacity: 1;
+  animation: none;
+}
+#hubPet:is([data-pose='nap'], [data-pose='idle-sleep'], [data-pose='happy']) .momo-eye-smiles {
+  display: inline;
+}
+#hubPet[data-expression='dizzy'] .momo-eye-lids {
+  display: inline;
+  opacity: 1;
+  animation: none;
+}
+#hubPet[data-pose='wink'] .momo-eye-lids {
+  display: inline;
+  opacity: 1;
+  animation: none;
+}
+#hubPet[data-pose='wink'] .momo-eye-lids > :first-child {
+  display: none;
+}
+#hubPet[data-pose='idle-yawn'] .momo-mouth-yawn {
+  transform-origin: 70px 66px;
+}
+body:not([data-motion='off']) #hubPet[data-pose='idle-yawn'] .momo-face {
+  animation: momo-boy-yawn 4.5s ease-in-out both;
+}
+body:not([data-motion='off']) #hubPet[data-pose='idle-yawn'] .momo-arm-right {
+  animation: momo-boy-yawn-hand 4.5s ease-in-out both;
+}
 
 /* Startle, squirm, land, then a very small sulk. */
-#hubPet[data-pose="startled"] .momo-surprise-mark { display:inline; }
-body:not([data-motion="off"]) #hubPet[data-pose="startled"] .pet-body { animation:momo-boy-startle .65s ease-out both; }
-#hubPet[data-pose="startled"] .momo-arm-left { transform:rotate(32deg); }
-#hubPet[data-pose="startled"] .momo-arm-right { transform:rotate(-32deg); }
-body:not([data-motion="off"]) #hubPet[data-pose="held"] .pet-body { transform-origin:70px 13px; animation:momo-boy-squirm .55s ease-in-out infinite; }
-body:not([data-motion="off"]) #hubPet[data-pose="held"] .momo-arm-left { animation:momo-boy-flail-left .27s ease-in-out infinite alternate; }
-body:not([data-motion="off"]) #hubPet[data-pose="held"] .momo-arm-right { animation:momo-boy-flail-right .31s ease-in-out infinite alternate; }
-body:not([data-motion="off"]) #hubPet[data-pose="held"] .momo-foot-left { animation:momo-boy-kick .3s ease-in-out infinite alternate; }
-body:not([data-motion="off"]) #hubPet[data-pose="held"] .momo-foot-right { animation:momo-boy-kick .35s -.2s ease-in-out infinite alternate-reverse; }
-#hubPet[data-expression="annoyed"] :is(.momo-annoyed-eyes,.momo-mouth-annoyed) { display:inline; }
-#hubPet[data-expression="annoyed"] .momo-brows { opacity:0; }
-#hubPet[data-pose="annoyed"] .momo-face { transform:rotate(7deg); }
-#hubPet[data-pose="annoyed"] .momo-arm-left { transform:rotate(-44deg); }
-#hubPet[data-pose="annoyed"] .momo-arm-right { transform:rotate(44deg); }
-body:not([data-motion="off"]) #hubPet[data-pose="annoyed"] .pet-body { animation:momo-boy-sulk .65s ease-out both; }
+#hubPet[data-pose='startled'] .momo-surprise-mark {
+  display: inline;
+}
+body:not([data-motion='off']) #hubPet[data-pose='startled'] .pet-body {
+  animation: momo-boy-startle 0.65s ease-out both;
+}
+#hubPet[data-pose='startled'] .momo-arm-left {
+  transform: rotate(32deg);
+}
+#hubPet[data-pose='startled'] .momo-arm-right {
+  transform: rotate(-32deg);
+}
+body:not([data-motion='off']) #hubPet[data-pose='held'] .pet-body {
+  transform-origin: 70px 13px;
+  animation: momo-boy-squirm 0.55s ease-in-out infinite;
+}
+body:not([data-motion='off']) #hubPet[data-pose='held'] .momo-arm-left {
+  animation: momo-boy-flail-left 0.27s ease-in-out infinite alternate;
+}
+body:not([data-motion='off']) #hubPet[data-pose='held'] .momo-arm-right {
+  animation: momo-boy-flail-right 0.31s ease-in-out infinite alternate;
+}
+body:not([data-motion='off']) #hubPet[data-pose='held'] .momo-foot-left {
+  animation: momo-boy-kick 0.3s ease-in-out infinite alternate;
+}
+body:not([data-motion='off']) #hubPet[data-pose='held'] .momo-foot-right {
+  animation: momo-boy-kick 0.35s -0.2s ease-in-out infinite alternate-reverse;
+}
+#hubPet[data-expression='annoyed'] :is(.momo-annoyed-eyes, .momo-mouth-annoyed) {
+  display: inline;
+}
+#hubPet[data-expression='annoyed'] .momo-brows {
+  opacity: 0;
+}
+#hubPet[data-pose='annoyed'] .momo-face {
+  transform: rotate(7deg);
+}
+#hubPet[data-pose='annoyed'] .momo-arm-left {
+  transform: rotate(-44deg);
+}
+#hubPet[data-pose='annoyed'] .momo-arm-right {
+  transform: rotate(44deg);
+}
+body:not([data-motion='off']) #hubPet[data-pose='annoyed'] .pet-body {
+  animation: momo-boy-sulk 0.65s ease-out both;
+}
 
 /* A folding chair opens, he sits, whistles, then folds it away again. */
-#hubPet[data-pose="idle-sit"] .momo-folding-chair { display:inline; transform-origin:70px 130px; }
-body:not([data-motion="off"]) #hubPet[data-pose="idle-sit"] .pet-body { animation:none; transform:translateY(9px); transition:transform .65s ease; }
-#hubPet[data-pose="idle-sit"] .momo-foot-left { transform:translate(-3px,4px) scale(1.2,.68); }
-#hubPet[data-pose="idle-sit"] .momo-foot-right { transform:translate(3px,4px) scale(1.2,.68); }
-#hubPet[data-pose="idle-sit"] .momo-arm-left { transform:rotate(-13deg); }
-body:not([data-motion="off"]) #hubPet[data-pose="idle-sit"] .momo-arm-right { transform:rotate(13deg); }
-body:not([data-motion="off"]) #hubPet[data-pose="idle-sit"] .momo-face { animation:momo-boy-content 3s ease-in-out infinite; }
-body:not([data-motion="off"]) #hubPet[data-chair-phase="unfold"] .pet-body { transform:translateX(-9px) rotate(-4deg); }
-#hubPet[data-chair-phase="unfold"] :is(.momo-foot-left,.momo-foot-right) { transform:none; }
-#hubPet[data-chair-phase="unfold"] .momo-arm-right { animation:momo-boy-open-chair 1.8s ease-in-out both; }
-#hubPet[data-chair-phase="unfold"] .momo-folding-chair { animation:momo-boy-chair-open 1.8s ease-out both; }
-#hubPet[data-chair-phase="unfold"] .momo-chair-legs { transform-origin:70px 139px; animation:momo-boy-chair-scissor 1.8s ease-out both; }
-#hubPet[data-chair-phase="whistle"] .momo-whistle-notes { display:inline; animation:momo-boy-notes 2.4s ease-in-out infinite; }
-#hubPet[data-chair-phase="whistle"] .momo-mouth-o { display:inline; transform:scale(.65); transform-origin:70px 66px; }
-#hubPet[data-chair-phase="whistle"] .momo-foot-right { animation:momo-boy-seated-toe 1.3s ease-in-out infinite; }
-body:not([data-motion="off"]) #hubPet[data-chair-phase="fold"] .pet-body { transform:none; }
-#hubPet[data-chair-phase="fold"] :is(.momo-foot-left,.momo-foot-right) { transform:none; }
-#hubPet[data-chair-phase="fold"] .momo-folding-chair { animation:momo-boy-chair-close 2.4s ease-in both; }
+#hubPet[data-pose='idle-sit'] .momo-folding-chair {
+  display: inline;
+  transform-origin: 70px 130px;
+}
+body:not([data-motion='off']) #hubPet[data-pose='idle-sit'] .pet-body {
+  animation: none;
+  transform: translateY(9px);
+  transition: transform 0.65s ease;
+}
+#hubPet[data-pose='idle-sit'] .momo-foot-left {
+  transform: translate(-3px, 4px) scale(1.2, 0.68);
+}
+#hubPet[data-pose='idle-sit'] .momo-foot-right {
+  transform: translate(3px, 4px) scale(1.2, 0.68);
+}
+#hubPet[data-pose='idle-sit'] .momo-arm-left {
+  transform: rotate(-13deg);
+}
+body:not([data-motion='off']) #hubPet[data-pose='idle-sit'] .momo-arm-right {
+  transform: rotate(13deg);
+}
+body:not([data-motion='off']) #hubPet[data-pose='idle-sit'] .momo-face {
+  animation: momo-boy-content 3s ease-in-out infinite;
+}
+body:not([data-motion='off']) #hubPet[data-chair-phase='unfold'] .pet-body {
+  transform: translateX(-9px) rotate(-4deg);
+}
+#hubPet[data-chair-phase='unfold'] :is(.momo-foot-left, .momo-foot-right) {
+  transform: none;
+}
+#hubPet[data-chair-phase='unfold'] .momo-arm-right {
+  animation: momo-boy-open-chair 1.8s ease-in-out both;
+}
+#hubPet[data-chair-phase='unfold'] .momo-folding-chair {
+  animation: momo-boy-chair-open 1.8s ease-out both;
+}
+#hubPet[data-chair-phase='unfold'] .momo-chair-legs {
+  transform-origin: 70px 139px;
+  animation: momo-boy-chair-scissor 1.8s ease-out both;
+}
+#hubPet[data-chair-phase='whistle'] .momo-whistle-notes {
+  display: inline;
+  animation: momo-boy-notes 2.4s ease-in-out infinite;
+}
+#hubPet[data-chair-phase='whistle'] .momo-mouth-o {
+  display: inline;
+  transform: scale(0.65);
+  transform-origin: 70px 66px;
+}
+#hubPet[data-chair-phase='whistle'] .momo-foot-right {
+  animation: momo-boy-seated-toe 1.3s ease-in-out infinite;
+}
+body:not([data-motion='off']) #hubPet[data-chair-phase='fold'] .pet-body {
+  transform: none;
+}
+#hubPet[data-chair-phase='fold'] :is(.momo-foot-left, .momo-foot-right) {
+  transform: none;
+}
+#hubPet[data-chair-phase='fold'] .momo-folding-chair {
+  animation: momo-boy-chair-close 2.4s ease-in both;
+}
 
 /* Impromptu sleepy moments are finite; a home nap still waits for you. */
-#hubPet:is([data-pose="nap"],[data-pose="idle-sleep"]) .momo-sleep-marks { display:inline; animation:momo-boy-snooze 3.5s ease-in-out infinite; }
-body:not([data-motion="off"]) #hubPet:is([data-pose="nap"],[data-pose="idle-sleep"]) .pet-body { animation:momo-boy-sleep-breathe 4s ease-in-out infinite; }
-#hubPet:is([data-pose="nap"],[data-pose="idle-sleep"]) .momo-face { animation:momo-boy-doze 5s ease-in-out infinite; }
-#hubPet[data-pose="idle-daydream"] .momo-face { transform:rotate(-12deg) translateY(-2px); }
-#hubPet[data-pose="idle-daydream"] .momo-arm-right { transform:rotate(118deg); }
-#hubPet[data-pose="idle-daydream"] .momo-sparkles { display:inline; animation:momo-boy-notes 3s ease-in-out infinite; }
-#hubPet[data-pose="idle-hair-tidy"] .momo-arm-right { animation:momo-boy-hair-tidy 1.2s ease-in-out 4; }
-#hubPet[data-pose="idle-hair-tidy"] .momo-face { transform:rotate(-6deg); }
-#hubPet[data-pose="idle-balance"] .pet-body { animation:momo-boy-balance 5.2s ease-in-out both; }
-#hubPet[data-pose="idle-balance"] .momo-arm-left { transform:rotate(65deg); }
-#hubPet[data-pose="idle-balance"] .momo-arm-right { transform:rotate(-65deg); }
-#hubPet[data-pose="idle-balance"] .momo-foot-right { transform:rotate(-20deg) translateY(-5px); }
-body:not([data-motion="off"]) #hubPet:is([data-pose="walk"],[data-roaming="true"]) .pet-body { animation:hub-walk .7s ease-in-out infinite; }
-body:not([data-motion="off"]) #hubPet[data-pose="music-dance"] .pet-body { animation:momo-music-dance .85s ease-in-out infinite; }
-body:not([data-motion="off"]) #hubPet[data-pose="stumble"] .pet-body { animation:momo-oops 1.8s ease-in-out both; }
-body:not([data-motion="off"]) #hubPet[data-pose="sneeze"] .pet-body { animation:momo-achoo 1.4s ease-in-out both; }
-body:not([data-motion="off"]) #hubPet[data-pose="happy"] .pet-body { animation:hub-happy .55s ease-in-out 3; }
-body:not([data-motion="off"]) #hubPet[data-pose="stretch"] .pet-body { animation:momo-stretch 1.5s ease-in-out; }
+#hubPet:is([data-pose='nap'], [data-pose='idle-sleep']) .momo-sleep-marks {
+  display: inline;
+  animation: momo-boy-snooze 3.5s ease-in-out infinite;
+}
+body:not([data-motion='off']) #hubPet:is([data-pose='nap'], [data-pose='idle-sleep']) .pet-body {
+  animation: momo-boy-sleep-breathe 4s ease-in-out infinite;
+}
+#hubPet:is([data-pose='nap'], [data-pose='idle-sleep']) .momo-face {
+  animation: momo-boy-doze 5s ease-in-out infinite;
+}
+#hubPet[data-pose='idle-daydream'] .momo-face {
+  transform: rotate(-12deg) translateY(-2px);
+}
+#hubPet[data-pose='idle-daydream'] .momo-arm-right {
+  transform: rotate(118deg);
+}
+#hubPet[data-pose='idle-daydream'] .momo-sparkles {
+  display: inline;
+  animation: momo-boy-notes 3s ease-in-out infinite;
+}
+#hubPet[data-pose='idle-hair-tidy'] .momo-arm-right {
+  animation: momo-boy-hair-tidy 1.2s ease-in-out 4;
+}
+#hubPet[data-pose='idle-hair-tidy'] .momo-face {
+  transform: rotate(-6deg);
+}
+#hubPet[data-pose='idle-balance'] .pet-body {
+  animation: momo-boy-balance 5.2s ease-in-out both;
+}
+#hubPet[data-pose='idle-balance'] .momo-arm-left {
+  transform: rotate(65deg);
+}
+#hubPet[data-pose='idle-balance'] .momo-arm-right {
+  transform: rotate(-65deg);
+}
+#hubPet[data-pose='idle-balance'] .momo-foot-right {
+  transform: rotate(-20deg) translateY(-5px);
+}
+body:not([data-motion='off']) #hubPet:is([data-pose='walk'], [data-roaming='true']) .pet-body {
+  animation: hub-walk 0.7s ease-in-out infinite;
+}
+body:not([data-motion='off']) #hubPet[data-pose='music-dance'] .pet-body {
+  animation: momo-music-dance 0.85s ease-in-out infinite;
+}
+body:not([data-motion='off']) #hubPet[data-pose='stumble'] .pet-body {
+  animation: momo-oops 1.8s ease-in-out both;
+}
+body:not([data-motion='off']) #hubPet[data-pose='sneeze'] .pet-body {
+  animation: momo-achoo 1.4s ease-in-out both;
+}
+body:not([data-motion='off']) #hubPet[data-pose='happy'] .pet-body {
+  animation: hub-happy 0.55s ease-in-out 3;
+}
+body:not([data-motion='off']) #hubPet[data-pose='stretch'] .pet-body {
+  animation: momo-stretch 1.5s ease-in-out;
+}
 
-@keyframes momo-boy-breathe { 0%,100%{transform:none}50%{transform:translateY(-.8px) scale(1.006,1.008)} }
-@keyframes momo-boy-blink { 0%,42%,46%,100%{opacity:0}43%,45%{opacity:1} }
-@keyframes momo-boy-startle { 0%,100%{transform:none}25%{transform:translateY(-9px) rotate(-4deg)}65%{transform:translateY(2px)} }
-@keyframes momo-boy-squirm { 0%,100%{transform:rotate(-7deg) translateY(2px)}50%{transform:rotate(7deg) translateY(-1px)} }
-@keyframes momo-boy-flail-left { from{transform:rotate(30deg)}to{transform:rotate(90deg)} }
-@keyframes momo-boy-flail-right { from{transform:rotate(-85deg)}to{transform:rotate(-25deg)} }
-@keyframes momo-boy-kick { from{transform:rotate(-16deg)}to{transform:rotate(18deg) translateY(-3px)} }
-@keyframes momo-boy-sulk { 0%{transform:translateY(-4px)}35%{transform:translateY(3px) scale(1.02,.97)}100%{transform:none} }
-@keyframes momo-boy-open-chair { 0%,100%{transform:rotate(0)}40%,75%{transform:rotate(-58deg)} }
-@keyframes momo-boy-chair-open { 0%{opacity:0;transform:translate(29px,-9px) scaleX(.1) rotate(14deg)}20%{opacity:1}100%{opacity:1;transform:none} }
-@keyframes momo-boy-chair-scissor { from{transform:scaleX(.08)}to{transform:scaleX(1)} }
-@keyframes momo-boy-chair-close { 0%{transform:none;opacity:1}65%{opacity:1;transform:translateX(25px) scaleX(.1)}100%{transform:translate(30px,-8px) scale(.05);opacity:0} }
-@keyframes momo-boy-content { 0%,100%{transform:rotate(-2deg)}50%{transform:rotate(3deg)} }
-@keyframes momo-boy-notes { 0%,100%{opacity:.15;transform:translate(0,3px)}50%{opacity:1;transform:translate(3px,-4px)} }
-@keyframes momo-boy-seated-toe { 0%,100%{transform:translate(3px,4px) scale(1.2,.68)}50%{transform:translate(3px,2px) scale(1.2,.68) rotate(-7deg)} }
-@keyframes momo-boy-sleep-breathe { 0%,100%{transform:translateY(3px)}50%{transform:translateY(5px) scale(1.012,.99)} }
-@keyframes momo-boy-doze { 0%,100%{transform:rotate(8deg) translateY(2px)}50%{transform:rotate(13deg) translateY(4px)} }
-@keyframes momo-boy-snooze { 0%,100%{opacity:.25;transform:translateY(2px)}60%{opacity:1;transform:translateY(-4px)} }
-@keyframes momo-boy-hair-tidy { 0%,100%{transform:rotate(-5deg)}30%,70%{transform:rotate(-155deg) translateX(-2px)}50%{transform:rotate(-165deg)} }
-@keyframes momo-boy-balance { 0%,100%{transform:none}20%,60%{transform:rotate(-9deg)}40%{transform:rotate(12deg)}80%{transform:rotate(4deg)} }
-@keyframes momo-boy-yawn { 0%,100%{transform:none}35%,65%{transform:translateY(-2px) rotate(-8deg)} }
-@keyframes momo-boy-yawn-hand { 0%,100%{transform:none}25%,80%{transform:rotate(142deg)} }
-body[data-motion="off"] #hubPet * { animation:none !important; transition:none !important; }
-@media(prefers-reduced-motion:reduce) { #hubPet * { animation:none !important; transition:none !important; } }
+@keyframes momo-boy-breathe {
+  0%,
+  100% {
+    transform: none;
+  }
+  50% {
+    transform: translateY(-0.8px) scale(1.006, 1.008);
+  }
+}
+@keyframes momo-boy-blink {
+  0%,
+  42%,
+  46%,
+  100% {
+    opacity: 0;
+  }
+  43%,
+  45% {
+    opacity: 1;
+  }
+}
+@keyframes momo-boy-startle {
+  0%,
+  100% {
+    transform: none;
+  }
+  25% {
+    transform: translateY(-9px) rotate(-4deg);
+  }
+  65% {
+    transform: translateY(2px);
+  }
+}
+@keyframes momo-boy-squirm {
+  0%,
+  100% {
+    transform: rotate(-7deg) translateY(2px);
+  }
+  50% {
+    transform: rotate(7deg) translateY(-1px);
+  }
+}
+@keyframes momo-boy-flail-left {
+  from {
+    transform: rotate(30deg);
+  }
+  to {
+    transform: rotate(90deg);
+  }
+}
+@keyframes momo-boy-flail-right {
+  from {
+    transform: rotate(-85deg);
+  }
+  to {
+    transform: rotate(-25deg);
+  }
+}
+@keyframes momo-boy-kick {
+  from {
+    transform: rotate(-16deg);
+  }
+  to {
+    transform: rotate(18deg) translateY(-3px);
+  }
+}
+@keyframes momo-boy-sulk {
+  0% {
+    transform: translateY(-4px);
+  }
+  35% {
+    transform: translateY(3px) scale(1.02, 0.97);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes momo-boy-open-chair {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  40%,
+  75% {
+    transform: rotate(-58deg);
+  }
+}
+@keyframes momo-boy-chair-open {
+  0% {
+    opacity: 0;
+    transform: translate(29px, -9px) scaleX(0.1) rotate(14deg);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes momo-boy-chair-scissor {
+  from {
+    transform: scaleX(0.08);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes momo-boy-chair-close {
+  0% {
+    transform: none;
+    opacity: 1;
+  }
+  65% {
+    opacity: 1;
+    transform: translateX(25px) scaleX(0.1);
+  }
+  100% {
+    transform: translate(30px, -8px) scale(0.05);
+    opacity: 0;
+  }
+}
+@keyframes momo-boy-content {
+  0%,
+  100% {
+    transform: rotate(-2deg);
+  }
+  50% {
+    transform: rotate(3deg);
+  }
+}
+@keyframes momo-boy-notes {
+  0%,
+  100% {
+    opacity: 0.15;
+    transform: translate(0, 3px);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(3px, -4px);
+  }
+}
+@keyframes momo-boy-seated-toe {
+  0%,
+  100% {
+    transform: translate(3px, 4px) scale(1.2, 0.68);
+  }
+  50% {
+    transform: translate(3px, 2px) scale(1.2, 0.68) rotate(-7deg);
+  }
+}
+@keyframes momo-boy-sleep-breathe {
+  0%,
+  100% {
+    transform: translateY(3px);
+  }
+  50% {
+    transform: translateY(5px) scale(1.012, 0.99);
+  }
+}
+@keyframes momo-boy-doze {
+  0%,
+  100% {
+    transform: rotate(8deg) translateY(2px);
+  }
+  50% {
+    transform: rotate(13deg) translateY(4px);
+  }
+}
+@keyframes momo-boy-snooze {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(2px);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-4px);
+  }
+}
+@keyframes momo-boy-hair-tidy {
+  0%,
+  100% {
+    transform: rotate(-5deg);
+  }
+  30%,
+  70% {
+    transform: rotate(-155deg) translateX(-2px);
+  }
+  50% {
+    transform: rotate(-165deg);
+  }
+}
+@keyframes momo-boy-balance {
+  0%,
+  100% {
+    transform: none;
+  }
+  20%,
+  60% {
+    transform: rotate(-9deg);
+  }
+  40% {
+    transform: rotate(12deg);
+  }
+  80% {
+    transform: rotate(4deg);
+  }
+}
+@keyframes momo-boy-yawn {
+  0%,
+  100% {
+    transform: none;
+  }
+  35%,
+  65% {
+    transform: translateY(-2px) rotate(-8deg);
+  }
+}
+@keyframes momo-boy-yawn-hand {
+  0%,
+  100% {
+    transform: none;
+  }
+  25%,
+  80% {
+    transform: rotate(142deg);
+  }
+}
+body[data-motion='off'] #hubPet * {
+  animation: none !important;
+  transition: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  #hubPet * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

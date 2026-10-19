@@ -1,5 +1,439 @@
-#focusModeButton{display:inline-flex;align-items:center;gap:6px}#focusModeButton[aria-expanded="true"]{background:var(--hub-accent-soft,#ede6f6);border-color:var(--hub-accent,#8d70a5)}
-#focusPanel{position:fixed;z-index:90;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;border:1px solid var(--hub-border,#ded5e8);border-radius:22px;background:var(--hub-surface,#fffdfb);color:var(--hub-text,#4e405b);box-shadow:0 12px 45px #36254624,0 2px 8px #3625460a;font-family:var(--hub-font,system-ui,sans-serif);animation:fp-arrive .22s ease-out;isolation:isolate}#focusPanel[hidden]{display:none!important}#focusPanel *{box-sizing:border-box}#focusPanel .fp-header{display:flex;align-items:center;gap:3px;flex-shrink:0;min-height:49px;padding:7px 9px;background:var(--hub-surface-soft,#f5f1f9);border-bottom:1px solid var(--hub-border,#e5dced)}#focusPanel button{font-family:inherit;cursor:pointer}#focusPanel .fp-drag{min-width:0;display:flex;align-items:center;gap:7px;flex:1;border:0;background:transparent;color:var(--hub-muted,#8a7996);padding:8px 3px;font-size:11px;font-weight:600;touch-action:none;cursor:grab;box-shadow:none}#focusPanel .fp-drag:active{cursor:grabbing}#focusPanel .fp-drag svg{opacity:.6;flex-shrink:0}#focusPanel .fp-icon{padding:6px;border:0;background:transparent;min-height:29px;width:29px;flex-shrink:0;color:var(--hub-muted,#8a7996)}#focusPanel .fp-icon:hover{background:var(--hub-accent-soft,#ece4f4)}#focusPanel .fp-mini-clock{display:none;margin-left:auto;font-variant-numeric:tabular-nums;color:var(--hub-accent,#8e70ab);font-weight:650;font-size:15px}#focusPanel .fp-body{padding:18px 21px 15px;overflow:auto;overscroll-behavior:contain;min-height:0}#focusPanel .fp-intro{display:flex;align-items:center;justify-content:space-between;gap:10px}#focusPanel .fp-eyebrow{font-size:8px;letter-spacing:.14em;font-weight:700;color:var(--hub-muted,#93839d)}#focusPanel .fp-sun{width:19px;height:19px;flex-shrink:0;border-radius:50%;background:#eddba8;box-shadow:0 0 0 4px #eddfa936}#focusPanel .fp-clock-wrap{text-align:center;padding:17px 0 13px}#focusPanel .fp-state{font-size:10px;color:var(--hub-muted,#927da0)}#focusPanel .fp-clock{display:block;margin:8px 0 4px;font-size:48px;font-weight:400;letter-spacing:-.055em;line-height:1.1;font-variant-numeric:tabular-nums;color:var(--hub-text,#6e537e)}#focusPanel .fp-clock[data-long="true"]{font-size:37px}#focusPanel .fp-task{font-size:10px;color:var(--hub-muted,#92809d);white-space:nowrap;text-overflow:ellipsis;overflow:hidden;margin:8px 0 14px;line-height:1.6}#focusPanel .fp-progress{height:3px;background:var(--hub-border,#e8e0ef);border-radius:8px;overflow:hidden}#focusPanel .fp-progress>span{display:block;height:100%;width:0;background:var(--hub-accent,#ae93bd);border-radius:8px;transition:width .4s}#focusPanel .fp-timer-fields{display:flex;gap:9px;margin-bottom:12px}#focusPanel .fp-timer-fields>label{display:flex;flex-direction:column;gap:6px;font-size:9px;font-weight:600;color:var(--hub-muted,#8c7c97);min-width:0;flex:1}#focusPanel .fp-timer-fields>label:first-child{flex:0 0 78px}#focusPanel .fp-timer-fields:has(#fpTaskLabel[hidden])>label:first-child{flex:1}#focusPanel input:not([type="range"]),#focusPanel select{font-family:inherit;font-size:10px;line-height:1.5;min-height:34px;min-width:0;max-width:100%;width:100%;border:1px solid var(--hub-border,#e5dced);border-radius:9px;padding:7px 9px;background:var(--hub-surface,#fffdfc);color:var(--hub-text,#6b547b);box-shadow:none}#focusPanel .fp-timer-actions{display:flex;align-items:center;gap:7px}#focusPanel .fp-button{display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:10px;font-weight:600;line-height:1.5;border:1px solid var(--hub-border,#e5dced);border-radius:10px;padding:8px 11px;min-height:33px;color:var(--hub-text,#735a84);background:var(--hub-surface,#fffdfb);box-shadow:none;transition:background .18s,transform .18s}#focusPanel .fp-button:hover{background:var(--hub-surface-soft,#f1eaf8)}#focusPanel .fp-primary{background:var(--hub-accent,#9470b1);border-color:var(--hub-accent,#9470b1);color:var(--hub-on-accent,#fff);flex:1}#focusPanel .fp-primary:hover{background:var(--hub-accent-strong,var(--hub-accent,#8963a7));filter:brightness(.97)}#focusPanel .fp-quiet{background:transparent;border-color:transparent;color:var(--hub-muted,#9b8aa7)}#focusPanel .fp-soft{background:var(--hub-surface-soft,#f4eff9)}#focusPanel .fp-text{background:transparent;border:0;font-size:9px;font-weight:500;padding:4px 0;min-height:27px;color:var(--hub-muted,#9b88a8)}#focusPanel .fp-audio{border-top:1px solid var(--hub-border,#e8dfef);margin-top:18px;padding-top:12px}#focusPanel .fp-audio-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}#focusPanel .fp-audio-heading h3{font:400 17px Georgia,serif;letter-spacing:-.025em;margin:0;color:var(--hub-text,#765b87)}#focusPanel .fp-source-switch{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;background:var(--hub-surface-soft,#f2edf7);border:1px solid var(--hub-border,#e8dff0);border-radius:12px;margin-bottom:12px}#focusPanel .fp-source-switch .fp-button{padding:7px 4px;font-size:9px;border-color:transparent;background:transparent;min-height:30px;border-radius:8px;color:var(--hub-muted,#93809f)}#focusPanel .fp-source-switch .fp-button[aria-pressed="true"]{background:var(--hub-surface,#fffdfd);color:var(--hub-accent,#9270ac);box-shadow:0 2px 5px #36254608;border-color:var(--hub-border,#e7dded)}#focusPanel .fp-wide-label{display:flex;flex-direction:column;gap:6px;margin:0 0 9px;font-size:9px;font-weight:600;color:var(--hub-muted,#9885a5)}#focusPanel .fp-sound-row{display:flex;align-items:center;gap:12px;margin:10px 0 3px}#focusPanel .fp-volume{display:flex;flex:1;flex-direction:column;gap:3px;font-size:8px;color:var(--hub-muted,#9d8daa);min-width:0;margin:0}#focusPanel .fp-volume input{width:100%;min-width:0;height:17px;margin:0;accent-color:var(--hub-accent,#a385b7);cursor:pointer}#focusPanel .fp-link-row{display:flex;align-items:center;gap:6px}#focusPanel .fp-music-actions{display:flex;justify-content:space-between;gap:9px;margin:7px 0 3px}#focusPanel #fpMusicPane>small{display:block;font-size:9px;line-height:1.7;color:var(--hub-muted,#9f90aa)}#focusPanel .fp-audio-status{font-size:9px;line-height:1.7;color:var(--hub-muted,#95839f);margin:7px 0 0;min-height:15px}#focusPanel .fp-footer{font-size:8px;line-height:1.6;color:var(--hub-muted,#a496ad);margin:14px 0 0;text-align:center}#focusPanel button:focus-visible,#focusPanel input:focus-visible,#focusPanel select:focus-visible{outline:3px solid var(--hub-accent,#b4a0c2);outline-offset:2px}#focusPanel [hidden]{display:none!important}#focusPanel[data-minimized="true"] .fp-body{display:none}#focusPanel[data-minimized="true"] .fp-header{border:0}#focusPanel[data-minimized="true"] .fp-mini-clock{display:inline}#focusPanel[data-minimized="true"]{border-radius:15px}#focusPanel[data-running="true"] .fp-state{color:var(--hub-accent,#9779ad)}body.hub-private #focusPanel .hub-sensitive{filter:blur(5px)}
-@keyframes fp-arrive{from{opacity:.4;transform:translateY(5px)}to{opacity:1;transform:none}}@media(max-width:400px){#focusPanel .fp-body{padding:15px 17px}#focusPanel .fp-clock{font-size:43px}}@media(prefers-reduced-motion:reduce){#focusPanel,#focusPanel *{animation:none!important;transition:none!important}}body[data-motion="off"] #focusPanel,body[data-motion="off"] #focusPanel *{animation:none!important;transition:none!important}
+/* focus-panel.css — Draggable mini focus timer, compact audio controls and phone layout.
+   See docs/FILE-MAP.md. Keep rule order: later selectors can override earlier ones. */
+#focusModeButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+#focusModeButton[aria-expanded='true'] {
+  background: var(--hub-accent-soft, #ede6f6);
+  border-color: var(--hub-accent, #8d70a5);
+}
+#focusPanel {
+  position: fixed;
+  z-index: 90;
+  box-sizing: border-box;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--hub-border, #ded5e8);
+  border-radius: 22px;
+  background: var(--hub-surface, #fffdfb);
+  color: var(--hub-text, #4e405b);
+  box-shadow:
+    0 12px 45px #36254624,
+    0 2px 8px #3625460a;
+  font-family: var(--hub-font, system-ui, sans-serif);
+  animation: fp-arrive 0.22s ease-out;
+  isolation: isolate;
+}
+#focusPanel[hidden] {
+  display: none !important;
+}
+#focusPanel * {
+  box-sizing: border-box;
+}
+#focusPanel .fp-header {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  min-height: 49px;
+  padding: 7px 9px;
+  background: var(--hub-surface-soft, #f5f1f9);
+  border-bottom: 1px solid var(--hub-border, #e5dced);
+}
+#focusPanel button {
+  font-family: inherit;
+  cursor: pointer;
+}
+#focusPanel .fp-drag {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--hub-muted, #8a7996);
+  padding: 8px 3px;
+  font-size: 11px;
+  font-weight: 600;
+  touch-action: none;
+  cursor: grab;
+  box-shadow: none;
+}
+#focusPanel .fp-drag:active {
+  cursor: grabbing;
+}
+#focusPanel .fp-drag svg {
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+#focusPanel .fp-icon {
+  padding: 6px;
+  border: 0;
+  background: transparent;
+  min-height: 29px;
+  width: 29px;
+  flex-shrink: 0;
+  color: var(--hub-muted, #8a7996);
+}
+#focusPanel .fp-icon:hover {
+  background: var(--hub-accent-soft, #ece4f4);
+}
+#focusPanel .fp-mini-clock {
+  display: none;
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  color: var(--hub-accent, #8e70ab);
+  font-weight: 650;
+  font-size: 15px;
+}
+#focusPanel .fp-body {
+  padding: 18px 21px 15px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  min-height: 0;
+}
+#focusPanel .fp-intro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+#focusPanel .fp-eyebrow {
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  font-weight: 700;
+  color: var(--hub-muted, #93839d);
+}
+#focusPanel .fp-sun {
+  width: 19px;
+  height: 19px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #eddba8;
+  box-shadow: 0 0 0 4px #eddfa936;
+}
+#focusPanel .fp-clock-wrap {
+  text-align: center;
+  padding: 17px 0 13px;
+}
+#focusPanel .fp-state {
+  font-size: 10px;
+  color: var(--hub-muted, #927da0);
+}
+#focusPanel .fp-clock {
+  display: block;
+  margin: 8px 0 4px;
+  font-size: 48px;
+  font-weight: 400;
+  letter-spacing: -0.055em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--hub-text, #6e537e);
+}
+#focusPanel .fp-clock[data-long='true'] {
+  font-size: 37px;
+}
+#focusPanel .fp-task {
+  font-size: 10px;
+  color: var(--hub-muted, #92809d);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  margin: 8px 0 14px;
+  line-height: 1.6;
+}
+#focusPanel .fp-progress {
+  height: 3px;
+  background: var(--hub-border, #e8e0ef);
+  border-radius: 8px;
+  overflow: hidden;
+}
+#focusPanel .fp-progress > span {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--hub-accent, #ae93bd);
+  border-radius: 8px;
+  transition: width 0.4s;
+}
+#focusPanel .fp-timer-fields {
+  display: flex;
+  gap: 9px;
+  margin-bottom: 12px;
+}
+#focusPanel .fp-timer-fields > label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--hub-muted, #8c7c97);
+  min-width: 0;
+  flex: 1;
+}
+#focusPanel .fp-timer-fields > label:first-child {
+  flex: 0 0 78px;
+}
+#focusPanel .fp-timer-fields:has(#fpTaskLabel[hidden]) > label:first-child {
+  flex: 1;
+}
+#focusPanel input:not([type='range']),
+#focusPanel select {
+  font-family: inherit;
+  font-size: 10px;
+  line-height: 1.5;
+  min-height: 34px;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  border: 1px solid var(--hub-border, #e5dced);
+  border-radius: 9px;
+  padding: 7px 9px;
+  background: var(--hub-surface, #fffdfc);
+  color: var(--hub-text, #6b547b);
+  box-shadow: none;
+}
+#focusPanel .fp-timer-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+#focusPanel .fp-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.5;
+  border: 1px solid var(--hub-border, #e5dced);
+  border-radius: 10px;
+  padding: 8px 11px;
+  min-height: 33px;
+  color: var(--hub-text, #735a84);
+  background: var(--hub-surface, #fffdfb);
+  box-shadow: none;
+  transition:
+    background 0.18s,
+    transform 0.18s;
+}
+#focusPanel .fp-button:hover {
+  background: var(--hub-surface-soft, #f1eaf8);
+}
+#focusPanel .fp-primary {
+  background: var(--hub-accent, #9470b1);
+  border-color: var(--hub-accent, #9470b1);
+  color: var(--hub-on-accent, #fff);
+  flex: 1;
+}
+#focusPanel .fp-primary:hover {
+  background: var(--hub-accent-strong, var(--hub-accent, #8963a7));
+  filter: brightness(0.97);
+}
+#focusPanel .fp-quiet {
+  background: transparent;
+  border-color: transparent;
+  color: var(--hub-muted, #9b8aa7);
+}
+#focusPanel .fp-soft {
+  background: var(--hub-surface-soft, #f4eff9);
+}
+#focusPanel .fp-text {
+  background: transparent;
+  border: 0;
+  font-size: 9px;
+  font-weight: 500;
+  padding: 4px 0;
+  min-height: 27px;
+  color: var(--hub-muted, #9b88a8);
+}
+#focusPanel .fp-audio {
+  border-top: 1px solid var(--hub-border, #e8dfef);
+  margin-top: 18px;
+  padding-top: 12px;
+}
+#focusPanel .fp-audio-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+#focusPanel .fp-audio-heading h3 {
+  font:
+    400 17px Georgia,
+    serif;
+  letter-spacing: -0.025em;
+  margin: 0;
+  color: var(--hub-text, #765b87);
+}
+#focusPanel .fp-source-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  background: var(--hub-surface-soft, #f2edf7);
+  border: 1px solid var(--hub-border, #e8dff0);
+  border-radius: 12px;
+  margin-bottom: 12px;
+}
+#focusPanel .fp-source-switch .fp-button {
+  padding: 7px 4px;
+  font-size: 9px;
+  border-color: transparent;
+  background: transparent;
+  min-height: 30px;
+  border-radius: 8px;
+  color: var(--hub-muted, #93809f);
+}
+#focusPanel .fp-source-switch .fp-button[aria-pressed='true'] {
+  background: var(--hub-surface, #fffdfd);
+  color: var(--hub-accent, #9270ac);
+  box-shadow: 0 2px 5px #36254608;
+  border-color: var(--hub-border, #e7dded);
+}
+#focusPanel .fp-wide-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 9px;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--hub-muted, #9885a5);
+}
+#focusPanel .fp-sound-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 0 3px;
+}
+#focusPanel .fp-volume {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 8px;
+  color: var(--hub-muted, #9d8daa);
+  min-width: 0;
+  margin: 0;
+}
+#focusPanel .fp-volume input {
+  width: 100%;
+  min-width: 0;
+  height: 17px;
+  margin: 0;
+  accent-color: var(--hub-accent, #a385b7);
+  cursor: pointer;
+}
+#focusPanel .fp-link-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+#focusPanel .fp-music-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 9px;
+  margin: 7px 0 3px;
+}
+#focusPanel #fpMusicPane > small {
+  display: block;
+  font-size: 9px;
+  line-height: 1.7;
+  color: var(--hub-muted, #9f90aa);
+}
+#focusPanel .fp-audio-status {
+  font-size: 9px;
+  line-height: 1.7;
+  color: var(--hub-muted, #95839f);
+  margin: 7px 0 0;
+  min-height: 15px;
+}
+#focusPanel .fp-footer {
+  font-size: 8px;
+  line-height: 1.6;
+  color: var(--hub-muted, #a496ad);
+  margin: 14px 0 0;
+  text-align: center;
+}
+#focusPanel button:focus-visible,
+#focusPanel input:focus-visible,
+#focusPanel select:focus-visible {
+  outline: 3px solid var(--hub-accent, #b4a0c2);
+  outline-offset: 2px;
+}
+#focusPanel [hidden] {
+  display: none !important;
+}
+#focusPanel[data-minimized='true'] .fp-body {
+  display: none;
+}
+#focusPanel[data-minimized='true'] .fp-header {
+  border: 0;
+}
+#focusPanel[data-minimized='true'] .fp-mini-clock {
+  display: inline;
+}
+#focusPanel[data-minimized='true'] {
+  border-radius: 15px;
+}
+#focusPanel[data-running='true'] .fp-state {
+  color: var(--hub-accent, #9779ad);
+}
+body.hub-private #focusPanel .hub-sensitive {
+  filter: blur(5px);
+}
+@keyframes fp-arrive {
+  from {
+    opacity: 0.4;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (max-width: 400px) {
+  #focusPanel .fp-body {
+    padding: 15px 17px;
+  }
+  #focusPanel .fp-clock {
+    font-size: 43px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #focusPanel,
+  #focusPanel * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+body[data-motion='off'] #focusPanel,
+body[data-motion='off'] #focusPanel * {
+  animation: none !important;
+  transition: none !important;
+}
 
-#focusPanel .fp-header .fp-icon{padding:6px;min-height:29px;width:29px;border:0}#focusPanel .fp-header .fp-icon svg{flex-shrink:0;width:15px;height:15px}#focusPanel .fp-drag>span:first-of-type{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#focusPanel .fp-mini-clock{flex-shrink:0}
+#focusPanel .fp-header .fp-icon {
+  padding: 6px;
+  min-height: 29px;
+  width: 29px;
+  border: 0;
+}
+#focusPanel .fp-header .fp-icon svg {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+}
+#focusPanel .fp-drag > span:first-of-type {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#focusPanel .fp-mini-clock {
+  flex-shrink: 0;
+}

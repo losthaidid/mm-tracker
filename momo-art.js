@@ -1,21 +1,32 @@
+/**
+ * momo-art.js
+ * Original Momo character artwork and render helpers.
+ * Uses assets/momo/anime-rig.webp and CSS animation. No saved account data.
+ * Change appearance here and momo-anime.css; behaviour belongs in the other Momo modules.
+ * File map: docs/FILE-MAP.md
+ */
 /* Original soft-3D anime artwork, assembled as a browser-animated rig.
  * SVG viewports isolate the optimized atlas into six illustrated parts.
  * Eyes are live vector layers, so Momo can keep watching the cursor. */
-(function(root){
-'use strict';
-const ATLAS='./assets/momo/anime-rig.webp?v=20261017-momo-render-fix';
-function accessory(name){
- if(name==='none')return '';
- if(name==='helmet')return '<path d="M39 37a31 29 0 0162 0H39" fill="#f2c362" stroke="#9c753b" stroke-width="1.2"/><path d="M36 37h68M70 12v19" stroke="#ffe8a6" stroke-width="4" stroke-linecap="round"/>';
- if(name==='partyhat')return '<path d="M48 20L66-4 86 19Z" fill="#c4adf0" stroke="#765d9c"/><path d="m52 16 25-6m-20 1 12-9" stroke="#f7d486" stroke-width="3"/><circle cx="66" cy="-3" r="4" fill="#f4b8c9"/>';
- return '<g fill="none" stroke="#594e54" stroke-width=".9"><rect x="50.7" y="48.9" width="14.1" height="10.8" rx="4.2"/><rect x="74.4" y="48" width="14.1" height="10.8" rx="4.2"/><path d="M65 53.5q4.5-2.8 9.3-.5m-24-.6-6-1m44-1 6-1"/></g>';
-}
-function svg(name='glasses'){
- // Keep each raster image in its rendered viewport. A shared image in <defs>
- // can become Chromium's broken-image placeholder when cloned with <use>.
- const part=(cls,source,target,clip='')=>`<g class="${cls}"><svg x="${target[0]}" y="${target[1]}" width="${target[2]}" height="${target[3]}" viewBox="${source.join(' ')}" preserveAspectRatio="none" overflow="hidden" style="width:${target[2]}px;height:${target[3]}px;overflow:hidden;filter:none"><g${clip?` clip-path="url(#${clip})"`:''}><image class="momo-part-image" href="${ATLAS}" width="1024" height="1536"/></g></svg></g>`;
- const eye=(side,x,y)=>`<g class="momo-eye-${side}"><g clip-path="url(#momo-eye-clip-${side})"><g class="momo-pupils"><ellipse cx="${x}" cy="${y+.6}" rx="3.75" ry="4.65" fill="url(#momo-iris)"/><ellipse cx="${x}" cy="${y}" rx="1.85" ry="3.1" fill="#182b34"/><ellipse cx="${x-1.2}" cy="${y-2.4}" rx="1.45" ry="1.7" fill="#fff"/><circle cx="${x+1.6}" cy="${y+2.4}" r=".7" fill="#d5ffff"/></g></g></g>`;
- return `<svg class="momo-anime-art" data-art-ready="false" viewBox="0 0 140 155" role="img" aria-label="Momo, an original anime boy in a mint hoodie" xmlns="http://www.w3.org/2000/svg">
+(function (root) {
+  'use strict';
+  const ATLAS = './assets/momo/anime-rig.webp?v=20261017-momo-render-fix';
+  function accessory(name) {
+    if (name === 'none') return '';
+    if (name === 'helmet')
+      return '<path d="M39 37a31 29 0 0162 0H39" fill="#f2c362" stroke="#9c753b" stroke-width="1.2"/><path d="M36 37h68M70 12v19" stroke="#ffe8a6" stroke-width="4" stroke-linecap="round"/>';
+    if (name === 'partyhat')
+      return '<path d="M48 20L66-4 86 19Z" fill="#c4adf0" stroke="#765d9c"/><path d="m52 16 25-6m-20 1 12-9" stroke="#f7d486" stroke-width="3"/><circle cx="66" cy="-3" r="4" fill="#f4b8c9"/>';
+    return '<g fill="none" stroke="#594e54" stroke-width=".9"><rect x="50.7" y="48.9" width="14.1" height="10.8" rx="4.2"/><rect x="74.4" y="48" width="14.1" height="10.8" rx="4.2"/><path d="M65 53.5q4.5-2.8 9.3-.5m-24-.6-6-1m44-1 6-1"/></g>';
+  }
+  function svg(name = 'glasses') {
+    // Keep each raster image in its rendered viewport. A shared image in <defs>
+    // can become Chromium's broken-image placeholder when cloned with <use>.
+    const part = (cls, source, target, clip = '') =>
+      `<g class="${cls}"><svg x="${target[0]}" y="${target[1]}" width="${target[2]}" height="${target[3]}" viewBox="${source.join(' ')}" preserveAspectRatio="none" overflow="hidden" style="width:${target[2]}px;height:${target[3]}px;overflow:hidden;filter:none"><g${clip ? ` clip-path="url(#${clip})"` : ''}><image class="momo-part-image" href="${ATLAS}" width="1024" height="1536"/></g></svg></g>`;
+    const eye = (side, x, y) =>
+      `<g class="momo-eye-${side}"><g clip-path="url(#momo-eye-clip-${side})"><g class="momo-pupils"><ellipse cx="${x}" cy="${y + 0.6}" rx="3.75" ry="4.65" fill="url(#momo-iris)"/><ellipse cx="${x}" cy="${y}" rx="1.85" ry="3.1" fill="#182b34"/><ellipse cx="${x - 1.2}" cy="${y - 2.4}" rx="1.45" ry="1.7" fill="#fff"/><circle cx="${x + 1.6}" cy="${y + 2.4}" r=".7" fill="#d5ffff"/></g></g></g>`;
+    return `<svg class="momo-anime-art" data-art-ready="false" viewBox="0 0 140 155" role="img" aria-label="Momo, an original anime boy in a mint hoodie" xmlns="http://www.w3.org/2000/svg">
  <defs>
   <radialGradient id="momo-iris" cx="45%" cy="25%"><stop stop-color="#244856"/><stop offset=".56" stop-color="#4d8d91"/><stop offset=".83" stop-color="#78c6bc"/><stop offset="1" stop-color="#244553"/></radialGradient>
   <radialGradient id="momo-skin"><stop stop-color="#f8d0b7"/><stop offset="1" stop-color="#f5c7b0"/></radialGradient>
@@ -35,14 +46,14 @@ function svg(name='glasses'){
   <path class="momo-chair-seat" d="m43 123 48-1 6 8H42Z" fill="#b491ac" stroke="#7d637e" stroke-width="1.2"/>
  </g>
  <g class="pet-body">
-  ${part('momo-foot-left',[161,962,198,561],[47,108,23,44],'momo-leg-left-clip')}
-  ${part('momo-foot-right',[665,962,202,561],[70,108,23,44],'momo-leg-right-clip')}
-  ${part('momo-torso',[570,50,400,460],[45,75,50,39])}
-  ${part('momo-arm-left',[158,515,198,467],[36,78,20,47],'momo-arm-left-clip')}
-  ${part('momo-arm-right',[668,515,199,467],[84,78,20,47],'momo-arm-right-clip')}
+  ${part('momo-foot-left', [161, 962, 198, 561], [47, 108, 23, 44], 'momo-leg-left-clip')}
+  ${part('momo-foot-right', [665, 962, 202, 561], [70, 108, 23, 44], 'momo-leg-right-clip')}
+  ${part('momo-torso', [570, 50, 400, 460], [45, 75, 50, 39])}
+  ${part('momo-arm-left', [158, 515, 198, 467], [36, 78, 20, 47], 'momo-arm-left-clip')}
+  ${part('momo-arm-right', [668, 515, 199, 467], [84, 78, 20, 47], 'momo-arm-right-clip')}
   <g class="momo-face">
-   ${part('momo-head',[45,0,508,510],[29,1,82,82])}
-   <g class="pet-eye">${eye('left',58.1,53.4)}${eye('right',80.6,52.5)}</g>
+   ${part('momo-head', [45, 0, 508, 510], [29, 1, 82, 82])}
+   <g class="pet-eye">${eye('left', 58.1, 53.4)}${eye('right', 80.6, 52.5)}</g>
    <g class="momo-eye-lids" fill="url(#momo-skin)"><ellipse cx="58.1" cy="53.4" rx="5.3" ry="4.5"/><ellipse cx="80.6" cy="52.5" rx="5.45" ry="4.5"/></g>
    <g class="momo-eye-smiles" fill="none" stroke="#634a44" stroke-width="1.15" stroke-linecap="round"><path d="M53.7 54q4.5-4.7 9 0m13.4-1q4.5-4.7 9 0"/></g>
    <path class="momo-eye-wink" d="M76 53q4.5-3.5 9 0" fill="none" stroke="#634a44" stroke-width="1.2" stroke-linecap="round"/>
@@ -66,15 +77,20 @@ function svg(name='glasses'){
  <g class="momo-sleep-marks" fill="#8a83bb" aria-hidden="true"><text x="106" y="45" font-size="8" font-family="system-ui">z</text><text x="114" y="34" font-size="11" font-family="system-ui">z</text><text x="124" y="20" font-size="14" font-family="system-ui">Z</text></g>
  <path class="momo-surprise-mark" d="m109 39 2-8m-1 12h.1m7-8 4-5" fill="none" stroke="#e9aa62" stroke-width="2" stroke-linecap="round"/>
  </svg>`;
-}
-function mount(container){
- const art=container?.querySelector('.momo-anime-art'),source=art?.querySelector('.momo-part-image')?.getAttribute('href');
- if(!art||!source)return;
- art.dataset.artReady='false';
- const image=new root.Image();
- image.onload=()=>{art.dataset.artReady='true';};
- image.onerror=()=>{art.dataset.artReady='false';};
- image.src=source;
-}
-root.WorkHubMomoArt=Object.freeze({svg,accessory,mount});
+  }
+  function mount(container) {
+    const art = container?.querySelector('.momo-anime-art'),
+      source = art?.querySelector('.momo-part-image')?.getAttribute('href');
+    if (!art || !source) return;
+    art.dataset.artReady = 'false';
+    const image = new root.Image();
+    image.onload = () => {
+      art.dataset.artReady = 'true';
+    };
+    image.onerror = () => {
+      art.dataset.artReady = 'false';
+    };
+    image.src = source;
+  }
+  root.WorkHubMomoArt = Object.freeze({ svg, accessory, mount });
 })(window);
