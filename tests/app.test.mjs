@@ -23,7 +23,8 @@ async function app(t,{storage={},rpcError=null,remote=null,login=true,styles=fal
  const intervals=[],frames=new Map();let nextFrame=1;
  window.setTimeout=()=>0;window.setInterval=(callback,ms)=>{intervals.push({callback,ms});return intervals.length;};
  window.requestAnimationFrame=callback=>{const id=nextFrame++;frames.set(id,callback);return id;};window.cancelAnimationFrame=id=>frames.delete(id);
- if(styles){const style=window.document.createElement('style');style.textContent=['studio.css','music.css','atmosphere.css','workbench.css','lab-workshop.css','soundscape.css','momo-moments.css','workspace-upgrades.css','workspace-features.css','momo-anime.css','validator-studio.css','batch-a.css','work-library.css','ticket-workspace.css','task-workspace.css','focus-panel.css','momo-world.css','claims.css','recipients.css','settings-panel.css'].map(file=>readFileSync(new URL('../'+file,import.meta.url),'utf8')).join('\n');window.document.head.append(style);}
+ const baseStyle=window.document.createElement('style');baseStyle.textContent=readFileSync(new URL('../base.css',import.meta.url),'utf8');window.document.head.append(baseStyle);
+ if(styles){const style=window.document.createElement('style');style.textContent=[...window.document.querySelectorAll('link[rel="stylesheet"]')].map(link=>new URL(link.href).pathname.split('/').at(-1)).filter(file=>file!=='base.css').map(file=>readFileSync(new URL('../'+file,import.meta.url),'utf8')).join('\n');window.document.head.append(style);}
  window.HTMLDialogElement.prototype.showModal=function(){this.setAttribute('open','');};
  window.HTMLDialogElement.prototype.close=function(){this.removeAttribute('open');};
  window.confirm=()=>true;
@@ -43,9 +44,9 @@ async function app(t,{storage={},rpcError=null,remote=null,login=true,styles=fal
   }
  };
  window.MMTrackerSupabase={createClient:()=>client};
- for(const file of ['sync-merge.js','momo-art.js','momo-life.js','music.js','momo-world-art.js','atmosphere.js','lab-workshop.js','workspace-upgrades.js','workspace-features.js','workbench.js','lofi-engine.js','soundscape.js','momo-moments.js','reminders.js','reports.js','validator-engine.js','validator-files.js','validator-studio.js','batch-a-engine.js','batch-a.js','work-library-engine.js','work-library.js','ticket-workspace.js','focus-panel.js','momo-adventures.js','claims-engine.js','claims.js','recipients-engine.js','recipients.js','settings-panel.js','studio.js'])window.eval(readFileSync(new URL('../'+file,import.meta.url),'utf8'));
- const script=[...window.document.scripts].find(script=>script.textContent.includes("'use strict'"));
- window.eval(script.textContent+`\nwindow.api={
+ // Use production's script order, replacing only the network client with the stub above.
+ for(const script of window.document.querySelectorAll('script[src]')){const file=new URL(script.src).pathname.split('/mm-tracker/')[1];if(!['supabase-client.js','app.js'].includes(file))window.eval(readFileSync(new URL('../'+file,import.meta.url),'utf8'));}
+ window.eval(readFileSync(new URL('../app.js',import.meta.url),'utf8')+`\nwindow.api={
   hub,queueCloudReview,state:()=>state,steps:()=>STEPS,cloud,KEY,payload,parseBackup,emptyState,validate,mutate,loadCloud,flushCloud,refreshCloud,retryCloud,closeModal,
   openMMAreaManager,saveMMAreas,editMMAreaDraft,canonicalArea,summarizeGovernanceRows,
   renderProjectCompanies,editCompany,saveCompany,editProcess,saveProcess,editProject,saveProject,
@@ -792,8 +793,8 @@ test('Momo watches from a reserved seat and randomly dances only during visible 
 });
 
 test('YouTube API loading errors are recoverable and the live policy allows only required integration origins',async t=>{
- const {api,document,window}=await app(t);api.hub.music.open();await api.hub.music.search('M7lc1UVf-VE');const script=document.getElementById('musicYouTubeAPI');assert.equal(script.src,'https://www.youtube.com/iframe_api');script.dispatchEvent(new window.Event('error'));assert.match(api.hub.music.snapshot().status,/could not load/);api.hub.music.close();api.hub.music.open();assert.equal(document.querySelectorAll('#musicYouTubeAPI').length,1);const instances=mockYouTube(window);window.onYouTubeIframeAPIReady();assert.equal(instances.length,1);instances[0].events.onError({data:150});assert.match(api.hub.music.snapshot().status,/cannot play on other websites/);
- const csp=document.querySelector('meta[http-equiv="Content-Security-Policy"]').content;assert.match(csp,/frame-src https:\/\/www.youtube-nocookie.com https:\/\/www.youtube.com/);assert.match(csp,/connect-src https:\/\/aaotojqkiewbhtnrlcur.supabase.co https:\/\/www.googleapis.com/);assert.equal(csp.includes('https://*'),false);const css=readFileSync(new URL('../music.css',import.meta.url),'utf8');assert.match(css,/min-width: 200px; min-height: 200px/);
+ const {api,document,window}=await app(t,{styles:true});api.hub.music.open();await api.hub.music.search('M7lc1UVf-VE');const script=document.getElementById('musicYouTubeAPI');assert.equal(script.src,'https://www.youtube.com/iframe_api');script.dispatchEvent(new window.Event('error'));assert.match(api.hub.music.snapshot().status,/could not load/);api.hub.music.close();api.hub.music.open();assert.equal(document.querySelectorAll('#musicYouTubeAPI').length,1);const instances=mockYouTube(window);window.onYouTubeIframeAPIReady();assert.equal(instances.length,1);instances[0].events.onError({data:150});assert.match(api.hub.music.snapshot().status,/cannot play on other websites/);
+ const csp=document.querySelector('meta[http-equiv="Content-Security-Policy"]').content;assert.match(csp,/frame-src https:\/\/www.youtube-nocookie.com https:\/\/www.youtube.com/);assert.match(csp,/connect-src https:\/\/aaotojqkiewbhtnrlcur.supabase.co https:\/\/www.googleapis.com/);assert.equal(csp.includes('https://*'),false);const playerStyle=window.getComputedStyle(document.querySelector('#musicCorner iframe'));assert.equal(playerStyle.minWidth,'200px');assert.equal(playerStyle.minHeight,'200px');
 });
 
 test('the music corner defaults to only a small video screen and keeps Momo outside it',async t=>{

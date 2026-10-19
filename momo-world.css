@@ -1,116 +1,825 @@
+/* momo-world.css — Visitor artwork, window scenes, umbrella, mischief and soccer surprises.
+   See docs/FILE-MAP.md. Keep rule order: later selectors can override earlier ones. */
 /* Storybook window: one landscape and one weather layer at a time. */
-.world-scene{display:none}
-.world-window-weather>g{display:none}
-.ambient-landscape:has(.world-scenery)>g>.ambient-hill-back,.ambient-landscape:has(.world-scenery)>g>.ambient-hill-front,.ambient-landscape:has(.world-scenery)>g>.ambient-tree{display:none}
-[data-scenery="valley"] .world-scene-valley,[data-scenery="coast"] .world-scene-coast,[data-scenery="city"] .world-scene-city,[data-scenery="mountains"] .world-scene-mountains,[data-scenery="forest"] .world-scene-forest,[data-scenery="lake"] .world-scene-lake,[data-scenery="garden"] .world-scene-garden,[data-scenery="winter"] .world-scene-winter{display:inline}
-[data-weather="rain"] .world-rain,[data-weather="snow"] .world-snow,[data-weather="fog"] .world-fog,[data-weather="rainbow"] .world-rainbow,[data-weather="breeze"] .world-breeze,[data-weather="aurora"] .world-aurora{display:inline}
+.world-scene {
+  display: none;
+}
+.world-window-weather > g {
+  display: none;
+}
+.ambient-landscape:has(.world-scenery) > g > .ambient-hill-back,
+.ambient-landscape:has(.world-scenery) > g > .ambient-hill-front,
+.ambient-landscape:has(.world-scenery) > g > .ambient-tree {
+  display: none;
+}
+[data-scenery='valley'] .world-scene-valley,
+[data-scenery='coast'] .world-scene-coast,
+[data-scenery='city'] .world-scene-city,
+[data-scenery='mountains'] .world-scene-mountains,
+[data-scenery='forest'] .world-scene-forest,
+[data-scenery='lake'] .world-scene-lake,
+[data-scenery='garden'] .world-scene-garden,
+[data-scenery='winter'] .world-scene-winter {
+  display: inline;
+}
+[data-weather='rain'] .world-rain,
+[data-weather='snow'] .world-snow,
+[data-weather='fog'] .world-fog,
+[data-weather='rainbow'] .world-rainbow,
+[data-weather='breeze'] .world-breeze,
+[data-weather='aurora'] .world-aurora {
+  display: inline;
+}
 /* Explicit preview choices override the inherited scene behind the dialog. */
-#atmospherePreview .world-scene,#atmospherePreview .world-window-weather>g{display:none}
-#atmospherePreview[data-scenery="valley"] .world-scene-valley,#atmospherePreview[data-scenery="coast"] .world-scene-coast,#atmospherePreview[data-scenery="city"] .world-scene-city,#atmospherePreview[data-scenery="mountains"] .world-scene-mountains,#atmospherePreview[data-scenery="forest"] .world-scene-forest,#atmospherePreview[data-scenery="lake"] .world-scene-lake,#atmospherePreview[data-scenery="garden"] .world-scene-garden,#atmospherePreview[data-scenery="winter"] .world-scene-winter{display:inline}
-#atmospherePreview[data-weather="rain"] .world-rain,#atmospherePreview[data-weather="snow"] .world-snow,#atmospherePreview[data-weather="fog"] .world-fog,#atmospherePreview[data-weather="rainbow"] .world-rainbow,#atmospherePreview[data-weather="breeze"] .world-breeze,#atmospherePreview[data-weather="aurora"] .world-aurora{display:inline}
-[data-phase="night"] .world-scenery{filter:brightness(.72) saturate(.7)}
-:is(#hubAtmosphereCard,#hubAtmospherePocket,#atmospherePreview):is([data-weather="cloudy"],[data-weather="rain"],[data-weather="fog"]) .ambient-solar-orbit{opacity:.35}
-:is(#hubAtmosphereCard,#hubAtmospherePocket,#atmospherePreview):is([data-weather="cloudy"],[data-weather="rain"]) .ambient-clouds{filter:brightness(.8);opacity:.9}
-.world-rain{animation:world-rain .9s linear infinite}.world-snow circle{animation:world-snow 5s linear infinite;animation-delay:calc(var(--flake) * -.41s)}.world-breeze{animation:world-breeze 6s ease-in-out infinite}.world-fog{animation:world-fog 14s ease-in-out infinite alternate}.world-aurora{animation:world-aurora 9s ease-in-out infinite alternate;transform-origin:120px 40px}
-.world-window-options select{width:100%;margin-top:6px}.world-window-options{margin-top:16px}
-body .hub-visitor.is-chasing{opacity:1;will-change:left,top;animation:none;transform:none}.hub-visitor.is-chasing .visitor-art{animation:world-visitor-bob .5s ease-in-out infinite alternate}.hub-visitor[data-visitor="rabbit"] .visitor-art{animation-duration:.35s}.hub-visitor[data-visitor="turtle"] .visitor-art{animation-duration:1.4s}
+#atmospherePreview .world-scene,
+#atmospherePreview .world-window-weather > g {
+  display: none;
+}
+#atmospherePreview[data-scenery='valley'] .world-scene-valley,
+#atmospherePreview[data-scenery='coast'] .world-scene-coast,
+#atmospherePreview[data-scenery='city'] .world-scene-city,
+#atmospherePreview[data-scenery='mountains'] .world-scene-mountains,
+#atmospherePreview[data-scenery='forest'] .world-scene-forest,
+#atmospherePreview[data-scenery='lake'] .world-scene-lake,
+#atmospherePreview[data-scenery='garden'] .world-scene-garden,
+#atmospherePreview[data-scenery='winter'] .world-scene-winter {
+  display: inline;
+}
+#atmospherePreview[data-weather='rain'] .world-rain,
+#atmospherePreview[data-weather='snow'] .world-snow,
+#atmospherePreview[data-weather='fog'] .world-fog,
+#atmospherePreview[data-weather='rainbow'] .world-rainbow,
+#atmospherePreview[data-weather='breeze'] .world-breeze,
+#atmospherePreview[data-weather='aurora'] .world-aurora {
+  display: inline;
+}
+[data-phase='night'] .world-scenery {
+  filter: brightness(0.72) saturate(0.7);
+}
+:is(#hubAtmosphereCard, #hubAtmospherePocket, #atmospherePreview):is(
+    [data-weather='cloudy'],
+    [data-weather='rain'],
+    [data-weather='fog']
+  )
+  .ambient-solar-orbit {
+  opacity: 0.35;
+}
+:is(#hubAtmosphereCard, #hubAtmospherePocket, #atmospherePreview):is(
+    [data-weather='cloudy'],
+    [data-weather='rain']
+  )
+  .ambient-clouds {
+  filter: brightness(0.8);
+  opacity: 0.9;
+}
+.world-rain {
+  animation: world-rain 0.9s linear infinite;
+}
+.world-snow circle {
+  animation: world-snow 5s linear infinite;
+  animation-delay: calc(var(--flake) * -0.41s);
+}
+.world-breeze {
+  animation: world-breeze 6s ease-in-out infinite;
+}
+.world-fog {
+  animation: world-fog 14s ease-in-out infinite alternate;
+}
+.world-aurora {
+  animation: world-aurora 9s ease-in-out infinite alternate;
+  transform-origin: 120px 40px;
+}
+.world-window-options select {
+  width: 100%;
+  margin-top: 6px;
+}
+.world-window-options {
+  margin-top: 16px;
+}
+body .hub-visitor.is-chasing {
+  opacity: 1;
+  will-change: left, top;
+  animation: none;
+  transform: none;
+}
+.hub-visitor.is-chasing .visitor-art {
+  animation: world-visitor-bob 0.5s ease-in-out infinite alternate;
+}
+.hub-visitor[data-visitor='rabbit'] .visitor-art {
+  animation-duration: 0.35s;
+}
+.hub-visitor[data-visitor='turtle'] .visitor-art {
+  animation-duration: 1.4s;
+}
 /* One steady umbrella: the controller reserves its full canopy footprint. */
-body #hubMomoUmbrella{position:absolute;left:10%;top:-48%;width:96%;height:90%;pointer-events:none;transform:none;animation:none;z-index:3}
-#hubMomoUmbrella svg{width:100%;height:100%;display:block;overflow:visible}
-body:not([data-motion="off"]) #hubPet[data-pose="umbrella-walk"] .pet-body{animation:none;transform:none}
-#hubPet[data-pose="umbrella-walk"] .momo-arm-right{transform:rotate(125deg);animation:none}
-#hubPet[data-pose="umbrella-walk"] .momo-arm-left{animation:world-umbrella-arm 1.1s ease-in-out infinite alternate}
-#hubPet[data-pose="umbrella-walk"] .momo-foot-left{animation:world-step .85s ease-in-out infinite alternate}
-#hubPet[data-pose="umbrella-walk"] .momo-foot-right{animation:world-step .85s -.85s ease-in-out infinite alternate}
+body #hubMomoUmbrella {
+  position: absolute;
+  left: 10%;
+  top: -48%;
+  width: 96%;
+  height: 90%;
+  pointer-events: none;
+  transform: none;
+  animation: none;
+  z-index: 3;
+}
+#hubMomoUmbrella svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+body:not([data-motion='off']) #hubPet[data-pose='umbrella-walk'] .pet-body {
+  animation: none;
+  transform: none;
+}
+#hubPet[data-pose='umbrella-walk'] .momo-arm-right {
+  transform: rotate(125deg);
+  animation: none;
+}
+#hubPet[data-pose='umbrella-walk'] .momo-arm-left {
+  animation: world-umbrella-arm 1.1s ease-in-out infinite alternate;
+}
+#hubPet[data-pose='umbrella-walk'] .momo-foot-left {
+  animation: world-step 0.85s ease-in-out infinite alternate;
+}
+#hubPet[data-pose='umbrella-walk'] .momo-foot-right {
+  animation: world-step 0.85s -0.85s ease-in-out infinite alternate;
+}
 /* Quick feet, glances and eight new finite idle gestures. */
-#hubPet[data-facing="left"] .pet-body{scale:-1 1}
-body:not([data-motion="off"]) #hubPet[data-pose="run"] .pet-body{animation:world-run .22s ease-in-out infinite}
-#hubPet[data-pose="run"] .momo-foot-left{animation:world-run-foot .22s linear infinite alternate}
-#hubPet[data-pose="run"] .momo-foot-right{animation:world-run-foot .22s -.22s linear infinite alternate}
-#hubPet[data-pose="run"] .momo-arm-left{animation:world-run-arm .22s linear infinite alternate}
-#hubPet[data-pose="run"] .momo-arm-right{animation:world-run-arm .22s -.22s linear infinite alternate}
-#hubPet[data-pose="window-watch"] .momo-face{transform:translateX(-3px) rotate(-9deg)}
-#hubPet[data-pose="window-watch"] .momo-arm-left{transform:rotate(-95deg)}
-#hubPet[data-pose="window-watch"] .momo-arm-right{transform:rotate(70deg)}
-#hubPet[data-pose="window-watch"] .pet-body{animation:world-window-peek 3s ease-in-out infinite}
-#hubPet[data-pose="mischief-pull"] .pet-body{animation:world-tug .65s ease-in-out infinite}
-#hubPet[data-pose="mischief-pull"] .momo-arm-left{transform:rotate(70deg)}
-#hubPet[data-pose="mischief-pull"] .momo-arm-right{transform:rotate(100deg)}
-#hubPet[data-pose="mischief-pull"] .momo-foot-right{transform:translate(8px,-2px) rotate(-17deg)}
-#hubPet[data-pose="idle-hop"] .pet-body{animation:world-hop .8s ease-in-out 4}
-#hubPet[data-pose="idle-tiptoe"] .pet-body{animation:world-tiptoe 1s ease-in-out 4}
-#hubPet[data-pose="idle-tiptoe"] .momo-arm-left{transform:rotate(35deg)}
-#hubPet[data-pose="idle-tiptoe"] .momo-arm-right{transform:rotate(-35deg)}
-#hubPet[data-pose="idle-hand-heart"] .momo-arm-left{transform:rotate(-65deg)}
-#hubPet[data-pose="idle-hand-heart"] .momo-arm-right{transform:rotate(65deg)}
-#hubPet:is([data-pose="idle-hand-heart"],[data-pose="idle-leaf-catch"],[data-pose="idle-pocket-search"])::after{position:absolute;left:43%;top:40%;font-size:23px;color:#c17d9e;pointer-events:none;animation:world-heart 1.8s ease-in-out 2;content:'♡'}
-#hubPet[data-pose="idle-leaf-catch"]::after{content:'❧';color:#86ac8f;left:65%;top:4%;animation:world-leaf 4s ease-in-out both}
-#hubPet[data-pose="idle-pocket-search"]::after{content:'✦';color:#d8b16e;left:65%;top:46%;animation-delay:2.3s;animation-fill-mode:both}
-#hubPet[data-pose="idle-peek"] .momo-arm-left{transform:rotate(-135deg)}
-#hubPet[data-pose="idle-peek"] .momo-arm-right{transform:rotate(135deg)}
-#hubPet[data-pose="idle-peek"] .momo-face{animation:world-peek 1.4s ease-in-out 3}
-#hubPet[data-pose="idle-shadow-box"] .momo-arm-left{animation:world-box .5s ease-in-out 8}
-#hubPet[data-pose="idle-shadow-box"] .momo-arm-right{animation:world-box .5s -.25s ease-in-out 8}
-#hubPet[data-pose="idle-toe-spin"] .pet-body{animation:world-toe-spin 1s ease-in-out 3}
-#hubPet[data-pose="idle-leaf-catch"] .momo-arm-right{animation:world-leaf-hand 4s ease-in-out both}
-#hubPet[data-pose="idle-pocket-search"] .momo-arm-right{animation:world-search .7s ease-in-out 4}
-#hubPet[data-pose="idle-pocket-search"] .momo-face{transform:rotate(12deg) translateY(4px)}
+#hubPet[data-facing='left'] .pet-body {
+  scale: -1 1;
+}
+body:not([data-motion='off']) #hubPet[data-pose='run'] .pet-body {
+  animation: world-run 0.22s ease-in-out infinite;
+}
+#hubPet[data-pose='run'] .momo-foot-left {
+  animation: world-run-foot 0.22s linear infinite alternate;
+}
+#hubPet[data-pose='run'] .momo-foot-right {
+  animation: world-run-foot 0.22s -0.22s linear infinite alternate;
+}
+#hubPet[data-pose='run'] .momo-arm-left {
+  animation: world-run-arm 0.22s linear infinite alternate;
+}
+#hubPet[data-pose='run'] .momo-arm-right {
+  animation: world-run-arm 0.22s -0.22s linear infinite alternate;
+}
+#hubPet[data-pose='window-watch'] .momo-face {
+  transform: translateX(-3px) rotate(-9deg);
+}
+#hubPet[data-pose='window-watch'] .momo-arm-left {
+  transform: rotate(-95deg);
+}
+#hubPet[data-pose='window-watch'] .momo-arm-right {
+  transform: rotate(70deg);
+}
+#hubPet[data-pose='window-watch'] .pet-body {
+  animation: world-window-peek 3s ease-in-out infinite;
+}
+#hubPet[data-pose='mischief-pull'] .pet-body {
+  animation: world-tug 0.65s ease-in-out infinite;
+}
+#hubPet[data-pose='mischief-pull'] .momo-arm-left {
+  transform: rotate(70deg);
+}
+#hubPet[data-pose='mischief-pull'] .momo-arm-right {
+  transform: rotate(100deg);
+}
+#hubPet[data-pose='mischief-pull'] .momo-foot-right {
+  transform: translate(8px, -2px) rotate(-17deg);
+}
+#hubPet[data-pose='idle-hop'] .pet-body {
+  animation: world-hop 0.8s ease-in-out 4;
+}
+#hubPet[data-pose='idle-tiptoe'] .pet-body {
+  animation: world-tiptoe 1s ease-in-out 4;
+}
+#hubPet[data-pose='idle-tiptoe'] .momo-arm-left {
+  transform: rotate(35deg);
+}
+#hubPet[data-pose='idle-tiptoe'] .momo-arm-right {
+  transform: rotate(-35deg);
+}
+#hubPet[data-pose='idle-hand-heart'] .momo-arm-left {
+  transform: rotate(-65deg);
+}
+#hubPet[data-pose='idle-hand-heart'] .momo-arm-right {
+  transform: rotate(65deg);
+}
+#hubPet:is(
+    [data-pose='idle-hand-heart'],
+    [data-pose='idle-leaf-catch'],
+    [data-pose='idle-pocket-search']
+  )::after {
+  position: absolute;
+  left: 43%;
+  top: 40%;
+  font-size: 23px;
+  color: #c17d9e;
+  pointer-events: none;
+  animation: world-heart 1.8s ease-in-out 2;
+  content: '♡';
+}
+#hubPet[data-pose='idle-leaf-catch']::after {
+  content: '❧';
+  color: #86ac8f;
+  left: 65%;
+  top: 4%;
+  animation: world-leaf 4s ease-in-out both;
+}
+#hubPet[data-pose='idle-pocket-search']::after {
+  content: '✦';
+  color: #d8b16e;
+  left: 65%;
+  top: 46%;
+  animation-delay: 2.3s;
+  animation-fill-mode: both;
+}
+#hubPet[data-pose='idle-peek'] .momo-arm-left {
+  transform: rotate(-135deg);
+}
+#hubPet[data-pose='idle-peek'] .momo-arm-right {
+  transform: rotate(135deg);
+}
+#hubPet[data-pose='idle-peek'] .momo-face {
+  animation: world-peek 1.4s ease-in-out 3;
+}
+#hubPet[data-pose='idle-shadow-box'] .momo-arm-left {
+  animation: world-box 0.5s ease-in-out 8;
+}
+#hubPet[data-pose='idle-shadow-box'] .momo-arm-right {
+  animation: world-box 0.5s -0.25s ease-in-out 8;
+}
+#hubPet[data-pose='idle-toe-spin'] .pet-body {
+  animation: world-toe-spin 1s ease-in-out 3;
+}
+#hubPet[data-pose='idle-leaf-catch'] .momo-arm-right {
+  animation: world-leaf-hand 4s ease-in-out both;
+}
+#hubPet[data-pose='idle-pocket-search'] .momo-arm-right {
+  animation: world-search 0.7s ease-in-out 4;
+}
+#hubPet[data-pose='idle-pocket-search'] .momo-face {
+  transform: rotate(12deg) translateY(4px);
+}
 /* The stretchy card is an inert visual copy; the live section keeps its layout. */
-body .momo-elastic-card{box-sizing:border-box;overflow:hidden!important;border-radius:var(--hub-radius,16px);background:var(--hub-surface,#fff);box-shadow:0 4px 24px #576c7d20;transform-origin:left center;animation:world-elastic .65s ease-in-out 6 both;contain:paint;user-select:none}
-.momo-elastic-card *{pointer-events:none!important}.momo-elastic-card iframe,.momo-elastic-card video{visibility:hidden}
-.momo-adventure-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:13px 0;margin-top:13px;border-top:1px solid var(--hub-border)}
-.momo-adventure-actions .hub-kicker{grid-column:1/-1;font-size:.58rem;margin-bottom:3px}.momo-adventure-actions button{font-size:.75rem;text-align:left;padding:9px 10px;border-radius:12px;background:var(--hub-surface-soft)}
-.momo-nudge-open{display:block!important;width:fit-content;margin-top:9px;padding:5px 10px!important;font-size:.7rem!important;border-radius:9px!important;color:var(--hub-accent)!important;background:var(--hub-surface-soft)!important;border:1px solid var(--hub-border)!important;cursor:pointer!important;touch-action:manipulation!important}
-#hubPetBubble{max-height:min(280px,42vh);overflow:auto;overflow-wrap:anywhere;pointer-events:auto}
-#momoAdventuresForm>.check-label{display:flex;gap:12px;align-items:flex-start;margin:10px 0;padding:13px;border:1px solid var(--hub-border);border-radius:13px;background:var(--hub-surface-soft)}
-#momoAdventuresForm>.check-label input{margin-top:3px}#momoNameForm h3{margin-top:8px}#momoNameForm input,#momoJuggleForm input{display:block;width:100%;margin:8px 0 12px}
+body .momo-elastic-card {
+  box-sizing: border-box;
+  overflow: hidden !important;
+  border-radius: var(--hub-radius, 16px);
+  background: var(--hub-surface, #fff);
+  box-shadow: 0 4px 24px #576c7d20;
+  transform-origin: left center;
+  animation: world-elastic 0.65s ease-in-out 6 both;
+  contain: paint;
+  user-select: none;
+}
+.momo-elastic-card * {
+  pointer-events: none !important;
+}
+.momo-elastic-card iframe,
+.momo-elastic-card video {
+  visibility: hidden;
+}
+.momo-adventure-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  padding: 13px 0;
+  margin-top: 13px;
+  border-top: 1px solid var(--hub-border);
+}
+.momo-adventure-actions .hub-kicker {
+  grid-column: 1/-1;
+  font-size: 0.58rem;
+  margin-bottom: 3px;
+}
+.momo-adventure-actions button {
+  font-size: 0.75rem;
+  text-align: left;
+  padding: 9px 10px;
+  border-radius: 12px;
+  background: var(--hub-surface-soft);
+}
+.momo-nudge-open {
+  display: block !important;
+  width: fit-content;
+  margin-top: 9px;
+  padding: 5px 10px !important;
+  font-size: 0.7rem !important;
+  border-radius: 9px !important;
+  color: var(--hub-accent) !important;
+  background: var(--hub-surface-soft) !important;
+  border: 1px solid var(--hub-border) !important;
+  cursor: pointer !important;
+  touch-action: manipulation !important;
+}
+#hubPetBubble {
+  max-height: min(280px, 42vh);
+  overflow: auto;
+  overflow-wrap: anywhere;
+  pointer-events: auto;
+}
+#momoAdventuresForm > .check-label {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin: 10px 0;
+  padding: 13px;
+  border: 1px solid var(--hub-border);
+  border-radius: 13px;
+  background: var(--hub-surface-soft);
+}
+#momoAdventuresForm > .check-label input {
+  margin-top: 3px;
+}
+#momoNameForm h3 {
+  margin-top: 8px;
+}
+#momoNameForm input,
+#momoJuggleForm input {
+  display: block;
+  width: 100%;
+  margin: 8px 0 12px;
+}
 /* A small football stage, counted kicks, and eight surprise finales. */
-#momoSoccerStage{position:fixed;z-index:86;isolation:isolate;border:1px solid color-mix(in srgb,var(--hub-accent) 20%,var(--hub-border));border-radius:28px;background:linear-gradient(155deg,color-mix(in srgb,var(--hub-surface) 92%,#cfbce8),color-mix(in srgb,var(--hub-surface) 89%,#b2d6c5));box-shadow:0 12px 45px #334d6220;pointer-events:none;overflow:hidden}
-.momo-soccer-roof{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:14px 13px 0 18px;color:var(--hub-muted);font-size:.54rem;font-weight:700;letter-spacing:.11em}
-.momo-soccer-roof button{width:28px;height:28px;min-height:28px;padding:0;border-radius:50%;background:var(--hub-surface);color:var(--hub-text);font-size:20px;pointer-events:auto}
-.momo-soccer-floor{position:absolute;left:10%;right:10%;bottom:36px;height:18px;border-radius:50%;background:#79a29518;border-bottom:1px solid #789d8c28}
-#momoSoccerBall{position:absolute;width:32px;height:32px;left:calc(50% - 16px);bottom:45px;translate:var(--ball-sway,0px) var(--ball-hop,0px);rotate:var(--ball-roll,0deg);z-index:2;filter:drop-shadow(0 2px 1px #2a4a5022)}
-#momoSoccerBall svg{display:block;width:100%;height:100%}#momoJuggleCount{position:absolute;bottom:8px;left:0;right:0;text-align:center;margin:0;color:var(--hub-muted);font-size:.75rem;font-weight:700;font-variant-numeric:tabular-nums}
-#hubPet[data-pose="juggle"] .pet-body{animation:world-juggle-bob .65s ease-in-out infinite}
-#hubPet[data-pose="juggle"] .momo-arm-left{transform:rotate(-32deg)}#hubPet[data-pose="juggle"] .momo-arm-right{transform:rotate(32deg)}
-#hubPet[data-pose="juggle"][data-juggle-side="left"] .momo-foot-left,#hubPet[data-pose="juggle"][data-juggle-side="right"] .momo-foot-right{transform:translateY(-7px) rotate(-25deg);transition:transform .16s ease}
-.momo-trick-intro{margin-bottom:20px;padding:20px;border:1px solid var(--hub-border);border-radius:20px;background:linear-gradient(140deg,var(--hub-surface-soft),color-mix(in srgb,var(--hub-surface) 90%,#d7c8e9));text-align:center}.momo-trick-intro>div{width:64px;height:64px;margin:0 auto 12px}.momo-trick-intro h3{margin:9px 0}.momo-trick-intro p{color:var(--hub-muted);font-size:.85rem;line-height:1.6;margin:0}
-.momo-finale{position:absolute;left:50%;top:75%;z-index:3}.momo-finale span{position:absolute;left:-12px;top:-12px;font-size:28px;color:hsl(calc(var(--finale-hue) + var(--i) * 17) 48% 66%);text-shadow:0 2px 8px #ffffff80;animation:world-finale 3.5s calc(var(--i) * .04s) ease-out both}
-.momo-finale[data-finale="balloons"] span{border-radius:50%;background:color-mix(in srgb,currentColor 18%,transparent);padding:4px}
-.momo-finale[data-finale="cranes"] span{font-size:35px;rotate:30deg}.momo-finale[data-finale="galaxy"] span{border:1px solid currentColor;border-radius:50%;padding:3px}.momo-finale[data-finale="moon"] span:first-child{font-size:64px}.momo-finale[data-finale="trophy"] span:first-child{font-size:46px}
-@keyframes world-rain{from{transform:translate(0,-9px)}to{transform:translate(-5px,10px)}}
-@keyframes world-snow{from{transform:translate(0,-12px)}to{transform:translate(7px,42px)}}
-@keyframes world-breeze{0%,100%{transform:translateX(-25px);opacity:.2}50%{transform:translateX(25px);opacity:.85}}
-@keyframes world-fog{from{transform:translateX(-15px);opacity:.3}to{transform:translateX(12px);opacity:.65}}
-@keyframes world-aurora{from{transform:scaleY(.6) skewX(-6deg);opacity:.2}to{transform:scaleY(1.3) skewX(7deg);opacity:.5}}
-@keyframes world-visitor-bob{to{translate:0 -5px}}
-@keyframes world-umbrella-arm{from{transform:rotate(-7deg)}to{transform:rotate(10deg)}}
-@keyframes world-step{from{transform:translateY(-1px) rotate(-7deg)}to{transform:translateY(1px) rotate(7deg)}}
-@keyframes world-run{0%,100%{transform:translateY(1px) rotate(9deg)}50%{transform:translateY(-5px) rotate(7deg)}}
-@keyframes world-run-foot{from{transform:rotate(-24deg) translateY(-2px)}to{transform:rotate(25deg) translateY(-7px)}}
-@keyframes world-run-arm{from{transform:rotate(-32deg)}to{transform:rotate(40deg)}}
-@keyframes world-window-peek{0%,100%{transform:rotate(-3deg)}50%{transform:translateY(-3px) rotate(-5deg)}}
-@keyframes world-tug{0%,100%{transform:rotate(8deg) translateX(2px)}50%{transform:rotate(15deg) translateX(8px)}}
-@keyframes world-elastic{0%,100%{transform:none}55%{transform:scaleX(1.045) skewY(-.5deg)}}
-@keyframes world-hop{0%,100%{transform:none}25%{transform:scale(1.04,.96)}55%{transform:translateY(-12px) rotate(4deg)}}
-@keyframes world-tiptoe{0%,100%{transform:translateY(-3px) rotate(-4deg)}50%{transform:translateY(-6px) rotate(4deg)}}
-@keyframes world-heart{0%,100%{opacity:0;translate:0 4px;scale:.7}40%,70%{opacity:1;translate:0 -4px;scale:1.1}}
-@keyframes world-leaf{0%{translate:30px -30px;rotate:0deg;opacity:0}20%{opacity:1}65%{translate:-5px 18px;rotate:80deg}100%{translate:8px 48px;rotate:150deg;opacity:0}}
-@keyframes world-peek{0%,100%{transform:none}50%{transform:translateX(4px) rotate(9deg)}}
-@keyframes world-box{0%,100%{transform:rotate(-25deg)}50%{transform:rotate(-100deg) translateY(-4px)}}
-@keyframes world-toe-spin{0%,100%{transform:none}35%{transform:rotate(-12deg) scaleX(.7)}65%{transform:rotate(12deg) scaleX(-.7)}}
-@keyframes world-leaf-hand{0%,100%{transform:none}40%,70%{transform:rotate(-135deg)}}
-@keyframes world-search{0%,100%{transform:rotate(25deg)}50%{transform:rotate(60deg)}}
-@keyframes world-juggle-bob{0%,100%{transform:translateY(1px)}50%{transform:translateY(-2px)}}
-@keyframes world-finale{0%{opacity:0;translate:0 0;scale:.2}18%{opacity:1}65%{opacity:1;translate:var(--burst-x) var(--burst-y);scale:1}100%{opacity:0;translate:var(--burst-x) calc(var(--burst-y) - 24px);scale:.6}}
-body:is(.hub-private,.hub-present,.hub-focus) :is(#momoElasticCard,#momoSoccerStage){display:none!important}
-body[data-motion="off"] :is(.world-window-weather *,#hubMomoUmbrella,#hubPet .pet-body,#hubPet .momo-arm-left,#hubPet .momo-arm-right,#hubPet .momo-foot-left,#hubPet .momo-foot-right){animation:none!important;transition:none!important}
-body[data-motion="off"] #hubPet::after{display:none}
-@media(prefers-reduced-motion:reduce){.world-window-weather *,#hubPet::after,#hubPet .pet-body,#hubPet .momo-arm-left,#hubPet .momo-arm-right,#hubPet .momo-foot-left,#hubPet .momo-foot-right{animation:none!important;transition:none!important}#momoElasticCard,#momoSoccerStage{display:none!important}}
-@media print{#momoElasticCard,#momoSoccerStage{display:none!important}}
-body:not([data-motion="off"]) #hubPet[data-pose="idle-wave"] .momo-arm-right{animation:world-wave .5s ease-in-out 7 alternate}
-#hubPet[data-pose="idle-wave"] .momo-face{transform:rotate(-5deg)}
-@keyframes world-wave{from{transform:rotate(-125deg)}to{transform:rotate(-157deg)}}
-body.hub-private #hubPetBubble{display:none!important}
+#momoSoccerStage {
+  position: fixed;
+  z-index: 86;
+  isolation: isolate;
+  border: 1px solid color-mix(in srgb, var(--hub-accent) 20%, var(--hub-border));
+  border-radius: 28px;
+  background: linear-gradient(
+    155deg,
+    color-mix(in srgb, var(--hub-surface) 92%, #cfbce8),
+    color-mix(in srgb, var(--hub-surface) 89%, #b2d6c5)
+  );
+  box-shadow: 0 12px 45px #334d6220;
+  pointer-events: none;
+  overflow: hidden;
+}
+.momo-soccer-roof {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 13px 0 18px;
+  color: var(--hub-muted);
+  font-size: 0.54rem;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+}
+.momo-soccer-roof button {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--hub-surface);
+  color: var(--hub-text);
+  font-size: 20px;
+  pointer-events: auto;
+}
+.momo-soccer-floor {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  bottom: 36px;
+  height: 18px;
+  border-radius: 50%;
+  background: #79a29518;
+  border-bottom: 1px solid #789d8c28;
+}
+#momoSoccerBall {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  left: calc(50% - 16px);
+  bottom: 45px;
+  translate: var(--ball-sway, 0px) var(--ball-hop, 0px);
+  rotate: var(--ball-roll, 0deg);
+  z-index: 2;
+  filter: drop-shadow(0 2px 1px #2a4a5022);
+}
+#momoSoccerBall svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+#momoJuggleCount {
+  position: absolute;
+  bottom: 8px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  margin: 0;
+  color: var(--hub-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+#hubPet[data-pose='juggle'] .pet-body {
+  animation: world-juggle-bob 0.65s ease-in-out infinite;
+}
+#hubPet[data-pose='juggle'] .momo-arm-left {
+  transform: rotate(-32deg);
+}
+#hubPet[data-pose='juggle'] .momo-arm-right {
+  transform: rotate(32deg);
+}
+#hubPet[data-pose='juggle'][data-juggle-side='left'] .momo-foot-left,
+#hubPet[data-pose='juggle'][data-juggle-side='right'] .momo-foot-right {
+  transform: translateY(-7px) rotate(-25deg);
+  transition: transform 0.16s ease;
+}
+.momo-trick-intro {
+  margin-bottom: 20px;
+  padding: 20px;
+  border: 1px solid var(--hub-border);
+  border-radius: 20px;
+  background: linear-gradient(
+    140deg,
+    var(--hub-surface-soft),
+    color-mix(in srgb, var(--hub-surface) 90%, #d7c8e9)
+  );
+  text-align: center;
+}
+.momo-trick-intro > div {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 12px;
+}
+.momo-trick-intro h3 {
+  margin: 9px 0;
+}
+.momo-trick-intro p {
+  color: var(--hub-muted);
+  font-size: 0.85rem;
+  line-height: 1.6;
+  margin: 0;
+}
+.momo-finale {
+  position: absolute;
+  left: 50%;
+  top: 75%;
+  z-index: 3;
+}
+.momo-finale span {
+  position: absolute;
+  left: -12px;
+  top: -12px;
+  font-size: 28px;
+  color: hsl(calc(var(--finale-hue) + var(--i) * 17) 48% 66%);
+  text-shadow: 0 2px 8px #ffffff80;
+  animation: world-finale 3.5s calc(var(--i) * 0.04s) ease-out both;
+}
+.momo-finale[data-finale='balloons'] span {
+  border-radius: 50%;
+  background: color-mix(in srgb, currentColor 18%, transparent);
+  padding: 4px;
+}
+.momo-finale[data-finale='cranes'] span {
+  font-size: 35px;
+  rotate: 30deg;
+}
+.momo-finale[data-finale='galaxy'] span {
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  padding: 3px;
+}
+.momo-finale[data-finale='moon'] span:first-child {
+  font-size: 64px;
+}
+.momo-finale[data-finale='trophy'] span:first-child {
+  font-size: 46px;
+}
+@keyframes world-rain {
+  from {
+    transform: translate(0, -9px);
+  }
+  to {
+    transform: translate(-5px, 10px);
+  }
+}
+@keyframes world-snow {
+  from {
+    transform: translate(0, -12px);
+  }
+  to {
+    transform: translate(7px, 42px);
+  }
+}
+@keyframes world-breeze {
+  0%,
+  100% {
+    transform: translateX(-25px);
+    opacity: 0.2;
+  }
+  50% {
+    transform: translateX(25px);
+    opacity: 0.85;
+  }
+}
+@keyframes world-fog {
+  from {
+    transform: translateX(-15px);
+    opacity: 0.3;
+  }
+  to {
+    transform: translateX(12px);
+    opacity: 0.65;
+  }
+}
+@keyframes world-aurora {
+  from {
+    transform: scaleY(0.6) skewX(-6deg);
+    opacity: 0.2;
+  }
+  to {
+    transform: scaleY(1.3) skewX(7deg);
+    opacity: 0.5;
+  }
+}
+@keyframes world-visitor-bob {
+  to {
+    translate: 0 -5px;
+  }
+}
+@keyframes world-umbrella-arm {
+  from {
+    transform: rotate(-7deg);
+  }
+  to {
+    transform: rotate(10deg);
+  }
+}
+@keyframes world-step {
+  from {
+    transform: translateY(-1px) rotate(-7deg);
+  }
+  to {
+    transform: translateY(1px) rotate(7deg);
+  }
+}
+@keyframes world-run {
+  0%,
+  100% {
+    transform: translateY(1px) rotate(9deg);
+  }
+  50% {
+    transform: translateY(-5px) rotate(7deg);
+  }
+}
+@keyframes world-run-foot {
+  from {
+    transform: rotate(-24deg) translateY(-2px);
+  }
+  to {
+    transform: rotate(25deg) translateY(-7px);
+  }
+}
+@keyframes world-run-arm {
+  from {
+    transform: rotate(-32deg);
+  }
+  to {
+    transform: rotate(40deg);
+  }
+}
+@keyframes world-window-peek {
+  0%,
+  100% {
+    transform: rotate(-3deg);
+  }
+  50% {
+    transform: translateY(-3px) rotate(-5deg);
+  }
+}
+@keyframes world-tug {
+  0%,
+  100% {
+    transform: rotate(8deg) translateX(2px);
+  }
+  50% {
+    transform: rotate(15deg) translateX(8px);
+  }
+}
+@keyframes world-elastic {
+  0%,
+  100% {
+    transform: none;
+  }
+  55% {
+    transform: scaleX(1.045) skewY(-0.5deg);
+  }
+}
+@keyframes world-hop {
+  0%,
+  100% {
+    transform: none;
+  }
+  25% {
+    transform: scale(1.04, 0.96);
+  }
+  55% {
+    transform: translateY(-12px) rotate(4deg);
+  }
+}
+@keyframes world-tiptoe {
+  0%,
+  100% {
+    transform: translateY(-3px) rotate(-4deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(4deg);
+  }
+}
+@keyframes world-heart {
+  0%,
+  100% {
+    opacity: 0;
+    translate: 0 4px;
+    scale: 0.7;
+  }
+  40%,
+  70% {
+    opacity: 1;
+    translate: 0 -4px;
+    scale: 1.1;
+  }
+}
+@keyframes world-leaf {
+  0% {
+    translate: 30px -30px;
+    rotate: 0deg;
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  65% {
+    translate: -5px 18px;
+    rotate: 80deg;
+  }
+  100% {
+    translate: 8px 48px;
+    rotate: 150deg;
+    opacity: 0;
+  }
+}
+@keyframes world-peek {
+  0%,
+  100% {
+    transform: none;
+  }
+  50% {
+    transform: translateX(4px) rotate(9deg);
+  }
+}
+@keyframes world-box {
+  0%,
+  100% {
+    transform: rotate(-25deg);
+  }
+  50% {
+    transform: rotate(-100deg) translateY(-4px);
+  }
+}
+@keyframes world-toe-spin {
+  0%,
+  100% {
+    transform: none;
+  }
+  35% {
+    transform: rotate(-12deg) scaleX(0.7);
+  }
+  65% {
+    transform: rotate(12deg) scaleX(-0.7);
+  }
+}
+@keyframes world-leaf-hand {
+  0%,
+  100% {
+    transform: none;
+  }
+  40%,
+  70% {
+    transform: rotate(-135deg);
+  }
+}
+@keyframes world-search {
+  0%,
+  100% {
+    transform: rotate(25deg);
+  }
+  50% {
+    transform: rotate(60deg);
+  }
+}
+@keyframes world-juggle-bob {
+  0%,
+  100% {
+    transform: translateY(1px);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+@keyframes world-finale {
+  0% {
+    opacity: 0;
+    translate: 0 0;
+    scale: 0.2;
+  }
+  18% {
+    opacity: 1;
+  }
+  65% {
+    opacity: 1;
+    translate: var(--burst-x) var(--burst-y);
+    scale: 1;
+  }
+  100% {
+    opacity: 0;
+    translate: var(--burst-x) calc(var(--burst-y) - 24px);
+    scale: 0.6;
+  }
+}
+body:is(.hub-private, .hub-present, .hub-focus) :is(#momoElasticCard, #momoSoccerStage) {
+  display: none !important;
+}
+body[data-motion='off']
+  :is(
+    .world-window-weather *,
+    #hubMomoUmbrella,
+    #hubPet .pet-body,
+    #hubPet .momo-arm-left,
+    #hubPet .momo-arm-right,
+    #hubPet .momo-foot-left,
+    #hubPet .momo-foot-right
+  ) {
+  animation: none !important;
+  transition: none !important;
+}
+body[data-motion='off'] #hubPet::after {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .world-window-weather *,
+  #hubPet::after,
+  #hubPet .pet-body,
+  #hubPet .momo-arm-left,
+  #hubPet .momo-arm-right,
+  #hubPet .momo-foot-left,
+  #hubPet .momo-foot-right {
+    animation: none !important;
+    transition: none !important;
+  }
+  #momoElasticCard,
+  #momoSoccerStage {
+    display: none !important;
+  }
+}
+@media print {
+  #momoElasticCard,
+  #momoSoccerStage {
+    display: none !important;
+  }
+}
+body:not([data-motion='off']) #hubPet[data-pose='idle-wave'] .momo-arm-right {
+  animation: world-wave 0.5s ease-in-out 7 alternate;
+}
+#hubPet[data-pose='idle-wave'] .momo-face {
+  transform: rotate(-5deg);
+}
+@keyframes world-wave {
+  from {
+    transform: rotate(-125deg);
+  }
+  to {
+    transform: rotate(-157deg);
+  }
+}
+body.hub-private #hubPetBubble {
+  display: none !important;
+}
 
-.momo-finale span:has(svg){width:36px;height:42px;padding:0;background:none;border:0}.momo-finale span svg{display:block;width:100%;height:100%;overflow:visible}.momo-finale[data-finale="trophy"] span:first-child,.momo-finale[data-finale="moon"] span:first-child{width:58px;height:64px}
+.momo-finale span:has(svg) {
+  width: 36px;
+  height: 42px;
+  padding: 0;
+  background: none;
+  border: 0;
+}
+.momo-finale span svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.momo-finale[data-finale='trophy'] span:first-child,
+.momo-finale[data-finale='moon'] span:first-child {
+  width: 58px;
+  height: 64px;
+}

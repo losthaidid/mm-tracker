@@ -2,6 +2,12 @@
 
 Tickets, tasks, projects, scheduling, reporting, and private cloud saving.
 
+## Edit and learn
+
+Start with the [beginner editing guide](docs/EDITING-GUIDE.md) and [complete file map](docs/FILE-MAP.md). The page shell is `index.html`, the core application is `app.js`, the original shared styles are `base.css`, and `custom.css` is your space for personal style changes. Each handwritten source file now explains its purpose in a header comment. See [source cleanup notes](docs/SOURCE-CLEANUP.md) for the removed duplicates and retained compatibility helpers.
+
+Developer commands: `npm ci`, `npm test`, `npm run format:check`. Use `npm run format` to apply formatting.
+
 The selected Batch A workflow enhancements are documented in [BATCH-A.md](BATCH-A.md), including dependencies, wrap-ups, resume context, labels, environment badges, glossary, reading mode and work-location totals.
 
 The seven selected wishlist items and refreshed ticket screens are documented in [WISHLIST.md](WISHLIST.md), including snippets, bundles, timelines, reusable fields, reference combinations, reference descriptions and copy formats.
@@ -9,7 +15,7 @@ The seven selected wishlist items and refreshed ticket screens are documented in
 ## Publish using GitHub Pages
 
 1. Create a repository named `mm-tracker`. GitHub Pages on a free personal account requires a public repository.
-2. Upload the repository's root HTML, JavaScript and CSS files, `THIRD-PARTY-LICENSES.txt`, and `.nojekyll`. Keep their relative filenames and commit the files.
+2. Upload the repository's root HTML, JavaScript and CSS files, the `vendor/` and `assets/` folders, the Excel template, `THIRD-PARTY-LICENSES.txt`, and `.nojekyll`. Keep their relative filenames and commit the files.
 3. Open Settings → Pages. Choose Deploy from a branch, main, and /(root). Save.
 4. Use the published website address displayed by GitHub Pages.
 
@@ -35,7 +41,7 @@ If earlier records remain under this website’s browser storage key, signing in
 
 If the records came from a different website address or browser, click Backup in your previous tracker. Sign in here and use Restore to select that JSON backup. Future visits open your cloud records automatically.
 
-Do not upload backups, Excel reports, or the original record-filled HTML to GitHub. This package starts empty and contains no original work records, including inside its report template.
+Do not upload backups, Excel reports, or the original record-filled HTML to GitHub. This package starts empty and contains no original work records, including inside generated reports.
 
 ## Storage
 
@@ -46,7 +52,7 @@ If a Free plan project pauses after inactivity, restore it in your Supabase dash
 ## Update an existing installation
 
 1. In the existing Supabase project’s SQL Editor, run `supabase/migrations/20261015140424_workspace_studio_records.sql` once. This only broadens the document-format constraint; it preserves all rows, ownership policies, revisions, and the save function. It can be reapplied safely.
-2. Deploy `index.html` with all referenced local JavaScript/CSS assets, the existing `supabase-client.js`, Excel template and `.nojekyll` through the repository’s current GitHub Pages deployment.
+2. Deploy `index.html`, `app.js`, `base.css`, `custom.css`, `vendor/` and all referenced local JavaScript/CSS assets, the existing `supabase-client.js`, Excel template and `.nojekyll` through the repository’s current GitHub Pages deployment.
 3. Sign in to the tracker. Make an edit, wait for **Saved to Supabase**, and reopen it using the same tracker account on another device.
 
 The previous checked-in SQL accepted only document versions 1–4, while the previous website wrote version 6. The current migration accepts versions 1–9. The updated app writes version 9 so older pages cannot discard workspace features, sub-task details or precise schedule times. It can restore older backups, including versions 6, 7 and 8. Do not run `cloud-schema.sql` on an initialized database; that file is for a fresh installation.

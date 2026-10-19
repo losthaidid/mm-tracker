@@ -1,46 +1,206 @@
+/**
+ * momo-world-art.js
+ * Vector visitors and illustrated window scenery.
+ * Returns artwork to atmosphere.js and Momo adventures. No network or account saves.
+ * Scene/visitor definitions are a good place to learn how SVG shapes are combined.
+ * File map: docs/FILE-MAP.md
+ */
 /* Small original vector visitors and storybook window layers. */
-(function(root){
-'use strict';
-const svg=body=>'<svg viewBox="0 0 64 64" fill="none" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round">'+body+'</svg>',eyes=(x=26,y=29)=>'<circle cx="'+x+'" cy="'+y+'" r="2" fill="#364757"/><circle cx="'+(x+12)+'" cy="'+y+'" r="2" fill="#364757"/><path d="M'+(x+3)+' '+(y+6)+'q3 3 6 0" stroke="#805e62" stroke-width="1.4"/>',wings='<g class="visitor-wing"><ellipse cx="21" cy="21" rx="10" ry="15" transform="rotate(-30 21 21)" fill="#e8f6f4" stroke="#8ba7b2"/><ellipse cx="43" cy="21" rx="10" ry="15" transform="rotate(30 43 21)" fill="#e8f6f4" stroke="#8ba7b2"/></g>';
-const visitors={
- bee:svg(wings+'<ellipse cx="32" cy="39" rx="16" ry="17" fill="#f3d47c" stroke="#9c7c42" stroke-width="1.6"/><path d="M20 36h24M19 44h26" stroke="#786654" stroke-width="5"/><circle cx="32" cy="25" r="11" fill="#f6dfa0" stroke="#9c7c42"/>'+eyes(26,24)),
- ladybird:svg('<path d="m25 17-5-6m19 6 5-6" stroke="#5f6167" stroke-width="2"/><ellipse cx="32" cy="38" rx="21" ry="22" fill="#e8a1a7" stroke="#855f70" stroke-width="1.5"/><path d="M32 22v36" stroke="#855f70" stroke-width="2"/><g fill="#745e77"><circle cx="22" cy="33" r="4"/><circle cx="43" cy="35" r="4"/><circle cx="22" cy="47" r="3"/><circle cx="42" cy="48" r="3"/></g><circle cx="32" cy="20" r="12" fill="#74667f"/><circle cx="27" cy="19" r="2" fill="white"/><circle cx="37" cy="19" r="2" fill="white"/>'),
- dragonfly:svg('<g class="visitor-wing" fill="#b7dfdc" stroke="#709fa6"><ellipse cx="18" cy="23" rx="16" ry="7" transform="rotate(22 18 23)"/><ellipse cx="46" cy="23" rx="16" ry="7" transform="rotate(-22 46 23)"/><ellipse cx="18" cy="37" rx="16" ry="7" transform="rotate(-22 18 37)"/><ellipse cx="46" cy="37" rx="16" ry="7" transform="rotate(22 46 37)"/></g><path d="M32 24v31" stroke="#7196a7" stroke-width="6"/><circle cx="27" cy="20" r="6" fill="#bbcf7f"/><circle cx="37" cy="20" r="6" fill="#bbcf7f"/><circle cx="27" cy="20" r="2" fill="#455c68"/><circle cx="37" cy="20" r="2" fill="#455c68"/>'),
- moth:svg('<g class="visitor-wing" fill="#e8d8bf" stroke="#9b8b7b" stroke-width="1.4"><path d="M31 29C5-9-6 31 20 38L9 51q16 10 23-11Z"/><path d="M33 29C59-9 70 31 44 38l11 13q-16 10-23-11Z"/></g><g fill="#baa6c5"><circle cx="20" cy="26" r="6"/><circle cx="44" cy="26" r="6"/></g><path d="m29 18-7-8m13 8 7-8M32 25v23" stroke="#a18a79" stroke-width="5"/><circle cx="32" cy="23" r="7" fill="#f6e6cb"/>'+eyes(28,22).replace('cx="40"','cx="36"')),
- hummingbird:svg('<path d="m47 28 15-5-14 1" fill="#a58965" stroke="#80674b"/><path d="M15 39q7-22 23-17 18 4 8 22-15 16-31-5Z" fill="#91c7af" stroke="#608e80" stroke-width="1.5"/><g class="visitor-bird-wing"><path d="M29 31Q7-5 8 20q1 17 21 18Z" fill="#b5d9ce" stroke="#608e80"/></g><path d="m17 40-13 6 14 5" fill="#8baeb8"/><circle cx="41" cy="26" r="2.5" fill="#354b55"/>'),
- owl:svg('<path d="m15 23-2-17 16 10M49 23l2-17-16 10" fill="#bba9ce" stroke="#82728f"/><ellipse cx="32" cy="37" rx="23" ry="24" fill="#bba9ce" stroke="#82728f" stroke-width="1.5"/><ellipse cx="22" cy="29" rx="10" ry="11" fill="#fff0db"/><ellipse cx="42" cy="29" rx="10" ry="11" fill="#fff0db"/><circle cx="22" cy="29" r="4" fill="#526573"/><circle cx="42" cy="29" r="4" fill="#526573"/><path d="m28 38 4 5 4-5" fill="#e6bf78"/><path d="m22 52 4 3m12-3 4 3" stroke="#8c749b" stroke-width="3"/>'),
- bat:svg('<g class="visitor-wing" fill="#b6a3d1" stroke="#7b6b93" stroke-width="1.5"><path d="M28 31 4 10l2 32q7-9 13 1 5-8 10 2Z"/><path d="m36 31 24-21-2 32q-7-9-13 1-5-8-10 2Z"/></g><path d="m23 24 1-14 8 8 8-8 1 14q10 24-9 30-19-6-9-30Z" fill="#8a7ba5" stroke="#665a81"/><circle cx="28" cy="29" r="2" fill="#fff0ce"/><circle cx="37" cy="29" r="2" fill="#fff0ce"/>'),
- duck:svg('<path d="M12 35q7-5 17-2l3-14q14-10 21 4 5 12-10 16 8 18-15 20Q8 58 8 43Z" fill="#f4d48b" stroke="#ae8a55" stroke-width="1.5"/><path d="m49 28 13 4-13 4" fill="#e9aa73" stroke="#ae8a55"/><path d="M18 43q9-10 17 1-2 12-15 7" fill="#f9e5ad"/><circle cx="43" cy="24" r="2.6" fill="#52616b"/>'),
- sparrow:svg('<path d="m15 39-12 1 11 11 11-5" fill="#ad8c7a"/><ellipse cx="33" cy="36" rx="22" ry="21" fill="#c3a58e" stroke="#8e776d" stroke-width="1.5"/><path d="M20 35q20-12 25 7-8 19-25 0" fill="#f6dfba"/><g class="visitor-bird-wing"><path d="M28 32Q4 3 12 29Z" fill="#9e8f9c" stroke="#75687b"/></g><circle cx="43" cy="27" r="2.5" fill="#465562"/><path d="m51 31 11 4-11 4" fill="#e7b678"/>'),
- squirrel:svg('<path d="M25 45C-7 56 1 5 18 10q14 7-1 23 9-9 14 3" fill="#cfa48c" stroke="#946f65" stroke-width="2"/><ellipse cx="38" cy="43" rx="15" ry="17" fill="#cfa48c" stroke="#946f65"/><path d="m27 23 1-15 11 10 11-9 2 15" fill="#cfa48c" stroke="#946f65"/><circle cx="40" cy="29" r="15" fill="#e2b9a0" stroke="#946f65"/>'+eyes(34,28).replace('cx="46"','cx="46"')+'<ellipse cx="41" cy="48" rx="6" ry="8" fill="#f3ddbd"/>'),
- rabbit:svg('<ellipse cx="24" cy="16" rx="7" ry="15" fill="#e8d1d7" stroke="#aa8b9b"/><ellipse cx="40" cy="16" rx="7" ry="15" fill="#e8d1d7" stroke="#aa8b9b"/><ellipse cx="32" cy="45" rx="20" ry="17" fill="#eee1e0" stroke="#aa8b9b"/><circle cx="32" cy="32" r="18" fill="#f4e7e5" stroke="#aa8b9b"/>'+eyes(26,30)+'<path d="M20 56h10m6 0h10" stroke="#aa8b9b" stroke-width="4"/>'),
- fox:svg('<path d="M21 47Q0 17 2 45q3 20 24 14" fill="#dda28b" stroke="#a27467" stroke-width="1.5"/><ellipse cx="38" cy="47" rx="15" ry="13" fill="#dda28b"/><path d="m19 18 2-16 15 12L49 2l6 20q3 22-19 27-22-5-17-31Z" fill="#e7b196" stroke="#a27467" stroke-width="1.5"/><path d="m21 29 15 7 17-8q-2 17-17 19-12-3-15-18Z" fill="#fff0d8"/><circle cx="28" cy="25" r="2" fill="#4d5561"/><circle cx="44" cy="25" r="2" fill="#4d5561"/><path d="m33 36 3 3 3-3" fill="#4d5561"/>'),
- turtle:svg('<path d="m15 48-6 10m33-10 7 10" stroke="#91b39b" stroke-width="7"/><circle cx="52" cy="33" r="10" fill="#bed0a0" stroke="#789480"/><path d="M5 43a24 25 0 0 1 46 0Z" fill="#99baa7" stroke="#658f7c" stroke-width="2"/><path d="m27 19-10 9 3 12h15l3-12Z" fill="#bfd0a5" stroke="#658f7c"/><circle cx="54" cy="30" r="2" fill="#49645c"/>'),
- cat:svg('<path d="M22 50Q-2 33 4 55q7 11 23 2" stroke="#9a8da8" stroke-width="7"/><ellipse cx="35" cy="47" rx="17" ry="14" fill="#c7b9d2" stroke="#8c7c9e"/><path d="m17 24 2-21 14 12L49 3l2 23q4 22-17 23-22-1-17-25Z" fill="#d8c9df" stroke="#8c7c9e" stroke-width="1.5"/>'+eyes(27,28)+'<path d="m18 33-10-3m10 8-11 2m42-7 10-3m-10 8 10 2" stroke="#8c7c9e"/>' )
-};
-const scenery={valley:'Soft green valley',coast:'Seaside horizon',city:'A quiet little town',mountains:'Misty mountains',forest:'Woodland hideaway',lake:'Lakeside afternoon',garden:'Flower garden',winter:'Snowy village'};
-const layers={
- valley:'<path d="M0 103Q60 61 116 99t124 0v33H0Z" fill="#88b899"/><path d="M68 132q18-29 56-33l-8 33" fill="#d5dbb1"/>',
- coast:'<path d="M0 88h240v44H0Z" fill="#9bcbd0"/><path d="M0 111q84-23 132 9t108-4v16H0Z" fill="#f1dfb6"/><path d="m147 98 18-26v26Z" fill="#fff4db"/><path d="M165 71v33m-25 0h38" stroke="#8b9499" stroke-width="2"/>',
- city:'<path d="M0 113h240v19H0Z" fill="#a9b9a3"/><g stroke="#9e8d92"><path d="M19 111V77h33v34m8 0V63h34v48m16 0V83h28v28m14 0V69h39v42m12 0V88h28v23" fill="#d5c4d4"/><path d="M15 77l21-14 20 14m94-8 21-14 23 14" fill="#b49cab"/></g><g fill="#f8e8b0"><path d="M27 86h8v10h-8m35-24h7v9h-7m8 8h7v9h-7m90-20h8v11h-8m13 0h8v11h-8"/></g>',
- mountains:'<path d="M-7 120 45 42l43 60 43-77 54 77 28-53 39 71" fill="#8f9eaf"/><path d="m26 70 19-28 20 29-17-8-9 9m75-16 17-31 21 31-20-7-10 10" fill="#e5e5dd"/><path d="M0 116q57-30 110 0t130-3v19H0Z" fill="#a6bab6"/>',
- forest:'<path d="M0 106q80-28 240 0v26H0Z" fill="#8daf9e"/><g fill="#6f9985" stroke="#5c8476"><path d="m20 40-18 63h36Zm36 12-18 58h36Zm43-25-23 83h46Zm45 20-19 67h38Zm45-14-23 82h46Zm34 17-18 63h36Z"/></g><path d="M93 132q25-28 50-20l18 20" fill="#c6cdb1"/>',
- lake:'<path d="M0 100q60-29 112-2t128-3v37H0Z" fill="#a1b99f"/><ellipse cx="116" cy="116" rx="92" ry="18" fill="#a6cdd1"/><path d="m53 113 26 1m62 4h31m-73 5h30" stroke="#d2e7df" stroke-width="2"/><path d="M35 115V75m0 10q-28 3-18-16 10-14 18 6 6-25 18-9 11 21-18 19" stroke="#6d8c79" fill="#91b595"/>',
- garden:'<path d="M0 104q100-32 240 0v28H0Z" fill="#a7bea0"/><g stroke="#7d9b78" stroke-width="2">'+[22,53,86,122,157,191,223].map((x,i)=>'<path d="M'+x+' 124V'+(94+i%3*5)+'"/><circle cx="'+x+'" cy="'+(94+i%3*5)+'" r="6" fill="'+['#ddb2c9','#e8cf8c','#c1b3df'][i%3]+'"/>').join('')+'</g>',
- winter:'<path d="M0 100q66-24 125 0t115-3v35H0Z" fill="#e1e8e3"/><path d="M54 119V88h33v31m77 0V77h38v42" fill="#c4b1bf" stroke="#9f8fa0"/><path d="m48 89 23-21 23 21m63-11 26-23 26 23" fill="#f1efde" stroke="#bbc6c9" stroke-width="3"/><path d="M65 98h12v16H65m111-24h12v15h-12" fill="#f8e3a5"/>'
-};
-const sceneryMarkup='<g class="world-scenery">'+Object.entries(layers).map(([k,v])=>'<g class="world-scene world-scene-'+k+'">'+v+'</g>').join('')+'</g>';
-const weather={sunny:'Sunshine',cloudy:'Cloudy',rain:'Gentle rain',snow:'Soft snow',fog:'Misty',breeze:'Breezy',rainbow:'Rainbow after rain',aurora:'Dreamy aurora'};
-const weatherMarkup='<g class="world-window-weather"><g class="world-rain" stroke="#9bb9ce" stroke-width="1">'+Array.from({length:18},(_,i)=>'<path d="m'+(10+i*13)+' '+(12+i%4*13)+'-5 11"/>').join('')+'</g><g class="world-snow" fill="#fffdf4">'+Array.from({length:18},(_,i)=>'<circle cx="'+(7+i*13)+'" cy="'+(13+i%5*17)+'" r="'+(i%2?1.6:2.4)+'" style="--flake:'+i+'"/>').join('')+'</g><g class="world-fog" fill="#e6e8e2" opacity=".58"><path d="M0 53h240v15H0Zm0 26h240v12H0Zm0 26h240v10H0Z"/></g><g class="world-rainbow" fill="none" opacity=".6" stroke-width="5">'+['#d9a6bb','#eac09e','#e8dfab','#b0ccb7','#abc3d4','#c5b3d8'].map((c,i)=>'<path d="M'+(30+i*5)+' 113a'+(90-i*5)+' '+(90-i*5)+' 0 0 1 '+(180-i*10)+' 0" stroke="'+c+'"/>').join('')+'</g><g class="world-breeze" stroke="#e7e9d4" stroke-width="2" opacity=".8"><path d="M17 43h72q17-13 23 0M106 63h91q20-12 23 0M34 81h82"/></g><g class="world-aurora" fill="none" stroke-width="17" opacity=".35"><path d="M-20 28q53 55 95 4t85 8 90-13" stroke="#a3d5b4"/><path d="M-15 42q50 28 94-2t81 20 90-24" stroke="#c4ace0"/></g></g>';
-const finales={
- balloons:svg('<ellipse cx="32" cy="23" rx="18" ry="21" fill="currentColor" opacity=".8"/><path d="m28 44 4-5 4 5M32 44q-8 9 0 18" fill="none" stroke="#728894" stroke-width="1.5"/><path d="M22 14q-5 5-4 10" stroke="#fff5e9" stroke-width="3"/>'),
- cranes:svg('<path d="m5 37 25-27 6 22 23-15-14 28-16 6Z" fill="currentColor" opacity=".8" stroke="#8194a2"/><path d="m5 37 24 14 7-19M30 10l-1 41 16-6" stroke="#fff8ee" stroke-width="1.5"/>'),
- rainbow:svg('<g fill="none" stroke-width="6"><path d="M7 49a25 31 0 0 1 50 0" stroke="#dfa3b7"/><path d="M13 49a19 25 0 0 1 38 0" stroke="#eacb97"/><path d="M19 49a13 19 0 0 1 26 0" stroke="#a6c7b3"/><path d="M25 49a7 13 0 0 1 14 0" stroke="#b6b5dd"/></g>'),
- trophy:svg('<path d="M17 8h30v16q0 16-15 16T17 24Z" fill="#efd390" stroke="#ac905d" stroke-width="2"/><path d="M17 15H7q-3 18 14 19m26-19h10q3 18-14 19M32 40v12m-13 5h26" fill="none" stroke="#ac905d" stroke-width="4"/><path d="m32 13 3 7 8 1-6 5 2 8-7-4-7 4 2-8-6-5 8-1Z" fill="#fff4ce"/>'),
- flowers:svg('<g fill="currentColor" opacity=".85"><ellipse cx="32" cy="17" rx="8" ry="13"/><ellipse cx="32" cy="47" rx="8" ry="13"/><ellipse cx="17" cy="32" rx="13" ry="8"/><ellipse cx="47" cy="32" rx="13" ry="8"/></g><circle cx="32" cy="32" r="10" fill="#f3dfa3"/><circle cx="32" cy="32" r="4" fill="#c7a67a"/>'),
- moon:svg('<path d="M41 5a27 27 0 1 0 17 43A28 28 0 0 1 41 5Z" fill="#f2e2ad" stroke="#bdad8b"/><path d="m48 17 2 5 5 2-5 2-2 5-2-5-5-2 5-2Z" fill="#cbb9e2"/>'),
- ducks:visitors.duck,
- galaxy:svg('<circle cx="32" cy="32" r="22" fill="currentColor" opacity=".16" stroke="currentColor"/><ellipse cx="32" cy="32" rx="30" ry="9" transform="rotate(-30 32 32)" stroke="#c6b8de" stroke-width="3"/><circle cx="27" cy="25" r="7" fill="#ffffff55"/><circle cx="50" cy="13" r="3" fill="#e9d69d"/>')
-};
-root.WorkHubMomoWorldArt={visitors,scenery,weather,sceneryMarkup,weatherMarkup,finales};
+(function (root) {
+  'use strict';
+  const svg = body =>
+      '<svg viewBox="0 0 64 64" fill="none" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round">' +
+      body +
+      '</svg>',
+    eyes = (x = 26, y = 29) =>
+      '<circle cx="' +
+      x +
+      '" cy="' +
+      y +
+      '" r="2" fill="#364757"/><circle cx="' +
+      (x + 12) +
+      '" cy="' +
+      y +
+      '" r="2" fill="#364757"/><path d="M' +
+      (x + 3) +
+      ' ' +
+      (y + 6) +
+      'q3 3 6 0" stroke="#805e62" stroke-width="1.4"/>',
+    wings =
+      '<g class="visitor-wing"><ellipse cx="21" cy="21" rx="10" ry="15" transform="rotate(-30 21 21)" fill="#e8f6f4" stroke="#8ba7b2"/><ellipse cx="43" cy="21" rx="10" ry="15" transform="rotate(30 43 21)" fill="#e8f6f4" stroke="#8ba7b2"/></g>';
+  const visitors = {
+    bee: svg(
+      wings +
+        '<ellipse cx="32" cy="39" rx="16" ry="17" fill="#f3d47c" stroke="#9c7c42" stroke-width="1.6"/><path d="M20 36h24M19 44h26" stroke="#786654" stroke-width="5"/><circle cx="32" cy="25" r="11" fill="#f6dfa0" stroke="#9c7c42"/>' +
+        eyes(26, 24)
+    ),
+    ladybird: svg(
+      '<path d="m25 17-5-6m19 6 5-6" stroke="#5f6167" stroke-width="2"/><ellipse cx="32" cy="38" rx="21" ry="22" fill="#e8a1a7" stroke="#855f70" stroke-width="1.5"/><path d="M32 22v36" stroke="#855f70" stroke-width="2"/><g fill="#745e77"><circle cx="22" cy="33" r="4"/><circle cx="43" cy="35" r="4"/><circle cx="22" cy="47" r="3"/><circle cx="42" cy="48" r="3"/></g><circle cx="32" cy="20" r="12" fill="#74667f"/><circle cx="27" cy="19" r="2" fill="white"/><circle cx="37" cy="19" r="2" fill="white"/>'
+    ),
+    dragonfly: svg(
+      '<g class="visitor-wing" fill="#b7dfdc" stroke="#709fa6"><ellipse cx="18" cy="23" rx="16" ry="7" transform="rotate(22 18 23)"/><ellipse cx="46" cy="23" rx="16" ry="7" transform="rotate(-22 46 23)"/><ellipse cx="18" cy="37" rx="16" ry="7" transform="rotate(-22 18 37)"/><ellipse cx="46" cy="37" rx="16" ry="7" transform="rotate(22 46 37)"/></g><path d="M32 24v31" stroke="#7196a7" stroke-width="6"/><circle cx="27" cy="20" r="6" fill="#bbcf7f"/><circle cx="37" cy="20" r="6" fill="#bbcf7f"/><circle cx="27" cy="20" r="2" fill="#455c68"/><circle cx="37" cy="20" r="2" fill="#455c68"/>'
+    ),
+    moth: svg(
+      '<g class="visitor-wing" fill="#e8d8bf" stroke="#9b8b7b" stroke-width="1.4"><path d="M31 29C5-9-6 31 20 38L9 51q16 10 23-11Z"/><path d="M33 29C59-9 70 31 44 38l11 13q-16 10-23-11Z"/></g><g fill="#baa6c5"><circle cx="20" cy="26" r="6"/><circle cx="44" cy="26" r="6"/></g><path d="m29 18-7-8m13 8 7-8M32 25v23" stroke="#a18a79" stroke-width="5"/><circle cx="32" cy="23" r="7" fill="#f6e6cb"/>' +
+        eyes(28, 22).replace('cx="40"', 'cx="36"')
+    ),
+    hummingbird: svg(
+      '<path d="m47 28 15-5-14 1" fill="#a58965" stroke="#80674b"/><path d="M15 39q7-22 23-17 18 4 8 22-15 16-31-5Z" fill="#91c7af" stroke="#608e80" stroke-width="1.5"/><g class="visitor-bird-wing"><path d="M29 31Q7-5 8 20q1 17 21 18Z" fill="#b5d9ce" stroke="#608e80"/></g><path d="m17 40-13 6 14 5" fill="#8baeb8"/><circle cx="41" cy="26" r="2.5" fill="#354b55"/>'
+    ),
+    owl: svg(
+      '<path d="m15 23-2-17 16 10M49 23l2-17-16 10" fill="#bba9ce" stroke="#82728f"/><ellipse cx="32" cy="37" rx="23" ry="24" fill="#bba9ce" stroke="#82728f" stroke-width="1.5"/><ellipse cx="22" cy="29" rx="10" ry="11" fill="#fff0db"/><ellipse cx="42" cy="29" rx="10" ry="11" fill="#fff0db"/><circle cx="22" cy="29" r="4" fill="#526573"/><circle cx="42" cy="29" r="4" fill="#526573"/><path d="m28 38 4 5 4-5" fill="#e6bf78"/><path d="m22 52 4 3m12-3 4 3" stroke="#8c749b" stroke-width="3"/>'
+    ),
+    bat: svg(
+      '<g class="visitor-wing" fill="#b6a3d1" stroke="#7b6b93" stroke-width="1.5"><path d="M28 31 4 10l2 32q7-9 13 1 5-8 10 2Z"/><path d="m36 31 24-21-2 32q-7-9-13 1-5-8-10 2Z"/></g><path d="m23 24 1-14 8 8 8-8 1 14q10 24-9 30-19-6-9-30Z" fill="#8a7ba5" stroke="#665a81"/><circle cx="28" cy="29" r="2" fill="#fff0ce"/><circle cx="37" cy="29" r="2" fill="#fff0ce"/>'
+    ),
+    duck: svg(
+      '<path d="M12 35q7-5 17-2l3-14q14-10 21 4 5 12-10 16 8 18-15 20Q8 58 8 43Z" fill="#f4d48b" stroke="#ae8a55" stroke-width="1.5"/><path d="m49 28 13 4-13 4" fill="#e9aa73" stroke="#ae8a55"/><path d="M18 43q9-10 17 1-2 12-15 7" fill="#f9e5ad"/><circle cx="43" cy="24" r="2.6" fill="#52616b"/>'
+    ),
+    sparrow: svg(
+      '<path d="m15 39-12 1 11 11 11-5" fill="#ad8c7a"/><ellipse cx="33" cy="36" rx="22" ry="21" fill="#c3a58e" stroke="#8e776d" stroke-width="1.5"/><path d="M20 35q20-12 25 7-8 19-25 0" fill="#f6dfba"/><g class="visitor-bird-wing"><path d="M28 32Q4 3 12 29Z" fill="#9e8f9c" stroke="#75687b"/></g><circle cx="43" cy="27" r="2.5" fill="#465562"/><path d="m51 31 11 4-11 4" fill="#e7b678"/>'
+    ),
+    squirrel: svg(
+      '<path d="M25 45C-7 56 1 5 18 10q14 7-1 23 9-9 14 3" fill="#cfa48c" stroke="#946f65" stroke-width="2"/><ellipse cx="38" cy="43" rx="15" ry="17" fill="#cfa48c" stroke="#946f65"/><path d="m27 23 1-15 11 10 11-9 2 15" fill="#cfa48c" stroke="#946f65"/><circle cx="40" cy="29" r="15" fill="#e2b9a0" stroke="#946f65"/>' +
+        eyes(34, 28).replace('cx="46"', 'cx="46"') +
+        '<ellipse cx="41" cy="48" rx="6" ry="8" fill="#f3ddbd"/>'
+    ),
+    rabbit: svg(
+      '<ellipse cx="24" cy="16" rx="7" ry="15" fill="#e8d1d7" stroke="#aa8b9b"/><ellipse cx="40" cy="16" rx="7" ry="15" fill="#e8d1d7" stroke="#aa8b9b"/><ellipse cx="32" cy="45" rx="20" ry="17" fill="#eee1e0" stroke="#aa8b9b"/><circle cx="32" cy="32" r="18" fill="#f4e7e5" stroke="#aa8b9b"/>' +
+        eyes(26, 30) +
+        '<path d="M20 56h10m6 0h10" stroke="#aa8b9b" stroke-width="4"/>'
+    ),
+    fox: svg(
+      '<path d="M21 47Q0 17 2 45q3 20 24 14" fill="#dda28b" stroke="#a27467" stroke-width="1.5"/><ellipse cx="38" cy="47" rx="15" ry="13" fill="#dda28b"/><path d="m19 18 2-16 15 12L49 2l6 20q3 22-19 27-22-5-17-31Z" fill="#e7b196" stroke="#a27467" stroke-width="1.5"/><path d="m21 29 15 7 17-8q-2 17-17 19-12-3-15-18Z" fill="#fff0d8"/><circle cx="28" cy="25" r="2" fill="#4d5561"/><circle cx="44" cy="25" r="2" fill="#4d5561"/><path d="m33 36 3 3 3-3" fill="#4d5561"/>'
+    ),
+    turtle: svg(
+      '<path d="m15 48-6 10m33-10 7 10" stroke="#91b39b" stroke-width="7"/><circle cx="52" cy="33" r="10" fill="#bed0a0" stroke="#789480"/><path d="M5 43a24 25 0 0 1 46 0Z" fill="#99baa7" stroke="#658f7c" stroke-width="2"/><path d="m27 19-10 9 3 12h15l3-12Z" fill="#bfd0a5" stroke="#658f7c"/><circle cx="54" cy="30" r="2" fill="#49645c"/>'
+    ),
+    cat: svg(
+      '<path d="M22 50Q-2 33 4 55q7 11 23 2" stroke="#9a8da8" stroke-width="7"/><ellipse cx="35" cy="47" rx="17" ry="14" fill="#c7b9d2" stroke="#8c7c9e"/><path d="m17 24 2-21 14 12L49 3l2 23q4 22-17 23-22-1-17-25Z" fill="#d8c9df" stroke="#8c7c9e" stroke-width="1.5"/>' +
+        eyes(27, 28) +
+        '<path d="m18 33-10-3m10 8-11 2m42-7 10-3m-10 8 10 2" stroke="#8c7c9e"/>'
+    ),
+  };
+  const scenery = {
+    valley: 'Soft green valley',
+    coast: 'Seaside horizon',
+    city: 'A quiet little town',
+    mountains: 'Misty mountains',
+    forest: 'Woodland hideaway',
+    lake: 'Lakeside afternoon',
+    garden: 'Flower garden',
+    winter: 'Snowy village',
+  };
+  const layers = {
+    valley:
+      '<path d="M0 103Q60 61 116 99t124 0v33H0Z" fill="#88b899"/><path d="M68 132q18-29 56-33l-8 33" fill="#d5dbb1"/>',
+    coast:
+      '<path d="M0 88h240v44H0Z" fill="#9bcbd0"/><path d="M0 111q84-23 132 9t108-4v16H0Z" fill="#f1dfb6"/><path d="m147 98 18-26v26Z" fill="#fff4db"/><path d="M165 71v33m-25 0h38" stroke="#8b9499" stroke-width="2"/>',
+    city: '<path d="M0 113h240v19H0Z" fill="#a9b9a3"/><g stroke="#9e8d92"><path d="M19 111V77h33v34m8 0V63h34v48m16 0V83h28v28m14 0V69h39v42m12 0V88h28v23" fill="#d5c4d4"/><path d="M15 77l21-14 20 14m94-8 21-14 23 14" fill="#b49cab"/></g><g fill="#f8e8b0"><path d="M27 86h8v10h-8m35-24h7v9h-7m8 8h7v9h-7m90-20h8v11h-8m13 0h8v11h-8"/></g>',
+    mountains:
+      '<path d="M-7 120 45 42l43 60 43-77 54 77 28-53 39 71" fill="#8f9eaf"/><path d="m26 70 19-28 20 29-17-8-9 9m75-16 17-31 21 31-20-7-10 10" fill="#e5e5dd"/><path d="M0 116q57-30 110 0t130-3v19H0Z" fill="#a6bab6"/>',
+    forest:
+      '<path d="M0 106q80-28 240 0v26H0Z" fill="#8daf9e"/><g fill="#6f9985" stroke="#5c8476"><path d="m20 40-18 63h36Zm36 12-18 58h36Zm43-25-23 83h46Zm45 20-19 67h38Zm45-14-23 82h46Zm34 17-18 63h36Z"/></g><path d="M93 132q25-28 50-20l18 20" fill="#c6cdb1"/>',
+    lake: '<path d="M0 100q60-29 112-2t128-3v37H0Z" fill="#a1b99f"/><ellipse cx="116" cy="116" rx="92" ry="18" fill="#a6cdd1"/><path d="m53 113 26 1m62 4h31m-73 5h30" stroke="#d2e7df" stroke-width="2"/><path d="M35 115V75m0 10q-28 3-18-16 10-14 18 6 6-25 18-9 11 21-18 19" stroke="#6d8c79" fill="#91b595"/>',
+    garden:
+      '<path d="M0 104q100-32 240 0v28H0Z" fill="#a7bea0"/><g stroke="#7d9b78" stroke-width="2">' +
+      [22, 53, 86, 122, 157, 191, 223]
+        .map(
+          (x, i) =>
+            '<path d="M' +
+            x +
+            ' 124V' +
+            (94 + (i % 3) * 5) +
+            '"/><circle cx="' +
+            x +
+            '" cy="' +
+            (94 + (i % 3) * 5) +
+            '" r="6" fill="' +
+            ['#ddb2c9', '#e8cf8c', '#c1b3df'][i % 3] +
+            '"/>'
+        )
+        .join('') +
+      '</g>',
+    winter:
+      '<path d="M0 100q66-24 125 0t115-3v35H0Z" fill="#e1e8e3"/><path d="M54 119V88h33v31m77 0V77h38v42" fill="#c4b1bf" stroke="#9f8fa0"/><path d="m48 89 23-21 23 21m63-11 26-23 26 23" fill="#f1efde" stroke="#bbc6c9" stroke-width="3"/><path d="M65 98h12v16H65m111-24h12v15h-12" fill="#f8e3a5"/>',
+  };
+  const sceneryMarkup =
+    '<g class="world-scenery">' +
+    Object.entries(layers)
+      .map(([k, v]) => '<g class="world-scene world-scene-' + k + '">' + v + '</g>')
+      .join('') +
+    '</g>';
+  const weather = {
+    sunny: 'Sunshine',
+    cloudy: 'Cloudy',
+    rain: 'Gentle rain',
+    snow: 'Soft snow',
+    fog: 'Misty',
+    breeze: 'Breezy',
+    rainbow: 'Rainbow after rain',
+    aurora: 'Dreamy aurora',
+  };
+  const weatherMarkup =
+    '<g class="world-window-weather"><g class="world-rain" stroke="#9bb9ce" stroke-width="1">' +
+    Array.from(
+      { length: 18 },
+      (_, i) => '<path d="m' + (10 + i * 13) + ' ' + (12 + (i % 4) * 13) + '-5 11"/>'
+    ).join('') +
+    '</g><g class="world-snow" fill="#fffdf4">' +
+    Array.from(
+      { length: 18 },
+      (_, i) =>
+        '<circle cx="' +
+        (7 + i * 13) +
+        '" cy="' +
+        (13 + (i % 5) * 17) +
+        '" r="' +
+        (i % 2 ? 1.6 : 2.4) +
+        '" style="--flake:' +
+        i +
+        '"/>'
+    ).join('') +
+    '</g><g class="world-fog" fill="#e6e8e2" opacity=".58"><path d="M0 53h240v15H0Zm0 26h240v12H0Zm0 26h240v10H0Z"/></g><g class="world-rainbow" fill="none" opacity=".6" stroke-width="5">' +
+    ['#d9a6bb', '#eac09e', '#e8dfab', '#b0ccb7', '#abc3d4', '#c5b3d8']
+      .map(
+        (c, i) =>
+          '<path d="M' +
+          (30 + i * 5) +
+          ' 113a' +
+          (90 - i * 5) +
+          ' ' +
+          (90 - i * 5) +
+          ' 0 0 1 ' +
+          (180 - i * 10) +
+          ' 0" stroke="' +
+          c +
+          '"/>'
+      )
+      .join('') +
+    '</g><g class="world-breeze" stroke="#e7e9d4" stroke-width="2" opacity=".8"><path d="M17 43h72q17-13 23 0M106 63h91q20-12 23 0M34 81h82"/></g><g class="world-aurora" fill="none" stroke-width="17" opacity=".35"><path d="M-20 28q53 55 95 4t85 8 90-13" stroke="#a3d5b4"/><path d="M-15 42q50 28 94-2t81 20 90-24" stroke="#c4ace0"/></g></g>';
+  const finales = {
+    balloons: svg(
+      '<ellipse cx="32" cy="23" rx="18" ry="21" fill="currentColor" opacity=".8"/><path d="m28 44 4-5 4 5M32 44q-8 9 0 18" fill="none" stroke="#728894" stroke-width="1.5"/><path d="M22 14q-5 5-4 10" stroke="#fff5e9" stroke-width="3"/>'
+    ),
+    cranes: svg(
+      '<path d="m5 37 25-27 6 22 23-15-14 28-16 6Z" fill="currentColor" opacity=".8" stroke="#8194a2"/><path d="m5 37 24 14 7-19M30 10l-1 41 16-6" stroke="#fff8ee" stroke-width="1.5"/>'
+    ),
+    rainbow: svg(
+      '<g fill="none" stroke-width="6"><path d="M7 49a25 31 0 0 1 50 0" stroke="#dfa3b7"/><path d="M13 49a19 25 0 0 1 38 0" stroke="#eacb97"/><path d="M19 49a13 19 0 0 1 26 0" stroke="#a6c7b3"/><path d="M25 49a7 13 0 0 1 14 0" stroke="#b6b5dd"/></g>'
+    ),
+    trophy: svg(
+      '<path d="M17 8h30v16q0 16-15 16T17 24Z" fill="#efd390" stroke="#ac905d" stroke-width="2"/><path d="M17 15H7q-3 18 14 19m26-19h10q3 18-14 19M32 40v12m-13 5h26" fill="none" stroke="#ac905d" stroke-width="4"/><path d="m32 13 3 7 8 1-6 5 2 8-7-4-7 4 2-8-6-5 8-1Z" fill="#fff4ce"/>'
+    ),
+    flowers: svg(
+      '<g fill="currentColor" opacity=".85"><ellipse cx="32" cy="17" rx="8" ry="13"/><ellipse cx="32" cy="47" rx="8" ry="13"/><ellipse cx="17" cy="32" rx="13" ry="8"/><ellipse cx="47" cy="32" rx="13" ry="8"/></g><circle cx="32" cy="32" r="10" fill="#f3dfa3"/><circle cx="32" cy="32" r="4" fill="#c7a67a"/>'
+    ),
+    moon: svg(
+      '<path d="M41 5a27 27 0 1 0 17 43A28 28 0 0 1 41 5Z" fill="#f2e2ad" stroke="#bdad8b"/><path d="m48 17 2 5 5 2-5 2-2 5-2-5-5-2 5-2Z" fill="#cbb9e2"/>'
+    ),
+    ducks: visitors.duck,
+    galaxy: svg(
+      '<circle cx="32" cy="32" r="22" fill="currentColor" opacity=".16" stroke="currentColor"/><ellipse cx="32" cy="32" rx="30" ry="9" transform="rotate(-30 32 32)" stroke="#c6b8de" stroke-width="3"/><circle cx="27" cy="25" r="7" fill="#ffffff55"/><circle cx="50" cy="13" r="3" fill="#e9d69d"/>'
+    ),
+  };
+  root.WorkHubMomoWorldArt = { visitors, scenery, weather, sceneryMarkup, weatherMarkup, finales };
 })(window);

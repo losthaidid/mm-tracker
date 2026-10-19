@@ -1,231 +1,2042 @@
+/**
+ * validator-studio.js
+ * Template editor, mapping preview and validation results interface.
+ * Uses validator-engine.js plus validator-files.js. Uploaded rows remain in memory.
+ * Reviewed definitions/run summaries save through a.mutate(); do not store uploaded rows by accident.
+ * File map: docs/FILE-MAP.md
+ */
 /* Validation Studio: account-owned definitions; uploaded rows stay in memory. */
-(function(root){
-'use strict';
-const E=root.WorkHubValidatorEngine,F=root.WorkHubValidatorFiles;
-const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const icon=(name,size=22)=>'<svg width="'+size+'" height="'+size+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+({leaf:'<path d="M19 4C8 3 3 8 6 15c5 5 13 1 13-11Z"/><path d="m5 20 10-11"/>',upload:'<path d="M12 16V4m-4 4 4-4 4 4M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/>',columns:'<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 9h18M10 9v11M16 9v11"/>',rules:'<path d="M5 5h7v7h7M12 5h7M5 19h7v-7"/><circle cx="5" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="19" cy="12" r="2"/>',check:'<path d="m5 12 4 4L19 6"/><circle cx="12" cy="12" r="10"/>',reference:'<path d="M4 4h6a3 3 0 0 1 3 3v14a4 4 0 0 0-4-3H4ZM20 4h-4a3 3 0 0 0-3 3"/><path d="M20 4v14h-3"/>',history:'<path d="M3 5v5h5M4 10a8 8 0 1 1 1 8m7-12v6l4 2"/>',file:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"/><path d="M14 3v6h6M8 14h8M8 17h5"/>',spark:'<path d="m12 2 2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5Z"/>'}[name]||'')+'</svg>';
-const btn=(action,label,attrs='',cls='')=>'<button type="button" class="val-btn '+cls+'" data-val="'+action+'" '+attrs+'>'+label+'</button>';
-const options=(rows,value)=>rows.map(([v,label])=>'<option value="'+esc(v)+'"'+(String(v)===String(value)?' selected':'')+'>'+esc(label)+'</option>').join('');
-const input=(name,label,value='',type='text',attrs='')=>'<label class="val-label">'+label+'<input name="'+name+'" type="'+type+'" value="'+esc(value)+'" '+attrs+'></label>';
-const select=(name,label,rows,value)=>'<label class="val-label">'+label+'<select name="'+name+'">'+options(rows,value)+'</select></label>';
-const area=(name,label,value='',attrs='')=>'<label class="val-label">'+label+'<textarea name="'+name+'" '+attrs+'>'+esc(value)+'</textarea></label>';
-const toggle=(name,label,checked)=>'<label class="val-toggle"><input type="checkbox" name="'+name+'"'+(checked?' checked':'')+'><span>'+label+'</span></label>';
-const stamp=s=>s?new Date(s).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'';
-function install(a){
- const $=id=>document.getElementById(id),store=()=>a.state().workhub.validator;
- let owner='',generation=0,draft=null,selected='',baseStamp='',dirty=false,mode='columns',columnId='',ruleId='',message='',search='',book=null,sheetIndex=0,headerRow=1,headers=[],sourceRows=[],mapping={},rows=[],result=null,resultSchema=null,version='draft',fileName='',filter='all',page=0,busy=false,refEditing='',targetRow=-1;
- function sync(){const next=a.owner?.()||'';if(next!==owner){owner=next;generation++;draft=null;selected='';baseStamp='';dirty=false;book=null;headers=[];sourceRows=[];rows=[];result=null;resultSchema=null;fileName='';busy=false;mode='columns';}return next;}
- function paint(){a.render();}
- function say(text,error=false){message=text;a.tell?.(text,error);}
- function ensure(){sync();if(!a.ready())throw Error('Sign in to open Validation Studio.');}
- function mark(){generation++;busy=false;dirty=true;result=null;resultSchema=null;const el=$('valDraftStatus');if(el)el.textContent='Unsaved draft';}
- function activeSchema(){if(version==='draft')return E.schema(draft);const r=draft?.releases.find(r=>String(r.version)===version);if(!r)throw Error('Choose an available template version.');return E.copy(r.schema);}
- function pick(id,force=false){if(!force&&dirty&&!root.confirm('Switch templates and discard unsaved draft changes?'))return;const t=store().templates.find(t=>t.id===id);draft=t?E.copy(t):null;selected=t?.id||'';baseStamp=t?.updatedAt||'';dirty=false;columnId=draft?.columns[0]?.id||'';ruleId=draft?.rules[0]?.id||'';version=draft?.releases.length?String(draft.releases.at(-1).version):'draft';clearFile();message='';}
- function clearFile(){generation++;book=null;headers=[];sourceRows=[];mapping={};rows=[];result=null;resultSchema=null;fileName='';page=0;busy=false;}
- function create(example=false){if(dirty&&!root.confirm('Create a template and discard unsaved draft changes?'))return;draft=example?E.example():E.create();selected=draft.id;baseStamp='';columnId=draft.columns[0]?.id||'';ruleId=draft.rules[0]?.id||'';dirty=true;version='draft';mode='columns';clearFile();message=example?'An example to explore. All fields and rules are yours to change.':'';paint();}
- function rewire(oldKey,newKey){
-  for(const r of draft.rules){const walk=g=>{for(const c of g.conditions){if(c.field===oldKey)c.field=newKey;if(c.otherField===oldKey)c.otherField=newKey;for(const pair of c.pairs||[])if(pair.field===oldKey)pair.field=newKey;}for(const c of g.groups)walk(c);};walk(r.when);if(r.assertion.field===oldKey)r.assertion.field=newKey;if(r.assertion.otherField===oldKey)r.assertion.otherField=newKey;for(const pair of r.assertion.pairs||[])if(pair.field===oldKey)pair.field=newKey;}
-  draft.uniqueGroups=draft.uniqueGroups.map(g=>g.map(k=>k===oldKey?newKey:k));
- }
- function readClause(el){if(!el)return null;const get=k=>el.querySelector('[data-clause="'+k+'"]')?.value||'';return{field:get('field'),operator:get('operator'),value:get('value'),otherField:get('otherField'),lookupId:get('lookupId'),lookupColumn:get('lookupColumn'),...(get('operator')==='lookupTuple'?{pairs:Array.from(el.querySelectorAll('[data-tuple-pair]')).map(pair=>({field:pair.querySelector('[data-pair-field]').value,referenceColumn:pair.querySelector('[data-pair-reference]').value}))}:{})};}
- function readGroup(el){
-  return{join:el.querySelector(':scope > .val-group-head select').value,conditions:Array.from(el.querySelectorAll(':scope > .val-group-items > .val-clause')).map(readClause),groups:Array.from(el.querySelectorAll(':scope > .val-group-items > .val-condition-group')).map(readGroup)};
- }
- function commitCurrent(){
-  if(!draft)return;
-  const meta=$('valMetaForm');if(meta){draft.name=meta.elements.namedItem('name').value.trim();draft.description=meta.elements.namedItem('description').value;}
-  const cf=$('valColumnForm');if(cf){const c=draft.columns.find(c=>c.id===cf.dataset.id),old=c.key;for(const k of ['key','label','type','minLength','maxLength','min','max','values','aliases','description','format'])c[k]=cf.elements.namedItem(k).value;for(const k of ['required','unique','trim','caseSensitive'])c[k]=cf.elements.namedItem(k).checked;if(old!==c.key)rewire(old,c.key);}
-  const rf=$('valRuleForm');if(rf){const r=draft.rules.find(r=>r.id===rf.dataset.id);r.name=rf.elements.namedItem('name').value;r.severity=rf.elements.namedItem('severity').value;r.message=rf.elements.namedItem('message').value;r.enabled=rf.elements.namedItem('enabled').checked;r.when=readGroup(rf.querySelector('[data-group-root]'));r.assertion=readClause(rf.querySelector('[data-assertion]'));}
- }
- function saveDraft(quiet=false){
-  ensure();commitCurrent();E.checkSchema(draft,true);
-  const existing=store().templates.find(t=>t.id===draft.id);if(existing&&existing.updatedAt!==baseStamp)throw Error('This template changed elsewhere. Export your draft, then reopen the saved template before replacing it.');
-  const saved=E.copy(draft);saved.updatedAt=new Date().toISOString();
-  const ok=a.mutate(d=>{const list=d.workhub.validator.templates,i=list.findIndex(t=>t.id===saved.id);if(i<0)list.push(saved);else list[i]=saved;});
-  if(!ok)return false;draft=saved;selected=saved.id;baseStamp=saved.updatedAt;dirty=false;if(!quiet)say('Template draft saved.');return true;
- }
- function publish(){
-  commitCurrent();E.checkSchema(draft);if(draft.releases.length>=E.LIMITS.versions)throw Error('This template has 15 published versions. Duplicate it to start a new version series.');
-  if(!saveDraft(true))return;const release={version:(draft.releases.at(-1)?.version||0)+1,publishedAt:new Date().toISOString(),schema:E.schema(draft)};draft.releases.push(release);dirty=true;
-  if(saveDraft(true)){version=String(release.version);result=null;say('Version '+version+' published. Its rules are now frozen.');paint();}
- }
- function library(){
-  const list=store().templates.filter(t=>t.name.toLowerCase().includes(search.toLowerCase()));
-  return'<aside class="val-library"><div class="val-library-heading"><span>Your templates</span><span>'+store().templates.length+'</span></div><label class="val-search"><span class="sr-only">Find a template</span><input id="valSearch" type="search" placeholder="Find a template…" value="'+esc(search)+'"></label><div class="val-template-list">'+list.map(t=>btn('open',icon('file',18)+'<span><strong>'+esc(t.name)+'</strong><small>'+t.columns.length+' columns · '+(t.releases.length?'v'+t.releases.at(-1).version:'Draft')+'</small></span>','data-id="'+esc(t.id)+'"',t.id===selected?'is-active':'')).join('')+(!list.length?'<p class="val-muted">Your next useful template starts here.</p>':'')+'</div>'+btn('new','＋ New template','','val-wide')+btn('import-definition','Import definition','','val-wide val-quiet')+'<div class="val-library-note">'+icon('leaf',24)+'<p>Make the rules once.<br>Use them whenever you need.</p></div></aside>';
- }
- function empty(){
-  return'<div class="val-welcome"><div class="val-welcome-art"><div class="val-paper val-paper-back"></div><div class="val-paper">'+icon('columns',60)+'<i></i><i></i><i></i></div><span class="val-art-check">'+icon('check',28)+'</span><span class="val-art-spark">'+icon('spark',25)+'</span></div><span class="val-eyebrow">A HOME FOR YOUR DATA RULES</span><h2>Any file. Your rules.</h2><p>Give your columns a name, shape the conditions and let your data tell you what needs attention.</p><div class="val-actions">'+btn('new','Create a template','','val-primary')+btn('example','Explore an example', '', 'val-secondary')+'</div><div class="val-welcome-steps"><span>'+icon('columns')+'Design columns</span><span>'+icon('rules')+'Build conditions</span><span>'+icon('check')+'Check & correct</span></div><small>XLSX, CSV and TSV · No SAP connection needed</small></div>';
- }
- function header(){
-  const latest=draft.releases.at(-1);
-  return'<div class="val-work-head"><div><span class="val-eyebrow">'+(latest?'PUBLISHED v'+latest.version:'YOUR WORKING DRAFT')+'</span><h2>'+esc(draft.name||'Untitled template')+'</h2><p>'+esc(draft.description||'A flexible home for columns, conditions and clean data.')+'</p><span id="valDraftStatus" class="val-save-state">'+(dirty?'Unsaved draft':'Draft saved')+'</span></div><div class="val-actions">'+btn('save','Save draft','','val-secondary')+btn('publish',icon('spark',16)+' Publish version','','val-primary')+'<details class="val-more"><summary aria-label="Template options">•••</summary><div>'+btn('export-definition','Export definition')+btn('duplicate','Duplicate template')+btn('delete-template','Delete template','','val-danger')+'</div></details></div></div><nav class="val-tabs" aria-label="Validation workspace">'+[['columns','Columns','columns'],['rules','Conditions','rules'],['references','References','reference'],['check','Validate','check'],['history','Versions & runs','history']].map(([key,label,art])=>btn('mode',icon(art,17)+label,'data-mode="'+key+'" aria-current="'+(mode===key?'page':'false')+'"',mode===key?'is-active':'')).join('')+'</nav>';
- }
- function columnEditor(){
-  const c=draft.columns.find(c=>c.id===columnId)||draft.columns[0];if(c)columnId=c.id;
-  return'<div class="val-section-heading"><div><h3>Give your data a shape</h3><p>Display labels for people. Technical field names for your rules.</p></div>'+'<div class="val-actions">'+btn('field-library','Field library','','val-secondary')+btn('add-column','＋ Add column','','val-secondary')+'</div>'+'</div><div class="val-designer"><div class="val-outline"><div class="val-outline-title">UPLOAD COLUMNS <span>'+draft.columns.length+'/80</span></div>'+draft.columns.map((f,i)=>'<div class="val-column-item'+(f.id===columnId?' is-active':'')+'" draggable="true" data-column-id="'+esc(f.id)+'">'+btn('select-column','<span class="val-grip">⠿</span><span class="val-col-index">'+F.col(i)+'</span><span><strong>'+esc(f.label)+'</strong><code>'+esc(f.key)+'</code></span>'+(f.required?'<b title="Required">*</b>':''),'data-id="'+esc(f.id)+'"')+'<div class="val-order">'+btn('move-column','↑','data-id="'+esc(f.id)+'" data-delta="-1" aria-label="Move '+esc(f.label)+' up"'+(!i?' disabled':''))+btn('move-column','↓','data-id="'+esc(f.id)+'" data-delta="1" aria-label="Move '+esc(f.label)+' down"'+(i===draft.columns.length-1?' disabled':''))+'</div></div>').join('')+(!draft.columns.length?'<div class="val-empty-small">'+icon('columns',34)+'<p>Add your first column.<br>You decide what belongs here.</p></div>':'')+'</div><div class="val-inspector"><form id="valMetaForm" class="val-meta">'+input('name','Template name',draft.name,'text','maxlength="120" required')+area('description','A little context',draft.description,'maxlength="2000" rows="2" placeholder="What will this template help you check?"')+'</form>'+(c?'<form id="valColumnForm" data-id="'+esc(c.id)+'"><div class="val-panel-title"><div><span class="val-eyebrow">COLUMN DETAILS</span><h3>'+esc(c.label)+'</h3></div>'+'<div class="val-actions">'+btn('field-save','Keep this field','','val-secondary')+btn('remove-column','Remove','data-id="'+esc(c.id)+'"','val-quiet val-danger')+'</div>'+'</div><div class="val-fields">'+input('label','Column label',c.label,'text','maxlength="120" required')+input('key','Technical field name',c.key,'text','maxlength="64" spellcheck="false" autocapitalize="off" required')+select('type','Data type',E.TYPES.map(x=>[x,x==='integer'?'Whole number':x==='decimal'?'Decimal number':x[0].toUpperCase()+x.slice(1)]),c.type)+select('format','Format check',[['','Any format'],...Object.keys(E.FORMATS).map(x=>[x,x])],c.format)+input('minLength','Minimum length',c.minLength,'number','min="0" max="32000"')+input('maxLength','Maximum length',c.maxLength,'number','min="0" max="32000"')+input('min','Minimum number',c.min,'number','step="any"')+input('max','Maximum number',c.max,'number','step="any"')+'</div><div class="val-toggle-grid">'+toggle('required','Required',c.required)+toggle('unique','Unique values',c.unique)+toggle('trim','Ignore surrounding spaces',c.trim)+toggle('caseSensitive','Case-sensitive comparisons',c.caseSensitive)+'</div>'+area('values','Allowed values',c.values,'rows="3" placeholder="One value per line, or comma separated" maxlength="8000"')+input('aliases','Other accepted upload headers',c.aliases,'text','placeholder="Separate alternative headers with commas" maxlength="8000"')+area('description','Instructions for this column',c.description,'rows="2" maxlength="8000"')+'<p class="val-help">Dates use YYYY-MM-DD. Keep identifiers as Text to preserve leading zeros and every digit. Number limits apply to whole-number and decimal columns.</p><button class="val-btn val-secondary" type="submit">Apply column changes</button></form>':'<p class="val-muted">Your column settings will appear here.</p>')+'</div></div><section class="val-card val-combinations"><div><h3>Unique combinations</h3><p>For example: the same ID may appear in different plants, but each ID + plant pair must be unique.</p></div>'+draft.uniqueGroups.map((g,i)=>'<div class="val-combination"><span>'+g.map(k=>'<code>'+esc(k)+'</code>').join(' + ')+'</span>'+btn('remove-combination','×','data-index="'+i+'" aria-label="Remove unique combination"','val-quiet')+'</div>').join('')+'<form id="valUniqueForm"><div class="val-check-list">'+draft.columns.map(c=>toggle(c.key,esc(c.label),false)).join('')+'</div><button type="submit" class="val-btn val-secondary">Add selected combination</button></form></section>';
- }
- function clause(c,path,assertion=false){
-  const fields=draft.columns.map(f=>[f.key,f.label+' ('+f.key+')']),op=c.operator||'eq',reference=draft.lookups.find(l=>l.id===c.lookupId)||draft.lookups[0];
-  const control=(key,rows,value)=>'<select data-clause="'+key+'" aria-label="'+key+'">'+options(rows,value)+'</select>';
-  return'<div class="val-clause" data-path="'+esc(path)+'"'+(assertion?' data-assertion':'')+'>'+control('field',fields,c.field)+control('operator',Object.entries(E.OPS),op)+(op.startsWith('field')?control('otherField',fields,c.otherField):op==='lookupTuple'?tupleView(c,path,reference,fields):op==='lookup'?'<div class="val-lookup-select">'+control('lookupId',draft.lookups.map(l=>[l.id,l.name]),c.lookupId||reference?.id)+control('lookupColumn',(reference?.headers||[]).map(h=>[h,h]),c.lookupColumn)+'</div>':op==='pattern'?control('value',Object.keys(E.FORMATS).map(f=>[f,f]),c.value):['empty','notEmpty'].includes(op)?'<span class="val-clause-note">No value needed</span>':'<input data-clause="value" aria-label="Condition value" value="'+esc(c.value)+'" placeholder="Value'+(['in','notIn'].includes(op)?'s, separated by commas':'')+'" maxlength="8000">')+(!assertion?btn('remove-clause','×','data-path="'+esc(path)+'" aria-label="Remove condition"','val-quiet'):'')+'</div>';
- }
- function tupleView(c,path,reference,fields){
-  const pairs=c.pairs?.length?c.pairs:[{field:c.field,referenceColumn:reference?.headers[0]||''},{field:draft.columns.find(f=>f.key!==c.field)?.key||'',referenceColumn:reference?.headers[1]||''}];
-  return'<div class="val-tuple"><label class="val-label">Trusted reference<select data-clause="lookupId" aria-label="lookupId">'+options(draft.lookups.map(l=>[l.id,l.name]),c.lookupId||reference?.id)+'</select></label><p class="val-help">All mapped values must match the same reference row. The field above is highlighted when this check fails.</p>'+pairs.map((pair,i)=>'<div class="val-tuple-pair" data-tuple-pair><select data-pair-field aria-label="Upload field '+(i+1)+'">'+options(fields,pair.field)+'</select><span>→</span><select data-pair-reference aria-label="Reference column '+(i+1)+'">'+options((reference?.headers||[]).map(h=>[h,h]),pair.referenceColumn)+'</select>'+btn('tuple-remove','×','data-path="'+esc(path)+'" data-index="'+i+'" aria-label="Remove mapping '+(i+1)+'"'+(pairs.length<=2?' disabled':''),'val-quiet')+'</div>').join('')+btn('tuple-add','＋ Map another field','data-path="'+esc(path)+'"'+(pairs.length>=10?' disabled':''),'val-quiet')+'</div>';
- }
- function groupView(g,path,depth=0){
-  return'<div class="val-condition-group" data-path="'+path+'"'+(!depth?' data-group-root':'')+'><div class="val-group-head"><span>'+(depth?'Nested group':'WHEN')+'</span><select aria-label="Condition group logic">'+options([['all','ALL of these (AND)'],['any','ANY of these (OR)']],g.join)+'</select>'+(depth?btn('remove-group','×','data-path="'+path+'" aria-label="Remove nested group"','val-quiet'):'')+'</div><div class="val-group-items">'+g.conditions.map((c,i)=>clause(c,path+'.conditions.'+i)).join('')+g.groups.map((child,i)=>groupView(child,path+'.groups.'+i,depth+1)).join('')+(!g.conditions.length&&!g.groups.length?'<p class="val-every-row">Every row. Add a condition to make this rule conditional.</p>':'')+'</div><div class="val-group-actions">'+btn('add-clause','＋ Condition','data-path="'+path+'"','val-quiet')+(depth<4?btn('add-group','＋ AND/OR group','data-path="'+path+'"','val-quiet'):'')+'</div></div>';
- }
- function getPath(path){let value=draft.rules.find(r=>r.id===ruleId);for(const k of path.split('.')){if(!/^(when|assertion|groups|conditions|\d+)$/.test(k))throw Error('Invalid condition path.');value=value[k];}return value;}
- function rulesEditor(){
-  const r=draft.rules.find(r=>r.id===ruleId)||draft.rules[0];if(r)ruleId=r.id;
-  return'<div class="val-section-heading"><div><h3>Small conditions. Clear answers.</h3><p>Combine AND/OR groups, compare fields and choose what an issue should say.</p></div>'+btn('add-rule','＋ Add condition',!draft.columns.length?'disabled':'','val-secondary')+'</div><div class="val-designer"><div class="val-outline"><div class="val-outline-title">YOUR CONDITIONS <span>'+draft.rules.length+'</span></div>'+draft.rules.map(r=>btn('select-rule','<span class="val-rule-dot '+r.severity+'"></span><span><strong>'+esc(r.name)+'</strong><small>'+(r.enabled?r.severity==='warning'?'Warning':'Error':'Paused')+'</small></span>','data-id="'+esc(r.id)+'"',r.id===ruleId?'is-active':'')).join('')+(!draft.rules.length?'<div class="val-empty-small">'+icon('rules',34)+'<p>Basic column checks already work. Add conditions for your business rules.</p></div>':'')+'</div><div class="val-inspector">'+(r?'<form id="valRuleForm" data-id="'+esc(r.id)+'"><div class="val-panel-title"><span class="val-eyebrow">VISUAL CONDITION BUILDER</span>'+btn('remove-rule','Remove','data-id="'+esc(r.id)+'"','val-quiet val-danger')+'</div><div class="val-fields">'+input('name','Rule name',r.name,'text','maxlength="160" required')+select('severity','When this fails',[['error','Error — must be corrected'],['warning','Warning — needs review']],r.severity)+'</div>'+toggle('enabled','Enable this condition',r.enabled)+groupView(r.when,'when')+'<div class="val-then"><span class="val-eyebrow">THEN REQUIRE</span>'+clause(r.assertion,'assertion',true)+'</div>'+area('message','Your validation message',r.message,'maxlength="1000" rows="2" placeholder="Explain what needs to change"')+'<div class="val-rule-summary">'+icon('leaf',18)+'<p>If '+esc(F.describeGroup(r.when,draft))+', require '+esc(E.describe(r.assertion,draft))+'.</p></div><button type="submit" class="val-btn val-secondary">Apply condition</button></form>':'<div class="val-empty-small"><h3>Let your rules do the checking.</h3><p>“If type is Urgent, require an owner.”<br>“End date must be after start date.”<br>“This value must exist in my reference list.”</p></div>')+'</div></div>';
- }
- function references(){
-  const current=draft.lookups.find(l=>l.id===refEditing);
-  return'<div class="val-section-heading"><div><h3>Your trusted reference shelf</h3><p>Maintain your own codes and values, then check individual values or a combination in the same reference row.</p></div>'+btn('reference-new','＋ New reference','','val-secondary')+'</div><div class="val-reference-grid">'+draft.lookups.map(l=>'<article class="val-card"><span class="val-ref-icon">'+icon('reference',26)+'</span><h3>'+esc(l.name)+'</h3><p>'+l.rows.length+' rows · '+l.headers.length+' columns</p><div class="val-ref-tags">'+l.headers.map(h=>'<code>'+esc(h)+'</code>').join('')+'</div><div class="val-actions">'+btn('reference-edit','Edit list','data-id="'+esc(l.id)+'"','val-secondary')+btn('reference-remove','Remove','data-id="'+esc(l.id)+'"','val-quiet val-danger')+'</div></article>').join('')+'</div><section class="val-card"><form id="valReferenceForm" data-id="'+esc(current?.id||'')+'"><div class="val-panel-title"><h3>'+(current?'Edit '+esc(current.name):'Add a reference list')+'</h3>'+btn('reference-file',icon('upload',16)+' Import file','','val-secondary')+'</div>'+input('name','List name',current?.name||'','text','maxlength="120" placeholder="For example: Approved cost centres" required')+area('data','Headers and values',current?E.csv([current.headers,...current.rows]).replace(/^\uFEFF/,''):'','rows="7" placeholder="CODE,DESCRIPTION\n1000,Head office\n2000,Regional office" required')+(current?'<fieldset class="val-description-options"><legend>Readable reference details</legend><div class="val-fields">'+select('codeColumn','Code column',current.headers.map(h=>[h,h]),current.codeColumn||current.headers[0])+select('nameColumn','Display-name column',[['','No display name'],...current.headers.map(h=>[h,h])],current.nameColumn||'')+'</div><p class="val-help">Choose up to five description columns. Matched codes can then be explained beside your results.</p><div class="val-check-list">'+current.headers.map(h=>'<label class="val-toggle"><input type="checkbox" name="refDescription" value="'+esc(h)+'"'+(current.descriptionColumns?.includes(h)?' checked':'')+'><span>'+esc(h)+'</span></label>').join('')+'</div></fieldset>':'<p class="val-help">After adding the list, choose its code, display name and description columns here.</p>')+'<p class="val-help">Paste CSV/TSV with a header row, or import the first worksheet of an XLSX file. Up to 2,000 reference rows per list.</p><button class="val-btn val-primary" type="submit">'+(current?'Apply reference changes':'Add to draft')+'</button></form></section>';
- }
- function getDataFromSheet(){
-  if(!book)return;const sheet=book.sheets[sheetIndex];if(!sheet)throw Error('Choose a worksheet.');const start=headerRow-1;
-  headers=(sheet.rows[start]||[]).map(v=>String(v??'').trim());while(headers.length&&!headers.at(-1))headers.pop();sourceRows=sheet.rows.slice(start+1).map(row=>Array.from({length:headers.length},(_,i)=>String(row[i]??'')));
-  while(sourceRows.length&&sourceRows.at(-1).every(E.blank))sourceRows.pop();
-  if(!headers.length)throw Error('The selected header row is empty.');if(sourceRows.length>5000||sourceRows.length*headers.length>E.LIMITS.cells)throw Error('Use up to 5,000 rows and 200,000 cells.');
-  mapping=E.autoMap(headers,activeSchema());rows=[];result=null;resultSchema=null;page=0;
- }
- async function loadFile(file,kind='data'){
-  ensure();commitCurrent();if(!draft)throw Error('Create a template first.');const token=++generation,account=owner;busy=true;say('Reading '+file.name+'…');paint();
-  try{const value=await F.read(file);if(token!==generation||account!==a.owner?.()||!a.ready())return;
-   if(kind==='reference'){busy=false;mode='references';paint();const form=$('valReferenceForm');form.elements.namedItem('name').value=file.name.replace(/\.[^.]+$/,'').slice(0,120);form.elements.namedItem('data').value=E.csv(value.sheets[0].rows).replace(/^\uFEFF/,'');say('Review the reference name and values, then add it to your draft.');return;}
-   book=value;sheetIndex=0;headerRow=1;fileName=file.name;getDataFromSheet();mode='check';say('File ready. Check the column mapping before validating.');
-  }finally{if(token===generation&&account===a.owner?.()){busy=false;paint();}}
- }
- function loadSample(){
-  commitCurrent();const t=activeSchema();E.checkSchema(t);
-  const sample=t.columns.map(c=>c.type==='date'?'2026-10-20':c.type==='integer'?'1':c.type==='decimal'?'25.50':c.type==='boolean'?'true':E.tokens(c.values)[0]||'Example');
-  book={sheets:[{name:'Example data',rows:[t.columns.map(c=>c.label),sample,sample.map((v,i)=>i===0?'Example 2':v)]}]};
-  if(t.columns.map(c=>c.key).join(',')==='REQUEST_ID,TYPE,OWNER,AMOUNT,START_DATE,END_DATE')book.sheets[0].rows=[t.columns.map(c=>c.label),['REQ-001','Standard','Aisha','250','2026-10-20','2026-10-22'],['REQ-002','Urgent','','-5','2026-10-22','2026-10-20'],['REQ-003','Standard','Daniel','15000','2026-10-23','2026-10-24']];
-  sheetIndex=0;headerRow=1;fileName='Example data';getDataFromSheet();mode='check';paint();
- }
- async function run(){
-  ensure();commitCurrent();const t=activeSchema();E.checkSchema(t);const mapped=E.mapRows(headers,sourceRows,t,mapping);if(!mapped.length)throw Error('Upload or paste at least one data row.');
-  if(version==='draft'&&!saveDraft(true))return;const token=++generation,account=owner;busy=true;result=null;rows=mapped;say('Checking columns, conditions and references…');paint();
-  await new Promise(resolve=>root.setTimeout(resolve,50));if(token!==generation||account!==a.owner?.()||!a.ready())return;
-  try{
-   const checked=E.validateRows(t,rows);if(token!==generation||account!==a.owner?.())return;
-   result=checked;resultSchema=E.copy(t);filter='all';page=0;
-   const summary={id:E.uid(),templateId:draft.id,templateName:t.name,fileName:fileName.slice(0,240),version:version==='draft'?0:Number(version),at:new Date().toISOString(),rows:checked.rows,passed:checked.passed,errors:checked.errors,warnings:checked.warnings};
-   a.mutate(d=>{const history=d.workhub.validator.runs;history.unshift(summary);if(history.length>150)history.length=150;});
-   say(checked.errors?checked.errors+' errors found. Let’s tidy those up.':checked.warnings?'No errors. '+checked.warnings+' warnings to review.':'All '+checked.rows+' rows passed. Nicely done.');
-  }finally{if(token===generation){busy=false;paint();}}
- }
- function mappingView(){
-  const t=activeSchema(),unmapped=t.columns.filter(c=>Number(mapping[c.key])<0).length;
-  return'<section class="val-card val-mapping"><div class="val-panel-title"><div><span class="val-eyebrow">CONNECT YOUR COLUMNS</span><h3>One small check before we start</h3></div><span class="val-chip">'+sourceRows.length+' rows · '+unmapped+' unmapped fields</span></div><div class="val-file-options">'+select('sheet','Worksheet',book.sheets.map((s,i)=>[i,s.name]),sheetIndex)+input('headerRow','Header row',headerRow,'number','min="1" max="5001"')+'</div><div class="val-map-grid">'+t.columns.map(c=>'<label class="val-map-row"><span><strong>'+esc(c.label)+(c.required?' *':'')+'</strong><code>'+esc(c.key)+'</code></span><span aria-hidden="true">→</span><select data-map="'+esc(c.key)+'" aria-label="Map '+esc(c.label)+'">'+options([[-1,c.required?'Choose a column':'Skip this field'],...headers.map((h,i)=>[i,F.col(i)+' · '+h])],mapping[c.key])+'</select></label>').join('')+'</div><div class="val-run-bar"><p>Uploaded rows stay in this browser. Only the run summary is saved.</p>'+btn('run',icon('check',18)+' Run validation',busy?'disabled':'','val-primary')+'</div></section>';
- }
- function resultsView(){
-  if(!rows.length)return'';
-  const indices=rows.map((r,i)=>i).filter(i=>!result||filter==='all'||filter==='errors'&&result.status[i].errors||filter==='warnings'&&result.status[i].warnings||filter==='passed'&&!result.status[i].errors);
-  page=Math.max(0,Math.min(page,Math.ceil(indices.length/25)-1));const shown=indices.slice(page*25,page*25+25),t=resultSchema||activeSchema(),issues=result?.issues||[];
-  return(result?'<div class="val-metrics"><div class="val-metric passed"><span>Rows without errors</span><strong>'+result.passed+'<small> / '+result.rows+'</small></strong></div><div class="val-metric errors"><span>Errors to correct</span><strong>'+result.errors+'</strong></div><div class="val-metric warnings"><span>Warnings to review</span><strong>'+result.warnings+'</strong></div><div class="val-metric"><span>Template used</span><strong class="val-version-text">'+(version==='draft'?'Saved draft':'Version '+version)+'</strong></div></div>':'<div class="val-inline-note">Your data changed. Run validation again to refresh the results and exports.</div>')+'<section class="val-card val-results"><div class="val-panel-title"><div><span class="val-eyebrow">LOOK CLOSER</span><h3>Your data, with the answers beside it</h3></div><div class="val-actions">'+btn('report','Export issue workbook',!result?'disabled':'','val-secondary')+btn('accepted','Export accepted rows',!result||!result.passed?'disabled':'','val-primary')+'</div></div><p class="val-help">Accepted exports exclude rows with errors. Rows with warnings remain included for your review.</p><div class="val-result-toolbar"><div class="val-segments">'+[['all','All rows'],['errors','Errors'],['warnings','Warnings'],['passed','Without errors']].map(([key,label])=>btn('filter',label,'data-filter="'+key+'"'+(!result&&key!=='all'?' disabled':''),filter===key?'is-active':'')).join('')+'</div><span>Showing '+(shown.length?page*25+1:0)+'–'+(page*25+shown.length)+' of '+indices.length+'</span></div><div class="val-table-scroll"><table class="val-grid"><thead><tr><th>Excel row</th><th>Check</th>'+t.columns.map(c=>'<th>'+esc(c.label)+'<code>'+esc(c.key)+'</code></th>').join('')+'</tr></thead><tbody>'+shown.map(i=>'<tr'+(targetRow===i?' class="val-target-row"':'')+'><th>'+ (headerRow+i+1)+'</th><td><span class="val-status '+(!result?'pending':result.status[i].errors?'error':result.status[i].warnings?'warning':'passed')+'">'+(!result?'Not checked':result.status[i].errors?'Needs correction':result.status[i].warnings?'Review':'Passed')+'</span>'+(result&&t.lookups.some(l=>l.nameColumn||l.descriptionColumns?.length)?btn('reference-details','Reference details','data-index="'+i+'"','val-quiet val-reference-button'):'')+'</td>'+t.columns.map(c=>{const found=issues.filter(x=>x.index===i&&x.field===c.key),severity=found.some(x=>x.severity==='error')?'error':found.length?'warning':'';return'<td class="'+severity+'"><input data-cell="'+i+'" data-field="'+esc(c.key)+'" aria-label="Row '+(headerRow+i+1)+' '+esc(c.label)+'" value="'+esc(rows[i][c.key])+'" maxlength="32000" title="'+esc(found.map(x=>x.message).join('\n')||'Edit this value')+'"></td>';}).join('')+'</tr>').join('')+'</tbody></table></div><div class="val-pagination">'+btn('page','← Previous','data-delta="-1"'+(!page?' disabled':''),'val-quiet')+'<span>Page '+(page+1)+' of '+Math.max(1,Math.ceil(indices.length/25))+'</span>'+btn('page','Next →','data-delta="1"'+((page+1)*25>=indices.length?' disabled':''),'val-quiet')+'</div></section>'+(result&&issues.length?'<section class="val-card"><div class="val-panel-title"><h3>What needs attention</h3><span class="val-chip">'+issues.length+' listed'+(result.truncated?' · capped at 15,000':'')+'</span></div><div class="val-issue-list">'+issues.slice(0,100).map(issue=>btn('issue','<span class="val-issue-marker '+issue.severity+'">'+(issue.severity==='error'?'!':'i')+'</span><span><strong>'+esc(issue.message)+'</strong><small>Row '+(headerRow+issue.index+1)+' · '+esc(issue.column)+' · '+esc(issue.rule)+'</small></span><span>↗</span>','data-index="'+issue.index+'"')).join('')+'</div>'+(issues.length>100?'<p class="val-help">Showing the first 100 issues here. Export the workbook for all listed issues.</p>':'')+'</section>':'');
- }
- function checkView(){
-  const versions=[['draft','Current draft'],...draft.releases.slice().reverse().map(r=>[r.version,'Published version '+r.version])];
-  return'<div class="val-section-heading"><div><h3>Let’s give your file a check.</h3><p>Choose a version, connect your columns, then correct issues in place.</p></div><div class="val-version-picker">'+select('version','Validate against',versions,version)+'</div></div>'+(busy?'<div class="val-scanning" role="status"><span class="val-scanner-orb">'+icon('spark',28)+'</span><div><strong>Making sense of your data…</strong><p>'+esc(message)+'</p></div><i></i></div>':'')+'<div class="val-upload-layout"><section class="val-dropzone" id="valDropzone"><span class="val-upload-icon">'+icon('upload',30)+'</span><h3>'+esc(fileName||'Drop a file. Find your clarity.')+'</h3><p>XLSX, CSV or TSV · Up to 5,000 rows and 200,000 cells</p><div class="val-actions">'+btn('browse',fileName?'Choose another file':'Browse files','','val-primary')+btn('download-template','Download Excel template','','val-secondary')+'</div><div class="val-upload-foot">'+btn('sample','Try example data','','val-quiet')+(book?btn('clear-file','Clear file','','val-quiet'):'')+'</div></section><details class="val-card val-paste"><summary>Or paste a table</summary><form id="valPasteForm">'+area('data','CSV or tab-separated data','','rows="6" placeholder="Include the header row" required')+'<button type="submit" class="val-btn val-secondary">Use pasted data</button></form><p class="val-help">Values only. Excel formulas must be pasted as values before upload.</p></details></div>'+(book?mappingView():'')+resultsView();
- }
- function history(){
-  const runs=store().runs.filter(r=>r.templateId===draft.id);
-  return'<div class="val-section-heading"><div><h3>A little history, clearly kept.</h3><p>Published versions stay frozen. Run history contains counts, never uploaded rows.</p></div></div><div class="val-history-layout"><section class="val-card"><h3>Published versions</h3>'+draft.releases.slice().reverse().map(r=>'<article class="val-release"><span class="val-version-bubble">'+r.version+'</span><div><strong>Version '+r.version+'</strong><p>'+stamp(r.publishedAt)+'<br>'+r.schema.columns.length+' columns · '+r.schema.rules.length+' conditions</p></div>'+btn('restore-version','Copy to draft','data-version="'+r.version+'"','val-secondary')+'</article>').join('')+(!draft.releases.length?'<p class="val-muted">Publish a version when your template is ready. Later draft edits won’t change it.</p>':'')+'</section><section class="val-card"><h3>Recent checks</h3>'+runs.slice(0,30).map(r=>'<article class="val-run-history"><span class="val-rule-dot '+(r.errors?'error':r.warnings?'warning':'passed')+'"></span><div><strong>'+esc(r.fileName)+'</strong><p>'+stamp(r.at)+' · '+(r.version?'v'+r.version:'Draft')+'</p><small>'+r.rows+' rows · '+r.errors+' errors · '+r.warnings+' warnings</small></div></article>').join('')+(!runs.length?'<p class="val-muted">Your validation summaries will appear here after the first check.</p>':'')+'</section></div>';
- }
- function render(){
-  sync();if(!draft&&store().templates.length)pick(store().templates[0].id,true);
-  return'<section class="validation-studio"><header class="val-heading"><div class="val-brand"><span class="val-brand-mark">'+icon('leaf',29)+'</span><div><span class="val-eyebrow">YOUR WORKHUB TOOLKIT</span><h1>Validation Studio</h1></div></div><div class="val-heading-note"><span class="val-dot"></span> A calmer way to check your data</div></header><div class="val-shell">'+library()+'<main class="val-main">'+(draft?header()+(message?'<div class="val-message" role="status" aria-live="polite">'+esc(message)+'</div>':'')+({columns:columnEditor,rules:rulesEditor,references,check:checkView,history}[mode]||columnEditor)():empty())+'</main></div><input id="valFile" type="file" accept=".xlsx,.csv,.tsv" hidden><input id="valDefinitionFile" type="file" accept=".json" hidden><input id="valReferenceFile" type="file" accept=".xlsx,.csv,.tsv" hidden></section>';
- }
- async function handle(el){
-  ensure();const action=el.dataset.val,id=el.dataset.id;message='';
-  if(action==='new'||action==='example'){create(action==='example');return;}
-  if(action==='open'){pick(id);paint();return;}
-  if(action==='reference-close'){$('valReferenceDialog')?.close();return;}
-  if(action==='reference-details'){referenceDetails(Number(el.dataset.index));return;}
-  if(action==='import-definition'){$('valDefinitionFile').click();return;}
-  if(!draft)throw Error('Create or choose a template first.');
-  commitCurrent();
-  if(action==='save'){saveDraft();paint();return;}
-  if(action==='publish'){publish();return;}
-  if(action==='mode'){mode=el.dataset.mode;paint();return;}
-  if(action==='field-library'||action==='field-save'){if(!a.fieldLibrary)throw Error('Open the field library from your signed-in workspace.');const account=owner,templateId=draft.id;a.fieldLibrary(action==='field-save'?E.copy(draft.columns.find(c=>c.id===columnId)):null,definition=>{if(account!==a.owner?.()||draft?.id!==templateId)throw Error('Reopen this template before inserting a field.');addLibraryField(definition);});return;}
-  if(action==='tuple-add'){const c=getPath(el.dataset.path);c.pairs||=[];const ref=draft.lookups.find(l=>l.id===c.lookupId);if(c.pairs.length>=10)throw Error('Map up to ten fields.');c.pairs.push({field:draft.columns.find(f=>!c.pairs.some(p=>p.field===f.key))?.key||'',referenceColumn:ref?.headers.find(h=>!c.pairs.some(p=>p.referenceColumn===h))||''});mark();}
-  if(action==='tuple-remove'){const c=getPath(el.dataset.path);if(c.pairs.length>2){c.pairs.splice(Number(el.dataset.index),1);mark();}}
-  if(action==='add-column'){if(draft.columns.length>=80)throw Error('Use up to 80 columns.');let n=draft.columns.length,c=E.column(n);while(draft.columns.some(f=>f.key===c.key))c=E.column(++n);draft.columns.push(c);columnId=c.id;mark();}
-  if(action==='select-column'){columnId=id;}
-  if(action==='move-column'){const i=draft.columns.findIndex(c=>c.id===id),j=i+Number(el.dataset.delta);if(j>=0&&j<draft.columns.length){draft.columns.splice(j,0,draft.columns.splice(i,1)[0]);mark();}}
-  if(action==='remove-column'){const c=draft.columns.find(c=>c.id===id),used=draft.rules.some(r=>JSON.stringify(r).includes('"'+c.key+'"'))||draft.uniqueGroups.some(g=>g.includes(c.key));if(used)throw Error('This field is used in a condition or unique combination. Update those first.');draft.columns=draft.columns.filter(c=>c.id!==id);columnId=draft.columns[0]?.id||'';mark();}
-  if(action==='add-rule'){if(!draft.columns.length)throw Error('Add a column before making conditions.');const r=E.rule(draft.columns[0].key);draft.rules.push(r);ruleId=r.id;mark();}
-  if(action==='select-rule')ruleId=id;
-  if(action==='remove-rule'){draft.rules=draft.rules.filter(r=>r.id!==id);ruleId=draft.rules[0]?.id||'';mark();}
-  if(action==='add-clause'){getPath(el.dataset.path).conditions.push(E.condition(draft.columns[0].key));mark();}
-  if(action==='add-group'){const g=E.group(draft.columns[0].key);getPath(el.dataset.path).groups.push(g);mark();}
-  if(action==='remove-clause'||action==='remove-group'){const parts=el.dataset.path.split('.'),i=Number(parts.pop());getPath(parts.join('.')).splice(i,1);mark();}
-  if(action==='remove-combination'){draft.uniqueGroups.splice(Number(el.dataset.index),1);mark();}
-  if(action==='reference-new'){refEditing='';}
-  if(action==='reference-edit')refEditing=id;
-  if(action==='reference-remove'){if(draft.rules.some(r=>JSON.stringify(r).includes('"'+id+'"')))throw Error('A condition uses this reference. Update that condition before removing it.');draft.lookups=draft.lookups.filter(l=>l.id!==id);refEditing='';mark();}
-  if(action==='reference-file'){$('valReferenceFile').click();return;}
-  if(action==='browse'){$('valFile').click();return;}
-  if(action==='clear-file')clearFile();
-  if(action==='sample'){loadSample();return;}
-  if(action==='run'){await run();return;}
-  if(action==='filter'){filter=el.dataset.filter;page=0;}
-  if(action==='page')page+=Number(el.dataset.delta);
-  if(action==='issue'){targetRow=Number(el.dataset.index);filter='all';page=Math.floor(targetRow/25);}
-  if(action==='download-template'){const t=activeSchema();a.download(await F.template(t),safeName(t.name)+'-template.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');return;}
-  if(action==='report'||action==='accepted'){if(!result||!resultSchema)throw Error('Run validation again before exporting.');const outcome=E.copy(result);outcome.issues.forEach(i=>i.row=headerRow+i.index+1);a.download(await F.report(resultSchema,rows,outcome,action==='accepted'),safeName(resultSchema.name)+(action==='accepted'?'-accepted.xlsx':'-issues.xlsx'),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');return;}
-  if(action==='export-definition'){E.checkSchema(draft,true);a.download(JSON.stringify({app:'workhub-validator',version:1,template:draft},null,2),safeName(draft.name)+'.json','application/json');return;}
-  if(action==='duplicate'){const t=E.copy(draft);t.id=E.uid();t.name=(t.name+' copy').slice(0,120);t.releases=[];t.createdAt=new Date().toISOString();draft=t;selected=t.id;baseStamp='';dirty=true;clearFile();mode='columns';}
-  if(action==='delete-template'){if(!root.confirm('Delete this template and its saved versions? Export its definition first if you want to keep a copy.'))return;const templateId=draft.id;if(a.mutate(d=>{d.workhub.validator.templates=d.workhub.validator.templates.filter(t=>t.id!==templateId);})){draft=null;selected='';dirty=false;clearFile();}}
-  if(action==='restore-version'){if(dirty&&!root.confirm('Replace the current draft with this published version?'))return;const r=draft.releases.find(r=>String(r.version)===el.dataset.version);Object.assign(draft,E.copy(r.schema));columnId=draft.columns[0]?.id||'';ruleId=draft.rules[0]?.id||'';version='draft';mark();mode='columns';}
-  paint();
- }
- function addLibraryField(definition){
-  ensure();if(!draft)throw Error('Create a template first.');if(draft.columns.length>=80)throw Error('Use up to 80 columns.');
-  const c=E.copy(definition);c.id=E.uid();let n=1,key=c.key,label=c.label;
-  while(draft.columns.some(f=>f.key.toLowerCase()===key.toLowerCase()||E.headerKey(f.label)===E.headerKey(label))){n++;const suffix='_'+n;key=c.key.slice(0,64-suffix.length)+suffix;const ls=' ('+n+')';label=c.label.slice(0,120-ls.length)+ls;}
-  c.key=key;c.label=label;draft.columns.push(c);columnId=c.id;mode='columns';mark();a.closeModal?.();paint();say('Field inserted as an independent copy.');
- }
- function referenceDetails(index){
-  if(!result||!resultSchema||!rows[index])throw Error('Run validation to inspect the current row.');
-  const matches=E.referenceDetails(resultSchema,rows[index]);
-  const body='<div class="wl-intro"><span class="val-eyebrow">READ THE CODE IN CONTEXT</span><h3>Reference details · row '+(headerRow+index+1)+'</h3><p>Values below come from matching rows in your configured reference lists.</p></div><div class="val-reference-explanations">'+matches.map(m=>'<article class="val-reference-explanation"><span class="val-eyebrow">'+esc(m.reference)+'</span><h3>'+esc(m.displayName||m.code)+'</h3><code>'+esc(m.code)+'</code><p>'+esc(m.description||'No additional description configured.')+'</p><small>Reference row '+m.sourceRow+' · '+esc(m.fields.join(' + '))+(m.matchCount>1?' · '+m.matchCount+' matches; first five shown':'')+'</small></article>').join('')+'</div>'+(!matches.length?'<p class="val-help">No matching reference description for this row. Check the values, conditions and selected description columns.</p>':'');
-  if(a.openModal)a.openModal('Reference details',body);else{let dialog=$('valReferenceDialog');if(!dialog){dialog=document.createElement('dialog');dialog.id='valReferenceDialog';document.body.append(dialog);}dialog.innerHTML=body+btn('reference-close','Close');dialog.showModal();}
- }
- function safeName(name){return String(name).replace(/[^A-Za-z0-9_-]+/g,'-').slice(0,80)||'validation';}
- function formSubmit(form){
-  ensure();
-  if(form.id==='valPasteForm'){commitCurrent();book={sheets:[{name:'Pasted data',rows:E.parseCSV(form.elements.namedItem('data').value)}]};sheetIndex=0;headerRow=1;fileName='Pasted data';getDataFromSheet();paint();return;}
-  if(form.id==='valUniqueForm'){commitCurrent();const keys=Array.from(form.querySelectorAll('input:checked')).map(el=>el.name);if(keys.length<2)throw Error('Select at least two fields.');draft.uniqueGroups.push(keys);mark();paint();return;}
-  if(form.id==='valReferenceForm'){commitCurrent();const table=E.parseCSV(form.elements.namedItem('data').value),headers=table.shift()||[],l={id:form.dataset.id||E.uid(),name:form.elements.namedItem('name').value.trim(),headers,rows:table,codeColumn:headers.includes(form.elements.namedItem('codeColumn')?.value)?form.elements.namedItem('codeColumn').value:headers[0],nameColumn:headers.includes(form.elements.namedItem('nameColumn')?.value)?form.elements.namedItem('nameColumn').value:'',descriptionColumns:Array.from(form.querySelectorAll('[name="refDescription"]:checked')).map(x=>x.value).filter(h=>headers.includes(h))};const proposed=E.copy(draft),i=proposed.lookups.findIndex(x=>x.id===l.id);if(i<0)proposed.lookups.push(l);else proposed.lookups[i]=l;E.checkSchema(proposed,true);draft=proposed;refEditing=l.id;mark();say('Reference list added to the draft.');paint();return;}
-  commitCurrent();E.checkSchema(draft,true);mark();say(form.id==='valRuleForm'?'Condition applied to draft.':'Column changes applied to draft.');paint();
- }
- document.addEventListener('click',event=>{const el=event.target.closest?.('[data-val]');if(!el)return;event.preventDefault();event.stopPropagation();void handle(el).catch(error=>{busy=false;say(error.message,true);});});
- document.addEventListener('submit',event=>{if(!event.target.id.startsWith('val'))return;event.preventDefault();try{formSubmit(event.target);}catch(error){say(error.message,true);}});
- document.addEventListener('input',event=>{if(event.target.closest?.('#valColumnForm,#valRuleForm,#valMetaForm'))mark();});
- document.addEventListener('change',event=>{const el=event.target;if(!el.closest?.('.validation-studio'))return;void(async()=>{
-  ensure();
-  if(el.id==='valFile'){if(el.files[0])await loadFile(el.files[0]);return;}
-  if(el.id==='valReferenceFile'){if(el.files[0])await loadFile(el.files[0],'reference');return;}
-  if(el.id==='valDefinitionFile'){const file=el.files[0];if(!file)return;if(file.size>1000000)throw Error('Template definitions must be below 1 MB.');const account=owner,token=++generation,value=JSON.parse(await file.text());if(token!==generation||account!==a.owner?.())return;if(value.app!=='workhub-validator'||value.version!==1)throw Error('Choose a Validation Studio template definition.');const t=value.template;E.validateState({workhub:{validator:{templates:[t],runs:[]}}});if(dirty&&!root.confirm('Import this definition and discard unsaved draft changes?'))return;draft=E.copy(t);draft.id=E.uid();draft.createdAt=new Date().toISOString();selected=draft.id;baseStamp='';dirty=true;columnId=draft.columns[0]?.id||'';ruleId=draft.rules[0]?.id||'';version='draft';mode='columns';clearFile();paint();return;}
-  if(el.id==='valSearch'){search=el.value;paint();return;}
-  if(el.name==='version'){generation++;busy=false;version=el.value;if(book)getDataFromSheet();result=null;rows=[];paint();return;}
-  if(el.name==='sheet'||el.name==='headerRow'){generation++;busy=false;if(el.name==='sheet')sheetIndex=Number(el.value);else headerRow=Number(el.value);if(!Number.isInteger(headerRow)||headerRow<1)throw Error('Enter a valid header row.');getDataFromSheet();paint();return;}
-  if(el.dataset.map){generation++;busy=false;mapping[el.dataset.map]=Number(el.value);rows=[];result=null;paint();return;}
-  if(el.dataset.cell!==undefined){generation++;busy=false;const i=Number(el.dataset.cell),field=el.dataset.field;if(!rows[i]||!activeSchema().columns.some(c=>c.key===field))return;rows[i][field]=el.value;const source=Number(mapping[field]);if(source>=0)sourceRows[i][source]=el.value;result=null;resultSchema=null;filter='all';paint();return;}
-  if(el.dataset.clause==='operator'||el.dataset.clause==='lookupId'){commitCurrent();mark();paint();}
- })().catch(error=>{busy=false;say(error.message,true);});});
- let dragging='';
- document.addEventListener('dragstart',event=>{const el=event.target.closest?.('[data-column-id]');if(el){commitCurrent();dragging=el.dataset.columnId;event.dataTransfer?.setData('text/plain',dragging);}});
- document.addEventListener('dragover',event=>{const target=event.target.closest?.('#valDropzone,[data-column-id]');if(target){event.preventDefault();target.classList.add('val-drag-over');}});
- document.addEventListener('dragleave',event=>event.target.closest?.('#valDropzone,[data-column-id]')?.classList.remove('val-drag-over'));
- document.addEventListener('drop',event=>{const drop=event.target.closest?.('#valDropzone'),target=event.target.closest?.('[data-column-id]');if(!drop&&!target)return;event.preventDefault();event.stopPropagation();document.querySelectorAll('.val-drag-over').forEach(el=>el.classList.remove('val-drag-over'));try{ensure();if(drop&&event.dataTransfer?.files[0]){void loadFile(event.dataTransfer.files[0]).catch(err=>say(err.message,true));return;}if(target&&dragging){const from=draft.columns.findIndex(c=>c.id===dragging),to=draft.columns.findIndex(c=>c.id===target.dataset.columnId);if(from>=0&&to>=0){draft.columns.splice(to,0,draft.columns.splice(from,1)[0]);mark();paint();}dragging='';}}catch(err){say(err.message,true);}});
- return{render,sync,handle,loadFile,run,saveDraft,publish,addLibraryField,referenceDetails,snapshot:()=>({draft:E.copy(draft),dirty,mode,rows:E.copy(rows),result:E.copy(result),mapping:{...mapping},owner}),loadSample};
-}
-root.WorkHubValidatorStudio={install};
+(function (root) {
+  'use strict';
+  const E = root.WorkHubValidatorEngine,
+    F = root.WorkHubValidatorFiles;
+  const esc = v =>
+    String(v ?? '').replace(
+      /[&<>"']/g,
+      c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
+    );
+  const icon = (name, size = 22) =>
+    '<svg width="' +
+    size +
+    '" height="' +
+    size +
+    '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    ({
+      leaf: '<path d="M19 4C8 3 3 8 6 15c5 5 13 1 13-11Z"/><path d="m5 20 10-11"/>',
+      upload: '<path d="M12 16V4m-4 4 4-4 4 4M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/>',
+      columns:
+        '<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 9h18M10 9v11M16 9v11"/>',
+      rules:
+        '<path d="M5 5h7v7h7M12 5h7M5 19h7v-7"/><circle cx="5" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="19" cy="12" r="2"/>',
+      check: '<path d="m5 12 4 4L19 6"/><circle cx="12" cy="12" r="10"/>',
+      reference:
+        '<path d="M4 4h6a3 3 0 0 1 3 3v14a4 4 0 0 0-4-3H4ZM20 4h-4a3 3 0 0 0-3 3"/><path d="M20 4v14h-3"/>',
+      history: '<path d="M3 5v5h5M4 10a8 8 0 1 1 1 8m7-12v6l4 2"/>',
+      file: '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"/><path d="M14 3v6h6M8 14h8M8 17h5"/>',
+      spark: '<path d="m12 2 2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5Z"/>',
+    }[name] || '') +
+    '</svg>';
+  const btn = (action, label, attrs = '', cls = '') =>
+    '<button type="button" class="val-btn ' +
+    cls +
+    '" data-val="' +
+    action +
+    '" ' +
+    attrs +
+    '>' +
+    label +
+    '</button>';
+  const options = (rows, value) =>
+    rows
+      .map(
+        ([v, label]) =>
+          '<option value="' +
+          esc(v) +
+          '"' +
+          (String(v) === String(value) ? ' selected' : '') +
+          '>' +
+          esc(label) +
+          '</option>'
+      )
+      .join('');
+  const input = (name, label, value = '', type = 'text', attrs = '') =>
+    '<label class="val-label">' +
+    label +
+    '<input name="' +
+    name +
+    '" type="' +
+    type +
+    '" value="' +
+    esc(value) +
+    '" ' +
+    attrs +
+    '></label>';
+  const select = (name, label, rows, value) =>
+    '<label class="val-label">' +
+    label +
+    '<select name="' +
+    name +
+    '">' +
+    options(rows, value) +
+    '</select></label>';
+  const area = (name, label, value = '', attrs = '') =>
+    '<label class="val-label">' +
+    label +
+    '<textarea name="' +
+    name +
+    '" ' +
+    attrs +
+    '>' +
+    esc(value) +
+    '</textarea></label>';
+  const toggle = (name, label, checked) =>
+    '<label class="val-toggle"><input type="checkbox" name="' +
+    name +
+    '"' +
+    (checked ? ' checked' : '') +
+    '><span>' +
+    label +
+    '</span></label>';
+  const stamp = s =>
+    s
+      ? new Date(s).toLocaleString(undefined, {
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      : '';
+  function install(a) {
+    const $ = id => document.getElementById(id),
+      store = () => a.state().workhub.validator;
+    let owner = '',
+      generation = 0,
+      draft = null,
+      selected = '',
+      baseStamp = '',
+      dirty = false,
+      mode = 'columns',
+      columnId = '',
+      ruleId = '',
+      message = '',
+      search = '',
+      book = null,
+      sheetIndex = 0,
+      headerRow = 1,
+      headers = [],
+      sourceRows = [],
+      mapping = {},
+      rows = [],
+      result = null,
+      resultSchema = null,
+      version = 'draft',
+      fileName = '',
+      filter = 'all',
+      page = 0,
+      busy = false,
+      refEditing = '',
+      targetRow = -1;
+    function sync() {
+      const next = a.owner?.() || '';
+      if (next !== owner) {
+        owner = next;
+        generation++;
+        draft = null;
+        selected = '';
+        baseStamp = '';
+        dirty = false;
+        book = null;
+        headers = [];
+        sourceRows = [];
+        rows = [];
+        result = null;
+        resultSchema = null;
+        fileName = '';
+        busy = false;
+        mode = 'columns';
+      }
+      return next;
+    }
+    function paint() {
+      a.render();
+    }
+    function say(text, error = false) {
+      message = text;
+      a.tell?.(text, error);
+    }
+    function ensure() {
+      sync();
+      if (!a.ready()) throw Error('Sign in to open Validation Studio.');
+    }
+    function mark() {
+      generation++;
+      busy = false;
+      dirty = true;
+      result = null;
+      resultSchema = null;
+      const el = $('valDraftStatus');
+      if (el) el.textContent = 'Unsaved draft';
+    }
+    function activeSchema() {
+      if (version === 'draft') return E.schema(draft);
+      const r = draft?.releases.find(r => String(r.version) === version);
+      if (!r) throw Error('Choose an available template version.');
+      return E.copy(r.schema);
+    }
+    function pick(id, force = false) {
+      if (!force && dirty && !root.confirm('Switch templates and discard unsaved draft changes?'))
+        return;
+      const t = store().templates.find(t => t.id === id);
+      draft = t ? E.copy(t) : null;
+      selected = t?.id || '';
+      baseStamp = t?.updatedAt || '';
+      dirty = false;
+      columnId = draft?.columns[0]?.id || '';
+      ruleId = draft?.rules[0]?.id || '';
+      version = draft?.releases.length ? String(draft.releases.at(-1).version) : 'draft';
+      clearFile();
+      message = '';
+    }
+    function clearFile() {
+      generation++;
+      book = null;
+      headers = [];
+      sourceRows = [];
+      mapping = {};
+      rows = [];
+      result = null;
+      resultSchema = null;
+      fileName = '';
+      page = 0;
+      busy = false;
+    }
+    function create(example = false) {
+      if (dirty && !root.confirm('Create a template and discard unsaved draft changes?')) return;
+      draft = example ? E.example() : E.create();
+      selected = draft.id;
+      baseStamp = '';
+      columnId = draft.columns[0]?.id || '';
+      ruleId = draft.rules[0]?.id || '';
+      dirty = true;
+      version = 'draft';
+      mode = 'columns';
+      clearFile();
+      message = example ? 'An example to explore. All fields and rules are yours to change.' : '';
+      paint();
+    }
+    function rewire(oldKey, newKey) {
+      for (const r of draft.rules) {
+        const walk = g => {
+          for (const c of g.conditions) {
+            if (c.field === oldKey) c.field = newKey;
+            if (c.otherField === oldKey) c.otherField = newKey;
+            for (const pair of c.pairs || []) if (pair.field === oldKey) pair.field = newKey;
+          }
+          for (const c of g.groups) walk(c);
+        };
+        walk(r.when);
+        if (r.assertion.field === oldKey) r.assertion.field = newKey;
+        if (r.assertion.otherField === oldKey) r.assertion.otherField = newKey;
+        for (const pair of r.assertion.pairs || []) if (pair.field === oldKey) pair.field = newKey;
+      }
+      draft.uniqueGroups = draft.uniqueGroups.map(g => g.map(k => (k === oldKey ? newKey : k)));
+    }
+    function readClause(el) {
+      if (!el) return null;
+      const get = k => el.querySelector('[data-clause="' + k + '"]')?.value || '';
+      return {
+        field: get('field'),
+        operator: get('operator'),
+        value: get('value'),
+        otherField: get('otherField'),
+        lookupId: get('lookupId'),
+        lookupColumn: get('lookupColumn'),
+        ...(get('operator') === 'lookupTuple'
+          ? {
+              pairs: Array.from(el.querySelectorAll('[data-tuple-pair]')).map(pair => ({
+                field: pair.querySelector('[data-pair-field]').value,
+                referenceColumn: pair.querySelector('[data-pair-reference]').value,
+              })),
+            }
+          : {}),
+      };
+    }
+    function readGroup(el) {
+      return {
+        join: el.querySelector(':scope > .val-group-head select').value,
+        conditions: Array.from(el.querySelectorAll(':scope > .val-group-items > .val-clause')).map(
+          readClause
+        ),
+        groups: Array.from(
+          el.querySelectorAll(':scope > .val-group-items > .val-condition-group')
+        ).map(readGroup),
+      };
+    }
+    function commitCurrent() {
+      if (!draft) return;
+      const meta = $('valMetaForm');
+      if (meta) {
+        draft.name = meta.elements.namedItem('name').value.trim();
+        draft.description = meta.elements.namedItem('description').value;
+      }
+      const cf = $('valColumnForm');
+      if (cf) {
+        const c = draft.columns.find(c => c.id === cf.dataset.id),
+          old = c.key;
+        for (const k of [
+          'key',
+          'label',
+          'type',
+          'minLength',
+          'maxLength',
+          'min',
+          'max',
+          'values',
+          'aliases',
+          'description',
+          'format',
+        ])
+          c[k] = cf.elements.namedItem(k).value;
+        for (const k of ['required', 'unique', 'trim', 'caseSensitive'])
+          c[k] = cf.elements.namedItem(k).checked;
+        if (old !== c.key) rewire(old, c.key);
+      }
+      const rf = $('valRuleForm');
+      if (rf) {
+        const r = draft.rules.find(r => r.id === rf.dataset.id);
+        r.name = rf.elements.namedItem('name').value;
+        r.severity = rf.elements.namedItem('severity').value;
+        r.message = rf.elements.namedItem('message').value;
+        r.enabled = rf.elements.namedItem('enabled').checked;
+        r.when = readGroup(rf.querySelector('[data-group-root]'));
+        r.assertion = readClause(rf.querySelector('[data-assertion]'));
+      }
+    }
+    function saveDraft(quiet = false) {
+      ensure();
+      commitCurrent();
+      E.checkSchema(draft, true);
+      const existing = store().templates.find(t => t.id === draft.id);
+      if (existing && existing.updatedAt !== baseStamp)
+        throw Error(
+          'This template changed elsewhere. Export your draft, then reopen the saved template before replacing it.'
+        );
+      const saved = E.copy(draft);
+      saved.updatedAt = new Date().toISOString();
+      const ok = a.mutate(d => {
+        const list = d.workhub.validator.templates,
+          i = list.findIndex(t => t.id === saved.id);
+        if (i < 0) list.push(saved);
+        else list[i] = saved;
+      });
+      if (!ok) return false;
+      draft = saved;
+      selected = saved.id;
+      baseStamp = saved.updatedAt;
+      dirty = false;
+      if (!quiet) say('Template draft saved.');
+      return true;
+    }
+    function publish() {
+      commitCurrent();
+      E.checkSchema(draft);
+      if (draft.releases.length >= E.LIMITS.versions)
+        throw Error(
+          'This template has 15 published versions. Duplicate it to start a new version series.'
+        );
+      if (!saveDraft(true)) return;
+      const release = {
+        version: (draft.releases.at(-1)?.version || 0) + 1,
+        publishedAt: new Date().toISOString(),
+        schema: E.schema(draft),
+      };
+      draft.releases.push(release);
+      dirty = true;
+      if (saveDraft(true)) {
+        version = String(release.version);
+        result = null;
+        say('Version ' + version + ' published. Its rules are now frozen.');
+        paint();
+      }
+    }
+    function library() {
+      const list = store().templates.filter(t =>
+        t.name.toLowerCase().includes(search.toLowerCase())
+      );
+      return (
+        '<aside class="val-library"><div class="val-library-heading"><span>Your templates</span><span>' +
+        store().templates.length +
+        '</span></div><label class="val-search"><span class="sr-only">Find a template</span><input id="valSearch" type="search" placeholder="Find a template…" value="' +
+        esc(search) +
+        '"></label><div class="val-template-list">' +
+        list
+          .map(t =>
+            btn(
+              'open',
+              icon('file', 18) +
+                '<span><strong>' +
+                esc(t.name) +
+                '</strong><small>' +
+                t.columns.length +
+                ' columns · ' +
+                (t.releases.length ? 'v' + t.releases.at(-1).version : 'Draft') +
+                '</small></span>',
+              'data-id="' + esc(t.id) + '"',
+              t.id === selected ? 'is-active' : ''
+            )
+          )
+          .join('') +
+        (!list.length ? '<p class="val-muted">Your next useful template starts here.</p>' : '') +
+        '</div>' +
+        btn('new', '＋ New template', '', 'val-wide') +
+        btn('import-definition', 'Import definition', '', 'val-wide val-quiet') +
+        '<div class="val-library-note">' +
+        icon('leaf', 24) +
+        '<p>Make the rules once.<br>Use them whenever you need.</p></div></aside>'
+      );
+    }
+    function empty() {
+      return (
+        '<div class="val-welcome"><div class="val-welcome-art"><div class="val-paper val-paper-back"></div><div class="val-paper">' +
+        icon('columns', 60) +
+        '<i></i><i></i><i></i></div><span class="val-art-check">' +
+        icon('check', 28) +
+        '</span><span class="val-art-spark">' +
+        icon('spark', 25) +
+        '</span></div><span class="val-eyebrow">A HOME FOR YOUR DATA RULES</span><h2>Any file. Your rules.</h2><p>Give your columns a name, shape the conditions and let your data tell you what needs attention.</p><div class="val-actions">' +
+        btn('new', 'Create a template', '', 'val-primary') +
+        btn('example', 'Explore an example', '', 'val-secondary') +
+        '</div><div class="val-welcome-steps"><span>' +
+        icon('columns') +
+        'Design columns</span><span>' +
+        icon('rules') +
+        'Build conditions</span><span>' +
+        icon('check') +
+        'Check & correct</span></div><small>XLSX, CSV and TSV · No SAP connection needed</small></div>'
+      );
+    }
+    function header() {
+      const latest = draft.releases.at(-1);
+      return (
+        '<div class="val-work-head"><div><span class="val-eyebrow">' +
+        (latest ? 'PUBLISHED v' + latest.version : 'YOUR WORKING DRAFT') +
+        '</span><h2>' +
+        esc(draft.name || 'Untitled template') +
+        '</h2><p>' +
+        esc(draft.description || 'A flexible home for columns, conditions and clean data.') +
+        '</p><span id="valDraftStatus" class="val-save-state">' +
+        (dirty ? 'Unsaved draft' : 'Draft saved') +
+        '</span></div><div class="val-actions">' +
+        btn('save', 'Save draft', '', 'val-secondary') +
+        btn('publish', icon('spark', 16) + ' Publish version', '', 'val-primary') +
+        '<details class="val-more"><summary aria-label="Template options">•••</summary><div>' +
+        btn('export-definition', 'Export definition') +
+        btn('duplicate', 'Duplicate template') +
+        btn('delete-template', 'Delete template', '', 'val-danger') +
+        '</div></details></div></div><nav class="val-tabs" aria-label="Validation workspace">' +
+        [
+          ['columns', 'Columns', 'columns'],
+          ['rules', 'Conditions', 'rules'],
+          ['references', 'References', 'reference'],
+          ['check', 'Validate', 'check'],
+          ['history', 'Versions & runs', 'history'],
+        ]
+          .map(([key, label, art]) =>
+            btn(
+              'mode',
+              icon(art, 17) + label,
+              'data-mode="' + key + '" aria-current="' + (mode === key ? 'page' : 'false') + '"',
+              mode === key ? 'is-active' : ''
+            )
+          )
+          .join('') +
+        '</nav>'
+      );
+    }
+    function columnEditor() {
+      const c = draft.columns.find(c => c.id === columnId) || draft.columns[0];
+      if (c) columnId = c.id;
+      return (
+        '<div class="val-section-heading"><div><h3>Give your data a shape</h3><p>Display labels for people. Technical field names for your rules.</p></div>' +
+        '<div class="val-actions">' +
+        btn('field-library', 'Field library', '', 'val-secondary') +
+        btn('add-column', '＋ Add column', '', 'val-secondary') +
+        '</div>' +
+        '</div><div class="val-designer"><div class="val-outline"><div class="val-outline-title">UPLOAD COLUMNS <span>' +
+        draft.columns.length +
+        '/80</span></div>' +
+        draft.columns
+          .map(
+            (f, i) =>
+              '<div class="val-column-item' +
+              (f.id === columnId ? ' is-active' : '') +
+              '" draggable="true" data-column-id="' +
+              esc(f.id) +
+              '">' +
+              btn(
+                'select-column',
+                '<span class="val-grip">⠿</span><span class="val-col-index">' +
+                  F.col(i) +
+                  '</span><span><strong>' +
+                  esc(f.label) +
+                  '</strong><code>' +
+                  esc(f.key) +
+                  '</code></span>' +
+                  (f.required ? '<b title="Required">*</b>' : ''),
+                'data-id="' + esc(f.id) + '"'
+              ) +
+              '<div class="val-order">' +
+              btn(
+                'move-column',
+                '↑',
+                'data-id="' +
+                  esc(f.id) +
+                  '" data-delta="-1" aria-label="Move ' +
+                  esc(f.label) +
+                  ' up"' +
+                  (!i ? ' disabled' : '')
+              ) +
+              btn(
+                'move-column',
+                '↓',
+                'data-id="' +
+                  esc(f.id) +
+                  '" data-delta="1" aria-label="Move ' +
+                  esc(f.label) +
+                  ' down"' +
+                  (i === draft.columns.length - 1 ? ' disabled' : '')
+              ) +
+              '</div></div>'
+          )
+          .join('') +
+        (!draft.columns.length
+          ? '<div class="val-empty-small">' +
+            icon('columns', 34) +
+            '<p>Add your first column.<br>You decide what belongs here.</p></div>'
+          : '') +
+        '</div><div class="val-inspector"><form id="valMetaForm" class="val-meta">' +
+        input('name', 'Template name', draft.name, 'text', 'maxlength="120" required') +
+        area(
+          'description',
+          'A little context',
+          draft.description,
+          'maxlength="2000" rows="2" placeholder="What will this template help you check?"'
+        ) +
+        '</form>' +
+        (c
+          ? '<form id="valColumnForm" data-id="' +
+            esc(c.id) +
+            '"><div class="val-panel-title"><div><span class="val-eyebrow">COLUMN DETAILS</span><h3>' +
+            esc(c.label) +
+            '</h3></div>' +
+            '<div class="val-actions">' +
+            btn('field-save', 'Keep this field', '', 'val-secondary') +
+            btn('remove-column', 'Remove', 'data-id="' + esc(c.id) + '"', 'val-quiet val-danger') +
+            '</div>' +
+            '</div><div class="val-fields">' +
+            input('label', 'Column label', c.label, 'text', 'maxlength="120" required') +
+            input(
+              'key',
+              'Technical field name',
+              c.key,
+              'text',
+              'maxlength="64" spellcheck="false" autocapitalize="off" required'
+            ) +
+            select(
+              'type',
+              'Data type',
+              E.TYPES.map(x => [
+                x,
+                x === 'integer'
+                  ? 'Whole number'
+                  : x === 'decimal'
+                    ? 'Decimal number'
+                    : x[0].toUpperCase() + x.slice(1),
+              ]),
+              c.type
+            ) +
+            select(
+              'format',
+              'Format check',
+              [['', 'Any format'], ...Object.keys(E.FORMATS).map(x => [x, x])],
+              c.format
+            ) +
+            input('minLength', 'Minimum length', c.minLength, 'number', 'min="0" max="32000"') +
+            input('maxLength', 'Maximum length', c.maxLength, 'number', 'min="0" max="32000"') +
+            input('min', 'Minimum number', c.min, 'number', 'step="any"') +
+            input('max', 'Maximum number', c.max, 'number', 'step="any"') +
+            '</div><div class="val-toggle-grid">' +
+            toggle('required', 'Required', c.required) +
+            toggle('unique', 'Unique values', c.unique) +
+            toggle('trim', 'Ignore surrounding spaces', c.trim) +
+            toggle('caseSensitive', 'Case-sensitive comparisons', c.caseSensitive) +
+            '</div>' +
+            area(
+              'values',
+              'Allowed values',
+              c.values,
+              'rows="3" placeholder="One value per line, or comma separated" maxlength="8000"'
+            ) +
+            input(
+              'aliases',
+              'Other accepted upload headers',
+              c.aliases,
+              'text',
+              'placeholder="Separate alternative headers with commas" maxlength="8000"'
+            ) +
+            area(
+              'description',
+              'Instructions for this column',
+              c.description,
+              'rows="2" maxlength="8000"'
+            ) +
+            '<p class="val-help">Dates use YYYY-MM-DD. Keep identifiers as Text to preserve leading zeros and every digit. Number limits apply to whole-number and decimal columns.</p><button class="val-btn val-secondary" type="submit">Apply column changes</button></form>'
+          : '<p class="val-muted">Your column settings will appear here.</p>') +
+        '</div></div><section class="val-card val-combinations"><div><h3>Unique combinations</h3><p>For example: the same ID may appear in different plants, but each ID + plant pair must be unique.</p></div>' +
+        draft.uniqueGroups
+          .map(
+            (g, i) =>
+              '<div class="val-combination"><span>' +
+              g.map(k => '<code>' + esc(k) + '</code>').join(' + ') +
+              '</span>' +
+              btn(
+                'remove-combination',
+                '×',
+                'data-index="' + i + '" aria-label="Remove unique combination"',
+                'val-quiet'
+              ) +
+              '</div>'
+          )
+          .join('') +
+        '<form id="valUniqueForm"><div class="val-check-list">' +
+        draft.columns.map(c => toggle(c.key, esc(c.label), false)).join('') +
+        '</div><button type="submit" class="val-btn val-secondary">Add selected combination</button></form></section>'
+      );
+    }
+    function clause(c, path, assertion = false) {
+      const fields = draft.columns.map(f => [f.key, f.label + ' (' + f.key + ')']),
+        op = c.operator || 'eq',
+        reference = draft.lookups.find(l => l.id === c.lookupId) || draft.lookups[0];
+      const control = (key, rows, value) =>
+        '<select data-clause="' +
+        key +
+        '" aria-label="' +
+        key +
+        '">' +
+        options(rows, value) +
+        '</select>';
+      return (
+        '<div class="val-clause" data-path="' +
+        esc(path) +
+        '"' +
+        (assertion ? ' data-assertion' : '') +
+        '>' +
+        control('field', fields, c.field) +
+        control('operator', Object.entries(E.OPS), op) +
+        (op.startsWith('field')
+          ? control('otherField', fields, c.otherField)
+          : op === 'lookupTuple'
+            ? tupleView(c, path, reference, fields)
+            : op === 'lookup'
+              ? '<div class="val-lookup-select">' +
+                control(
+                  'lookupId',
+                  draft.lookups.map(l => [l.id, l.name]),
+                  c.lookupId || reference?.id
+                ) +
+                control(
+                  'lookupColumn',
+                  (reference?.headers || []).map(h => [h, h]),
+                  c.lookupColumn
+                ) +
+                '</div>'
+              : op === 'pattern'
+                ? control(
+                    'value',
+                    Object.keys(E.FORMATS).map(f => [f, f]),
+                    c.value
+                  )
+                : ['empty', 'notEmpty'].includes(op)
+                  ? '<span class="val-clause-note">No value needed</span>'
+                  : '<input data-clause="value" aria-label="Condition value" value="' +
+                    esc(c.value) +
+                    '" placeholder="Value' +
+                    (['in', 'notIn'].includes(op) ? 's, separated by commas' : '') +
+                    '" maxlength="8000">') +
+        (!assertion
+          ? btn(
+              'remove-clause',
+              '×',
+              'data-path="' + esc(path) + '" aria-label="Remove condition"',
+              'val-quiet'
+            )
+          : '') +
+        '</div>'
+      );
+    }
+    function tupleView(c, path, reference, fields) {
+      const pairs = c.pairs?.length
+        ? c.pairs
+        : [
+            { field: c.field, referenceColumn: reference?.headers[0] || '' },
+            {
+              field: draft.columns.find(f => f.key !== c.field)?.key || '',
+              referenceColumn: reference?.headers[1] || '',
+            },
+          ];
+      return (
+        '<div class="val-tuple"><label class="val-label">Trusted reference<select data-clause="lookupId" aria-label="lookupId">' +
+        options(
+          draft.lookups.map(l => [l.id, l.name]),
+          c.lookupId || reference?.id
+        ) +
+        '</select></label><p class="val-help">All mapped values must match the same reference row. The field above is highlighted when this check fails.</p>' +
+        pairs
+          .map(
+            (pair, i) =>
+              '<div class="val-tuple-pair" data-tuple-pair><select data-pair-field aria-label="Upload field ' +
+              (i + 1) +
+              '">' +
+              options(fields, pair.field) +
+              '</select><span>→</span><select data-pair-reference aria-label="Reference column ' +
+              (i + 1) +
+              '">' +
+              options(
+                (reference?.headers || []).map(h => [h, h]),
+                pair.referenceColumn
+              ) +
+              '</select>' +
+              btn(
+                'tuple-remove',
+                '×',
+                'data-path="' +
+                  esc(path) +
+                  '" data-index="' +
+                  i +
+                  '" aria-label="Remove mapping ' +
+                  (i + 1) +
+                  '"' +
+                  (pairs.length <= 2 ? ' disabled' : ''),
+                'val-quiet'
+              ) +
+              '</div>'
+          )
+          .join('') +
+        btn(
+          'tuple-add',
+          '＋ Map another field',
+          'data-path="' + esc(path) + '"' + (pairs.length >= 10 ? ' disabled' : ''),
+          'val-quiet'
+        ) +
+        '</div>'
+      );
+    }
+    function groupView(g, path, depth = 0) {
+      return (
+        '<div class="val-condition-group" data-path="' +
+        path +
+        '"' +
+        (!depth ? ' data-group-root' : '') +
+        '><div class="val-group-head"><span>' +
+        (depth ? 'Nested group' : 'WHEN') +
+        '</span><select aria-label="Condition group logic">' +
+        options(
+          [
+            ['all', 'ALL of these (AND)'],
+            ['any', 'ANY of these (OR)'],
+          ],
+          g.join
+        ) +
+        '</select>' +
+        (depth
+          ? btn(
+              'remove-group',
+              '×',
+              'data-path="' + path + '" aria-label="Remove nested group"',
+              'val-quiet'
+            )
+          : '') +
+        '</div><div class="val-group-items">' +
+        g.conditions.map((c, i) => clause(c, path + '.conditions.' + i)).join('') +
+        g.groups.map((child, i) => groupView(child, path + '.groups.' + i, depth + 1)).join('') +
+        (!g.conditions.length && !g.groups.length
+          ? '<p class="val-every-row">Every row. Add a condition to make this rule conditional.</p>'
+          : '') +
+        '</div><div class="val-group-actions">' +
+        btn('add-clause', '＋ Condition', 'data-path="' + path + '"', 'val-quiet') +
+        (depth < 4
+          ? btn('add-group', '＋ AND/OR group', 'data-path="' + path + '"', 'val-quiet')
+          : '') +
+        '</div></div>'
+      );
+    }
+    function getPath(path) {
+      let value = draft.rules.find(r => r.id === ruleId);
+      for (const k of path.split('.')) {
+        if (!/^(when|assertion|groups|conditions|\d+)$/.test(k))
+          throw Error('Invalid condition path.');
+        value = value[k];
+      }
+      return value;
+    }
+    function rulesEditor() {
+      const r = draft.rules.find(r => r.id === ruleId) || draft.rules[0];
+      if (r) ruleId = r.id;
+      return (
+        '<div class="val-section-heading"><div><h3>Small conditions. Clear answers.</h3><p>Combine AND/OR groups, compare fields and choose what an issue should say.</p></div>' +
+        btn(
+          'add-rule',
+          '＋ Add condition',
+          !draft.columns.length ? 'disabled' : '',
+          'val-secondary'
+        ) +
+        '</div><div class="val-designer"><div class="val-outline"><div class="val-outline-title">YOUR CONDITIONS <span>' +
+        draft.rules.length +
+        '</span></div>' +
+        draft.rules
+          .map(r =>
+            btn(
+              'select-rule',
+              '<span class="val-rule-dot ' +
+                r.severity +
+                '"></span><span><strong>' +
+                esc(r.name) +
+                '</strong><small>' +
+                (r.enabled ? (r.severity === 'warning' ? 'Warning' : 'Error') : 'Paused') +
+                '</small></span>',
+              'data-id="' + esc(r.id) + '"',
+              r.id === ruleId ? 'is-active' : ''
+            )
+          )
+          .join('') +
+        (!draft.rules.length
+          ? '<div class="val-empty-small">' +
+            icon('rules', 34) +
+            '<p>Basic column checks already work. Add conditions for your business rules.</p></div>'
+          : '') +
+        '</div><div class="val-inspector">' +
+        (r
+          ? '<form id="valRuleForm" data-id="' +
+            esc(r.id) +
+            '"><div class="val-panel-title"><span class="val-eyebrow">VISUAL CONDITION BUILDER</span>' +
+            btn('remove-rule', 'Remove', 'data-id="' + esc(r.id) + '"', 'val-quiet val-danger') +
+            '</div><div class="val-fields">' +
+            input('name', 'Rule name', r.name, 'text', 'maxlength="160" required') +
+            select(
+              'severity',
+              'When this fails',
+              [
+                ['error', 'Error — must be corrected'],
+                ['warning', 'Warning — needs review'],
+              ],
+              r.severity
+            ) +
+            '</div>' +
+            toggle('enabled', 'Enable this condition', r.enabled) +
+            groupView(r.when, 'when') +
+            '<div class="val-then"><span class="val-eyebrow">THEN REQUIRE</span>' +
+            clause(r.assertion, 'assertion', true) +
+            '</div>' +
+            area(
+              'message',
+              'Your validation message',
+              r.message,
+              'maxlength="1000" rows="2" placeholder="Explain what needs to change"'
+            ) +
+            '<div class="val-rule-summary">' +
+            icon('leaf', 18) +
+            '<p>If ' +
+            esc(F.describeGroup(r.when, draft)) +
+            ', require ' +
+            esc(E.describe(r.assertion, draft)) +
+            '.</p></div><button type="submit" class="val-btn val-secondary">Apply condition</button></form>'
+          : '<div class="val-empty-small"><h3>Let your rules do the checking.</h3><p>“If type is Urgent, require an owner.”<br>“End date must be after start date.”<br>“This value must exist in my reference list.”</p></div>') +
+        '</div></div>'
+      );
+    }
+    function references() {
+      const current = draft.lookups.find(l => l.id === refEditing);
+      return (
+        '<div class="val-section-heading"><div><h3>Your trusted reference shelf</h3><p>Maintain your own codes and values, then check individual values or a combination in the same reference row.</p></div>' +
+        btn('reference-new', '＋ New reference', '', 'val-secondary') +
+        '</div><div class="val-reference-grid">' +
+        draft.lookups
+          .map(
+            l =>
+              '<article class="val-card"><span class="val-ref-icon">' +
+              icon('reference', 26) +
+              '</span><h3>' +
+              esc(l.name) +
+              '</h3><p>' +
+              l.rows.length +
+              ' rows · ' +
+              l.headers.length +
+              ' columns</p><div class="val-ref-tags">' +
+              l.headers.map(h => '<code>' + esc(h) + '</code>').join('') +
+              '</div><div class="val-actions">' +
+              btn('reference-edit', 'Edit list', 'data-id="' + esc(l.id) + '"', 'val-secondary') +
+              btn(
+                'reference-remove',
+                'Remove',
+                'data-id="' + esc(l.id) + '"',
+                'val-quiet val-danger'
+              ) +
+              '</div></article>'
+          )
+          .join('') +
+        '</div><section class="val-card"><form id="valReferenceForm" data-id="' +
+        esc(current?.id || '') +
+        '"><div class="val-panel-title"><h3>' +
+        (current ? 'Edit ' + esc(current.name) : 'Add a reference list') +
+        '</h3>' +
+        btn('reference-file', icon('upload', 16) + ' Import file', '', 'val-secondary') +
+        '</div>' +
+        input(
+          'name',
+          'List name',
+          current?.name || '',
+          'text',
+          'maxlength="120" placeholder="For example: Approved cost centres" required'
+        ) +
+        area(
+          'data',
+          'Headers and values',
+          current ? E.csv([current.headers, ...current.rows]).replace(/^\uFEFF/, '') : '',
+          'rows="7" placeholder="CODE,DESCRIPTION\n1000,Head office\n2000,Regional office" required'
+        ) +
+        (current
+          ? '<fieldset class="val-description-options"><legend>Readable reference details</legend><div class="val-fields">' +
+            select(
+              'codeColumn',
+              'Code column',
+              current.headers.map(h => [h, h]),
+              current.codeColumn || current.headers[0]
+            ) +
+            select(
+              'nameColumn',
+              'Display-name column',
+              [['', 'No display name'], ...current.headers.map(h => [h, h])],
+              current.nameColumn || ''
+            ) +
+            '</div><p class="val-help">Choose up to five description columns. Matched codes can then be explained beside your results.</p><div class="val-check-list">' +
+            current.headers
+              .map(
+                h =>
+                  '<label class="val-toggle"><input type="checkbox" name="refDescription" value="' +
+                  esc(h) +
+                  '"' +
+                  (current.descriptionColumns?.includes(h) ? ' checked' : '') +
+                  '><span>' +
+                  esc(h) +
+                  '</span></label>'
+              )
+              .join('') +
+            '</div></fieldset>'
+          : '<p class="val-help">After adding the list, choose its code, display name and description columns here.</p>') +
+        '<p class="val-help">Paste CSV/TSV with a header row, or import the first worksheet of an XLSX file. Up to 2,000 reference rows per list.</p><button class="val-btn val-primary" type="submit">' +
+        (current ? 'Apply reference changes' : 'Add to draft') +
+        '</button></form></section>'
+      );
+    }
+    function getDataFromSheet() {
+      if (!book) return;
+      const sheet = book.sheets[sheetIndex];
+      if (!sheet) throw Error('Choose a worksheet.');
+      const start = headerRow - 1;
+      headers = (sheet.rows[start] || []).map(v => String(v ?? '').trim());
+      while (headers.length && !headers.at(-1)) headers.pop();
+      sourceRows = sheet.rows
+        .slice(start + 1)
+        .map(row => Array.from({ length: headers.length }, (_, i) => String(row[i] ?? '')));
+      while (sourceRows.length && sourceRows.at(-1).every(E.blank)) sourceRows.pop();
+      if (!headers.length) throw Error('The selected header row is empty.');
+      if (sourceRows.length > 5000 || sourceRows.length * headers.length > E.LIMITS.cells)
+        throw Error('Use up to 5,000 rows and 200,000 cells.');
+      mapping = E.autoMap(headers, activeSchema());
+      rows = [];
+      result = null;
+      resultSchema = null;
+      page = 0;
+    }
+    async function loadFile(file, kind = 'data') {
+      ensure();
+      commitCurrent();
+      if (!draft) throw Error('Create a template first.');
+      const token = ++generation,
+        account = owner;
+      busy = true;
+      say('Reading ' + file.name + '…');
+      paint();
+      try {
+        const value = await F.read(file);
+        if (token !== generation || account !== a.owner?.() || !a.ready()) return;
+        if (kind === 'reference') {
+          busy = false;
+          mode = 'references';
+          paint();
+          const form = $('valReferenceForm');
+          form.elements.namedItem('name').value = file.name.replace(/\.[^.]+$/, '').slice(0, 120);
+          form.elements.namedItem('data').value = E.csv(value.sheets[0].rows).replace(
+            /^\uFEFF/,
+            ''
+          );
+          say('Review the reference name and values, then add it to your draft.');
+          return;
+        }
+        book = value;
+        sheetIndex = 0;
+        headerRow = 1;
+        fileName = file.name;
+        getDataFromSheet();
+        mode = 'check';
+        say('File ready. Check the column mapping before validating.');
+      } finally {
+        if (token === generation && account === a.owner?.()) {
+          busy = false;
+          paint();
+        }
+      }
+    }
+    function loadSample() {
+      commitCurrent();
+      const t = activeSchema();
+      E.checkSchema(t);
+      const sample = t.columns.map(c =>
+        c.type === 'date'
+          ? '2026-10-20'
+          : c.type === 'integer'
+            ? '1'
+            : c.type === 'decimal'
+              ? '25.50'
+              : c.type === 'boolean'
+                ? 'true'
+                : E.tokens(c.values)[0] || 'Example'
+      );
+      book = {
+        sheets: [
+          {
+            name: 'Example data',
+            rows: [
+              t.columns.map(c => c.label),
+              sample,
+              sample.map((v, i) => (i === 0 ? 'Example 2' : v)),
+            ],
+          },
+        ],
+      };
+      if (
+        t.columns.map(c => c.key).join(',') === 'REQUEST_ID,TYPE,OWNER,AMOUNT,START_DATE,END_DATE'
+      )
+        book.sheets[0].rows = [
+          t.columns.map(c => c.label),
+          ['REQ-001', 'Standard', 'Aisha', '250', '2026-10-20', '2026-10-22'],
+          ['REQ-002', 'Urgent', '', '-5', '2026-10-22', '2026-10-20'],
+          ['REQ-003', 'Standard', 'Daniel', '15000', '2026-10-23', '2026-10-24'],
+        ];
+      sheetIndex = 0;
+      headerRow = 1;
+      fileName = 'Example data';
+      getDataFromSheet();
+      mode = 'check';
+      paint();
+    }
+    async function run() {
+      ensure();
+      commitCurrent();
+      const t = activeSchema();
+      E.checkSchema(t);
+      const mapped = E.mapRows(headers, sourceRows, t, mapping);
+      if (!mapped.length) throw Error('Upload or paste at least one data row.');
+      if (version === 'draft' && !saveDraft(true)) return;
+      const token = ++generation,
+        account = owner;
+      busy = true;
+      result = null;
+      rows = mapped;
+      say('Checking columns, conditions and references…');
+      paint();
+      await new Promise(resolve => root.setTimeout(resolve, 50));
+      if (token !== generation || account !== a.owner?.() || !a.ready()) return;
+      try {
+        const checked = E.validateRows(t, rows);
+        if (token !== generation || account !== a.owner?.()) return;
+        result = checked;
+        resultSchema = E.copy(t);
+        filter = 'all';
+        page = 0;
+        const summary = {
+          id: E.uid(),
+          templateId: draft.id,
+          templateName: t.name,
+          fileName: fileName.slice(0, 240),
+          version: version === 'draft' ? 0 : Number(version),
+          at: new Date().toISOString(),
+          rows: checked.rows,
+          passed: checked.passed,
+          errors: checked.errors,
+          warnings: checked.warnings,
+        };
+        a.mutate(d => {
+          const history = d.workhub.validator.runs;
+          history.unshift(summary);
+          if (history.length > 150) history.length = 150;
+        });
+        say(
+          checked.errors
+            ? checked.errors + ' errors found. Let’s tidy those up.'
+            : checked.warnings
+              ? 'No errors. ' + checked.warnings + ' warnings to review.'
+              : 'All ' + checked.rows + ' rows passed. Nicely done.'
+        );
+      } finally {
+        if (token === generation) {
+          busy = false;
+          paint();
+        }
+      }
+    }
+    function mappingView() {
+      const t = activeSchema(),
+        unmapped = t.columns.filter(c => Number(mapping[c.key]) < 0).length;
+      return (
+        '<section class="val-card val-mapping"><div class="val-panel-title"><div><span class="val-eyebrow">CONNECT YOUR COLUMNS</span><h3>One small check before we start</h3></div><span class="val-chip">' +
+        sourceRows.length +
+        ' rows · ' +
+        unmapped +
+        ' unmapped fields</span></div><div class="val-file-options">' +
+        select(
+          'sheet',
+          'Worksheet',
+          book.sheets.map((s, i) => [i, s.name]),
+          sheetIndex
+        ) +
+        input('headerRow', 'Header row', headerRow, 'number', 'min="1" max="5001"') +
+        '</div><div class="val-map-grid">' +
+        t.columns
+          .map(
+            c =>
+              '<label class="val-map-row"><span><strong>' +
+              esc(c.label) +
+              (c.required ? ' *' : '') +
+              '</strong><code>' +
+              esc(c.key) +
+              '</code></span><span aria-hidden="true">→</span><select data-map="' +
+              esc(c.key) +
+              '" aria-label="Map ' +
+              esc(c.label) +
+              '">' +
+              options(
+                [
+                  [-1, c.required ? 'Choose a column' : 'Skip this field'],
+                  ...headers.map((h, i) => [i, F.col(i) + ' · ' + h]),
+                ],
+                mapping[c.key]
+              ) +
+              '</select></label>'
+          )
+          .join('') +
+        '</div><div class="val-run-bar"><p>Uploaded rows stay in this browser. Only the run summary is saved.</p>' +
+        btn('run', icon('check', 18) + ' Run validation', busy ? 'disabled' : '', 'val-primary') +
+        '</div></section>'
+      );
+    }
+    function resultsView() {
+      if (!rows.length) return '';
+      const indices = rows
+        .map((r, i) => i)
+        .filter(
+          i =>
+            !result ||
+            filter === 'all' ||
+            (filter === 'errors' && result.status[i].errors) ||
+            (filter === 'warnings' && result.status[i].warnings) ||
+            (filter === 'passed' && !result.status[i].errors)
+        );
+      page = Math.max(0, Math.min(page, Math.ceil(indices.length / 25) - 1));
+      const shown = indices.slice(page * 25, page * 25 + 25),
+        t = resultSchema || activeSchema(),
+        issues = result?.issues || [];
+      return (
+        (result
+          ? '<div class="val-metrics"><div class="val-metric passed"><span>Rows without errors</span><strong>' +
+            result.passed +
+            '<small> / ' +
+            result.rows +
+            '</small></strong></div><div class="val-metric errors"><span>Errors to correct</span><strong>' +
+            result.errors +
+            '</strong></div><div class="val-metric warnings"><span>Warnings to review</span><strong>' +
+            result.warnings +
+            '</strong></div><div class="val-metric"><span>Template used</span><strong class="val-version-text">' +
+            (version === 'draft' ? 'Saved draft' : 'Version ' + version) +
+            '</strong></div></div>'
+          : '<div class="val-inline-note">Your data changed. Run validation again to refresh the results and exports.</div>') +
+        '<section class="val-card val-results"><div class="val-panel-title"><div><span class="val-eyebrow">LOOK CLOSER</span><h3>Your data, with the answers beside it</h3></div><div class="val-actions">' +
+        btn('report', 'Export issue workbook', !result ? 'disabled' : '', 'val-secondary') +
+        btn(
+          'accepted',
+          'Export accepted rows',
+          !result || !result.passed ? 'disabled' : '',
+          'val-primary'
+        ) +
+        '</div></div><p class="val-help">Accepted exports exclude rows with errors. Rows with warnings remain included for your review.</p><div class="val-result-toolbar"><div class="val-segments">' +
+        [
+          ['all', 'All rows'],
+          ['errors', 'Errors'],
+          ['warnings', 'Warnings'],
+          ['passed', 'Without errors'],
+        ]
+          .map(([key, label]) =>
+            btn(
+              'filter',
+              label,
+              'data-filter="' + key + '"' + (!result && key !== 'all' ? ' disabled' : ''),
+              filter === key ? 'is-active' : ''
+            )
+          )
+          .join('') +
+        '</div><span>Showing ' +
+        (shown.length ? page * 25 + 1 : 0) +
+        '–' +
+        (page * 25 + shown.length) +
+        ' of ' +
+        indices.length +
+        '</span></div><div class="val-table-scroll"><table class="val-grid"><thead><tr><th>Excel row</th><th>Check</th>' +
+        t.columns
+          .map(c => '<th>' + esc(c.label) + '<code>' + esc(c.key) + '</code></th>')
+          .join('') +
+        '</tr></thead><tbody>' +
+        shown
+          .map(
+            i =>
+              '<tr' +
+              (targetRow === i ? ' class="val-target-row"' : '') +
+              '><th>' +
+              (headerRow + i + 1) +
+              '</th><td><span class="val-status ' +
+              (!result
+                ? 'pending'
+                : result.status[i].errors
+                  ? 'error'
+                  : result.status[i].warnings
+                    ? 'warning'
+                    : 'passed') +
+              '">' +
+              (!result
+                ? 'Not checked'
+                : result.status[i].errors
+                  ? 'Needs correction'
+                  : result.status[i].warnings
+                    ? 'Review'
+                    : 'Passed') +
+              '</span>' +
+              (result && t.lookups.some(l => l.nameColumn || l.descriptionColumns?.length)
+                ? btn(
+                    'reference-details',
+                    'Reference details',
+                    'data-index="' + i + '"',
+                    'val-quiet val-reference-button'
+                  )
+                : '') +
+              '</td>' +
+              t.columns
+                .map(c => {
+                  const found = issues.filter(x => x.index === i && x.field === c.key),
+                    severity = found.some(x => x.severity === 'error')
+                      ? 'error'
+                      : found.length
+                        ? 'warning'
+                        : '';
+                  return (
+                    '<td class="' +
+                    severity +
+                    '"><input data-cell="' +
+                    i +
+                    '" data-field="' +
+                    esc(c.key) +
+                    '" aria-label="Row ' +
+                    (headerRow + i + 1) +
+                    ' ' +
+                    esc(c.label) +
+                    '" value="' +
+                    esc(rows[i][c.key]) +
+                    '" maxlength="32000" title="' +
+                    esc(found.map(x => x.message).join('\n') || 'Edit this value') +
+                    '"></td>'
+                  );
+                })
+                .join('') +
+              '</tr>'
+          )
+          .join('') +
+        '</tbody></table></div><div class="val-pagination">' +
+        btn('page', '← Previous', 'data-delta="-1"' + (!page ? ' disabled' : ''), 'val-quiet') +
+        '<span>Page ' +
+        (page + 1) +
+        ' of ' +
+        Math.max(1, Math.ceil(indices.length / 25)) +
+        '</span>' +
+        btn(
+          'page',
+          'Next →',
+          'data-delta="1"' + ((page + 1) * 25 >= indices.length ? ' disabled' : ''),
+          'val-quiet'
+        ) +
+        '</div></section>' +
+        (result && issues.length
+          ? '<section class="val-card"><div class="val-panel-title"><h3>What needs attention</h3><span class="val-chip">' +
+            issues.length +
+            ' listed' +
+            (result.truncated ? ' · capped at 15,000' : '') +
+            '</span></div><div class="val-issue-list">' +
+            issues
+              .slice(0, 100)
+              .map(issue =>
+                btn(
+                  'issue',
+                  '<span class="val-issue-marker ' +
+                    issue.severity +
+                    '">' +
+                    (issue.severity === 'error' ? '!' : 'i') +
+                    '</span><span><strong>' +
+                    esc(issue.message) +
+                    '</strong><small>Row ' +
+                    (headerRow + issue.index + 1) +
+                    ' · ' +
+                    esc(issue.column) +
+                    ' · ' +
+                    esc(issue.rule) +
+                    '</small></span><span>↗</span>',
+                  'data-index="' + issue.index + '"'
+                )
+              )
+              .join('') +
+            '</div>' +
+            (issues.length > 100
+              ? '<p class="val-help">Showing the first 100 issues here. Export the workbook for all listed issues.</p>'
+              : '') +
+            '</section>'
+          : '')
+      );
+    }
+    function checkView() {
+      const versions = [
+        ['draft', 'Current draft'],
+        ...draft.releases
+          .slice()
+          .reverse()
+          .map(r => [r.version, 'Published version ' + r.version]),
+      ];
+      return (
+        '<div class="val-section-heading"><div><h3>Let’s give your file a check.</h3><p>Choose a version, connect your columns, then correct issues in place.</p></div><div class="val-version-picker">' +
+        select('version', 'Validate against', versions, version) +
+        '</div></div>' +
+        (busy
+          ? '<div class="val-scanning" role="status"><span class="val-scanner-orb">' +
+            icon('spark', 28) +
+            '</span><div><strong>Making sense of your data…</strong><p>' +
+            esc(message) +
+            '</p></div><i></i></div>'
+          : '') +
+        '<div class="val-upload-layout"><section class="val-dropzone" id="valDropzone"><span class="val-upload-icon">' +
+        icon('upload', 30) +
+        '</span><h3>' +
+        esc(fileName || 'Drop a file. Find your clarity.') +
+        '</h3><p>XLSX, CSV or TSV · Up to 5,000 rows and 200,000 cells</p><div class="val-actions">' +
+        btn('browse', fileName ? 'Choose another file' : 'Browse files', '', 'val-primary') +
+        btn('download-template', 'Download Excel template', '', 'val-secondary') +
+        '</div><div class="val-upload-foot">' +
+        btn('sample', 'Try example data', '', 'val-quiet') +
+        (book ? btn('clear-file', 'Clear file', '', 'val-quiet') : '') +
+        '</div></section><details class="val-card val-paste"><summary>Or paste a table</summary><form id="valPasteForm">' +
+        area(
+          'data',
+          'CSV or tab-separated data',
+          '',
+          'rows="6" placeholder="Include the header row" required'
+        ) +
+        '<button type="submit" class="val-btn val-secondary">Use pasted data</button></form><p class="val-help">Values only. Excel formulas must be pasted as values before upload.</p></details></div>' +
+        (book ? mappingView() : '') +
+        resultsView()
+      );
+    }
+    function history() {
+      const runs = store().runs.filter(r => r.templateId === draft.id);
+      return (
+        '<div class="val-section-heading"><div><h3>A little history, clearly kept.</h3><p>Published versions stay frozen. Run history contains counts, never uploaded rows.</p></div></div><div class="val-history-layout"><section class="val-card"><h3>Published versions</h3>' +
+        draft.releases
+          .slice()
+          .reverse()
+          .map(
+            r =>
+              '<article class="val-release"><span class="val-version-bubble">' +
+              r.version +
+              '</span><div><strong>Version ' +
+              r.version +
+              '</strong><p>' +
+              stamp(r.publishedAt) +
+              '<br>' +
+              r.schema.columns.length +
+              ' columns · ' +
+              r.schema.rules.length +
+              ' conditions</p></div>' +
+              btn(
+                'restore-version',
+                'Copy to draft',
+                'data-version="' + r.version + '"',
+                'val-secondary'
+              ) +
+              '</article>'
+          )
+          .join('') +
+        (!draft.releases.length
+          ? '<p class="val-muted">Publish a version when your template is ready. Later draft edits won’t change it.</p>'
+          : '') +
+        '</section><section class="val-card"><h3>Recent checks</h3>' +
+        runs
+          .slice(0, 30)
+          .map(
+            r =>
+              '<article class="val-run-history"><span class="val-rule-dot ' +
+              (r.errors ? 'error' : r.warnings ? 'warning' : 'passed') +
+              '"></span><div><strong>' +
+              esc(r.fileName) +
+              '</strong><p>' +
+              stamp(r.at) +
+              ' · ' +
+              (r.version ? 'v' + r.version : 'Draft') +
+              '</p><small>' +
+              r.rows +
+              ' rows · ' +
+              r.errors +
+              ' errors · ' +
+              r.warnings +
+              ' warnings</small></div></article>'
+          )
+          .join('') +
+        (!runs.length
+          ? '<p class="val-muted">Your validation summaries will appear here after the first check.</p>'
+          : '') +
+        '</section></div>'
+      );
+    }
+    function render() {
+      sync();
+      if (!draft && store().templates.length) pick(store().templates[0].id, true);
+      return (
+        '<section class="validation-studio"><header class="val-heading"><div class="val-brand"><span class="val-brand-mark">' +
+        icon('leaf', 29) +
+        '</span><div><span class="val-eyebrow">YOUR WORKHUB TOOLKIT</span><h1>Validation Studio</h1></div></div><div class="val-heading-note"><span class="val-dot"></span> A calmer way to check your data</div></header><div class="val-shell">' +
+        library() +
+        '<main class="val-main">' +
+        (draft
+          ? header() +
+            (message
+              ? '<div class="val-message" role="status" aria-live="polite">' +
+                esc(message) +
+                '</div>'
+              : '') +
+            (
+              { columns: columnEditor, rules: rulesEditor, references, check: checkView, history }[
+                mode
+              ] || columnEditor
+            )()
+          : empty()) +
+        '</main></div><input id="valFile" type="file" accept=".xlsx,.csv,.tsv" hidden><input id="valDefinitionFile" type="file" accept=".json" hidden><input id="valReferenceFile" type="file" accept=".xlsx,.csv,.tsv" hidden></section>'
+      );
+    }
+    async function handle(el) {
+      ensure();
+      const action = el.dataset.val,
+        id = el.dataset.id;
+      message = '';
+      if (action === 'new' || action === 'example') {
+        create(action === 'example');
+        return;
+      }
+      if (action === 'open') {
+        pick(id);
+        paint();
+        return;
+      }
+      if (action === 'reference-close') {
+        $('valReferenceDialog')?.close();
+        return;
+      }
+      if (action === 'reference-details') {
+        referenceDetails(Number(el.dataset.index));
+        return;
+      }
+      if (action === 'import-definition') {
+        $('valDefinitionFile').click();
+        return;
+      }
+      if (!draft) throw Error('Create or choose a template first.');
+      commitCurrent();
+      if (action === 'save') {
+        saveDraft();
+        paint();
+        return;
+      }
+      if (action === 'publish') {
+        publish();
+        return;
+      }
+      if (action === 'mode') {
+        mode = el.dataset.mode;
+        paint();
+        return;
+      }
+      if (action === 'field-library' || action === 'field-save') {
+        if (!a.fieldLibrary) throw Error('Open the field library from your signed-in workspace.');
+        const account = owner,
+          templateId = draft.id;
+        a.fieldLibrary(
+          action === 'field-save' ? E.copy(draft.columns.find(c => c.id === columnId)) : null,
+          definition => {
+            if (account !== a.owner?.() || draft?.id !== templateId)
+              throw Error('Reopen this template before inserting a field.');
+            addLibraryField(definition);
+          }
+        );
+        return;
+      }
+      if (action === 'tuple-add') {
+        const c = getPath(el.dataset.path);
+        c.pairs ||= [];
+        const ref = draft.lookups.find(l => l.id === c.lookupId);
+        if (c.pairs.length >= 10) throw Error('Map up to ten fields.');
+        c.pairs.push({
+          field: draft.columns.find(f => !c.pairs.some(p => p.field === f.key))?.key || '',
+          referenceColumn:
+            ref?.headers.find(h => !c.pairs.some(p => p.referenceColumn === h)) || '',
+        });
+        mark();
+      }
+      if (action === 'tuple-remove') {
+        const c = getPath(el.dataset.path);
+        if (c.pairs.length > 2) {
+          c.pairs.splice(Number(el.dataset.index), 1);
+          mark();
+        }
+      }
+      if (action === 'add-column') {
+        if (draft.columns.length >= 80) throw Error('Use up to 80 columns.');
+        let n = draft.columns.length,
+          c = E.column(n);
+        while (draft.columns.some(f => f.key === c.key)) c = E.column(++n);
+        draft.columns.push(c);
+        columnId = c.id;
+        mark();
+      }
+      if (action === 'select-column') {
+        columnId = id;
+      }
+      if (action === 'move-column') {
+        const i = draft.columns.findIndex(c => c.id === id),
+          j = i + Number(el.dataset.delta);
+        if (j >= 0 && j < draft.columns.length) {
+          draft.columns.splice(j, 0, draft.columns.splice(i, 1)[0]);
+          mark();
+        }
+      }
+      if (action === 'remove-column') {
+        const c = draft.columns.find(c => c.id === id),
+          used =
+            draft.rules.some(r => JSON.stringify(r).includes('"' + c.key + '"')) ||
+            draft.uniqueGroups.some(g => g.includes(c.key));
+        if (used)
+          throw Error(
+            'This field is used in a condition or unique combination. Update those first.'
+          );
+        draft.columns = draft.columns.filter(c => c.id !== id);
+        columnId = draft.columns[0]?.id || '';
+        mark();
+      }
+      if (action === 'add-rule') {
+        if (!draft.columns.length) throw Error('Add a column before making conditions.');
+        const r = E.rule(draft.columns[0].key);
+        draft.rules.push(r);
+        ruleId = r.id;
+        mark();
+      }
+      if (action === 'select-rule') ruleId = id;
+      if (action === 'remove-rule') {
+        draft.rules = draft.rules.filter(r => r.id !== id);
+        ruleId = draft.rules[0]?.id || '';
+        mark();
+      }
+      if (action === 'add-clause') {
+        getPath(el.dataset.path).conditions.push(E.condition(draft.columns[0].key));
+        mark();
+      }
+      if (action === 'add-group') {
+        const g = E.group(draft.columns[0].key);
+        getPath(el.dataset.path).groups.push(g);
+        mark();
+      }
+      if (action === 'remove-clause' || action === 'remove-group') {
+        const parts = el.dataset.path.split('.'),
+          i = Number(parts.pop());
+        getPath(parts.join('.')).splice(i, 1);
+        mark();
+      }
+      if (action === 'remove-combination') {
+        draft.uniqueGroups.splice(Number(el.dataset.index), 1);
+        mark();
+      }
+      if (action === 'reference-new') {
+        refEditing = '';
+      }
+      if (action === 'reference-edit') refEditing = id;
+      if (action === 'reference-remove') {
+        if (draft.rules.some(r => JSON.stringify(r).includes('"' + id + '"')))
+          throw Error('A condition uses this reference. Update that condition before removing it.');
+        draft.lookups = draft.lookups.filter(l => l.id !== id);
+        refEditing = '';
+        mark();
+      }
+      if (action === 'reference-file') {
+        $('valReferenceFile').click();
+        return;
+      }
+      if (action === 'browse') {
+        $('valFile').click();
+        return;
+      }
+      if (action === 'clear-file') clearFile();
+      if (action === 'sample') {
+        loadSample();
+        return;
+      }
+      if (action === 'run') {
+        await run();
+        return;
+      }
+      if (action === 'filter') {
+        filter = el.dataset.filter;
+        page = 0;
+      }
+      if (action === 'page') page += Number(el.dataset.delta);
+      if (action === 'issue') {
+        targetRow = Number(el.dataset.index);
+        filter = 'all';
+        page = Math.floor(targetRow / 25);
+      }
+      if (action === 'download-template') {
+        const t = activeSchema();
+        a.download(
+          await F.template(t),
+          safeName(t.name) + '-template.xlsx',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        );
+        return;
+      }
+      if (action === 'report' || action === 'accepted') {
+        if (!result || !resultSchema) throw Error('Run validation again before exporting.');
+        const outcome = E.copy(result);
+        outcome.issues.forEach(i => (i.row = headerRow + i.index + 1));
+        a.download(
+          await F.report(resultSchema, rows, outcome, action === 'accepted'),
+          safeName(resultSchema.name) + (action === 'accepted' ? '-accepted.xlsx' : '-issues.xlsx'),
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        );
+        return;
+      }
+      if (action === 'export-definition') {
+        E.checkSchema(draft, true);
+        a.download(
+          JSON.stringify({ app: 'workhub-validator', version: 1, template: draft }, null, 2),
+          safeName(draft.name) + '.json',
+          'application/json'
+        );
+        return;
+      }
+      if (action === 'duplicate') {
+        const t = E.copy(draft);
+        t.id = E.uid();
+        t.name = (t.name + ' copy').slice(0, 120);
+        t.releases = [];
+        t.createdAt = new Date().toISOString();
+        draft = t;
+        selected = t.id;
+        baseStamp = '';
+        dirty = true;
+        clearFile();
+        mode = 'columns';
+      }
+      if (action === 'delete-template') {
+        if (
+          !root.confirm(
+            'Delete this template and its saved versions? Export its definition first if you want to keep a copy.'
+          )
+        )
+          return;
+        const templateId = draft.id;
+        if (
+          a.mutate(d => {
+            d.workhub.validator.templates = d.workhub.validator.templates.filter(
+              t => t.id !== templateId
+            );
+          })
+        ) {
+          draft = null;
+          selected = '';
+          dirty = false;
+          clearFile();
+        }
+      }
+      if (action === 'restore-version') {
+        if (dirty && !root.confirm('Replace the current draft with this published version?'))
+          return;
+        const r = draft.releases.find(r => String(r.version) === el.dataset.version);
+        Object.assign(draft, E.copy(r.schema));
+        columnId = draft.columns[0]?.id || '';
+        ruleId = draft.rules[0]?.id || '';
+        version = 'draft';
+        mark();
+        mode = 'columns';
+      }
+      paint();
+    }
+    function addLibraryField(definition) {
+      ensure();
+      if (!draft) throw Error('Create a template first.');
+      if (draft.columns.length >= 80) throw Error('Use up to 80 columns.');
+      const c = E.copy(definition);
+      c.id = E.uid();
+      let n = 1,
+        key = c.key,
+        label = c.label;
+      while (
+        draft.columns.some(
+          f =>
+            f.key.toLowerCase() === key.toLowerCase() || E.headerKey(f.label) === E.headerKey(label)
+        )
+      ) {
+        n++;
+        const suffix = '_' + n;
+        key = c.key.slice(0, 64 - suffix.length) + suffix;
+        const ls = ' (' + n + ')';
+        label = c.label.slice(0, 120 - ls.length) + ls;
+      }
+      c.key = key;
+      c.label = label;
+      draft.columns.push(c);
+      columnId = c.id;
+      mode = 'columns';
+      mark();
+      a.closeModal?.();
+      paint();
+      say('Field inserted as an independent copy.');
+    }
+    function referenceDetails(index) {
+      if (!result || !resultSchema || !rows[index])
+        throw Error('Run validation to inspect the current row.');
+      const matches = E.referenceDetails(resultSchema, rows[index]);
+      const body =
+        '<div class="wl-intro"><span class="val-eyebrow">READ THE CODE IN CONTEXT</span><h3>Reference details · row ' +
+        (headerRow + index + 1) +
+        '</h3><p>Values below come from matching rows in your configured reference lists.</p></div><div class="val-reference-explanations">' +
+        matches
+          .map(
+            m =>
+              '<article class="val-reference-explanation"><span class="val-eyebrow">' +
+              esc(m.reference) +
+              '</span><h3>' +
+              esc(m.displayName || m.code) +
+              '</h3><code>' +
+              esc(m.code) +
+              '</code><p>' +
+              esc(m.description || 'No additional description configured.') +
+              '</p><small>Reference row ' +
+              m.sourceRow +
+              ' · ' +
+              esc(m.fields.join(' + ')) +
+              (m.matchCount > 1 ? ' · ' + m.matchCount + ' matches; first five shown' : '') +
+              '</small></article>'
+          )
+          .join('') +
+        '</div>' +
+        (!matches.length
+          ? '<p class="val-help">No matching reference description for this row. Check the values, conditions and selected description columns.</p>'
+          : '');
+      if (a.openModal) a.openModal('Reference details', body);
+      else {
+        let dialog = $('valReferenceDialog');
+        if (!dialog) {
+          dialog = document.createElement('dialog');
+          dialog.id = 'valReferenceDialog';
+          document.body.append(dialog);
+        }
+        dialog.innerHTML = body + btn('reference-close', 'Close');
+        dialog.showModal();
+      }
+    }
+    function safeName(name) {
+      return (
+        String(name)
+          .replace(/[^A-Za-z0-9_-]+/g, '-')
+          .slice(0, 80) || 'validation'
+      );
+    }
+    function formSubmit(form) {
+      ensure();
+      if (form.id === 'valPasteForm') {
+        commitCurrent();
+        book = {
+          sheets: [
+            { name: 'Pasted data', rows: E.parseCSV(form.elements.namedItem('data').value) },
+          ],
+        };
+        sheetIndex = 0;
+        headerRow = 1;
+        fileName = 'Pasted data';
+        getDataFromSheet();
+        paint();
+        return;
+      }
+      if (form.id === 'valUniqueForm') {
+        commitCurrent();
+        const keys = Array.from(form.querySelectorAll('input:checked')).map(el => el.name);
+        if (keys.length < 2) throw Error('Select at least two fields.');
+        draft.uniqueGroups.push(keys);
+        mark();
+        paint();
+        return;
+      }
+      if (form.id === 'valReferenceForm') {
+        commitCurrent();
+        const table = E.parseCSV(form.elements.namedItem('data').value),
+          headers = table.shift() || [],
+          l = {
+            id: form.dataset.id || E.uid(),
+            name: form.elements.namedItem('name').value.trim(),
+            headers,
+            rows: table,
+            codeColumn: headers.includes(form.elements.namedItem('codeColumn')?.value)
+              ? form.elements.namedItem('codeColumn').value
+              : headers[0],
+            nameColumn: headers.includes(form.elements.namedItem('nameColumn')?.value)
+              ? form.elements.namedItem('nameColumn').value
+              : '',
+            descriptionColumns: Array.from(form.querySelectorAll('[name="refDescription"]:checked'))
+              .map(x => x.value)
+              .filter(h => headers.includes(h)),
+          };
+        const proposed = E.copy(draft),
+          i = proposed.lookups.findIndex(x => x.id === l.id);
+        if (i < 0) proposed.lookups.push(l);
+        else proposed.lookups[i] = l;
+        E.checkSchema(proposed, true);
+        draft = proposed;
+        refEditing = l.id;
+        mark();
+        say('Reference list added to the draft.');
+        paint();
+        return;
+      }
+      commitCurrent();
+      E.checkSchema(draft, true);
+      mark();
+      say(
+        form.id === 'valRuleForm'
+          ? 'Condition applied to draft.'
+          : 'Column changes applied to draft.'
+      );
+      paint();
+    }
+    document.addEventListener('click', event => {
+      const el = event.target.closest?.('[data-val]');
+      if (!el) return;
+      event.preventDefault();
+      event.stopPropagation();
+      void handle(el).catch(error => {
+        busy = false;
+        say(error.message, true);
+      });
+    });
+    document.addEventListener('submit', event => {
+      if (!event.target.id.startsWith('val')) return;
+      event.preventDefault();
+      try {
+        formSubmit(event.target);
+      } catch (error) {
+        say(error.message, true);
+      }
+    });
+    document.addEventListener('input', event => {
+      if (event.target.closest?.('#valColumnForm,#valRuleForm,#valMetaForm')) mark();
+    });
+    document.addEventListener('change', event => {
+      const el = event.target;
+      if (!el.closest?.('.validation-studio')) return;
+      void (async () => {
+        ensure();
+        if (el.id === 'valFile') {
+          if (el.files[0]) await loadFile(el.files[0]);
+          return;
+        }
+        if (el.id === 'valReferenceFile') {
+          if (el.files[0]) await loadFile(el.files[0], 'reference');
+          return;
+        }
+        if (el.id === 'valDefinitionFile') {
+          const file = el.files[0];
+          if (!file) return;
+          if (file.size > 1000000) throw Error('Template definitions must be below 1 MB.');
+          const account = owner,
+            token = ++generation,
+            value = JSON.parse(await file.text());
+          if (token !== generation || account !== a.owner?.()) return;
+          if (value.app !== 'workhub-validator' || value.version !== 1)
+            throw Error('Choose a Validation Studio template definition.');
+          const t = value.template;
+          E.validateState({ workhub: { validator: { templates: [t], runs: [] } } });
+          if (dirty && !root.confirm('Import this definition and discard unsaved draft changes?'))
+            return;
+          draft = E.copy(t);
+          draft.id = E.uid();
+          draft.createdAt = new Date().toISOString();
+          selected = draft.id;
+          baseStamp = '';
+          dirty = true;
+          columnId = draft.columns[0]?.id || '';
+          ruleId = draft.rules[0]?.id || '';
+          version = 'draft';
+          mode = 'columns';
+          clearFile();
+          paint();
+          return;
+        }
+        if (el.id === 'valSearch') {
+          search = el.value;
+          paint();
+          return;
+        }
+        if (el.name === 'version') {
+          generation++;
+          busy = false;
+          version = el.value;
+          if (book) getDataFromSheet();
+          result = null;
+          rows = [];
+          paint();
+          return;
+        }
+        if (el.name === 'sheet' || el.name === 'headerRow') {
+          generation++;
+          busy = false;
+          if (el.name === 'sheet') sheetIndex = Number(el.value);
+          else headerRow = Number(el.value);
+          if (!Number.isInteger(headerRow) || headerRow < 1)
+            throw Error('Enter a valid header row.');
+          getDataFromSheet();
+          paint();
+          return;
+        }
+        if (el.dataset.map) {
+          generation++;
+          busy = false;
+          mapping[el.dataset.map] = Number(el.value);
+          rows = [];
+          result = null;
+          paint();
+          return;
+        }
+        if (el.dataset.cell !== undefined) {
+          generation++;
+          busy = false;
+          const i = Number(el.dataset.cell),
+            field = el.dataset.field;
+          if (!rows[i] || !activeSchema().columns.some(c => c.key === field)) return;
+          rows[i][field] = el.value;
+          const source = Number(mapping[field]);
+          if (source >= 0) sourceRows[i][source] = el.value;
+          result = null;
+          resultSchema = null;
+          filter = 'all';
+          paint();
+          return;
+        }
+        if (el.dataset.clause === 'operator' || el.dataset.clause === 'lookupId') {
+          commitCurrent();
+          mark();
+          paint();
+        }
+      })().catch(error => {
+        busy = false;
+        say(error.message, true);
+      });
+    });
+    let dragging = '';
+    document.addEventListener('dragstart', event => {
+      const el = event.target.closest?.('[data-column-id]');
+      if (el) {
+        commitCurrent();
+        dragging = el.dataset.columnId;
+        event.dataTransfer?.setData('text/plain', dragging);
+      }
+    });
+    document.addEventListener('dragover', event => {
+      const target = event.target.closest?.('#valDropzone,[data-column-id]');
+      if (target) {
+        event.preventDefault();
+        target.classList.add('val-drag-over');
+      }
+    });
+    document.addEventListener('dragleave', event =>
+      event.target.closest?.('#valDropzone,[data-column-id]')?.classList.remove('val-drag-over')
+    );
+    document.addEventListener('drop', event => {
+      const drop = event.target.closest?.('#valDropzone'),
+        target = event.target.closest?.('[data-column-id]');
+      if (!drop && !target) return;
+      event.preventDefault();
+      event.stopPropagation();
+      document
+        .querySelectorAll('.val-drag-over')
+        .forEach(el => el.classList.remove('val-drag-over'));
+      try {
+        ensure();
+        if (drop && event.dataTransfer?.files[0]) {
+          void loadFile(event.dataTransfer.files[0]).catch(err => say(err.message, true));
+          return;
+        }
+        if (target && dragging) {
+          const from = draft.columns.findIndex(c => c.id === dragging),
+            to = draft.columns.findIndex(c => c.id === target.dataset.columnId);
+          if (from >= 0 && to >= 0) {
+            draft.columns.splice(to, 0, draft.columns.splice(from, 1)[0]);
+            mark();
+            paint();
+          }
+          dragging = '';
+        }
+      } catch (err) {
+        say(err.message, true);
+      }
+    });
+    return {
+      render,
+      sync,
+      handle,
+      loadFile,
+      run,
+      saveDraft,
+      publish,
+      addLibraryField,
+      referenceDetails,
+      snapshot: () => ({
+        draft: E.copy(draft),
+        dirty,
+        mode,
+        rows: E.copy(rows),
+        result: E.copy(result),
+        mapping: { ...mapping },
+        owner,
+      }),
+      loadSample,
+    };
+  }
+  root.WorkHubValidatorStudio = { install };
 })(window);

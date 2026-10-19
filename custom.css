@@ -1,0 +1,27 @@
+/*
+ * YOUR PERSONAL STYLE SPACE
+ * This file loads after the other stylesheets. Start with one example below.
+ * Remove its opening and closing comment markers to activate it, then change a value.
+ * Full instructions: docs/EDITING-GUIDE.md
+ * CSS changes appearance; saved ticket/task/project values are handled by JavaScript.
+ */
+
+/* Example 1: Make the website title a little larger.
+body #hubHeader #hubSiteTitle {
+  font-size: 1.8rem;
+}
+*/
+
+/* Example 2: Give ticket cards softer corners.
+body .workspace-v10 .ticket-queue-card {
+  border-radius: 22px;
+}
+*/
+
+/* Example 3: Increase the space between the main task cards.
+body .workspace-v10 .task-board {
+  gap: 24px;
+}
+*/
+
+/* Add your own rules below this line. */

@@ -1,35 +1,219 @@
-#momoTheatre { position: fixed; z-index: 87; pointer-events: none; border: 1px solid #b99bab; border-radius: 60px 60px 16px 16px; color: #493e4b; background: linear-gradient(90deg,#d6b4c3 0 12%,#fff5df 12% 88%,#d6b4c3 88%); box-shadow: 0 9px 25px #26374b20; }
-.moments-stage-roof { position: absolute; inset: 0 0 auto; height: 38px; text-align: center; padding-top: 7px; border-radius: 60px 60px 0 0; background: #ba8fa7; color: #fff4d2; font-size: 1.05rem; }
-body #momoTheatre > button { position: absolute; top: 0; right: 0; width: 44px; min-height: 44px; padding: 5px; border: 0; border-radius: 50%; background: transparent; color: #493e4b; pointer-events: auto; }
-.moments-stage-floor { position: absolute; left: 10px; right: 10px; top: 123px; height: 10px; border-radius: 50%; background: #d6b897; }
-.moments-prop { position: absolute; right: 11px; top: 65px; width: 51px; height: 66px; }
-.moments-prop svg { display: block; width: 100%; height: 100%; overflow: visible; }
-#momoTheatreCaption { position: absolute; left: 17px; right: 17px; bottom: 8px; min-height: 48px; margin: 0; padding: 7px; font: 500 12px/1.45 system-ui,sans-serif; text-align: center; color: #493e4b; background: #fffdf6; border: 1px solid #dccab4; border-radius: 10px; }
-#momoTheatre[data-scene="clip"][data-step="1"] .moments-prop { animation: moments-joust .8s ease-in-out infinite alternate; }
-#momoTheatre[data-scene="plant"][data-step="1"] .moments-prop { animation: moments-nod 1.2s ease-in-out infinite alternate; }
-.moments-lunch-lid { transform-origin: 12px 36px; transition: transform .7s; }
-#momoTheatre[data-scene="lunch"][data-step="1"] .moments-lunch-lid,#momoTheatre[data-scene="lunch"][data-step="2"] .moments-lunch-lid { transform: rotate(-38deg); }
-#hubPet[data-pose^="theatre"] .pet-body { animation: moments-momo 2s ease-in-out infinite; }
-#hubPet[data-pose="visitor-watch"] .pet-body { animation: moments-momo 3s ease-in-out infinite; }
-#momoVisitorProp { position: fixed; width: 46px; height: 77px; pointer-events: none; z-index: 91; }
-#momoVisitorProp svg { width: 100%; height: 100%; }
-body #momoDiscovery { position: fixed; z-index: 91; width: 56px; height: 52px; min-height: 44px; padding: 0; border: 0; background: transparent; box-shadow: none; animation: moments-envelope 3s ease-in-out infinite; }
-#momoDiscovery svg { display: block; width: 100%; height: 100%; filter: drop-shadow(0 3px 4px #26374b20); }
-.moments-letter { position: relative; padding: 25px; margin-bottom: 18px; border: 1px solid var(--hub-border); border-radius: 16px; background: linear-gradient(135deg,var(--hub-yellow),var(--hub-surface)); }
-.moments-letter h3 { margin: 14px 0 10px; font-size: 1.3rem; }
-.moments-letter p { overflow-wrap: anywhere; }
-.moments-letter .actions { flex-wrap: wrap; }
-.moments-letter-stamp { position: absolute; right: 20px; top: 18px; color: var(--hub-accent); font-size: 1.5rem; }
-.moments-discovery-empty { padding: 22px; text-align: center; }
-.moments-discovery-empty > span { font-size: 3rem; color: var(--hub-accent); }
-.moments-static-prop { width: 90px; margin: 15px auto; }
-.moments-static-prop svg { width: 100%; height: 100px; }
-#momentsSettingsForm > .check-label { display: flex; gap: 10px; align-items: center; margin: 10px 0; padding: 12px; border: 1px solid var(--hub-border); border-radius: 12px; }
-#momentsSettingsForm > select { width: 100%; margin: 6px 0 14px; }
-@keyframes moments-joust { to { transform: translateX(-14px) rotate(-12deg); } }
-@keyframes moments-nod { to { transform: rotate(6deg); } }
-@keyframes moments-momo { 50% { transform: translateY(-3px) rotate(2deg); } }
-@keyframes moments-envelope { 40% { transform: translateY(-3px) rotate(-5deg); } 65% { transform: rotate(4deg); } }
-body:is(.hub-present,.hub-private,.hub-focus) :is(#momoTheatre,#momoDiscovery,#momoVisitorProp) { display: none !important; }
-@media(prefers-reduced-motion:reduce) { #momoTheatre *,#momoDiscovery { animation: none !important; transition: none !important; } }
-@media print { #momoTheatre,#momoDiscovery,#momoVisitorProp { display: none !important; } }
+/* momo-moments.css — Momo performance scenes and discovery effects.
+   See docs/FILE-MAP.md. Keep rule order: later selectors can override earlier ones. */
+#momoTheatre {
+  position: fixed;
+  z-index: 87;
+  pointer-events: none;
+  border: 1px solid #b99bab;
+  border-radius: 60px 60px 16px 16px;
+  color: #493e4b;
+  background: linear-gradient(90deg, #d6b4c3 0 12%, #fff5df 12% 88%, #d6b4c3 88%);
+  box-shadow: 0 9px 25px #26374b20;
+}
+.moments-stage-roof {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 38px;
+  text-align: center;
+  padding-top: 7px;
+  border-radius: 60px 60px 0 0;
+  background: #ba8fa7;
+  color: #fff4d2;
+  font-size: 1.05rem;
+}
+body #momoTheatre > button {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 44px;
+  min-height: 44px;
+  padding: 5px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #493e4b;
+  pointer-events: auto;
+}
+.moments-stage-floor {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: 123px;
+  height: 10px;
+  border-radius: 50%;
+  background: #d6b897;
+}
+.moments-prop {
+  position: absolute;
+  right: 11px;
+  top: 65px;
+  width: 51px;
+  height: 66px;
+}
+.moments-prop svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+#momoTheatreCaption {
+  position: absolute;
+  left: 17px;
+  right: 17px;
+  bottom: 8px;
+  min-height: 48px;
+  margin: 0;
+  padding: 7px;
+  font:
+    500 12px/1.45 system-ui,
+    sans-serif;
+  text-align: center;
+  color: #493e4b;
+  background: #fffdf6;
+  border: 1px solid #dccab4;
+  border-radius: 10px;
+}
+#momoTheatre[data-scene='clip'][data-step='1'] .moments-prop {
+  animation: moments-joust 0.8s ease-in-out infinite alternate;
+}
+#momoTheatre[data-scene='plant'][data-step='1'] .moments-prop {
+  animation: moments-nod 1.2s ease-in-out infinite alternate;
+}
+.moments-lunch-lid {
+  transform-origin: 12px 36px;
+  transition: transform 0.7s;
+}
+#momoTheatre[data-scene='lunch'][data-step='1'] .moments-lunch-lid,
+#momoTheatre[data-scene='lunch'][data-step='2'] .moments-lunch-lid {
+  transform: rotate(-38deg);
+}
+#hubPet[data-pose^='theatre'] .pet-body {
+  animation: moments-momo 2s ease-in-out infinite;
+}
+#hubPet[data-pose='visitor-watch'] .pet-body {
+  animation: moments-momo 3s ease-in-out infinite;
+}
+#momoVisitorProp {
+  position: fixed;
+  width: 46px;
+  height: 77px;
+  pointer-events: none;
+  z-index: 91;
+}
+#momoVisitorProp svg {
+  width: 100%;
+  height: 100%;
+}
+body #momoDiscovery {
+  position: fixed;
+  z-index: 91;
+  width: 56px;
+  height: 52px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  animation: moments-envelope 3s ease-in-out infinite;
+}
+#momoDiscovery svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 3px 4px #26374b20);
+}
+.moments-letter {
+  position: relative;
+  padding: 25px;
+  margin-bottom: 18px;
+  border: 1px solid var(--hub-border);
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--hub-yellow), var(--hub-surface));
+}
+.moments-letter h3 {
+  margin: 14px 0 10px;
+  font-size: 1.3rem;
+}
+.moments-letter p {
+  overflow-wrap: anywhere;
+}
+.moments-letter .actions {
+  flex-wrap: wrap;
+}
+.moments-letter-stamp {
+  position: absolute;
+  right: 20px;
+  top: 18px;
+  color: var(--hub-accent);
+  font-size: 1.5rem;
+}
+.moments-discovery-empty {
+  padding: 22px;
+  text-align: center;
+}
+.moments-discovery-empty > span {
+  font-size: 3rem;
+  color: var(--hub-accent);
+}
+.moments-static-prop {
+  width: 90px;
+  margin: 15px auto;
+}
+.moments-static-prop svg {
+  width: 100%;
+  height: 100px;
+}
+#momentsSettingsForm > .check-label {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 10px 0;
+  padding: 12px;
+  border: 1px solid var(--hub-border);
+  border-radius: 12px;
+}
+#momentsSettingsForm > select {
+  width: 100%;
+  margin: 6px 0 14px;
+}
+@keyframes moments-joust {
+  to {
+    transform: translateX(-14px) rotate(-12deg);
+  }
+}
+@keyframes moments-nod {
+  to {
+    transform: rotate(6deg);
+  }
+}
+@keyframes moments-momo {
+  50% {
+    transform: translateY(-3px) rotate(2deg);
+  }
+}
+@keyframes moments-envelope {
+  40% {
+    transform: translateY(-3px) rotate(-5deg);
+  }
+  65% {
+    transform: rotate(4deg);
+  }
+}
+body:is(.hub-present, .hub-private, .hub-focus)
+  :is(#momoTheatre, #momoDiscovery, #momoVisitorProp) {
+  display: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  #momoTheatre *,
+  #momoDiscovery {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+@media print {
+  #momoTheatre,
+  #momoDiscovery,
+  #momoVisitorProp {
+    display: none !important;
+  }
+}

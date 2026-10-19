@@ -1,47 +1,339 @@
+/**
+ * reminders.js
+ * Account reminder dates, reminder inbox and record decorations.
+ * Compact reminder data saves with the workhub document; timers only refresh the visible interface.
+ * These are in-app reminders; this module does not send messages when the website is closed.
+ * File map: docs/FILE-MAP.md
+ */
 /* Account-owned reminder dates. No background messaging or paid services. */
-(function(root){
-'use strict';
-const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const TYPES={tickets:'Ticket',tasks:'Task',projects:'Project'};
-const date=d=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
-const validDate=s=>typeof s==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(s)&&!Number.isNaN(Date.parse(s+'T12:00:00Z'))&&new Date(s+'T12:00:00Z').toISOString().slice(0,10)===s;
-function shift(s,n){const d=new Date(s+'T12:00:00');d.setDate(d.getDate()+n);return date(d);}
-function upgrade(d){if(d.workhub&&d.workhub.reminders===undefined)d.workhub.reminders=[];return d;}
-function validate(d){const rs=d.workhub.reminders;if(!Array.isArray(rs)||rs.length>5000)throw Error('Check reminder records.');const ids=new Set();for(const r of rs){if(!r||!Object.hasOwn(TYPES,r.kind)||typeof r.recordId!=='string'||r.recordId.length>100||!r.recordId||r.id!==r.kind+':'+r.recordId||ids.has(r.id)||!validDate(r.until)||typeof r.note!=='string'||r.note.length>2000||typeof r.updatedAt!=='string'||!Number.isFinite(Date.parse(r.updatedAt)))throw Error('Check reminder dates and notes.');ids.add(r.id);}}
-const lookup=(d,kind,id)=>d.workhub?.reminders?.find(r=>r.kind===kind&&r.recordId===id);
-const isSnoozed=(d,kind,id,today)=>!!lookup(d,kind,id)&&lookup(d,kind,id).until>today;
-function records(d,today){return(d.workhub?.reminders||[]).map(r=>({...r,record:d[r.kind]?.find(x=>x.id===r.recordId)})).filter(r=>r.record).map(r=>({...r,title:r.kind==='tickets'?[r.record.ticket,r.record.description].filter(Boolean).join(' · '):r.kind==='tasks'?r.record.task:r.record.name,due:r.until<=today})).sort((a,b)=>a.until.localeCompare(b.until)||a.title.localeCompare(b.title));}
-function install(a){
- const $=id=>document.getElementById(id),items=()=>records(a.state(),a.today());let lastDay=a.today(),announced='';
- const button=(action,label,r)=>`<button type="button" class="small" data-reminder="${action}" data-kind="${esc(r.kind)}" data-id="${esc(r.recordId)}">${label}</button>`;
- function change(fn,message){const ok=a.mutate(d=>{upgrade(d);fn(d.workhub.reminders,d);});if(ok){a.tell(message);a.closeModal();}return ok;}
- function set(kind,id,until,note=''){if(!Object.hasOwn(TYPES,kind)||!a.state()[kind].some(r=>r.id===id))throw Error('That record no longer exists.');if(!validDate(until)||until<=a.today())throw Error('Choose a reminder date after today.');if(note.length>2000)throw Error('Keep the reminder note within 2,000 characters.');return change(rs=>{const r={id:kind+':'+id,kind,recordId:id,until,note:note.trim(),updatedAt:new Date().toISOString()},i=rs.findIndex(x=>x.id===r.id);if(i<0)rs.push(r);else rs[i]=r;},'Set aside until '+until+'. Your status and due date are kept.');}
- function dismiss(kind,id){return change(rs=>{const i=rs.findIndex(r=>r.kind===kind&&r.recordId===id);if(i>=0)rs.splice(i,1);},'Reminder cleared. The item is available in its normal view.');}
- function editor(kind,id){const item=a.state()[kind]?.find(x=>x.id===id);if(!item)throw Error('That record no longer exists.');const r=lookup(a.state(),kind,id),title=kind==='tickets'?[item.ticket,item.description].filter(Boolean).join(' · '):kind==='tasks'?item.task:item.name;
-  a.openModal('Remind me in…',`<div class="reminder-record"><span class="hub-kicker">${TYPES[kind]}</span><h3>${esc(title)}</h3></div><form id="reminderForm" data-kind="${kind}" data-id="${esc(id)}"><div class="reminder-presets" role="group" aria-label="Choose days">${[1,3,7,14,30].map(n=>`<button type="button" data-reminder="days" data-days="${n}">${n} day${n===1?'':'s'}</button>`).join('')}</div><div class="form-grid"><div><label for="reminderDays">Number of days</label><input id="reminderDays" name="days" type="number" min="1" max="3650" value="3" inputmode="numeric"></div><div><label for="reminderDate">Or choose a date</label><input id="reminderDate" name="until" type="date" min="${shift(a.today(),1)}" value="${r?.until>a.today()?r.until:shift(a.today(),3)}" required></div><div class="wide"><label for="reminderNote">Note for your future self (optional)</label><textarea id="reminderNote" name="note" maxlength="2000" placeholder="What should you revisit?">${esc(r?.note||'')}</textarea></div></div><p class="hub-meta">The item returns on this date. You’ll see a reminder when WorkHub is open. Original statuses, deadlines and linked records stay as they are.</p>${kind==='projects'?'<p class="hub-meta">This applies to the project reminder. Its tasks and tickets keep their own dates.</p>':''}<div class="modal-actions"><button type="button" data-action="cancel">Cancel</button><button type="submit" class="primary">Set reminder</button></div></form>`);
-  $('reminderDays').value=Math.max(1,Math.round((Date.parse($('reminderDate').value)-Date.parse(a.today()))/86400000));
- }
- function open(kind,id){if(kind==='projects')a.project(id);else if(kind==='tickets')a.ticket(id);else{a.closeModal();a.hubAction({dataset:{hub:'task-detail',id}});}}
- function rows(rs){return rs.map(r=>`<article class="reminder-row"><div><span class="hub-badge">${TYPES[r.kind]} · ${r.due?'Time to revisit':r.until}</span><h4 class="hub-sensitive">${esc(r.title)}</h4>${r.note?`<p class="hub-sensitive">${esc(r.note)}</p>`:''}${r.due?`<small>Reminder date: ${r.until}</small>`:''}</div><div class="actions">${button('open','Open',r)}${button('edit',r.due?'Remind me again':'Change date',r)}${button('dismiss',r.due?'Dismiss reminder':'Bring back now',r)}</div></article>`).join('');}
- function inbox(){const all=items(),due=all.filter(r=>r.due),sleep=all.filter(r=>!r.due);a.openModal('Your reminders',`<div class="reminder-inbox"><h3>Time to revisit · ${due.length}</h3>${rows(due)||'<p class="hub-meta">Nothing is due for review.</p>'}<details${due.length?'':' open'}><summary>Snoozed · ${sleep.length}</summary>${rows(sleep)||'<p class="hub-meta">Set a reminder from any ticket, task or project.</p>'}</details></div>`);}
- function decorate(tab){
-  if(!a.cloud().ready)return;const all=items(),due=all.filter(r=>r.due);let toolbar=$('hubToolbar');if(toolbar&&!$('reminderInboxButton')){const b=document.createElement('button');b.id='reminderInboxButton';b.dataset.reminder='inbox';toolbar.append(b);}if($('reminderInboxButton'))$('reminderInboxButton').textContent='◷ Reminders'+(due.length?' · '+due.length:'');
-  const view=$('view');if(!view)return;
-  function attach(target,kind,id){if(!target||target.querySelector(':scope > [data-reminder="edit"]'))return;const r=lookup(a.state(),kind,id),holder=document.createElement('div');holder.className='reminder-item-control';holder.innerHTML=button('edit',r?.until<=a.today()?'Time to revisit · Remind me again':'Remind me in…',{kind,recordId:id});if(r&&r.until<=a.today())holder.classList.add('is-due');target.append(holder);}
-  if(tab==='tickets')for(const card of view.querySelectorAll('.ticket-queue-card,.ticket-card,tr')){const b=card.querySelector('[data-action="edit"][data-group="tickets"],[data-action="detail"][data-id]');if(b)attach(card.tagName==='TR'?card.lastElementChild:card,'tickets',b.dataset.id);}
-  if(tab==='tasks')for(const card of view.querySelectorAll('.task-main-card,[data-task-card]')){const id=card.dataset.taskCard||card.querySelector('[data-action="edit"][data-group="tasks"]')?.dataset.id;if(id)attach(card,'tasks',id);}
-  if(tab==='specs'){attach(view.querySelector('.project-banner .actions'),'projects',a.state().activeProjectId);for(const row of view.querySelectorAll('[data-project-id]'))attach(row,'projects',row.dataset.projectId);}
-  const kind=tab==='tickets'?'tickets':tab==='tasks'?'tasks':tab==='specs'?'projects':'';
-  if(kind){const snoozed=all.filter(r=>r.kind===kind&&!r.due);if(snoozed.length){const box=document.createElement('details');box.className='reminder-snoozed';box.innerHTML=`<summary>Snoozed ${TYPES[kind].toLowerCase()}${snoozed.length===1?'':'s'} · ${snoozed.length}</summary>${rows(snoozed)}`;view.prepend(box);}}
-  if(tab==='home'&&due.length){const panel=document.createElement('section');panel.className='hub-card reminder-due-panel';panel.innerHTML=`<div class="flex-title"><div><span class="hub-kicker">WELCOME BACK TO THESE</span><h3>Time to revisit · ${due.length}</h3></div><button type="button" data-reminder="inbox">All reminders</button></div>${rows(due.slice(0,5))}`;view.querySelector('.hub-layout')?.before(panel);}
-  const signature=due.map(r=>r.id+':'+r.until).join('|');if(signature&&signature!==announced){announced=signature;a.react?.('busy',due.length+' item'+(due.length===1?' is':'s are')+' ready for another look. Open Reminders to review.');}
- }
- document.addEventListener('click',event=>{const el=event.target.closest?.('[data-reminder]');if(!el)return;event.preventDefault();event.stopImmediatePropagation();try{const action=el.dataset.reminder,kind=el.dataset.kind,id=el.dataset.id;if(action==='inbox')inbox();if(action==='edit')editor(kind,id);if(action==='open')open(kind,id);if(action==='dismiss')dismiss(kind,id);if(action==='days'){const n=Number(el.dataset.days);$('reminderDays').value=n;$('reminderDate').value=shift(a.today(),n);}}catch(error){a.tell(error.message,true);}},true);
- document.addEventListener('input',event=>{if(event.target.id==='reminderDays'){const n=Number(event.target.value);if(Number.isInteger(n)&&n>=1&&n<=3650)$('reminderDate').value=shift(a.today(),n);}if(event.target.id==='reminderDate'&&validDate(event.target.value))$('reminderDays').value=Math.round((Date.parse(event.target.value)-Date.parse(a.today()))/86400000);});
- document.addEventListener('submit',event=>{if(event.target.id!=='reminderForm')return;event.preventDefault();event.stopImmediatePropagation();try{const f=event.target;set(f.dataset.kind,f.dataset.id,f.elements.namedItem('until').value,f.elements.namedItem('note').value);}catch(error){a.tell(error.message,true);}},true);
- function tick(){if(lastDay!==a.today()&&!document.querySelector('dialog[open] form')){lastDay=a.today();a.render();} }
- root.addEventListener('focus',tick);document.addEventListener('visibilitychange',()=>{if(!document.hidden)tick();});setInterval(tick,60000);
- return{set,dismiss,editor,inbox,decorate,tick};
-}
-root.WorkHubReminders={upgrade,validate,isSnoozed,lookup,records,shift,validDate,install};
+(function (root) {
+  'use strict';
+  const esc = x =>
+    String(x ?? '').replace(
+      /[&<>"']/g,
+      c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
+    );
+  const TYPES = { tickets: 'Ticket', tasks: 'Task', projects: 'Project' };
+  const date = d =>
+    [
+      d.getFullYear(),
+      String(d.getMonth() + 1).padStart(2, '0'),
+      String(d.getDate()).padStart(2, '0'),
+    ].join('-');
+  const validDate = s =>
+    typeof s === 'string' &&
+    /^\d{4}-\d{2}-\d{2}$/.test(s) &&
+    !Number.isNaN(Date.parse(s + 'T12:00:00Z')) &&
+    new Date(s + 'T12:00:00Z').toISOString().slice(0, 10) === s;
+  function shift(s, n) {
+    const d = new Date(s + 'T12:00:00');
+    d.setDate(d.getDate() + n);
+    return date(d);
+  }
+  function upgrade(d) {
+    if (d.workhub && d.workhub.reminders === undefined) d.workhub.reminders = [];
+    return d;
+  }
+  function validate(d) {
+    const rs = d.workhub.reminders;
+    if (!Array.isArray(rs) || rs.length > 5000) throw Error('Check reminder records.');
+    const ids = new Set();
+    for (const r of rs) {
+      if (
+        !r ||
+        !Object.hasOwn(TYPES, r.kind) ||
+        typeof r.recordId !== 'string' ||
+        r.recordId.length > 100 ||
+        !r.recordId ||
+        r.id !== r.kind + ':' + r.recordId ||
+        ids.has(r.id) ||
+        !validDate(r.until) ||
+        typeof r.note !== 'string' ||
+        r.note.length > 2000 ||
+        typeof r.updatedAt !== 'string' ||
+        !Number.isFinite(Date.parse(r.updatedAt))
+      )
+        throw Error('Check reminder dates and notes.');
+      ids.add(r.id);
+    }
+  }
+  const lookup = (d, kind, id) =>
+    d.workhub?.reminders?.find(r => r.kind === kind && r.recordId === id);
+  const isSnoozed = (d, kind, id, today) =>
+    !!lookup(d, kind, id) && lookup(d, kind, id).until > today;
+  function records(d, today) {
+    return (d.workhub?.reminders || [])
+      .map(r => ({ ...r, record: d[r.kind]?.find(x => x.id === r.recordId) }))
+      .filter(r => r.record)
+      .map(r => ({
+        ...r,
+        title:
+          r.kind === 'tickets'
+            ? [r.record.ticket, r.record.description].filter(Boolean).join(' · ')
+            : r.kind === 'tasks'
+              ? r.record.task
+              : r.record.name,
+        due: r.until <= today,
+      }))
+      .sort((a, b) => a.until.localeCompare(b.until) || a.title.localeCompare(b.title));
+  }
+  function install(a) {
+    const $ = id => document.getElementById(id),
+      items = () => records(a.state(), a.today());
+    let lastDay = a.today(),
+      announced = '';
+    const button = (action, label, r) =>
+      `<button type="button" class="small" data-reminder="${action}" data-kind="${esc(r.kind)}" data-id="${esc(r.recordId)}">${label}</button>`;
+    function change(fn, message) {
+      const ok = a.mutate(d => {
+        upgrade(d);
+        fn(d.workhub.reminders, d);
+      });
+      if (ok) {
+        a.tell(message);
+        a.closeModal();
+      }
+      return ok;
+    }
+    function set(kind, id, until, note = '') {
+      if (!Object.hasOwn(TYPES, kind) || !a.state()[kind].some(r => r.id === id))
+        throw Error('That record no longer exists.');
+      if (!validDate(until) || until <= a.today())
+        throw Error('Choose a reminder date after today.');
+      if (note.length > 2000) throw Error('Keep the reminder note within 2,000 characters.');
+      return change(
+        rs => {
+          const r = {
+              id: kind + ':' + id,
+              kind,
+              recordId: id,
+              until,
+              note: note.trim(),
+              updatedAt: new Date().toISOString(),
+            },
+            i = rs.findIndex(x => x.id === r.id);
+          if (i < 0) rs.push(r);
+          else rs[i] = r;
+        },
+        'Set aside until ' + until + '. Your status and due date are kept.'
+      );
+    }
+    function dismiss(kind, id) {
+      return change(rs => {
+        const i = rs.findIndex(r => r.kind === kind && r.recordId === id);
+        if (i >= 0) rs.splice(i, 1);
+      }, 'Reminder cleared. The item is available in its normal view.');
+    }
+    function editor(kind, id) {
+      const item = a.state()[kind]?.find(x => x.id === id);
+      if (!item) throw Error('That record no longer exists.');
+      const r = lookup(a.state(), kind, id),
+        title =
+          kind === 'tickets'
+            ? [item.ticket, item.description].filter(Boolean).join(' · ')
+            : kind === 'tasks'
+              ? item.task
+              : item.name;
+      a.openModal(
+        'Remind me in…',
+        `<div class="reminder-record"><span class="hub-kicker">${TYPES[kind]}</span><h3>${esc(title)}</h3></div><form id="reminderForm" data-kind="${kind}" data-id="${esc(id)}"><div class="reminder-presets" role="group" aria-label="Choose days">${[1, 3, 7, 14, 30].map(n => `<button type="button" data-reminder="days" data-days="${n}">${n} day${n === 1 ? '' : 's'}</button>`).join('')}</div><div class="form-grid"><div><label for="reminderDays">Number of days</label><input id="reminderDays" name="days" type="number" min="1" max="3650" value="3" inputmode="numeric"></div><div><label for="reminderDate">Or choose a date</label><input id="reminderDate" name="until" type="date" min="${shift(a.today(), 1)}" value="${r?.until > a.today() ? r.until : shift(a.today(), 3)}" required></div><div class="wide"><label for="reminderNote">Note for your future self (optional)</label><textarea id="reminderNote" name="note" maxlength="2000" placeholder="What should you revisit?">${esc(r?.note || '')}</textarea></div></div><p class="hub-meta">The item returns on this date. You’ll see a reminder when WorkHub is open. Original statuses, deadlines and linked records stay as they are.</p>${kind === 'projects' ? '<p class="hub-meta">This applies to the project reminder. Its tasks and tickets keep their own dates.</p>' : ''}<div class="modal-actions"><button type="button" data-action="cancel">Cancel</button><button type="submit" class="primary">Set reminder</button></div></form>`
+      );
+      $('reminderDays').value = Math.max(
+        1,
+        Math.round((Date.parse($('reminderDate').value) - Date.parse(a.today())) / 86400000)
+      );
+    }
+    function open(kind, id) {
+      if (kind === 'projects') a.project(id);
+      else if (kind === 'tickets') a.ticket(id);
+      else {
+        a.closeModal();
+        a.hubAction({ dataset: { hub: 'task-detail', id } });
+      }
+    }
+    function rows(rs) {
+      return rs
+        .map(
+          r =>
+            `<article class="reminder-row"><div><span class="hub-badge">${TYPES[r.kind]} · ${r.due ? 'Time to revisit' : r.until}</span><h4 class="hub-sensitive">${esc(r.title)}</h4>${r.note ? `<p class="hub-sensitive">${esc(r.note)}</p>` : ''}${r.due ? `<small>Reminder date: ${r.until}</small>` : ''}</div><div class="actions">${button('open', 'Open', r)}${button('edit', r.due ? 'Remind me again' : 'Change date', r)}${button('dismiss', r.due ? 'Dismiss reminder' : 'Bring back now', r)}</div></article>`
+        )
+        .join('');
+    }
+    function inbox() {
+      const all = items(),
+        due = all.filter(r => r.due),
+        sleep = all.filter(r => !r.due);
+      a.openModal(
+        'Your reminders',
+        `<div class="reminder-inbox"><h3>Time to revisit · ${due.length}</h3>${rows(due) || '<p class="hub-meta">Nothing is due for review.</p>'}<details${due.length ? '' : ' open'}><summary>Snoozed · ${sleep.length}</summary>${rows(sleep) || '<p class="hub-meta">Set a reminder from any ticket, task or project.</p>'}</details></div>`
+      );
+    }
+    function decorate(tab) {
+      if (!a.cloud().ready) return;
+      const all = items(),
+        due = all.filter(r => r.due);
+      let toolbar = $('hubToolbar');
+      if (toolbar && !$('reminderInboxButton')) {
+        const b = document.createElement('button');
+        b.id = 'reminderInboxButton';
+        b.dataset.reminder = 'inbox';
+        toolbar.append(b);
+      }
+      if ($('reminderInboxButton'))
+        $('reminderInboxButton').textContent =
+          '◷ Reminders' + (due.length ? ' · ' + due.length : '');
+      const view = $('view');
+      if (!view) return;
+      function attach(target, kind, id) {
+        if (!target || target.querySelector(':scope > [data-reminder="edit"]')) return;
+        const r = lookup(a.state(), kind, id),
+          holder = document.createElement('div');
+        holder.className = 'reminder-item-control';
+        holder.innerHTML = button(
+          'edit',
+          r?.until <= a.today() ? 'Time to revisit · Remind me again' : 'Remind me in…',
+          { kind, recordId: id }
+        );
+        if (r && r.until <= a.today()) holder.classList.add('is-due');
+        target.append(holder);
+      }
+      if (tab === 'tickets')
+        for (const card of view.querySelectorAll('.ticket-queue-card,.ticket-card,tr')) {
+          const b = card.querySelector(
+            '[data-action="edit"][data-group="tickets"],[data-action="detail"][data-id]'
+          );
+          if (b)
+            attach(card.tagName === 'TR' ? card.lastElementChild : card, 'tickets', b.dataset.id);
+        }
+      if (tab === 'tasks')
+        for (const card of view.querySelectorAll('.task-main-card,[data-task-card]')) {
+          const id =
+            card.dataset.taskCard ||
+            card.querySelector('[data-action="edit"][data-group="tasks"]')?.dataset.id;
+          if (id) attach(card, 'tasks', id);
+        }
+      if (tab === 'specs') {
+        attach(
+          view.querySelector('.project-banner .actions'),
+          'projects',
+          a.state().activeProjectId
+        );
+        for (const row of view.querySelectorAll('[data-project-id]'))
+          attach(row, 'projects', row.dataset.projectId);
+      }
+      const kind =
+        tab === 'tickets'
+          ? 'tickets'
+          : tab === 'tasks'
+            ? 'tasks'
+            : tab === 'specs'
+              ? 'projects'
+              : '';
+      if (kind) {
+        const snoozed = all.filter(r => r.kind === kind && !r.due);
+        if (snoozed.length) {
+          const box = document.createElement('details');
+          box.className = 'reminder-snoozed';
+          box.innerHTML = `<summary>Snoozed ${TYPES[kind].toLowerCase()}${snoozed.length === 1 ? '' : 's'} · ${snoozed.length}</summary>${rows(snoozed)}`;
+          view.prepend(box);
+        }
+      }
+      if (tab === 'home' && due.length) {
+        const panel = document.createElement('section');
+        panel.className = 'hub-card reminder-due-panel';
+        panel.innerHTML = `<div class="flex-title"><div><span class="hub-kicker">WELCOME BACK TO THESE</span><h3>Time to revisit · ${due.length}</h3></div><button type="button" data-reminder="inbox">All reminders</button></div>${rows(due.slice(0, 5))}`;
+        view.querySelector('.hub-layout')?.before(panel);
+      }
+      const signature = due.map(r => r.id + ':' + r.until).join('|');
+      if (signature && signature !== announced) {
+        announced = signature;
+        a.react?.(
+          'busy',
+          due.length +
+            ' item' +
+            (due.length === 1 ? ' is' : 's are') +
+            ' ready for another look. Open Reminders to review.'
+        );
+      }
+    }
+    document.addEventListener(
+      'click',
+      event => {
+        const el = event.target.closest?.('[data-reminder]');
+        if (!el) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        try {
+          const action = el.dataset.reminder,
+            kind = el.dataset.kind,
+            id = el.dataset.id;
+          if (action === 'inbox') inbox();
+          if (action === 'edit') editor(kind, id);
+          if (action === 'open') open(kind, id);
+          if (action === 'dismiss') dismiss(kind, id);
+          if (action === 'days') {
+            const n = Number(el.dataset.days);
+            $('reminderDays').value = n;
+            $('reminderDate').value = shift(a.today(), n);
+          }
+        } catch (error) {
+          a.tell(error.message, true);
+        }
+      },
+      true
+    );
+    document.addEventListener('input', event => {
+      if (event.target.id === 'reminderDays') {
+        const n = Number(event.target.value);
+        if (Number.isInteger(n) && n >= 1 && n <= 3650)
+          $('reminderDate').value = shift(a.today(), n);
+      }
+      if (event.target.id === 'reminderDate' && validDate(event.target.value))
+        $('reminderDays').value = Math.round(
+          (Date.parse(event.target.value) - Date.parse(a.today())) / 86400000
+        );
+    });
+    document.addEventListener(
+      'submit',
+      event => {
+        if (event.target.id !== 'reminderForm') return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        try {
+          const f = event.target;
+          set(
+            f.dataset.kind,
+            f.dataset.id,
+            f.elements.namedItem('until').value,
+            f.elements.namedItem('note').value
+          );
+        } catch (error) {
+          a.tell(error.message, true);
+        }
+      },
+      true
+    );
+    function tick() {
+      if (lastDay !== a.today() && !document.querySelector('dialog[open] form')) {
+        lastDay = a.today();
+        a.render();
+      }
+    }
+    root.addEventListener('focus', tick);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) tick();
+    });
+    setInterval(tick, 60000);
+    return { set, dismiss, editor, inbox, decorate, tick };
+  }
+  root.WorkHubReminders = {
+    upgrade,
+    validate,
+    isSnoozed,
+    lookup,
+    records,
+    shift,
+    validDate,
+    install,
+  };
 })(window);
