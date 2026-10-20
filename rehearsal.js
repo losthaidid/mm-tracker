@@ -232,7 +232,7 @@
     document.addEventListener('pointercancel',()=>{if(!drag)return;drag=null;a.render();});
     document.addEventListener('keydown',event=>{
       const el=event.target.closest?.('[data-rehearsal-drag]');if(!el||!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.key))return;
-      event.preventDefault();event.stopPropagation();try{const s=model().steps.find(s=>s.id===el.dataset.rehearsalDrag),n=event.shiftKey?30:10;if(s)moveStep(s.id,s.x+(event.key==='ArrowLeft'?-n:event.key==='ArrowRight'?n:0),s.y+(event.key==='ArrowUp'?-n:event.key==='ArrowDown'?n:0));}catch(err){a.tell(err.message,true);}
+      event.preventDefault();event.stopPropagation();try{const s=model().steps.find(s=>s.id===el.dataset.rehearsalDrag),n=event.shiftKey?30:10;if(s){moveStep(s.id,s.x+(event.key==='ArrowLeft'?-n:event.key==='ArrowRight'?n:0),s.y+(event.key==='ArrowUp'?-n:event.key==='ArrowDown'?n:0));[...document.querySelectorAll('[data-rehearsal-drag]')].find(node=>node.dataset.rehearsalDrag===s.id)?.focus();}}catch(err){a.tell(err.message,true);}
     },true);
     document.addEventListener('submit',event=>{if(!['rehearsalStepForm','rehearsalProcessForm','rehearsalScenarioForm','rehearsalNewForm'].includes(event.target.id))return;event.preventDefault();try{saveForm(event.target);}catch(err){a.tell(err.message,true);}});
     document.addEventListener('change',event=>{

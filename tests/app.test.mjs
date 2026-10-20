@@ -1976,3 +1976,12 @@ test('T-code UI: stale account forms and invalid duplicate codes cannot overwrit
  const {api,document}=await app(t);api.hub.setTool('tcodes');api.showTab('studio');const ui=api.hub.tcodes;ui.editor();const f=document.getElementById('tcodeForm');f.elements.namedItem('code').value='ME21N';f.elements.namedItem('title').value='Duplicate';assert.throws(()=>ui.save(f),/unique/);assert.equal(api.state().workhub.tcodes.records.length,79);
  api.cloud.user={id:'22222222-2222-4222-8222-222222222222'};api.showTab('home');assert.equal(document.getElementById('modal').open,false);assert.throws(()=>ui.save(f),/Sign in/);
 });
+
+test('rehearsal UI: audio waits for a gesture, respects mute and keyboard positioning preserves focus',async t=>{
+ const {api,document,window}=await app(t);let starts=0,suspends=0;
+ class AudioMock{constructor(){this.state='suspended';this.currentTime=0;this.destination={};}async resume(){this.state='running';}async suspend(){suspends++;this.state='suspended';}async close(){this.state='closed';}createOscillator(){return{frequency:{setValueAtTime(){}},connect(){},disconnect(){},start(){starts++;},stop(){}};}createGain(){return{gain:{setValueAtTime(){},linearRampToValueAtTime(){},exponentialRampToValueAtTime(){}},connect(){},disconnect(){}};}}
+ window.AudioContext=AudioMock;api.hub.setTool('simulator');api.showTab('studio');assert.equal(starts,0);
+ document.querySelector('[data-rehearsal="play"]').click();await settle();document.querySelector('[data-rehearsal="play"]').click();await settle();assert.ok(starts>0);
+ document.querySelector('[data-rehearsal="sound"]').click();await settle();assert.equal(api.state().workhub.rehearsal.preferences.sound,false);assert.ok(suspends>0);
+ document.querySelector('[data-rehearsal="keep"]').click();await settle();const old=api.state().workhub.rehearsal.processes[0].steps[0].x,handle=document.querySelector('[data-rehearsal-drag="po"]');handle.focus();handle.dispatchEvent(new window.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));await settle();assert.equal(api.state().workhub.rehearsal.processes[0].steps[0].x,old+10);assert.equal(document.activeElement.dataset.rehearsalDrag,'po');
+});

@@ -102,10 +102,12 @@
       const id=queue.shift(),s=nodes.get(id);if(!s)continue;
       for(const next of [s.next,s.failNext])if(next&&nodes.has(next)&&!depth.has(next)){depth.set(next,Math.min(14,depth.get(id)+1));queue.push(next);}
     }
-    let spare=0;
+    let spare=0;const occupied=new Set();
     for(const s of process.steps) {
-      const col=depth.has(s.id)?depth.get(s.id):spare++%4, row=rows.get(col)||0;rows.set(col,row+1);
-      s.x=50+col*260;s.y=55+row*180;
+      const preferred=depth.has(s.id)?depth.get(s.id):spare++%4,n=rows.get(preferred)||0;rows.set(preferred,n+1);
+      let col=(preferred+Math.floor(n/20))%15,row=n%20;
+      while(occupied.has(col+':'+row)){col=(col+1)%15;if(col===0)row=(row+1)%20;}
+      occupied.add(col+':'+row);s.x=50+col*260;s.y=55+row*180;
     }
     return process;
   }

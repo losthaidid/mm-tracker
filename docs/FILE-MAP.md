@@ -4,6 +4,8 @@ This is the source map for **SAP MM WorkHub** in `losthaidid/mm-tracker`.
 The website is published by GitHub Pages. Supabase stores private account records and handles login.
 There is no build step for ordinary website changes.
 
+Personal process rehearsal: `rehearsal-engine.js` validates saved graphs, scenarios and sample-value changes; `rehearsal.js` supplies the animated canvas, editors, audio and journal; `rehearsal.css` styles both rehearsal and the T-code desk. `sap-tcodes-data.js` contains the SAP-sourced starter references, `sap-tcodes-engine.js` validates and filters the private library, and `sap-tcodes.js` handles maintenance. See [PROCESS-REHEARSAL.md](PROCESS-REHEARSAL.md).
+
 Project reporting: [project-standup-engine.js](../project-standup-engine.js) handles progress totals, recorded update times and Action/task links; [project-standup.js](../project-standup.js) supplies the Overview card, expanded report and Actions forms; [project-standup.css](../project-standup.css) controls its responsive layout. See [PROJECT-STANDUP.md](PROJECT-STANDUP.md) for usage and storage notes.
 
 **Start with [Editing guide](EDITING-GUIDE.md).** For appearance changes, use [custom.css](../custom.css).
