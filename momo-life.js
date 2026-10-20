@@ -38,7 +38,9 @@
       reaction = null,
       nearCursor = false,
       nextStartle = 0,
-      umbrellaUntil = 0;
+      umbrellaUntil = 0,
+      ballResumeUntil = 0,
+      owner = null;
     function scene(value) {
       if (value) {
         endUmbrella();
@@ -312,7 +314,7 @@
       pose('startled');
       if (!quiet) a.react('busy', 'Oh! You startled me!', 2200);
     }
-    function quip() {
+    function quip(contextual = false) {
       if (!safe()) return;
       endGesture();
       reaction = null;
@@ -323,30 +325,37 @@
       let i = Math.floor(Math.random() * QUIPS.length);
       if (i === lastQuip) i = (i + 1) % QUIPS.length;
       lastQuip = i;
-      const [act, face, line] = QUIPS[i];
+      const context = contextual ? a.contextLine?.() : '',
+        [act, face, line] = context ? ['wink', 'cheeky', context] : QUIPS[i];
       pose(motion() ? act : 'idle');
       express(face);
       restUntil = Date.now() + 8000;
       nextQuip = Date.now() + 60000 + Math.random() * 60000;
       a.react('happy', line, 7000);
+      if (['stumble', 'sneeze'].includes(act)) a.remember?.(act);
     }
-    function cancelTravel() {
+    function cancelTravel(resumable = false) {
+      if (resumable && journey?.purpose === 'ball' && $('hubMomoBall'))
+        ballResumeUntil = Date.now() + 120000;
       if (moving) root.cancelAnimationFrame(moving);
       moving = 0;
       journey = null;
+      pet()?.removeAttribute('data-travel-phase');
     }
-    function travel(x, y, onDone = () => {}, duration = 1400) {
+    function travel(x, y, onDone = () => {}, duration = 1400, purpose = '') {
       a.stop();
       cancelTravel();
       const el = pet();
       if (!el) return;
       const from = { x: parseFloat(el.style.left) || 0, y: parseFloat(el.style.top) || 0 };
+      if (purpose !== 'ball') ballResumeUntil = 0;
+      if (Math.abs(x - from.x) > 1) el.dataset.facing = x < from.x ? 'left' : 'right';
       if (!motion()) {
         a.move({ x, y });
         onDone();
         return;
       }
-      journey = { from, to: { x, y }, start: root.performance.now(), duration };
+      journey = { from, to: { x, y }, start: root.performance.now(), duration, purpose };
       pose(umbrellaUntil ? 'umbrella-walk' : 'walk');
       function frame(t) {
         if (
@@ -355,19 +364,20 @@
           document.querySelector('dialog[open]') ||
           document.activeElement?.matches('input,textarea,select')
         ) {
-          cancelTravel();
-          pose('idle');
+          cancelTravel(motion() && safe());
+          pose(umbrellaUntil ? 'umbrella-rest' : 'idle');
           return;
         }
         const j = journey,
           q = Math.min(1, Math.max(0, (t - j.start) / j.duration)),
-          e = q * q * (3 - 2 * q);
+          e = root.WorkHubMomoBehaviourEngine.ease((q - 0.08) / 0.84);
+        el.dataset.travelPhase = q < 0.08 ? 'turn' : q > 0.92 ? 'settle' : 'walk';
         a.move({ x: j.from.x + (j.to.x - j.from.x) * e, y: j.from.y + (j.to.y - j.from.y) * e });
         layout();
         if (q < 1) moving = root.requestAnimationFrame(frame);
         else {
           cancelTravel();
-          pose(umbrellaUntil ? 'umbrella-walk' : 'idle');
+          pose(umbrellaUntil ? 'umbrella-rest' : 'idle');
           onDone();
         }
       }
@@ -459,6 +469,21 @@
       if (ball) ball.hidden = !safe();
     }
     function mount() {
+      const next = a.ready() ? a.owner?.() || 'local' : '';
+      if (next !== owner) {
+        owner = next;
+        ballResumeUntil = 0;
+        cancelTravel();
+        endGesture();
+        endUmbrella();
+        sceneState = null;
+        reaction = null;
+        nap = false;
+        perch = null;
+        held = null;
+        ballDrag = null;
+        $('hubMomoBall')?.remove();
+      }
       if (!$('hubMomoHome')) {
         const el = document.createElement('button');
         el.id = 'hubMomoHome';
@@ -520,12 +545,18 @@
       const x = parseFloat(ball.style.left),
         y = parseFloat(ball.style.top),
         size = parseFloat(pet()?.style.width) || 96;
-      travel(x - size * 0.5, y - size * 0.6, () => {
-        pose('play');
-        restUntil = Date.now() + 8000;
-        ball.classList.add('momo-ball-bounce');
-        a.react('happy', 'Caught it! Drag the ball to toss it again.');
-      });
+      travel(
+        x - size * 0.5,
+        y - size * 0.6,
+        () => {
+          pose('play');
+          restUntil = Date.now() + 8000;
+          ball.classList.add('momo-ball-bounce');
+          a.react('happy', 'Caught it! Drag the ball to toss it again.');
+        },
+        1400,
+        'ball'
+      );
     }
     function ball() {
       const v = viewport();
@@ -581,7 +612,7 @@
       $('hubMomoUmbrella')?.remove();
       el?.removeAttribute('data-umbrella');
       if (el) a.move(point);
-      if (el?.dataset.pose === 'umbrella-walk') pose('idle');
+      if (['umbrella-walk', 'umbrella-rest'].includes(el?.dataset.pose)) pose('idle');
     }
     function umbrella() {
       if (
@@ -609,7 +640,10 @@
       restUntil = umbrellaUntil;
       pet().dataset.umbrella = 'true';
       a.move(point);
+      point.x = parseFloat(pet().style.left) || 0;
+      point.y = parseFloat(pet().style.top) || 0;
       pose('umbrella-walk');
+      if (a.weather?.() === 'rain') a.remember?.('rain-walk');
       a.react('happy', 'A tiny umbrella. Feet steady, rainy thoughts welcome.', 5000);
       if (motion()) {
         const v = viewport(),
@@ -619,7 +653,7 @@
             Math.min(v.x + v.w - size * 1.12 - 12, point.x + (point.x > v.x + v.w / 2 ? -85 : 85))
           ),
           y = Math.max(v.y + size * 0.48 + 12, point.y);
-        travel(x, y, () => pose('umbrella-walk'), 3200);
+        travel(x, y, () => pose('umbrella-rest'), 3200);
       }
       return true;
     }
@@ -910,7 +944,10 @@
       true
     );
     document.addEventListener('focusin', event => {
-      if (event.target.matches?.('input,textarea,select,[contenteditable]')) endGesture();
+      if (event.target.matches?.('input,textarea,select,[contenteditable]')) {
+        endGesture();
+        cancelTravel(true);
+      }
     });
     document.addEventListener('keydown', event => {
       if (event.key === 'Escape') {
@@ -920,6 +957,7 @@
         $('hubMomoMenu')?.remove();
         $('hubMomoBall')?.remove();
         cancelTravel();
+        ballResumeUntil = 0;
         if (!nap && !held) pose('idle');
       }
     });
@@ -928,7 +966,7 @@
         endUmbrella();
         cancelHomeDrag();
         endGesture();
-        cancelTravel();
+        cancelTravel(true);
         held = null;
         ballDrag = null;
         reaction = null;
@@ -1007,6 +1045,18 @@
         layout();
         return;
       }
+      if (ballResumeUntil && Date.now() > ballResumeUntil) ballResumeUntil = 0;
+      if (
+        ballResumeUntil &&
+        !interrupted &&
+        !busy() &&
+        $('hubMomoBall') &&
+        a.canResume?.() !== false
+      ) {
+        ballResumeUntil = 0;
+        chase();
+        return;
+      }
       if (!motion()) {
         cancelTravel();
         pet()?.style.setProperty('--momo-look-x', '0px');
@@ -1019,7 +1069,7 @@
         !!perch ||
         !!$('hubMomoMenu') ||
         !$('hubPetBubble')?.hidden;
-      if (!quiet && motion() && !blocked && Date.now() >= nextQuip) quip();
+      if (!quiet && motion() && !blocked && Date.now() >= nextQuip) quip(true);
       else if (!blocked && motion() && Date.now() >= nextGesture) {
         gesture();
         return;
@@ -1042,6 +1092,20 @@
       goHome,
       express,
       scene,
+      clearForWork() {
+        if (held || homeDrag) return false;
+        cancelTravel(true);
+        endGesture();
+        endUmbrella();
+        reaction = null;
+        sceneState = null;
+        nap = false;
+        perch = null;
+        armed = false;
+        restUntil = Date.now() + 12000;
+        pose('idle');
+        return true;
+      },
       homePosition: () => ({ ...home }),
       sceneAvailable: () => !homeDrag && !held && !journey && !armed && !idleGesture && !reaction,
     };

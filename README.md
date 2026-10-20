@@ -14,7 +14,7 @@ The seven selected wishlist items and refreshed ticket screens are documented in
 
 Ticket **History tracker** automatically appends an entry when progress remarks are added or changed: `Awaiting user confirmation [20-10-2026 08:38]`. Entries contain the remark, local date and time, without a label or bullet prefix. Status/milestone changes alone do not append history or refresh its timestamp, and unchanged remarks are not repeated. Manual updates use the same format. Previously saved history remains available; status changes are still recorded separately in the Work timeline.
 
-The TNG statement extractor and automatically looping Troubleshooting Lab results are documented in [the TNG and playback guide](docs/TNG-AND-LAB.md). The next Momo behaviour improvements are kept separately in [Batch B](BATCH-B.md); they are not included in this release.
+The TNG statement extractor and automatically looping Troubleshooting Lab results are documented in [the TNG and playback guide](docs/TNG-AND-LAB.md). [Batch B](BATCH-B.md) documents Momo's connected behaviour, visitor friendships, temporary weather effects and nearby-click reactions. [Batch C](BATCH-C.md) keeps the pending ticket-twin and screenshot-brush ideas.
 
 ## Publish using GitHub Pages
 
@@ -287,6 +287,8 @@ Momo can chase a visitor across the viewport, sprint, watch the window, or tug a
 **Soccer surprise** asks for 1–50 kicks, counts each one, then reveals a balloon parade, paper wishes, rainbow, trophy, flowers, moon, duck referees or bubble galaxy. The eight finales use a shuffled bag, with no repeat until all have appeared, plus varying colours. Momo may offer a trick in a bubble; the count form opens only when chosen. Escape or the stage close button stops the show.
 
 Work nudges use loaded open tasks, tickets, project items and projects, with a button to open the source record. Completed, archived and snoozed work is skipped, including work under a snoozed or completed project. These are on-page nudges while the website is open. Adventure switches, scenery/weather, visitor choices and surprise order stay on the device; only an explicit name change saves account data. Quiet time pauses automatic speech and invitations. Animations Off and reduced motion keep moving adventures still; the opening greeting can remain as text.
+
+Momo's **Batch B** adds staged chases and mischief, shared soccer/foot timing, weather-aware window watching, brief-return greetings and contextual follow-up chatter. Familiar visitors have stable names and distinct roles: racing rivals, present-bringing friends, chair borrowers or quiet companions. Rain can leave a small, fading footprint trail, breezes send a few leaves through his theatre, and a foggy window can be wiped while watching. He moves clear of active controls and occasionally reacts to nearby button/panel changes. **Adventure settings** groups the switches for these behaviours. Brief interruptions can resume the same soccer count or return to a visitor/window activity; Escape and explicit stop actions cancel that pending activity. Visitor counters are device-local and account-scoped, and these animations never autosave work records. See [the full Batch B guide](BATCH-B.md).
 
 ## On-site mileage and monthly expenses
 

@@ -69,9 +69,11 @@ CSS (`.css`) controls appearance; HTML supplies the initial page structure.
 | [momo-art.js](../momo-art.js), [momo-anime.css](../momo-anime.css) | Momo's rendered character, rig layers, expressions and poses. |
 | [assets/momo/anime-rig.webp](../assets/momo/anime-rig.webp), [assets/momo/README.md](../assets/momo/README.md) | Character image asset and its artwork notes. |
 | [momo-life.js](../momo-life.js) | Basic expressions, dragging, home and simple play. |
+| [momo-behaviour-engine.js](../momo-behaviour-engine.js), [momo-behaviour.css](../momo-behaviour.css) | Pure activity phases, shared ball/kick calculations, visitor roles and safe resting positions; staged poses and temporary weather/friend props. |
 | [momo-moments.js](../momo-moments.js), [momo-moments.css](../momo-moments.css) | Small performances and discoveries. |
 | [momo-adventures.js](../momo-adventures.js), [momo-world.css](../momo-world.css) | Name/greetings/dialogue, chase/sprint/umbrella/mischief and soccer tricks/surprises. |
 | [momo-world-art.js](../momo-world-art.js) | Vector visitors and illustrated window scenes. |
+| [tests/momo-behaviour.test.mjs](../tests/momo-behaviour.test.mjs) | Soccer contact/count invariants, staged chase/tug phases, bounded paths and phone-sized control avoidance. |
 | [atmosphere.js](../atmosphere.js), [atmosphere.css](../atmosphere.css) | Daylight, weather, scenery, visitor lifecycle and local atmosphere settings. |
 | [focus-panel.js](../focus-panel.js), [focus-panel.css](../focus-panel.css) | Draggable mini focus timer with Soundscape controls. |
 | [soundscape.js](../soundscape.js), [soundscape.css](../soundscape.css) | Ambient mixer, presets and floating audio controls. |
@@ -105,7 +107,7 @@ CSS (`.css`) controls appearance; HTML supplies the initial page structure.
 | `tests/*-preview.html` | Manual feature preview pages for Momo, Batch A, Validation Studio and wishlist tools. These are development previews, not extra live application pages. |
 | [README.md](../README.md) | Setup, deployment, cloud saving and feature usage. |
 | [BATCH-A.md](../BATCH-A.md), [WISHLIST.md](../WISHLIST.md), [VALIDATION-STUDIO.md](../VALIDATION-STUDIO.md) | Implemented feature instructions. |
-| [BATCH-B.md](../BATCH-B.md), [docs/TNG-AND-LAB.md](TNG-AND-LAB.md) | Deferred Momo behaviour batch; TNG review/export and saved Lab playback instructions. |
+| [BATCH-B.md](../BATCH-B.md), [BATCH-C.md](../BATCH-C.md), [docs/TNG-AND-LAB.md](TNG-AND-LAB.md) | Implemented Momo behaviour guide, pending ticket discovery/screenshot privacy ideas, TNG review/export and saved Lab playback instructions. |
 | [docs/EDITING-GUIDE.md](EDITING-GUIDE.md) | Beginner editing steps, examples and explanation of the application flow. |
 | [docs/SOURCE-CLEANUP.md](SOURCE-CLEANUP.md) | What this cleanup changed and why some compatibility code remains. |
 | [package.json](../package.json), [package-lock.json](../package-lock.json) | Developer commands and pinned tool/library versions. Not needed to run the published site. |

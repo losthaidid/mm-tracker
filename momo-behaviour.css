@@ -1,0 +1,388 @@
+/* Batch B: state-specific movement and temporary props. Keep the source artwork intact.
+   The controllers own timing; these styles never change work panels or their controls. */
+.momo-behaviour-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 12px;
+  margin: 18px 0;
+}
+.momo-behaviour-choices fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 15px;
+  border: 1px solid var(--hub-border);
+  border-radius: 16px;
+  background: var(--hub-surface-soft);
+}
+.momo-behaviour-choices legend {
+  padding: 0 6px;
+  font-size: 0.8rem;
+  color: var(--hub-text);
+  font-weight: 700;
+}
+.momo-behaviour-choices .check-label {
+  align-items: flex-start;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  margin: 12px 0;
+}
+.momo-behaviour-choices input {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+#hubPet .momo-face,
+#hubPet .momo-arm-left,
+#hubPet .momo-arm-right {
+  transition: transform 220ms ease;
+}
+#hubPet .pet-body {
+  transform-origin: 50% 80%;
+  transition: scale 140ms ease;
+}
+#hubPet[data-travel-phase='turn'] .momo-face {
+  transform: rotate(-5deg);
+}
+#hubPet[data-travel-phase='settle'] .momo-foot-left,
+#hubPet[data-travel-phase='settle'] .momo-foot-right {
+  animation-duration: 1.2s;
+}
+#hubPet[data-travel-phase='turn'] .momo-foot-left,
+#hubPet[data-travel-phase='turn'] .momo-foot-right {
+  animation-play-state: paused;
+}
+/* Mirroring the canopy around the same centre as the illustrated body keeps its grip attached. */
+#hubPet[data-umbrella='true'][data-facing='left'] #hubMomoUmbrella {
+  left: -6%;
+  scale: -1 1;
+}
+#hubPet[data-pose='umbrella-rest'] .pet-body,
+#hubPet[data-pose='umbrella-rest'] .momo-foot-left,
+#hubPet[data-pose='umbrella-rest'] .momo-foot-right {
+  animation: none;
+  transform: none;
+}
+#hubPet[data-pose='umbrella-rest'] .momo-arm-right {
+  animation: none;
+  transform: rotate(125deg);
+}
+#hubPet[data-pose='umbrella-rest'] .momo-arm-left {
+  animation: none;
+  transform: rotate(-5deg);
+}
+#hubPet[data-adventure='sprint'][data-scene-phase='slow'] .pet-body,
+#hubPet[data-adventure='chase'][data-scene-phase='slow'] .pet-body {
+  animation-duration: 0.48s;
+}
+#hubPet[data-adventure='chase'][data-scene-phase='notice'] .momo-face {
+  transform: rotate(-13deg) translateX(-3px);
+}
+#hubPet[data-adventure='chase'][data-scene-phase='recover'] .pet-body {
+  animation: momo-catch-breath 1s ease-in-out 2;
+}
+#hubPet[data-adventure='chase'][data-scene-phase='recover'] .momo-arm-left {
+  transform: rotate(-25deg);
+}
+#hubPet[data-adventure='chase'][data-scene-phase='recover'] .momo-arm-right {
+  transform: rotate(25deg);
+}
+#hubPet[data-adventure='pull'][data-scene-phase='check'] .momo-face {
+  animation: momo-check-for-witnesses 900ms ease both;
+}
+body .momo-elastic-card[data-tug-phase] {
+  animation: none;
+  transition: opacity 200ms ease;
+}
+#hubPet[data-adventure='pull'][data-scene-phase='reach'] .momo-arm-right {
+  transform: rotate(92deg);
+}
+#hubPet[data-adventure='pull'][data-scene-phase='release'] .momo-arm-right {
+  transform: rotate(25deg);
+}
+#hubPet[data-adventure='window'][data-scene-phase='settle'] .pet-body {
+  animation: momo-window-settle 800ms ease both;
+}
+#hubPet[data-adventure='window'][data-scene-phase='wipe'] .momo-arm-right {
+  animation: momo-window-wipe 1.3s ease-in-out 3;
+}
+#momoWindowFog {
+  position: fixed;
+  z-index: 83;
+  pointer-events: none;
+}
+#momoWindowFog svg {
+  width: 100%;
+  height: 100%;
+}
+.momo-clear-patch {
+  transform-origin: 150px 68px;
+  animation: momo-glass-clears 3.8s ease both;
+}
+#hubPet[data-adventure='juggle'] .pet-body {
+  animation: none;
+  transform: translateY(var(--momo-juggle-bob, 0px));
+  transition: transform 90ms linear;
+}
+#hubPet[data-adventure='juggle'] .momo-foot-left,
+#hubPet[data-adventure='juggle'] .momo-foot-right {
+  animation: none;
+  transform: none;
+  transition: transform 60ms linear;
+}
+#hubPet[data-adventure='juggle'][data-juggle-side='left'] .momo-foot-left,
+#hubPet[data-adventure='juggle'][data-juggle-side='right'] .momo-foot-right {
+  transform: translateY(calc(-1 * var(--momo-kick-lift, 0px))) rotate(-18deg);
+}
+#hubPet[data-adventure='juggle'][data-kick-phase='flight'] .momo-foot-left,
+#hubPet[data-adventure='juggle'][data-kick-phase='flight'] .momo-foot-right {
+  transform: none;
+}
+#hubPet[data-adventure='juggle'][data-scene-phase='awkward'] .momo-face {
+  transform: rotate(9deg) translateX(3px);
+}
+#momoSoccerShadow {
+  position: absolute;
+  left: calc(50% - 13px);
+  bottom: 42px;
+  width: 26px;
+  height: 6px;
+  border-radius: 50%;
+  background: #355d6945;
+  pointer-events: none;
+}
+#hubPet[data-yielding='true'],
+#hubPet[data-yielding='true'] > button {
+  pointer-events: none !important;
+}
+#hubPet[data-yielding='true'] #hubPetBubble {
+  display: none;
+}
+#hubPet[data-pose='click-lean'] .pet-body {
+  animation: momo-click-lean 1.35s ease both;
+}
+#hubPet[data-pose='click-brace'] .pet-body {
+  animation: momo-click-brace 1.35s ease both;
+}
+#hubPet[data-pose='click-brace'] .momo-arm-left {
+  transform: rotate(-42deg);
+}
+#hubPet[data-pose='click-brace'] .momo-arm-right {
+  transform: rotate(42deg);
+}
+#momoWeatherEffects {
+  position: fixed;
+  inset: 0;
+  z-index: 82;
+  pointer-events: none;
+  overflow: hidden;
+}
+.momo-wet-footprint {
+  position: absolute;
+  width: 9px;
+  height: 15px;
+  border: 1px solid #77adb63b;
+  background: #a7d3d35c;
+  border-radius: 55% 55% 40% 40%;
+  animation: momo-footprint-dries 6.5s ease both;
+}
+.momo-wet-footprint::after {
+  content: '';
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  top: -5px;
+  left: 1px;
+  border-radius: 50%;
+  background: #9ac8cd66;
+}
+.momo-weather-leaf {
+  position: absolute;
+  top: 10%;
+  left: -24px;
+  width: 20px;
+  height: 20px;
+  z-index: 2;
+  pointer-events: none;
+  animation: momo-leaf-visits-theatre 9s calc(var(--leaf-index) * 800ms) ease-in-out both;
+}
+.momo-weather-leaf svg {
+  width: 100%;
+  height: 100%;
+}
+#momoFriendProp,
+#momoFriendSeat {
+  position: fixed;
+  z-index: 85;
+  pointer-events: none;
+  width: 30px;
+}
+#momoFriendProp svg,
+#momoFriendSeat svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+#momoFriendProp[data-phase='exchange'] {
+  animation: momo-present-glow 1.2s ease-in-out 2;
+}
+.hub-visitor[data-relationship='seat'][data-play-phase='exchange'] .visitor-art {
+  animation: momo-seat-wiggle 1s ease-in-out 2;
+}
+.hub-visitor.is-chasing .visitor-art svg {
+  scale: var(--visitor-look, 1) 1;
+  transition: scale 160ms ease;
+}
+.hub-visitor[data-relationship='gift'][data-play-phase='exchange'] .visitor-art {
+  animation: momo-friend-bow 1.3s ease 2;
+}
+.hub-visitor[data-relationship='rival'][data-play-phase='notice']::after {
+  content: '✦';
+  position: absolute;
+  right: -2px;
+  top: -10px;
+  color: #bd8aa4;
+}
+#hubPet[data-adventure='friend'][data-scene-phase='exchange'] .momo-arm-right {
+  transform: rotate(-55deg);
+}
+#hubPet[data-adventure='friend'][data-friend-role='seat'][data-scene-phase='react'] .momo-face {
+  transform: translateX(5px) rotate(12deg);
+}
+@keyframes momo-catch-breath {
+  50% {
+    transform: translateY(3px) scale(1.02, 0.98);
+  }
+}
+@keyframes momo-check-for-witnesses {
+  30% {
+    transform: rotate(-10deg) translateX(-4px);
+  }
+  70% {
+    transform: rotate(9deg) translateX(4px);
+  }
+}
+@keyframes momo-window-settle {
+  45% {
+    transform: translateY(3px) rotate(-3deg);
+  }
+}
+@keyframes momo-window-wipe {
+  0%,
+  100% {
+    transform: rotate(70deg);
+  }
+  50% {
+    transform: rotate(115deg) translateX(-4px);
+  }
+}
+@keyframes momo-glass-clears {
+  from {
+    transform: scale(0.01);
+  }
+  to {
+    transform: scale(1.4);
+  }
+}
+@keyframes momo-click-lean {
+  25%,
+  55% {
+    transform: translateX(var(--momo-reaction-x, 5px)) rotate(-5deg);
+  }
+}
+@keyframes momo-click-brace {
+  25% {
+    transform: translateY(4px) scale(1.04, 0.93);
+  }
+  50% {
+    transform: translateY(-3px) rotate(5deg);
+  }
+  75% {
+    transform: rotate(-2deg);
+  }
+}
+@keyframes momo-footprint-dries {
+  0%,
+  30% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 0;
+    scale: 0.75;
+  }
+}
+@keyframes momo-leaf-visits-theatre {
+  0% {
+    opacity: 0;
+    translate: 0 0;
+    rotate: -25deg;
+  }
+  15% {
+    opacity: 1;
+  }
+  50% {
+    translate: 180px 60px;
+    rotate: 80deg;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    translate: 440px 150px;
+    rotate: 170deg;
+  }
+}
+@keyframes momo-present-glow {
+  50% {
+    filter: drop-shadow(0 0 7px #e1c785);
+  }
+}
+@keyframes momo-seat-wiggle {
+  30% {
+    transform: rotate(-7deg) translateY(2px);
+  }
+  70% {
+    transform: rotate(7deg);
+  }
+}
+@keyframes momo-friend-bow {
+  50% {
+    transform: rotate(13deg) translateY(4px);
+  }
+}
+/* These props never remain over private work, a presentation or a disabled animation setting. */
+body:is(.hub-private, .hub-present, .hub-focus, .hub-motion-paused)
+  :is(#momoFriendProp, #momoFriendSeat, #momoWeatherEffects, #momoWindowFog, .momo-weather-leaf),
+body[data-motion='off']
+  :is(#momoFriendProp, #momoFriendSeat, #momoWeatherEffects, #momoWindowFog, .momo-weather-leaf) {
+  display: none !important;
+}
+body[data-motion='off']
+  #hubPet
+  :is(.pet-body, .momo-face, .momo-arm-left, .momo-arm-right, .momo-foot-left, .momo-foot-right) {
+  animation: none !important;
+  transition: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  #momoFriendProp,
+  #momoFriendSeat,
+  #momoWeatherEffects,
+  #momoWindowFog,
+  .momo-weather-leaf {
+    display: none !important;
+  }
+  #hubPet
+    :is(.pet-body, .momo-face, .momo-arm-left, .momo-arm-right, .momo-foot-left, .momo-foot-right) {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+@media print {
+  #momoFriendProp,
+  #momoFriendSeat,
+  #momoWeatherEffects,
+  #momoWindowFog,
+  .momo-weather-leaf {
+    display: none !important;
+  }
+}
