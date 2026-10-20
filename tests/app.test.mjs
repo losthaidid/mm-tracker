@@ -1954,7 +1954,7 @@ test('rehearsal UI: scenario changes, rewind, failure routes and off-route inspe
  const {api,document,window}=await app(t);api.hub.setTool('simulator');api.showTab('studio');const r=api.hub.rehearsal;
  const select=document.getElementById('rehearsalScenario');select.value='partial';select.dispatchEvent(new window.Event('change',{bubbles:true}));assert.equal(r.plan().values['Received quantity'],60);assert.ok(r.plan().entries.some(e=>e.id==='followup'));
  document.querySelector('[data-rehearsal="inspect"][data-id="rework"]').click();await settle();assert.match(document.getElementById('rehearsalInspector').textContent,/Revise rejected order/);
- document.querySelector('[data-rehearsal="failure"][data-id="rework"]').click();await settle();assert.ok(r.plan().entries.length>0);
+ document.querySelector('[data-rehearsal="failure"][data-id="rework"]').click();await settle();assert.ok(r.plan().entries.length>0);assert.match(document.getElementById('toast').textContent,/outside the current route/);
  document.querySelector('[data-rehearsal="back"]').click();await settle();assert.equal(r.snapshot().paused,true);
 });
 

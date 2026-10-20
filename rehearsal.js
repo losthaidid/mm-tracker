@@ -208,7 +208,7 @@
       if(action==='remove-image'){$('rehearsalStepForm').elements.namedItem('image').value='';$('rehearsalImagePreview').innerHTML='';return;}
       if(action==='cancel-edit'){editing=false;paused=true;$('rehearsalInspector').innerHTML=detailHTML(p.steps.find(s=>s.id===selected));return;}
       if(action==='inspect'){if(Date.now()<suppressClick)return;inspect(id);return;}
-      if(action==='success'||action==='failure'){overrides[id]=action;const at=index;rebuild();index=Math.min(at,route.entries.length-1);paused=false;paintKey='';paint();return;}
+      if(action==='success'||action==='failure'){if(!route.entries.some(entry=>entry.id===id)){a.tell('This step is outside the current route. Choose a scenario that reaches it.');return;}overrides[id]=action;const at=index;rebuild();index=Math.min(at,route.entries.length-1);paused=false;paintKey='';paint();return;}
       if(action==='journal'){selected='';index=Math.max(0,Math.min(route.entries.length-1,Number(el.dataset.index)));elapsed=0;paused=true;editing=false;paintKey='';paint();return;}
       if(action==='play'){if(editing){a.tell('Save or cancel the step editor first.');return;}paused=!paused;selected='';paintKey='';paint();return;}
       if(action==='restart'){selected='';overrides={};rebuild();paused=false;editing=false;paint();return;}
