@@ -205,7 +205,7 @@ Choose **Settings → Your soundscape** to mix synthesized rain, café murmur, f
 
 Tap Momo for **Tiny theatre**, **Desk discoveries** or **Little moment settings**. Settings also contains **Momo’s little moments**, with switches for each automatic behaviour and a choice of three performances to try immediately.
 
-- **Tiny theatre:** a paperclip knight, a plant interview and a lunchbox mystery, each with original SVG props and a short three-part performance. Occasional automatic shows wait until you are not editing, focusing, presenting or playing with Momo. Quiet time pauses automatic shows. Reduced motion offers a still performance when requested.
+- **Tiny theatre:** a paperclip knight, a plant interview and a lunchbox mystery, each with original SVG props and a short three-part performance. The stage expands to 420 × 336 pixels, with larger props and captions, and fits within the visible screen on phones. Occasional automatic shows wait until you are not editing, focusing, presenting or playing with Momo. Quiet time pauses automatic shows. Reduced motion offers a still performance when requested.
 - **Desk discoveries:** Momo occasionally leaves a little envelope linking a task or ticket to its related Knowledge note, matching a lab case's T-code/message ID to your notes, or pointing out a blocked task. Suggestions explain the record link and open the actual source. Snoozed work is excluded. With no matching records, Momo does not invent a discovery or change any records.
 - **Visitor meetings:** a butterfly can tickle Momo’s nose, a bird can become a very chirpy hat, and a firefly can meet a tiny lantern. These replace normal wandering briefly and keep clear of visible controls. Visitors can also continue to land elsewhere in the workspace.
 
