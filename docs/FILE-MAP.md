@@ -4,6 +4,8 @@ This is the source map for **SAP MM WorkHub** in `losthaidid/mm-tracker`.
 The website is published by GitHub Pages. Supabase stores private account records and handles login.
 There is no build step for ordinary website changes.
 
+Project reporting: [project-standup-engine.js](../project-standup-engine.js) handles progress totals, recorded update times and Action/task links; [project-standup.js](../project-standup.js) supplies the Overview card, expanded report and Actions forms; [project-standup.css](../project-standup.css) controls its responsive layout. See [PROJECT-STANDUP.md](PROJECT-STANDUP.md) for usage and storage notes.
+
 **Start with [Editing guide](EDITING-GUIDE.md).** For appearance changes, use [custom.css](../custom.css).
 For feature-specific changes, find the matching file below. JavaScript (`.js`) controls behaviour;
 CSS (`.css`) controls appearance; HTML supplies the initial page structure.

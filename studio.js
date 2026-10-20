@@ -77,6 +77,7 @@
     root.WorkHubValidatorEngine?.upgrade(d);
     root.WorkHubBatchEngine?.upgrade(d);
     root.WorkHubWorkLibraryEngine?.upgrade(d);
+    root.WorkHubProjectStandupEngine?.upgrade(d);
     if (h.simulator === undefined)
       h.simulator = {
         quantity: 100,
@@ -94,6 +95,7 @@
     root.WorkHubValidatorEngine?.validateState(d);
     root.WorkHubBatchEngine?.validate(d);
     root.WorkHubWorkLibraryEngine?.validate(d);
+    root.WorkHubProjectStandupEngine?.validate(d);
     root.WorkHubReminders?.validate(d);
     root.WorkHubProjectDates.validate(d);
     root.WorkHubLeave.validate(d);
@@ -251,6 +253,7 @@
     let batchA = null,
       validator = null,
       library = null,
+      standup = null,
       focusPanel = null,
       life = null,
       atmosphere = null,
@@ -1199,7 +1202,7 @@
       if (!t) throw Error('Task no longer exists.');
       a.openModal(
         t.task,
-        `<div class="hub-detail"><span class="hub-kicker">MAIN TASK · ${esc(a.taskLabel(t))}</span><p>${esc(t.priority)} · ${BOARD[taskStatus(t)]}</p><h3>Remarks</h3><p class="prewrap hub-sensitive">${esc(t.remarks) || 'No remarks yet.'}</p><h3>Feedback</h3><p class="prewrap hub-sensitive">${esc(t.feedback) || 'No feedback yet.'}</p><h3>Subtasks</h3>${t.subTasks.map(s => `<div class="hub-card"><strong>${esc(s.title)}</strong><span class="hub-badge">${esc(s.status)}</span><p class="prewrap">${esc(s.remarks)}</p><p class="prewrap">${esc(s.feedback)}</p><div class="actions">${subtaskCompletionButton(t, s, true)}${btn('subtask-edit', 'Edit', 'data-parent="' + esc(id) + '" data-id="' + esc(s.id) + '"', 'small')}${btn('timer-new', '▶ Track time', 'data-kind="task" data-id="' + esc(id) + '" data-sub="' + esc(s.id) + '"', 'small')}</div></div>`).join('') || '<p>No subtasks yet.</p>'}<div class="modal-actions">${btn('task-edit', 'Edit main task', 'data-id="' + esc(id) + '"')}${btn('subtask-edit', '＋ Add subtask', 'data-parent="' + esc(id) + '"')}</div></div>`
+        `<div class="hub-detail"><span class="hub-kicker">MAIN TASK · ${esc(a.taskLabel(t))}</span><p>${esc(t.priority)} · ${BOARD[taskStatus(t)]}</p>${standup?.taskContext(t.id) || ''}<h3>Remarks</h3><p class="prewrap hub-sensitive">${esc(t.remarks) || 'No remarks yet.'}</p><h3>Feedback</h3><p class="prewrap hub-sensitive">${esc(t.feedback) || 'No feedback yet.'}</p><h3>Subtasks</h3>${t.subTasks.map(s => `<div class="hub-card"><strong>${esc(s.title)}</strong><span class="hub-badge">${esc(s.status)}</span><p class="prewrap">${esc(s.remarks)}</p><p class="prewrap">${esc(s.feedback)}</p><div class="actions">${subtaskCompletionButton(t, s, true)}${btn('subtask-edit', 'Edit', 'data-parent="' + esc(id) + '" data-id="' + esc(s.id) + '"', 'small')}${btn('timer-new', '▶ Track time', 'data-kind="task" data-id="' + esc(id) + '" data-sub="' + esc(s.id) + '"', 'small')}</div></div>`).join('') || '<p>No subtasks yet.</p>'}<div class="modal-actions">${btn('task-edit', 'Edit main task', 'data-id="' + esc(id) + '"')}${btn('subtask-edit', '＋ Add subtask', 'data-parent="' + esc(id) + '"')}</div></div>`
       );
     }
     function currentProcess() {
@@ -2288,6 +2291,7 @@
       root.WorkHubClaimsEngine.prepare(next, previous, restoring);
       root.WorkHubValidatorEngine?.prepare(next, previous, restoring);
       root.WorkHubProjectDates.prepare(next, previous, today(), restoring);
+      root.WorkHubProjectStandupEngine?.prepare(next, previous, restoring);
       const h = next.workhub;
       for (const t of next.tickets) {
         const old = previous?.tickets.find(x => x.id === t.id),
@@ -2400,6 +2404,7 @@
       batchA?.sync();
       validator?.sync();
       library?.sync();
+      standup?.sync();
       if (tab !== 'studio' || currentTool !== 'theme') themePreview = null;
       if (sorting && !sorting.source.isConnected) clearSort();
       if (tab !== 'processhub') clearTimeout(walkTimer);
@@ -3582,6 +3587,12 @@
       openModal: a.openModal,
     });
     projectDates = root.WorkHubProjectDates.install(a);
+    standup = root.WorkHubProjectStandup?.install({
+      ...a,
+      ready: () => a.cloud().ready,
+      owner: () => a.cloud().user?.id || '',
+      hubAction: handle,
+    });
     processDeck = root.WorkHubProcessDeck.install({
       ...a,
       ready: () => a.cloud().ready,
@@ -3658,6 +3669,7 @@
       batchA,
       validator,
       library,
+      standup,
       focusPanel,
       focusSnapshot,
       reminders,
