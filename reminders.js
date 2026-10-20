@@ -626,7 +626,8 @@
         signature = signatureOf(all);
       if (
         (lastDay !== a.today() || signature !== lastSignature) &&
-        !document.querySelector('dialog[open] form')
+        !document.querySelector('dialog[open] form') &&
+        !document.activeElement?.matches('input,textarea,select,[contenteditable="true"]')
       ) {
         lastDay = a.today();
         lastSignature = signature;

@@ -1707,7 +1707,10 @@ test('timed reminders: due alerts wait for editing and respect hidden pages and 
  const writes=db.calls.length;reminderClock(window,'2026-10-20T12:15:00');ui.tick();
  assert.equal(document.getElementById('editForm'),f);assert.equal(f.elements.namedItem('task').value,'Unsaved draft remains');
  assert.equal(document.getElementById('reminderAlert'),null);
- api.closeModal();ui.tick();assert.ok(document.getElementById('reminderAlert'));
+ api.closeModal();
+ const inline=document.createElement('input');document.getElementById('view').append(inline);inline.value='Unsaved inline text';inline.focus();
+ ui.tick();assert.equal(inline.isConnected,true);assert.equal(document.activeElement,inline);assert.equal(inline.value,'Unsaved inline text');assert.equal(document.getElementById('reminderAlert'),null);
+ inline.blur();inline.remove();ui.tick();assert.ok(document.getElementById('reminderAlert'));
  document.body.classList.add('hub-private');ui.tick();assert.equal(document.getElementById('reminderAlert'),null);
  document.body.classList.remove('hub-private');ui.tick();assert.ok(document.getElementById('reminderAlert'));
  Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});ui.tick();assert.equal(document.getElementById('reminderAlert'),null);
