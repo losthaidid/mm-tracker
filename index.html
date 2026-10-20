@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-workhub-startup="loading">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -17,6 +17,82 @@
       type="image/svg+xml"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231b3353'/%3E%3Cpath d='M8 8h16v4H8zm0 6h16v4H8zm0 6h10v4H8z' fill='white'/%3E%3C/svg%3E"
     />
+    <!-- Critical startup styles prevent the original markup flashing before assets load. -->
+    <style>
+      html[data-workhub-startup] { background: #f8f7f2; }
+      html[data-workhub-startup] body { overflow: hidden; }
+      html[data-workhub-startup] body > :not(#workhubStartup):not(script):not(style) {
+        visibility: hidden;
+        pointer-events: none;
+      }
+      #workhubStartup {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483647;
+        display: grid;
+        place-items: center;
+        overflow: auto;
+        padding: 28px 18px;
+        color: #304a45;
+        background: radial-gradient(ellipse at 18% 22%, #e5f0e5 0, transparent 55%), radial-gradient(ellipse at 88% 82%, #eee8f5 0, transparent 50%), #f8f7f2;
+        font: 15px/1.6 system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        opacity: 1;
+        transition: opacity 180ms ease;
+      }
+      #workhubStartup.is-leaving { opacity: 0; pointer-events: none; }
+      #workhubStartup .startup-card {
+        box-sizing: border-box;
+        width: min(100%, 430px);
+        padding: 40px 30px 28px;
+        border: 1px solid #d8e2d6;
+        border-radius: 28px;
+        background: #fffefa;
+        box-shadow: 0 14px 60px #38564a0d;
+        text-align: center;
+      }
+      #workhubStartup .startup-brand {
+        margin: 0 0 28px;
+        color: #63756b;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+      #workhubStartup .startup-art { display: block; width: 118px; height: 88px; margin: 0 auto 22px; }
+      #workhubStartup h1 {
+        margin: 0 0 12px;
+        color: #304a45;
+        font-size: clamp(23px, 6vw, 29px);
+        font-weight: 650;
+        letter-spacing: -0.035em;
+        line-height: 1.25;
+      }
+      #workhubStartupStatus { min-height: 48px; margin: 0; color: #62736a; }
+      #workhubStartup .startup-dots { display: flex; justify-content: center; gap: 7px; margin: 18px 0 26px; }
+      #workhubStartup .startup-dots span {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #79a18b;
+        animation: startup-breathe 1.4s ease-in-out infinite;
+      }
+      #workhubStartup .startup-dots span:nth-child(2) { animation-delay: 150ms; background: #b3a1c9; }
+      #workhubStartup .startup-dots span:nth-child(3) { animation-delay: 300ms; background: #d4b77d; }
+      #workhubStartup .startup-recovery { margin: 0; color: #737d73; font-size: 12px; }
+      #workhubStartup a { display: inline-block; padding: 8px 4px; color: #366b57; text-decoration: underline; text-underline-offset: 3px; }
+      #workhubStartup a:focus-visible { outline: 2px solid #366b57; outline-offset: 3px; border-radius: 4px; }
+      html[data-workhub-startup-state] #workhubStartup .startup-dots span { animation: none; }
+      #workhubStartup noscript p { color: #7b4f40; }
+      @keyframes startup-breathe {
+        0%, 100% { opacity: 0.45; transform: translateY(0); }
+        50% { opacity: 1; transform: translateY(-4px); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #workhubStartup { transition: none; }
+        #workhubStartup .startup-dots span { animation: none; }
+      }
+    </style>
+    <script src="./startup.js?v=20261020-startup-1"></script>
     <!-- Shared foundation first; feature styles follow; custom.css is your editing space. -->
     <link rel="stylesheet" href="./base.css?v=20261020-schedule-companies-1" />
     <link rel="stylesheet" href="./studio.css?v=20261019-source-1" />
@@ -44,6 +120,50 @@
     <link rel="stylesheet" href="./custom.css?v=20261019-source-1" />
   </head>
   <body>
+    <div id="workhubStartup">
+      <section class="startup-card" aria-labelledby="workhubStartupTitle">
+        <p class="startup-brand">SAP MM WorkHub</p>
+        <svg class="startup-art" viewBox="0 0 118 88" fill="none" aria-hidden="true">
+          <circle cx="91" cy="22" r="18" fill="#F7E9C8" />
+          <rect x="10" y="25" width="68" height="53" rx="9" fill="#DFECE1" />
+          <rect
+            x="31"
+            y="9"
+            width="58"
+            height="66"
+            rx="9"
+            fill="#FFFEFA"
+            stroke="#6E8D7A"
+            stroke-width="2"
+          />
+          <path
+            d="m43 28 4 4 7-9m-11 24 4 4 7-9m9-15h15M63 47h15M43 62h29"
+            stroke="#8BA38D"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <path
+            d="M95 74V53m0 7c-13 0-18-11-12-14 7-3 13 7 12 14Zm0-8c0-13 12-19 16-12 4 7-7 12-16 12Z"
+            fill="#B5D3BA"
+            stroke="#6E8D7A"
+            stroke-width="1.5"
+          />
+          <path d="M86 70h19l-3 12H89l-3-12Z" fill="#E9C6B1" stroke="#AE8D78" stroke-width="1.5" />
+        </svg>
+        <h1 id="workhubStartupTitle">Make yourself at home.</h1>
+        <p id="workhubStartupStatus" role="status" aria-live="polite">
+          Getting your workspace ready…
+        </p>
+        <div class="startup-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+        <p class="startup-recovery">
+          Taking longer? <a id="workhubStartupReload" href="./">Reload WorkHub</a>
+        </p>
+        <noscript
+          ><p>Enable JavaScript in your browser, then reload to open your workspace.</p></noscript
+        >
+      </section>
+    </div>
     <header>
       <div>
         <h1>SAP MM WorkHub</h1>
@@ -80,7 +200,6 @@
         />
       </div>
     </header>
-    <noscript><p>Enable JavaScript in your browser to use this tracker.</p></noscript>
     <main class="page">
       <div class="notice" id="storageNotice" role="status" hidden></div>
       <div class="notice" id="browserMigrationNotice" hidden></div>
@@ -421,6 +540,6 @@
       }
     </script>
     <!-- Start the application after all feature modules and the empty seed defaults are ready. -->
-    <script src="./app.js?v=20261020-schedule-companies-1"></script>
+    <script src="./app.js?v=20261020-startup-1"></script>
   </body>
 </html>

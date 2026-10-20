@@ -15,7 +15,7 @@ async function atmosphereChoices(ctx,values={},meet=false){
  const submitter=form.querySelector('[value="'+(meet?'visit':'save')+'"]');form.dispatchEvent(new window.SubmitEvent('submit',{bubbles:true,cancelable:true,submitter}));await settle();
 }
 
-async function app(t,{storage={},rpcError=null,remote=null,login=true,styles=false,adventures=false}={}){
+async function app(t,{storage={},rpcError=null,remote=null,login=true,styles=false,adventures=false,sessionLookup=null,read=null,cloudClient=true}={}){
  const dom=new JSDOM(html,{url:'https://losthaidid.github.io/mm-tracker/',runScripts:'outside-only',pretendToBeVisual:true});
  const {window}=dom;
  t.after(()=>window.close());
@@ -30,9 +30,9 @@ async function app(t,{storage={},rpcError=null,remote=null,login=true,styles=fal
  window.confirm=()=>true;
  if(!adventures&&!storage['mm-tracker.momo-adventures.v1'])window.localStorage.setItem('mm-tracker.momo-adventures.v1',JSON.stringify({greetings:false,antics:false,reminders:false,chases:false}));
  for(const [key,value]of Object.entries(storage))window.localStorage.setItem(key,value);
- const db={row:remote,calls:[],error:rpcError,read:null,selects:[]};
+ const db={row:remote,calls:[],error:rpcError,read,selects:[]};
  const client={
-  auth:{getSession:async()=>({data:{session:null},error:null}),onAuthStateChange:()=>({data:{subscription:{unsubscribe(){}}}})},
+  auth:{getSession:sessionLookup||(async()=>({data:{session:null},error:null})),onAuthStateChange:()=>({data:{subscription:{unsubscribe(){}}}})},
   from:()=>({select:columns=>{db.selects.push(columns);return{eq:()=>({maybeSingle:async()=>db.read?db.read():({data:copy(db.row),error:null})})};}}),
   rpc:async(name,args)=>{
    db.calls.push({name,args:copy(args)});
@@ -43,7 +43,7 @@ async function app(t,{storage={},rpcError=null,remote=null,login=true,styles=fal
    return{data:[{revision:db.row.revision,mutation_id:db.row.mutation_id,updated_at:db.row.updated_at}],error:null};
   }
  };
- window.MMTrackerSupabase={createClient:()=>client};
+ if(cloudClient)window.MMTrackerSupabase={createClient:()=>client};
  // Use production's script order, replacing only the network client with the stub above.
  for(const script of window.document.querySelectorAll('script[src]')){const file=new URL(script.src).pathname.split('/mm-tracker/')[1];if(!['supabase-client.js','app.js'].includes(file))window.eval(readFileSync(new URL('../'+file,import.meta.url),'utf8'));}
  window.eval(readFileSync(new URL('../app.js',import.meta.url),'utf8')+`\nwindow.api={
@@ -59,6 +59,51 @@ async function app(t,{storage={},rpcError=null,remote=null,login=true,styles=fal
  if(login)window.api.login();
  return{window,document:window.document,api:window.api,db,intervals,frames};
 }
+
+test('startup: signed-out visitors see the modern sign-in screen after layout preparation',async t=>{
+ const {document,window,db}=await app(t,{login:false,styles:true});
+ assert.equal(document.documentElement.hasAttribute('data-workhub-startup'),false);
+ assert.ok(document.getElementById('hubHeader'));assert.ok(document.getElementById('hubShell'));
+ assert.equal(document.getElementById('cloudGate').hidden,false);assert.equal(document.getElementById('tabs').hidden,true);
+ assert.notEqual(window.getComputedStyle(document.querySelector('body > header')).visibility,'hidden');
+ assert.equal(document.getElementById('workhubStartup').getAttribute('aria-hidden'),'true');assert.equal(db.calls.length,0);
+});
+
+test('startup: returning visitors stay covered through session lookup and slow record loading',async t=>{
+ let resolveSession,resolveRow;const session=new Promise(resolve=>resolveSession=resolve),row=new Promise(resolve=>resolveRow=resolve);
+ const {document,window,api,db}=await app(t,{login:false,sessionLookup:()=>session,read:()=>row});
+ assert.equal(document.documentElement.dataset.workhubStartup,'loading');assert.equal(window.getComputedStyle(document.querySelector('body > header')).visibility,'hidden');
+ resolveSession({data:{session:{user:{id:'11111111-1111-4111-8111-111111111111',email:'owner@example.com'}}},error:null});await settle();
+ assert.equal(document.documentElement.dataset.workhubStartup,'loading');assert.match(document.getElementById('workhubStartupStatus').textContent,/Opening your records/);
+ const data=api.emptyState();data.workhub.preferences.workspace='A calm desk';data.workhub.preferences.theme='forest';
+ resolveRow({data:{document:JSON.parse(api.payload(data)),revision:1,mutation_id:'initial'},error:null});await settle();
+ assert.equal(api.cloud.ready,true);assert.equal(document.documentElement.hasAttribute('data-workhub-startup'),false);
+ assert.equal(document.getElementById('hubSiteTitle').textContent,'A calm desk');assert.equal(document.body.dataset.hubTheme,'forest');assert.equal(document.getElementById('cloudGate').hidden,true);assert.equal(db.calls.length,0);
+});
+
+test('startup: failed session lookup exposes styled recovery for returned and rejected errors',async t=>{
+ for(const sessionLookup of [async()=>({data:{session:null},error:{message:'Session unavailable'}}),async()=>{throw Error('Network unavailable');}]){
+  const {document,api,db}=await app(t,{login:false,sessionLookup});
+  assert.equal(document.documentElement.hasAttribute('data-workhub-startup'),false);assert.ok(document.getElementById('hubHeader'));assert.equal(api.cloud.error,true);
+  assert.equal(document.getElementById('storageNotice').hidden,false);assert.equal(document.getElementById('cloudGate').hidden,false);assert.equal(db.calls.length,0);
+ }
+});
+
+test('startup: offline record loading opens an existing recovery copy or the styled retry notice',async t=>{
+ const seed=await app(t,{login:false}),data=seed.api.emptyState();data.workhub.preferences.workspace='My cached workspace';
+ const key='mm-tracker.cloud.v1:aaotojqkiewbhtnrlcur:11111111-1111-4111-8111-111111111111',cache=JSON.stringify({document:JSON.parse(seed.api.payload(data)),revision:1,pending:null,inFlight:null,baseDocument:null});
+ for(const storage of [{[key]:cache},{}]){
+  const {document,api,db}=await app(t,{login:false,storage,sessionLookup:async()=>({data:{session:{user:{id:'11111111-1111-4111-8111-111111111111',email:'owner@example.com'}}},error:null}),read:async()=>({data:null,error:{message:'Failed to fetch'}})});
+  assert.equal(document.documentElement.hasAttribute('data-workhub-startup'),false);assert.equal(document.getElementById('storageNotice').hidden,false);assert.equal(db.calls.length,0);
+  assert.equal(api.cloud.ready,!!storage[key]);assert.equal(document.getElementById('cloudGate').hidden,!!storage[key]);
+  if(storage[key])assert.equal(document.getElementById('hubSiteTitle').textContent,'My cached workspace');
+ }
+});
+
+test('startup: an unavailable sign-in client leaves a usable modern recovery screen',async t=>{
+ const {document,api,db}=await app(t,{login:false,cloudClient:false});
+ assert.equal(document.documentElement.hasAttribute('data-workhub-startup'),false);assert.equal(api.cloud.error,true);assert.match(document.getElementById('storageNotice').textContent,/Cloud sign-in could not load/);assert.ok(document.getElementById('hubShell'));assert.equal(db.calls.length,0);
+});
 
 function addCompany(api,document,name='Farms'){
  api.editCompany();const form=document.getElementById('companyForm');

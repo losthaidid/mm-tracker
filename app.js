@@ -8780,6 +8780,7 @@ async function loadCloud(session) {
     closeModal();
     notice();
     render();
+    window.WorkHubStartup?.finish();
     return;
   }
   if (cloud.user?.id === session.user.id && (cloud.ready || cloud.loading)) {
@@ -8795,6 +8796,7 @@ async function loadCloud(session) {
   cloud.conflict = false;
   cloud.key = 'mm-tracker.cloud.v1:' + cloudConfig.project + ':' + cloud.user.id;
   cloud.status = 'Opening cloud records…';
+  window.WorkHubStartup?.message('Opening your records…');
   notice();
   render();
   let cache = null;
@@ -8835,6 +8837,7 @@ async function loadCloud(session) {
     persistCloudCache();
     notice();
     render();
+    window.WorkHubStartup?.finish();
     if (!cloud.conflict) void flushCloud();
   } catch (err) {
     if (generation !== cloud.generation) return;
@@ -8855,6 +8858,7 @@ async function loadCloud(session) {
       cloud.status = 'Could not open cloud records. ' + cloudErrorMessage(err);
       notice();
     }
+    window.WorkHubStartup?.finish();
     scheduleCloudRetry();
   }
 }
@@ -9330,6 +9334,7 @@ function startCloud() {
     cloud.error = true;
     cloud.status = 'Cloud sign-in could not load. Refresh this page.';
     notice();
+    window.WorkHubStartup?.finish();
     return;
   }
   cloud.client = window.MMTrackerSupabase.createClient(
@@ -9396,13 +9401,22 @@ function startCloud() {
   setInterval(() => {
     if (!document.hidden) void retryCloud();
   }, 20000);
-  cloud.client.auth.getSession().then(({ data, error }) => {
-    if (error) {
+  cloud.client.auth
+    .getSession()
+    .then(({ data, error }) => {
+      if (error) {
+        cloud.error = true;
+        cloud.status = error.message;
+        notice();
+        window.WorkHubStartup?.finish();
+      } else void loadCloud(data.session);
+    })
+    .catch(() => {
       cloud.error = true;
-      cloud.status = error.message;
+      cloud.status = 'Cloud sign-in could not open. Check your connection and refresh this page.';
       notice();
-    } else void loadCloud(data.session);
-  });
+      window.WorkHubStartup?.finish();
+    });
 }
 
 // =============================================================================
@@ -9514,6 +9528,7 @@ month = state.calendarMonth;
 notice();
 render();
 if (CLOUD_MODE) startCloud();
+else window.WorkHubStartup?.finish();
 if (document.modelContext?.registerTool) {
   try {
     Promise.resolve(

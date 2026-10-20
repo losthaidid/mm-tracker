@@ -25,6 +25,8 @@ The TNG statement extractor and automatically looping Troubleshooting Lab result
 
 No terminal or build tools are needed to use the tracker.
 
+Opening the website shows a small illustrated loading screen while the current layout and sign-in state prepare. Returning users stay on it until their cloud records (or an available offline copy) open. Signed-out users see the styled sign-in screen. Interrupted downloads show a reload option instead of uncovering the old HTML layout; reduced-motion preferences are respected. This screen creates no database records.
+
 ## Cloud login
 
 The website is configured for the Supabase project identified in `index.html`. Create a tracker login in the website and confirm your email, then sign in. The database must have the compatible private-record schema described below. Signing in to the Supabase dashboard does not create a tracker login.
@@ -277,7 +279,6 @@ Drag Momo’s house with a mouse or finger, or focus it and use arrow keys (Shif
 **Your soundscape → Lo-fi study → Play soundscape** blends original mellow keys, warm bass and soft drums with the ambient channels. **Paper lanterns** (72 BPM) and **Blue hour** (66 BPM) are synthesized as short stereo loops after Play, with a separate music volume slider. Track and mix choices stay on the device; reloading never starts playback automatically. A single audio buffer loops independently of animation timers and is released on Pause/sign-out. No YouTube integration, subscription, API key, media downloads or Supabase audio storage is used.
 
 The scenery now hides the entire inactive sun/moon group, so animated opacity cannot reveal both. Sun and moon gently bob, and the sun rays rotate. Animations Off, reduced motion and hidden-page pausing still apply.
-
 
 ## Floating Focus mode
 
