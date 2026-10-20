@@ -174,6 +174,7 @@
       raf = 0;
       $('momoElasticCard')?.remove();
       $('momoSoccerStage')?.remove();
+      $('momoSoccerBall')?.remove();
       $('momoFriendProp')?.remove();
       $('momoFriendSeat')?.remove();
       $('momoWindowFog')?.remove();
@@ -737,7 +738,13 @@
         size = parseFloat(pet()?.style.width) || 144;
       if (!from) return false;
       const target = {
-        x: actor.x + size * (friend.role === 'seat' ? 0.5 : 0.23),
+        x: Math.max(
+          viewport().x + 8,
+          Math.min(
+            viewport().x + viewport().w - 56,
+            actor.x + size * (friend.role === 'seat' ? 0.5 : 0.78)
+          )
+        ),
         y: actor.y + size * (friend.role === 'seat' ? 0.47 : 0.43),
       };
       if (
@@ -1191,6 +1198,19 @@
         height: h + 'px',
       });
       document.body.append(stage);
+      // A separate foreground layer escapes the stage's lower stacking context.
+      // Keep the ball over Momo while leaving the stage backdrop behind him.
+      const ball = $('momoSoccerBall');
+      Object.assign(ball.style, {
+        position: 'fixed',
+        left: x + w / 2 - 16 + 'px',
+        top: y + h - 77 + 'px',
+        bottom: 'auto',
+        zIndex: '91',
+        pointerEvents: 'none',
+      });
+      ball.setAttribute('aria-hidden', 'true');
+      document.body.append(ball);
       a.move({ x: x + (w - size) / 2, y: y + h - size - 42 });
       a.react(
         'happy',
