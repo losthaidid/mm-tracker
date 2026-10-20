@@ -332,17 +332,18 @@ body[data-motion='calm'] {
   }
 }
 @keyframes world-wave {
+  /* Keep the hand above its shoulder; small angles wave down by his side. */
   0%,
   100% {
-    transform: rotate(-10deg);
+    transform: rotate(-125deg);
   }
   25%,
   65% {
-    transform: rotate(28deg);
+    transform: rotate(-157deg);
   }
   45%,
   85% {
-    transform: rotate(-18deg);
+    transform: rotate(-118deg);
   }
 }
 @keyframes world-run {
