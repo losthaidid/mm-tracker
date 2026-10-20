@@ -147,3 +147,6 @@
 @media(prefers-reduced-motion:reduce){.rehearsal-workspace *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 body[data-motion=off] .rehearsal-workspace *{animation:none!important;transition:none!important}
 @media print{.rehearsal-playbar,.rehearsal-options,.rehearsal-drag,.rehearsal-token{display:none!important}.rehearsal-workspace *{animation:none!important}.rehearsal-viewport{overflow:visible;max-height:none}}
+
+/* Respect the existing screen-privacy switch for personal process and library content. */
+body.hub-private :is(.rehearsal-workspace,.tcodes-workspace,#rehearsalStepForm,#rehearsalProcessForm,#rehearsalScenarioForm,#rehearsalNewForm,#tcodeForm){filter:blur(8px);user-select:none;pointer-events:none}
