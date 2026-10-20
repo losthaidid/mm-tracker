@@ -59,6 +59,40 @@ async function app(t,{storage={},rpcError=null,remote=null,login=true,styles=fal
  return{window,document:window.document,api:window.api,db,intervals,frames};
 }
 
+function standupFixture(api,document){
+ api.editRecord('specs');let f=document.getElementById('editForm');f.elements.namedItem('description').value='PO configuration';f.elements.namedItem('status').value='In Progress';f.elements.namedItem('remarks').value='Core setup ready';api.saveEdit(f);const item=api.state().specs.at(-1);
+ for(const [title,status,remarks]of [['Standard PO','Completed','Tested successfully'],['Subcontracting','Blocked','Awaiting business reply']]){api.editSubItem(item.id);f=document.getElementById('subItemForm');f.elements.namedItem('title').value=title;f.elements.namedItem('status').value=status;f.elements.namedItem('remarks').value=remarks;api.saveSubItem(f);}
+ api.closeModal();return api.state().specs.find(r=>r.id===item.id);
+}
+
+test('stand-up: overview card opens all item and sub-item remarks with independent progress and update times',async t=>{
+ const {api,document,db}=await app(t),item=standupFixture(api,document);await settle();api.showTab('specs');const calls=db.calls.length;
+ document.querySelector('.standup-overview-card').click();assert.ok(document.getElementById('modal').classList.contains('standup-dialog'));
+ assert.equal(document.querySelectorAll('.standup-item').length,1);assert.equal(document.querySelectorAll('.standup-sub-row').length,2);assert.match(document.querySelector('.standup-report').textContent,/Core setup ready/);assert.match(document.querySelector('.standup-report').textContent,/Awaiting business reply/);
+ assert.equal(document.querySelector('[aria-label="Project items completed"]').getAttribute('aria-valuenow'),'0');assert.equal(document.querySelector('[aria-label="Sub-items completed"]').getAttribute('aria-valuenow'),'50');assert.ok(document.querySelector('time[datetime]'));assert.equal(db.calls.length,calls);
+ document.querySelector('[data-standup="collapse"]').click();assert.equal(document.querySelector('.standup-item').open,false);document.querySelector('[data-standup="expand"]').click();assert.equal(document.querySelector('.standup-item').open,true);assert.equal(api.state().specs[0].id,item.id);
+});
+
+test('stand-up: saving Actions creates linked tasks once, persists together and shows task completion',async t=>{
+ const {api,document,window,db}=await app(t),item=standupFixture(api,document),ui=api.hub.standup;ui.open(item.projectId);
+ document.querySelector('.standup-sub-row [data-standup="add"]').click();let f=document.getElementById('standupActionForm');f.elements.namedItem('text').value='Email the business team';f.elements.namedItem('dueDate').value='2026-10-23';submitLocal(window,f);await settle();
+ let action=api.state().workhub.projectStandup.actions[0],task=api.state().tasks[0];assert.equal(task.taskType,'Project');assert.equal(task.linkId,item.projectId);assert.equal(action.subItemId,item.subItems[0].id);assert.equal(task.task,'Email the business team');assert.equal(db.row.document.data.tasks[0].id,action.taskId);assert.equal(db.row.document.data.workhub.projectStandup.actions[0].taskId,task.id);
+ document.querySelector('[data-standup="edit"]').click();f=document.getElementById('standupActionForm');f.elements.namedItem('text').value='Email the confirmed details';submitLocal(window,f);await settle();assert.equal(api.state().tasks.length,1);assert.equal(api.state().tasks[0].task,'Email the confirmed details');
+ api.hub.moveTask(task.id,'done');await settle();assert.match(document.querySelector('.standup-actions').closest('.standup-item').textContent,/Completed/);assert.equal(api.state().specs[0].status,'In Progress');
+ const restored=api.parseBackup(api.payload(api.state()));assert.equal(restored.workhub.projectStandup.actions[0].taskId,task.id);assert.equal(restored.tasks[0].done,true);
+});
+
+test('stand-up: task details and task editing retain the source link and synchronize instruction edits',async t=>{
+ const {api,document,window}=await app(t),item=standupFixture(api,document),ui=api.hub.standup;ui.open(item.projectId);document.querySelector('[data-standup="add"]').click();let f=document.getElementById('standupActionForm');f.elements.namedItem('text').value='Request feedback';submitLocal(window,f);await settle();const task=api.state().tasks[0];
+ document.querySelector('[data-standup="task"]').click();await settle();assert.match(document.querySelector('.standup-task-context').textContent,/PO configuration/);document.querySelector('[data-standup="source"]').click();assert.ok(document.querySelector('.standup-report'));
+ api.editRecord('tasks',task.id);assert.equal(document.getElementById('modal').classList.contains('standup-dialog'),false);f=document.getElementById('editForm');f.elements.namedItem('task').value='Request updated feedback';f.elements.namedItem('feedback').value='Keep this feedback';api.saveEdit(f);await settle();assert.equal(api.state().workhub.projectStandup.actions[0].text,'Request updated feedback');ui.open(item.projectId);assert.match(document.querySelector('.standup-report').textContent,/Request updated feedback/);api.showTab('tasks');assert.ok(document.querySelector('#view .standup-task-context'));assert.equal(api.state().tasks[0].feedback,'Keep this feedback');
+});
+
+test('stand-up: cancelled drafts do not create tasks and account changes close the private report',async t=>{
+ const {api,document}=await app(t),item=standupFixture(api,document),ui=api.hub.standup;ui.open(item.projectId);document.querySelector('[data-standup="add"]').click();const form=document.getElementById('standupActionForm');form.elements.namedItem('text').value='Private draft';document.querySelector('[data-standup="cancel-action"]').click();assert.equal(api.state().tasks.length,0);assert.equal(api.state().workhub.projectStandup.actions.length,0);
+ document.querySelector('[data-standup="add"]').click();const stale=document.getElementById('standupActionForm');stale.elements.namedItem('text').value='Old account instruction';api.cloud.user={id:'22222222-2222-4222-8222-222222222222'};api.showTab('home');assert.equal(document.getElementById('modal').open,false);assert.throws(()=>ui.saveAction(stale),/signing in/);assert.equal(api.state().tasks.length,0);
+});
+
 test('startup: signed-out visitors see the modern sign-in screen after layout preparation',async t=>{
  const {document,window,db}=await app(t,{login:false,styles:true});
  assert.equal(document.documentElement.hasAttribute('data-workhub-startup'),false);

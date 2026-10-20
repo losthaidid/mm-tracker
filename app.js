@@ -423,6 +423,7 @@ function renderSpecs() {
 
 /** Use the shared dialog and decorate linked feature controls after its HTML is inserted. */
 function openModal(title, body) {
+  $('modal').classList.toggle('standup-dialog', body.includes('class="standup-report"'));
   $('modal').classList.toggle(
     'hub-drawer',
     !body.includes('<form') && !/Search|Quick|Review/.test(title)
@@ -1155,7 +1156,10 @@ function filteredTasks() {
 }
 function taskLinkFields(r) {
   const type = r.taskType || 'Custom';
-  return `<div class="wide task-link-fields" data-task-link="Project"${type === 'Project' ? '' : ' hidden'}><label for="taskProjectLink">Linked project *</label><select id="taskProjectLink" name="projectLink"><option value="">Choose a project</option>${state.projects.map(p => `<option value="${esc(p.id)}"${r.linkId === p.id ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div><div class="wide task-link-fields" data-task-link="Ticket"${type === 'Ticket' ? '' : ' hidden'}><label for="taskTicketLink">Linked ticket *</label><select id="taskTicketLink" name="ticketLink"><option value="">Choose a ticket</option>${state.tickets.map(t => `<option value="${esc(t.id)}"${r.linkId === t.id ? ' selected' : ''}>${esc(t.ticket + ' — ' + t.description.slice(0, 90))}</option>`).join('')}</select></div><div class="wide task-link-fields" data-task-link="Custom"${type === 'Custom' ? '' : ' hidden'}><label for="taskCustomLink">Custom link / reference</label><input id="taskCustomLink" name="customLink" maxlength="500" value="${esc(r.customLink || '')}" placeholder="e.g. Internal follow-up or meeting"></div>`;
+  return (
+    (hub?.standup?.taskContext(r.id) || '') +
+    `<div class="wide task-link-fields" data-task-link="Project"${type === 'Project' ? '' : ' hidden'}><label for="taskProjectLink">Linked project *</label><select id="taskProjectLink" name="projectLink"><option value="">Choose a project</option>${state.projects.map(p => `<option value="${esc(p.id)}"${r.linkId === p.id ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div><div class="wide task-link-fields" data-task-link="Ticket"${type === 'Ticket' ? '' : ' hidden'}><label for="taskTicketLink">Linked ticket *</label><select id="taskTicketLink" name="ticketLink"><option value="">Choose a ticket</option>${state.tickets.map(t => `<option value="${esc(t.id)}"${r.linkId === t.id ? ' selected' : ''}>${esc(t.ticket + ' — ' + t.description.slice(0, 90))}</option>`).join('')}</select></div><div class="wide task-link-fields" data-task-link="Custom"${type === 'Custom' ? '' : ' hidden'}><label for="taskCustomLink">Custom link / reference</label><input id="taskCustomLink" name="customLink" maxlength="500" value="${esc(r.customLink || '')}" placeholder="e.g. Internal follow-up or meeting"></div>`
+  );
 }
 function updateTaskLinkFields(form) {
   const type = form.elements.namedItem('taskType')?.value || 'Custom';
@@ -3703,7 +3707,7 @@ function renderProjectOverview(m) {
     statuses = [...new Set([...OPTIONS.specStatus, ...m.items.map(s => s.status)])],
     attention = m.overdue.slice(0, 5),
     gateDone = m.gates.filter(g => g.status !== 'Pending').length;
-  return `<div class="dashboard-grid"><section class="panel box"><h2>Project overview</h2><div class="view-details" style="margin-top:16px"><div><div class="detail-label">Current phase</div><div class="detail-value">${esc(p.phase)} · ${projectPhasePercent(p)}%</div></div><div><div class="detail-label">Health · automatic</div><div class="detail-value">${healthBadge(health)}<small class="health-summary">${esc(health.summary)}</small></div></div><div><div class="detail-label">Go-Live</div><div class="detail-value">${goLiveInfo(p)}</div></div><div class="wide"><div class="detail-label">Next milestone</div><div class="detail-value">${esc(p.nextMilestone) || 'Not set'}</div></div></div>${projectAlerts(p, m)}<h3 class="section-label">Project item progress</h3><div class="status-breakdown">${
+  return `<div class="dashboard-grid">${hub?.standup?.card(p.id) || ''}<section class="panel box"><h2>Project overview</h2><div class="view-details" style="margin-top:16px"><div><div class="detail-label">Current phase</div><div class="detail-value">${esc(p.phase)} · ${projectPhasePercent(p)}%</div></div><div><div class="detail-label">Health · automatic</div><div class="detail-value">${healthBadge(health)}<small class="health-summary">${esc(health.summary)}</small></div></div><div><div class="detail-label">Go-Live</div><div class="detail-value">${goLiveInfo(p)}</div></div><div class="wide"><div class="detail-label">Next milestone</div><div class="detail-value">${esc(p.nextMilestone) || 'Not set'}</div></div></div>${projectAlerts(p, m)}<h3 class="section-label">Project item progress</h3><div class="status-breakdown">${
     statuses
       .map(s => {
         const n = m.items.filter(i => i.status === s).length;
