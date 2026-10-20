@@ -5,7 +5,7 @@
   const ICONS={task:'✓',document:'▤',decision:'◇',approval:'✦',result:'⚑'};
   function install(a) {
     let owner='',processId='',scenarioId='',selected='',editing=false,zoom=1,wasVisible=false,paused=false,raf=0,last=0,elapsed=0,index=0,loops=0,route=null,lastModel='',paintKey='',overrides={},drag=null,suppressClick=0;
-    let audio=null,audioReady=false,notes=[],demo=null,editorSnapshot=null;
+    let audio=null,audioReady=false,notes=[],demo=null,editorSnapshot=null,reverse=null;
     const $=id=>document.getElementById(id), prefs=()=>a.state().workhub.rehearsal.preferences;
     const guard=expected=>{if(!a.ready()||!a.owner()||(expected&&expected!==a.owner()))throw Error('Sign in and reopen your rehearsal.');};
     const now=()=>new Date().toISOString(), uid=()=>root.crypto.randomUUID();
@@ -13,7 +13,7 @@
     function clearAudio() {for(const n of notes){try{n.stop();}catch{}}notes=[];try{audio?.suspend()?.catch(()=>{});}catch{}}
     function resetOwner() {
       if(owner===a.owner())return;
-      owner=a.owner();processId='';scenarioId='';selected='';editing=false;overrides={};lastModel='';route=null;elapsed=0;index=0;loops=0;paused=false;
+      owner=a.owner();reverse=null;processId='';scenarioId='';selected='';editing=false;overrides={};lastModel='';route=null;elapsed=0;index=0;loops=0;paused=false;
       clearAudio();try{audio?.close()?.catch(()=>{});}catch{}audio=null;audioReady=false;editorSnapshot=null;drag=null;
       demo=E.seed('__demo__',now());
     }
@@ -26,7 +26,7 @@
     }
     function scenario(p=model()){return p.scenarios.find(s=>s.id===scenarioId)||p.scenarios[0];}
     function rebuild(keep=false) {
-      const p=model();try{route=E.plan(p,scenario(p),overrides);}catch(err){route={entries:[],ending:'invalid',error:err.message};paused=true;}
+      reverse=null;const p=model();try{route=E.plan(p,scenario(p),overrides);}catch(err){route={entries:[],ending:'invalid',error:err.message};paused=true;}
       if(!keep){index=0;elapsed=0;}else index=Math.min(index,Math.max(0,route.entries.length-1));
       paintKey='';
     }
@@ -75,7 +75,7 @@
       return `<span class="hub-kicker">STEP DETAILS</span><div class="rehearsal-detail-title"><span>${ICONS[step.type]}</span><h3>${esc(step.title)}</h3></div>${step.tcode?`<span class="rehearsal-tcode">${esc(step.tcode)}</span>`:''}<dl><dt>Who handles it</dt><dd>${esc(step.owner)||'Not specified'}</dd>${step.prerequisites?`<dt>Before you start</dt><dd>${esc(step.prerequisites)}</dd>`:''}<dt>Instructions</dt><dd>${esc(step.instruction)||'Add instructions for this step.'}</dd><dt>Expected result</dt><dd>${esc(step.expected)||'Not specified'}</dd>${step.failure?`<dt>If it fails</dt><dd>${esc(step.failure)}</dd>`:''}</dl>${step.image?`<a class="rehearsal-image-link" href="${esc(step.image)}" target="_blank" rel="noopener"><img src="${esc(step.image)}" alt="Reference screenshot for ${esc(step.title)}"></a>`:''}${step.link?`<a href="${esc(step.link)}" target="_blank" rel="noopener noreferrer">Open reference ↗</a>`:''}<div class="rehearsal-branches"><strong>Choose an outcome</strong>${button('success','Follow success',`data-id="${esc(step.id)}"`)}${button('failure','What if this fails?',`data-id="${esc(step.id)}"`)}</div>${model().id!=='__demo__'?button('edit-step','Edit this step',`data-id="${esc(step.id)}"`,'primary small'):'<p class="hub-meta">Save this example to edit it.</p>'}`;
     }
     function inspect(id) {
-      const p=model();selected=id;paused=true;elapsed=0;const at=route.entries.findIndex(e=>e.id===id);if(at>=0)index=at;
+      reverse=null;const p=model();selected=id;paused=true;elapsed=0;const at=route.entries.findIndex(e=>e.id===id);if(at>=0)index=at;
       if(!editing)$('rehearsalInspector').innerHTML=detailHTML(p.steps.find(s=>s.id===id));paintKey='';paint();
     }
     function camera(step) {
@@ -84,9 +84,10 @@
     }
     function paint() {
       const rootEl=$('rehearsalRoot');if(!rootEl||!route)return;
+      if(reverse&&motionOff()){index=reverse.target;reverse=null;elapsed=0;paintKey='';}
       const p=model(),entry=route.entries[index],display=entry||route.entries.at(-1),duration=entry?entry.duration*1000:3200,phase=entry?Math.min(1,elapsed/duration):1,key=index+'|'+(entry?phase>=0.55:'end');
-      rootEl.dataset.playing=String(!paused&&!blocked());rootEl.dataset.reduced=String(motionOff());
-      const play=$('rehearsalPlay');if(play)play.textContent=paused||motionOff()?'Play':'Pause';
+      rootEl.dataset.playing=String((!paused||!!reverse)&&!blocked());rootEl.dataset.direction=reverse?'reverse':'forward';rootEl.dataset.reduced=String(motionOff());
+      const play=$('rehearsalPlay');if(play)play.textContent=reverse?'Pause':paused||motionOff()?'Play':'Pause';
       if(key!==paintKey) {
         const moved=paintKey.split('|')[0]!==String(index);paintKey=key;
         for(const el of rootEl.querySelectorAll('[data-node]')){
@@ -104,13 +105,15 @@
         if(!editing&&display){const detailId=paused&&selected?selected:display.id;selected=detailId;$('rehearsalInspector').innerHTML=detailHTML(p.steps.find(s=>s.id===detailId));}
         if(moved&&entry){const step=p.steps.find(s=>s.id===entry.id);if(step&&!paused&&!blocked())camera(step);if(!paused)tone(entry);}
       }
+      if(reverse){const prev=p.steps.find(s=>s.id===route.entries[reverse.target]?.id),current=p.steps.find(s=>s.id===route.entries[reverse.source]?.id),token=$('rehearsalToken');if(prev&&current&&token){const point=E.point(prev,current,1-Math.min(1,reverse.elapsed/850));token.hidden=false;token.style.left=point.x+'px';token.style.top=point.y+'px';token.dataset.type=prev.type;token.dataset.outcome='success';$('rehearsalStatus').textContent='Rewinding · '+prev.title;for(const edge of rootEl.querySelectorAll('.rehearsal-edge'))edge.dataset.active=String(edge.dataset.from===prev.id&&edge.dataset.to===current.id);}return;}
       const token=$('rehearsalToken'),from=entry&&p.steps.find(s=>s.id===entry.id),to=entry&&p.steps.find(s=>s.id===entry.nextId);
       if(token){token.hidden=!entry||!from||!to||phase<0.5||motionOff();if(!token.hidden){const point=E.point(from,to,Math.min(1,(phase-0.5)*2));token.style.left=point.x+'px';token.style.top=point.y+'px';token.dataset.type=entry.type;token.dataset.outcome=entry.outcome;}}
     }
     function tick(t) {
       raf=0;if(!$('rehearsalRoot')||!a.ready()||owner!==a.owner()){stopFrame();return;}
       if(!last)last=t;const dt=Math.min(150,Math.max(0,t-last));last=t;
-      if(!paused&&!blocked()&&route?.entries.length) {
+      if(reverse&&!blocked()){reverse.elapsed+=dt*prefs().speed;if(reverse.elapsed>=850){index=reverse.target;reverse=null;elapsed=0;selected='';paintKey='';}}
+      else if(!paused&&!blocked()&&route?.entries.length) {
         elapsed+=dt*prefs().speed;const entry=route.entries[index],duration=entry?entry.duration*1000:3200;
         if(elapsed>=duration){elapsed=0;index++;if(index>route.entries.length){loops++;if(prefs().explore){const p=model(),n=p.scenarios.findIndex(s=>s.id===scenarioId);scenarioId=p.scenarios[(n+1)%p.scenarios.length].id;overrides={};}rebuild();}}
       }
@@ -149,7 +152,7 @@
     }
     function stepEditor(id) {
       const p=model(),step=p.steps.find(s=>s.id===id);guard(owner);if(!saved(p)||!step)throw Error('Step no longer exists.');
-      paused=true;editing=true;selected=id;
+      reverse=null;paused=true;editing=true;selected=id;
       const field=(k,label,type='text',max=32767)=>`<label>${label}${type==='textarea'?`<textarea name="${k}" maxlength="${max}">${esc(step[k])}</textarea>`:`<input name="${k}" maxlength="${max}" value="${esc(step[k])}"${k==='title'?' required':''}${k==='tcode'?' list="rehearsalTcodes"':''}>`}</label>`;
       $('rehearsalInspector').innerHTML=`<form id="rehearsalStepForm" data-owner="${esc(owner)}" data-process="${esc(p.id)}" data-id="${esc(id)}" data-updated="${esc(p.updatedAt)}"><span class="hub-kicker">EDIT STEP · PLAYBACK PAUSED</span>${field('title','Step title','text',300)}<label>Step type<select name="type">${E.TYPES.map(t=>`<option${t===step.type?' selected':''}>${t}</option>`).join('')}</select></label>${field('tcode','SAP T-code','text',40)}<datalist id="rehearsalTcodes">${a.state().workhub.tcodes.records.filter(r=>!r.archived).map(r=>`<option value="${esc(r.code)}">${esc(r.title)}</option>`).join('')}</datalist>${field('owner','Who handles it','text',200)}${field('prerequisites','Before you start','textarea')}${field('instruction','Instructions','textarea')}${field('expected','Expected result','textarea')}${field('failure','If it fails','textarea')}<label>Normal next step<select name="next"><option value="">End route</option>${p.steps.map(s=>`<option value="${esc(s.id)}"${s.id===step.next?' selected':''}>${esc(s.title)}</option>`).join('')}</select></label><label>Failure / exception next step<select name="failNext"><option value="">Stop at the exception</option>${p.steps.map(s=>`<option value="${esc(s.id)}"${s.id===step.failNext?' selected':''}>${esc(s.title)}</option>`).join('')}</select></label><label>Sample value changes<textarea name="changes" placeholder="Received quantity += @Delivery quantity">${esc(step.changes.map(c=>c.field+(c.operator==='add'?' += ':' = ')+c.value).join('\n'))}</textarea></label><p class="hub-meta">Use = to set a value; += to add a number. @Field reads another sample field. No code is executed.</p><label>Seconds on this step (0 = automatic)<input name="duration" type="number" min="0" max="30" step="0.5" value="${step.duration}"></label>${field('link','Reference URL','text',2000)}<label>Reference screenshot<input id="rehearsalImageInput" type="file" accept="image/png,image/jpeg,image/webp"></label><p class="hub-meta">Optimized screenshot saved with the process. Up to 2 MB of screenshots across your rehearsals.</p><input name="image" type="hidden" value="${esc(step.image)}"><div id="rehearsalImagePreview">${step.image?`<img src="${esc(step.image)}" alt="Step screenshot">`:''}</div>${button('remove-image','Remove screenshot')}<div class="actions"><button type="submit" class="primary">Save step</button>${button('cancel-edit','Cancel')}</div>${p.steps.length>1?button('delete-step','Delete step',`data-id="${esc(id)}"`,'danger small'):''}</form>`;
       $('rehearsalInspector').querySelector('[name="title"]').focus();clearAudio();
@@ -209,10 +212,11 @@
       if(action==='cancel-edit'){editing=false;paused=true;$('rehearsalInspector').innerHTML=detailHTML(p.steps.find(s=>s.id===selected));return;}
       if(action==='inspect'){if(Date.now()<suppressClick)return;inspect(id);return;}
       if(action==='success'||action==='failure'){if(!route.entries.some(entry=>entry.id===id)){a.tell('This step is outside the current route. Choose a scenario that reaches it.');return;}overrides[id]=action;const at=index;rebuild();index=Math.min(at,route.entries.length-1);paused=false;paintKey='';paint();return;}
-      if(action==='journal'){selected='';index=Math.max(0,Math.min(route.entries.length-1,Number(el.dataset.index)));elapsed=0;paused=true;editing=false;paintKey='';paint();return;}
-      if(action==='play'){if(editing){a.tell('Save or cancel the step editor first.');return;}paused=!paused;selected='';paintKey='';paint();return;}
+      if(action==='journal'){reverse=null;selected='';index=Math.max(0,Math.min(route.entries.length-1,Number(el.dataset.index)));elapsed=0;paused=true;editing=false;paintKey='';paint();return;}
+      if(action==='play'){if(reverse){reverse=null;paused=true;paintKey='';paint();return;}if(editing){a.tell('Save or cancel the step editor first.');return;}paused=!paused;selected='';paintKey='';paint();return;}
       if(action==='restart'){selected='';overrides={};rebuild();paused=false;editing=false;paint();return;}
-      if(action==='back'||action==='next'){if(editing){a.tell('Save or cancel the step editor first.');return;}selected='';index=Math.max(0,Math.min(route.entries.length-1,index+(action==='back'?-1:1)));elapsed=0;paused=true;paintKey='';paint();return;}
+      if(action==='back'&&index>0&&index<route.entries.length&&!motionOff()&&!editing){paused=true;reverse={source:index,target:index-1,elapsed:0};paintKey='';paint();return;}
+      if(action==='back'||action==='next'){reverse=null;if(editing){a.tell('Save or cancel the step editor first.');return;}selected='';index=Math.max(0,Math.min(route.entries.length-1,index+(action==='back'?-1:1)));elapsed=0;paused=true;paintKey='';paint();return;}
       if(action==='sound'){setPreference('sound',!prefs().sound);if(prefs().sound)await unlock();return;}
       if(action==='zoom-in'||action==='zoom-out'){zoom=Math.max(0.5,Math.min(1.5,zoom+(action==='zoom-in'?0.1:-0.1)));a.render();}
     }
@@ -246,7 +250,7 @@
       }catch(err){a.tell(err.message,true);}
     });
     document.addEventListener('visibilitychange',()=>{last=0;if(document.hidden)clearAudio();});
-    return {render,mount,saveForm,stepEditor,scenarioEditor,model,plan:()=>route,snapshot:()=>({index,elapsed,paused,editing,scenarioId,processId,loops,sound:audioReady}),tick,stop:stopFrame};
+    return {render,mount,saveForm,stepEditor,scenarioEditor,model,plan:()=>route,snapshot:()=>({index,elapsed,paused,editing,scenarioId,processId,loops,sound:audioReady,rewinding:!!reverse}),tick,stop:stopFrame};
   }
   root.WorkHubRehearsal={install};
 })(window);

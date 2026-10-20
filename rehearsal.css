@@ -150,3 +150,5 @@ body[data-motion=off] .rehearsal-workspace *{animation:none!important;transition
 
 /* Respect the existing screen-privacy switch for personal process and library content. */
 body.hub-private :is(.rehearsal-workspace,.tcodes-workspace,#rehearsalStepForm,#rehearsalProcessForm,#rehearsalScenarioForm,#rehearsalNewForm,#tcodeForm){filter:blur(8px);user-select:none;pointer-events:none}
+
+.rehearsal-workspace[data-direction=reverse] .rehearsal-edge[data-active=true]{animation-direction:reverse}

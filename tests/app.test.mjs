@@ -1985,3 +1985,11 @@ test('rehearsal UI: audio waits for a gesture, respects mute and keyboard positi
  document.querySelector('[data-rehearsal="sound"]').click();await settle();assert.equal(api.state().workhub.rehearsal.preferences.sound,false);assert.ok(suspends>0);
  document.querySelector('[data-rehearsal="keep"]').click();await settle();const old=api.state().workhub.rehearsal.processes[0].steps[0].x,handle=document.querySelector('[data-rehearsal-drag="po"]');handle.focus();handle.dispatchEvent(new window.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));await settle();assert.equal(api.state().workhub.rehearsal.processes[0].steps[0].x,old+10);assert.equal(document.activeElement.dataset.rehearsalDrag,'po');
 });
+
+test('rehearsal UI: rewind visibly retraces the previous connector before restoring its step',async t=>{
+ const {api,document}=await app(t);api.hub.setTool('simulator');api.showTab('studio');const r=api.hub.rehearsal;
+ document.querySelector('[data-rehearsal="next"]').click();await settle();assert.equal(r.snapshot().index,1);
+ document.querySelector('[data-rehearsal="back"]').click();await settle();assert.equal(r.snapshot().rewinding,true);const token=document.getElementById('rehearsalToken'),start=token.style.left;assert.equal(token.hidden,false);
+ r.tick(150);r.tick(300);r.tick(450);assert.notEqual(token.style.left,start);
+ for(let n=4;n<=12;n++)r.tick(n*150);assert.equal(r.snapshot().rewinding,false);assert.equal(r.snapshot().index,0);assert.equal(r.snapshot().paused,true);assert.equal(document.getElementById('rehearsalRoot').dataset.direction,'forward');
+});
