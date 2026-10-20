@@ -25,7 +25,7 @@ behaviour and record format.
 
 ## Why some older names and wrappers remain
 
-A name such as `workhubActionV9Base` or `ticketTableV10` captures a function before a later assignment
+A name such as `workhubActionV9Base` or `scheduleRenderV10` captures a function before a later assignment
 extends it. The wrapper still calls that captured implementation. This differs from two same-name
 function declarations where the earlier declaration was unreachable from the outset. Removing
 wrappers merely because their names look old would remove current behaviour.
