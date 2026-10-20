@@ -139,6 +139,18 @@ body .momo-elastic-card[data-tug-phase] {
 #hubPet[data-adventure='juggle'][data-scene-phase='awkward'] .momo-face {
   transform: rotate(9deg) translateX(3px);
 }
+/* Visiting friends sit in front of the actor, rather than vanishing behind him. */
+body:has(#hubPet[data-adventure='friend']) #hubVisitors {
+  z-index: 91;
+}
+body:is(.hub-private, .hub-present, .hub-focus) > #momoSoccerBall {
+  display: none !important;
+}
+@media print {
+  body > #momoSoccerBall {
+    display: none !important;
+  }
+}
 #momoSoccerShadow {
   position: absolute;
   left: calc(50% - 13px);
