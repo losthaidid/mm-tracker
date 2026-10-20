@@ -37,6 +37,8 @@ Settings also contains Account, Charge codes, Project management, editable built
 
 Tasks can be linked to a project, ticket, or custom reference. Scheduling supports 00:00–24:00 entry with minute precision, status colours, configurable work locations, and automatic weekend TOIL identification. Project governance includes editable phase-specific acceptance criteria, gate skipping, Go-Live countdowns, project health, and planned-versus-actual confirmation.
 
+Schedule date and time ranges include an optional **Company** selector using the companies maintained in **Projects → Companies & processes**. Project bookings show that project's companies; other booking types group all maintained companies by project. The selection saves with the booking and appears in the Schedule calendar, day agenda, week time grid, booking details and Projects calendar. Project-calendar edits preserve it. Company renames update the displayed name; a saved name keeps historical bookings readable if the company is later deleted. Older bookings remain available with no company selected.
+
 Use **Companies & processes → Upload company / process Excel** to import Organization Structure, Master Data, Inventory Management, and Procurement mappings. The preview can add companies, departments, organization/master-data items, BPML processes, and decision states together. Re-importing the same code or item creates a new proposal version. The workbook stays in the browser; only normalized rows and source metadata are saved online. Project items can select an imported company and record expected and due dates.
 
 ## Bring in existing records once

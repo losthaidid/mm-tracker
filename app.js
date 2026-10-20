@@ -867,6 +867,13 @@ function projectChange(el) {
     changeScheduleKind(el);
     return true;
   }
+  if (
+    (el.id === 'scheduleLink' && el.form?.id === 'scheduleForm') ||
+    (el.id === 'planProject' && el.form?.id === 'planForm')
+  ) {
+    updateScheduleCompanyField(el.form);
+    return true;
+  }
   return false;
 }
 
@@ -968,6 +975,8 @@ function changeRangeKind(el) {
     time: leave ? '09:00' : val('time'),
     endTime: leave ? '18:00' : val('endTime'),
     text: val('text'),
+    companyId: val('companyId') || '',
+    companyName: f.elements.namedItem('companyId')?.selectedOptions[0]?.dataset.companyName || '',
     kind: el.value,
     linkId: el.value === 'project' ? state.activeProjectId : '',
     activity: '',
@@ -1423,7 +1432,12 @@ function statusClass(status) {
 function scheduleDisplayText(s, d = state) {
   if (!s) return '';
   if (window.WorkHubLeave.isLeave(s.kind))
-    return [s.title || window.WorkHubLeave.TYPES[s.kind], s.leave.status, s.text]
+    return [
+      s.title || window.WorkHubLeave.TYPES[s.kind],
+      scheduleCompanyName(s, d),
+      s.leave.status,
+      s.text,
+    ]
       .filter(Boolean)
       .join('\n');
   let linked = '';
@@ -1444,6 +1458,7 @@ function scheduleDisplayText(s, d = state) {
   return [
     isToilSchedule(s, d) ? 'TOIL' : '',
     linked,
+    scheduleCompanyName(s, d),
     s.kind === 'project' ? s.location : '',
     s.text,
   ]
@@ -1479,6 +1494,91 @@ function earlyScheduleBookings() {
   return `<div class="box" style="border-top:1px solid var(--line)"><div class="flex-title"><h3 class="section-label" style="margin:0">Early-hours bookings · 01:00–09:00</h3><span class="muted">Calendar grid unchanged</span></div><div class="actions" style="margin-top:12px">${rows.map(s => `<button class="small" data-action="open-booking" data-date="${esc(s.date)}" data-time="${esc(s.time)}">${esc(s.date + ' ' + s.time + ' · ' + scheduleTimeStatus(s) + ' · ' + scheduleDisplayText(s).split('\n')[0])}</button>`).join('')}</div></div>`;
 }
 
+/** Company records belong to Projects; bookings keep a name for historical/deleted companies. */
+function scheduleCompanyProject(row, d = state) {
+  if (row.kind === 'project' || (!row.kind && row.projectId))
+    return row.linkId || row.projectId || d.activeProjectId;
+  return '';
+}
+function scheduleCompanyName(row, d = state) {
+  const plan = row.planId ? d.projectPlans.find(p => p.id === row.planId) : null;
+  return (
+    d.projectCompanies.find(c => c.id === (row.companyId || plan?.companyId))?.name ||
+    row.companyName ||
+    plan?.companyName ||
+    ''
+  );
+}
+function scheduleCompanyOptions(projectId, selected = '', savedName = '') {
+  const groups = state.projects
+    .filter(p => !projectId || p.id === projectId)
+    .map(p => {
+      const companies = state.projectCompanies
+        .filter(c => c.projectId === p.id)
+        .sort((a, b) => a.name.localeCompare(b.name));
+      return companies.length
+        ? `<optgroup label="${esc(p.name)}">${companies.map(c => `<option value="${esc(c.id)}" data-company-name="${esc(c.name)}"${c.id === selected ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}</optgroup>`
+        : '';
+    })
+    .join('');
+  const former = selected && savedName && !state.projectCompanies.some(c => c.id === selected);
+  return `<option value="">No company / personal time</option>${groups}${former ? `<option value="${esc(selected)}" data-company-name="${esc(savedName)}" selected>${esc(savedName)} (saved company)</option>` : ''}`;
+}
+function scheduleCompanyField(row) {
+  const projectId = scheduleCompanyProject(row);
+  return `<div class="wide schedule-company-field"><label for="bookingCompany">Company <span class="muted">(optional)</span></label><select id="bookingCompany" name="companyId" data-project-scope="${esc(projectId)}" aria-describedby="bookingCompanyHint">${scheduleCompanyOptions(projectId, row.companyId, row.companyName)}</select><p class="hint" id="bookingCompanyHint">${projectId ? 'Companies from the selected project.' : 'Companies are grouped by project.'} Maintain them in Projects → Companies &amp; processes. Leave blank for personal time.</p></div>`;
+}
+function updateScheduleCompanyField(form) {
+  const select = form.elements.namedItem('companyId');
+  if (!select) return;
+  const value = k => form.elements.namedItem(k)?.value || '',
+    projectId = scheduleCompanyProject({
+      kind: form.id === 'planForm' ? 'project' : value('kind'),
+      linkId: form.id === 'planForm' ? value('projectId') : value('linkId'),
+    }),
+    savedName =
+      !projectId || projectId === select.dataset.projectScope
+        ? select.selectedOptions[0]?.dataset.companyName || ''
+        : '';
+  select.innerHTML = scheduleCompanyOptions(projectId, select.value, savedName);
+  select.dataset.projectScope = projectId;
+  $('bookingCompanyHint').textContent =
+    (projectId ? 'Companies from the selected project.' : 'Companies are grouped by project.') +
+    ' Maintain them in Projects → Companies & processes. Leave blank for personal time.';
+}
+function readScheduleCompany(form, previous, row) {
+  const id = form.elements.namedItem('companyId')?.value || '';
+  if (!id) return { companyId: '', companyName: '' };
+  const company = state.projectCompanies.find(c => c.id === id),
+    projectId = scheduleCompanyProject(row);
+  if (company && (!projectId || company.projectId === projectId))
+    return { companyId: company.id, companyName: company.name };
+  if (
+    !company &&
+    previous?.companyId === id &&
+    previous.companyName &&
+    (!projectId || projectId === scheduleCompanyProject(previous))
+  )
+    return { companyId: id, companyName: previous.companyName };
+  throw Error('Choose a company maintained in Projects for the selected project.');
+}
+function validateScheduleCompany(row, d) {
+  if (
+    (row.companyId !== undefined && !checkText(row.companyId, 100)) ||
+    (row.companyName !== undefined && !checkText(row.companyName, 200))
+  )
+    throw Error('Check the schedule company.');
+  const company = d.projectCompanies.find(c => c.id === row.companyId),
+    projectId = scheduleCompanyProject(row, d);
+  if (company && projectId && company.projectId !== projectId)
+    throw Error('The schedule company must belong to the selected project.');
+}
+function scheduleCompanyBadge(row) {
+  const name = scheduleCompanyName(row);
+  return name
+    ? `<span class="booking-company" title="Company: ${esc(name)}"><span class="booking-company-label">Company</span> ${esc(name)}</span>`
+    : '';
+}
 function renderRangeEditor() {
   const s = scheduleDraft,
     tasks = state.tasks.filter(t => !t.archived || t.id === s.linkId);
@@ -1494,7 +1594,7 @@ function renderRangeEditor() {
       .map(([v, l]) => `<option value="${v}"${v === s.kind ? ' selected' : ''}>${l}</option>`)
       .join(
         ''
-      )}</select></div>${window.WorkHubLeave.fields(s)}${window.WorkHubClaims.fields(s, state)}${s.kind === 'task' ? `<div class="wide"><label for="scheduleLink">Task *</label><select id="scheduleLink" name="linkId" required><option value="">Choose a task</option>${tasks.map(t => `<option value="${esc(t.id)}"${t.id === s.linkId ? ' selected' : ''}>[${esc(t.taskType)}] ${esc((t.number ? t.number + '. ' : '') + t.task.slice(0, 105))} · ${esc(taskLinkedLabel(t))}${t.done ? ' (done)' : ''}</option>`).join('')}</select></div>` : s.kind === 'project' ? `<div class="span2"><label for="scheduleLink">Project *</label><select id="scheduleLink" name="linkId" required>${projectOptions(s.linkId || state.activeProjectId)}</select></div><div><label for="scheduleActivity">Project activity</label><select id="scheduleActivity" name="activity">${selectOptions(state.lists.projectActivities, s.activity, '—')}</select></div>${projectLocationField(s.location)}<div class="span2"><label for="bookingTitle">Activity title</label><input id="bookingTitle" name="title" maxlength="500" value="${esc(s.title)}" placeholder="Defaults to the selected activity"></div><div><label for="bookingStatus">Plan status</label><select id="bookingStatus" name="status">${selectOptions(PLAN_STATUS, s.status, 'Choose status')}</select></div>` : ''}<div class="wide"><label for="slotText">${window.WorkHubLeave.isLeave(s.kind) ? 'Leave / handover notes' : s.kind === 'custom' ? 'Activity' : 'Additional notes'}</label><textarea id="slotText" name="text" maxlength="32767">${esc(s.text)}</textarea></div></div><p class="hint">The same time range fills every selected date. Weekend project or ticket-linked task time is marked TOIL automatically. Existing bookings are protected.</p><div class="modal-actions"><div>${s.bookingId || state.schedule.some(r => r.date === s.originalDate && r.time === s.originalTime) ? '<button type="button" class="danger" data-action="clear-booking">Delete activity</button>' : ''}</div><div class="actions"><button type="button" data-action="cancel">Cancel</button><button class="primary" type="submit">Save time range</button></div></div></form>`
+      )}</select></div>${window.WorkHubLeave.fields(s)}${window.WorkHubClaims.fields(s, state)}${s.kind === 'task' ? `<div class="wide"><label for="scheduleLink">Task *</label><select id="scheduleLink" name="linkId" required><option value="">Choose a task</option>${tasks.map(t => `<option value="${esc(t.id)}"${t.id === s.linkId ? ' selected' : ''}>[${esc(t.taskType)}] ${esc((t.number ? t.number + '. ' : '') + t.task.slice(0, 105))} · ${esc(taskLinkedLabel(t))}${t.done ? ' (done)' : ''}</option>`).join('')}</select></div>` : s.kind === 'project' ? `<div class="span2"><label for="scheduleLink">Project *</label><select id="scheduleLink" name="linkId" required>${projectOptions(s.linkId || state.activeProjectId)}</select></div><div><label for="scheduleActivity">Project activity</label><select id="scheduleActivity" name="activity">${selectOptions(state.lists.projectActivities, s.activity, '—')}</select></div>${projectLocationField(s.location)}<div class="span2"><label for="bookingTitle">Activity title</label><input id="bookingTitle" name="title" maxlength="500" value="${esc(s.title)}" placeholder="Defaults to the selected activity"></div><div><label for="bookingStatus">Plan status</label><select id="bookingStatus" name="status">${selectOptions(PLAN_STATUS, s.status, 'Choose status')}</select></div>` : ''}${scheduleCompanyField(s)}<div class="wide"><label for="slotText">${window.WorkHubLeave.isLeave(s.kind) ? 'Leave / handover notes' : s.kind === 'custom' ? 'Activity' : 'Additional notes'}</label><textarea id="slotText" name="text" maxlength="32767">${esc(s.text)}</textarea></div></div><p class="hint">The same time range fills every selected date. Weekend project or ticket-linked task time is marked TOIL automatically. Existing bookings are protected.</p><div class="modal-actions"><div>${s.bookingId || state.schedule.some(r => r.date === s.originalDate && r.time === s.originalTime) ? '<button type="button" class="danger" data-action="clear-booking">Delete activity</button>' : ''}</div><div class="actions"><button type="button" data-action="cancel">Cancel</button><button class="primary" type="submit">Save time range</button></div></div></form>`
   );
   hub?.claims?.updateTravel($('scheduleForm'));
 }
@@ -1515,6 +1615,12 @@ function saveRange(form) {
     draft = scheduleDraft || { bookingId: '', planId: '', originalDate: date, originalTime: time },
     bookingId = draft.bookingId || uid(),
     oldPlan = state.projectPlans.find(p => p.id === draft.planId),
+    oldBooking = state.schedule.find(s =>
+      draft.bookingId
+        ? s.bookingId === draft.bookingId
+        : s.date === draft.originalDate && s.time === draft.originalTime
+    ),
+    company = readScheduleCompany(form, oldBooking || oldPlan, { kind, linkId }),
     leaveData = window.WorkHubLeave.read(form, kind),
     travel = window.WorkHubClaims.read(form, kind);
   if (dates.length * times.length > LIMIT)
@@ -1537,6 +1643,7 @@ function saveRange(form) {
       d.projectPlans.push({
         id: planId,
         projectId: linkId,
+        ...company,
         title: value('title').trim() || activity || 'Project activity',
         activity,
         text,
@@ -1561,6 +1668,7 @@ function saveRange(form) {
           text,
           kind,
           linkId,
+          ...company,
           activity,
           location,
           bookingId,
@@ -1616,7 +1724,7 @@ function planStatusClass(p, date = '') {
   return isWeekend(date || p.date) ? 'toil' : statusClass(p.status);
 }
 function planRow(p) {
-  return `<button class="plan-row ${planStatusClass(p)}" data-action="view-plan" data-id="${esc(p.id)}"><span class="plan-date">${esc(p.date)}${p.endDate !== p.date ? ' to ' + esc(p.endDate) : ''}<small>${esc(p.time)}–${esc(p.endTime)}</small></span><span class="plan-title">${esc(p.activity || p.title)}<small>${esc([p.location, p.title !== p.activity ? p.title : '', p.text.slice(0, 100)].filter(Boolean).join(' · '))}${planHasToil(p) ? ' · TOIL' : ''}</small></span><span>${tag(p.status)}</span></button>`;
+  return `<button class="plan-row ${planStatusClass(p)}" data-action="view-plan" data-id="${esc(p.id)}"><span class="plan-date">${esc(p.date)}${p.endDate !== p.date ? ' to ' + esc(p.endDate) : ''}<small>${esc(p.time)}–${esc(p.endTime)}</small></span><span class="plan-title">${esc(p.activity || p.title)}${scheduleCompanyBadge(p)}<small>${esc([p.location, p.title !== p.activity ? p.title : '', p.text.slice(0, 100)].filter(Boolean).join(' · '))}${planHasToil(p) ? ' · TOIL' : ''}</small></span><span>${tag(p.status)}</span></button>`;
 }
 
 function viewPlan(id) {
@@ -1625,7 +1733,7 @@ function viewPlan(id) {
   const project = state.projects.find(x => x.id === p.projectId);
   openModal(
     'Planned activity',
-    `<div class="view-details"><div><div class="detail-label">Project</div><div class="detail-value">${esc(project?.name) || '—'}</div></div><div><div class="detail-label">Project activity</div><div class="detail-value">${esc(p.activity) || '—'}</div></div><div><div class="detail-label">Status</div><div class="detail-value">${tag(p.status)}</div></div><div><div class="detail-label">Date range</div><div class="detail-value">${esc(p.date)}${p.endDate !== p.date ? ' to ' + esc(p.endDate) : ''}</div></div><div><div class="detail-label">Time</div><div class="detail-value">${esc(p.time)}–${esc(p.endTime)}</div></div><div><div class="detail-label">Work location</div><div class="detail-value">${esc(p.location) || '—'}</div></div><div class="wide"><div class="detail-label">Activity title</div><div class="detail-value">${esc(p.title)}</div></div><div class="wide"><div class="detail-label">Notes</div><div class="detail-value">${esc(p.text) || '—'}</div></div>${p.actualReviewedAt ? `<div class="wide"><div class="detail-label">Confirmed actual task</div><div class="detail-value">${esc(p.actualTask)} · ${p.actualSame ? 'Same as planned' : 'Different from plan'} · ${esc(p.actualReviewedAt)}</div></div>` : ''}</div><div class="modal-actions"><span>${planHasToil(p) ? '<span class="phase-badge">TOIL</span>' : ''}</span><div class="actions"><button type="button" data-action="cancel">Close</button><button class="primary" type="button" data-action="edit-plan" data-id="${esc(p.id)}">Edit activity</button></div></div>`
+    `<div class="view-details"><div><div class="detail-label">Project</div><div class="detail-value">${esc(project?.name) || '—'}</div></div><div><div class="detail-label">Company</div><div class="detail-value">${esc(scheduleCompanyName(p)) || 'Not specified'}</div></div><div><div class="detail-label">Project activity</div><div class="detail-value">${esc(p.activity) || '—'}</div></div><div><div class="detail-label">Status</div><div class="detail-value">${tag(p.status)}</div></div><div><div class="detail-label">Date range</div><div class="detail-value">${esc(p.date)}${p.endDate !== p.date ? ' to ' + esc(p.endDate) : ''}</div></div><div><div class="detail-label">Time</div><div class="detail-value">${esc(p.time)}–${esc(p.endTime)}</div></div><div><div class="detail-label">Work location</div><div class="detail-value">${esc(p.location) || '—'}</div></div><div class="wide"><div class="detail-label">Activity title</div><div class="detail-value">${esc(p.title)}</div></div><div class="wide"><div class="detail-label">Notes</div><div class="detail-value">${esc(p.text) || '—'}</div></div>${p.actualReviewedAt ? `<div class="wide"><div class="detail-label">Confirmed actual task</div><div class="detail-value">${esc(p.actualTask)} · ${p.actualSame ? 'Same as planned' : 'Different from plan'} · ${esc(p.actualReviewedAt)}</div></div>` : ''}</div><div class="modal-actions"><span>${planHasToil(p) ? '<span class="phase-badge">TOIL</span>' : ''}</span><div class="actions"><button type="button" data-action="cancel">Close</button><button class="primary" type="button" data-action="edit-plan" data-id="${esc(p.id)}">Edit activity</button></div></div>`
   );
 }
 function editPlan(id = '', date = today()) {
@@ -1645,7 +1753,7 @@ function editPlan(id = '', date = today()) {
   };
   openModal(
     p ? 'Edit planned activity' : 'Plan project activity',
-    `<form id="planForm" data-id="${esc(id)}"><div class="form-grid"><div class="wide"><label for="planProject">Project *</label><select id="planProject" name="projectId">${projectOptions(r.projectId)}</select></div><div class="span2"><label for="planTitle">Activity title *</label><input id="planTitle" name="title" value="${esc(r.title)}" maxlength="500" required></div><div><label for="planActivity">Project activity</label><select id="planActivity" name="activity">${selectOptions(state.lists.projectActivities, r.activity, '—')}</select></div>${scheduleRangeFields(r)}${projectLocationField(r.location)}<div><label for="planStatus">Status</label><select id="planStatus" name="status">${selectOptions(PLAN_STATUS, r.status, 'Choose status')}</select></div><div class="wide"><label for="planNotes">Notes</label><textarea id="planNotes" name="text" maxlength="32767">${esc(r.text)}</textarea></div></div><p class="hint">Times use the 24-hour system. Saving also updates Schedule.</p><div class="modal-actions"><div>${p ? `<button class="danger" type="button" data-action="delete-plan" data-id="${esc(p.id)}">Delete activity</button>` : ''}</div><div class="actions"><button type="button" data-action="cancel">Cancel</button><button class="primary" type="submit">Save activity</button></div></div></form>`
+    `<form id="planForm" data-id="${esc(id)}"><div class="form-grid"><div class="wide"><label for="planProject">Project *</label><select id="planProject" name="projectId">${projectOptions(r.projectId)}</select></div>${scheduleCompanyField(r)}<div class="span2"><label for="planTitle">Activity title *</label><input id="planTitle" name="title" value="${esc(r.title)}" maxlength="500" required></div><div><label for="planActivity">Project activity</label><select id="planActivity" name="activity">${selectOptions(state.lists.projectActivities, r.activity, '—')}</select></div>${scheduleRangeFields(r)}${projectLocationField(r.location)}<div><label for="planStatus">Status</label><select id="planStatus" name="status">${selectOptions(PLAN_STATUS, r.status, 'Choose status')}</select></div><div class="wide"><label for="planNotes">Notes</label><textarea id="planNotes" name="text" maxlength="32767">${esc(r.text)}</textarea></div></div><p class="hint">Times use the 24-hour system. Saving also updates Schedule.</p><div class="modal-actions"><div>${p ? `<button class="danger" type="button" data-action="delete-plan" data-id="${esc(p.id)}">Delete activity</button>` : ''}</div><div class="actions"><button type="button" data-action="cancel">Cancel</button><button class="primary" type="submit">Save activity</button></div></div></form>`
   );
 }
 function savePlan(form) {
@@ -1655,6 +1763,7 @@ function savePlan(form) {
     p = {
       id,
       projectId: value('projectId'),
+      ...readScheduleCompany(form, old, { kind: 'project', linkId: value('projectId') }),
       title: value('title').trim(),
       activity: value('activity'),
       text: value('text'),
@@ -1691,6 +1800,8 @@ function savePlan(form) {
             text: p.text,
             kind: 'project',
             linkId: p.projectId,
+            companyId: p.companyId,
+            companyName: p.companyName,
             activity: p.activity,
             location: p.location,
             bookingId: id,
@@ -2665,6 +2776,7 @@ function validateFeaturesV6(d) {
   const ids = new Set(d.projectPlans.map(p => p.id));
   if (ids.size !== d.projectPlans.length) throw Error('Duplicate project plan IDs.');
   for (const p of d.projectPlans) {
+    validateScheduleCompany(p, d);
     if (
       !checkText(p.id, 100) ||
       !p.id ||
@@ -2687,6 +2799,7 @@ function validateFeaturesV6(d) {
     if (!['', ...locations].includes(p.location)) throw Error('Invalid project location.');
   }
   for (const s of d.schedule) {
+    validateScheduleCompany(s, d);
     if (
       !checkText(s.bookingId, 100) ||
       !checkText(s.planId, 100) ||
@@ -2702,6 +2815,8 @@ function validateFeaturesV6(d) {
         s.date < p.date ||
         s.date > p.endDate ||
         s.location !== p.location ||
+        (s.companyId || '') !== (p.companyId || '') ||
+        (s.companyName || '') !== (p.companyName || '') ||
         s.time < p.time ||
         s.time >= p.endTime
       )
@@ -6078,7 +6193,7 @@ function editCompany(id = '') {
   const row = old || { name: '', role: '' };
   openModal(
     old ? 'Edit project company' : 'Add company manually',
-    `<form id="companyForm" data-id="${esc(id)}"><div class="manual-entry-hero"><span class="eyebrow">Quick company setup</span><strong>${old ? 'Update the company name or role' : 'Create a company without an Excel upload'}</strong><p>After saving, this company becomes available in processes, project items, phase gates and Phase Feedback.</p></div><div class="form-grid"><div class="wide"><label for="companyName">Company *</label><input id="companyName" name="name" maxlength="200" value="${esc(row.name)}" required placeholder="e.g. Farms"></div><div class="wide"><label for="companyRole">Company role</label><input id="companyRole" name="role" maxlength="500" value="${esc(row.role)}" placeholder="e.g. Farm operations"></div></div><p class="hint">Add processes after saving the company. Permanent deletion remains in Settings → Project management.</p><div class="modal-actions"><button type="button" data-action="cancel">Cancel</button><button class="primary" type="submit">${old ? 'Save company changes' : 'Add company'}</button></div></form>`
+    `<form id="companyForm" data-id="${esc(id)}"><div class="manual-entry-hero"><span class="eyebrow">Quick company setup</span><strong>${old ? 'Update the company name or role' : 'Create a company without an Excel upload'}</strong><p>After saving, this company becomes available in Schedule, processes, project items, phase gates and Phase Feedback.</p></div><div class="form-grid"><div class="wide"><label for="companyName">Company *</label><input id="companyName" name="name" maxlength="200" value="${esc(row.name)}" required placeholder="e.g. Farms"></div><div class="wide"><label for="companyRole">Company role</label><input id="companyRole" name="role" maxlength="500" value="${esc(row.role)}" placeholder="e.g. Farm operations"></div></div><p class="hint">Add processes after saving the company. Permanent deletion remains in Settings → Project management.</p><div class="modal-actions"><button type="button" data-action="cancel">Cancel</button><button class="primary" type="submit">${old ? 'Save company changes' : 'Add company'}</button></div></form>`
   );
 }
 
@@ -6345,7 +6460,7 @@ function renderProjectCalendar() {
     const dayPlans = plans.filter(p => p.date <= date && p.endDate >= date),
       isGoLive = project.goLiveDate === date;
     cells.push(
-      `<div class="calendar-day${date === today() ? ' today' : ''}${isGoLive ? ' go-live-day' : ''}"><button class="calendar-number" data-action="new-plan" data-date="${date}" aria-label="Plan activity on ${date}">${+date.slice(8)}</button>${isGoLive ? goLiveScheduleCard(project, true) : ''}${dayPlans.map(p => `<button class="calendar-event ${planStatusClass(p, date)}" data-action="view-plan" data-id="${esc(p.id)}"><span>${esc(p.time)}–${esc(p.endTime)}${isWeekend(date) ? ' · TOIL' : ''}</span><strong>${esc(p.activity || p.title)}</strong><small>${esc(p.status)}${p.location ? ' · ' + esc(p.location) : ''}</small></button>`).join('')}</div>`
+      `<div class="calendar-day${date === today() ? ' today' : ''}${isGoLive ? ' go-live-day' : ''}"><button class="calendar-number" data-action="new-plan" data-date="${date}" aria-label="Plan activity on ${date}">${+date.slice(8)}</button>${isGoLive ? goLiveScheduleCard(project, true) : ''}${dayPlans.map(p => `<button class="calendar-event ${planStatusClass(p, date)}" data-action="view-plan" data-id="${esc(p.id)}"><span>${esc(p.time)}–${esc(p.endTime)}${isWeekend(date) ? ' · TOIL' : ''}</span><strong>${esc(p.activity || p.title)}</strong>${scheduleCompanyBadge(p)}<small>${esc(p.status)}${p.location ? ' · ' + esc(p.location) : ''}</small></button>`).join('')}</div>`
     );
   }
   while (cells.length % 7)
@@ -6653,6 +6768,8 @@ function openRangeEditor(date = today(), time = '09:00', taskId = '', createNew 
     originalTime: createNew ? '' : time,
     status: plan?.status || 'Planned',
     title: plan?.title || old?.title || '',
+    companyId: old?.companyId || plan?.companyId || '',
+    companyName: old?.companyName || plan?.companyName || '',
     travel: old?.travel ? JSON.parse(JSON.stringify(old.travel)) : null,
     leave: old?.leave ? JSON.parse(JSON.stringify(old.leave)) : undefined,
   };
@@ -6707,7 +6824,7 @@ function scheduleEntryStatus(entry, date = today(), time = timeNow().slice(0, 5)
 function scheduleEntryCard(entry, compact = false) {
   const slot = entry.slot,
     status = scheduleEntryStatus(entry);
-  return `<button type="button" class="slot workhub-booking${compact ? ' compact' : ''} status-${statusClass(status)}${isToilSchedule(slot) ? ' toil' : ''}" data-schedule-status="${esc(slot.date + '|' + slot.time)}" data-schedule-class="slot workhub-booking${compact ? ' compact' : ''}" data-action="open-booking" data-date="${esc(slot.date)}" data-time="${esc(slot.time)}"><span class="booking-time">${entry.time}–${entry.endTime}${isToilSchedule(slot) ? ' · TOIL' : ''}</span><strong>${esc(scheduleEntryTitle(entry))}</strong>${window.WorkHubClaims.badge(slot)}${!compact ? `<span class="booking-context">${esc(scheduleEntryContext(entry))}</span><span class="booking-duration-label">${formatDuration(entry.hours * 60)} · View details ↗</span>` : ''}<span class="slot-state">${esc(status)}</span></button>`;
+  return `<button type="button" class="slot workhub-booking${compact ? ' compact' : ''} status-${statusClass(status)}${isToilSchedule(slot) ? ' toil' : ''}" data-schedule-status="${esc(slot.date + '|' + slot.time)}" data-schedule-class="slot workhub-booking${compact ? ' compact' : ''}" data-action="open-booking" data-date="${esc(slot.date)}" data-time="${esc(slot.time)}"><span class="booking-time">${entry.time}–${entry.endTime}${isToilSchedule(slot) ? ' · TOIL' : ''}</span><strong>${esc(scheduleEntryTitle(entry))}</strong>${scheduleCompanyBadge(slot)}${window.WorkHubClaims.badge(slot)}${!compact ? `<span class="booking-context">${esc(scheduleEntryContext(entry))}</span><span class="booking-duration-label">${formatDuration(entry.hours * 60)} · View details ↗</span>` : ''}<span class="slot-state">${esc(status)}</span></button>`;
 }
 function scheduleMonthMetrics() {
   const entries = monthDates(month).flatMap(scheduleEntries);
@@ -6889,7 +7006,7 @@ function viewBooking(date, time) {
     status = scheduleEntryStatus(entry);
   openModal(
     'Scheduled activity',
-    `<div class="booking-view-hero"><span class="eyebrow">${esc(window.WorkHubLeave.isLeave(slot.kind) ? window.WorkHubLeave.TYPES[slot.kind] : slot.kind === 'task' ? 'Main task' : slot.kind === 'project' ? 'Project activity' : 'Activity')}</span><h3>${esc(scheduleEntryTitle(entry))}</h3><p>${esc(scheduleEntryContext(entry))}</p>${tag(status)}</div><dl class="booking-facts"><div><dt>Dates</dt><dd>${esc(dates[0])}${dates.length > 1 ? ' → ' + esc(dates.at(-1)) : ''}</dd></div><div><dt>Time each day</dt><dd>${esc(entry.time)}–${esc(entry.endTime)}</dd></div><div><dt>Duration</dt><dd>${formatDuration(entry.hours * 60)} per day${dates.length > 1 ? ' · ' + formatDuration(block.reduce((sum, row) => sum + slotMinutes(row), 0)) + ' total' : ''}</dd></div><div><dt>Work location</dt><dd>${esc(slot.location) || 'Not specified'}</dd></div></dl>${window.WorkHubLeave.details(slot)}${window.WorkHubClaims.details(slot, state)}<h3 class="section-label">${slot.kind === 'custom' ? 'Activity details' : 'Remarks / notes'}</h3><p class="prewrap">${esc(slot.text) || 'No notes added.'}</p>${plan?.actualReviewedAt ? `<h3 class="section-label">Actual work</h3><p class="prewrap">${esc(plan.actualTask) || 'Same as planned'}</p>` : ''}${slot.kind === 'task' && task?.subTasks?.length ? `<h3 class="section-label">Sub-tasks · ${task.subTasks.filter(sub => sub.status === 'Completed').length}/${task.subTasks.length} complete</h3>${task.subTasks.map(sub => `<p><strong>${esc(sub.title)}</strong> · ${esc(sub.status)}</p>`).join('')}` : ''}<div class="modal-actions"><button type="button" data-action="cancel">Close</button><button type="button" class="primary" data-action="edit-booking" data-date="${esc(date)}" data-time="${esc(entry.slot.time)}">Edit activity</button></div>`
+    `<div class="booking-view-hero"><span class="eyebrow">${esc(window.WorkHubLeave.isLeave(slot.kind) ? window.WorkHubLeave.TYPES[slot.kind] : slot.kind === 'task' ? 'Main task' : slot.kind === 'project' ? 'Project activity' : 'Activity')}</span><h3>${esc(scheduleEntryTitle(entry))}</h3><p>${esc(scheduleEntryContext(entry))}</p>${tag(status)}</div><dl class="booking-facts"><div><dt>Company</dt><dd>${esc(scheduleCompanyName(slot)) || 'Not specified'}</dd></div><div><dt>Dates</dt><dd>${esc(dates[0])}${dates.length > 1 ? ' → ' + esc(dates.at(-1)) : ''}</dd></div><div><dt>Time each day</dt><dd>${esc(entry.time)}–${esc(entry.endTime)}</dd></div><div><dt>Duration</dt><dd>${formatDuration(entry.hours * 60)} per day${dates.length > 1 ? ' · ' + formatDuration(block.reduce((sum, row) => sum + slotMinutes(row), 0)) + ' total' : ''}</dd></div><div><dt>Work location</dt><dd>${esc(slot.location) || 'Not specified'}</dd></div></dl>${window.WorkHubLeave.details(slot)}${window.WorkHubClaims.details(slot, state)}<h3 class="section-label">${slot.kind === 'custom' ? 'Activity details' : 'Remarks / notes'}</h3><p class="prewrap">${esc(slot.text) || 'No notes added.'}</p>${plan?.actualReviewedAt ? `<h3 class="section-label">Actual work</h3><p class="prewrap">${esc(plan.actualTask) || 'Same as planned'}</p>` : ''}${slot.kind === 'task' && task?.subTasks?.length ? `<h3 class="section-label">Sub-tasks · ${task.subTasks.filter(sub => sub.status === 'Completed').length}/${task.subTasks.length} complete</h3>${task.subTasks.map(sub => `<p><strong>${esc(sub.title)}</strong> · ${esc(sub.status)}</p>`).join('')}` : ''}<div class="modal-actions"><button type="button" data-action="cancel">Close</button><button type="button" class="primary" data-action="edit-booking" data-date="${esc(date)}" data-time="${esc(entry.slot.time)}">Edit activity</button></div>`
   );
 }
 function subTaskCard(task, sub) {
