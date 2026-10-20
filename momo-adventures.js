@@ -411,10 +411,7 @@
       const d = a.state(),
         today = a.today(),
         out = [],
-        snoozed = (kind, id) =>
-          (d.workhub.reminders || []).some(
-            r => r.kind === kind && r.recordId === id && r.until > today
-          ),
+        snoozed = (kind, id) => root.WorkHubReminders.isSnoozed(d, kind, id, today),
         projectClosed = id => {
           const p = d.projects.find(p => p.id === id);
           return (

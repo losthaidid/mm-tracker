@@ -594,7 +594,7 @@ function useDay(window,day){const RealDate=window.Date;window.Date=class extends
 
 test('reminder presets and custom dates persist without changing task details or subtasks',async t=>{
  const {api,document,window,db}=await app(t),id=addMainTask(api,document,'Revisit the rollout');addTaskSub(api,document,id,'Keep this child','Child remarks','Child feedback');await settle();const before=copy(api.state().tasks[0]);api.showTab('tasks');document.querySelector('.task-main-card [data-reminder="edit"]').click();await settle();
- document.querySelector('[data-reminder="days"][data-days="7"]').click();assert.equal(document.getElementById('reminderDays').value,'7');document.getElementById('reminderDays').value='5';document.getElementById('reminderDays').dispatchEvent(new window.Event('input',{bubbles:true}));let f=document.getElementById('reminderForm');const until=window.WorkHubReminders.shift(window.api.state().tasks[0].doneDate||new window.Date().toLocaleDateString('en-CA'),5);assert.equal(f.elements.namedItem('until').value,until);f.elements.namedItem('note').value='Review transport after UAT';f.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));await settle();
+ document.querySelector('[data-reminder="days"][data-days="7"]').click();assert.equal(document.getElementById('reminderDays').value,'7');document.getElementById('reminderDays').value='5';document.getElementById('reminderDays').dispatchEvent(new window.Event('input',{bubbles:true}));let f=document.getElementById('reminderForm');const until=window.WorkHubReminders.shift(window.api.state().tasks[0].doneDate||new window.Date().toLocaleDateString('en-CA'),5);assert.equal(f.elements.namedItem('until').value,until);f.elements.namedItem('hideUntilDue').checked=true;f.elements.namedItem('note').value='Review transport after UAT';f.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));await settle();
  assert.deepEqual(copy(api.state().tasks[0]),before);assert.equal(document.querySelectorAll('.task-main-card').length,0);assert.match(document.querySelector('.reminder-snoozed').textContent,/Review transport after UAT/);assert.equal(db.row.document.data.workhub.reminders[0].until,until);assert.equal(api.parseBackup(api.payload(api.state())).workhub.reminders[0].note,'Review transport after UAT');
  api.hub.setBoard(true);api.showTab('tasks');assert.equal(document.querySelectorAll('[data-task-card]').length,0);api.hub.reminders.dismiss('tasks',id);await settle();assert.ok(document.querySelector('[data-task-card]'));assert.equal(api.state().tasks[0].subTasks[0].feedback,'Child feedback');
 });
@@ -1000,7 +1000,7 @@ test('workspace Momo respects quiet, focus, reduced motion and local moment swit
 
 test('workspace Momo discoveries use real record links, open the reference and respect snoozed tasks',async t=>{
  const {api,document,window,db}=await app(t),id=addMainTask(api,document,'Review procurement design');await settle();api.mutate(d=>{d.tasks[0].taskType='Project';d.tasks[0].linkId=d.projects[0].id;d.workhub.notes.push({id:'note-discovery',title:'Verified procurement reference',body:'Our checked notes',tags:'',tcodes:'ME21N',configuration:'',errors:'',testing:'',projectId:d.projects[0].id,ticketId:'',itemId:'',updatedAt:new Date().toISOString()});});await settle();const calls=db.calls.length,discovery=api.hub.moments.discoveries()[0];assert.equal(discovery.links[0].id,id);assert.equal(discovery.links[1].id,'note-discovery');assert.equal(api.hub.moments.deliver(),true);document.getElementById('momoDiscovery').click();assert.match(document.getElementById('modalBody').textContent,/Verified procurement reference/);document.querySelector('[data-moment="open-record"][data-kind="notes"]').click();await settle();assert.match(document.getElementById('modalBody').textContent,/Our checked notes/);assert.equal(db.calls.length,calls);
- api.closeModal();api.hub.reminders.editor('tasks',id);const form=document.getElementById('reminderForm');assert.ok(form);form.elements.namedItem('days').value='7';form.elements.namedItem('days').dispatchEvent(new window.Event('input',{bubbles:true}));form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));await settle();assert.equal(api.hub.moments.discoveries().some(x=>x.links.some(l=>l.kind==='tasks'&&l.id===id)),false);
+ api.closeModal();api.hub.reminders.editor('tasks',id);const form=document.getElementById('reminderForm');assert.ok(form);form.elements.namedItem('days').value='7';form.elements.namedItem('days').dispatchEvent(new window.Event('input',{bubbles:true}));form.elements.namedItem('hideUntilDue').checked=true;form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));await settle();assert.equal(api.hub.moments.discoveries().some(x=>x.links.some(l=>l.kind==='tasks'&&l.id===id)),false);
 });
 
 test('workspace visitors meet Momo, change expressions and release the scene when they leave',async t=>{
@@ -1665,6 +1665,105 @@ test('ticket history preserves older entries and manual updates use plain timest
  assert.equal(sheet.rows[0].values[3],legacy);
  assert.equal(sheet.rows[1].values[3],'New progress note [20-10-2026 12:00:00]');
  assert.equal(sheet.rows[2].values[3],'Manual follow-up [20-10-2026 12:00:00]');
+});
+
+function reminderClock(window, stamp) {
+ const NativeDate=window.Date;
+ window.Date=class extends NativeDate {
+  constructor(...args){super(...(args.length?args:[stamp]));}
+  static now(){return new NativeDate(stamp).getTime();}
+ };
+}
+
+test('timed reminders: end-of-day alerts arrive at the chosen minute without hiding the task or saving clock ticks',async t=>{
+ const {api,document,window,db}=await app(t),ui=api.hub.reminders;
+ reminderClock(window,'2026-10-20T12:00:00');
+ const id=addMainTask(api,document,'Prepare the end-of-day update');
+ await settle();const before=copy(api.state().tasks[0]);api.showTab('tasks');
+ ui.editor('tasks',id);document.querySelector('[data-quick="eod"]').click();
+ const f=document.getElementById('reminderForm');
+ assert.equal(f.elements.namedItem('until').value,'2026-10-20');
+ assert.equal(f.elements.namedItem('time').value,'18:00');
+ assert.equal(f.elements.namedItem('hideUntilDue').checked,false);
+ f.elements.namedItem('note').value='Update the ticket <img src=x> before signing off';
+ f.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));await settle();
+ const r=api.state().workhub.reminders[0],writes=db.calls.length;
+ assert.equal(r.at,'2026-10-20T10:00:00.000Z');assert.equal(r.hideUntilDue,false);
+ assert.ok(document.querySelector('.task-main-card'));assert.equal(document.getElementById('reminderAlert'),null);
+ reminderClock(window,'2026-10-20T17:59:59');ui.tick();assert.equal(document.getElementById('reminderAlert'),null);
+ reminderClock(window,'2026-10-20T18:00:00');ui.tick();
+ const alert=document.getElementById('reminderAlert');assert.ok(alert);
+ assert.match(alert.textContent,/before signing off/);assert.equal(alert.querySelector('img'),null);
+ ui.tick();assert.equal(document.getElementById('reminderAlert'),alert);
+ assert.equal(db.calls.length,writes);assert.deepEqual(copy(api.state().tasks[0]),before);
+ assert.equal(api.parseBackup(api.payload(api.state())).workhub.reminders[0].at,r.at);
+});
+
+test('timed reminders: due alerts wait for editing and respect hidden pages and Privacy',async t=>{
+ const {api,document,window,db}=await app(t),ui=api.hub.reminders;
+ reminderClock(window,'2026-10-20T12:00:00');const id=addMainTask(api,document,'Review a draft');
+ ui.schedule('tasks',id,'2026-10-20T04:15:00.000Z','Review this draft');await settle();
+ api.editRecord('tasks',id);const f=document.getElementById('editForm');f.elements.namedItem('task').value='Unsaved draft remains';
+ const writes=db.calls.length;reminderClock(window,'2026-10-20T12:15:00');ui.tick();
+ assert.equal(document.getElementById('editForm'),f);assert.equal(f.elements.namedItem('task').value,'Unsaved draft remains');
+ assert.equal(document.getElementById('reminderAlert'),null);
+ api.closeModal();ui.tick();assert.ok(document.getElementById('reminderAlert'));
+ document.body.classList.add('hub-private');ui.tick();assert.equal(document.getElementById('reminderAlert'),null);
+ document.body.classList.remove('hub-private');ui.tick();assert.ok(document.getElementById('reminderAlert'));
+ Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});ui.tick();assert.equal(document.getElementById('reminderAlert'),null);
+ Object.defineProperty(document,'hidden',{configurable:true,get:()=>false});document.dispatchEvent(new window.Event('visibilitychange'));
+ assert.ok(document.getElementById('reminderAlert'));assert.equal(db.calls.length,writes);
+});
+
+test('timed reminders: snooze reschedules once and hiding an alert keeps it in the inbox without cloud writes',async t=>{
+ const {api,document,window,db}=await app(t),ui=api.hub.reminders;
+ reminderClock(window,'2026-10-20T12:00:00');const id=addMainTask(api,document,'Call back after lunch');
+ ui.schedule('tasks',id,'2026-10-20T04:15:00.000Z','Call the user back');await settle();
+ reminderClock(window,'2026-10-20T12:15:00');ui.tick();const writes=db.calls.length;
+ document.querySelector('#reminderAlert [data-reminder="later15"]').click();await settle();
+ assert.equal(api.state().workhub.reminders[0].at,'2026-10-20T04:30:00.000Z');
+ assert.equal(api.state().workhub.reminders[0].note,'Call the user back');assert.equal(db.calls.length,writes+1);
+ assert.equal(document.getElementById('reminderAlert'),null);
+ reminderClock(window,'2026-10-20T12:30:00');ui.tick();assert.ok(document.getElementById('reminderAlert'));
+ document.querySelector('[data-reminder="hide-alert"]').click();ui.tick();
+ assert.equal(document.getElementById('reminderAlert'),null);assert.equal(db.calls.length,writes+1);
+ assert.equal(api.state().workhub.reminders.length,1);ui.inbox();assert.match(document.getElementById('modalBody').textContent,/Call the user back/);
+ document.querySelector('.reminder-inbox [data-reminder="dismiss"]').click();await settle();
+ assert.equal(api.state().workhub.reminders.length,0);assert.equal(api.state().tasks[0].done,false);
+});
+
+test('timed reminders: relative choices cross midnight, end-of-day time is editable and past times are rejected',async t=>{
+ const {api,document,window,db}=await app(t),ui=api.hub.reminders;
+ reminderClock(window,'2026-10-20T23:55:00');const id=addMainTask(api,document,'Tomorrow review');ui.editor('tasks',id);
+ document.querySelector('[data-quick="15"]').click();let f=document.getElementById('reminderForm');
+ assert.equal(f.elements.namedItem('until').value,'2026-10-21');assert.equal(f.elements.namedItem('time').value,'00:10');
+ const end=document.getElementById('reminderEndTime');end.value='17:30';end.dispatchEvent(new window.Event('change',{bubbles:true}));
+ document.querySelector('[data-quick="eod"]').click();assert.equal(f.elements.namedItem('until').value,'2026-10-21');assert.equal(f.elements.namedItem('time').value,'17:30');
+ const writes=db.calls.length;f.elements.namedItem('until').value='2026-10-20';f.elements.namedItem('time').value='12:00';
+ f.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));await settle();
+ assert.equal(api.state().workhub.reminders.length,0);assert.equal(db.calls.length,writes);assert.equal(document.getElementById('modal').open,true);
+ assert.equal(window.localStorage.getItem('mm-tracker.reminder-end-time'),'17:30');
+});
+
+test('timed reminders: exact times survive cloud reopen and calendar/report exports without extra saves',async t=>{
+ const {api,document,window,db}=await app(t),ui=api.hub.reminders;
+ reminderClock(window,'2026-10-20T12:00:00');const id=addMainTask(api,document,'Review before signing off');
+ ui.schedule('tasks',id,'2026-10-20T10:00:00.000Z','Send the final update');await settle();const writes=db.calls.length;
+ let downloaded;window.URL.createObjectURL=blob=>{downloaded=blob;return 'blob:calendar';};window.URL.revokeObjectURL=()=>{};window.HTMLAnchorElement.prototype.click=()=>{};
+ ui.exportCalendar('tasks',id);assert.match(await downloaded.text(),/DTSTART:20261020T100000Z/);assert.equal(db.calls.length,writes);
+ const sheet=window.WorkHubReports.build(api.state(),{asOf:'2026-10-20'}).sheets.find(s=>s.name==='Reminders');
+ assert.equal(sheet.rows[0].values[3],'Scheduled');assert.equal(sheet.rows[0].values[5],'2026-10-20T10:00:00.000Z');assert.equal(sheet.rows[0].values[6],'No');
+ const reopened=await app(t,{remote:copy(db.row),login:false});reminderClock(reopened.window,'2026-10-20T18:30:00');await reopened.api.loadCloud(sessionUser);await settle();
+ assert.equal(reopened.api.state().workhub.reminders[0].at,'2026-10-20T10:00:00.000Z');assert.ok(reopened.document.getElementById('reminderAlert'));
+});
+
+test('timed reminders: switching accounts closes the old reminder editor and rejects its stale form',async t=>{
+ const {api,document,window,db}=await app(t),ui=api.hub.reminders;
+ reminderClock(window,'2026-10-20T12:00:00');const id=addMainTask(api,document,'Private reminder');await settle();ui.editor('tasks',id);
+ const stale=document.getElementById('reminderForm'),writes=db.calls.length;
+ api.cloud.ready=false;api.cloud.user=null;ui.tick();assert.equal(document.getElementById('modal').open,false);
+ stale.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));await settle();
+ assert.equal(db.calls.length,writes);assert.equal(api.state().workhub.reminders.length,0);assert.equal(document.getElementById('reminderAlert'),null);
 });
 
 test('grouped Settings: option spacing overrides header button styles and hidden sections stay hidden',async t=>{

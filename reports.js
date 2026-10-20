@@ -154,8 +154,10 @@
     );
     const history = tickets =>
       tickets.flatMap(t =>
-        historyEntries(t.history)
-          .map((v, i) => ({ values: [t.ticket, t.description, i + 1, v], record: 0 }))
+        historyEntries(t.history).map((v, i) => ({
+          values: [t.ticket, t.description, i + 1, v],
+          record: 0,
+        }))
       );
     sheet(
       'Ticket updates',
@@ -583,25 +585,32 @@
     const reminders = root.WorkHubReminders.records(d, o.asOf);
     sheet(
       'Reminders',
-      'Items set aside for another look',
+      'Scheduled alerts and items set aside for another look',
       [
         C('Type', 16),
         C('Item', 60),
         C('Revisit on', 18, 'date'),
         C('State', 23),
         C('Reminder note', 80),
+        C('Reminder time (UTC)', 27),
+        C('Hide until due', 18),
       ],
       reminders.map(r => ({
         values: [
           r.kind === 'tickets' ? 'Ticket' : r.kind === 'tasks' ? 'Task' : 'Project',
           r.title,
           date(r.until),
-          r.due ? 'Time to revisit' : 'Snoozed',
+          r.due ? 'Time to revisit' : r.hidden ? 'Snoozed' : 'Scheduled',
           r.note,
+          r.at || '',
+          r.hidden ? 'Yes' : 'No',
         ],
         record: 1,
       })),
-      { status: 3, note: 'Snoozing does not change original statuses or deadlines.' }
+      {
+        status: 3,
+        note: 'Timed alerts use a fixed UTC instant and display in the device timezone. Legacy date-only reminders retain their original date. Statuses and deadlines are unchanged.',
+      }
     );
     if (o.includeArchive)
       sheet(
