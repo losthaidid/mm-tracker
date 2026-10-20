@@ -28,7 +28,7 @@
     return d.workhub.tcodes.records.filter(r=>(filters.archived?r.archived:!r.archived) &&
       (!filters.system || r.systems.includes(filters.system)) && (!filters.category || r.category===filters.category) &&
       (!filters.favorite || r.favorite) && (!q || [r.code,r.title,r.area,r.notes,r.eccNote,r.s4Note].some(v=>v.toLowerCase().includes(q))))
-      .sort((a,b)=>Number(b.favorite)-Number(a.favorite)||a.category.localeCompare(b.category)||a.code.localeCompare(b.code));
+      .sort((a,b)=>{const order=['Transactions','Reporting','Master data','Configuration','Support'],rank=c=>order.includes(c)?order.indexOf(c):99;return rank(a.category)-rank(b.category)||a.category.localeCompare(b.category)||Number(b.favorite)-Number(a.favorite)||a.code.localeCompare(b.code);});
   }
   root.WorkHubSapTcodesEngine={upgrade,validate,query};
 })(window);
