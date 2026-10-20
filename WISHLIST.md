@@ -4,7 +4,9 @@
 
 The two prioritised items are implemented: **TNG PDF extraction and cropped evidence downloads**, and **continuous Troubleshooting Lab result animations with saved-result autoplay**. See [the usage guide](docs/TNG-AND-LAB.md).
 
-The Momo behaviour suggestions (51–60) are kept in [Batch B](BATCH-B.md), for later implementation. Request inbox, End-of-day ritual, Personal learning roadmap and Show-me-how walkthroughs also remain deferred. This release does not implement those deferred items.
+The Momo behaviour suggestions (51–60) are kept in [Batch B](BATCH-B.md), for later implementation. They are the remaining pending wishlist items.
+
+On 20 October 2026, Request inbox, End-of-day ritual, Personal learning roadmap and Show-me-how walkthroughs were removed from the wishlist at the user's request.
 
 ## Earlier completed selections
 
