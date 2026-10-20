@@ -78,6 +78,8 @@
     root.WorkHubBatchEngine?.upgrade(d);
     root.WorkHubWorkLibraryEngine?.upgrade(d);
     root.WorkHubProjectStandupEngine?.upgrade(d);
+    root.WorkHubRehearsalEngine?.upgrade(d);
+    root.WorkHubSapTcodesEngine?.upgrade(d);
     if (h.simulator === undefined)
       h.simulator = {
         quantity: 100,
@@ -96,6 +98,8 @@
     root.WorkHubBatchEngine?.validate(d);
     root.WorkHubWorkLibraryEngine?.validate(d);
     root.WorkHubProjectStandupEngine?.validate(d);
+    root.WorkHubRehearsalEngine?.validate(d);
+    root.WorkHubSapTcodesEngine?.validate(d);
     root.WorkHubReminders?.validate(d);
     root.WorkHubProjectDates.validate(d);
     root.WorkHubLeave.validate(d);
@@ -254,6 +258,8 @@
       validator = null,
       library = null,
       standup = null,
+      rehearsal = null,
+      tcodes = null,
       focusPanel = null,
       life = null,
       atmosphere = null,
@@ -290,7 +296,6 @@
       timerDraft = null,
       timerOwner = '',
       viewTab = 'home',
-      simulatorDraft = null,
       themePreview = null;
     const focusMinutesKey = 'mm-tracker.focus-minutes.v1',
       validFocusMinutes = n => Number.isInteger(n) && n >= 1 && n <= 1440;
@@ -1458,40 +1463,6 @@
         withinTolerance: p ? Math.abs(((ip - p) / p) * 100) <= t : ip === 0,
       };
     }
-    function simulator() {
-      const v = simulatorDraft || data().simulator;
-      return `<section class="hub-card"><span class="hub-kicker">LOCAL VISUAL EXPLAINER</span><h3>Purchase order → Goods receipt → Invoice</h3><p>Experiment with sample values. This illustrates matching differences; it does not post to SAP or determine your system’s blocking rules.</p><form id="hubSimulator"><div class="form-grid">${[
-        ['quantity', 'Ordered quantity'],
-        ['price', 'PO unit price'],
-        ['received', 'Received quantity'],
-        ['invoiced', 'Invoiced quantity'],
-        ['invoicePrice', 'Invoice unit price'],
-        ['tolerance', 'Illustrative price tolerance (%)'],
-      ]
-        .map(
-          ([k, l]) =>
-            `<div><label for="sim-${k}">${l}</label><input type="number" min="0" max="1000000000" step="any" id="sim-${k}" name="${k}" value="${v[k]}" required></div>`
-        )
-        .join(
-          ''
-        )}</div><div id="hubSimulationResult">${simulationResult(v)}</div><button type="submit" class="primary">Save sample values</button></form></section>`;
-    }
-    function simulationResult(v) {
-      const r = simulationValues(v),
-        money = n => n.toLocaleString(undefined, { maximumFractionDigits: 2 });
-      return `<div class="hub-simulator">${[
-        ['Purchase order', v.quantity + ' units', money(r.order)],
-        ['Goods receipt', v.received + ' units', money(r.receipt)],
-        ['Invoice', v.invoiced + ' units', money(r.invoice)],
-      ]
-        .map(
-          ([t, q, m]) =>
-            `<article class="hub-document"><span class="hub-kicker">${t}</span><strong>${q}</strong><p>Value ${m}</p></article>`
-        )
-        .join(
-          ''
-        )}</div><div class="hub-difference"><p>Invoice minus receipt: <strong>${money(r.quantityDifference)} units</strong></p><p>Unit-price difference: <strong>${money(r.priceDifference)} (${money(r.priceVariance)}%)</strong></p><p>${r.withinTolerance ? '✓ Within' : '! Outside'} your illustrative price tolerance.</p></div>`;
-    }
     function focusWidget() {
       return `<form id="hubFocusForm" class="hub-focus-form"><div class="hub-focus-clock" id="hubFocusClock" data-long="${(focus?.minutes || focusMinutes) >= 1000}">${focus ? focusText() : String(focusMinutes).padStart(2, '0') + ':00'}</div><p class="hub-meta">${focus?.title ? esc(focus.title) : 'A quiet space for one thing at a time.'}</p>${
         !focus
@@ -1640,7 +1611,8 @@
     function studio() {
       const tools = {
         theme: 'Theme studio',
-        simulator: 'Document simulator',
+        simulator: 'Process Rehearsal',
+        tcodes: 'SAP T-codes',
         focus: 'Focus room',
         journey: 'Project journey',
         scrapbook: 'Scrapbook',
@@ -1655,7 +1627,7 @@
         )
         .join(
           ''
-        )}</div>${currentTool === 'theme' ? themeStudio() : currentTool === 'simulator' ? simulator() : currentTool === 'focus' ? `<section class="hub-card">${focusWidget()}${prefs().desk ? desk() : ''}</section>` : currentTool === 'journey' ? `<section class="hub-card">${journey()}</section>` : currentTool === 'scrapbook' ? scrapbook() : currentTool === 'wrap' ? dailySummary() : sessionsView()}</section>`;
+        )}</div>${currentTool === 'theme' ? themeStudio() : currentTool === 'simulator' ? (rehearsal?.render() || '') : currentTool === 'tcodes' ? (tcodes?.render() || '') : currentTool === 'focus' ? `<section class="hub-card">${focusWidget()}${prefs().desk ? desk() : ''}</section>` : currentTool === 'journey' ? `<section class="hub-card">${journey()}</section>` : currentTool === 'scrapbook' ? scrapbook() : currentTool === 'wrap' ? dailySummary() : sessionsView()}</section>`;
     }
     function timerKey() {
       return a.cloud().user ? 'mm-tracker.timer.v1:' + a.cloud().user.id : null;
@@ -2459,6 +2431,8 @@
       tng?.mount(tab);
       recipients?.mount(tab);
       settingsPanel?.mount();
+      rehearsal?.mount();
+      tcodes?.mount();
     }
     const renderers = {
       home: dashboard,
@@ -2760,7 +2734,6 @@
       if (action === 'tool') {
         $('settingsMenu').open = false;
         currentTool = el.dataset.tool;
-        simulatorDraft = null;
         a.closeModal();
         navigate('studio');
         return;
@@ -3122,15 +3095,6 @@
         a.closeModal();
         return;
       }
-      if (form.id === 'hubSimulator') {
-        const v = Object.fromEntries(Object.entries(values).map(([k, v]) => [k, Number(v)])),
-          d = copy(a.state());
-        d.workhub.simulator = v;
-        validate(d);
-        simulatorDraft = null;
-        save(h => (h.simulator = v), 'Sample values saved.');
-        return;
-      }
       if (form.id === 'hubTimerStart') {
         startTimer(values);
         return;
@@ -3373,13 +3337,6 @@
           previewTheme(el.form);
         } catch {}
       }
-      if (el.form?.id === 'hubSimulator') {
-        const v = Object.fromEntries([...new FormData(el.form)].map(([k, v]) => [k, Number(v)]));
-        if (Object.values(v).every(x => Number.isFinite(x) && x >= 0 && x <= 1e9)) {
-          simulatorDraft = v;
-          $('hubSimulationResult').innerHTML = simulationResult(v);
-        }
-      }
     });
     document.addEventListener('change', event => {
       const el = event.target;
@@ -3586,6 +3543,8 @@
       tell: a.tell,
       openModal: a.openModal,
     });
+    rehearsal = root.WorkHubRehearsal?.install({ ...a, ready: () => a.cloud().ready, owner: () => a.cloud().user?.id || '', prefs: () => themePreview || prefs() });
+    tcodes = root.WorkHubSapTcodes?.install({ ...a, ready: () => a.cloud().ready, owner: () => a.cloud().user?.id || '' });
     projectDates = root.WorkHubProjectDates.install(a);
     standup = root.WorkHubProjectStandup?.install({
       ...a,
@@ -3670,6 +3629,8 @@
       validator,
       library,
       standup,
+      rehearsal,
+      tcodes,
       focusPanel,
       focusSnapshot,
       reminders,

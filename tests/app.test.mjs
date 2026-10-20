@@ -1932,3 +1932,56 @@ test('Schedule companies: changing booking types preserves company choices for t
  api.openRangeEditor('2026-10-20','13:15','',true);let f=document.getElementById('scheduleForm');fill(f,{companyId:company.id,text:'Notes before switching'});f.elements.namedItem('kind').value='task';f.elements.namedItem('kind').dispatchEvent(new window.Event('change',{bubbles:true}));f=document.getElementById('scheduleForm');assert.equal(f.elements.namedItem('companyId').value,company.id);assert.equal(f.elements.namedItem('text').value,'Notes before switching');f.elements.namedItem('linkId').value=task;api.saveRange(f);await settle();assert.equal(api.state().schedule[0].companyId,company.id);
  api.openRangeEditor('2026-10-21','09:00','',true);f=document.getElementById('scheduleForm');f.elements.namedItem('companyId').value=company.id;f.elements.namedItem('kind').value='annual-leave';f.elements.namedItem('kind').dispatchEvent(new window.Event('change',{bubbles:true}));f=document.getElementById('scheduleForm');assert.equal(f.elements.namedItem('companyId').value,company.id);api.saveRange(f);await settle();assert.ok(api.state().schedule.filter(s=>s.kind==='annual-leave').every(s=>s.companyId===company.id));assert.equal(db.row.document.data.schedule.at(-1).companyId,company.id);api.validate(api.state());
 });
+
+test('rehearsal UI: opening the replacement starts a local looping preview with sound enabled by default',async t=>{
+ const {api,document,db}=await app(t);api.hub.setTool('simulator');api.showTab('studio');const r=api.hub.rehearsal;
+ assert.ok(document.getElementById('rehearsalRoot'));assert.equal(document.getElementById('hubSimulator'),null);assert.equal(api.state().workhub.rehearsal.preferences.sound,true);assert.equal(r.snapshot().paused,false);assert.equal(db.calls.length,0);
+ assert.ok(document.querySelectorAll('.rehearsal-node').length>=8);assert.equal(r.plan().entries.length,6);
+ for(let n=1;n<=420;n++)r.tick(n*150);
+ assert.ok(r.snapshot().loops>=1);assert.equal(api.state().workhub.rehearsal.processes.length,0);assert.equal(db.calls.length,0);
+});
+
+test('rehearsal UI: save example, edit a step and retain snapshots through cloud saving and backup',async t=>{
+ const {api,document,window,db}=await app(t);api.hub.setTool('simulator');api.showTab('studio');document.querySelector('[data-rehearsal="keep"]').click();await settle();
+ const r=api.hub.rehearsal,p=api.state().workhub.rehearsal.processes[0];assert.ok(p);assert.notEqual(p.id,'__demo__');r.stepEditor('po');let f=document.getElementById('rehearsalStepForm');
+ assert.equal(r.snapshot().paused,true);assert.equal(r.snapshot().editing,true);f.elements.namedItem('instruction').value='Review the order with my checklist';f.elements.namedItem('changes').value='Ordered quantity = 120\nOrder value = 1200';r.saveForm(f);await settle();
+ assert.equal(api.state().workhub.rehearsal.processes[0].steps[0].instruction,'Review the order with my checklist');assert.equal(r.snapshot().editing,false);assert.equal(r.snapshot().paused,false);
+ const restored=api.parseBackup(JSON.stringify(db.row.document));assert.equal(restored.workhub.rehearsal.processes[0].steps[0].changes[0].value,120);
+ r.stepEditor('po');f=document.getElementById('rehearsalStepForm');f.elements.namedItem('instruction').value='Unsaved draft';const speed=document.getElementById('rehearsalSpeed');speed.value='2';speed.dispatchEvent(new window.Event('change',{bubbles:true}));assert.equal(document.getElementById('rehearsalStepForm').elements.namedItem('instruction').value,'Unsaved draft');
+});
+
+test('rehearsal UI: scenario changes, rewind, failure routes and off-route inspection remain deterministic',async t=>{
+ const {api,document,window}=await app(t);api.hub.setTool('simulator');api.showTab('studio');const r=api.hub.rehearsal;
+ const select=document.getElementById('rehearsalScenario');select.value='partial';select.dispatchEvent(new window.Event('change',{bubbles:true}));assert.equal(r.plan().values['Received quantity'],60);assert.ok(r.plan().entries.some(e=>e.id==='followup'));
+ document.querySelector('[data-rehearsal="inspect"][data-id="rework"]').click();await settle();assert.match(document.getElementById('rehearsalInspector').textContent,/Revise rejected order/);
+ document.querySelector('[data-rehearsal="failure"][data-id="rework"]').click();await settle();assert.ok(r.plan().entries.length>0);assert.match(document.getElementById('toast').textContent,/outside the current route/);
+ document.querySelector('[data-rehearsal="back"]').click();await settle();assert.equal(r.snapshot().paused,true);
+});
+
+test('rehearsal UI: account switches reject stale step editors and motion off stops automatic advance',async t=>{
+ const {api,document}=await app(t);api.hub.setTool('simulator');api.showTab('studio');document.querySelector('[data-rehearsal="keep"]').click();await settle();const r=api.hub.rehearsal;r.stepEditor('po');const stale=document.getElementById('rehearsalStepForm');stale.elements.namedItem('title').value='Private old draft';
+ api.cloud.user={id:'22222222-2222-4222-8222-222222222222'};api.showTab('home');assert.throws(()=>r.saveForm(stale),/Sign in/);
+ api.mutate(d=>{d.workhub.preferences.motion='off';});api.hub.setTool('simulator');api.showTab('studio');const before=r.snapshot().index;for(let n=1;n<=80;n++)r.tick(n*150);assert.equal(r.snapshot().index,before);
+});
+
+test('T-code UI: version filters, custom maintenance, favourites and archival use private autosave',async t=>{
+ const {api,document,window,db}=await app(t);api.hub.setTool('tcodes');api.showTab('studio');assert.equal(document.querySelectorAll('.tcode-card').length,79);
+ const system=document.getElementById('tcodesSystem');system.value='S4';system.dispatchEvent(new window.Event('change',{bubbles:true}));assert.ok(![...document.querySelectorAll('.tcode-code')].some(el=>el.textContent==='XK01'));assert.ok([...document.querySelectorAll('.tcode-code')].some(el=>el.textContent==='BP'));
+ api.hub.tcodes.editor();let f=document.getElementById('tcodeForm');for(const [k,v]of Object.entries({code:'ZMM_REPORT',title:'My MM report',category:'Reporting',area:'Purchasing',notes:'Use my saved variant'}))f.elements.namedItem(k).value=v;api.hub.tcodes.save(f);await settle();
+ const record=api.state().workhub.tcodes.records.find(r=>r.code==='ZMM_REPORT');assert.ok(record);assert.equal(db.row.document.data.workhub.tcodes.records.at(-1).id,record.id);document.querySelector('[data-tcodes="favorite"][data-id="'+record.id+'"]').click();await settle();assert.equal(api.state().workhub.tcodes.records.find(r=>r.id===record.id).favorite,true);
+ document.querySelector('[data-tcodes="archive"][data-id="'+record.id+'"]').click();await settle();assert.equal(api.state().workhub.tcodes.records.find(r=>r.id===record.id).archived,true);
+});
+
+test('T-code UI: stale account forms and invalid duplicate codes cannot overwrite library entries',async t=>{
+ const {api,document}=await app(t);api.hub.setTool('tcodes');api.showTab('studio');const ui=api.hub.tcodes;ui.editor();const f=document.getElementById('tcodeForm');f.elements.namedItem('code').value='ME21N';f.elements.namedItem('title').value='Duplicate';assert.throws(()=>ui.save(f),/unique/);assert.equal(api.state().workhub.tcodes.records.length,79);
+ api.cloud.user={id:'22222222-2222-4222-8222-222222222222'};api.showTab('home');assert.equal(document.getElementById('modal').open,false);assert.throws(()=>ui.save(f),/Sign in/);
+});
+
+test('rehearsal UI: audio waits for a gesture, respects mute and keyboard positioning preserves focus',async t=>{
+ const {api,document,window}=await app(t);let starts=0,suspends=0;
+ class AudioMock{constructor(){this.state='suspended';this.currentTime=0;this.destination={};}async resume(){this.state='running';}async suspend(){suspends++;this.state='suspended';}async close(){this.state='closed';}createOscillator(){return{frequency:{setValueAtTime(){}},connect(){},disconnect(){},start(){starts++;},stop(){}};}createGain(){return{gain:{setValueAtTime(){},linearRampToValueAtTime(){},exponentialRampToValueAtTime(){}},connect(){},disconnect(){}};}}
+ window.AudioContext=AudioMock;api.hub.setTool('simulator');api.showTab('studio');assert.equal(starts,0);
+ document.querySelector('[data-rehearsal="play"]').click();await settle();document.querySelector('[data-rehearsal="play"]').click();await settle();assert.ok(starts>0);
+ document.querySelector('[data-rehearsal="sound"]').click();await settle();assert.equal(api.state().workhub.rehearsal.preferences.sound,false);assert.ok(suspends>0);
+ document.querySelector('[data-rehearsal="keep"]').click();await settle();const old=api.state().workhub.rehearsal.processes[0].steps[0].x,handle=document.querySelector('[data-rehearsal-drag="po"]');handle.focus();handle.dispatchEvent(new window.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));await settle();assert.equal(api.state().workhub.rehearsal.processes[0].steps[0].x,old+10);assert.equal(document.activeElement.dataset.rehearsalDrag,'po');
+});
