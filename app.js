@@ -966,6 +966,7 @@ function changeRangeKind(el) {
   scheduleDraft = {
     ...scheduleDraft,
     travel: window.WorkHubClaims.draft(f, el.value),
+    ...window.WorkHubClaims.context(f, el.value),
     date: val('date'),
     endDate: val('endDate'),
     time: leave ? '09:00' : val('time'),
@@ -1605,7 +1606,8 @@ function saveRange(form) {
     ),
     company = readScheduleCompany(form, oldBooking || oldPlan, { kind, linkId }),
     leaveData = window.WorkHubLeave.read(form, kind),
-    travel = window.WorkHubClaims.read(form, kind);
+    travel = window.WorkHubClaims.read(form, kind),
+    claimContext = window.WorkHubClaims.context(form, kind, true);
   if (dates.length * times.length > LIMIT)
     throw Error('A booking can contain at most 5,000 time segments.');
   if (kind === 'project' && !state.lists.workLocations.includes(location))
@@ -1657,6 +1659,7 @@ function saveRange(form) {
           bookingId,
           planId,
           travel,
+          ...claimContext,
           ...leaveData,
         });
     d.calendarMonth = date.slice(0, 7);
@@ -6739,6 +6742,8 @@ function openRangeEditor(date = today(), time = '09:00', taskId = '', createNew 
     companyId: old?.companyId || plan?.companyId || '',
     companyName: old?.companyName || plan?.companyName || '',
     travel: old?.travel ? JSON.parse(JSON.stringify(old.travel)) : null,
+    claimType: window.WorkHubClaimsEngine.claimType(old),
+    claimLocationName: old?.claimLocationName || '',
     leave: old?.leave ? JSON.parse(JSON.stringify(old.leave)) : undefined,
   };
   renderRangeEditor();

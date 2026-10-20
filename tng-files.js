@@ -209,7 +209,90 @@
     );
   const filename = row =>
     `tng-${row.date}-${row.section === 'online' ? 'online' : 'offline'}-${row.transactionNo.replace(/[^a-z0-9-]/gi, '').slice(0, 60) || 'manual'}.png`;
-  async function pdfPack(session, rows, includeHeader, alive = () => true) {
+  /** Lay source crops edge-to-edge beneath one journey caption. No giant combined canvas:
+   * each row is embedded individually so long journeys can paginate without exhausting memory.
+   */
+  async function groupedPdf(pdf, font, rgb, session, rows, includeHeader, alive, captions) {
+    const groups = E().evidenceGroups(rows);
+    if (groups.some(g => g.direction === 'review'))
+      throw Error(
+        'Review missing transaction times before exporting To / Return evidence. Use Edit beside the toll record.'
+      );
+    const safeText = value =>
+      String(value)
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^\x20-\x7e]/g, '?');
+    let page, y;
+    function next(group, continued = false) {
+      page = pdf.addPage([595.28, 841.89]);
+      page.drawText('Client site claims', {
+        x: 36,
+        y: 794,
+        size: 16,
+        font,
+        color: rgb(0.13, 0.25, 0.27),
+      });
+      y = 764;
+      const caption = safeText((captions[group.key] || group.caption).trim().slice(0, 120));
+      // Wrap long custom captions while keeping the source table at its full readable width.
+      let line = '';
+      for (const char of caption) {
+        if (font.widthOfTextAtSize(line + char, 13) > 523) {
+          page.drawText(line, { x: 36, y, size: 13, font });
+          y -= 18;
+          line = '';
+        }
+        line += char;
+      }
+      if (line) page.drawText(line, { x: 36, y, size: 13, font });
+      y -= 21;
+      page.drawText(
+        `${group.rows.length} records | RM ${(group.rows.reduce((n, r) => n + r.amountCents, 0) / 100).toFixed(2)}${continued ? ' | continued' : ''}`,
+        { x: 36, y, size: 9, font }
+      );
+      y -= 22;
+    }
+    for (const group of groups) {
+      next(group);
+      let priorHeader = '';
+      for (const row of group.rows) {
+        if (!alive()) throw Error('Export cancelled.');
+        const headerKey = `${row.page}|${row.section}|${JSON.stringify(row.headerRect)}`;
+        let withHeader = includeHeader && headerKey !== priorHeader;
+        let canvas = await crop(session, row, withHeader);
+        let factor = Math.min(523 / canvas.width, 640 / canvas.height);
+        if (y - canvas.height * factor < 45) {
+          next(group, true);
+          if (includeHeader && !withHeader) {
+            withHeader = true;
+            canvas = await crop(session, row, true);
+            factor = Math.min(523 / canvas.width, 640 / canvas.height);
+          }
+        }
+        const blob = await png(canvas);
+        if (!alive()) throw Error('Export cancelled.');
+        const image = await pdf.embedPng(await blob.arrayBuffer()),
+          width = image.width * factor,
+          height = image.height * factor;
+        page.drawImage(image, { x: 36, y: y - height, width, height });
+        y -= height;
+        priorHeader = headerKey;
+      }
+    }
+    const pages = pdf.getPages();
+    pages.forEach((p, i) =>
+      p.drawText(`TNG source evidence | ${i + 1} of ${pages.length}`, {
+        x: 36,
+        y: 23,
+        size: 8,
+        font,
+      })
+    );
+  }
+  async function pdfPack(session, rows, includeHeader, alive = () => true, options = {}) {
+    const type = options.claimType || 'special';
+    if (!['client-site', 'special'].includes(type)) throw Error('Choose a valid claim type.');
     const { PDFDocument, StandardFonts, rgb } = await import(
       new URL('vendor/pdf-lib/pdf-lib.esm.min.js', base).href
     );
@@ -217,6 +300,14 @@
       font = await pdf.embedFont(StandardFonts.Helvetica);
     pdf.setTitle('TNG selected expense evidence');
     pdf.setCreator('SAP MM WorkHub');
+    if (!alive()) throw Error('Export cancelled.');
+    if (type === 'client-site') {
+      if (!rows.some(r => !r.manual)) throw Error('Select PDF transactions for evidence.');
+      await groupedPdf(pdf, font, rgb, session, rows, includeHeader, alive, options.captions || {});
+      const bytes = await pdf.save();
+      if (!alive()) throw Error('Export cancelled.');
+      return new Blob([bytes], { type: 'application/pdf' });
+    }
     let page, y;
     const next = () => {
       page = pdf.addPage([595.28, 841.89]);

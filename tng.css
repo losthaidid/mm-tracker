@@ -456,6 +456,64 @@
   text-align: center;
   color: var(--hub-muted);
 }
+.tng-claim-type,
+.tng-evidence-plan {
+  margin: 18px 26px;
+  padding: 18px 20px;
+  border: 1px solid var(--hub-border);
+  border-radius: 16px;
+  background: var(--hub-surface);
+}
+.tng-claim-type {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px 24px;
+}
+.tng-claim-type label {
+  flex: 1 1 220px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.tng-claim-type select {
+  margin-top: 7px;
+}
+.tng-claim-type p {
+  flex: 2 1 260px;
+}
+.tng-claim-type p,
+.tng-evidence-plan p {
+  margin: 5px 0;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: var(--hub-muted);
+}
+.tng-evidence-plan h3 {
+  margin: 7px 0;
+  font-size: 1rem;
+}
+.tng-evidence-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr));
+  gap: 10px;
+  margin-top: 13px;
+}
+.tng-evidence-group {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--hub-border);
+  border-radius: 12px;
+  background: var(--hub-surface-soft);
+}
+.tng-evidence-group > span {
+  font-size: 0.68rem;
+  color: var(--hub-muted);
+}
+.tng-evidence-group input {
+  font-size: 0.78rem;
+}
 #tngRowForm {
   padding: 18px;
   margin-bottom: 18px;
@@ -501,6 +559,11 @@ body.hub-private .tng-page-frame {
   }
 }
 @media (max-width: 800px) {
+  .tng-claim-type,
+  .tng-evidence-plan {
+    margin: 16px;
+    padding: 15px;
+  }
   .tng-main {
     grid-template-columns: 1fr;
   }

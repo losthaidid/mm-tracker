@@ -43,10 +43,10 @@ CSS (`.css`) controls appearance; HTML supplies the initial page structure.
 | Files | What they control |
 | --- | --- |
 | [app.js](../app.js), [base.css](../base.css) | Schedule views, exact minute intervals, bookings, project-calendar links and the original form layouts. |
-| [claims-engine.js](../claims-engine.js) | Location/rate rules, booking travel snapshots, integer-sen calculations, monthly totals and CSV output. |
-| [claims.js](../claims.js), [claims.css](../claims.css) | Maintainable mileage locations, travel fields, monthly summary and other-expense ledger. |
+| [claims-engine.js](../claims-engine.js) | Location/rate rules, booking travel snapshots, client/special claim types, integer-sen calculations, monthly totals and CSV output. |
+| [claims.js](../claims.js), [claims.css](../claims.css) | Maintainable mileage locations, claim type and one-off destinations, travel fields, monthly summary and other-expense ledger. |
 | [tng-engine.js](../tng-engine.js) | Positioned statement-table parsing, integer-sen amounts, on-site suggestions, duplicate identities and confirmed expense/source validation. No PDF library or account writes. |
-| [tng-files.js](../tng-files.js) | Lazy local PDF.js loading, source-page rendering, faithful row crops and PNG/PDF/ZIP evidence generation. PDF bytes stay in memory. |
+| [tng-files.js](../tng-files.js) | Lazy local PDF.js loading, source-page rendering, faithful row crops and PNG/PDF/ZIP evidence generation. Client PDFs combine dated To/Return crops with editable captions; special claims keep individual crops. PDF bytes stay in memory. |
 | [tng.js](../tng.js), [tng.css](../tng.css) | Schedule's TNG review desk, date filters, manual drafts, visit allocation, bounded crop controls and explicit expense saves. |
 | [recipients-engine.js](../recipients-engine.js) | Email validation, bulk parsing, duplicates, To/Cc/Bcc grouping and plain address output. |
 | [recipients.js](../recipients.js), [recipients.css](../recipients.css) | Company/contact forms, list search, undo, copy preview and clipboard fallback. |
@@ -98,6 +98,7 @@ CSS (`.css`) controls appearance; HTML supplies the initial page structure.
 | [tests/database.test.mjs](../tests/database.test.mjs) | Database/schema/migration checks using an isolated test database. |
 | [tests/batch-a.test.mjs](../tests/batch-a.test.mjs), [tests/claims.test.mjs](../tests/claims.test.mjs), [tests/recipients.test.mjs](../tests/recipients.test.mjs) | Focused workflow, expense and recipient rule tests. |
 | [tests/tng.test.mjs](../tests/tng.test.mjs) | Synthetic offline/online statement parsing, amount/date rules, Schedule matching, duplicate prevention and bounded evidence provenance. No private statement fixture. |
+| [tests/tng-pdf.test.mjs](../tests/tng-pdf.test.mjs) | Actual evidence PDF generation and reading: crop counts, continuation pages, captions, noon split, special format and cancellation, using synthetic source crops. |
 | [tests/reminders.test.mjs](../tests/reminders.test.mjs) | Exact due boundaries, local-time conversion, legacy snoozes, restored-record validation and escaped UTF-8 calendar alarms. Timed reminder interactions are also covered in `tests/app.test.mjs`. |
 | [tests/validator.test.mjs](../tests/validator.test.mjs), [tests/work-library.test.mjs](../tests/work-library.test.mjs) | Validation and reusable-library tests. |
 | [tests/source-layout.test.mjs](../tests/source-layout.test.mjs) | Checks production asset paths/order and the protected vendor/empty-seed layout after extraction. |

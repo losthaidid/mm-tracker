@@ -41,6 +41,8 @@
       page = 0,
       preview = '',
       includeHeader = true,
+      claimType = 'client-site',
+      captions = {},
       editing = '';
     let pendingSource = null;
     let drag = null,
@@ -48,16 +50,29 @@
     const day = r => (basis === 'posted' ? r.postedDate : r.date);
     const openNow = () => !!$('tngStudio') && !!$('modal')?.open;
     const alive = (token, account) => a.ready() && a.owner() === account && generation === token;
-    const selectable = r => !['reload', 'credit'].includes(r.kind) && !r.errors.length;
+    const selectable = r =>
+      !['reload', 'credit'].includes(r.kind) &&
+      !r.errors.length &&
+      (!savedExpense(r) || C.claimType(savedExpense(r)) === claimType);
     const editable = r => selectable(r) && !isDuplicate(r);
     let keysForState = null,
-      importedKeys = new Set();
+      importedKeys = new Set(),
+      importedExpenses = new Map();
+    const savedExpense = r => {
+      isDuplicate(r); // Refresh the lookup when the account document changes.
+      return !r.manual && session
+        ? importedExpenses.get(E.sourceKey(session.source.cardKey, r))
+        : null;
+    };
     const isDuplicate = r => {
       const d = a.state();
       if (d !== keysForState) {
         keysForState = d;
         importedKeys = new Set(
           d.workhub.claims.expenses.filter(e => e.tngSource).map(e => e.tngSource.key)
+        );
+        importedExpenses = new Map(
+          d.workhub.claims.expenses.filter(e => e.tngSource).map(e => [e.tngSource.key, e])
         );
       }
       return (
@@ -66,6 +81,7 @@
       );
     };
     const selected = () => rows.filter(r => r.selected && editable(r));
+    const evidenceRows = () => rows.filter(r => r.selected && !r.manual && selectable(r));
     const visible = () =>
       rows.filter(
         r =>
@@ -96,6 +112,9 @@
         pendingSource = null;
         keysForState = null;
         importedKeys.clear();
+        importedExpenses.clear();
+        claimType = 'client-site';
+        captions = {};
       }
     }
     function mount(tab) {
@@ -114,7 +133,7 @@
     function totals() {
       const shown = visible(),
         picked = selected();
-      return `<div class="tng-total tng-picked"><span>Selected for expenses</span><strong>${C.money(picked.reduce((n, r) => n + r.amountCents, 0))}</strong><small>${picked.length} new records · ${rows.filter(r => r.selected && !r.manual).length} PDF records selected for evidence</small></div><div class="tng-total"><span>Tolls in this view</span><strong>${C.money(shown.filter(r => r.kind === 'toll').reduce((n, r) => n + (r.amountCents || 0), 0))}</strong><small>${shown.filter(r => r.kind === 'toll').length} transactions</small></div><div class="tng-total"><span>Reloads in this view</span><strong>${C.money(shown.filter(r => r.kind === 'reload').reduce((n, r) => n + (r.amountCents || 0), 0))}</strong><small>Kept separate from expenses</small></div>`;
+      return `<div class="tng-total tng-picked"><span>Selected for expenses</span><strong>${C.money(picked.reduce((n, r) => n + r.amountCents, 0))}</strong><small>${picked.length} new records · ${evidenceRows().length} PDF records selected for evidence</small></div><div class="tng-total"><span>Tolls in this view</span><strong>${C.money(shown.filter(r => r.kind === 'toll').reduce((n, r) => n + (r.amountCents || 0), 0))}</strong><small>${shown.filter(r => r.kind === 'toll').length} transactions</small></div><div class="tng-total"><span>Reloads in this view</span><strong>${C.money(shown.filter(r => r.kind === 'reload').reduce((n, r) => n + (r.amountCents || 0), 0))}</strong><small>Kept separate from expenses</small></div>`;
     }
     function datesHTML() {
       const dates = [...new Set(rows.map(day).filter(Boolean))].sort();
@@ -122,7 +141,7 @@
         .map(date => {
           const list = rows.filter(r => day(r) === date && r.kind === 'toll'),
             sum = list.reduce((n, r) => n + (r.amountCents || 0), 0),
-            visits = E.matches(a.state(), date);
+            visits = E.matches(a.state(), date, claimType);
           return button(
             'date',
             `<strong>${esc(new Date(date + 'T12:00:00').toLocaleDateString('en-MY', { day: 'numeric', month: 'short' }))}</strong><span>${C.money(sum)}</span>${visits.length ? '<small>↗ On-site day</small>' : ''}`,
@@ -134,8 +153,8 @@
     }
     function rowHTML(r) {
       const dup = isDuplicate(r),
-        visits = E.matches(a.state(), day(r));
-      return `<tr class="${r.selected ? 'is-selected ' : ''}${dup ? 'is-duplicate' : ''}"><td><input type="checkbox" data-tng-select="${esc(r.id)}" aria-label="Select ${esc(r.transactionNo || r.description)}"${r.selected ? ' checked' : ''}${selectable(r) ? '' : ' disabled'}></td><td><strong>${esc(day(r) || 'Review date')}</strong><small>${esc(r.time)}${r.date !== r.postedDate ? ' · Posted ' + esc(r.postedDate) : ''}</small></td><td><strong class="hub-sensitive">${esc(r.description || 'Review description')}</strong><small>${esc(r.manual ? 'Manual entry' : r.type + ' · ' + r.section + ' · p' + r.page)}</small>${r.errors.length ? '<small class="tng-error">' + esc(r.errors.join(' · ')) + '</small>' : ''}</td><td><span class="tng-kind" data-kind="${r.kind}">${esc(r.kind === 'reload' ? 'Reload · excluded' : r.kind === 'credit' ? 'Refund · excluded' : r.manual ? 'Manual' : C.CATEGORIES[r.category])}</span><small>${dup ? 'Already imported' : r.saved ? 'Saved to expenses' : ''}</small></td><td class="tng-money">${r.amountCents === null ? 'Review' : C.money(r.amountCents)}</td><td><select data-tng-booking="${esc(r.id)}" aria-label="Link visit for ${esc(r.transactionNo || r.description)}"${r.kind === 'reload' || r.kind === 'credit' ? ' disabled' : ''}><option value="">${visits.length > 1 ? 'Choose one of ' + visits.length + ' visits' : 'No linked visit'}</option>${options(
+        visits = E.matches(a.state(), day(r), claimType);
+      return `<tr class="${r.selected ? 'is-selected ' : ''}${dup ? 'is-duplicate' : ''}"><td><input type="checkbox" data-tng-select="${esc(r.id)}" aria-label="Select ${esc(r.transactionNo || r.description)}"${r.selected ? ' checked' : ''}${selectable(r) ? '' : ' disabled'}></td><td><strong>${esc(day(r) || 'Review date')}</strong><small>${esc(r.time)}${r.date !== r.postedDate ? ' · Posted ' + esc(r.postedDate) : ''}</small></td><td><strong class="hub-sensitive">${esc(r.description || 'Review description')}</strong><small>${esc(r.manual ? 'Manual entry' : r.type + ' · ' + r.section + ' · p' + r.page)}</small>${r.errors.length ? '<small class="tng-error">' + esc(r.errors.join(' · ')) + '</small>' : ''}</td><td><span class="tng-kind" data-kind="${r.kind}">${esc(r.kind === 'reload' ? 'Reload · excluded' : r.kind === 'credit' ? 'Refund · excluded' : r.manual ? 'Manual' : C.CATEGORIES[r.category])}</span><small>${dup ? 'Already imported · ' + esc(C.CLAIM_TYPES[C.claimType(savedExpense(r))]) : r.saved ? 'Saved to expenses' : ''}</small></td><td class="tng-money">${r.amountCents === null ? 'Review' : C.money(r.amountCents)}</td><td><select data-tng-booking="${esc(r.id)}" aria-label="Link visit for ${esc(r.transactionNo || r.description)}"${r.kind === 'reload' || r.kind === 'credit' ? ' disabled' : ''}><option value="">${visits.length > 1 ? 'Choose one of ' + visits.length + ' visits' : 'No linked visit'}</option>${options(
         visits.map(v => [v.key, [v.locationName, v.title, v.project].filter(Boolean).join(' · ')]),
         r.bookingKey
       )}</select>${visits.length > 1 && !r.bookingKey ? '<small>Several visits: please allocate</small>' : ''}</td><td><div class="tng-row-actions">${!r.manual ? button('preview', 'Crop', `data-id="${esc(r.id)}"`, 'small') : ''}${!dup && !['reload', 'credit'].includes(r.kind) ? button('edit', 'Edit', `data-id="${esc(r.id)}"`, 'small') : ''}${r.manual ? button('remove', 'Remove', `data-id="${esc(r.id)}"`, 'small') : ''}</div></td></tr>`;
@@ -150,7 +169,7 @@
         category: 'toll',
         notes: '',
       };
-      return `<form id="tngRowForm" data-owner="${esc(owner)}" data-generation="${generation}" data-id="${esc(r.id || '')}"><div class="tng-editor-head"><h3>${r.id ? 'Review transaction' : 'Add a manual expense'}</h3>${button('cancel-edit', 'Close', '', 'small')}</div><div class="form-grid"><div><label>Transaction date<input type="date" name="date" value="${esc(r.date)}" required></label></div><div><label>Posted date<input type="date" name="postedDate" value="${esc(r.postedDate)}" required></label></div><div><label>Amount (RM)<input type="number" name="amount" min="0.01" max="1000000" step="0.01" value="${r.amountCents === null ? '' : (r.amountCents / 100).toFixed(2)}" required></label></div><div><label>Category<select name="category">${options(Object.entries(C.CATEGORIES), r.category)}</select></label></div><div class="wide"><label>Description<input name="description" maxlength="300" value="${esc(r.description)}" required></label></div><div class="wide"><label>Notes<textarea name="notes" maxlength="2000">${esc(r.notes || '')}</textarea></label></div></div><p class="hint">${r.id && !r.manual ? 'Corrections affect your expense draft. The source crop stays faithful to the PDF.' : 'Manual entries join your selected expenses. They have no PDF crop.'}</p><button class="primary" type="submit">Keep in review</button></form>`;
+      return `<form id="tngRowForm" data-owner="${esc(owner)}" data-generation="${generation}" data-id="${esc(r.id || '')}"><div class="tng-editor-head"><h3>${r.id ? 'Review transaction' : 'Add a manual expense'}</h3>${button('cancel-edit', 'Close', '', 'small')}</div><div class="form-grid"><div><label>Transaction date<input type="date" name="date" value="${esc(r.date)}" required></label></div><div><label>Posted date<input type="date" name="postedDate" value="${esc(r.postedDate)}" required></label></div><div><label>Transaction time<input type="time" name="time" step="1" value="${esc(r.time || '')}"></label></div><div><label>Amount (RM)<input type="number" name="amount" min="0.01" max="1000000" step="0.01" value="${r.amountCents === null ? '' : (r.amountCents / 100).toFixed(2)}" required></label></div><div><label>Category<select name="category">${options(Object.entries(C.CATEGORIES), r.category)}</select></label></div><div class="wide"><label>Description<input name="description" maxlength="300" value="${esc(r.description)}" required></label></div><div class="wide"><label>Notes<textarea name="notes" maxlength="2000">${esc(r.notes || '')}</textarea></label></div></div><p class="hint">${r.id && !r.manual ? 'Corrections affect your expense draft. The source crop stays faithful to the PDF.' : 'Manual entries join your selected expenses. They have no PDF crop.'}</p><button class="primary" type="submit">Keep in review</button></form>`;
     }
     function previewHTML() {
       const r = rows.find(r => r.id === preview);
@@ -158,11 +177,15 @@
         return `<div class="tng-preview-empty"><span aria-hidden="true">⌗</span><h3>Your evidence, up close</h3><p>Choose Crop beside a transaction to inspect its source page and adjust the evidence area.</p></div>`;
       return `<div class="tng-preview-head"><span class="hub-kicker">SOURCE PAGE ${r.page}</span><h3>${esc(r.transactionNo)}</h3><p>Move the frame or drag its corners. Arrow keys move it; Shift + arrows resize it.</p></div><div id="tngPageFrame" class="tng-page-frame"><canvas id="tngPageCanvas" aria-label="Statement page ${r.page}"></canvas><div id="tngCropFrame" tabindex="0" role="group" aria-label="Evidence crop. Arrow keys move; Shift and arrows resize."><i data-tng-corner="nw"></i><i data-tng-corner="ne"></i><i data-tng-corner="sw"></i><i data-tng-corner="se"></i></div></div><div class="tng-crop-fields">${['x', 'y', 'w', 'h'].map(k => `<label>${{ x: 'Left', y: 'Top', w: 'Width', h: 'Height' }[k]}<input type="number" data-tng-rect="${k}" value="${Math.round(r.rect[k] * 10) / 10}" step="0.5" min="${k === 'w' || k === 'h' ? 1 : 0}" aria-label="Crop ${k}"></label>`).join('')}</div><label class="tng-header-check"><input id="tngIncludeHeader" type="checkbox"${includeHeader ? ' checked' : ''}>Include the table headings with each crop</label><div class="actions">${button('reset-crop', 'Reset crop', '', 'small')}${button('png', '↓ Download PNG', exporting ? 'disabled' : '', 'primary')}</div><p class="hint">PDF contents stay on this device. Reattach the same statement when you need source images in a later visit.</p>`;
     }
+    function evidenceHTML() {
+      const groups = claimType === 'client-site' ? E.evidenceGroups(evidenceRows()) : [];
+      return `<section class="tng-evidence-plan"><div><span class="hub-kicker">YOUR CLAIM PACK</span><h3>${claimType === 'client-site' ? 'One journey, one caption.' : 'Special claims evidence'}</h3><p>${claimType === 'client-site' ? 'Toll crops join by transaction date: To before 12:00 noon, Return from noon onward. Posted-date filters do not change the PDF grouping. Captions are editable; they do not change your expenses.' : 'Your existing evidence format is kept: individual source crops, without To / Return grouping or toll captions.'}</p></div>${groups.length ? `<div class="tng-evidence-groups">${groups.map(g => `<label class="tng-evidence-group"><span>${esc(g.date)} · ${g.rows.length} crop${g.rows.length === 1 ? '' : 's'}${g.direction === 'review' ? ' · Edit the missing time first' : ''}</span><input data-tng-caption="${esc(g.key)}" maxlength="120" aria-label="Caption for ${esc(g.date + ' ' + g.direction)}" value="${esc(captions[g.key] ?? g.caption)}"></label>`).join('')}</div>` : claimType === 'client-site' ? '<p class="hint">Select PDF records to see the journey groups and edit their captions. Manual entries have no source crop.</p>' : ''}</section>`;
+    }
     function html() {
       const shown = visible(),
         size = 50;
       page = Math.max(0, Math.min(page, Math.max(0, Math.ceil(shown.length / size) - 1)));
-      return `<section id="tngStudio" class="tng-studio"><div class="tng-hero"><div><span class="hub-kicker">A LITTLE LESS PAPERWORK</span><h2>TNG statement desk</h2><p>Find your travel days. Review the details. Keep the evidence.</p></div><div class="tng-hero-mark" aria-hidden="true">▤<span>↗</span></div></div><div class="tng-upload" id="tngDrop"><div><strong>${session ? esc(session.source.fileName) : 'Drop your TNG card statement here'}</strong><p>${session ? session.source.pages + ' pages · ' + rows.filter(r => !r.manual).length + ' extracted records' : 'Offline and online card transactions · PDF up to 20 MB'}</p></div><label class="tng-file-label">${busy ? 'Reading…' : session ? 'Choose another PDF' : 'Choose PDF'}<input type="file" id="tngFile" accept=".pdf,application/pdf"${busy ? ' disabled' : ''}></label>${session ? button('clear', 'Clear PDF', '', 'small') : ''}</div><div class="tng-notice" id="tngMessage" role="status"${message ? '' : ' hidden'}>${esc(message)}</div>${warnings.length ? '<div class="tng-warning">' + warnings.map(esc).join('<br>') + '</div>' : ''}<div class="tng-summary">${totals()}</div><div class="tng-main"><div class="tng-review"><div class="tng-filters"><label>From<input type="date" id="tngFrom" value="${esc(from)}"></label><label>To<input type="date" id="tngTo" value="${esc(to)}"></label><label>Date basis<select id="tngBasis">${options(
+      return `<section id="tngStudio" class="tng-studio"><div class="tng-hero"><div><span class="hub-kicker">A LITTLE LESS PAPERWORK</span><h2>TNG statement desk</h2><p>Find your travel days. Review the details. Keep the evidence.</p></div><div class="tng-hero-mark" aria-hidden="true">▤<span>↗</span></div></div><div class="tng-claim-type"><label for="tngClaimType">Claim type<select id="tngClaimType">${options(Object.entries(C.CLAIM_TYPES), claimType)}</select></label><p>${claimType === 'client-site' ? 'Combined To / Return evidence with editable captions.' : 'Original evidence format. No journey grouping.'} Saved rows of the other claim type stay in their own pack.</p></div><div class="tng-upload" id="tngDrop"><div><strong>${session ? esc(session.source.fileName) : 'Drop your TNG card statement here'}</strong><p>${session ? session.source.pages + ' pages · ' + rows.filter(r => !r.manual).length + ' extracted records' : 'Offline and online card transactions · PDF up to 20 MB'}</p></div><label class="tng-file-label">${busy ? 'Reading…' : session ? 'Choose another PDF' : 'Choose PDF'}<input type="file" id="tngFile" accept=".pdf,application/pdf"${busy ? ' disabled' : ''}></label>${session ? button('clear', 'Clear PDF', '', 'small') : ''}</div><div class="tng-notice" id="tngMessage" role="status"${message ? '' : ' hidden'}>${esc(message)}</div>${warnings.length ? '<div class="tng-warning">' + warnings.map(esc).join('<br>') + '</div>' : ''}<div class="tng-summary">${totals()}</div>${evidenceHTML()}<div class="tng-main"><div class="tng-review"><div class="tng-filters"><label>From<input type="date" id="tngFrom" value="${esc(from)}"></label><label>To<input type="date" id="tngTo" value="${esc(to)}"></label><label>Date basis<select id="tngBasis">${options(
         [
           ['transaction', 'Journey / exit date'],
           ['posted', 'Posted date'],
@@ -207,6 +230,8 @@
       sync();
       const expense = a.state().workhub.claims.expenses.find(e => e.id === id);
       if (!expense?.tngSource) return;
+      claimType = C.claimType(expense);
+      for (const row of rows) if (!selectable(row)) row.selected = false;
       pendingSource = { ...expense.tngSource };
       const r =
         session &&
@@ -250,6 +275,7 @@
       rows = manualRows;
       preview = '';
       editing = '';
+      captions = {};
       warnings = [];
       busy = true;
       exporting = false;
@@ -306,7 +332,7 @@
       let count = 0,
         ambiguous = 0;
       for (const r of visible()) {
-        const visits = E.matches(a.state(), day(r));
+        const visits = E.matches(a.state(), day(r), claimType);
         if (r.kind !== 'toll' || !editable(r) || !visits.length) continue;
         r.selected = true;
         count++;
@@ -324,10 +350,10 @@
       sync();
       if (!a.ready()) throw Error('Sign in before saving expenses.');
       const picked = selected();
-      const list = E.expenses(a.state(), picked, session?.source || {}, basis);
+      const list = E.expenses(a.state(), picked, session?.source || {}, basis, claimType);
       if (
         a.mutate(d => {
-          const checked = E.expenses(d, picked, session?.source || {}, basis);
+          const checked = E.expenses(d, picked, session?.source || {}, basis, claimType);
           d.workhub.claims.expenses.push(...checked);
         })
       ) {
@@ -362,6 +388,9 @@
         !Object.hasOwn(C.CATEGORIES, val('category'))
       )
         throw Error('Enter valid dates, a description and a positive amount.');
+      const time = val('time');
+      if (time && !/^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(time))
+        throw Error('Enter a valid transaction time.');
       const row = old || {
         id: root.crypto.randomUUID(),
         transactionNo: '',
@@ -377,6 +406,7 @@
         throw Error('This transaction cannot be edited as a new expense.');
       Object.assign(row, {
         date: val('date'),
+        time,
         postedDate: val('postedDate'),
         amountCents: amount,
         description: val('description'),
@@ -448,10 +478,11 @@
         session === source &&
         exportToken === token &&
         openNow();
-      const list =
-        kind === 'png'
-          ? [rows.find(r => r.id === preview)].filter(Boolean)
-          : rows.filter(r => r.selected && !r.manual);
+      const list = JSON.parse(
+        JSON.stringify(
+          kind === 'png' ? [rows.find(r => r.id === preview)].filter(Boolean) : evidenceRows()
+        )
+      );
       if (!source || !list.length || list.some(r => r.manual))
         throw Error('Select at least one PDF transaction for evidence.');
       if (list.length > 200) throw Error('Export up to 200 evidence crops at a time.');
@@ -459,12 +490,13 @@
       say('Preparing your cropped evidence…');
       paint();
       try {
-        const header = includeHeader;
+        const header = includeHeader,
+          exportOptions = { claimType, captions: { ...captions } };
         const blob =
           kind === 'png'
             ? await F.png(await F.crop(source, list[0], header))
             : kind === 'pdf'
-              ? await F.pdfPack(source, list, header, valid)
+              ? await F.pdfPack(source, list, header, valid, exportOptions)
               : await F.zipPack(source, list, header, valid);
         if (!valid()) return;
         a.download(
@@ -547,6 +579,7 @@
           preview = '';
           busy = false;
           exporting = false;
+          captions = {};
           say('Statement cleared. Manual drafts are kept.');
         }
         paint();
@@ -592,6 +625,17 @@
         for (const r of rows) r.bookingKey = '';
       }
       if (el.id === 'tngKind') filter = el.value;
+      if (el.id === 'tngClaimType') {
+        claimType = el.value;
+        exportToken++;
+        exporting = false;
+        for (const r of rows) {
+          r.bookingKey = '';
+          if (!selectable(r)) r.selected = false;
+        }
+        paint();
+        return;
+      }
       if (el.id === 'tngIncludeHeader') {
         includeHeader = el.checked;
         return;
@@ -615,6 +659,11 @@
     });
     document.addEventListener('dragover', event => {
       if (event.target.closest?.('#tngDrop')) event.preventDefault();
+    });
+    document.addEventListener('input', event => {
+      const el = event.target;
+      if (el.closest?.('#tngStudio') && el.dataset.tngCaption && a.owner() === owner)
+        captions[el.dataset.tngCaption] = el.value;
     });
     document.addEventListener('drop', event => {
       if (event.target.closest?.('#tngDrop')) {
@@ -708,6 +757,7 @@
         busy,
         exporting,
         basis,
+        claimType,
         selected: selected().length,
       }),
     };

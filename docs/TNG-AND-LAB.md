@@ -3,9 +3,9 @@
 ## TNG: review first, save when ready
 
 1. Open **Schedule → TNG PDF extractor** beside the monthly claims summary.
-2. Choose or drop a text-based TNG **Customer Transactions Statement** PDF. The supported offline and online card tables are read on your device.
+2. Choose **Client site claims** or **Special claims**, then choose or drop a text-based TNG **Customer Transactions Statement** PDF. The supported offline and online card tables are read on your device.
 3. Choose a date range or one or more date chips. **Journey / exit date** is the default; **Posted date** is available when required. Filters change the view, not your previous selections.
-4. Use **Match on-site dates** to suggest tolls on your scheduled client/site visits. Review personal trips yourself. If there are several visits that day, choose the correct allocation; the app does not guess the company or client.
+4. Use **Match on-site dates** to suggest tolls on scheduled visits of the chosen claim type, including one-off destinations. Review personal trips yourself. If there are several visits that day, choose the correct allocation; the app does not guess the company or client.
 5. Select the expenses you want. Reloads and refunds remain separate and cannot enter expense totals. **Edit** corrects an extracted draft; it never changes the source PDF image. **Manual entry** creates a draft without invented PDF evidence.
 6. Choose **Save selected expenses**. This adds the confirmed records to the existing expense ledger in one save and updates Schedule's monthly claim totals. Wait for **Saved to Supabase** before leaving.
 
@@ -20,6 +20,12 @@ Choose **Crop** beside a PDF transaction. Move the frame, drag a corner, or edit
 - **Crop images ZIP:** one PNG per selected PDF record.
 
 The optional table-heading strip is copied separately from the source. It does not include the statement's personal account heading. Crops are source images, not retyped evidence. Always check that the selected area contains all relevant fields and no neighbouring private records. Downloads do not add or change expenses, and manual entries do not have PDF crops.
+
+For **Client site claims**, the PDF combines toll crops by transaction date and time: **To** before noon, **Return** from 12:00 noon onward. Review and edit the caption above each group, for example `tol 4 of 4 (09/10/2026 to)`. Captions are remarks only. A long group continues onto the next page with its caption repeated; table headings are included when enabled. Parking and other spending appear separately. Changing to Posted date affects the expense date, while the evidence pack still follows the transaction's journey date. Edit a missing toll time before grouped export.
+
+For **Special claims**, the PDF keeps the existing individual-crop format. PNG/ZIP exports keep their original formats for both types. Saved expenses of the other claim type cannot be selected into the current pack; opening a saved expense's evidence selects its own claim type. Captions are temporary review settings and clear when replacing or clearing the PDF or switching accounts.
+
+Maintain claim types in **Schedule → Location & mileage** and in the expense editor. Reuse a saved mileage route for either type, or choose **One-off destination · no mileage**. The monthly header and CSV report distinguish Client site and Special claims; older unclassified records retain their amounts and are treated as Client site claims.
 
 The original PDF and unselected rows stay in memory on the current device; they are not uploaded, stored in the account or included in backups. Confirmed expenses save a compact source reference and the crop coordinates. **PDF evidence** beside a saved expense can reopen the source review. Reattach the same statement after reloading, switching devices or signing out. Keep your original PDF safely if you need evidence later.
 

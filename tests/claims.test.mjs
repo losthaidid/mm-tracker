@@ -48,3 +48,14 @@ test('claims engine: monthly CSV preserves references, excludes other months and
  const d=state();add(d,'2026-10-19');d.workhub.claims.expenses.push({...expense('cost','2026-10-19','toll',1010),description:'=HYPERLINK("bad")',reference:'+command',notes:'two lines\n"quoted"'},expense('next','2026-11-01','parking',100));
  const csv=E.csv(d,'2026-10');assert.ok(csv.startsWith('\uFEFF"Date"'));assert.match(csv,/'=HYPERLINK\(""bad""\)/);assert.match(csv,/'\+command/);assert.match(csv,/two lines\n""quoted""/);assert.doesNotMatch(csv,/2026-11-01/);assert.match(csv,/Claimable total.*40\.98/);
 });
+
+test('claims engine: claim types split mileage and receipts without repricing historical records',()=>{
+ const d=state();add(d,'2026-10-19');add(d,'2026-10-20','special-trip');
+ for(const s of d.schedule.filter(s=>s.bookingId==='special-trip'))s.claimType='special';
+ d.workhub.claims.expenses.push(expense('old','2026-10-19','toll',100),{...expense('special','2026-10-20','parking',250),claimType:'special'},{...expense('excluded','2026-10-20','meals',500,false),claimType:'special'});
+ E.validate(d);const m=E.summary(d,'2026-10');assert.equal(m.totalCents,6526);assert.equal(m.byClaimType['client-site'].totalCents,3188);assert.equal(m.byClaimType.special.totalCents,3338);assert.equal(m.excludedCents,500);
+ const csv=E.csv(d,'2026-10');assert.match(csv,/Claim type/);assert.match(csv,/Special claims/);assert.match(csv,/Client site claims/);
+ const before=copy(d),next=copy(d);next.schedule=next.schedule.map(s=>{const {claimType,travel,...rebuilt}=s;return rebuilt;});E.prepare(next,before);E.validate(next);assert.equal(next.schedule.at(-1).claimType,'special');
+ next.schedule.at(-1).claimType='client-site';assert.throws(()=>E.validate(next),/same claim type/);
+ for(const bad of ['other',null,42]){const invalid=copy(d);invalid.workhub.claims.expenses[0].claimType=bad;assert.throws(()=>E.validate(invalid),/expense date/);}
+});
