@@ -2019,6 +2019,33 @@ a {
   font-size: 0.75rem;
   color: #4c6380;
 }
+.booking-company {
+  display: block;
+  margin-top: 5px;
+  color: inherit;
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.booking-company-label {
+  font-size: 0.66rem;
+  font-weight: 500;
+  opacity: 0.72;
+  margin-right: 3px;
+}
+.workhub-booking.compact .booking-company,
+.calendar-event .booking-company {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 0.68rem;
+}
+.schedule-company-field .hint {
+  margin: 6px 0 0;
+}
 .workhub-booking .slot-state {
   margin: 0;
   max-width: 100%;
