@@ -8,6 +8,10 @@ The Momo behaviour enhancements in [Batch B](BATCH-B.md) are implemented, includ
 
 On 20 October 2026, Request inbox, End-of-day ritual, Personal learning roadmap and Show-me-how walkthroughs were removed from the wishlist at the user's request.
 
+## Pending stand-up enhancement
+
+Kept on 21 October 2026: **2 · Waiting on** — add a field beside project items and sub-items in the Daily stand-up summary to record who needs to respond, such as the business team, ABAP, BASIS or a named person. This is a wishlist selection; implementation has not been requested yet. No batch assigned.
+
 ## Earlier completed selections
 
 The seven selected items are now part of the existing account document. The tracker keeps its current sign-in, saving, backup and restore workflows. No database migration is needed.
