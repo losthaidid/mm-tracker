@@ -116,7 +116,7 @@
       esc(t.id) +
       '"><label for="newHistory">Add a history update</label><textarea id="newHistory" name="newHistory" required maxlength="10000" rows="4" placeholder="What changed? What needs following up?"></textarea><div class="actions"><button class="primary" type="submit">＋ Add dated update</button>' +
       button('check-ticket', 'Mark checked today', t) +
-      '</div><p class="hint">Each update is appended with today’s date. The history timestamp updates automatically.</p></form></section></main><aside class="ticket-facts"><span class="ticket-kicker">AT A GLANCE</span><h3>Ticket facts</h3><dl>' +
+      '</div><p class="hint">New or changed progress remarks are added here with the date and time. Status changes do not add history entries. You can also add an update above.</p></form></section></main><aside class="ticket-facts"><span class="ticket-kicker">AT A GLANCE</span><h3>Ticket facts</h3><dl>' +
       o.facts
         .map(
           ([label, v]) =>

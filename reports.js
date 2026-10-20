@@ -43,11 +43,25 @@
   };
   const closed = t => ['Closed', 'Completed'].includes(t.status);
   const formula = (f, value) => ({ formula: f, value });
-  const latest = t =>
-    (t.history || '')
-      .trim()
-      .split(/\r?\n(?=\s*-\s)/)
-      .at(-1) || '';
+  /** Shared by ticket previews and exports: older bullets and plain dated remarks both work. */
+  function historyEntries(value) {
+    const entries = [],
+      datedEnd = /\[\d{2}-\d{2}-\d{4}(?: \d{2}:\d{2}(?::\d{2})?)?\]\s*$/;
+    let lines = [];
+    const finish = () => {
+      const text = lines.join('\n').trim();
+      if (text) entries.push(text);
+      lines = [];
+    };
+    for (const line of String(value || '').split(/\r?\n/)) {
+      if (/^\s*-\s/.test(line) && lines.length) finish();
+      lines.push(line);
+      if (datedEnd.test(line)) finish();
+    }
+    finish();
+    return entries;
+  }
+  const latest = t => historyEntries(t.history).at(-1) || '';
   const numberTime = s => {
     const [h, m] = String(s || '00:00')
       .split(':')
@@ -140,10 +154,7 @@
     );
     const history = tickets =>
       tickets.flatMap(t =>
-        (t.history || '')
-          .trim()
-          .split(/\r?\n(?=\s*-\s)/)
-          .filter(Boolean)
+        historyEntries(t.history)
           .map((v, i) => ({ values: [t.ticket, t.description, i + 1, v], record: 0 }))
       );
     sheet(
@@ -1204,6 +1215,7 @@
     );
   }
   root.WorkHubReports = {
+    historyEntries,
     options,
     build,
     files,

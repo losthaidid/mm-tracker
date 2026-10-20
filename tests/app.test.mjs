@@ -1231,7 +1231,7 @@ test('existing lo-fi volume choices remain local with a stronger music channel a
 function addWishlistTicket(api,document){api.editRecord('tickets');const f=document.getElementById('editForm');for(const [k,v]of Object.entries({ticket:'AMS-2048',description:'Keep plant assignments consistent',history:'- Blueprint confirmed [16-10-2026]',pic:'Haidid',transport:'FMD'}))f.elements.namedItem(k).value=v;f.elements.namedItem('batchSystem').value='S4Q';f.elements.namedItem('batchClient').value='010';api.saveEdit(f);return api.state().tickets.at(-1).id;}
 test('wishlist snippets and bundles persist through cloud reopen and backup with safe record composition',async t=>{const {api,document,window,db}=await app(t),ui=api.hub.library,id=addWishlistTicket(api,document);ui.bundleManager();let f=document.getElementById('wlBundleNew');f.elements.namedItem('name').value='Testing coordination';ui.submit(f);const bundle=api.state().workhub.workLibrary.bundles[0].id;ui.snippetEditor();f=document.getElementById('wlSnippet');f.elements.namedItem('title').value='Ready for testing';f.elements.namedItem('bundleId').value=bundle;f.elements.namedItem('body').value='Hi {name},\n\nPlease test {ticket} in {system}/{client}.';ui.submit(f);const snippet=api.state().workhub.workLibrary.snippets[0].id;ui.composer(snippet,'tickets',id);f=document.getElementById('wlCompose');assert.equal(f.elements.namedItem('p_ticket').value,'AMS-2048');assert.equal(f.elements.namedItem('p_system').value,'S4Q');assert.equal(f.elements.namedItem('p_client').value,'010');assert.equal(f.elements.namedItem('p_name').value,'');assert.equal(f.querySelector('[data-wl="copy"]').disabled,true);f.elements.namedItem('p_name').value='<Aisha>';f.elements.namedItem('p_name').dispatchEvent(new window.Event('input',{bubbles:true}));let copied='';Object.defineProperty(window.navigator,'clipboard',{configurable:true,value:{writeText:async x=>copied=x}});await ui.copyMessage();assert.ok(copied.includes('AMS-2048'));assert.ok(copied.includes('<Aisha>'));await settle();await api.flushCloud();const saved=api.parseBackup(api.payload(api.state()));assert.equal(saved.workhub.workLibrary.snippets[0].body,api.state().workhub.workLibrary.snippets[0].body);const reopened=await app(t,{login:false,remote:copy(db.row)});await reopened.api.loadCloud(sessionUser);await settle();reopened.api.showTab('snippets');assert.match(reopened.document.getElementById('view').textContent,/Ready for testing/);assert.equal(reopened.api.state().workhub.workLibrary.bundles[0].name,'Testing coordination');});
 test('snippet bundle removal and undo preserve messages and later assignments',async t=>{const {api,document,window}=await app(t),ui=api.hub.library;window.confirm=()=>true;api.mutate(d=>{d.workhub.workLibrary.bundles=[{id:'a',name:'Testing'},{id:'b',name:'Delivery'}];d.workhub.workLibrary.snippets=[{id:'s',title:'Ready',category:'',body:'Hello',bundleId:'a',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()}];});await ui.handle({dataset:{wl:'bundle-remove',id:'a'}});assert.equal(api.state().workhub.workLibrary.snippets[0].bundleId,'');api.mutate(d=>d.workhub.workLibrary.snippets[0].bundleId='b');await ui.handle({dataset:{wl:'undo'}});assert.equal(api.state().workhub.workLibrary.snippets[0].bundleId,'b');assert.equal(api.state().workhub.workLibrary.bundles.length,2);});
-test('ticket cards, details and grouped editor preserve fields, Work Context, milestones and dated history',async t=>{const {api,document,window}=await app(t),id=addWishlistTicket(api,document);api.showTab('tickets');assert.ok(document.querySelector('.ticket-folio'));assert.match(document.querySelector('.ticket-history-preview').textContent,/Ticket created/);await api.action({dataset:{action:'detail',id}});assert.ok(document.querySelector('[data-ticket-detail] .ticket-facts'));assert.ok(document.querySelector('[data-ticket-detail] [data-wl="timeline"]'));let f=document.getElementById('historyForm');f.elements.namedItem('newHistory').value='UAT data prepared';f.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));await settle();assert.match(api.state().tickets[0].history,/UAT data prepared/);await api.action({dataset:{action:'progress-detail',id:api.state().trackers[0].id}});f=document.getElementById('progressForm');f.elements.namedItem('step0').checked=true;f.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));await settle();await api.action({dataset:{action:'detail',id}});assert.equal(document.querySelectorAll('.ticket-milestones [data-step]').length,api.steps().length+2);api.editRecord('tickets',id);f=document.getElementById('editForm');assert.equal(f.querySelectorAll('.ticket-editor-section').length,4);assert.match(f.querySelector('.ticket-context-panel').textContent,/Work Context/);assert.equal(f.elements.namedItem('batchClient').value,'010');assert.equal(f.elements.namedItem('transport').value,'FMD');f.elements.namedItem('pic').value='Aisha';api.saveEdit(f);assert.equal(api.state().tickets[0].pic,'Aisha');assert.equal(api.state().trackers[0].steps[0],true);assert.equal(window.WorkHubBatchEngine.meta(api.state(),'tickets',id).systemId,'S4Q');assert.ok(api.state().workhub.workLibrary.events.some(e=>e.title==='Milestone tracker added'));});
+test('ticket cards, details and grouped editor preserve fields, Work Context, milestones and dated history',async t=>{const {api,document,window}=await app(t),id=addWishlistTicket(api,document);api.showTab('tickets');assert.ok(document.querySelector('.ticket-folio'));assert.match(document.querySelector('.ticket-history-preview').textContent,/Blueprint confirmed/);await api.action({dataset:{action:'detail',id}});assert.ok(document.querySelector('[data-ticket-detail] .ticket-facts'));assert.ok(document.querySelector('[data-ticket-detail] [data-wl="timeline"]'));let f=document.getElementById('historyForm');f.elements.namedItem('newHistory').value='UAT data prepared';f.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));await settle();assert.match(api.state().tickets[0].history,/UAT data prepared/);await api.action({dataset:{action:'progress-detail',id:api.state().trackers[0].id}});f=document.getElementById('progressForm');f.elements.namedItem('step0').checked=true;f.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));await settle();await api.action({dataset:{action:'detail',id}});assert.equal(document.querySelectorAll('.ticket-milestones [data-step]').length,api.steps().length+2);api.editRecord('tickets',id);f=document.getElementById('editForm');assert.equal(f.querySelectorAll('.ticket-editor-section').length,4);assert.match(f.querySelector('.ticket-context-panel').textContent,/Work Context/);assert.equal(f.elements.namedItem('batchClient').value,'010');assert.equal(f.elements.namedItem('transport').value,'FMD');f.elements.namedItem('pic').value='Aisha';api.saveEdit(f);assert.equal(api.state().tickets[0].pic,'Aisha');assert.equal(api.state().trackers[0].steps[0],true);assert.equal(window.WorkHubBatchEngine.meta(api.state(),'tickets',id).systemId,'S4Q');assert.ok(api.state().workhub.workLibrary.events.some(e=>e.title==='Milestone tracker added'));});
 test('work timeline opens without saves and filters recorded status and history changes',async t=>{const {api,document,window,db}=await app(t),id=addMainTask(api,document,'Prepare a test scenario'),ui=api.hub.library;api.mutate(d=>{d.tasks[0].done=true;d.tasks[0].remarks='Result confirmed';});await settle();const calls=db.calls.length;ui.openTimeline('tasks',id);assert.match(document.getElementById('modalBody').textContent,/Status changed/);const filter=document.querySelector('[name="timelineFilter"]');filter.value='status';filter.dispatchEvent(new window.Event('change',{bubbles:true}));assert.equal(document.querySelectorAll('.wl-event').length,1);await settle();assert.equal(db.calls.length,calls);assert.match(document.getElementById('modalBody').textContent,/Result confirmed/);});
 test('field library inserts independent complete columns, handles naming collisions and preserves published versions',async t=>{const {api,document,window}=await app(t),ui=api.hub.library,val=api.hub.validator;api.showTab('validator');await val.handle({dataset:{val:'example'}});await val.saveDraft();await val.publish();const frozen=copy(api.state().workhub.validator.templates[0].releases[0]);ui.openFields({...window.WorkHubValidatorEngine.column(),key:'TYPE',label:'Request type',required:true,values:'A,B'},definition=>val.addLibraryField(definition));ui.fieldEditor();let f=document.getElementById('wlField');f.elements.namedItem('name').value='Reusable request type';ui.submit(f);const field=api.state().workhub.workLibrary.fields[0];await ui.handle({dataset:{wl:'field-insert',id:field.id}});const c=val.snapshot().draft.columns.at(-1);assert.equal(c.key,'TYPE_2');assert.equal(c.required,true);assert.equal(c.values,'A,B');assert.notEqual(c.id,field.definition.id);await val.saveDraft();assert.deepEqual(copy(api.state().workhub.validator.templates[0].releases[0]),frozen);ui.fieldEditor(field.id);f=document.getElementById('wlField');f.elements.namedItem('values').value='C,D';ui.submit(f);assert.equal(api.state().workhub.validator.templates[0].columns.at(-1).values,'A,B');});
 test('combination builder, reference explanations and field renaming work through actual forms',async t=>{const {api,document,window}=await app(t),ui=api.hub.validator,E=window.WorkHubValidatorEngine;api.showTab('validator');await ui.handle({dataset:{val:'example'}});await ui.handle({dataset:{val:'mode',mode:'references'}});let f=document.getElementById('valReferenceForm');f.elements.namedItem('name').value='Owners by type';f.elements.namedItem('data').value='Type,Owner,Name,Description\nStandard,Aisha,Aisha team,Finance coordination\nUrgent,Daniel,Daniel team,Emergency support';f.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));f=document.getElementById('valReferenceForm');f.elements.namedItem('codeColumn').value='Owner';f.elements.namedItem('nameColumn').value='Name';f.querySelector('[name="refDescription"][value="Description"]').checked=true;f.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));await ui.handle({dataset:{val:'mode',mode:'rules'}});await ui.handle({dataset:{val:'add-rule'}});f=document.getElementById('valRuleForm');let clause=f.querySelector('[data-assertion]');clause.querySelector('[data-clause="field"]').value='OWNER';const op=clause.querySelector('[data-clause="operator"]');op.value='lookupTuple';op.dispatchEvent(new window.Event('change',{bubbles:true}));await settle();clause=document.querySelector('[data-assertion]');let pairs=clause.querySelectorAll('[data-tuple-pair]');pairs[0].querySelector('[data-pair-field]').value='OWNER';pairs[0].querySelector('[data-pair-reference]').value='Owner';pairs[1].querySelector('[data-pair-field]').value='TYPE';pairs[1].querySelector('[data-pair-reference]').value='Type';f=document.getElementById('valRuleForm');f.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));await ui.saveDraft();const saved=ui.snapshot().draft;assert.equal(saved.rules.at(-1).assertion.pairs.length,2);assert.equal(E.validateRows(saved,[{REQUEST_ID:'1',TYPE:'Standard',OWNER:'Daniel',AMOUNT:'1',START_DATE:'2026-10-20',END_DATE:'2026-10-21'}]).issues.some(i=>i.rule==='New condition'),true);await ui.handle({dataset:{val:'mode',mode:'columns'}});const column=saved.columns.find(c=>c.key==='OWNER');await ui.handle({dataset:{val:'select-column',id:column.id}});f=document.getElementById('valColumnForm');f.elements.namedItem('key').value='ASSIGNEE';f.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));assert.equal(ui.snapshot().draft.rules.at(-1).assertion.pairs[0].field,'ASSIGNEE');});
@@ -1563,6 +1563,108 @@ test('saved Lab results autoplay indefinitely, pause/stop locally, and restart a
 test('saved solved Lab cases animate on reopen and motion/privacy preferences suspend playback without writes',async t=>{
  const {api,document,window,db}=await app(t),id=addLabCase(api,document,{status:'Solved',solution:'Verified answer'});await settle();api.showTab('lab');assert.equal(document.querySelector('.lab-case').dataset.playback,'running');assert.ok(document.querySelector('.lab-issue .lab-result-motion'));const calls=db.calls.length;window.matchMedia=()=>({matches:true});api.hub.workbench.tick();assert.equal(document.querySelector('.lab-case').dataset.playback,'paused');window.matchMedia=()=>({matches:false});api.hub.workbench.tick();assert.equal(document.querySelector('.lab-case').dataset.playback,'running');document.body.classList.add('hub-private');await settle();assert.equal(document.querySelector('.lab-case').dataset.playback,'paused');document.body.classList.remove('hub-private');api.hub.workbench.tick();assert.equal(document.querySelector('.lab-case').dataset.playback,'running');api.openMMAreaManager();api.hub.workbench.tick();assert.equal(document.querySelector('.lab-case').dataset.playback,'paused');api.closeModal();api.hub.workbench.tick();assert.equal(document.querySelector('.lab-case').dataset.playback,'running');assert.equal(db.calls.length,calls);
  const reopened=await app(t,{remote:copy(db.row),login:false});await reopened.api.loadCloud(sessionUser);reopened.api.showTab('lab');assert.equal(reopened.document.querySelector('.lab-case').dataset.playback,'running');
+});
+
+async function saveProgressRemark(ctx, ticketId, remarks) {
+ const {api,document,window}=ctx;
+ const ticket=api.state().tickets.find(t=>t.id===ticketId);
+ const tracker=api.state().trackers.find(p=>p.ticket===ticket.ticket);
+ await api.action({dataset:{action:'progress-detail',id:tracker.id}});
+ const form=document.getElementById('progressForm');
+ form.elements.namedItem('remarks').value=remarks;
+ form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));
+ await settle();
+}
+
+test('ticket history appends only changed remarks with date and time, without prefixes',async t=>{
+ const ctx=await app(t),{api,document,window,db}=ctx;
+ useDay(window,'2026-10-20');
+ const id=addReportTicket(api,document);
+ await settle();
+ assert.equal(api.state().tickets[0].history,'');
+ assert.equal(api.state().tickets[0].historyDate,'');
+ await saveProgressRemark(ctx,id,'  Awaiting user confirmation  ');
+ let ticket=api.state().tickets[0];
+ assert.equal(ticket.history,'Awaiting user confirmation [20-10-2026 12:00:00]');
+ assert.equal(ticket.historyDate,'2026-10-20');
+ assert.equal(ticket.historyTime,'12:00:00');
+ const saved=copy(ticket);
+ useDay(window,'2026-10-21');
+ await saveProgressRemark(ctx,id,'Awaiting user confirmation');
+ assert.equal(api.state().tickets[0].history,saved.history);
+ assert.equal(api.state().tickets[0].historyDate,saved.historyDate);
+ await saveProgressRemark(ctx,id,'Test complete\nUser confirmed the result');
+ ticket=api.state().tickets[0];
+ assert.equal(ticket.history,saved.history+'\nTest complete\nUser confirmed the result [21-10-2026 12:00:00]');
+ api.showTab('tickets');
+ document.getElementById('statusFilter').value='';
+ document.getElementById('statusFilter').dispatchEvent(new window.Event('change',{bubbles:true}));
+ assert.equal(document.querySelector('.ticket-history-preview p').textContent,'Test complete\nUser confirmed the result [21-10-2026 12:00:00]');
+ const second=copy(ticket);
+ await saveProgressRemark(ctx,id,'   ');
+ assert.equal(api.state().tickets[0].history,second.history);
+ assert.equal(api.state().tickets[0].historyTime,second.historyTime);
+ assert.equal(api.parseBackup(api.payload(api.state())).tickets[0].history,second.history);
+ const reopened=await app(t,{remote:copy(db.row),login:false});
+ await reopened.api.loadCloud(sessionUser);
+ assert.equal(reopened.api.state().tickets[0].history,second.history);
+});
+
+test('ticket status and milestone changes preserve the remarks journal and its timestamp',async t=>{
+ const ctx=await app(t),{api,document,window}=ctx;
+ useDay(window,'2026-10-20');
+ const id=addReportTicket(api,document);
+ await saveProgressRemark(ctx,id,'Keep this useful update');
+ const prior=copy(api.state().tickets[0]);
+ useDay(window,'2026-10-21');
+ api.showTab('tickets');
+ document.getElementById('statusFilter').value='';
+ document.getElementById('statusFilter').dispatchEvent(new window.Event('change',{bubbles:true}));
+ let status=document.querySelector('select[data-ticket-status]');
+ status.value='Closed';
+ status.dispatchEvent(new window.Event('change',{bubbles:true}));
+ await settle();
+ assert.equal(api.state().tickets[0].status,'Closed');
+ assert.ok(api.state().trackers[0].steps.every(Boolean));
+ assert.equal(api.state().workhub.ticketClosures[0].date,'2026-10-21');
+ assert.equal(api.state().tickets[0].history,prior.history);
+ assert.equal(api.state().tickets[0].historyDate,prior.historyDate);
+ api.editRecord('tickets',id);
+ const editor=document.getElementById('editForm');
+ editor.elements.namedItem('status').value='Pending';
+ api.saveEdit(editor);
+ await settle();
+ assert.equal(api.state().tickets[0].history,prior.history);
+ await api.action({dataset:{action:'detail',id}});
+ const checkbox=document.querySelector('.ticket-milestones [data-step="all"]');
+ checkbox.checked=true;
+ checkbox.dispatchEvent(new window.Event('change',{bubbles:true}));
+ await settle();
+ assert.equal(api.state().tickets[0].status,'Closed');
+ assert.equal(api.state().tickets[0].history,prior.history);
+ assert.equal(api.state().tickets[0].historyTime,prior.historyTime);
+ assert.ok(api.state().workhub.workLibrary.events.some(e=>e.title==='Status changed'));
+});
+
+test('ticket history preserves older entries and manual updates use plain timestamped remarks',async t=>{
+ const ctx=await app(t),{api,document,window}=ctx;
+ useDay(window,'2026-10-20');
+ const id=addWishlistTicket(api,document),legacy=api.state().tickets[0].history;
+ await saveProgressRemark(ctx,id,'New progress note');
+ assert.equal(api.state().tickets[0].history,legacy+'\nNew progress note [20-10-2026 12:00:00]');
+ await api.action({dataset:{action:'detail',id}});
+ let form=document.getElementById('historyForm');
+ form.elements.namedItem('newHistory').value='Manual follow-up';
+ form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));
+ await settle();
+ assert.ok(api.state().tickets[0].history.startsWith(legacy+'\n'));
+ assert.ok(api.state().tickets[0].history.endsWith('Manual follow-up [20-10-2026 12:00:00]'));
+ assert.equal(document.querySelector('.ticket-detail-update p').textContent,'Manual follow-up [20-10-2026 12:00:00]');
+ const sheet=window.WorkHubReports.build(api.state(),{asOf:'2026-10-20'}).sheets.find(s=>s.name==='Ticket updates');
+ assert.equal(sheet.rows.length,3);
+ assert.equal(sheet.rows[0].values[3],legacy);
+ assert.equal(sheet.rows[1].values[3],'New progress note [20-10-2026 12:00:00]');
+ assert.equal(sheet.rows[2].values[3],'Manual follow-up [20-10-2026 12:00:00]');
 });
 
 test('grouped Settings: option spacing overrides header button styles and hidden sections stay hidden',async t=>{
