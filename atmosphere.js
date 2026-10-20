@@ -383,7 +383,7 @@
       );
       const obstacles = [
         ...document.querySelectorAll(
-          '#hubPet,#musicCorner,#hubTimerBar,#hubMomoBall,#hubMomoHome,#hubMomoMenu,#focusPanel,.toast:not([hidden]),button,input,select,textarea,a,summary,[role="button"]'
+          '#hubPet,#hubTimerBar,#hubMomoBall,#hubMomoHome,#hubMomoMenu,#focusPanel,.toast:not([hidden]),button,input,select,textarea,a,summary,[role="button"]'
         ),
       ]
         .filter(el => !el.closest('#hubAtmosphereCard,#hubVisitors'))

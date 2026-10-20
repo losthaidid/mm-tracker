@@ -271,31 +271,6 @@
   margin: 0;
   color: var(--hub-text, #765b87);
 }
-#focusPanel .fp-source-switch {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px;
-  padding: 4px;
-  background: var(--hub-surface-soft, #f2edf7);
-  border: 1px solid var(--hub-border, #e8dff0);
-  border-radius: 12px;
-  margin-bottom: 12px;
-}
-#focusPanel .fp-source-switch .fp-button {
-  padding: 7px 4px;
-  font-size: 9px;
-  border-color: transparent;
-  background: transparent;
-  min-height: 30px;
-  border-radius: 8px;
-  color: var(--hub-muted, #93809f);
-}
-#focusPanel .fp-source-switch .fp-button[aria-pressed='true'] {
-  background: var(--hub-surface, #fffdfd);
-  color: var(--hub-accent, #9270ac);
-  box-shadow: 0 2px 5px #36254608;
-  border-color: var(--hub-border, #e7dded);
-}
 #focusPanel .fp-wide-label {
   display: flex;
   flex-direction: column;
@@ -328,23 +303,6 @@
   margin: 0;
   accent-color: var(--hub-accent, #a385b7);
   cursor: pointer;
-}
-#focusPanel .fp-link-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-#focusPanel .fp-music-actions {
-  display: flex;
-  justify-content: space-between;
-  gap: 9px;
-  margin: 7px 0 3px;
-}
-#focusPanel #fpMusicPane > small {
-  display: block;
-  font-size: 9px;
-  line-height: 1.7;
-  color: var(--hub-muted, #9f90aa);
 }
 #focusPanel .fp-audio-status {
   font-size: 9px;

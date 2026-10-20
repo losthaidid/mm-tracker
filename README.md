@@ -93,6 +93,10 @@ Tickets use a card layout, and Tasks use a main-task/sub-task layout. These styl
 
 ## Your refreshed workspace
 
+**Settings → Work setup → Built-in lists** opens a searchable library with grouped navigation. Edit one list at a time and see its dropdown preview and item count while typing. Moving between lists keeps your drafts; **Save all lists** applies them together. Ticket milestones still require exactly 12 names, project phases remain ordered, and values used by existing records stay protected. Phase-gate criteria have their own editors in the library.
+
+The expressive motion layer adds stronger entrances, spring-like interactions, Momo reactions and theatre movement, weather/visitor effects and Lab outcome highlights. **Theme Studio → Animation** retains its motion choices. Animations Off and the device’s reduced-motion preference disable decorative motion; hidden pages pause it. Animation frames create no cloud writes. Focus mode provides the local Soundscape mixer and original lo-fi audio.
+
 The existing Tickets, Tasks, Schedule and Projects remain available alongside **My day**, **Knowledge**, **Process Hub**, **Waiting on** and **Studio**. The visual refresh covers all tabs and adapts to phone screens. Existing project, task, ticket and schedule records are preserved.
 
 - **My day:** personal greeting, today's schedule, next actions, follow-ups, daily achievements, project journey and a decorative growing workspace. Use **Arrange dashboard** to add/remove widgets; drag widgets or use their arrow buttons to reorder them. The size control switches a widget between one and two columns. Phone layouts use one column.
@@ -123,7 +127,7 @@ Open **Settings → Atmosphere & visitors**. By default the scenery follows the 
 
 Tiny visitors arrive occasionally: a butterfly in the morning, a bird in the afternoon, or a firefly in the evening and at night. Choose **Save & meet a visitor** to invite one immediately. Tap a visitor for a little hello from Momo; Escape lets it fly away. Only one appears at a time, landing away from visible controls and floating tools. If there is no room, it waits. A keyboard-focused visitor stays still until you greet it or leave it.
 
-Visitors and moving weather pause during typing, dialogs, Focus, Privacy, presentation, dragging and hidden pages. The device's reduced-motion setting and Theme Studio's Animations Off keep scenery still and disable visitors. Choices are remembered separately on each device, shared with other tracker tabs in that browser, and excluded from Supabase records, theme exports and backups. Scenery, visitor movement and greetings make no network requests or cloud writes. Existing tracker and YouTube behavior is unchanged.
+Visitors and moving weather pause during typing, dialogs, Focus, Privacy, presentation, dragging and hidden pages. The device's reduced-motion setting and Theme Studio's Animations Off keep scenery still and disable visitors. Choices are remembered separately on each device, shared with other tracker tabs in that browser, and excluded from Supabase records, theme exports and backups. Scenery, visitor movement and greetings make no network requests or cloud writes. These settings do not change your tracker records.
 
 ## Custom Focus timer
 
@@ -223,20 +227,6 @@ Adjacent hourly pieces from one booking are combined into a readable activity ro
 
 The export uses the required OOXML worksheet-property order (`tabColor`, `outlinePr`, `pageSetUpPr`), correcting an Excel repair/corruption warning. Export a new copy to get the corrected file; previously downloaded files are unchanged. Export checks cover the actual download form, ZIP contents, worksheet ordering and package relationships.
 
-## Floating YouTube corner
-
-Choose **♫ Music corner** in the workspace toolbar, **Open my music corner** in Momo's menu, or the music command in Search & commands. The default floating view contains only the video screen, approximately 200 pixels tall, plus a small external drag/menu/close pill. The title banner, empty stage, search results and favourites no longer occupy the floating window. Choose **⋯** for search, favourites, settings and Minimise. These controls open separately and return to the video after a selection. The video stays open as you change tracker tabs. Drag its dotted handle or use arrow keys on the focused handle. Phone layouts fit the visible screen and keep the separate search dialog usable with a keyboard. Minimise or close pauses and unloads the player; expanding cues the selection without autoplay. Hidden pages, Privacy, presentation and editing dialogs also pause playback.
-
-Paste an official YouTube, YouTube Music, Shorts, live-video or playlist link to play without a search key. The player uses YouTube's own visible controls, with a minimum 200 × 200 video area. An **Open YouTube** link is available for videos that disallow embedding, sign-in requirements or playback problems. WorkHub does not connect a Premium account; account benefits and availability are controlled by YouTube.
-
-Song/video results inside the panel use the official YouTube Data API. In **Settings → YouTube search settings**, add your own browser API key after enabling **YouTube Data API v3** in Google Cloud. Restrict the key to **Websites**, allowing `https://losthaidid.github.io` and `https://losthaidid.github.io/*`, and restrict its API access to YouTube Data API v3. Browser referrer policies can omit the path, so use the GitHub Pages origin restrictions rather than only `/mm-tracker/`. Without a key, the search box offers an explicitly labelled **Search on YouTube** link; paste your chosen link back to play. No scraping or third-party search proxy is used. Google controls the daily API quota. Search is submitted explicitly; results are cached in memory for five minutes, with no requests on each keystroke.
-
-Save and name up to 60 video/playlist shortcuts under **Your favourites**. Favourites, the search key and player position stay on the current browser/device, independently of tracker records. They do not sync through Supabase, enter JSON backups, or get committed to GitHub. Search keys are sent only to Google's official API. Remove the key through Search settings. Result metadata is kept only in memory; favourite labels are user-maintained shortcut names.
-
-Momo sits beside the compact video with little headphones; on narrow phones, the seat moves above or below when there is room. While playback is active, Momo randomly switches between watching and a short dance. Pausing or finishing a video ends the dance. Typing, Focus, reduced motion, disabled wandering and hidden/present modes suppress automatic dancing or docking as appropriate. Drag Momo away to give him space; he waits before returning. Music interactions and animation never upload to Supabase. The seat stays outside the video, and Momo’s speech bubble is hidden there so the screen remains clear.
-
-References: [IFrame Player API](https://developers.google.com/youtube/iframe_api_reference), [search.list](https://developers.google.com/youtube/v3/docs/search/list), [YouTube developer policies](https://developers.google.com/youtube/terms/developer-policies), [browser API-key restrictions](https://docs.cloud.google.com/docs/authentication/api-keys).
-
 ## Development checks
 
 Run `npm ci` followed by `npm test`. The tests exercise the app in a DOM environment and execute the original schema plus compatibility migration in a local PostgreSQL runtime. They cover area maintenance, imports, browser recovery, offline retries, cross-device and cross-tab conflicts, form drafts, knowledge and process editing, follow-ups, task board state, dashboard/theme settings, stopwatch recovery and timezone boundaries, exports, preserved records, idempotent saves, and owner-only access. No production records are used by these tests.
@@ -276,7 +266,7 @@ Settings opens on pointer hover and closes with a short animation after leaving.
 
 Drag Momo’s house with a mouse or finger, or focus it and use arrow keys (Shift for larger moves). Tap still sends Momo home or wakes Momo. Cancelled drags return to their earlier position. The house stays inside the visible viewport and remembers its position on that device; the previous home placement is migrated locally.
 
-**Your soundscape → Lo-fi study → Play soundscape** blends original mellow keys, warm bass and soft drums with the ambient channels. **Paper lanterns** (72 BPM) and **Blue hour** (66 BPM) are synthesized as short stereo loops after Play, with a separate music volume slider. Track and mix choices stay on the device; reloading never starts playback automatically. A single audio buffer loops independently of animation timers and is released on Pause/sign-out. No YouTube integration, subscription, API key, media downloads or Supabase audio storage is used.
+**Your soundscape → Lo-fi study → Play soundscape** blends original mellow keys, warm bass and soft drums with the ambient channels. **Paper lanterns** (72 BPM) and **Blue hour** (66 BPM) are synthesized as short stereo loops after Play, with a separate music volume slider. Track and mix choices stay on the device; reloading never starts playback automatically. A single audio buffer loops independently of animation timers and is released on Pause/sign-out. No subscription, API key, media downloads or cloud audio storage is used.
 
 The scenery now hides the entire inactive sun/moon group, so animated opacity cannot reveal both. Sun and moon gently bob, and the sun rays rotate. Animations Off, reduced motion and hidden-page pausing still apply.
 
@@ -284,7 +274,7 @@ The scenery now hides the entire inactive sun/moon group, so animated opacity ca
 
 Use **Focus mode** beside **Reminders** to open a small floating panel while continuing to work on the page underneath. Choose a task or focus freely, set 1–1,440 minutes and start. It shares the timer with **Studio → Focus room**, including duration updates. Pause/resume preserves elapsed time; **End** finishes the timer. Drag the header or use arrow keys while the move handle is focused. Position is clamped to the visible screen and remembered on this device. Minimise or hide the panel to clear space; the timer continues and the toolbar opens it again. The panel hides during dialogs, privacy/presentation mode and when the page is hidden. Signing out or changing accounts clears the active Focus session.
 
-Choose **Soundscape** for a saved mix or Rainy desk, Café corner, Forest walk, By the fire and Lo-fi study. Press Play to listen, adjust volume or mute, and use **Fine-tune your mix** for full settings. Choose **Music Corner** to play a saved favourite or paste a YouTube video/playlist link; **Search & favourites** opens the existing music controls. The video stays in the visible Music Corner and requires pressing Play there. Switching sources stops the other source; **Stop audio** stops both. Opening Focus mode starts neither the timer nor audio automatically. Timer and media controls do not save tracker records or replace the current page's unsaved forms.
+Use a saved mix or Rainy desk, Café corner, Forest walk, By the fire and Lo-fi study. Press Play to listen, adjust volume or mute, and use **Fine-tune your mix** for full settings. **Stop audio** stops the soundscape. Opening Focus mode starts neither the timer nor audio automatically. Timer and audio controls do not save tracker records or replace the current page’s unsaved forms.
 
 ## Momo’s world and adventures
 
@@ -322,6 +312,6 @@ Company lists and recipients can be removed and restored with **Undo removal**. 
 
 ## Grouped Settings
 
-**Settings** now shows one section at a time: **Workspace** (header, appearance and screen visibility), **Work setup** (projects, SAP MM areas, built-in lists, charge codes, mileage locations and company email recipients), **Companion & sound** (companion adventures, moments, scenery, soundscape and Music Corner), **Backups & sync**, and **Account**. Each action has a short description. The saved/sync status stays visible above the sections.
+**Settings** now shows one section at a time: **Workspace** (header, appearance and screen visibility), **Work setup** (projects, SAP MM areas, built-in lists, charge codes, mileage locations and company email recipients), **Companion & sound** (companion adventures, moments, scenery and soundscape), **Backups & sync**, and **Account**. Each action has a short description. The saved/sync status stays visible above the sections.
 
 **Find a setting** searches all sections, including aliases such as “email”, “KM”, “theme” and “backup”. Clearing search returns to the selected section. The sections appear beside the options on larger screens and as a scrollable horizontal row on phones. Arrow keys, Home and End navigate sections; Escape closes Settings and returns focus to its launcher. Changing sections and clearing search keep the menu open. Existing action buttons and their handlers are retained, including account/recovery visibility, hover/touch opening and automatic closing when an action is selected. Grouping, searching and navigation do not save account records.

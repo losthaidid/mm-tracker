@@ -297,9 +297,6 @@ body:not([data-motion='off']) #hubPet:is([data-pose='nap'], [data-pose='idle-sle
 body:not([data-motion='off']) #hubPet:is([data-pose='walk'], [data-roaming='true']) .pet-body {
   animation: hub-walk 0.7s ease-in-out infinite;
 }
-body:not([data-motion='off']) #hubPet[data-pose='music-dance'] .pet-body {
-  animation: momo-music-dance 0.85s ease-in-out infinite;
-}
 body:not([data-motion='off']) #hubPet[data-pose='stumble'] .pet-body {
   animation: momo-oops 1.8s ease-in-out both;
 }

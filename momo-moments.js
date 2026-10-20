@@ -101,7 +101,7 @@
           'input,textarea,select,[contenteditable]:not([contenteditable="false"])'
         ) &&
         !$('hubMomoMenu') &&
-        (!auto || (!quiet() && $('musicCorner')?.dataset.playing !== 'true'))
+        (!auto || !quiet())
       );
     }
     function finish(restore = true) {
@@ -221,7 +221,7 @@
         return null;
       const blocked = [
         ...document.querySelectorAll(
-          '#musicCorner,#hubTimerBar,#soundscapeDock,button,input,select,textarea,a,summary,[role="button"]'
+          '#hubTimerBar,#soundscapeDock,button,input,select,textarea,a,summary,[role="button"]'
         ),
       ]
         .filter(el => !el.closest('#hubPet,#hubVisitors'))

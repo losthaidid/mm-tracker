@@ -9,7 +9,7 @@
     />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; script-src 'self' 'unsafe-inline' https://www.youtube.com; worker-src 'self' blob:; font-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://i.ytimg.com; connect-src 'self' https://aaotojqkiewbhtnrlcur.supabase.co https://www.googleapis.com; frame-src https://www.youtube-nocookie.com https://www.youtube.com; base-uri 'none'; form-action 'none'"
+      content="default-src 'none'; script-src 'self' 'unsafe-inline'; worker-src 'self' blob:; font-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://aaotojqkiewbhtnrlcur.supabase.co; frame-src 'none'; base-uri 'none'; form-action 'none'"
     />
     <title>SAP MM WorkHub</title>
     <link
@@ -92,12 +92,11 @@
         #workhubStartup .startup-dots span { animation: none; }
       }
     </style>
-    <script src="./startup.js?v=20261020-startup-1"></script>
+    <script src="./startup.js?v=20261020-workspace-refresh-1"></script>
     <!-- Shared foundation first; feature styles follow; custom.css is your editing space. -->
     <link rel="stylesheet" href="./base.css?v=20261020-ticket-cards-1" />
     <link rel="stylesheet" href="./studio.css?v=20261019-source-1" />
     <link rel="stylesheet" href="./reminders.css?v=20261020-timed-1" />
-    <link rel="stylesheet" href="./music.css?v=20261019-source-1" />
     <link rel="stylesheet" href="./atmosphere.css?v=20261019-source-1" />
     <link rel="stylesheet" href="./workbench.css?v=20261019-source-1" />
     <link rel="stylesheet" href="./lab-workshop.css?v=20261020-tng-lab-1" />
@@ -105,7 +104,7 @@
     <link rel="stylesheet" href="./momo-moments.css?v=20261020-roomier-theatre-1" />
     <link rel="stylesheet" href="./workspace-upgrades.css?v=20261019-source-1" />
     <link rel="stylesheet" href="./workspace-features.css?v=20261019-source-1" />
-    <link rel="stylesheet" href="./momo-anime.css?v=20261019-source-1" />
+    <link rel="stylesheet" href="./momo-anime.css?v=20261020-workspace-refresh-1" />
     <link rel="stylesheet" href="./validator-studio.css?v=20261019-source-1" />
     <link rel="stylesheet" href="./batch-a.css?v=20261019-source-1" />
     <link rel="stylesheet" href="./work-library.css?v=20261019-source-1" />
@@ -115,8 +114,10 @@
     <link rel="stylesheet" href="./claims.css?v=20261019-source-1" />
     <link rel="stylesheet" href="./tng.css?v=20261020-tng-lab-1" />
     <link rel="stylesheet" href="./recipients.css?v=20261019-source-1" />
-    <link rel="stylesheet" href="./focus-panel.css?v=20261019-source-1" />
+    <link rel="stylesheet" href="./focus-panel.css?v=20261020-workspace-refresh-1" />
     <link rel="stylesheet" href="./settings-panel.css?v=20261019-source-1" />
+    <link rel="stylesheet" href="./built-in-lists.css?v=20261020-workspace-refresh-1" />
+    <link rel="stylesheet" href="./dramatic-motion.css?v=20261020-workspace-refresh-1" />
     <link rel="stylesheet" href="./custom.css?v=20261019-source-1" />
   </head>
   <body>
@@ -311,19 +312,18 @@
     <!-- Cloud merge, reminders, reports and visual feature modules. Preserve this load order. -->
     <script src="./sync-merge.js"></script>
     <script src="./momo-art.js?v=20261019-source-1"></script>
-    <script src="./momo-life.js?v=20261019-source-1"></script>
+    <script src="./momo-life.js?v=20261020-workspace-refresh-1"></script>
     <script src="./reminders.js?v=20261020-timed-2"></script>
     <script src="./reports.js?v=20261020-timed-1"></script>
-    <script src="./music.js?v=20261019-source-1"></script>
     <script src="./momo-world-art.js?v=20261019-source-1"></script>
-    <script src="./atmosphere.js?v=20261019-source-1"></script>
+    <script src="./atmosphere.js?v=20261020-workspace-refresh-1"></script>
     <script src="./lab-workshop.js?v=20261020-tng-lab-1"></script>
     <script src="./workspace-upgrades.js?v=20261019-source-1"></script>
     <script src="./workspace-features.js?v=20261019-source-1"></script>
     <script src="./workbench.js?v=20261019-source-1"></script>
     <script src="./lofi-engine.js?v=20261019-source-1"></script>
-    <script src="./soundscape.js?v=20261019-source-1"></script>
-    <script src="./momo-moments.js?v=20261020-roomier-theatre-1"></script>
+    <script src="./soundscape.js?v=20261020-workspace-refresh-1"></script>
+    <script src="./momo-moments.js?v=20261020-workspace-refresh-1"></script>
     <!-- Validation Studio: engine first, file readers second, user interface third. -->
     <script src="./validator-engine.js?v=20261019-source-1"></script>
     <script src="./validator-files.js?v=20261019-source-1"></script>
@@ -334,8 +334,8 @@
     <script src="./work-library-engine.js?v=20261019-source-1"></script>
     <script src="./work-library.js?v=20261019-source-1"></script>
     <script src="./ticket-workspace.js?v=20261020-ticket-history-1"></script>
-    <script src="./focus-panel.js?v=20261019-source-1"></script>
-    <script src="./momo-adventures.js?v=20261020-timed-1"></script>
+    <script src="./focus-panel.js?v=20261020-workspace-refresh-1"></script>
+    <script src="./momo-adventures.js?v=20261020-workspace-refresh-1"></script>
     <!-- Expenses, company recipients and Settings. Engines load before their interfaces. -->
     <script src="./claims-engine.js?v=20261020-tng-lab-1"></script>
     <script src="./tng-engine.js?v=20261020-tng-lab-1"></script>
@@ -344,8 +344,10 @@
     <script src="./claims.js?v=20261020-tng-lab-1"></script>
     <script src="./recipients-engine.js?v=20261019-source-1"></script>
     <script src="./recipients.js?v=20261019-source-1"></script>
-    <script src="./settings-panel.js?v=20261019-source-1"></script>
-    <script src="./studio.js?v=20261020-tng-lab-1"></script>
+    <script src="./settings-panel.js?v=20261020-workspace-refresh-1"></script>
+    <script src="./built-in-lists.js?v=20261020-workspace-refresh-1"></script>
+    <script src="./dramatic-motion.js?v=20261020-workspace-refresh-1"></script>
+    <script src="./studio.js?v=20261020-workspace-refresh-1"></script>
     <!-- Empty starter records and default lists; this is not your saved account data. -->
     <script id="seedData" type="application/json">
       {
@@ -540,6 +542,6 @@
       }
     </script>
     <!-- Start the application after all feature modules and the empty seed defaults are ready. -->
-    <script src="./app.js?v=20261020-ticket-cards-1"></script>
+    <script src="./app.js?v=20261020-workspace-refresh-1"></script>
   </body>
 </html>

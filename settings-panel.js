@@ -106,11 +106,6 @@
       'Ambient sounds and lo-fi music for focus.',
       'soundscape music audio nature rain focus lofi',
     ],
-    musicSettingsLauncher: [
-      'companion',
-      'YouTube search preferences for Music Corner.',
-      'youtube music corner search key',
-    ],
     backupButton: [
       'data',
       'Download a copy of your records.',

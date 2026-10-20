@@ -20,6 +20,8 @@ CSS (`.css`) controls appearance; HTML supplies the initial page structure.
 | [studio.js](../studio.js) | Workspace shell; My day, Knowledge, Process Hub, Waiting on, Studio, theme preferences, focus/work timers; installs the feature modules. | `DEFAULTS`, `WIDGETS`, `install`, `prepare`, `afterRender`. |
 | [studio.css](../studio.css) | Sidebar, dashboard, workspace screens, theme controls and work timer. | Shared WorkHub layouts and theme variables. |
 | [settings-panel.js](../settings-panel.js), [settings-panel.css](../settings-panel.css) | Searchable Settings categories and action descriptions. | `GROUPS` for category labels; `ITEMS` for descriptions/search words. |
+| [built-in-lists.js](../built-in-lists.js), [built-in-lists.css](../built-in-lists.css) | Grouped list library, search, one editor at a time, live counts and dropdown previews. Existing list validation and saving stay in `app.js`. | `fields`, `render`, `mount`. |
+| [dramatic-motion.css](../dramatic-motion.css), [dramatic-motion.js](../dramatic-motion.js) | Expressive arrivals, interactions, character motion, scenery and Lab result effects. Pauses decorative motion on hidden pages and respects Animations Off/reduced motion. | Keyframe groups and the accessibility rules at the end. |
 | [workspace-upgrades.js](../workspace-upgrades.js), [workspace-upgrades.css](../workspace-upgrades.css) | Theme/background choices and explicit project status dates. | `THEMES`, `BACKGROUNDS`, project-date hooks. |
 | [workspace-features.js](../workspace-features.js), [workspace-features.css](../workspace-features.css) | Annual/medical leave, Process Hub presentations and header/menu interactions. | `LEAVE`, `PORTIONS`, and the exported adapters at the bottom. |
 
@@ -71,8 +73,7 @@ CSS (`.css`) controls appearance; HTML supplies the initial page structure.
 | [momo-adventures.js](../momo-adventures.js), [momo-world.css](../momo-world.css) | Name/greetings/dialogue, chase/sprint/umbrella/mischief and soccer tricks/surprises. |
 | [momo-world-art.js](../momo-world-art.js) | Vector visitors and illustrated window scenes. |
 | [atmosphere.js](../atmosphere.js), [atmosphere.css](../atmosphere.css) | Daylight, weather, scenery, visitor lifecycle and local atmosphere settings. |
-| [focus-panel.js](../focus-panel.js), [focus-panel.css](../focus-panel.css) | Draggable mini focus timer with Soundscape/Music controls. |
-| [music.js](../music.js), [music.css](../music.css) | YouTube Music Corner, search, favourites and player interface. |
+| [focus-panel.js](../focus-panel.js), [focus-panel.css](../focus-panel.css) | Draggable mini focus timer with Soundscape controls. |
 | [soundscape.js](../soundscape.js), [soundscape.css](../soundscape.css) | Ambient mixer, presets and floating audio controls. |
 | [lofi-engine.js](../lofi-engine.js) | Locally synthesized keyboard, bass and drum loops used by Soundscape. |
 
