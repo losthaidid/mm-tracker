@@ -89,7 +89,7 @@ Select a booking to view its dates, exact times, duration, linked task/project a
 
 Enter start and end times to the minute, such as **09:15–10:45**. Quick-duration buttons offer 15, 30, 45, 60 and 90 minutes. For an end at midnight, select **End at midnight (24:00)**. A date range repeats the same daily time range. Adjacent bookings are allowed; overlapping intervals are blocked. Durations, weekend TOIL, project calendar syncing and Excel times retain minute precision. The time-grid view shows one week from 00:00–24:00.
 
-Tickets have a new card layout with a Table option, and Tasks use a main-task/sub-task layout. These styles are scoped to Tickets, Tasks and Schedule; the Projects layout is retained.
+Tickets use a card layout, and Tasks use a main-task/sub-task layout. These styles are scoped to Tickets, Tasks and Schedule; the Projects layout is retained.
 
 ## Your refreshed workspace
 

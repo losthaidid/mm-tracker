@@ -652,22 +652,7 @@ a {
     flex-wrap: wrap;
   }
 }
-/* Ticket progress and latest-history presentation */
-.ticket-status {
-  min-width: 170px;
-  font-size: 0.875rem;
-}
-.latest-history {
-  min-width: 310px;
-  max-width: 390px;
-}
-.latest-history > div {
-  max-height: 130px;
-  overflow: auto;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  margin-bottom: 7px;
-}
+/* Ticket milestone details */
 .ticket-milestones {
   margin-top: 20px;
   padding: 17px;

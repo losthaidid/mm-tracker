@@ -295,10 +295,14 @@ test('schedule milestones open in display mode and precise bookings remain visib
  await api.action(document.querySelector('.precision-grid [data-action="open-booking"]'));assert.equal(document.getElementById('scheduleForm'),null);assert.ok(document.querySelector('[data-action="edit-booking"]'));
 });
 
-test('Tickets offers cards and the original table with working detail controls',async t=>{
+test('Tickets use cards only with working details, editing and empty search results',async t=>{
  const {api,document}=await app(t);api.editRecord('tickets');const form=document.getElementById('editForm');form.elements.namedItem('ticket').value='AMS-100';form.elements.namedItem('description').value='Test ticket layout';api.saveEdit(form);await settle();
  api.showTab('tickets');assert.ok(document.querySelector('.ticket-queue-card'));assert.match(document.querySelector('.ticket-queue-card').textContent,/AMS-100/);
- await api.action(document.querySelector('[data-action="ticket-layout"][data-layout="table"]'));assert.ok(document.querySelector('#view table'));assert.match(document.getElementById('view').textContent,/History tracker/);
+ assert.equal(document.querySelector('#view table'),null);assert.equal(document.querySelector('[data-action="ticket-layout"]'),null);
+ await api.action(document.querySelector('.ticket-queue-card [data-action="detail"]'));assert.ok(document.querySelector('[data-ticket-detail]'));assert.ok(document.querySelector('.ticket-history-section'));
+ await api.action(document.querySelector('[data-ticket-detail] [data-action="edit"]'));const edit=document.getElementById('editForm');edit.elements.namedItem('description').value='Updated card description';api.saveEdit(edit);await settle();assert.match(document.querySelector('.ticket-queue-card').textContent,/Updated card description/);
+ const search=document.getElementById('ticketSearch');search.value='No matching ticket';search.dispatchEvent(new document.defaultView.Event('input',{bubbles:true}));assert.equal(document.querySelectorAll('.ticket-queue-card').length,0);assert.ok(document.querySelector('.workspace-empty'));assert.equal(document.querySelector('#view table'),null);
+ api.showTab('home');api.showTab('tickets');assert.equal(document.querySelector('[data-action="ticket-layout"]'),null);assert.equal(document.querySelector('#view table'),null);
 });
 
 test('older documents gain area defaults and the current format survives backup/restore',async t=>{

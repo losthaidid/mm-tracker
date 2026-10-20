@@ -402,10 +402,6 @@ function filteredTickets() {
 function stats() {
   return `<div class="stats"><div class="stat"><span>Total tickets</span><strong>${state.tickets.length}</strong></div><div class="stat"><span>Pending</span><strong>${state.tickets.filter(t => t.status === 'Pending').length}</strong></div><div class="stat"><span>Closed</span><strong>${state.tickets.filter(t => isClosed(t.status)).length}</strong></div><div class="stat"><span>On Hold</span><strong>${state.tickets.filter(t => t.status === 'On Hold').length}</strong></div></div>`;
 }
-function renderTickets() {
-  const rs = filteredTickets();
-  return `${stats()}<section class="panel"><div class="panel-top"><div><h2>Tickets</h2><p class="muted">${rs.length} of ${state.tickets.length} tickets shown</p></div><button class="primary" data-action="new" data-group="tickets">Add ticket</button></div><div class="toolbar"><input id="ticketSearch" type="search" value="${esc(filterState.query)}" placeholder="Search ticket, description, PIC, or history" aria-label="Search tickets"><select id="statusFilter" aria-label="Filter ticket status">${selectOptions(OPTIONS.status, filterState.status, 'All statuses')}</select><select id="objectFilter" aria-label="Filter ticket object">${selectOptions(OPTIONS.object, filterState.object, 'All objects')}</select><select id="priorityFilter" aria-label="Filter ticket priority">${selectOptions(OPTIONS.priority, filterState.priority, 'All priorities')}</select></div><div class="scroll"><table><thead><tr><th>AMS Ticket</th><th>Description</th><th>Priority</th><th>PIC</th><th>Status</th><th>Object / Action</th><th>Transport</th><th>Last checked</th><th>Actions</th></tr></thead><tbody>${rs.map(t => `<tr><td class="nowrap"><button class="ticket-button" data-action="detail" data-id="${esc(t.id)}">${esc(t.ticket)}</button><div class="hint">${esc(t.jira)}</div></td><td class="desc">${esc(t.description)}</td><td>${tag(t.priority)}</td><td class="desc">${esc(t.pic) || '—'}</td><td>${tag(t.status)}</td><td class="desc">${esc(t.object) || '—'}<div class="hint">${esc(t.action)}</div></td><td>${esc(t.transport) || '—'}</td><td class="nowrap">${checked(t)}</td><td><button class="small" data-action="edit" data-group="tickets" data-id="${esc(t.id)}">Edit</button></td></tr>`).join('')}</tbody></table>${!rs.length ? '<div class="empty">No matching tickets.</div>' : ''}</div><div class="footerline">Click an AMS Ticket to view its history and add a dated update.</div></section>`;
-}
 
 function renderTasks() {
   const rs = state.tasks.filter(r => match(r, tasksQuery));
@@ -1085,7 +1081,7 @@ function render() {
   const preserved = tab === 'lab' && hub?.workbench?.workshop?.patchRender();
   if (!preserved) {
     const fn = {
-        tickets: renderTicketsV3,
+        tickets: renderTickets,
         progress: renderProgress,
         tasks: renderTasksV3,
         schedule: renderSchedule,
@@ -1164,19 +1160,6 @@ function updateTaskLinkFields(form) {
   const type = form.elements.namedItem('taskType')?.value || 'Custom';
   for (const box of form.querySelectorAll?.('[data-task-link]') || [])
     box.hidden = box.dataset.taskLink !== type;
-}
-
-function renderTicketsV3() {
-  const rs = filteredTickets();
-  return `${stats()}${pendingObjectCounts()}<section class="panel"><div class="panel-top"><div><h2>Tickets</h2><p class="muted">${rs.length} of ${state.tickets.length} tickets shown</p></div><button class="primary" data-action="new" data-group="tickets">Add ticket</button></div><div class="toolbar"><input id="ticketSearch" type="search" value="${esc(filterState.query)}" placeholder="Search ticket, description, PIC, or history" aria-label="Search tickets"><select id="statusFilter" aria-label="Filter ticket status">${selectOptions(OPTIONS.status, filterState.status, 'All statuses')}</select><select id="objectFilter" aria-label="Filter ticket object">${selectOptions(OPTIONS.object, filterState.object, 'All objects').replace('>__unassigned</option>', '>Unassigned</option>')}</select><select id="priorityFilter" aria-label="Filter ticket priority">${selectOptions(OPTIONS.priority, filterState.priority, 'All priorities')}</select></div><div class="scroll"><table><thead><tr><th>AMS Ticket</th><th>Description</th><th>Priority</th><th>PIC</th><th>Status</th><th>Milestones</th><th>Object / Action</th><th>Transport</th><th>Last checked</th><th>History tracker · Latest update</th><th>Actions</th></tr></thead><tbody>${rs
-    .map(t => {
-      const p = progressFor(t.ticket),
-        h = latestHistory(t);
-      return `<tr><td class="nowrap"><button class="ticket-button" data-action="detail" data-id="${esc(t.id)}">${esc(t.ticket)}</button><div class="hint">${esc(t.jira)}</div></td><td class="desc">${esc(t.description)}</td><td>${tag(t.priority)}</td><td class="desc">${esc(t.pic) || '—'}</td><td><select class="ticket-status" data-ticket-status="${esc(t.id)}" aria-label="Status for ${esc(t.ticket)}">${selectOptions(OPTIONS.status, t.status, 'Choose status')}</select></td><td class="nowrap">${p ? `${p.steps.filter(Boolean).length}/${STEPS.length}<div class="progress"><span style="width:${pct(p) * 100}%"></span></div>${tag(progressStatus(p))}` : 'No tracker'}<div style="margin-top:6px"><button class="small" data-action="detail" data-id="${esc(t.id)}">Milestones</button></div></td><td class="desc">${esc(t.object) || '—'}<div class="hint">${esc(t.action)}</div></td><td>${esc(t.transport) || '—'}</td><td class="nowrap">${checked(t)}</td><td class="latest-history"><div>${esc(h) || 'No history recorded.'}</div><button class="ticket-button" data-action="detail" data-id="${esc(t.id)}">Full history</button></td><td><button class="small" data-action="edit" data-group="tickets" data-id="${esc(t.id)}">Edit</button></td></tr>`;
-    })
-    .join(
-      ''
-    )}</tbody></table>${!rs.length ? '<div class="empty">No matching tickets.</div>' : ''}</div><div class="footerline">New progress remarks are added to history with a date. Status and milestone changes keep your written history unchanged.</div></section>`;
 }
 
 function pct(r) {
@@ -7096,15 +7079,11 @@ function renderTasksV3() {
       ''
     )}</select></div><div class="workspace-results"><span>${rows.length} main task${rows.length === 1 ? '' : 's'}</span><button class="small" data-action="archive-done"${completed ? '' : ' disabled'}>Archive completed (${completed})</button></div><div class="task-board">${rows.map(taskCard).join('') || '<div class="workspace-empty"><strong>No tasks in this view</strong><p>Add a main task or adjust your filters to get started.</p></div>'}</div></section></div>`;
 }
-let ticketLayout = 'cards';
-const ticketTableV10 = renderTicketsV3;
-renderTicketsV3 = function () {
+/** Tickets use the card workspace; status, details and editors share the existing handlers. */
+function renderTickets() {
   const rows = filteredTickets(),
-    tools = `<input id="ticketSearch" type="search" value="${esc(filterState.query)}" placeholder="Search ticket, description, PIC or history" aria-label="Search tickets"><select id="statusFilter" aria-label="Filter ticket status">${selectOptions(OPTIONS.status, filterState.status, 'All statuses')}</select><select id="objectFilter" aria-label="Filter ticket object">${selectOptions(OPTIONS.object, filterState.object, 'All objects')}</select><select id="priorityFilter" aria-label="Filter ticket priority">${selectOptions(OPTIONS.priority, filterState.priority, 'All priorities')}</select>`,
-    toggle = `<div class="schedule-view-switch"><button data-action="ticket-layout" data-layout="cards" class="${ticketLayout === 'cards' ? 'active' : ''}">Cards</button><button data-action="ticket-layout" data-layout="table" class="${ticketLayout === 'table' ? 'active' : ''}">Table</button></div>`;
-  const heading = `<div class="workspace-heading"><div><span class="eyebrow">Ticket workspace</span><h2>A clearer view of your support queue</h2><p>Track priorities, ownership and the latest update in one place.</p></div><div class="actions">${toggle}<button class="primary" data-action="new" data-group="tickets">+ Add ticket</button></div></div>`;
-  if (ticketLayout === 'table')
-    return `<div class="workspace-v10 tickets-workspace">${heading}${ticketTableV10()}</div>`;
+    tools = `<input id="ticketSearch" type="search" value="${esc(filterState.query)}" placeholder="Search ticket, description, PIC or history" aria-label="Search tickets"><select id="statusFilter" aria-label="Filter ticket status">${selectOptions(OPTIONS.status, filterState.status, 'All statuses')}</select><select id="objectFilter" aria-label="Filter ticket object">${selectOptions(OPTIONS.object, filterState.object, 'All objects')}</select><select id="priorityFilter" aria-label="Filter ticket priority">${selectOptions(OPTIONS.priority, filterState.priority, 'All priorities')}</select>`;
+  const heading = `<div class="workspace-heading"><div><span class="eyebrow">Ticket workspace</span><h2>A clearer view of your support queue</h2><p>Track priorities, ownership and the latest update in one place.</p></div><button class="primary" data-action="new" data-group="tickets">+ Add ticket</button></div>`;
   return `<div class="workspace-v10 tickets-workspace">${heading}${stats()}${pendingObjectCounts()}<section class="panel"><div class="workspace-toolbar">${tools}</div><div class="workspace-results">${rows.length} of ${state.tickets.length} tickets</div><div class="ticket-board">${
     rows
       .map(ticket => {
@@ -7123,7 +7102,7 @@ renderTicketsV3 = function () {
       .join('') ||
     '<div class="workspace-empty"><strong>Your queue is clear</strong><p>Add a ticket or adjust your filters.</p></div>'
   }</div></section></div>`;
-};
+}
 const scheduleRenderV10 = renderSchedule;
 renderSchedule = function () {
   return `<div class="workspace-v10 schedule-workspace">${scheduleRenderV10().replace('Bookings and project Go-Live milestones stay synchronized automatically.', 'Plan to the minute. Open an activity to review its details, then choose Edit when you need to make a change.').replace('01:00–24:00 ·', '00:00–24:00 ·').replace('<div class="schedule-view-switch"><button class="active" data-action="schedule-layout"', '<button class="small" data-action="schedule-today">Today</button><div class="schedule-view-switch"><button class="active" data-action="schedule-layout"')}</div>`;
@@ -7211,11 +7190,6 @@ workhubAction = function (button) {
       closeModal();
       tell('Sub-task deleted.');
     }
-    return true;
-  }
-  if (action === 'ticket-layout') {
-    ticketLayout = button.dataset.layout === 'table' ? 'table' : 'cards';
-    render();
     return true;
   }
   if (action === 'schedule-today' || action === 'schedule-week') {
