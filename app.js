@@ -501,14 +501,10 @@ function saveHistory(form) {
   const id = form.dataset.id,
     text = form.elements.namedItem('newHistory').value.trim();
   if (!text) throw Error('Enter a history update.');
-  const [year, mo, day] = today().split('-');
   const ok = mutate(d => {
     const t = d.tickets.find(t => t.id === id);
     if (!t) throw Error('Ticket not found.');
-    t.history =
-      (t.history ? t.history.replace(/\s+$/, '') + '\n' : '') + `- ${text} [${day}-${mo}-${year}]`;
-    t.historyDate = today();
-    t.historyTime = timeNow();
+    autoHistory(t, text);
   });
   detail(id);
   if (ok) tell('History update saved and timestamped.');
@@ -881,10 +877,13 @@ function saveLinkedSchedule(form) {
   return saveRange(form);
 }
 
-function autoHistory(ticket, transaction, remarks = '') {
+/** Ticket history is a dated remarks journal; status changes stay in their own controls/timeline. */
+function autoHistory(ticket, remarks = '') {
+  const text = remarks.trim();
+  if (!text) return;
   const [year, mo, day] = today().split('-'),
     clock = timeNow();
-  const line = `- ${transaction}${remarks.trim() ? ' Remarks: ' + remarks.trim() : ''} [${day}-${mo}-${year} ${clock}]`;
+  const line = `${text} [${day}-${mo}-${year} ${clock}]`;
   ticket.history = (ticket.history ? ticket.history.replace(/\s+$/, '') + '\n' : '') + line;
   ticket.historyDate = today();
   ticket.historyTime = clock;
@@ -922,13 +921,7 @@ const PLAN_STATUS = ['Planned', 'In Progress', 'Completed', 'On Hold'];
 const isClosed = s => s === 'Closed' || s === 'Completed';
 
 function latestHistory(t) {
-  const text = (t.history || '').trim();
-  return text
-    ? text
-        .split(/\r?\n(?=\s*-\s)/)
-        .at(-1)
-        .trim()
-    : '';
+  return window.WorkHubReports.historyEntries(t.history).at(-1) || '';
 }
 
 function changeTicketStatus(id, status) {
@@ -941,7 +934,7 @@ function changeTicketStatus(id, status) {
     t.status = status;
     syncProgressFromTicket(d, t, old);
   });
-  if (ok) tell('Status, milestones, and history saved.');
+  if (ok) tell('Status and milestones saved.');
 }
 function taskOverdue(t) {
   return !t.done && !t.archived && !!t.dueDate && t.dueDate < today();
@@ -1174,7 +1167,7 @@ function renderTicketsV3() {
     })
     .join(
       ''
-    )}</tbody></table>${!rs.length ? '<div class="empty">No matching tickets.</div>' : ''}</div><div class="footerline">Milestone changes update status and record a dated history entry.</div></section>`;
+    )}</tbody></table>${!rs.length ? '<div class="empty">No matching tickets.</div>' : ''}</div><div class="footerline">New progress remarks are added to history with a date. Status and milestone changes keep your written history unchanged.</div></section>`;
 }
 
 function pct(r) {
@@ -1209,7 +1202,7 @@ function progressChanges(before, after) {
   if (before && before.remarks !== after.remarks) changed.push('Progress remarks updated');
   return changed;
 }
-function syncTicketFromProgress(d, r, before, summary = '') {
+function syncTicketFromProgress(d, r, before) {
   const t = d.tickets.find(t => t.ticket === r.ticket);
   if (!t) throw Error('The ticket for this tracker was not found.');
   const changes = progressChanges(before, r),
@@ -1217,15 +1210,7 @@ function syncTicketFromProgress(d, r, before, summary = '') {
     old = t.status;
   if (!changes.length && old === next) return false;
   t.status = next;
-  const notes =
-    [
-      summary || changes.join('; '),
-      `${r.steps.filter(Boolean).length}/${STEPS.length} milestones complete`,
-      old === next ? 'Ticket status: ' + next : 'Ticket status changed from ' + old + ' to ' + next,
-    ]
-      .filter(Boolean)
-      .join('. ') + '.';
-  autoHistory(t, 'Ticket progress: ' + notes, r.remarks);
+  if ((before?.remarks || '').trim() !== r.remarks.trim()) autoHistory(t, r.remarks);
   return true;
 }
 function alignClosedTickets(d) {
@@ -1252,7 +1237,6 @@ function syncProgressFromTicket(d, t, old) {
   let r = d.trackers.find(r => r.ticket === t.ticket);
   const changed = !old || t.status !== old.status;
   if (!changed && !isClosed(t.status)) return;
-  let created = false;
   if (!r) {
     if (!isClosed(t.status) && !changed) return;
     r = {
@@ -1263,9 +1247,7 @@ function syncProgressFromTicket(d, t, old) {
       remarks: '',
     };
     d.trackers.push(r);
-    created = true;
   }
-  const before = clone(r);
   if (isClosed(t.status)) {
     r.steps = Array(STEPS.length).fill(true);
     r.onHold = false;
@@ -1278,35 +1260,24 @@ function syncProgressFromTicket(d, t, old) {
     if (r.steps.every(Boolean)) r.steps[STEPS.length - 1] = false;
     if (t.status === 'Work In Progress' && !r.steps.some(Boolean)) r.steps[0] = true;
   }
-  const details = progressChanges(created ? null : before, r);
-  if (changed || details.length) {
-    const statusText = old
-      ? 'Status changed from ' + old.status + ' to ' + t.status
-      : 'Ticket created with status ' + t.status;
-    autoHistory(t, 'Tickets: ' + [statusText, ...details].join('; ') + '.', r.remarks);
-  }
 }
 function changeProgressCheckbox(id, step, checked) {
   const ok = mutate(d => {
     const r = d.trackers.find(r => r.id === id);
     if (!r) throw Error('Progress tracker not found.');
     const before = clone(r);
-    let summary = '';
     if (step === 'all') {
       r.steps = r.steps.map(() => checked);
       if (checked) r.onHold = false;
-      summary = checked
-        ? 'Select all: all milestones checked; On Hold cleared'
-        : 'Select all: all milestones unchecked';
     } else if (step === 'hold') r.onHold = checked;
     else {
       const i = Number(step);
       if (!Number.isInteger(i) || i < 0 || i >= STEPS.length) throw Error('Invalid milestone.');
       r.steps[i] = checked;
     }
-    syncTicketFromProgress(d, r, before, summary);
+    syncTicketFromProgress(d, r, before);
   });
-  if (ok) tell('Progress, ticket status, and history saved.');
+  if (ok) tell('Progress and ticket status saved.');
 }
 function saveLinkedProgress(form) {
   const id = form.dataset.id,
@@ -1326,7 +1297,7 @@ function saveLinkedProgress(form) {
     syncTicketFromProgress(d, r, old);
   });
   closeModal();
-  if (ok) tell('Progress, ticket status, and history saved.');
+  if (ok) tell('Progress and ticket status saved.');
 }
 function updateFormSelectAll(form) {
   const master = form.elements?.namedItem('allMilestones');

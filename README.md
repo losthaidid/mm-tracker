@@ -12,6 +12,8 @@ The selected Batch A workflow enhancements are documented in [BATCH-A.md](BATCH-
 
 The seven selected wishlist items and refreshed ticket screens are documented in [WISHLIST.md](WISHLIST.md), including snippets, bundles, timelines, reusable fields, reference combinations, reference descriptions and copy formats.
 
+Ticket **History tracker** automatically appends an entry when progress remarks are added or changed: `Awaiting user confirmation [20-10-2026 08:38]`. Entries contain the remark, local date and time, without a label or bullet prefix. Status/milestone changes alone do not append history or refresh its timestamp, and unchanged remarks are not repeated. Manual updates use the same format. Previously saved history remains available; status changes are still recorded separately in the Work timeline.
+
 The TNG statement extractor and automatically looping Troubleshooting Lab results are documented in [the TNG and playback guide](docs/TNG-AND-LAB.md). The next Momo behaviour improvements are kept separately in [Batch B](BATCH-B.md); they are not included in this release.
 
 ## Publish using GitHub Pages
