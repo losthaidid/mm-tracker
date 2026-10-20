@@ -17,6 +17,9 @@
       other: 'Other',
     },
     PAYMENTS = ['Touch ’n Go', 'Cash', 'Card', 'Other'];
+  const CLAIM_TYPES = { 'client-site': 'Client site claims', special: 'Special claims' };
+  // Older bookings/receipts keep their existing totals and are treated as client site claims.
+  const claimType = record => (record?.claimType === undefined ? 'client-site' : record.claimType);
   const JOURNEYS = { return: 'Return trip', 'one-way': 'One-way trip' },
     TRAVEL_KEYS = [
       'locationId',
@@ -120,6 +123,7 @@
         !e.description.trim() ||
         !PAYMENTS.includes(e.payment) ||
         typeof e.claimable !== 'boolean' ||
+        !Object.hasOwn(CLAIM_TYPES, claimType(e)) ||
         !line(e.locationId, 100) ||
         !line(e.locationName, 120) ||
         !line(e.bookingId, 100) ||
@@ -140,6 +144,11 @@
     }
     const bookings = new Map();
     for (const s of d.schedule || []) {
+      if (
+        !Object.hasOwn(CLAIM_TYPES, claimType(s)) ||
+        (s.claimLocationName !== undefined && !line(s.claimLocationName, 120))
+      )
+        throw Error('Choose a valid claim type and destination.');
       if (s.travel !== undefined && s.travel !== null) validateTravel(s.travel);
       if (s.travel && !s.bookingId) throw Error('Mileage needs a saved booking ID.');
       if (s.travel && root.WorkHubLeave?.isLeave(s.kind))
@@ -147,6 +156,11 @@
       if (s.bookingId) {
         const prior = bookings.get(s.bookingId);
         if (prior) {
+          if (
+            claimType(prior) !== claimType(s) ||
+            (prior.claimLocationName || '') !== (s.claimLocationName || '')
+          )
+            throw Error('All segments of a booking must keep the same claim type and destination.');
           if (TRAVEL_KEYS.some(k => prior.travel?.[k] !== s.travel?.[k]))
             throw Error('All segments of a booking must keep the same mileage details.');
         } else bookings.set(s.bookingId, s);
@@ -158,17 +172,16 @@
     if (restoring) return;
     const old = new Map();
     for (const s of previous?.schedule || [])
-      if (s.bookingId && s.travel && !old.has(s.bookingId)) old.set(s.bookingId, s);
+      if (s.bookingId && !old.has(s.bookingId)) old.set(s.bookingId, s);
     // Project-calendar edits rebuild schedule segments. Preserve the saved mapping on the same route.
     for (const s of next.schedule || [])
-      if (
-        !Object.hasOwn(s, 'travel') &&
-        s.bookingId &&
-        old.has(s.bookingId) &&
-        !root.WorkHubLeave?.isLeave(s.kind)
-      ) {
+      if (s.bookingId && old.has(s.bookingId) && !root.WorkHubLeave?.isLeave(s.kind)) {
         const before = old.get(s.bookingId);
-        if (s.location === before.location) s.travel = { ...before.travel };
+        if (s.location === before.location) {
+          if (!Object.hasOwn(s, 'travel') && before.travel) s.travel = { ...before.travel };
+          for (const field of ['claimType', 'claimLocationName'])
+            if (!Object.hasOwn(s, field) && Object.hasOwn(before, field)) s[field] = before[field];
+        }
       }
   }
   function distance(t) {
@@ -206,6 +219,7 @@
         date: s.date,
         time: s.time,
         bookingId: s.bookingId || '',
+        claimType: claimType(s),
         travel: { ...s.travel },
         distanceKm: distance(s.travel),
         amountCents: travelCost(s.travel),
@@ -228,7 +242,18 @@
           .reduce((n, e) => n + e.amountCents, 0),
       mileageCents = included.reduce((n, t) => n + t.amountCents, 0),
       tollCents = cost('toll'),
-      otherCents = cost() - tollCents;
+      otherCents = cost() - tollCents,
+      byClaimType = Object.fromEntries(
+        Object.keys(CLAIM_TYPES).map(type => {
+          const mileageCents = included
+              .filter(t => t.claimType === type)
+              .reduce((n, t) => n + t.amountCents, 0),
+            expenseCents = expenses
+              .filter(e => e.claimable && claimType(e) === type)
+              .reduce((n, e) => n + e.amountCents, 0);
+          return [type, { mileageCents, expenseCents, totalCents: mileageCents + expenseCents }];
+        })
+      );
     return {
       month,
       mileage,
@@ -236,6 +261,7 @@
       mileageCents,
       tollCents,
       otherCents,
+      byClaimType,
       totalCents: mileageCents + tollCents + otherCents,
       distanceKm: Math.round(included.reduce((n, t) => n + t.distanceKm, 0) * 100) / 100,
       visits: included.reduce((n, t) => n + t.travel.visits, 0),
@@ -270,6 +296,7 @@
           'Receipt / reference',
           'Notes',
           'Booking ID',
+          'Claim type',
         ],
       ];
     for (const t of m.mileage)
@@ -289,6 +316,7 @@
         '',
         '',
         t.bookingId,
+        CLAIM_TYPES[t.claimType],
       ]);
     for (const e of m.expenses)
       rows.push([
@@ -307,23 +335,13 @@
         e.reference,
         e.notes,
         e.bookingId,
+        CLAIM_TYPES[claimType(e)],
       ]);
-    rows.push([
-      '',
-      'Claimable total',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      (m.totalCents / 100).toFixed(2),
-      '',
-      '',
-      '',
-      '',
-    ]);
+    // Put the total in the same amount column as the individual records.
+    const total = Array(rows[0].length).fill('');
+    total[1] = 'Claimable total';
+    total[10] = (m.totalCents / 100).toFixed(2);
+    rows.push(total);
     const cell = value => {
       let s = String(value ?? '');
       if (/^[\s\uFEFF]*[=+\-@]/.test(s) || /^[\t\r]/.test(s)) s = "'" + s;
@@ -335,6 +353,8 @@
     CATEGORIES,
     PAYMENTS,
     JOURNEYS,
+    CLAIM_TYPES,
+    claimType,
     upgrade,
     validate,
     prepare,

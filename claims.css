@@ -1,6 +1,45 @@
 /* claims.css — Mileage settings, booking travel fields and monthly claim/expense ledger.
    See docs/FILE-MAP.md. Keep rule order: later selectors can override earlier ones. */
 /* A calm claim strip, reusable route cards and an expense ledger. */
+.claim-context-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 15px 0;
+}
+.claim-type-totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.claim-type-totals > span {
+  display: grid;
+  gap: 5px;
+  padding: 10px 13px;
+  border: 1px solid var(--hub-border);
+  border-radius: 12px;
+  background: var(--hub-surface);
+  min-width: 140px;
+}
+.claim-type-totals b {
+  font-size: 0.66rem;
+  font-weight: 500;
+  color: var(--hub-muted);
+}
+.claim-type-totals strong {
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 600px) {
+  .claim-context-grid {
+    grid-template-columns: 1fr;
+  }
+  .claim-type-totals > span {
+    min-width: 0;
+    flex: 1;
+  }
+}
 .claim-month-summary {
   display: flex;
   align-items: center;

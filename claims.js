@@ -51,7 +51,7 @@
     if (root.WorkHubLeave.isLeave(kind)) return null;
     const get = k => form.elements.namedItem(k)?.value || '',
       locationId = get('travelLocationId');
-    if (!locationId) return null;
+    if (!locationId || locationId === '__one-off__') return null;
     return {
       locationId,
       locationName: get('travelLocationName'),
@@ -61,6 +61,17 @@
       visits: Number(get('travelVisits')),
       claimable: !!form.elements.namedItem('travelClaimable')?.checked,
     };
+  }
+  function context(form, kind, strict = false) {
+    if (root.WorkHubLeave.isLeave(kind)) return {};
+    const claimType = form.elements.namedItem('claimType')?.value || 'client-site',
+      oneOff = form.elements.namedItem('travelLocationId')?.value === '__one-off__',
+      claimLocationName = oneOff
+        ? (form.elements.namedItem('claimLocationName')?.value || '').trim()
+        : '';
+    if (strict && (!Object.hasOwn(E.CLAIM_TYPES, claimType) || (oneOff && !claimLocationName)))
+      throw Error('Choose a claim type and enter the one-off destination.');
+    return { claimType, claimLocationName };
   }
   function read(form, kind) {
     const t = draft(form, kind);
@@ -76,8 +87,7 @@
     if (root.WorkHubLeave.isLeave(s.kind)) return '';
     const t = s.travel || null,
       locations = d.workhub.claims.locations.filter(l => !l.archived || l.id === t?.locationId),
-      selected = t?.locationId || '',
-      disabled = selected ? '' : ' disabled';
+      selected = t?.locationId || (s.claimLocationName ? '__one-off__' : '');
     return `<section class="claim-travel wide" data-claim-booking="${esc(s.bookingId || '')}"><div class="claim-section-heading"><span class="claim-route-icon" aria-hidden="true">↗</span><div><span class="hub-kicker">ON-SITE VISIT</span><h3>Location & mileage</h3><p>One visit entry per booked date, with its own saved rate.</p></div></div>${
       s.kind !== 'project'
         ? '<label for="claimWorkLocation">Work location (optional)</label><select id="claimWorkLocation" name="location">' +
@@ -88,29 +98,35 @@
           ) +
           '</select>'
         : ''
-    }<label for="travelLocationId">On-site location</label><select id="travelLocationId" name="travelLocationId">${options(
+    }<div class="claim-context-grid"><div><label for="bookingClaimType">Claim type</label><select id="bookingClaimType" name="claimType">${options(Object.entries(E.CLAIM_TYPES), E.claimType(s))}</select></div><div><label for="travelLocationId">Claim destination / mileage route</label><select id="travelLocationId" name="travelLocationId">${options(
       locations.map(l => [l.id, l.name + (l.archived ? ' · archived' : '')]),
       selected,
       'No on-site visit / no mileage'
-    )}${selected && !locations.some(l => l.id === selected) ? '<option value="' + esc(selected) + '" selected>' + esc(t.locationName) + ' · saved route</option>' : ''}</select>${!locations.length ? '<p class="hint">Add your sites and rates in Settings → On-site locations & mileage.</p>' : ''}<input name="travelLocationName" type="hidden" value="${esc(t?.locationName || '')}"><fieldset data-claim-route-fields${selected ? '' : ' hidden'}${disabled}><div class="form-grid">${input('travelKm', 'One-way distance (km)', t?.oneWayKm ?? '', 'number', 'min="0.01" max="10000" step="0.01" required')}${input('travelRate', 'Mileage rate (RM / km)', t?.ratePerKm ?? '', 'number', 'min="0" max="1000" step="0.0001" required')}<div><label for="travelJourney">Journey</label><select id="travelJourney" name="travelJourney">${options(Object.entries(E.JOURNEYS), t?.journey || 'return')}</select></div>${input('travelVisits', 'Visits per date', t?.visits || 1, 'number', 'min="1" max="20" step="1" required')}</div><label class="check-label"><input name="travelClaimable" type="checkbox"${t?.claimable ? ' checked' : ''}>Include this mileage in my monthly claim</label><div class="claim-trip-preview" data-claim-preview aria-live="polite"></div><p class="claim-duplicate-note" data-claim-duplicate hidden></p><div class="claim-route-footer"><small>Saved distance and rate stay with this booking. Toll and parking receipts are added separately.</small><button type="button" class="small" data-claim="latest-route">Use latest mapping</button></div></fieldset></section>`;
+    )}<option value="__one-off__"${selected === '__one-off__' ? ' selected' : ''}>One-off destination · no mileage</option>${selected && selected !== '__one-off__' && !locations.some(l => l.id === selected) ? '<option value="' + esc(selected) + '" selected>' + esc(t.locationName) + ' · saved route</option>' : ''}</select></div></div><div data-claim-one-off${selected === '__one-off__' ? '' : ' hidden'}><label for="bookingClaimLocation">One-off destination</label><input id="bookingClaimLocation" name="claimLocationName" maxlength="120" value="${esc(s.claimLocationName || '')}"${selected === '__one-off__' ? ' required' : ' disabled'} placeholder="e.g. Training venue"><p class="hint">Tolls and other expenses can be linked to this visit. Save a mileage route in Settings if you also need a kilometre claim.</p></div>${!locations.length ? '<p class="hint">Add reusable destinations and rates in Settings → On-site locations & mileage.</p>' : ''}<input name="travelLocationName" type="hidden" value="${esc(t?.locationName || '')}"><fieldset data-claim-route-fields${t ? '' : ' hidden'}${t ? '' : ' disabled'}><div class="form-grid">${input('travelKm', 'One-way distance (km)', t?.oneWayKm ?? '', 'number', 'min="0.01" max="10000" step="0.01" required')}${input('travelRate', 'Mileage rate (RM / km)', t?.ratePerKm ?? '', 'number', 'min="0" max="1000" step="0.0001" required')}<div><label for="travelJourney">Journey</label><select id="travelJourney" name="travelJourney">${options(Object.entries(E.JOURNEYS), t?.journey || 'return')}</select></div>${input('travelVisits', 'Visits per date', t?.visits || 1, 'number', 'min="1" max="20" step="1" required')}</div><label class="check-label"><input name="travelClaimable" type="checkbox"${t?.claimable ? ' checked' : ''}>Include this mileage in my monthly claim</label><div class="claim-trip-preview" data-claim-preview aria-live="polite"></div><p class="claim-duplicate-note" data-claim-duplicate hidden></p><div class="claim-route-footer"><small>Saved distance and rate stay with this booking. Toll and parking receipts are added separately.</small><button type="button" class="small" data-claim="latest-route">Use latest mapping</button></div></fieldset></section>`;
   }
   function badge(slot) {
-    if (!slot.travel) return '';
+    if (!slot.travel && !slot.claimLocationName) return '';
     const t = slot.travel;
     return (
       '<span class="claim-booking-badge">↗ ' +
-      esc(t.locationName) +
-      (t.claimable ? ' · ' + E.km(E.distance(t)) + ' km' : ' · no mileage') +
+      esc(t?.locationName || slot.claimLocationName) +
+      ' · ' +
+      E.CLAIM_TYPES[E.claimType(slot)] +
+      (t?.claimable ? ' · ' + E.km(E.distance(t)) + ' km' : ' · no mileage') +
       '</span>'
     );
   }
   function details(slot, d) {
-    if (!slot.travel || root.WorkHubLeave.isLeave(slot.kind)) return '';
+    if (root.WorkHubLeave.isLeave(slot.kind)) return '';
+    if (!slot.travel)
+      return slot.claimLocationName
+        ? `<section class="claim-booking-details"><h3>${esc(slot.claimLocationName)}</h3><p>${E.CLAIM_TYPES[E.claimType(slot)]} · No mileage</p><button type="button" data-claim="add-expense" data-date="${esc(slot.date)}" data-booking="${esc(slot.bookingId || '')}">＋ Add toll / other expense</button></section>`
+        : '';
     const t = slot.travel,
       booking = E.trips(d).filter(x => x.bookingId && x.bookingId === slot.bookingId),
       count = booking.length || 1,
       cost = E.travelCost(t);
-    return `<section class="claim-booking-details"><div class="claim-section-heading"><span class="claim-route-icon" aria-hidden="true">↗</span><div><span class="hub-kicker">SAVED ROUTE</span><h3>${esc(t.locationName)}</h3></div></div><dl class="booking-facts"><div><dt>One-way distance</dt><dd>${E.km(t.oneWayKm)} km</dd></div><div><dt>Journey / visits</dt><dd>${E.JOURNEYS[t.journey]} · ${t.visits} per date</dd></div><div><dt>Saved rate</dt><dd>${E.rate(t.ratePerKm)} / km</dd></div><div><dt>Mileage per date</dt><dd>${E.km(E.distance(t))} km · ${E.money(cost)}</dd></div><div><dt>Included in claim</dt><dd>${t.claimable ? 'Yes' : 'No · mileage excluded'}</dd></div><div><dt>Booking mileage</dt><dd>${E.money(t.claimable ? cost * count : 0)} · ${count} booked date${count === 1 ? '' : 's'}</dd></div></dl><button type="button" data-claim="add-expense" data-date="${esc(slot.date)}" data-booking="${esc(slot.bookingId || '')}" data-location="${esc(t.locationId)}">＋ Add toll / other expense</button></section>`;
+    return `<section class="claim-booking-details"><div class="claim-section-heading"><span class="claim-route-icon" aria-hidden="true">↗</span><div><span class="hub-kicker">SAVED ROUTE</span><h3>${esc(t.locationName)}</h3><p>${E.CLAIM_TYPES[E.claimType(slot)]}</p></div></div><dl class="booking-facts"><div><dt>One-way distance</dt><dd>${E.km(t.oneWayKm)} km</dd></div><div><dt>Journey / visits</dt><dd>${E.JOURNEYS[t.journey]} · ${t.visits} per date</dd></div><div><dt>Saved rate</dt><dd>${E.rate(t.ratePerKm)} / km</dd></div><div><dt>Mileage per date</dt><dd>${E.km(E.distance(t))} km · ${E.money(cost)}</dd></div><div><dt>Included in claim</dt><dd>${t.claimable ? 'Yes' : 'No · mileage excluded'}</dd></div><div><dt>Booking mileage</dt><dd>${E.money(t.claimable ? cost * count : 0)} · ${count} booked date${count === 1 ? '' : 's'}</dd></div></dl><button type="button" data-claim="add-expense" data-date="${esc(slot.date)}" data-booking="${esc(slot.bookingId || '')}" data-location="${esc(t.locationId)}">＋ Add toll / other expense</button></section>`;
   }
   function install(a) {
     const $ = id => document.getElementById(id),
@@ -210,7 +226,13 @@
         section = form.querySelector('[data-claim-route-fields]');
       if (!select || !section) return;
       const l = data().locations.find(l => l.id === select.value),
-        selected = !!select.value;
+        oneOff = select.value === '__one-off__',
+        selected = !!select.value && !oneOff,
+        custom = form.querySelector('[data-claim-one-off]'),
+        destination = form.elements.namedItem('claimLocationName');
+      custom.hidden = !oneOff;
+      destination.disabled = !oneOff;
+      destination.required = oneOff;
       section.hidden = !selected;
       section.disabled = !selected;
       if (latest && l) {
@@ -225,7 +247,11 @@
           form.elements.namedItem('travelVisits').value = 1;
           form.elements.namedItem('travelClaimable').checked = true;
           const workLocation = form.elements.namedItem('location');
-          if (workLocation && [...workLocation.options].some(o => o.value === 'Client site'))
+          if (
+            E.claimType(context(form, form.elements.namedItem('kind').value)) === 'client-site' &&
+            workLocation &&
+            [...workLocation.options].some(o => o.value === 'Client site')
+          )
             workLocation.value = 'Client site';
         }
       }
@@ -284,6 +310,7 @@
       if (!a.ready()) return;
       const old = data().expenses.find(e => e.id === id),
         site = data().locations.find(l => l.id === context.locationId),
+        booking = a.state().schedule.find(s => s.bookingId && s.bookingId === context.bookingId),
         e = old || {
           id: '',
           date: context.date || day(),
@@ -292,23 +319,24 @@
           description: '',
           payment: E.PAYMENTS[0],
           locationId: site?.id || '',
-          locationName: site?.name || '',
+          locationName: site?.name || booking?.claimLocationName || '',
           bookingId: context.bookingId || '',
           reference: '',
           notes: '',
           claimable: true,
+          claimType: E.claimType(booking),
         },
         locations = data().locations.filter(l => !l.archived || l.id === e.locationId);
       a.openModal(
         id ? 'Edit expense' : 'Add toll / other expense',
-        `<form id="claimExpenseForm" data-id="${esc(e.id)}" data-booking="${esc(e.bookingId)}" data-location-name="${esc(e.locationName)}" data-location-id="${esc(e.locationId)}"><div class="claim-form-intro"><span class="hub-kicker">TOLLS, PARKING & THE LITTLE EXTRAS</span><h3>Keep the whole visit together.</h3><p>${e.bookingId ? 'Linked to your scheduled visit.' : 'This expense is recorded against its own date.'}</p></div><div class="form-grid">${input('date', 'Expense date', e.date, 'date', 'min="1900-01-01" max="9999-12-31" required')}<div><label for="claim-category">Category</label><select id="claim-category" name="category">${options(Object.entries(E.CATEGORIES), e.category)}</select></div>${input('amount', 'Amount (RM)', e.amountCents === null ? '' : (e.amountCents / 100).toFixed(2), 'number', 'min="0.01" max="1000000" step="0.01" required')}${input('description', 'Description', e.description, 'text', 'maxlength="300" required placeholder="e.g. PLUS toll · client visit"')}<div><label for="claim-payment">Payment method</label><select id="claim-payment" name="payment">${options(
+        `<form id="claimExpenseForm" data-id="${esc(e.id)}" data-booking="${esc(e.bookingId)}" data-location-name="${esc(e.locationName)}" data-location-id="${esc(e.locationId)}"><div class="claim-form-intro"><span class="hub-kicker">TOLLS, PARKING & THE LITTLE EXTRAS</span><h3>Keep the whole visit together.</h3><p>${e.bookingId ? 'Linked to your scheduled visit.' : 'This expense is recorded against its own date.'}</p></div><div class="form-grid"><div><label for="expenseClaimType">Claim type</label><select id="expenseClaimType" name="claimType">${options(Object.entries(E.CLAIM_TYPES), E.claimType(e))}</select></div>${input('date', 'Expense date', e.date, 'date', 'min="1900-01-01" max="9999-12-31" required')}<div><label for="claim-category">Category</label><select id="claim-category" name="category">${options(Object.entries(E.CATEGORIES), e.category)}</select></div>${input('amount', 'Amount (RM)', e.amountCents === null ? '' : (e.amountCents / 100).toFixed(2), 'number', 'min="0.01" max="1000000" step="0.01" required')}${input('description', 'Description', e.description, 'text', 'maxlength="300" required placeholder="e.g. PLUS toll · client visit"')}<div><label for="claim-payment">Payment method</label><select id="claim-payment" name="payment">${options(
           E.PAYMENTS.map(p => [p, p]),
           e.payment
         )}</select></div><div><label for="claim-locationId">On-site location (optional)</label><select id="claim-locationId" name="locationId">${options(
           locations.map(l => [l.id, l.name + (l.archived ? ' · archived' : '')]),
-          e.locationId,
+          e.locationId || (e.locationName ? '__one-off__' : ''),
           'No specific site'
-        )}${e.locationId && !locations.some(l => l.id === e.locationId) ? '<option value="' + esc(e.locationId) + '" selected>' + esc(e.locationName) + '</option>' : ''}</select></div>${input('reference', 'Receipt / TnG reference (optional)', e.reference, 'text', 'maxlength="160"')}<div class="wide"><label for="claim-notes">Notes (optional)</label><textarea id="claim-notes" name="notes" maxlength="2000">${esc(e.notes)}</textarea></div></div><label class="check-label"><input type="checkbox" name="claimable"${e.claimable ? ' checked' : ''}>Include in my claimable expenses</label><p class="hint">Non-claimable entries stay in your ledger and are excluded from the monthly total. Expenses remain recorded if a linked activity is later deleted.</p><div class="modal-actions"><button type="button" data-action="cancel">Cancel</button><button type="submit" class="primary">Save expense</button></div></form>`
+        )}<option value="__one-off__"${!e.locationId && e.locationName ? ' selected' : ''}>One-off destination</option>${e.locationId && !locations.some(l => l.id === e.locationId) ? '<option value="' + esc(e.locationId) + '" selected>' + esc(e.locationName) + '</option>' : ''}</select></div><div data-claim-expense-one-off${!e.locationId && e.locationName ? '' : ' hidden'}><label for="expenseOneOffLocation">One-off destination</label><input id="expenseOneOffLocation" name="oneOffLocation" maxlength="120" value="${esc(!e.locationId ? e.locationName : '')}"${!e.locationId && e.locationName ? ' required' : ' disabled'}></div>${input('reference', 'Receipt / TnG reference (optional)', e.reference, 'text', 'maxlength="160"')}<div class="wide"><label for="claim-notes">Notes (optional)</label><textarea id="claim-notes" name="notes" maxlength="2000">${esc(e.notes)}</textarea></div></div><label class="check-label"><input type="checkbox" name="claimable"${e.claimable ? ' checked' : ''}>Include in my claimable expenses</label><p class="hint">Non-claimable entries stay in your ledger and are excluded from the monthly total. Expenses remain recorded if a linked activity is later deleted.</p><div class="modal-actions"><button type="button" data-action="cancel">Cancel</button><button type="submit" class="primary">Save expense</button></div></form>`
       );
     }
     function saveExpense(form) {
@@ -328,9 +356,14 @@
           description: value('description'),
           payment: value('payment'),
           claimable: form.elements.namedItem('claimable').checked,
-          locationId,
+          claimType: value('claimType'),
+          locationId: locationId === '__one-off__' ? '' : locationId,
           locationName:
-            locationId === form.dataset.locationId ? form.dataset.locationName : site?.name || '',
+            locationId === '__one-off__'
+              ? value('oneOffLocation')
+              : locationId === form.dataset.locationId
+                ? form.dataset.locationName
+                : site?.name || '',
           bookingId: form.dataset.booking || '',
           reference: value('reference'),
           notes: value('notes'),
@@ -338,6 +371,8 @@
           updatedAt: now,
         };
       if (form.dataset.id && !old) throw Error('This expense no longer exists.');
+      if (locationId === '__one-off__' && !row.locationName)
+        throw Error('Enter the one-off destination.');
       if (
         save(
           d => {
@@ -361,13 +396,22 @@
       });
     }
     function summaryHTML(m) {
-      return `<div class="claim-summary-copy"><span class="hub-kicker">${esc(monthLabel(m.month))} · MONTHLY CLAIMS</span><div class="claim-summary-main"><strong>${E.money(m.totalCents)}</strong><span>Claimable estimate</span></div><small>Scheduled mileage + recorded claimable expenses</small></div><dl class="claim-summary-breakdown"><div><dt>Mileage</dt><dd>${E.money(m.mileageCents)}</dd><small>${E.km(m.distanceKm)} km · ${m.visits} visit${m.visits === 1 ? '' : 's'}</small></div><div><dt>TnG / toll</dt><dd>${E.money(m.tollCents)}</dd></div><div><dt>Other expenses</dt><dd>${E.money(m.otherCents)}</dd></div></dl><div class="claim-summary-actions"><button type="button" data-claim="add-expense">＋ Add expense</button><button type="button" data-claim="review">Review / export</button></div>`;
+      return `<div class="claim-summary-copy"><span class="hub-kicker">${esc(monthLabel(m.month))} · MONTHLY CLAIMS</span><div class="claim-summary-main"><strong>${E.money(m.totalCents)}</strong><span>Claimable estimate</span></div><small>Scheduled mileage + recorded claimable expenses</small><div class="claim-type-totals">${Object.entries(
+        E.CLAIM_TYPES
+      )
+        .map(
+          ([type, label]) =>
+            `<span><b>${label}</b><strong>${E.money(m.byClaimType[type].totalCents)}</strong></span>`
+        )
+        .join(
+          ''
+        )}</div></div><dl class="claim-summary-breakdown"><div><dt>Mileage</dt><dd>${E.money(m.mileageCents)}</dd><small>${E.km(m.distanceKm)} km · ${m.visits} visit${m.visits === 1 ? '' : 's'}</small></div><div><dt>TnG / toll</dt><dd>${E.money(m.tollCents)}</dd></div><div><dt>Other expenses</dt><dd>${E.money(m.otherCents)}</dd></div></dl><div class="claim-summary-actions"><button type="button" data-claim="add-expense">＋ Add expense</button><button type="button" data-claim="review">Review / export</button></div>`;
     }
     function expenseRows(rows) {
       return rows
         .map(
           e =>
-            `<article class="claim-expense-row${e.claimable ? '' : ' is-excluded'}"><div class="claim-date-chip"><strong>${Number(e.date.slice(8))}</strong><span>${esc(new Date(e.date + 'T12:00:00').toLocaleDateString('en-MY', { month: 'short' }))}</span></div><div class="claim-expense-copy"><span class="claim-category">${E.CATEGORIES[e.category]}${e.claimable ? '' : ' · excluded'}</span><strong class="hub-sensitive">${esc(e.description)}</strong><small>${esc([e.locationName, e.payment, e.reference].filter(Boolean).join(' · '))}</small></div><strong class="claim-expense-amount hub-sensitive">${E.money(e.amountCents)}</strong><div class="actions"><button type="button" class="small" data-claim="edit-expense" data-id="${esc(e.id)}" aria-label="Edit ${esc(e.description)}">Edit</button>${e.tngSource ? `<button type="button" class="small" data-tng="open-source" data-id="${esc(e.id)}">PDF evidence</button>` : ''}<button type="button" class="small" data-claim="delete-expense" data-id="${esc(e.id)}" aria-label="Delete ${esc(e.description)}">Delete</button></div></article>`
+            `<article class="claim-expense-row${e.claimable ? '' : ' is-excluded'}"><div class="claim-date-chip"><strong>${Number(e.date.slice(8))}</strong><span>${esc(new Date(e.date + 'T12:00:00').toLocaleDateString('en-MY', { month: 'short' }))}</span></div><div class="claim-expense-copy"><span class="claim-category">${E.CATEGORIES[e.category]} · ${E.CLAIM_TYPES[E.claimType(e)]}${e.claimable ? '' : ' · excluded'}</span><strong class="hub-sensitive">${esc(e.description)}</strong><small>${esc([e.locationName, e.payment, e.reference].filter(Boolean).join(' · '))}</small></div><strong class="claim-expense-amount hub-sensitive">${E.money(e.amountCents)}</strong><div class="actions"><button type="button" class="small" data-claim="edit-expense" data-id="${esc(e.id)}" aria-label="Edit ${esc(e.description)}">Edit</button>${e.tngSource ? `<button type="button" class="small" data-tng="open-source" data-id="${esc(e.id)}">PDF evidence</button>` : ''}<button type="button" class="small" data-claim="delete-expense" data-id="${esc(e.id)}" aria-label="Delete ${esc(e.description)}">Delete</button></div></article>`
         )
         .join('');
     }
@@ -388,7 +432,16 @@
       }
       a.openModal(
         'Monthly claims · ' + monthLabel(m.month),
-        `<div class="claim-review-top"><span class="hub-kicker">CLAIMABLE ESTIMATE</span><strong>${E.money(m.totalCents)}</strong><p>${E.money(m.mileageCents)} mileage + ${E.money(m.tollCents)} tolls + ${E.money(m.otherCents)} other expenses.</p><button type="button" class="primary" data-claim="export">↓ Download ${esc(m.month)} CSV</button></div>${duplicates.size ? '<p class="claim-duplicate-note">Some dates have multiple mileage bookings for the same site. Review these as separate visits, or exclude the duplicate mileage in Schedule.</p>' : ''}<h3>Daily mileage · ${m.mileage.length} entries</h3><p class="hint">One line per booking and date. Repeated hourly segments are counted once. A date range spanning months is split by the actual visit dates.</p><div class="claim-review-table"><table><thead><tr><th>Date / activity</th><th>Site / saved rate</th><th>Distance</th><th>Amount</th><th></th></tr></thead><tbody>${m.mileage.map(t => `<tr><td>${esc(t.date)}<small>${esc(t.title)}</small></td><td>${esc(t.travel.locationName)}<small>${E.rate(t.travel.ratePerKm)} / km · ${E.JOURNEYS[t.travel.journey]} · ${t.travel.visits} visit${t.travel.visits === 1 ? '' : 's'}</small></td><td>${E.km(t.distanceKm)} km</td><td>${E.money(t.amountCents)}${t.travel.claimable ? '' : '<small>Excluded</small>'}</td><td><button type="button" class="small" data-claim="open-booking" data-date="${esc(t.date)}" data-time="${esc(t.time)}">Open</button></td></tr>`).join('') || '<tr><td colspan="5">No on-site mileage in this month.</td></tr>'}</tbody></table></div><h3>Tolls & other expenses</h3><div class="claim-expense-list">${expenseRows(m.expenses) || '<p class="hint">No extra expenses recorded.</p>'}</div><p class="hint">Future scheduled visits are included as planned mileage. Excluded entries remain visible for your reference.</p>`
+        `<div class="claim-review-top"><span class="hub-kicker">CLAIMABLE ESTIMATE</span><strong>${E.money(m.totalCents)}</strong><p>${E.money(m.mileageCents)} mileage + ${E.money(m.tollCents)} tolls + ${E.money(m.otherCents)} other expenses.</p><div class="claim-type-totals">${Object.entries(
+          E.CLAIM_TYPES
+        )
+          .map(
+            ([type, label]) =>
+              `<span><b>${label}</b><strong>${E.money(m.byClaimType[type].totalCents)}</strong></span>`
+          )
+          .join(
+            ''
+          )}</div><button type="button" class="primary" data-claim="export">↓ Download ${esc(m.month)} CSV</button></div>${duplicates.size ? '<p class="claim-duplicate-note">Some dates have multiple mileage bookings for the same site. Review these as separate visits, or exclude the duplicate mileage in Schedule.</p>' : ''}<h3>Daily mileage · ${m.mileage.length} entries</h3><p class="hint">One line per booking and date. Repeated hourly segments are counted once. A date range spanning months is split by the actual visit dates.</p><div class="claim-review-table"><table><thead><tr><th>Date / activity</th><th>Site / saved rate</th><th>Distance</th><th>Amount</th><th></th></tr></thead><tbody>${m.mileage.map(t => `<tr><td>${esc(t.date)}<small>${esc(t.title)}</small></td><td>${esc(t.travel.locationName)}<small>${E.CLAIM_TYPES[t.claimType]} · ${E.rate(t.travel.ratePerKm)} / km · ${E.JOURNEYS[t.travel.journey]} · ${t.travel.visits} visit${t.travel.visits === 1 ? '' : 's'}</small></td><td>${E.km(t.distanceKm)} km</td><td>${E.money(t.amountCents)}${t.travel.claimable ? '' : '<small>Excluded</small>'}</td><td><button type="button" class="small" data-claim="open-booking" data-date="${esc(t.date)}" data-time="${esc(t.time)}">Open</button></td></tr>`).join('') || '<tr><td colspan="5">No on-site mileage in this month.</td></tr>'}</tbody></table></div><h3>Tolls & other expenses</h3><div class="claim-expense-list">${expenseRows(m.expenses) || '<p class="hint">No extra expenses recorded.</p>'}</div><p class="hint">Future scheduled visits are included as planned mileage. Excluded entries remain visible for your reference.</p>`
       );
     }
     function mount(tab) {
@@ -436,7 +489,8 @@
       const f = event.target.form;
       if (
         f?.id === 'scheduleForm' &&
-        (event.target.name.startsWith('travel') || ['date', 'endDate'].includes(event.target.name))
+        (event.target.name.startsWith('travel') ||
+          ['date', 'endDate', 'claimType', 'claimLocationName'].includes(event.target.name))
       )
         updateTravel(f);
     });
@@ -444,13 +498,21 @@
       const f = event.target.form;
       if (
         f?.id === 'scheduleForm' &&
-        (event.target.name.startsWith('travel') || ['date', 'endDate'].includes(event.target.name))
+        (event.target.name.startsWith('travel') ||
+          ['date', 'endDate', 'claimType', 'claimLocationName'].includes(event.target.name))
       )
         updateTravel(
           f,
           event.target.name === 'travelLocationId',
           event.target.name === 'travelLocationId'
         );
+      if (f?.id === 'claimExpenseForm' && event.target.name === 'locationId') {
+        const oneOff = event.target.value === '__one-off__',
+          field = f.elements.namedItem('oneOffLocation');
+        field.closest('[data-claim-expense-one-off]').hidden = !oneOff;
+        field.disabled = !oneOff;
+        field.required = oneOff;
+      }
     });
     document.addEventListener(
       'submit',
@@ -550,5 +612,5 @@
       summary: () => E.summary(a.state(), thisMonth()),
     };
   }
-  root.WorkHubClaims = { install, fields, read, draft, badge, details };
+  root.WorkHubClaims = { install, fields, read, draft, context, badge, details };
 })(window);

@@ -221,11 +221,13 @@
     }
     return { rows, serial, warnings, tables };
   }
-  function matches(d, day) {
+  function matches(d, day, type = '') {
     const groups = new Map();
     for (const s of d.schedule || []) {
       if (s.date !== day || root.WorkHubLeave?.isLeave(s.kind)) continue;
-      const onSite = !!s.travel || /client|site|on.?site/i.test(s.location || '');
+      if (type && root.WorkHubClaimsEngine.claimType(s) !== type) continue;
+      const onSite =
+        !!s.travel || !!s.claimLocationName || /client|site|on.?site/i.test(s.location || '');
       if (!onSite) continue;
       const key = s.bookingId || s.planId || s.date + '|' + s.time;
       if (groups.has(key)) continue;
@@ -238,7 +240,8 @@
         key,
         bookingId: s.bookingId || '',
         locationId: s.travel?.locationId || '',
-        locationName: s.travel?.locationName || s.location || '',
+        locationName: s.travel?.locationName || s.claimLocationName || s.location || '',
+        claimType: root.WorkHubClaimsEngine.claimType(s),
         title: clean(plan?.title || task?.task || s.text || 'On-site visit').slice(0, 200),
         project: project?.name || '',
         time: s.time,
@@ -248,6 +251,51 @@
   }
   function sourceKey(cardKey, row) {
     return `${cardKey}|${row.section}|${row.transactionNo}`;
+  }
+  /** Evidence always follows the transaction date/time, even when the ledger uses posted dates. */
+  function evidenceGroups(rows) {
+    const groups = new Map();
+    for (const row of rows
+      .filter(r => !r.manual)
+      .slice()
+      .sort(
+        (a, b) =>
+          (a.date + a.time).localeCompare(b.date + b.time) || a.page - b.page || a.rect.y - b.rect.y
+      )) {
+      if (!dateValid(row.date))
+        throw Error('Review the transaction dates before exporting evidence.');
+      const toll = row.category === 'toll',
+        hasTime = /^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(row.time || ''),
+        direction = !toll
+          ? 'other'
+          : !hasTime
+            ? 'review'
+            : Number(row.time.slice(0, 2)) < 12
+              ? 'to'
+              : 'return',
+        key = row.date + '|' + direction;
+      if (!groups.has(key)) groups.set(key, { key, date: row.date, direction, rows: [] });
+      groups.get(key).rows.push(row);
+    }
+    return [...groups.values()]
+      .sort(
+        (a, b) =>
+          a.date.localeCompare(b.date) ||
+          ['to', 'return', 'review', 'other'].indexOf(a.direction) -
+            ['to', 'return', 'review', 'other'].indexOf(b.direction)
+      )
+      .map(g => {
+        const date = g.date.split('-').reverse().join('/');
+        return {
+          ...g,
+          caption:
+            g.direction === 'other'
+              ? `Other expenses (${date})`
+              : g.direction === 'review'
+                ? `Tolls (${date} - review time)`
+                : `tol ${g.rows.length} of ${g.rows.length} (${date} ${g.direction})`,
+        };
+      });
   }
   function duplicate(d, key) {
     return (d.workhub?.claims?.expenses || []).some(e => e.tngSource?.key === key);
@@ -281,8 +329,10 @@
       throw Error('Check the TNG expense source details.');
   }
   /** Build confirmed ledger rows. The caller saves the complete selection in one mutation. */
-  function expenses(d, rows, source, basis = 'transaction') {
+  function expenses(d, rows, source, basis = 'transaction', claimType = 'client-site') {
     if (!['transaction', 'posted'].includes(basis)) throw Error('Choose a valid date basis.');
+    if (!Object.hasOwn(root.WorkHubClaimsEngine.CLAIM_TYPES, claimType))
+      throw Error('Choose a valid claim type.');
     if (!rows.length || rows.length > MAX_ROWS) throw Error('Select at least one expense.');
     const out = [],
       keys = new Set(),
@@ -309,7 +359,7 @@
           'A selected transaction is already in your expense ledger. Refresh the review before saving.'
         );
       if (key) keys.add(key);
-      const choices = matches(d, day),
+      const choices = matches(d, day, claimType),
         match = choices.find(m => m.key === row.bookingKey);
       if (row.bookingKey && !match)
         throw Error('A linked visit changed. Choose the visit again before saving.');
@@ -328,6 +378,7 @@
         description: clean(row.description),
         payment: 'Touch ’n Go',
         claimable: true,
+        claimType,
         locationId: match?.locationId || '',
         locationName: match?.locationName || '',
         bookingId: match?.bookingId || '',
@@ -370,6 +421,7 @@
     clampRect,
     parsePages,
     matches,
+    evidenceGroups,
     sourceKey,
     duplicate,
     validateSource,

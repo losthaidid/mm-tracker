@@ -223,3 +223,27 @@ test('source rectangle validation bounds exported evidence and rejects malformed
     h: 1,
   });
 });
+
+test('claim-type matching includes special one-off destinations and prevents links across claim types', () => {
+  const d = data();
+  d.schedule = [{date:'2026-10-09',time:'09:00',kind:'custom',bookingId:'client',location:'Client site'},
+    {date:'2026-10-09',time:'14:00',kind:'custom',bookingId:'special',location:'Office',claimType:'special',claimLocationName:'Training venue'}];
+  assert.equal(E.matches(d,'2026-10-09','client-site').length,1);
+  assert.equal(E.matches(d,'2026-10-09','special')[0].locationName,'Training venue');
+  assert.throws(()=>E.expenses(d,[row({bookingKey:'client'})],source,'transaction','special'),/visit changed/);
+  const saved=E.expenses(d,[row({bookingKey:'special'})],source,'transaction','special')[0];
+  assert.equal(saved.claimType,'special');assert.equal(saved.locationName,'Training venue');assert.equal(saved.bookingId,'special');
+  d.workhub.claims.expenses.push(saved);C.validate(d);assert.equal(C.summary(d,'2026-10').byClaimType.special.totalCents,166);
+});
+
+test('client evidence groups use original transaction dates, noon boundary and deterministic order', () => {
+  const rows=[row({id:'pm',time:'12:00:00'}),row({id:'early',time:'07:00:00',postedDate:'2026-10-11'}),
+    row({id:'late',time:'11:59:59'}),row({id:'parking',category:'parking'}),row({id:'manual',manual:true}),
+    row({id:'next',date:'2026-10-10',time:'08:00:00'}),row({id:'missing',time:''})];
+  const before=copy(rows),groups=E.evidenceGroups(rows);
+  assert.equal(groups.length,5);assert.equal(groups[0].caption,'tol 2 of 2 (09/10/2026 to)');
+  assert.deepEqual(Array.from(groups[0].rows,r=>r.id),['early','late']);
+  assert.equal(groups[1].caption,'tol 1 of 1 (09/10/2026 return)');
+  assert.equal(groups[2].direction,'review');assert.equal(groups[3].direction,'other');
+  assert.equal(groups[4].date,'2026-10-10');assert.deepEqual(copy(rows),before);
+});
