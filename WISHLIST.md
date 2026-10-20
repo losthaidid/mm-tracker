@@ -4,7 +4,7 @@
 
 The two prioritised items are implemented: **TNG PDF extraction and cropped evidence downloads**, and **continuous Troubleshooting Lab result animations with saved-result autoplay**. See [the usage guide](docs/TNG-AND-LAB.md).
 
-The Momo behaviour suggestions (51–60) are kept in [Batch B](BATCH-B.md), for later implementation. They are the remaining pending wishlist items.
+The Momo behaviour suggestions (51–60) are kept in [Batch B](BATCH-B.md), for later implementation. [Batch C](BATCH-C.md) adds 25 · Ticket twin finder and 26 · Sensitive screenshot brush. Both batches remain pending.
 
 On 20 October 2026, Request inbox, End-of-day ritual, Personal learning roadmap and Show-me-how walkthroughs were removed from the wishlist at the user's request.
 
