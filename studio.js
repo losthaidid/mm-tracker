@@ -499,14 +499,14 @@
           16,
           Math.min(
             width < 600 ? 112 : 144,
-            (width - margin * 2) / (1 + right),
+            (width - margin * 2) / (1 + right * 2),
             (height - margin * 2) / (1 + overhead)
           )
         );
       return {
-        left: (v?.offsetLeft || 0) + margin,
+        left: (v?.offsetLeft || 0) + margin + size * right,
         top: (v?.offsetTop || 0) + margin + size * overhead,
-        width: Math.max(0, width - size * (1 + right) - margin * 2),
+        width: Math.max(0, width - size * (1 + right * 2) - margin * 2),
         height: Math.max(0, height - size * (1 + overhead) - margin * 2),
         size,
         viewportWidth: width,
@@ -515,6 +515,7 @@
     function positionCompanion(pixels = null) {
       const pet = $('hubPet');
       if (!pet) return;
+      const before = { x: parseFloat(pet.style.left) || 0, y: parseFloat(pet.style.top) || 0 };
       const b = companionBounds();
       if (pixels)
         petPosition = {
@@ -568,6 +569,7 @@
           bottom: top - b.top < 110 ? 'auto' : 'calc(100% + 10px)',
         });
       life?.layout();
+      adventures?.moved(before, { x: left, y: top });
     }
     function rememberCompanion() {
       try {
@@ -701,6 +703,7 @@
         duration,
       };
       $('hubPet').dataset.roaming = 'true';
+      $('hubPet').dataset.facing = target[0] < petPosition.x ? 'left' : 'right';
       document.body.dataset.mascotMood = 'idle';
       function frame(time) {
         if (!petWalk || !canCompanionWalk()) {
@@ -3511,6 +3514,15 @@
     life = root.WorkHubMomoLife?.install({
       prefs: () => themePreview || prefs(),
       ready: () => a.cloud().ready,
+      owner: () => a.cloud().user?.id || '',
+      weather: () =>
+        atmosphere?.snapshot().preferences.rain ? 'rain' : atmosphere?.snapshot().weather,
+      remember: (kind, detail) => adventures?.remember(kind, detail),
+      contextLine: () => adventures?.contextLine(),
+      canResume: () =>
+        !adventures?.snapshot().active &&
+        !adventures?.snapshot().bookmark &&
+        !moments?.snapshot().active,
       pet: () => $('hubPet'),
       move: positionCompanion,
       stop: stopCompanionWalk,
@@ -3525,6 +3537,7 @@
       closeModal: a.closeModal,
       visitor: kind => moments?.visitor(kind),
       visitorArrived: kind => adventures?.visitorArrived(kind),
+      visitorHello: kind => adventures?.visitorHello(kind),
       visitorEnd: () => {
         moments?.visitorEnd();
         adventures?.visitorEnd();

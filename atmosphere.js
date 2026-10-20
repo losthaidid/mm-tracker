@@ -157,6 +157,8 @@
       const v = viewport(),
         px = Math.max(v.x + 8, Math.min(v.x + v.w - 56, x)),
         py = Math.max(v.y + 8, Math.min(v.y + v.h - 56, y));
+      if (Math.abs(px - active.point.x) > 0.4)
+        active.el.style.setProperty('--visitor-look', px < active.point.x ? '-1' : '1');
       active.point = { x: px, y: py };
       active.el.classList.add('is-chasing');
       active.el.style.animation = 'none';
@@ -171,6 +173,25 @@
       if (!active) return null;
       const r = active.el.getBoundingClientRect();
       return r.width ? { x: r.left, y: r.top } : { ...active.point };
+    }
+    function holdVisitor(milliseconds = 12000) {
+      if (active && !active.greeted)
+        active.expires = Math.max(
+          active.expires,
+          Date.now() + Math.min(30000, Math.max(0, milliseconds))
+        );
+    }
+    function visitorMood(role = '', phase = '', label = '') {
+      if (!active) return;
+      active.el.dataset.relationship = role;
+      active.el.dataset.playPhase = phase;
+      if (label) {
+        active.el.title = label;
+        active.el.setAttribute(
+          'aria-label',
+          'Say hello to ' + label + '. Escape lets it fly away.'
+        );
+      }
     }
     function clearVisitor() {
       if (!active) return;
@@ -406,8 +427,10 @@
         ) || null
       );
     }
-    function invite(requested = '') {
+    function invite(requested = '', deliberate = false) {
+      if (deliberate && !pointerHeld) quietUntil = 0;
       sync();
+      if (deliberate && active && !quiet()) clearVisitor();
       if (!preferences.visitors || quiet() || active) return false;
       const v = viewport(),
         primary =
@@ -481,11 +504,13 @@
       active.el.classList.add('is-greeted');
       a.react(
         'happy',
-        {
-          butterfly: 'A tiny colleague! No meeting invite needed.',
-          bird: 'Our new teammate works for breadcrumbs.',
-          firefly: 'A little light for your next bright idea.',
-        }[active.kind] || 'A ' + active.kind + ' has joined our little desk adventure.',
+        a.visitorHello?.(active.kind) ||
+          {
+            butterfly: 'A tiny colleague! No meeting invite needed.',
+            bird: 'Our new teammate works for breadcrumbs.',
+            firefly: 'A little light for your next bright idea.',
+          }[active.kind] ||
+          'A ' + active.kind + ' has joined our little desk adventure.',
         3500
       );
     }
@@ -659,6 +684,8 @@
       invite,
       positionVisitor,
       visitorPoint,
+      holdVisitor,
+      visitorMood,
       clearVisitor,
       visitorKinds: Object.keys(ART),
       scenes: SCENERY,
