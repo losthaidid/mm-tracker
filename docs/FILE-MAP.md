@@ -30,7 +30,7 @@ CSS (`.css`) controls appearance; HTML supplies the initial page structure.
 | [task-workspace.css](../task-workspace.css) | Task action/status toolbar and main-task/sub-task styling. Task editors and saved fields are in `app.js`; board and timer interactions also use `studio.js`. |
 | [batch-a-engine.js](../batch-a-engine.js) | Rules/calculations for dependencies, labels, environments, outcomes, glossary, stale-work review and resume context. |
 | [batch-a.js](../batch-a.js), [batch-a.css](../batch-a.css) | Interfaces for those workflow tools: Work Context, splitting, wrap-ups, glossary and reading mode. |
-| [reminders.js](../reminders.js) | Reminder dates, snoozing, inbox and reminder decorations. |
+| [reminders.js](../reminders.js), [reminders.css](../reminders.css) | Exact reminder dates/times, quick scheduling, optional snoozing, due-alert panel, account isolation, calendar copies and inbox. Older date-only reminders remain compatible. |
 | [work-library-engine.js](../work-library-engine.js) | Snippet placeholders, reusable fields and timeline change calculations. |
 | [work-library.js](../work-library.js), [work-library.css](../work-library.css) | Snippet/bundle editors, message composer, reusable field interface and timeline view. |
 | [reports.js](../reports.js) | Current report options and formatted Excel report generation. The shared ZIP writer remains in `app.js`. |
@@ -96,6 +96,7 @@ CSS (`.css`) controls appearance; HTML supplies the initial page structure.
 | [tests/database.test.mjs](../tests/database.test.mjs) | Database/schema/migration checks using an isolated test database. |
 | [tests/batch-a.test.mjs](../tests/batch-a.test.mjs), [tests/claims.test.mjs](../tests/claims.test.mjs), [tests/recipients.test.mjs](../tests/recipients.test.mjs) | Focused workflow, expense and recipient rule tests. |
 | [tests/tng.test.mjs](../tests/tng.test.mjs) | Synthetic offline/online statement parsing, amount/date rules, Schedule matching, duplicate prevention and bounded evidence provenance. No private statement fixture. |
+| [tests/reminders.test.mjs](../tests/reminders.test.mjs) | Exact due boundaries, local-time conversion, legacy snoozes, restored-record validation and escaped UTF-8 calendar alarms. Timed reminder interactions are also covered in `tests/app.test.mjs`. |
 | [tests/validator.test.mjs](../tests/validator.test.mjs), [tests/work-library.test.mjs](../tests/work-library.test.mjs) | Validation and reusable-library tests. |
 | [tests/source-layout.test.mjs](../tests/source-layout.test.mjs) | Checks production asset paths/order and the protected vendor/empty-seed layout after extraction. |
 | `tests/*-preview.html` | Manual feature preview pages for Momo, Batch A, Validation Studio and wishlist tools. These are development previews, not extra live application pages. |
