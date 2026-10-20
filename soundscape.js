@@ -339,7 +339,7 @@
       let top = y + h - 62,
         left = x + 12;
       const obstacles = [
-        ...document.querySelectorAll('#hubTimerBar,#musicCorner,#hubPet,#focusPanel:not([hidden])'),
+        ...document.querySelectorAll('#hubTimerBar,#hubPet,#focusPanel:not([hidden])'),
       ]
         .map(el => el.getBoundingClientRect())
         .filter(r => r.width && r.height);

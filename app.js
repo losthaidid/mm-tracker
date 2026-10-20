@@ -2925,30 +2925,15 @@ function validateFeaturesV6(d) {
 }
 
 function editLists() {
-  const base = [
-    ['milestones', 'Ticket milestones (exactly 12)'],
-    ['projectActivities', 'Project activities'],
-    ['workLocations', 'Schedule work locations'],
-    ['projectPhases', 'Project phases (ordered)'],
-    ['projectItemTypes', 'Project item types'],
-    ['departments', 'Responsible departments'],
-    ['organizationObjects', 'Organization structure items'],
-    ['masterDataObjects', 'Master data items'],
-    ['feedbackCategories', 'Phase Feedback categories'],
-  ];
-  const gates = state.lists.projectPhases
-    .map(
-      (phase, i) =>
-        `<div><label for="phase-gates-${i}">${esc(phase)} · acceptance criteria</label><textarea id="phase-gates-${i}" name="phaseGateCriteria${i}" style="min-height:190px" required>${esc((state.lists.phaseGateCriteria[phase] || defaultGateCriteria(phase)).join('\n'))}</textarea></div>`
-    )
-    .join('');
-  openModal(
-    'Edit built-in lists',
-    `<form id="listsForm"><div class="form-grid">${base.map(([k, l]) => `<div><label for="list-${k}">${l}</label><textarea id="list-${k}" name="${k}" style="min-height:220px" required>${esc(state.lists[k].join('\n'))}</textarea></div>`).join('')}</div><h3 class="section-label">Phase-gate acceptance criteria</h3><p class="muted">Each project phase has its own dropdown list in Add Phase Gate.</p><div class="form-grid" style="margin-top:14px">${gates}</div><p class="hint">Enter one item per line. Existing mapped departments and schedule locations cannot be removed while records use them.</p><div class="modal-actions"><span></span><button class="primary" type="submit">Save lists</button></div></form>`
-  );
+  openModal('Built-in list library', window.WorkHubLists.render(state.lists, defaultGateCriteria));
+  const form = $('listsForm');
+  form.dataset.owner = cloud.user?.id || '';
+  window.WorkHubLists.mount(form);
 }
 
 function saveLists(form) {
+  if (form.dataset.owner !== (cloud.user?.id || ''))
+    throw Error('Reopen the built-in lists for the current account.');
   const milestones = listValues(form, 'milestones'),
     projectActivities = listValues(form, 'projectActivities'),
     workLocations = listValues(form, 'workLocations'),

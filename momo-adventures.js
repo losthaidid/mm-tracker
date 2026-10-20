@@ -88,7 +88,7 @@
         ) &&
         !editing() &&
         !$('hubMomoMenu') &&
-        (!auto || (!quiet() && $('musicCorner')?.dataset.playing !== 'true'))
+        (!auto || !quiet())
       );
     }
     function position() {

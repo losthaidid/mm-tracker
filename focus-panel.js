@@ -1,6 +1,6 @@
 /**
  * focus-panel.js
- * Draggable miniature focus timer with soundscape/music controls.
+ * Draggable miniature focus timer with local soundscape controls.
  * Uses the existing focus timer and audio adapters. No account record writes.
  * Panel layout belongs in focus-panel.css; preserve keyboard movement and viewport bounds.
  * File map: docs/FILE-MAP.md
@@ -24,7 +24,6 @@
       focus: 'M9 3H4v5m11-5h5v5M4 16v5h5m11-5v5h-5M9 12h6m-3-3v6',
       move: 'M8 5h.01M16 5h.01M8 12h.01M16 12h.01M8 19h.01M16 19h.01',
       sound: 'M3 16c3-8 5 8 9 0s6-8 9-3M3 8c3-8 5 8 9 0s6-8 9-3',
-      music: 'M9 18V5l11-2v13M9 9l11-2M9 18a3 3 0 1 1-3-3h3m11 1a3 3 0 1 1-3-3h3',
       pause: 'M8 5v14M16 5v14',
       play: 'M8 4l12 8-12 8V4Z',
       close: 'M6 6l12 12M6 18 18 6',
@@ -49,7 +48,6 @@
     let owner = '',
       opened = false,
       minimized = false,
-      source = 'soundscape',
       position = { x: 1, y: 1 },
       placed = false,
       drag = null,
@@ -95,12 +93,10 @@
         opened = false;
         last = taskSignature = '';
         drag = null;
-        source = 'soundscape';
         $('focusPanel')?.remove();
         if (prior) {
           a.reset();
           a.soundscape()?.stop();
-          a.music()?.close();
         }
         const label = $('focusModeButton')?.querySelector('span');
         if (label) label.textContent = 'Focus mode';
@@ -155,29 +151,13 @@
         button('end', 'End', 'id="fpEnd" hidden', 'fp-quiet') +
         '</div></form><section class="fp-audio"><div class="fp-audio-heading"><h3>Your little soundtrack</h3>' +
         button('quiet', 'Stop audio', '', 'fp-text') +
-        '</div><div class="fp-source-switch" role="group" aria-label="Choose focus audio">' +
-        button(
-          'source',
-          art('sound', 14) + 'Soundscape',
-          'data-source="soundscape" aria-pressed="true"'
-        ) +
-        button(
-          'source',
-          art('music', 14) + 'Music Corner',
-          'data-source="music" aria-pressed="false"'
-        ) +
         '</div><div id="fpSoundPane"><label class="fp-wide-label">Set the scene<select id="fpPreset"><option value="">Your saved mix</option><option value="rain">Rainy desk</option><option value="cafe">Café corner</option><option value="forest">Forest walk</option><option value="fireplace">By the fire</option><option value="lofi">Lo-fi study</option></select></label><div class="fp-sound-row">' +
         button('sound-play', art('play', 14) + '<span>Play</span>', 'id="fpSoundPlay"', 'fp-soft') +
         '<label class="fp-volume">Volume<input id="fpVolume" type="range" min="0" max="100" step="1" aria-label="Focus soundscape volume"></label>' +
         button('mute', 'Mute', 'id="fpMute" aria-pressed="false"', 'fp-text') +
         '</div>' +
         button('mix', 'Fine-tune your mix ↗', '', 'fp-text') +
-        '</div><div id="fpMusicPane" hidden><label class="fp-wide-label">Your favourites<select id="fpFavourite"><option value="">Choose a saved favourite</option></select></label><form id="fpMusicForm"><label class="fp-wide-label" for="fpMusicLink">Or paste a YouTube link</label><div class="fp-link-row"><input id="fpMusicLink" name="link" type="url" maxlength="500" placeholder="Video or playlist link" aria-label="YouTube video or playlist link"><button type="submit" class="fp-button fp-soft" aria-label="Open link or favourite in Music Corner">' +
-        art('play', 14) +
-        '</button></div></form><div class="fp-music-actions">' +
-        button('music-open', 'Open player ↗', '', 'fp-text') +
-        button('music-search', 'Search & favourites ↗', '', 'fp-text') +
-        '</div><small>Playback stays in the visible Music Corner. Press Play in the video to listen.</small></div><p id="fpAudioStatus" class="fp-audio-status" role="status">Choose a sound when you feel like it.</p></section><p class="fp-footer">Minimise for a little more space. Your timer keeps going.</p></div>';
+        '</div><p id="fpAudioStatus" class="fp-audio-status" role="status">Choose a sound when you feel like it.</p></section><p class="fp-footer">Minimise for a little more space. Your timer keeps going.</p></div>';
       document.body.append(el);
       last = taskSignature = '';
       const minimize = el.querySelector('[data-focus="minimize"]');
@@ -213,9 +193,7 @@
         };
       if (avoid) {
         const obstacles = [
-            ...document.querySelectorAll(
-              '#hubTimerBar,#musicCorner:not([hidden]),#soundscapeDock,#hubPet:not([hidden])'
-            ),
+            ...document.querySelectorAll('#hubTimerBar,#soundscapeDock,#hubPet:not([hidden])'),
           ]
             .map(x => x.getBoundingClientRect())
             .filter(r => r.width && r.height),
@@ -293,10 +271,6 @@
         : 0;
       $('fpProgress').style.width = pct + '%';
       el.querySelector('[role="progressbar"]').setAttribute('aria-valuenow', String(pct));
-      for (const b of el.querySelectorAll('[data-focus="source"]'))
-        b.setAttribute('aria-pressed', String(source === b.dataset.source));
-      $('fpSoundPane').hidden = source !== 'soundscape';
-      $('fpMusicPane').hidden = source !== 'music';
       const sound = a.soundscape()?.snapshot();
       if (sound) {
         if (document.activeElement !== $('fpVolume')) $('fpVolume').value = sound.master;
@@ -304,30 +278,13 @@
         $('fpMute').setAttribute('aria-pressed', String(sound.muted));
         $('fpSoundPlay').querySelector('span').textContent = sound.playing ? 'Pause' : 'Play';
       }
-      const music = a.music()?.snapshot();
-      if (source === 'music') {
-        const select = $('fpFavourite'),
-          chosen = select.value,
-          html =
-            '<option value="">Choose a saved favourite</option>' +
-            (music?.favourites || [])
-              .map((f, i) => '<option value="' + i + '">' + esc(f.label) + '</option>')
-              .join('');
-        if (select.innerHTML !== html) {
-          select.innerHTML = html;
-          select.value = chosen;
-        }
-      }
       const audioStatus =
-        source === 'soundscape'
-          ? sound?.error || sound?.playing
-            ? sound?.error || (sound.muted ? 'Soundscape is muted.' : 'Your soundscape is playing.')
-            : 'Choose a scene, then press Play.'
-          : music?.playing
-            ? 'Music Corner is playing.'
-            : music?.opened
-              ? 'Music Corner is open. Press Play in the video.'
-              : 'Pick a favourite or bring your own link.';
+        sound?.error ||
+        (sound?.playing
+          ? sound.muted
+            ? 'Soundscape is muted.'
+            : 'Your soundscape is playing.'
+          : 'Choose a scene, then press Play.');
       if ($('fpAudioStatus').textContent !== audioStatus)
         $('fpAudioStatus').textContent = audioStatus;
       $('focusModeButton')?.setAttribute('aria-expanded', String(opened));
@@ -389,19 +346,9 @@
       }
       if (action === 'pause') a.pause();
       if (action === 'end') a.end();
-      if (action === 'source') {
-        generation++;
-        source = el.dataset.source === 'music' ? 'music' : 'soundscape';
-        if (source === 'music') a.soundscape()?.stop();
-        else a.music()?.close();
-        refresh();
-        layout(true);
-        return;
-      }
       if (action === 'sound-play') {
         const sound = a.soundscape();
         if (!sound) throw Error('Soundscape is unavailable.');
-        a.music()?.close();
         const token = ++generation,
           account = owner;
         if (sound.snapshot().playing) sound.stop();
@@ -419,16 +366,6 @@
       if (action === 'quiet') {
         generation++;
         a.soundscape()?.stop();
-        a.music()?.close();
-      }
-      if (action === 'music-open') {
-        a.soundscape()?.stop();
-        a.music()?.open();
-      }
-      if (action === 'music-search') {
-        a.soundscape()?.stop();
-        a.music()?.openControls();
-        return;
       }
       refresh();
       layout(true);
@@ -440,34 +377,14 @@
       void handle(el).catch(err => a.tell(err.message, true));
     });
     document.addEventListener('submit', e => {
-      if (!['fpFocusForm', 'fpMusicForm'].includes(e.target.id)) return;
+      if (e.target.id !== 'fpFocusForm') return;
       e.preventDefault();
       try {
         ensure();
-        if (e.target.id === 'fpFocusForm') {
-          const f = e.target;
-          a.start(
-            Number(f.elements.namedItem('minutes').value),
-            f.elements.namedItem('task').value
-          );
-          refresh(true);
-          layout();
-        } else {
-          const link = $('fpMusicLink').value.trim(),
-            music = a.music(),
-            favourite = music?.snapshot().favourites[Number($('fpFavourite').value)];
-          if (link) {
-            if (!root.WorkHubMusic.parseLink(link))
-              throw Error('Paste a valid YouTube video or playlist link.');
-            a.soundscape()?.stop();
-            void music.search(link);
-          } else if ($('fpFavourite').value !== '' && favourite) {
-            a.soundscape()?.stop();
-            music.select(favourite);
-          } else throw Error('Choose a favourite or paste a YouTube link.');
-          refresh();
-          layout(true);
-        }
+        const f = e.target;
+        a.start(Number(f.elements.namedItem('minutes').value), f.elements.namedItem('task').value);
+        refresh(true);
+        layout();
       } catch (err) {
         a.tell(err.message, true);
       }
@@ -586,7 +503,7 @@
       refresh,
       tick: refresh,
       layout,
-      snapshot: () => ({ opened, minimized, source, position: { ...position } }),
+      snapshot: () => ({ opened, minimized, source: 'soundscape', position: { ...position } }),
     };
   }
   root.WorkHubFocusPanel = { install };

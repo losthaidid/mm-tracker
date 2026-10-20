@@ -57,12 +57,6 @@
         restUntil = Date.now() + 3000;
       }
     }
-    let musicScene = { visible: false, playing: false, rect: null },
-      musicDocked = false,
-      musicPrevious = null,
-      musicDetachedUntil = 0,
-      musicNextDance = 0,
-      musicDanceUntil = 0;
     const QUIPS = [
       ['stumble', 'dizzy', 'I tripped over a pixel. It was a very large pixel.'],
       ['sneeze', 'surprised', 'Achoo! Sorry. I’m allergic to Monday-shaped thoughts.'],
@@ -165,8 +159,7 @@
         nap ||
         armed ||
         Date.now() < restUntil ||
-        !!held ||
-        musicDocked
+        !!held
       );
     }
     function express(value) {
@@ -193,78 +186,6 @@
         }[value] || 'curious'
       );
     }
-    function undockMusic(restore = false) {
-      if (musicDocked) {
-        musicDocked = false;
-        if (pet()) {
-          pet().dataset.musicDocked = 'false';
-          pet().style.zIndex = '90';
-        }
-        if (restore && musicPrevious && !held) a.move(musicPrevious);
-        if (!held && !nap) pose('idle');
-      }
-      musicPrevious = null;
-      musicDanceUntil = 0;
-    }
-    function placeAtMusic() {
-      const r = musicScene.rect,
-        el = pet();
-      if (!r || !el) return;
-      const size = parseFloat(el.style.width) || 96;
-      a.move({ x: r.left + (r.width - size) / 2, y: r.top + (r.height - size) / 2 });
-      el.style.zIndex = '96';
-      el.dataset.musicDocked = 'true';
-    }
-    function music(value) {
-      const wasPlaying = musicScene.playing;
-      musicScene = { visible: !!value.visible, playing: !!value.playing, rect: value.rect };
-      if (!musicScene.visible) {
-        undockMusic(true);
-        return;
-      }
-      if (musicScene.playing && !wasPlaying)
-        musicNextDance = Date.now() + 3000 + Math.random() * 7000;
-      if (musicDocked) {
-        if (!musicScene.playing) {
-          musicDanceUntil = 0;
-          pose('music-watch');
-        }
-        if (!held) placeAtMusic();
-      }
-    }
-    function musicTick() {
-      if (!musicScene.visible || !musicScene.rect || !a.prefs().roaming || !motion()) {
-        undockMusic(true);
-        return false;
-      }
-      const editing =
-        !!document.querySelector('dialog[open]') ||
-        document.activeElement?.matches(
-          'input,textarea,select,[contenteditable]:not([contenteditable="false"])'
-        );
-      if (held || nap || journey || armed || Date.now() < musicDetachedUntil) return false;
-      if (!musicDocked) {
-        if (editing || Date.now() < restUntil || $('hubMomoMenu')) return false;
-        a.stop();
-        cancelTravel();
-        musicPrevious = {
-          x: parseFloat(pet().style.left) || 0,
-          y: parseFloat(pet().style.top) || 0,
-        };
-        musicDocked = true;
-        placeAtMusic();
-      }
-      if (editing || document.body.classList.contains('hub-focus') || $('hubMomoMenu')) {
-        pose('music-watch');
-        return true;
-      }
-      if (musicScene.playing && Date.now() >= musicNextDance) {
-        musicDanceUntil = Date.now() + 4000 + Math.random() * 3000;
-        musicNextDance = Date.now() + 14000 + Math.random() * 16000;
-      }
-      pose(musicScene.playing && Date.now() < musicDanceUntil ? 'music-dance' : 'music-watch');
-      return true;
-    }
     function endGesture() {
       if (!idleGesture) return;
       idleGesture = null;
@@ -280,7 +201,6 @@
         journey ||
         nap ||
         sceneState ||
-        musicDocked ||
         document.body.matches('.hub-private,.hub-present,.hub-focus,.lab-drag-active') ||
         document.querySelector('dialog[open]') ||
         document.activeElement?.matches(
@@ -583,7 +503,7 @@
         ($('hubMomoBall') ? 'Put ball away' : 'Play ball') +
         '</button><button data-momo="come">Come here…</button><button data-momo="perch">Find a perch</button><button data-momo="gesture">Show me a little move</button><button data-momo="sit">Unfold a chair & whistle</button><button data-momo="sleep">A tiny sleep break</button><button data-momo="home">' +
         (nap ? 'Wake up' : 'Go home & nap') +
-        '</button><button data-momo="place-home">Put my home here</button><button data-momo="rain">Umbrella moment</button><button data-momo="music">Open my music corner ♫</button><button data-momo="quip">Tell me something silly</button><button data-momo="theatre">Momo’s tiny theatre</button><button data-momo="discover">Desk discoveries</button><button data-momo="moments-settings">Little moment settings</button><button data-momo="quiet" aria-pressed="' +
+        '</button><button data-momo="place-home">Put my home here</button><button data-momo="rain">Umbrella moment</button><button data-momo="quip">Tell me something silly</button><button data-momo="theatre">Momo’s tiny theatre</button><button data-momo="discover">Desk discoveries</button><button data-momo="moments-settings">Little moment settings</button><button data-momo="quiet" aria-pressed="' +
         quiet +
         '">' +
         (quiet ? 'Turn on little chats' : 'Quiet time · pause little chats') +
@@ -842,8 +762,6 @@
           endUmbrella();
           endGesture();
           reaction = null;
-          undockMusic();
-          musicDetachedUntil = Date.now() + 30000;
           cancelTravel();
           nap = false;
           perch = null;
@@ -908,12 +826,6 @@
           if (action === 'home' && Date.now() < homeSuppress) return;
           $('hubMomoMenu')?.remove();
           if (action === 'close') return;
-          undockMusic();
-          musicDetachedUntil = Date.now() + 30000;
-          if (action === 'music') {
-            root.dispatchEvent(new CustomEvent('workhub:music-open'));
-            return;
-          }
           if (['theatre', 'discover', 'moments-settings'].includes(action)) {
             root.dispatchEvent(new CustomEvent('workhub:momo-extra', { detail: { action } }));
             return;
@@ -1064,8 +976,7 @@
         !!document.querySelector('dialog[open]') ||
         document.activeElement?.matches(
           'input,textarea,select,[contenteditable]:not([contenteditable="false"])'
-        ) ||
-        musicScene.visible;
+        );
       if (idleGesture) {
         if (interrupted || Date.now() >= idleGesture.until) endGesture();
         else {
@@ -1093,10 +1004,6 @@
         pose('idle');
       }
       if (sceneState) {
-        layout();
-        return;
-      }
-      if (musicTick()) {
         layout();
         return;
       }
@@ -1134,11 +1041,9 @@
       wake,
       goHome,
       express,
-      music,
       scene,
       homePosition: () => ({ ...home }),
-      sceneAvailable: () =>
-        !homeDrag && !held && !journey && !musicDocked && !armed && !idleGesture && !reaction,
+      sceneAvailable: () => !homeDrag && !held && !journey && !armed && !idleGesture && !reaction,
     };
   }
   root.WorkHubMomoLife = { install };

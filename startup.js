@@ -4,6 +4,12 @@
   'use strict';
   const document = root.document,
     page = document.documentElement;
+
+  // Clear the retired player’s device-only preferences and search key.
+  try {
+    localStorage.removeItem('mm-tracker.music.v1');
+    localStorage.removeItem('mm-tracker.youtube-key.v1');
+  } catch {}
   let finished = false,
     blocked = false,
     message = 'Getting your workspace ready…';

@@ -253,7 +253,6 @@
       library = null,
       focusPanel = null,
       life = null,
-      music = null,
       atmosphere = null,
       workbench = null,
       soundscape = null,
@@ -880,7 +879,6 @@
       }
       if (!present) exit?.remove();
       if (present) stopCompanionWalk();
-      music?.sync();
       atmosphere?.sync();
     }
     function heroArt() {
@@ -945,7 +943,6 @@
       renderTimerBar();
       syncViewModes();
       life?.mount();
-      music?.mount();
       atmosphere?.mount();
       workbench?.decorate();
       soundscape?.mount();
@@ -2218,7 +2215,6 @@
           ['new-ticket', 'Add ticket'],
           ['note-edit', 'Add knowledge note'],
           ['timer-new', 'Start work timer'],
-          ['music', 'Open music corner'],
         ];
       const results = [
         ...rows.map(([id, title]) => ({ id, title, type: 'command' })),
@@ -2536,10 +2532,6 @@
         a.tell(
           'Drag the dotted handle to move this item. Arrow keys work when the handle is focused.'
         );
-        return;
-      }
-      if (action === 'music') {
-        music?.open();
         return;
       }
       if (action === 'close') {
@@ -3524,13 +3516,6 @@
       stop: stopCompanionWalk,
       react,
     });
-    music = root.WorkHubMusic?.install({
-      ready: () => a.cloud().ready,
-      life: () => life,
-      tell: a.tell,
-      openModal: a.openModal,
-      closeModal: a.closeModal,
-    });
     atmosphere = root.WorkHubAtmosphere?.install({
       ready: () => a.cloud().ready,
       prefs: () => themePreview || prefs(),
@@ -3616,7 +3601,6 @@
       end: endFocus,
       reset: endFocus,
       soundscape: () => soundscape,
-      music: () => music,
       tell: a.tell,
     });
     adventures = root.WorkHubMomoAdventures?.install({
@@ -3665,7 +3649,6 @@
       focusSnapshot,
       reminders,
       life,
-      music,
       atmosphere,
       workbench,
       soundscape,

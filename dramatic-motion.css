@@ -1,0 +1,664 @@
+/* Expressive motion layer. Loaded after feature styles; custom.css remains your override space.
+   Animates visual layers, not saved coordinates. Existing pause/stop controls still own playback. */
+:root {
+  --hub-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-spring: cubic-bezier(0.2, 1.45, 0.35, 1);
+}
+body {
+  --motion-rise: 22px;
+  --motion-lift: -5px;
+}
+body[data-motion='calm'] {
+  --motion-rise: 10px;
+  --motion-lift: -2px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  body:not([data-motion='off']) :is(.hub, .workspace-v10, .validation-studio, .wl-workspace) {
+    animation: hub-reveal 0.55s var(--hub-ease) backwards;
+  }
+  body:not([data-motion='off']) :is(.ticket-folio, .task-main-card, .hub-widget, .wl-snippet) {
+    animation: ticket-arrive 0.5s var(--hub-ease) backwards;
+  }
+  body:not([data-motion='off']) :is(.ticket-board, .task-board, .hub-column) > :nth-child(3n + 2) {
+    animation-delay: 45ms;
+  }
+  body:not([data-motion='off']) :is(.ticket-board, .task-board, .hub-column) > :nth-child(3n + 3) {
+    animation-delay: 90ms;
+  }
+  body:not([data-motion='off']) .modal[open] .modal-body {
+    animation: motion-drawer 0.4s var(--hub-ease) backwards;
+  }
+  body:not([data-motion='off']) .modal[open]::backdrop {
+    animation: hub-fade 0.24s ease backwards;
+  }
+  body:not([data-motion='off']) .bl-pane:not([hidden]) {
+    animation: motion-list 0.35s var(--hub-ease) backwards;
+  }
+  body:not([data-motion='off']) .bl-library-mark {
+    animation: motion-library 5s ease-in-out infinite;
+  }
+  body:not([data-motion='off']) #momoTheatre {
+    animation: motion-theatre 0.55s var(--motion-spring) backwards;
+    transform-origin: center bottom;
+  }
+  body:not([data-motion='off']) :is(#toast, .hub-pet-bubble):not([hidden]) {
+    animation: motion-toast 0.42s var(--motion-spring) backwards;
+  }
+  body:not([data-motion='off']) .settings-group:not([hidden]) {
+    animation: motion-list 0.32s var(--hub-ease) backwards;
+  }
+  body:not([data-motion='off']) :is(.claim-summary, .tng-desk, .val-results) {
+    animation: hub-reveal 0.48s var(--hub-ease) backwards;
+  }
+  body:not([data-motion='off'])
+    :is(button, .hub-link-card, .ticket-folio, .task-main-card, .wl-snippet, .bl-nav button) {
+    transition-duration: 180ms;
+    transition-timing-function: var(--hub-ease);
+  }
+  body:not([data-motion='off']) button:not(:disabled):active {
+    transform: translateY(1px) scale(0.96);
+  }
+  body:not([data-motion='off']) #hubPet > button:active {
+    transform: none;
+  }
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  body:not([data-motion='off'])
+    :is(.ticket-folio, .task-main-card, .wl-snippet, .hub-link-card):hover {
+    transform: translateY(var(--motion-lift));
+    box-shadow:
+      0 12px 25px #26374b15,
+      0 0 0 1px var(--hub-border);
+  }
+  body:not([data-motion='off']) :is(.primary, .fp-primary):hover {
+    transform: translateY(-2px);
+    box-shadow: 0 7px 16px color-mix(in srgb, var(--hub-accent) 24%, transparent);
+  }
+  body:not([data-motion='off']) .bl-nav button:hover {
+    transform: translateX(3px);
+  }
+}
+/* Workspace arrivals: a little anticipation, a crisp landing, then stillness for reading. */
+@keyframes hub-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(var(--motion-rise, 22px)) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes ticket-arrive {
+  0% {
+    opacity: 0;
+    transform: translateY(var(--motion-rise, 22px)) scale(0.965);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-3px) scale(1.005);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes wl-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes val-arrive {
+  0% {
+    opacity: 0;
+    transform: translateY(24px) scale(0.96);
+  }
+  75% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.005);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes batch-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes claim-enter {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes fp-arrive {
+  0% {
+    opacity: 0;
+    transform: translateY(26px) scale(0.9);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-4px) scale(1.015);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes motion-drawer {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.975);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes motion-list {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes motion-theatre {
+  0% {
+    opacity: 0;
+    transform: translateY(28px) scale(0.8);
+  }
+  75% {
+    opacity: 1;
+    transform: translateY(-4px) scale(1.025);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes motion-toast {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes motion-library {
+  0%,
+  100% {
+    transform: rotate(-7deg) translateY(0);
+  }
+  50% {
+    transform: rotate(-2deg) translateY(-5px);
+  }
+}
+@keyframes hub-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(2deg);
+  }
+}
+/* Momo: stronger anticipation, squash/stretch and follow-through on existing actions. */
+@keyframes hub-happy {
+  0%,
+  100% {
+    transform: none;
+  }
+  25% {
+    transform: translateY(4px) scale(1.07, 0.92);
+  }
+  55% {
+    transform: translateY(-13px) rotate(-5deg) scale(0.97, 1.05);
+  }
+  80% {
+    transform: translateY(2px) rotate(3deg);
+  }
+}
+@keyframes momo-boy-startle {
+  0%,
+  100% {
+    transform: none;
+  }
+  15% {
+    transform: translateY(3px) scale(1.05, 0.94);
+  }
+  38% {
+    transform: translateY(-16px) rotate(-7deg) scale(0.96, 1.06);
+  }
+  72% {
+    transform: translateY(3px) rotate(3deg) scale(1.04, 0.96);
+  }
+}
+@keyframes momo-boy-squirm {
+  0%,
+  100% {
+    transform: rotate(-10deg) translateY(3px);
+  }
+  50% {
+    transform: rotate(11deg) translateY(-4px);
+  }
+}
+@keyframes momo-boy-kick {
+  from {
+    transform: rotate(-23deg) translateY(2px);
+  }
+  to {
+    transform: rotate(26deg) translateY(-6px);
+  }
+}
+@keyframes momo-land {
+  0% {
+    transform: translateY(-8px) scale(0.94, 1.08);
+  }
+  40% {
+    transform: translateY(6px) scale(1.14, 0.86);
+  }
+  75% {
+    transform: translateY(-3px) scale(0.98, 1.03);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes momo-oops {
+  0%,
+  100% {
+    transform: none;
+  }
+  20% {
+    transform: rotate(-10deg) translate(-5px, -5px);
+  }
+  42% {
+    transform: rotate(13deg) translate(7px, 4px) scale(1.05, 0.94);
+  }
+  65% {
+    transform: rotate(-6deg) translateY(-4px);
+  }
+  82% {
+    transform: rotate(3deg);
+  }
+}
+@keyframes momo-achoo {
+  0%,
+  100% {
+    transform: none;
+  }
+  28% {
+    transform: rotate(-8deg) translateY(-5px) scale(0.97, 1.03);
+  }
+  42% {
+    transform: rotate(12deg) translate(5px, 5px) scale(1.08, 0.91);
+  }
+  65% {
+    transform: rotate(-4deg) translateY(-3px);
+  }
+}
+@keyframes momo-stretch {
+  0%,
+  100% {
+    transform: none;
+  }
+  40%,
+  65% {
+    transform: translateY(-7px) scale(0.93, 1.13) rotate(-3deg);
+  }
+  80% {
+    transform: translateY(2px) scale(1.04, 0.97);
+  }
+}
+@keyframes world-wave {
+  0%,
+  100% {
+    transform: rotate(-10deg);
+  }
+  25%,
+  65% {
+    transform: rotate(28deg);
+  }
+  45%,
+  85% {
+    transform: rotate(-18deg);
+  }
+}
+@keyframes world-run {
+  0%,
+  100% {
+    transform: translateY(2px) rotate(-5deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(6deg);
+  }
+}
+@keyframes world-run-foot {
+  from {
+    transform: rotate(-29deg) translateY(2px);
+  }
+  to {
+    transform: rotate(32deg) translateY(-5px);
+  }
+}
+@keyframes world-hop {
+  0%,
+  100% {
+    transform: none;
+  }
+  20% {
+    transform: translateY(3px) scale(1.06, 0.93);
+  }
+  55% {
+    transform: translateY(-14px) scale(0.96, 1.05);
+  }
+  80% {
+    transform: translateY(2px) scale(1.04, 0.96);
+  }
+}
+@keyframes world-tiptoe {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-4deg);
+  }
+  50% {
+    transform: translateY(-7px) rotate(4deg);
+  }
+}
+@keyframes world-window-peek {
+  0%,
+  100% {
+    transform: translateX(-4px) rotate(-4deg);
+  }
+  50% {
+    transform: translateX(7px) rotate(5deg);
+  }
+}
+@keyframes world-juggle-bob {
+  0%,
+  100% {
+    transform: translateY(2px) rotate(-3deg);
+  }
+  50% {
+    transform: translateY(-5px) rotate(3deg);
+  }
+}
+@keyframes moments-momo {
+  0%,
+  100% {
+    transform: none;
+  }
+  40% {
+    transform: translateY(-7px) rotate(4deg);
+  }
+  70% {
+    transform: translateY(2px) rotate(-2deg);
+  }
+}
+@keyframes moments-joust {
+  from {
+    transform: translateX(2px) rotate(4deg);
+  }
+  to {
+    transform: translateX(-22px) rotate(-19deg);
+  }
+}
+@keyframes moments-nod {
+  0%,
+  100% {
+    transform: rotate(-3deg);
+  }
+  50% {
+    transform: rotate(10deg) translateY(3px);
+  }
+}
+@keyframes world-finale {
+  0% {
+    opacity: 0;
+    transform: translateY(22px) scale(0.35) rotate(-20deg);
+  }
+  25% {
+    opacity: 1;
+    transform: translateY(-12px) scale(1.15) rotate(7deg);
+  }
+  75% {
+    opacity: 1;
+    transform: translateY(-30px) scale(1) rotate(-5deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-60px) scale(0.8) rotate(12deg);
+  }
+}
+/* Scenery stays continuous: broad drift and glow, without flashing the page. */
+@keyframes ambient-orb-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+@keyframes ambient-moon-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-3deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(4deg);
+  }
+}
+@keyframes visitor-wingbeat {
+  0%,
+  100% {
+    transform: scaleX(1) rotate(-6deg);
+  }
+  50% {
+    transform: scaleX(0.22) rotate(8deg);
+  }
+}
+@keyframes visitor-birdbeat {
+  0%,
+  100% {
+    transform: rotate(-20deg);
+  }
+  50% {
+    transform: rotate(24deg);
+  }
+}
+@keyframes visitor-glow {
+  0%,
+  100% {
+    opacity: 0.55;
+    filter: drop-shadow(0 0 2px #fff4ac);
+  }
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 8px #fff4ac);
+  }
+}
+@keyframes world-rain {
+  from {
+    transform: translate(0, -18px);
+  }
+  to {
+    transform: translate(-10px, 24px);
+  }
+}
+@keyframes world-snow {
+  from {
+    transform: translate(-5px, -20px);
+  }
+  to {
+    transform: translate(15px, 58px);
+  }
+}
+@keyframes world-breeze {
+  0%,
+  100% {
+    transform: translateX(-32px);
+    opacity: 0.25;
+  }
+  50% {
+    transform: translateX(32px);
+    opacity: 0.85;
+  }
+}
+@keyframes world-aurora {
+  from {
+    transform: scaleY(0.55) skewX(-10deg);
+    opacity: 0.3;
+  }
+  to {
+    transform: scaleY(1.35) skewX(10deg);
+    opacity: 0.85;
+  }
+}
+/* Lab outcomes retain their existing loop durations, pause/stop controls and wire timing. */
+@keyframes lab-result-success {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 #63c78b00;
+    filter: saturate(1);
+  }
+  40% {
+    box-shadow:
+      0 0 0 8px #63c78b24,
+      0 8px 24px #2b8e6830;
+    filter: saturate(1.3);
+  }
+  70% {
+    box-shadow: 0 0 0 13px #63c78b00;
+    filter: saturate(1.1);
+  }
+}
+@keyframes lab-result-failure {
+  0%,
+  20%,
+  100% {
+    transform: none;
+    box-shadow: 0 0 0 0 #e67e7400;
+  }
+  35% {
+    transform: translateX(-2px);
+    box-shadow: 0 0 0 7px #e67e741c;
+  }
+  42% {
+    transform: translateX(2px);
+  }
+  50% {
+    transform: translateX(-1px);
+  }
+  65% {
+    transform: none;
+    box-shadow: 0 0 0 12px #e67e7400;
+  }
+}
+@keyframes lab-recoil {
+  20% {
+    transform: translateX(9px) rotate(2deg);
+  }
+  55% {
+    transform: translateX(-5px) rotate(-1deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes lab-snap {
+  0% {
+    transform: scale(0.93);
+  }
+  65% {
+    transform: scale(1.035);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes lab-momo-startle {
+  0% {
+    transform: none;
+  }
+  20% {
+    transform: translate(8px, -17px) rotate(13deg);
+  }
+  55%,
+  100% {
+    transform: translateY(5px) scale(0.93);
+  }
+}
+@keyframes lab-momo-celebrate {
+  20% {
+    transform: translateY(3px) scale(1.05, 0.94);
+  }
+  45% {
+    transform: translateY(-16px) rotate(-9deg);
+  }
+  75% {
+    transform: translateY(-5px) rotate(8deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes lab-stamp {
+  from {
+    opacity: 0;
+    transform: rotate(-18deg) scale(1.8);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(12deg) scale(1);
+  }
+}
+/* Pausing and accessibility are global so every decorative surface follows the same preference. */
+body.hub-motion-paused * {
+  animation-play-state: paused !important;
+}
+body.hub-motion-paused *::before,
+body.hub-motion-paused *::after {
+  animation-play-state: paused !important;
+}
+body[data-motion='off'] * {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+body[data-motion='off'] *::before,
+body[data-motion='off'] *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
