@@ -156,11 +156,15 @@
       const pet = $('hubPet'),
         v = viewport();
       if (!pet || v.h < 310) return false;
-      const w = Math.min(232, v.w - 24),
-        h = 210,
+      const w = Math.min(420, v.w - 24),
+        h = Math.min(336, v.h - 24),
+        petWidth = parseFloat(pet.style.width) || 144,
+        petHeight = parseFloat(pet.style.height) || petWidth,
+        // Momo and the props share a floor, leaving a separate area for captions.
+        floor = Math.max(petHeight + 50, h - 112),
         x = Math.max(
           v.x + 12,
-          Math.min(v.x + v.w - w - 12, (parseFloat(pet.style.left) || 0) - 68)
+          Math.min(v.x + v.w - w - 12, (parseFloat(pet.style.left) || 0) + petWidth / 2 - w * 0.42)
         ),
         y = Math.max(v.y + 12, Math.min(v.y + v.h - h - 12, (parseFloat(pet.style.top) || 0) - 30));
       active = {
@@ -172,7 +176,7 @@
         previous: { x: parseFloat(pet.style.left) || 0, y: parseFloat(pet.style.top) || 0 },
       };
       a.life()?.scene({ pose: 'theatre', expression: 'curious' });
-      a.move({ x: x + (w - (parseFloat(pet.style.width) || 96)) / 2, y: y + 36 });
+      a.move({ x: x + w * 0.42 - petWidth / 2, y: y + floor - petHeight + 6 });
       const stage = document.createElement('aside');
       stage.id = 'momoTheatre';
       stage.dataset.scene = show.prop;
@@ -184,6 +188,7 @@
         width: w + 'px',
         height: h + 'px',
       });
+      stage.style.setProperty('--moments-floor-y', floor + 'px');
       stage.querySelector('button').setAttribute('aria-label', 'Close ' + name() + '’s theatre');
       document.body.append(stage);
       theatreAt = Date.now() + random(360000, 660000);
