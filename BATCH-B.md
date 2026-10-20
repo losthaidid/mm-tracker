@@ -16,3 +16,4 @@ and Troubleshooting Lab playback release.
 | 59 | Work-area awareness | Move away from controls being used and settle in a quieter place. |
 | 60 | Resume interrupted activities | Return sensibly to the previous ball, visitor or window activity after a pause. |
 | 48 (new ideas) | Weather consequences | Let weather leave temporary effects in Momo's world: wet footprints after rain, wind-blown leaves in his theatre, or a foggy window he wipes clean to peek outside. Kept on 20 October 2026. |
+| 56 (new ideas) | Visitor friendships | Give recurring visitors distinct relationships with Momo: racing rivals, gift-bearing friends, or a cheeky visitor who steals his favourite seat. Kept on 20 October 2026; separate from the original item 56, Soccer physics. |
