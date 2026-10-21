@@ -30,6 +30,15 @@ Kept on 21 October 2026: selections **1–5** from the Material Type Explorer di
 4. **Configuration dependencies** — distinguish material-type settings, purchase-order settings and other configuration that influence behaviour.
 5. **Material-master preparation checklist** — prepare the information to confirm for the proposed design, including units, organisational levels, purchasing data, valuation settings and account assignments.
 
+## Pending Solution Studio discovery and simulation enhancements
+
+Kept on 21 October 2026: selections **16–18 and 23**. Wishlist only; implementation has not been requested. No batch assigned.
+
+- **16 · Business discovery interview** — guided questions about buying, storing, consuming, manufacturing and selling; answers build a draft process map for review.
+- **17 · Visual warehouse sandbox** — storage-location zones with draggable simulated materials, animated movements, quantities and effects.
+- **18 · Unexpected-event scenarios** — introduce events such as damaged deliveries, urgent consumption or supplier returns within supported simulation coverage to explore the proposed design.
+- **23 · Explain at three levels** — present the same proposal from Business user, SAP consultant and Finance perspectives.
+
 ## Earlier completed selections
 
 The seven selected items are now part of the existing account document. The tracker keeps its current sign-in, saving, backup and restore workflows. No database migration is needed.
