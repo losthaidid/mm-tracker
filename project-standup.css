@@ -207,6 +207,84 @@ body #modal.standup-dialog {
   color: var(--hub-muted);
   font-size: 0.72rem;
 }
+.standup-search {
+  margin: 0 30px 20px;
+  padding: 17px 18px 13px;
+  border: 1px solid color-mix(in srgb, var(--hub-accent) 24%, var(--hub-border));
+  border-radius: 17px;
+  background: color-mix(in srgb, var(--hub-accent) 4%, var(--hub-surface));
+}
+.standup-search > label {
+  display: block;
+  margin-bottom: 9px;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+.standup-search-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 5px 7px 5px 13px;
+  border: 1px solid var(--hub-border);
+  border-radius: 12px;
+  background: var(--hub-surface);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.standup-search-field:focus-within {
+  border-color: var(--hub-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--hub-accent) 12%, transparent);
+}
+.standup-search-field > svg {
+  flex: 0 0 20px;
+  color: var(--hub-accent);
+}
+.standup-search-field > input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  padding: 8px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--hub-text);
+  font-size: 16px;
+  box-shadow: none;
+}
+.standup-search-field > input:focus {
+  outline: none;
+  box-shadow: none;
+}
+.standup-search-clear {
+  flex-shrink: 0;
+  min-height: 36px;
+}
+.standup-search > p {
+  margin: 9px 0 0;
+  color: var(--hub-muted);
+  font-size: 0.7rem;
+  line-height: 1.6;
+}
+.standup-search #standupSearchResults {
+  color: var(--hub-accent);
+  font-weight: 650;
+}
+.standup-item[hidden],
+.standup-search-clear[hidden],
+.standup-no-results[hidden] {
+  display: none;
+}
+.standup-item mark {
+  color: var(--hub-text);
+  background: color-mix(in srgb, #e6b73c 34%, var(--hub-surface));
+  border-radius: 3px;
+  box-shadow: 0 1px 0 color-mix(in srgb, #e6b73c 70%, transparent);
+}
+.standup-sub-row.is-search-match {
+  background: color-mix(in srgb, var(--hub-accent) 5%, var(--hub-surface));
+}
 .standup-items {
   display: grid;
   gap: 16px;
@@ -480,6 +558,10 @@ body #modal.standup-dialog {
   .standup-items {
     padding: 0 12px 20px;
   }
+  .standup-search {
+    margin: 0 12px 16px;
+    padding: 15px 12px 12px;
+  }
   .standup-row,
   .standup-item > summary {
     padding: 16px 13px;
@@ -514,11 +596,13 @@ body #modal.standup-dialog {
 }
 @media (prefers-reduced-motion: reduce) {
   .standup-overview-card,
-  .standup-chevron {
+  .standup-chevron,
+  .standup-search-field {
     transition: none;
   }
 }
 body[data-motion='off'] .standup-overview-card,
-body[data-motion='off'] .standup-chevron {
+body[data-motion='off'] .standup-chevron,
+body[data-motion='off'] .standup-search-field {
   transition: none;
 }

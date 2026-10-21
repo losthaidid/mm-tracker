@@ -226,6 +226,26 @@ test('stand-up: overview card opens all item and sub-item remarks with independe
  document.querySelector('[data-standup="collapse"]').click();assert.equal(document.querySelector('.standup-item').open,false);document.querySelector('[data-standup="expand"]').click();assert.equal(document.querySelector('.standup-item').open,true);assert.equal(api.state().specs[0].id,item.id);
 });
 
+test('stand-up: live search keeps sub-item context, highlights safely and restores collapsed groups without saves',async t=>{
+ const {api,document,window,db}=await app(t),first=standupFixture(api,document),second=standupFixture(api,document);
+ api.mutate(d=>{const a=d.specs.find(r=>r.id===first.id),b=d.specs.find(r=>r.id===second.id);a.itemId=a.ricefw='MM-042';a.subItems[1].remarks='Awaiting business reply <img src=x onerror=alert(1)>';b.description='Invoice verification';b.remarks='Finance sign-off';b.status='Completed';b.subItems=[];});await settle();
+ api.hub.standup.open(first.projectId);document.querySelector('[data-standup="collapse"]').click();const calls=db.calls.length,input=document.getElementById('standupSearch');
+ const search=q=>{input.value=q;input.dispatchEvent(new window.Event('input',{bubbles:true}));};
+ search('MM-042 business');assert.equal(document.querySelectorAll('.standup-item:not([hidden])').length,1);assert.equal(document.querySelector('.standup-item:not([hidden])').open,true);assert.equal(document.querySelectorAll('.standup-sub-row').length,2);assert.match(document.querySelector('.standup-sub-row.is-search-match').textContent,/Subcontracting/);assert.match(document.getElementById('standupSearchResults').textContent,/1 of 2 project items · 1 matching sub-item/);assert.ok(document.querySelector('.standup-item mark'));assert.equal(document.querySelector('[aria-label="Project items completed"]').getAttribute('aria-valuenow'),'50');
+ search('<img');assert.equal(document.querySelector('.standup-report img'),null);assert.equal(document.querySelector('.standup-remarks mark').textContent,'<img');
+ search('missing.*');assert.equal(document.querySelectorAll('.standup-item:not([hidden])').length,0);assert.equal(document.querySelector('.standup-no-results').hidden,false);
+ document.querySelector('[data-standup="clear-search"]').click();assert.equal(input.value,'');assert.equal(document.activeElement,input);assert.equal(document.querySelectorAll('.standup-item:not([hidden])').length,2);assert.ok([...document.querySelectorAll('.standup-item')].every(el=>!el.open));assert.equal(document.querySelector('.standup-report mark'),null);assert.equal(db.calls.length,calls);
+});
+
+test('stand-up: search survives refreshes and Action saves, preserves drafts and resets on reopen or account change',async t=>{
+ const {api,document,window}=await app(t),item=standupFixture(api,document),ui=api.hub.standup;ui.open(item.projectId);
+ const search=q=>{const input=document.getElementById('standupSearch');input.value=q;input.dispatchEvent(new window.Event('input',{bubbles:true}));return input;};
+ search('PO');document.querySelector('.standup-sub-row [data-standup="add"]').click();let form=document.getElementById('standupActionForm');form.elements.namedItem('text').value='Email the business owner';submitLocal(window,form);await settle();assert.equal(document.getElementById('standupSearch').value,'PO');
+ const task=api.state().tasks[0];let input=search('email');input.focus();input.setSelectionRange(2,4);api.hub.moveTask(task.id,'blocked');await settle();input=document.getElementById('standupSearch');assert.equal(input.value,'email');assert.equal(document.activeElement,input);assert.equal(input.selectionStart,2);assert.equal(input.selectionEnd,4);assert.match(document.querySelector('.standup-item:not([hidden])').textContent,/Blocked/);
+ document.querySelector('.standup-sub-row [data-standup="add"]').click();form=document.getElementById('standupActionForm');form.elements.namedItem('text').value='Unsaved instruction';search('no-match');assert.equal(document.getElementById('standupActionForm'),form);document.querySelector('[data-standup="clear-search"]').click();assert.equal(form.elements.namedItem('text').value,'Unsaved instruction');assert.equal(api.state().tasks.length,1);document.querySelector('[data-standup="cancel-action"]').click();
+ search('email');api.closeModal();ui.open(item.projectId);assert.equal(document.getElementById('standupSearch').value,'');search('private term');api.cloud.user={id:'next-account'};api.showTab('home');assert.equal(document.getElementById('modal').open,false);api.login();ui.open(item.projectId);assert.equal(document.getElementById('standupSearch').value,'');
+});
+
 test('stand-up: saving Actions creates linked tasks once, persists together and shows task completion',async t=>{
  const {api,document,window,db}=await app(t),item=standupFixture(api,document),ui=api.hub.standup;ui.open(item.projectId);
  document.querySelector('.standup-sub-row [data-standup="add"]').click();let f=document.getElementById('standupActionForm');f.elements.namedItem('text').value='Email the business team';f.elements.namedItem('dueDate').value='2026-10-23';submitLocal(window,f);await settle();

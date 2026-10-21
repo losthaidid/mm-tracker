@@ -230,6 +230,50 @@
           : { todo: 'To do', doing: 'In progress', blocked: 'Blocked', done: 'Completed' }[
               t.boardStatus
             ] || 'To do';
+  // Search real report fields, rather than repeated UI labels such as “Remarks”.
+  // Keep each parent and its children together so a sub-item never loses its context.
+  function search(d, projectId, query = '') {
+    const terms = String(query).trim().toLowerCase().split(/\s+/).filter(Boolean),
+      tasks = new Map(d.tasks.map(t => [t.id, t])),
+      linked = new Map();
+    for (const action of data(d).actions) {
+      if (action.projectId !== projectId) continue;
+      const id = key(action.itemId, action.subItemId),
+        task = tasks.get(action.taskId);
+      linked.set(
+        id,
+        [
+          ...(linked.get(id) || []),
+          task?.task || action.text,
+          taskStatus(task),
+          task?.dueDate || '',
+        ].join(' ')
+      );
+    }
+    const matches = fields => {
+      const value = fields.filter(Boolean).join(' ').toLowerCase();
+      return terms.every(term => value.includes(term));
+    };
+    return d.specs
+      .filter(item => item.projectId === projectId)
+      .map(item => {
+        const heading = [item.itemId, item.ricefw, item.itemType, item.description],
+          itemMatch = matches([...heading, item.status, item.remarks, linked.get(key(item.id))]),
+          subItemIds = (item.subItems || [])
+            .filter(sub =>
+              matches([
+                ...heading,
+                sub.title,
+                sub.status,
+                sub.remarks,
+                linked.get(key(item.id, sub.id)),
+              ])
+            )
+            .map(sub => sub.id);
+        return { itemId: item.id, itemMatch, subItemIds };
+      })
+      .filter(result => result.itemMatch || result.subItemIds.length);
+  }
   root.WorkHubProjectStandupEngine = {
     upgrade,
     validate,
@@ -241,5 +285,6 @@
     updateTime,
     upsertAction,
     taskStatus,
+    search,
   };
 })(window);

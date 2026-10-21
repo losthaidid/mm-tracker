@@ -20,7 +20,9 @@
     [item.itemId || item.ricefw, item.description].filter(Boolean).join(' · ') || 'Untitled item';
   function install(a) {
     let owner = '',
-      projectId = '';
+      projectId = '',
+      searchQuery = '',
+      searchClosed = null;
     const $ = id => document.getElementById(id);
     const attrs = (item, sub = '') =>
       `data-project="${esc(item.projectId)}" data-item="${esc(item.id)}" data-sub="${esc(sub)}"`;
@@ -97,17 +99,85 @@
         complete = subs.filter(s => E.category(s.status) === 'completed').length;
       return `<details class="standup-item" open data-report-item="${esc(item.id)}"><summary><span class="standup-item-symbol" aria-hidden="true">▤</span><span class="standup-item-heading"><small>${esc(item.itemType || 'Project item')}${item.itemId ? ' · ' + esc(item.itemId) : ''}</small><strong>${esc(item.description) || 'Untitled item'}</strong><span>${subs.length ? `${complete}/${subs.length} sub-items completed` : 'No sub-items'}</span></span>${badge(item.status)}<span class="standup-chevron" aria-hidden="true">⌄</span></summary><div class="standup-item-body">${row(item)}${subs.length ? `<div class="standup-sub-list">${subs.map(sub => row(item, sub)).join('')}</div>` : ''}</div></details>`;
     }
+    function searchBar() {
+      return `<section class="standup-search" role="search" aria-label="Search daily stand-up"><label for="standupSearch">Find an item or update</label><div class="standup-search-field"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="standupSearch" type="search" maxlength="200" autocomplete="off" placeholder="Search items, remarks or Actions…" aria-describedby="standupSearchHint standupSearchResults" value="${esc(searchQuery)}">${button('clear-search', 'Clear', 'hidden', 'small standup-search-clear')}</div><p id="standupSearchHint">Search IDs, names, statuses, remarks &amp; Actions. Matching items keep their sub-items.</p><p id="standupSearchResults" role="status" aria-live="polite" aria-atomic="true"></p></section>`;
+    }
+    function highlight(report, terms) {
+      // Build marks as text nodes: punctuation and pasted HTML are always literal text.
+      const targets = report.querySelectorAll(
+        '.standup-item-heading small, .standup-item-heading strong, .standup-sub-heading h3, .standup-status, .standup-remarks > p:not(.is-empty), .standup-action-text > p, .standup-action-meta > span:not(.standup-status)'
+      );
+      for (const el of targets) {
+        const value = el.textContent,
+          lower = value.toLowerCase(),
+          fragments = [];
+        let at = 0;
+        while (terms.length && at < value.length) {
+          const hits = terms
+              .map(term => ({ term, at: lower.indexOf(term, at) }))
+              .filter(hit => hit.at !== -1)
+              .sort((a, b) => a.at - b.at || b.term.length - a.term.length),
+            hit = hits[0];
+          if (!hit) break;
+          fragments.push(document.createTextNode(value.slice(at, hit.at)));
+          const mark = document.createElement('mark');
+          mark.textContent = value.slice(hit.at, hit.at + hit.term.length);
+          fragments.push(mark);
+          at = hit.at + hit.term.length;
+        }
+        fragments.push(document.createTextNode(value.slice(at)));
+        el.replaceChildren(...fragments);
+      }
+    }
+    function applySearch(report) {
+      searchQuery = report.querySelector('#standupSearch').value;
+      const terms = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean),
+        active = !!terms.length,
+        cards = [...report.querySelectorAll('[data-report-item]')],
+        matches = new Map(
+          E.search(a.state(), report.dataset.project, searchQuery).map(r => [r.itemId, r])
+        );
+      if (active && !searchClosed)
+        searchClosed = new Set(
+          cards.filter(card => !card.open).map(card => card.dataset.reportItem)
+        );
+      let subMatches = 0;
+      for (const card of cards) {
+        const match = matches.get(card.dataset.reportItem);
+        card.hidden = !match;
+        if (active && match) card.open = true;
+        else if (!active && searchClosed) card.open = !searchClosed.has(card.dataset.reportItem);
+        for (const sub of card.querySelectorAll('.standup-sub-row'))
+          sub.classList.toggle(
+            'is-search-match',
+            active && !!match?.subItemIds.includes(sub.dataset.sub)
+          );
+        subMatches += match?.subItemIds.length || 0;
+      }
+      if (!active) searchClosed = null;
+      report.querySelector('[data-standup="clear-search"]').hidden = !searchQuery;
+      report.querySelector('.standup-no-results').hidden = !active || !!matches.size;
+      report.querySelector('#standupSearchResults').textContent = active
+        ? `${matches.size} of ${cards.length} project items · ${subMatches} matching sub-item${subMatches === 1 ? '' : 's'}`
+        : `Showing all ${cards.length} project item${cards.length === 1 ? '' : 's'} · ${subMatches} sub-item${subMatches === 1 ? '' : 's'}`;
+      highlight(report, terms);
+    }
     function body(id) {
       const project = a.state().projects.find(p => p.id === id);
       if (!project) throw Error('Project no longer exists.');
       const items = a.state().specs.filter(s => s.projectId === id);
-      return `<div class="standup-report" data-owner="${esc(a.owner())}" data-project="${esc(id)}"><header class="standup-hero"><span class="standup-kicker">PROJECT OVERVIEW · DAILY STAND-UP</span><h2>${esc(project.name)}</h2><p>Every item. Every update. Your next Actions.</p></header>${strip(id)}<div class="standup-report-toolbar"><div><h3>Items &amp; updates</h3><span>All remarks shown in full · Times in Malaysia (MYT)</span></div><div class="actions">${button('expand', 'Expand all')}${button('collapse', 'Collapse all')}</div></div><div class="standup-items">${items.map(itemCard).join('') || '<div class="standup-blank"><strong>No project items yet</strong><p>Add project items to see their statuses, remarks and Actions here.</p></div>'}</div><footer class="standup-footer">Actions stay linked to Tasks. Completing an Action’s task leaves the project item’s own status unchanged.</footer></div>`;
+      return `<div class="standup-report" data-owner="${esc(a.owner())}" data-project="${esc(id)}"><header class="standup-hero"><span class="standup-kicker">PROJECT OVERVIEW · DAILY STAND-UP</span><h2>${esc(project.name)}</h2><p>Every item. Every update. Your next Actions.</p></header>${strip(id)}<div class="standup-report-toolbar"><div><h3>Items &amp; updates</h3><span>All remarks shown in full · Times in Malaysia (MYT)</span></div><div class="actions">${button('expand', 'Expand all')}${button('collapse', 'Collapse all')}</div></div>${searchBar()}<div class="standup-items"><div class="standup-blank standup-no-results" hidden><strong>No matching items or updates</strong><p>Try another keyword, or clear your search to see every item.</p></div>${items.map(itemCard).join('') || '<div class="standup-blank"><strong>No project items yet</strong><p>Add project items to see their statuses, remarks and Actions here.</p></div>'}</div><footer class="standup-footer">Actions stay linked to Tasks. Completing an Action’s task leaves the project item’s own status unchanged.</footer></div>`;
     }
-    function open(id, itemId = '') {
+    function open(id, itemId = '', retainSearch = false) {
       guard(a.owner());
+      if (!retainSearch || owner !== a.owner() || projectId !== id) {
+        searchQuery = '';
+        searchClosed = null;
+      }
       owner = a.owner();
       projectId = id;
       a.openModal('Daily stand-up', body(id));
+      applySearch(document.querySelector('.standup-report'));
       if (itemId)
         [...document.querySelectorAll('[data-report-item]')]
           .find(el => el.dataset.reportItem === itemId)
@@ -149,7 +219,7 @@
         throw Error('This Action changed. Reopen the summary before saving.');
       const ok = a.mutate(d => E.upsertAction(d, values, new Date().toISOString(), uid));
       if (ok) {
-        open(values.projectId, values.itemId);
+        open(values.projectId, values.itemId, true);
         a.tell('Action saved to Tasks.');
       }
     }
@@ -170,6 +240,8 @@
         a.closeModal();
         owner = '';
         projectId = '';
+        searchQuery = '';
+        searchClosed = null;
         return;
       }
       if (report && !a.state().projects.some(p => p.id === report.dataset.project)) {
@@ -180,10 +252,19 @@
         const closed = [...report.querySelectorAll('details:not([open])')].map(
             el => el.dataset.reportItem
           ),
-          scroll = $('modalBody').scrollTop;
+          scroll = $('modalBody').scrollTop,
+          input = $('standupSearch'),
+          focused = document.activeElement === input,
+          selection = [input.selectionStart, input.selectionEnd];
+        searchQuery = input.value;
         report.outerHTML = body(report.dataset.project);
         for (const el of document.querySelectorAll('[data-report-item]'))
           if (closed.includes(el.dataset.reportItem)) el.open = false;
+        applySearch(document.querySelector('.standup-report'));
+        if (focused) {
+          $('standupSearch').focus({ preventScroll: true });
+          $('standupSearch').setSelectionRange(...selection);
+        }
         $('modalBody').scrollTop = scroll;
       }
       for (const card of document.querySelectorAll('.task-main-card,[data-task-card]')) {
@@ -212,10 +293,23 @@
         else if (action === 'task')
           a.hubAction({ dataset: { hub: 'task-detail', id: el.dataset.id } });
         else if (action === 'cancel-action') el.closest('.standup-composer-slot').innerHTML = '';
-        else if (action === 'expand' || action === 'collapse')
-          document.querySelectorAll('[data-report-item]').forEach(item => {
+        else if (action === 'clear-search') {
+          $('standupSearch').value = '';
+          applySearch(el.closest('.standup-report'));
+          $('standupSearch').focus({ preventScroll: true });
+        } else if (action === 'expand' || action === 'collapse')
+          document.querySelectorAll('[data-report-item]:not([hidden])').forEach(item => {
             item.open = action === 'expand';
           });
+      } catch (err) {
+        a.tell(err.message, true);
+      }
+    });
+    document.addEventListener('input', event => {
+      if (event.target.id !== 'standupSearch') return;
+      try {
+        guard();
+        applySearch(event.target.closest('.standup-report'));
       } catch (err) {
         a.tell(err.message, true);
       }
