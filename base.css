@@ -2004,7 +2004,8 @@ a {
   font-size: 0.75rem;
   color: #4c6380;
 }
-.booking-company {
+.booking-company,
+.booking-item {
   display: block;
   margin-top: 5px;
   color: inherit;
@@ -2014,20 +2015,28 @@ a {
   overflow-wrap: anywhere;
   white-space: normal;
 }
-.booking-company-label {
+.booking-company-label,
+.booking-item-label {
   font-size: 0.66rem;
   font-weight: 500;
   opacity: 0.72;
   margin-right: 3px;
 }
 .workhub-booking.compact .booking-company,
-.calendar-event .booking-company {
+.calendar-event .booking-company,
+.workhub-booking.compact .booking-item,
+.calendar-event .booking-item {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   font-size: 0.68rem;
 }
+.booking-subitem {
+  display: block;
+  font-weight: 500;
+}
+.schedule-item-field .hint,
 .schedule-company-field .hint {
   margin: 6px 0 0;
 }

@@ -2166,7 +2166,12 @@
       for (let i = 0; i < ranges.length; i++) {
         const r = ranges[i],
           id = session.id + '-' + i,
-          metadata = { itemId: session.itemId || '', subItemId: session.subItemId || '' },
+          metadata = {
+            itemId: session.itemId || '',
+            subItemId: session.subItemId || '',
+            itemTitle: session.itemTitle || '',
+            subItemTitle: session.subItemTitle || '',
+          },
           location = d.lists.workLocations[0] || 'Office',
           text = [
             session.title,

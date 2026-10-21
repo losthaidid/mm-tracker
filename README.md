@@ -334,3 +334,11 @@ Company lists and recipients can be removed and restored with **Undo removal**. 
 **Settings** now shows one section at a time: **Workspace** (header, appearance and screen visibility), **Work setup** (projects, SAP MM areas, built-in lists, charge codes, mileage locations and company email recipients), **Companion & sound** (companion adventures, moments, scenery and soundscape), **Backups & sync**, and **Account**. Each action has a short description. The saved/sync status stays visible above the sections.
 
 **Find a setting** searches all sections, including aliases such as “email”, “KM”, “theme” and “backup”. Clearing search returns to the selected section. The sections appear beside the options on larger screens and as a scrollable horizontal row on phones. Arrow keys, Home and End navigate sections; Escape closes Settings and returns focus to its launcher. Changing sections and clearing search keep the menu open. Existing action buttons and their handlers are retained, including account/recovery visibility, hover/touch opening and automatic closing when an action is selected. Grouping, searching and navigation do not save account records.
+
+### Schedule project items and Momo’s letters
+
+For a **Project** booking in **Schedule → Plan activity**, choose the project, an optional **Project item**, and an optional **Sub-item**. Both selectors use the items maintained in that project. Changing the project clears the previous item; changing the main item clears its sub-item. Notes and times stay in the form. The selection appears in Schedule’s calendar, agenda, time grid and activity details, and in the project calendar. Editing from either calendar retains the same link. General project work can leave both selectors blank.
+
+Item links and readable title snapshots use the existing account autosave and JSON backups. Current item names appear after renaming; saved titles keep past bookings readable if an item is removed. Tracked work sessions use the same links. Excel’s Schedule sheet includes Project item and Sub-item columns. Older bookings remain supported.
+
+Momo’s discovery envelope now belongs to his floating container. It travels and drags with him on phone and laptop, with no extra cloud saves or position polling. Tap the envelope to open its linked discovery; existing quiet, privacy and reduced-motion controls still apply.
