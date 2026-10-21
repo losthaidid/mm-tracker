@@ -47,6 +47,10 @@ Kept on 21 October 2026: selections **25, 28 and 29** from the Solution Studio i
 - **28 · Business-rule cards** — capture business rules, attach them to process steps, and identify SAP configuration, workflow or manual-control needs.
 - **29 · Consultant handover pack** — compile an agreed design into business requirements, process maps, material profiles, configuration assumptions, test scenarios and open questions.
 
+## Pending Solution Studio workshop enhancement
+
+Kept on 21 October 2026: **38 · Workshop presentation board** — a large, readable view for screen sharing that moves through business problems, proposed processes and simulations while capturing questions and decisions. Wishlist only; implementation has not been requested. No batch assigned.
+
 ## Earlier completed selections
 
 The seven selected items are now part of the existing account document. The tracker keeps its current sign-in, saving, backup and restore workflows. No database migration is needed.
