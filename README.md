@@ -85,6 +85,8 @@ Project sub-items have their own Remarks field under **Sub-items → Add/Edit su
 
 The Tasks tab displays each main title with its own sub-tasks. Use **Add sub-task** to maintain an individual title, status, remarks, and feedback. Updates belong only to that sub-task. Editing or archiving a main task preserves its children. Main-task completion remains a separate control. Search includes sub-task titles and notes. The formatted Excel report includes individual child rows with the main title and each child’s notes.
 
+Use **Add feedback** on a main task card, in Board view, or in task Details to post a quick update without opening the main editor. Saving appends the feedback and the device's current local date and time, keeping earlier feedback. The same feedback history appears on the task, syncs with the account, and stays in JSON backups and Excel's **Task notes** sheet. Remarks and sub-task feedback remain separate.
+
 ## Schedule viewing and precise times
 
 Select a booking to view its dates, exact times, duration, linked task/project and notes. Choose **Edit activity** to make changes. Go-Live milestones in Schedule also open in display mode before editing. Empty grid cells and **Plan this day** create a new booking.

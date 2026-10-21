@@ -69,6 +69,44 @@ body .task-action-cluster .task-action-button:hover {
   flex-shrink: 0;
   opacity: 0.75;
 }
+body .task-action-cluster .task-action-feedback {
+  grid-column: 1 / -1;
+  color: var(--hub-accent, #8463ab) !important;
+  font-weight: 700;
+}
+.task-feedback-form {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.task-feedback-context {
+  padding: 15px;
+  border-radius: 13px;
+  background: var(--hub-surface-soft, #f8f5fb);
+  border: 1px solid var(--hub-border, #ded6e9);
+}
+.task-feedback-context h3 {
+  margin: 7px 0 0;
+  overflow-wrap: anywhere;
+}
+.task-feedback-form textarea {
+  min-height: 140px;
+  resize: vertical;
+  width: 100%;
+}
+.task-feedback-form .hub-meta {
+  margin: 0;
+}
+.task-feedback-history summary {
+  cursor: pointer;
+  padding: 10px 0;
+  font-weight: 600;
+}
+.task-feedback-history p {
+  max-height: 180px;
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
 body .task-action-cluster .reminder-item-control {
   display: flex;
   padding: 0 !important;
@@ -98,6 +136,9 @@ body .task-action-cluster .task-action-button:focus-visible {
   }
 }
 @media (max-width: 500px) {
+  .task-feedback-form .modal-actions button {
+    min-height: 44px;
+  }
   .task-action-buttons {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

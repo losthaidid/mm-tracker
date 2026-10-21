@@ -1161,7 +1161,7 @@
                 .filter(t => taskStatus(t) === key)
                 .map(
                   t =>
-                    `<article class="hub-task" draggable="true" data-task-card="${esc(t.id)}"><div class="flex-title"><span class="hub-kicker">${esc(t.priority)} · ${esc(t.taskType)}</span><button type="button" class="hub-drag-handle" data-hub="drag-help" data-hub-drag="task" aria-label="Drag task to a column, or use left and right arrow keys" title="Drag to move">${icon('drag')}</button></div><h4 class="hub-sensitive">${esc(t.task)}</h4><p class="hub-meta">${esc(a.taskLabel(t))}</p><div class="hub-progress"><span style="width:${t.subTasks.length ? (t.subTasks.filter(s => s.status === 'Completed').length / t.subTasks.length) * 100 : 0}%"></span></div><p class="hub-meta">${t.subTasks.filter(s => s.status === 'Completed').length}/${t.subTasks.length} subtasks · ${esc(t.dueDate) || 'No due date'}</p><div class="actions">${btn('task-detail', 'Details', 'data-id="' + esc(t.id) + '"', 'small')}${btn('timer-new', '▶', 'data-kind="task" data-id="' + esc(t.id) + '" aria-label="Start timer"', 'small')}</div><label class="hub-meta">Move to<select data-hub-move="${esc(t.id)}">${Object.entries(
+                    `<article class="hub-task" draggable="true" data-task-card="${esc(t.id)}"><div class="flex-title"><span class="hub-kicker">${esc(t.priority)} · ${esc(t.taskType)}</span><button type="button" class="hub-drag-handle" data-hub="drag-help" data-hub-drag="task" aria-label="Drag task to a column, or use left and right arrow keys" title="Drag to move">${icon('drag')}</button></div><h4 class="hub-sensitive">${esc(t.task)}</h4><p class="hub-meta">${esc(a.taskLabel(t))}</p><div class="hub-progress"><span style="width:${t.subTasks.length ? (t.subTasks.filter(s => s.status === 'Completed').length / t.subTasks.length) * 100 : 0}%"></span></div><p class="hub-meta">${t.subTasks.filter(s => s.status === 'Completed').length}/${t.subTasks.length} subtasks · ${esc(t.dueDate) || 'No due date'}</p><div class="actions">${btn('task-detail', 'Details', 'data-id="' + esc(t.id) + '"', 'small')}${btn('task-feedback', 'Add feedback', 'data-id="' + esc(t.id) + '"', 'small')}${btn('timer-new', '▶', 'data-kind="task" data-id="' + esc(t.id) + '" aria-label="Start timer"', 'small')}</div><label class="hub-meta">Move to<select data-hub-move="${esc(t.id)}">${Object.entries(
                       BOARD
                     )
                       .map(
@@ -1207,8 +1207,43 @@
       if (!t) throw Error('Task no longer exists.');
       a.openModal(
         t.task,
-        `<div class="hub-detail"><span class="hub-kicker">MAIN TASK · ${esc(a.taskLabel(t))}</span><p>${esc(t.priority)} · ${BOARD[taskStatus(t)]}</p>${standup?.taskContext(t.id) || ''}<h3>Remarks</h3><p class="prewrap hub-sensitive">${esc(t.remarks) || 'No remarks yet.'}</p><h3>Feedback</h3><p class="prewrap hub-sensitive">${esc(t.feedback) || 'No feedback yet.'}</p><h3>Subtasks</h3>${t.subTasks.map(s => `<div class="hub-card"><strong>${esc(s.title)}</strong><span class="hub-badge">${esc(s.status)}</span><p class="prewrap">${esc(s.remarks)}</p><p class="prewrap">${esc(s.feedback)}</p><div class="actions">${subtaskCompletionButton(t, s, true)}${btn('subtask-edit', 'Edit', 'data-parent="' + esc(id) + '" data-id="' + esc(s.id) + '"', 'small')}${btn('timer-new', '▶ Track time', 'data-kind="task" data-id="' + esc(id) + '" data-sub="' + esc(s.id) + '"', 'small')}</div></div>`).join('') || '<p>No subtasks yet.</p>'}<div class="modal-actions">${btn('task-edit', 'Edit main task', 'data-id="' + esc(id) + '"')}${btn('subtask-edit', '＋ Add subtask', 'data-parent="' + esc(id) + '"')}</div></div>`
+        `<div class="hub-detail"><span class="hub-kicker">MAIN TASK · ${esc(a.taskLabel(t))}</span><p>${esc(t.priority)} · ${BOARD[taskStatus(t)]}</p>${standup?.taskContext(t.id) || ''}<h3>Remarks</h3><p class="prewrap hub-sensitive">${esc(t.remarks) || 'No remarks yet.'}</p><h3>Feedback</h3><p class="prewrap hub-sensitive">${esc(t.feedback) || 'No feedback yet.'}</p>${btn('task-feedback', 'Add feedback', 'data-id="' + esc(id) + '"', 'small')}<h3>Subtasks</h3>${t.subTasks.map(s => `<div class="hub-card"><strong>${esc(s.title)}</strong><span class="hub-badge">${esc(s.status)}</span><p class="prewrap">${esc(s.remarks)}</p><p class="prewrap">${esc(s.feedback)}</p><div class="actions">${subtaskCompletionButton(t, s, true)}${btn('subtask-edit', 'Edit', 'data-parent="' + esc(id) + '" data-id="' + esc(s.id) + '"', 'small')}${btn('timer-new', '▶ Track time', 'data-kind="task" data-id="' + esc(id) + '" data-sub="' + esc(s.id) + '"', 'small')}</div></div>`).join('') || '<p>No subtasks yet.</p>'}<div class="modal-actions">${btn('task-edit', 'Edit main task', 'data-id="' + esc(id) + '"')}${btn('subtask-edit', '＋ Add subtask', 'data-parent="' + esc(id) + '"')}</div></div>`
       );
+    }
+    function taskFeedback(id) {
+      if (!a.cloud().ready || !a.cloud().user)
+        throw Error('Finish signing in before adding feedback.');
+      const task = a.state().tasks.find(t => t.id === id);
+      if (!task) throw Error('Task no longer exists.');
+      a.openModal(
+        'Add feedback',
+        `<form id="hubTaskFeedback" class="task-feedback-form" data-id="${esc(id)}" data-owner="${esc(a.cloud().user.id)}"><div class="task-feedback-context"><span class="hub-kicker">MAIN TASK · ${esc(a.taskLabel(task))}</span><h3 class="hub-sensitive">${esc(task.task)}</h3></div><label for="hubTaskFeedbackText">New feedback</label><textarea id="hubTaskFeedbackText" name="feedback" maxlength="32767" required autofocus aria-describedby="hubTaskFeedbackHint"></textarea><p id="hubTaskFeedbackHint" class="hub-meta">Date and time are added when you save. Earlier feedback is kept.</p>${task.feedback ? `<details class="task-feedback-history"><summary>Earlier feedback</summary><p class="prewrap hub-sensitive">${esc(task.feedback)}</p></details>` : ''}<div class="modal-actions">${btn('close', 'Cancel')}<button type="submit" class="primary">Save feedback</button></div></form>`
+      );
+    }
+    function saveTaskFeedback(form) {
+      if (form.dataset.saved === 'true') return;
+      if (!a.cloud().ready || !a.cloud().user || form.dataset.owner !== a.cloud().user.id)
+        throw Error('Finish signing in and reopen Add feedback before saving.');
+      if (!form.isConnected || !$('modal').open || $('hubTaskFeedback') !== form)
+        throw Error('Reopen Add feedback before saving.');
+      const text = form.elements.namedItem('feedback').value.trim();
+      if (!text) throw Error('Enter feedback before saving.');
+      const savedAt = new Date(),
+        stamp = dateOf(savedAt).split('-').reverse().join('-') + ' ' + clock(savedAt);
+      const ok = save((h, state) => {
+        const task = state.tasks.find(t => t.id === form.dataset.id);
+        if (!task) throw Error('Task no longer exists.');
+        const feedback = (task.feedback ? task.feedback + '\n\n' : '') + text + ' [' + stamp + ']';
+        if (feedback.length > 32767)
+          throw Error(
+            'Feedback history is full. Shorten this update or edit earlier feedback to make room.'
+          );
+        task.feedback = feedback;
+      }, 'Feedback added.');
+      if (ok) {
+        form.dataset.saved = 'true';
+        a.closeModal();
+      }
     }
     function currentProcess() {
       return (
@@ -1627,7 +1662,7 @@
         )
         .join(
           ''
-        )}</div>${currentTool === 'theme' ? themeStudio() : currentTool === 'simulator' ? (rehearsal?.render() || '') : currentTool === 'tcodes' ? (tcodes?.render() || '') : currentTool === 'focus' ? `<section class="hub-card">${focusWidget()}${prefs().desk ? desk() : ''}</section>` : currentTool === 'journey' ? `<section class="hub-card">${journey()}</section>` : currentTool === 'scrapbook' ? scrapbook() : currentTool === 'wrap' ? dailySummary() : sessionsView()}</section>`;
+        )}</div>${currentTool === 'theme' ? themeStudio() : currentTool === 'simulator' ? rehearsal?.render() || '' : currentTool === 'tcodes' ? tcodes?.render() || '' : currentTool === 'focus' ? `<section class="hub-card">${focusWidget()}${prefs().desk ? desk() : ''}</section>` : currentTool === 'journey' ? `<section class="hub-card">${journey()}</section>` : currentTool === 'scrapbook' ? scrapbook() : currentTool === 'wrap' ? dailySummary() : sessionsView()}</section>`;
     }
     function timerKey() {
       return a.cloud().user ? 'mm-tracker.timer.v1:' + a.cloud().user.id : null;
@@ -2319,6 +2354,7 @@
     }
     function arrangeTaskActions() {
       const art = {
+        feedback: 'M21 11a8 8 0 0 1-8 8H7l-4 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v4ZM7 8h10M7 12h7',
         edit: 'M15 5l4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15v5Z',
         archive: 'M4 8h16v12H4V8M3 3h18v5H3V3M9 12h6',
         reminder: 'M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4',
@@ -2343,7 +2379,19 @@
           footer = card.querySelector('.task-card-footer'),
           reminder = card.querySelector('.reminder-item-control'),
           timer = card.querySelector('[data-hub="timer-new"][data-kind="task"]');
+        let feedback = card.querySelector('[data-hub="task-feedback"]');
+        if (!feedback) {
+          const id = card.querySelector('[data-action="edit"][data-group="tasks"]')?.dataset.id;
+          if (id) {
+            feedback = document.createElement('button');
+            feedback.type = 'button';
+            feedback.dataset.hub = 'task-feedback';
+            feedback.dataset.id = id;
+            feedback.textContent = 'Add feedback';
+          }
+        }
         const controls = [
+          ...(feedback ? [feedback] : []),
           ...(footer?.querySelectorAll('button') || []),
           ...(reminder?.querySelectorAll('button') || []),
           ...(timer ? [timer] : []),
@@ -2351,11 +2399,13 @@
         for (const b of controls) {
           const type = b.dataset.reminder
             ? 'reminder'
-            : b.dataset.hub === 'timer-new'
-              ? 'timer'
-              : b.dataset.action === 'edit'
-                ? 'edit'
-                : 'archive';
+            : b.dataset.hub === 'task-feedback'
+              ? 'feedback'
+              : b.dataset.hub === 'timer-new'
+                ? 'timer'
+                : b.dataset.action === 'edit'
+                  ? 'edit'
+                  : 'archive';
           b.classList.add('task-action-button', 'task-action-' + type);
           if (!b.querySelector('svg'))
             b.insertAdjacentHTML(
@@ -2368,11 +2418,19 @@
             target.append(reminder);
           } else target.append(b);
         }
+        if (feedback) target.prepend(feedback);
         if (footer && !footer.children.length) footer.remove();
       }
     }
     /** Refresh the workspace shell and feature decorations after app.js renders a screen. */
     function afterRender(tab) {
+      const feedbackForm = $('hubTaskFeedback');
+      if (
+        feedbackForm &&
+        $('modal').open &&
+        (!a.cloud().ready || feedbackForm.dataset.owner !== a.cloud().user?.id)
+      )
+        a.closeModal();
       batchA?.sync();
       validator?.sync();
       library?.sync();
@@ -2563,6 +2621,10 @@
       }
       if (action === 'task-detail') {
         taskDetail(id);
+        return;
+      }
+      if (action === 'task-feedback') {
+        taskFeedback(id);
         return;
       }
       if (action === 'subtask-edit') {
@@ -2950,6 +3012,10 @@
     function submit(form) {
       const values = Object.fromEntries(new FormData(form)),
         id = form.dataset.id;
+      if (form.id === 'hubTaskFeedback') {
+        saveTaskFeedback(form);
+        return;
+      }
       if (form.id === 'hubFocusForm') {
         startFocus(form);
         return;
@@ -3543,8 +3609,17 @@
       tell: a.tell,
       openModal: a.openModal,
     });
-    rehearsal = root.WorkHubRehearsal?.install({ ...a, ready: () => a.cloud().ready, owner: () => a.cloud().user?.id || '', prefs: () => themePreview || prefs() });
-    tcodes = root.WorkHubSapTcodes?.install({ ...a, ready: () => a.cloud().ready, owner: () => a.cloud().user?.id || '' });
+    rehearsal = root.WorkHubRehearsal?.install({
+      ...a,
+      ready: () => a.cloud().ready,
+      owner: () => a.cloud().user?.id || '',
+      prefs: () => themePreview || prefs(),
+    });
+    tcodes = root.WorkHubSapTcodes?.install({
+      ...a,
+      ready: () => a.cloud().ready,
+      owner: () => a.cloud().user?.id || '',
+    });
     projectDates = root.WorkHubProjectDates.install(a);
     standup = root.WorkHubProjectStandup?.install({
       ...a,
