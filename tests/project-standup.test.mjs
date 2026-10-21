@@ -55,3 +55,33 @@ test('stand-up retains an instruction when its task or source is removed and val
   const invalid = copy(d); invalid.workhub.projectStandup.actions.push(copy(invalid.workhub.projectStandup.actions[0]));
   assert.throws(() => E.validate(invalid), /Actions/);
 });
+
+test('stand-up search matches real item/sub-item fields, combines terms and stays project-scoped', () => {
+  const d = state();
+  d.specs[0].itemId = 'MM-042';
+  d.specs[0].itemType = 'Configuration';
+  d.specs.push({ id: 'other', projectId: 'elsewhere', description: 'Pricing', status: 'Blocked', remarks: 'Foreign remarks', subItems: [] });
+  assert.equal(E.search(d, 'p', ' pricing ').length, 1);
+  assert.deepEqual(Array.from(E.search(d, 'p', 'MM-042 BLOCKED')[0].subItemIds), ['s']);
+  assert.equal(E.search(d, 'p', 'MM-042 BLOCKED')[0].itemMatch, false);
+  assert.equal(E.search(d, 'p', 'configuration')[0].itemMatch, true);
+  assert.equal(E.search(d, 'p', 'Awaiting confirmation')[0].itemMatch, true);
+  assert.equal(E.search(d, 'p', 'Foreign').length, 0);
+  assert.equal(E.search(d, 'p', 'Remarks').length, 0);
+  assert.equal(E.search(d, 'missing', '').length, 0);
+});
+
+test('stand-up search reads live linked tasks, falls back to removed instructions and treats punctuation literally', () => {
+  const d = state();
+  E.upsertAction(d, { ...input, dueDate: '2026-10-23' }, now, () => 'task');
+  d.tasks[0].task = 'Request feedback (phase 2)';
+  d.tasks[0].boardStatus = 'blocked';
+  assert.equal(E.search(d, 'p', 'Email').length, 0);
+  assert.deepEqual(Array.from(E.search(d, 'p', 'feedback blocked 2026-10-23')[0].subItemIds), ['s']);
+  assert.equal(E.search(d, 'p', '(phase').length, 1);
+  d.specs[0].remarks = '<img src=x onerror=alert(1)>';
+  assert.equal(E.search(d, 'p', '<img')[0].itemMatch, true);
+  assert.equal(E.search(d, 'p', '.*').length, 0);
+  d.tasks = [];
+  assert.deepEqual(Array.from(E.search(d, 'p', 'Email removed')[0].subItemIds), ['s']);
+});
