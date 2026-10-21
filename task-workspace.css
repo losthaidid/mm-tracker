@@ -130,7 +130,8 @@ body .task-action-cluster .task-action-feedback {
 .item-feedback-sub {
   border-left: 3px solid var(--hub-accent, #8463ab);
 }
-#hubItemFeedbackHistory {
+#hubItemFeedbackHistory,
+#hubTaskFeedbackHistory {
   display: grid;
   gap: 8px;
 }
@@ -194,4 +195,19 @@ body .task-action-cluster .task-action-button:focus-visible {
 body[data-motion='off'] .task-action-cluster .task-action-button {
   transition: none;
   transform: none !important;
+}
+
+.task-child-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+.task-child-notes dd {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 760px) {
+  .hub-subtask-feedback {
+    min-height: 44px;
+  }
 }

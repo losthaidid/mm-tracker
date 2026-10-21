@@ -51,6 +51,9 @@
     const done = sub.status === 'Completed';
     return `<button type="button" class="small hub-subtask-complete" data-hub="subtask-complete" data-parent="${esc(task.id)}" data-id="${esc(sub.id)}"${detail ? ' data-detail="true"' : ''}${done || task.archived ? ' disabled' : ''} aria-label="${done ? 'Completed: ' : 'Mark subtask as completed: '}${esc(sub.title)}">${done ? '✓ Completed' : '✓ Complete'}</button>`;
   }
+  function subtaskFeedbackButton(task, sub) {
+    return `<button type="button" class="small hub-subtask-feedback" data-hub="subtask-feedback" data-parent="${esc(task.id)}" data-id="${esc(sub.id)}" aria-label="Add feedback for sub-task: ${esc(sub.title)}">Add feedback</button>`;
+  }
   /** Add missing workspace fields to older documents while retaining existing saved values. */
   function upgrade(d) {
     if (!d || typeof d !== 'object') return d;
@@ -1207,7 +1210,7 @@
       if (!t) throw Error('Task no longer exists.');
       a.openModal(
         t.task,
-        `<div class="hub-detail"><span class="hub-kicker">MAIN TASK · ${esc(a.taskLabel(t))}</span><p>${esc(t.priority)} · ${BOARD[taskStatus(t)]}</p>${standup?.taskContext(t.id) || ''}<h3>Remarks</h3><p class="prewrap hub-sensitive">${esc(t.remarks) || 'No remarks yet.'}</p><h3>Feedback</h3><p class="prewrap hub-sensitive">${esc(t.feedback) || 'No feedback yet.'}</p>${btn('task-feedback', 'Add feedback', 'data-id="' + esc(id) + '"', 'small')}<h3>Subtasks</h3>${t.subTasks.map(s => `<div class="hub-card"><strong>${esc(s.title)}</strong><span class="hub-badge">${esc(s.status)}</span><p class="prewrap">${esc(s.remarks)}</p><p class="prewrap">${esc(s.feedback)}</p><div class="actions">${subtaskCompletionButton(t, s, true)}${btn('subtask-edit', 'Edit', 'data-parent="' + esc(id) + '" data-id="' + esc(s.id) + '"', 'small')}${btn('timer-new', '▶ Track time', 'data-kind="task" data-id="' + esc(id) + '" data-sub="' + esc(s.id) + '"', 'small')}</div></div>`).join('') || '<p>No subtasks yet.</p>'}<div class="modal-actions">${btn('task-edit', 'Edit main task', 'data-id="' + esc(id) + '"')}${btn('subtask-edit', '＋ Add subtask', 'data-parent="' + esc(id) + '"')}</div></div>`
+        `<div class="hub-detail"><span class="hub-kicker">MAIN TASK · ${esc(a.taskLabel(t))}</span><p>${esc(t.priority)} · ${BOARD[taskStatus(t)]}</p>${standup?.taskContext(t.id) || ''}<h3>Remarks</h3><p class="prewrap hub-sensitive">${esc(t.remarks) || 'No remarks yet.'}</p><h3>Feedback</h3><p class="prewrap hub-sensitive">${esc(t.feedback) || 'No feedback yet.'}</p>${btn('task-feedback', 'Add feedback', 'data-id="' + esc(id) + '"', 'small')}<h3>Subtasks</h3>${t.subTasks.map(s => `<div class="hub-card task-detail-subtask" data-subtask-id="${esc(s.id)}"><strong>${esc(s.title)}</strong><span class="hub-badge">${esc(s.status)}</span><p class="prewrap">${esc(s.remarks)}</p><p class="hub-meta">Feedback</p><p class="prewrap hub-sensitive">${esc(s.feedback) || 'No feedback yet.'}</p><div class="actions">${subtaskCompletionButton(t, s, true)}${subtaskFeedbackButton(t, s)}${btn('subtask-edit', 'Edit', 'data-parent="' + esc(id) + '" data-id="' + esc(s.id) + '"', 'small')}${btn('timer-new', '▶ Track time', 'data-kind="task" data-id="' + esc(id) + '" data-sub="' + esc(s.id) + '"', 'small')}</div></div>`).join('') || '<p>No subtasks yet.</p>'}<div class="modal-actions">${btn('task-edit', 'Edit main task', 'data-id="' + esc(id) + '"')}${btn('subtask-edit', '＋ Add subtask', 'data-parent="' + esc(id) + '"')}</div></div>`
       );
     }
     const updateForms = {
@@ -1236,24 +1239,34 @@
         kicker: 'TICKET',
       },
     };
-    function projectFeedbackTarget(item, subId = '') {
+    function feedbackTarget(kind, item, subId = '') {
       if (!subId) return item;
-      const sub = (item.subItems || []).find(sub => sub.id === subId);
-      if (!sub) throw Error('Sub-item no longer exists. Reopen Add feedback to choose an item.');
+      const sub = (kind === 'tasks' ? item.subTasks : item.subItems).find(sub => sub.id === subId);
+      if (!sub)
+        throw Error(
+          (kind === 'tasks' ? 'Sub-task' : 'Sub-item') +
+            ' no longer exists. Reopen Add feedback to choose a target.'
+        );
       return sub;
     }
-    function projectFeedbackHistory(item, subId = '') {
-      const target = projectFeedbackTarget(item, subId),
-        label = subId ? 'Sub-item · ' + target.title : 'Main item · ' + item.description;
-      return `<p class="hub-meta hub-sensitive">Feedback for ${esc(label)}</p>${target.feedback ? `<details class="task-feedback-history"><summary>Earlier feedback</summary><p class="prewrap hub-sensitive">${esc(target.feedback)}</p></details>` : '<p class="hub-meta">No feedback yet for this item.</p>'}`;
+    function feedbackHistory(kind, item, subId = '') {
+      const target = feedbackTarget(kind, item, subId),
+        noun = kind === 'tasks' ? 'task' : 'item',
+        label = subId
+          ? 'Sub-' + noun + ' · ' + target.title
+          : 'Main ' + noun + ' · ' + (item.task || item.description);
+      return `<p class="hub-meta hub-sensitive">Feedback for ${esc(label)}</p>${target.feedback ? `<details class="task-feedback-history"><summary>Earlier feedback</summary><p class="prewrap hub-sensitive">${esc(target.feedback)}</p></details>` : `<p class="hub-meta">No feedback yet for this ${kind === 'tasks' ? 'task' : 'item'}.</p>`}`;
     }
-    function refreshProjectFeedbackHistory(form) {
+    function refreshFeedbackHistory(form) {
       if (!a.cloud().ready || form.dataset.owner !== a.cloud().user?.id)
         throw Error('Finish signing in and reopen Add feedback before continuing.');
-      const item = a.state().specs.find(item => item.id === form.dataset.id);
-      if (!item) throw Error('Project item no longer exists.');
-      $('hubItemFeedbackHistory').innerHTML = projectFeedbackHistory(
-        item,
+      const kind = form.dataset.kind,
+        config = updateForms[kind],
+        record = a.state()[kind].find(record => record.id === form.dataset.id);
+      if (!record) throw Error(config.record + ' no longer exists.');
+      $(config.id + 'History').innerHTML = feedbackHistory(
+        kind,
+        record,
         form.elements.namedItem('feedbackTarget').value
       );
     }
@@ -1271,13 +1284,15 @@
               : record.ticket,
         history = record[config.field] || '',
         input = kind === 'tickets' ? 'newHistory' : 'feedback',
+        children = kind === 'tasks' ? record.subTasks : kind === 'specs' ? record.subItems : [],
+        noun = kind === 'tasks' ? 'task' : 'item',
         targetField =
-          kind === 'specs'
-            ? `<label for="hubItemFeedbackTarget">Feedback for</label><select id="hubItemFeedbackTarget" name="feedbackTarget"><option value=""${!subId ? ' selected' : ''}>Main item · ${esc(record.description)}</option>${record.subItems.length ? `<optgroup label="Sub-items">${record.subItems.map(sub => `<option value="${esc(sub.id)}"${sub.id === subId ? ' selected' : ''}>Sub-item · ${esc(sub.title)}</option>`).join('')}</optgroup>` : ''}</select>`
+          kind !== 'tickets'
+            ? `<label for="${config.id}Target">Feedback for</label><select id="${config.id}Target" name="feedbackTarget"><option value=""${!subId ? ' selected' : ''}>Main ${noun} · ${esc(record.task || record.description)}</option>${children.length ? `<optgroup label="Sub-${noun}s">${children.map(sub => `<option value="${esc(sub.id)}"${sub.id === subId ? ' selected' : ''}>Sub-${noun} · ${esc(sub.title)}</option>`).join('')}</optgroup>` : ''}</select>`
             : '',
         earlier =
-          kind === 'specs'
-            ? `<div id="hubItemFeedbackHistory" aria-live="polite">${projectFeedbackHistory(record, subId)}</div>`
+          kind !== 'tickets'
+            ? `<div id="${config.id}History" aria-live="polite">${feedbackHistory(kind, record, subId)}</div>`
             : history
               ? `<details class="task-feedback-history"><summary>Earlier ${kind === 'tickets' ? 'updates' : 'feedback'}</summary><p class="prewrap hub-sensitive">${esc(history)}</p></details>`
               : '';
@@ -1295,8 +1310,8 @@
         throw Error('Finish signing in and reopen ' + config.title + ' before saving.');
       if (!form.isConnected || !$('modal').open || $(config.id) !== form)
         throw Error('Reopen ' + config.title + ' before saving.');
-      const targetControl = kind === 'specs' ? form.elements.namedItem('feedbackTarget') : null;
-      if (kind === 'specs' && !targetControl) throw Error('Reopen Add feedback before saving.');
+      const targetControl = kind !== 'tickets' ? form.elements.namedItem('feedbackTarget') : null;
+      if (kind !== 'tickets' && !targetControl) throw Error('Reopen Add feedback before saving.');
       const subId = targetControl?.value || '';
       const text = form.elements
         .namedItem(kind === 'tickets' ? 'newHistory' : 'feedback')
@@ -1308,7 +1323,7 @@
         (h, state) => {
           const parent = state[kind].find(t => t.id === form.dataset.id);
           if (!parent) throw Error(config.record + ' no longer exists.');
-          const record = kind === 'specs' ? projectFeedbackTarget(parent, subId) : parent;
+          const record = kind !== 'tickets' ? feedbackTarget(kind, parent, subId) : parent;
           if (kind === 'tickets') a.appendTicketHistory(record, text);
           else
             record.feedback =
@@ -1319,7 +1334,7 @@
                 ? 'Status update history is full. Shorten this update or edit earlier history to make room.'
                 : 'Feedback history is full. Shorten this update or edit earlier feedback to make room.'
             );
-          if (kind === 'specs' && subId) record.updatedAt = savedAt.toISOString();
+          if (kind !== 'tickets' && subId) record.updatedAt = savedAt.toISOString();
         },
         kind === 'tickets' ? 'Status update added.' : 'Feedback added.'
       );
@@ -2711,6 +2726,10 @@
         taskDetail(id);
         return;
       }
+      if (action === 'subtask-feedback') {
+        recordUpdate('tasks', el.dataset.parent, id);
+        return;
+      }
       if (action === 'task-feedback') {
         recordUpdate('tasks', id);
         return;
@@ -3503,7 +3522,8 @@
     document.addEventListener('change', event => {
       const el = event.target;
       try {
-        if (el.id === 'hubItemFeedbackTarget') refreshProjectFeedbackHistory(el.form);
+        if (['hubItemFeedbackTarget', 'hubTaskFeedbackTarget'].includes(el.id))
+          refreshFeedbackHistory(el.form);
         if (el.form?.id === 'hubTheme') previewTheme(el.form);
         if (el.dataset.hubMove) moveTask(el.dataset.hubMove, el.value);
         if (el.id === 'hubProcess') {
@@ -3842,5 +3862,13 @@
       refreshTheme: applyTheme,
     };
   }
-  root.WorkHubStudio = { upgrade, validate, install, DEFAULTS, WIDGETS, subtaskCompletionButton };
+  root.WorkHubStudio = {
+    upgrade,
+    validate,
+    install,
+    DEFAULTS,
+    WIDGETS,
+    subtaskCompletionButton,
+    subtaskFeedbackButton,
+  };
 })(window);
