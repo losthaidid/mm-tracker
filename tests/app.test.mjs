@@ -65,6 +65,64 @@ function standupFixture(api,document){
  api.closeModal();return api.state().specs.find(r=>r.id===item.id);
 }
 
+function peopleFixture(api,document,window){
+ api.showTab('specs');document.querySelector('[data-action="project-view"][data-view="people"]').click();
+ const ui=api.hub.people;
+ for(const [name,email,department,title]of [['Aisyah','aisyah@example.com','Purchasing','Business owner'],['Daniel','daniel@example.com','Purchasing','Buyer']]){
+  ui.personEditor();const f=document.getElementById('peForm');for(const [key,value]of Object.entries({name,email,department,title}))f.elements.namedItem(key).value=value;ui.submit(f);
+ }
+ const people=api.state().workhub.projectPeople.people;
+ ui.personEditor(people[1].id);let f=document.getElementById('peForm');f.elements.namedItem('managerId').value=people[0].id;ui.submit(f);
+ ui.activityEditor();f=document.getElementById('peForm');f.elements.namedItem('name').value='Create PO';ui.submit(f);
+ return{ui,manager:api.state().workhub.projectPeople.people[0],buyer:api.state().workhub.projectPeople.people[1],activity:api.state().workhub.projectPeople.activities[0]};
+}
+
+test('people: project workspace saves contacts and assignments together, restores them and keeps MM area IDs',async t=>{
+ const {api,document,window,db}=await app(t),{ui,buyer,activity}=peopleFixture(api,document,window);await settle();
+ ui.place(buyer.id,{type:'activity',id:activity.id});await settle();
+ assert.equal(api.state().workhub.projectPeople.assignments.length,1);assert.equal(db.row.document.data.workhub.projectPeople.assignments[0].personId,buyer.id);
+ ui.place(buyer.id,{type:'activity',id:activity.id});assert.equal(api.state().workhub.projectPeople.assignments.length,1);
+ ui.details(buyer.id);assert.match(document.querySelector('.pe-person-detail').textContent,/Create PO/);
+ const link=api.state().workhub.projectPeople.assignments[0];ui.assignmentEditor(buyer.id,link.id);const f=document.getElementById('peForm');f.elements.namedItem('role').value='Tester';f.elements.namedItem('scope').value='Plant 1100';f.elements.namedItem('notes').value='UAT owner';ui.submit(f);await settle();
+ const restored=api.parseBackup(api.payload(api.state()));assert.equal(restored.workhub.projectPeople.assignments[0].scope,'Plant 1100');assert.equal(restored.workhub.projectPeople.assignments[0].role,'Tester');
+ const areaId=activity.areaId;api.mutate(d=>{d.projects[0].mmAreas.find(a=>a.id===areaId).name='Procurement renamed';});ui.details(buyer.id);assert.match(document.querySelector('.pe-person-detail').textContent,/Procurement renamed/);
+});
+
+test('people: drag-drop and tap mapping use the same assignment path and reverse lookup is local',async t=>{
+ const {api,document,window,db}=await app(t),{buyer,activity}=peopleFixture(api,document,window);await settle();const calls=db.calls.length;
+ const chip=document.querySelector('[data-chip-type="activity"][data-id="'+activity.id+'"]');chip.click();assert.ok(document.querySelector('.pe-armed-bar'));document.querySelector('[data-pe="place"][data-id="'+buyer.id+'"]').click();await settle();assert.equal(api.state().workhub.projectPeople.assignments.length,1);
+ const payload={owner:api.cloud.user.id,projectId:api.state().activeProjectId,type:'area',id:api.state().projects[0].mmAreas[0].id};
+ const card=document.querySelector('[data-pe-person="'+buyer.id+'"]'),event=new window.Event('drop',{bubbles:true,cancelable:true});Object.defineProperty(event,'dataTransfer',{value:{getData:()=>JSON.stringify(payload)}});card.dispatchEvent(event);await settle();assert.equal(api.state().workhub.projectPeople.assignments.length,2);
+ const pointerChip=document.querySelector('[data-chip-type="area"][data-id="'+api.state().projects[0].mmAreas[1].id+'"]');document.elementFromPoint=()=>document.querySelector('[data-pe-person="'+buyer.id+'"]');
+ for(const [type,x,y]of [['pointerdown',20,20],['pointermove',160,80],['pointerup',160,80]]){const e=new window.Event(type,{bubbles:true,cancelable:true});for(const [k,v]of Object.entries({pointerId:7,button:0,clientX:x,clientY:y}))Object.defineProperty(e,k,{value:v});(type==='pointerdown'?pointerChip:document).dispatchEvent(e);}
+ await settle();assert.equal(api.state().workhub.projectPeople.assignments.length,3);assert.equal(document.querySelector('.pe-drag-ghost'),null);
+ const before=db.calls.length;document.querySelector('[data-pe="lookup-activity"][data-id="'+activity.id+'"]').click();assert.equal(document.querySelectorAll('[data-pe-person]').length,1);assert.ok(document.querySelector('.pe-filter-notice'));assert.equal(db.calls.length,before);assert.ok(before>calls);
+});
+
+test('people: stale editors, replaced forms and foreign-account drops cannot overwrite contacts',async t=>{
+ const {api,document,window}=await app(t),{ui,buyer,activity}=peopleFixture(api,document,window);await settle();
+ ui.personEditor(buyer.id);let stale=document.getElementById('peForm');stale.elements.namedItem('name').value='Outdated';api.mutate(d=>d.workhub.projectPeople.people.find(p=>p.id===buyer.id).title='New title');assert.throws(()=>ui.submit(stale),/record changed/);assert.equal(api.state().workhub.projectPeople.people[1].name,'Daniel');
+ ui.personEditor(buyer.id);stale=document.getElementById('peForm');ui.personEditor();assert.throws(()=>ui.submit(stale),/Reopen/);
+ ui.personEditor(buyer.id);stale=document.getElementById('peForm');api.cloud.user={id:'another-owner'};api.showTab('home');assert.equal(document.getElementById('modal').open,false);assert.throws(()=>ui.submit(stale),/Reopen|signing in/);
+ api.showTab('specs');document.querySelector('[data-action="project-view"][data-view="people"]').click();await settle();const event=new window.Event('drop',{bubbles:true,cancelable:true});Object.defineProperty(event,'dataTransfer',{value:{getData:()=>JSON.stringify({owner:'old-owner',projectId:api.state().activeProjectId,type:'activity',id:activity.id})}});document.querySelector('[data-pe-person]').dispatchEvent(event);assert.equal(api.state().workhub.projectPeople.assignments.length,0);
+});
+
+test('people: pointer movement saves once, keyboard arrangement preserves assignments and privacy blocks exports',async t=>{
+ const {api,document,window,db}=await app(t),{ui,buyer,activity}=peopleFixture(api,document,window);ui.place(buyer.id,{type:'activity',id:activity.id});await settle();
+ document.querySelector('[data-pe="chart"]').click();const handle=document.querySelector('[data-pe-move="'+buyer.id+'"]'),x=api.state().workhub.projectPeople.people[1].x,calls=db.calls.length;
+ function pointer(type,target,px,py){const e=new window.Event(type,{bubbles:true,cancelable:true});for(const [k,v]of Object.entries({pointerId:3,button:0,clientX:px,clientY:py}))Object.defineProperty(e,k,{value:v});target.dispatchEvent(e);}
+ pointer('pointerdown',handle,100,100);pointer('pointermove',document,160,145);await settle();assert.equal(db.calls.length,calls);pointer('pointerup',document,160,145);await settle();assert.equal(db.calls.length,calls+1);assert.equal(api.state().workhub.projectPeople.people[1].x,x+60);assert.equal(api.state().workhub.projectPeople.assignments.length,1);
+ document.querySelector('[data-pe-move="'+buyer.id+'"]').dispatchEvent(new window.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true}));assert.equal(api.state().workhub.projectPeople.people[1].x,x+84);
+ const viewport=document.getElementById('peViewport'),tray=document.querySelector('.pe-area-list');viewport.scrollLeft=40;viewport.scrollTop=80;viewport.dispatchEvent(new window.Event('scroll'));tray.scrollTop=90;tray.dispatchEvent(new window.Event('scroll'));document.querySelector('[data-pe="zoom-in"]').click();assert.equal(document.getElementById('peViewport').scrollTop,80);assert.equal(document.querySelector('.pe-area-list').scrollTop,90);
+ document.body.classList.add('hub-private');await assert.rejects(ui.exportFile('excel'),/screen privacy/);document.body.classList.remove('hub-private');
+});
+
+test('people: Excel is project-scoped, text-safe, complete and cancelled if the account changes',async t=>{
+ const {api,document,window}=await app(t),{ui,buyer,activity}=peopleFixture(api,document,window);ui.place(buyer.id,{type:'activity',id:activity.id});await settle();
+ const E=window.WorkHubProjectPeopleEngine,sheets=E.sheets(api.state(),api.state().activeProjectId);assert.deepEqual(Array.from(sheets,s=>s.name),['People','Responsibility Assignments','Unassigned Activities','Area Coverage']);
+ let finish;window.WorkHubProjectPeopleFiles.excel=()=>new Promise(resolve=>finish=resolve);const exporting=ui.exportFile('excel');api.cloud.user={id:'next-account'};api.showTab('home');finish(new window.Blob(['demo']));await assert.rejects(exporting,/Reopen/);
+});
+
 test('stand-up: overview card opens all item and sub-item remarks with independent progress and update times',async t=>{
  const {api,document,db}=await app(t),item=standupFixture(api,document);await settle();api.showTab('specs');const calls=db.calls.length;
  document.querySelector('.standup-overview-card').click();assert.ok(document.getElementById('modal').classList.contains('standup-dialog'));

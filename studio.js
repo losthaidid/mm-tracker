@@ -81,6 +81,7 @@
     root.WorkHubBatchEngine?.upgrade(d);
     root.WorkHubWorkLibraryEngine?.upgrade(d);
     root.WorkHubProjectStandupEngine?.upgrade(d);
+    root.WorkHubProjectPeopleEngine?.upgrade(d);
     root.WorkHubRehearsalEngine?.upgrade(d);
     root.WorkHubSapTcodesEngine?.upgrade(d);
     if (h.simulator === undefined)
@@ -101,6 +102,7 @@
     root.WorkHubBatchEngine?.validate(d);
     root.WorkHubWorkLibraryEngine?.validate(d);
     root.WorkHubProjectStandupEngine?.validate(d);
+    root.WorkHubProjectPeopleEngine?.validate(d);
     root.WorkHubRehearsalEngine?.validate(d);
     root.WorkHubSapTcodesEngine?.validate(d);
     root.WorkHubReminders?.validate(d);
@@ -261,6 +263,7 @@
       validator = null,
       library = null,
       standup = null,
+      people = null,
       rehearsal = null,
       tcodes = null,
       focusPanel = null,
@@ -2402,6 +2405,7 @@
       root.WorkHubValidatorEngine?.prepare(next, previous, restoring);
       root.WorkHubProjectDates.prepare(next, previous, today(), restoring);
       root.WorkHubProjectStandupEngine?.prepare(next, previous, restoring);
+      root.WorkHubProjectPeopleEngine?.prepare(next, previous, restoring);
       const h = next.workhub;
       for (const t of next.tickets) {
         const old = previous?.tickets.find(x => x.id === t.id),
@@ -2538,6 +2542,7 @@
       validator?.sync();
       library?.sync();
       standup?.sync();
+      people?.sync();
       if (tab !== 'studio' || currentTool !== 'theme') themePreview = null;
       if (sorting && !sorting.source.isConnected) clearSort();
       if (tab !== 'processhub') clearTimeout(walkTimer);
@@ -2548,6 +2553,7 @@
       projectDates?.decorate();
       batchA?.mount(tab);
       library?.mount();
+      people?.mount();
       mountUndo();
       document.body.classList.toggle('hub-focus', !!focus);
       const extra = $('hubBoardToggle');
@@ -3744,6 +3750,11 @@
       owner: () => a.cloud().user?.id || '',
       hubAction: handle,
     });
+    people = root.WorkHubProjectPeople?.install({
+      ...a,
+      ready: () => a.cloud().ready,
+      owner: () => a.cloud().user?.id || '',
+    });
     processDeck = root.WorkHubProcessDeck.install({
       ...a,
       ready: () => a.cloud().ready,
@@ -3821,6 +3832,7 @@
       validator,
       library,
       standup,
+      people,
       rehearsal,
       tcodes,
       focusPanel,
