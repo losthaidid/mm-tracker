@@ -1,4 +1,4 @@
-/* task-workspace.css — Main task/sub-task cards and the far-right action/status toolbar.
+/* task-workspace.css — Task cards/actions, quick update dialogs and project-item feedback.
    See docs/FILE-MAP.md. Keep rule order: later selectors can override earlier ones. */
 /* Keep task actions together at the far right without crowding the title. */
 body .workspace-v10 .task-card-heading {
@@ -107,6 +107,33 @@ body .task-action-cluster .task-action-feedback {
   overflow: auto;
   overflow-wrap: anywhere;
 }
+.item-feedback {
+  margin: 14px 0;
+  padding: 13px;
+  border: 1px solid var(--hub-border, #ded6e9);
+  border-radius: 12px;
+  background: var(--hub-surface-soft, #f8f5fb);
+}
+.item-feedback-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.item-feedback-heading h5 {
+  margin: 0;
+  font-size: 13px;
+  color: var(--hub-text, #51445f);
+}
+.item-feedback p {
+  margin: 10px 0 0;
+  max-height: 220px;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.6;
+}
 body .task-action-cluster .reminder-item-control {
   display: flex;
   padding: 0 !important;
@@ -137,6 +164,9 @@ body .task-action-cluster .task-action-button:focus-visible {
 }
 @media (max-width: 500px) {
   .task-feedback-form .modal-actions button {
+    min-height: 44px;
+  }
+  .item-feedback-heading button {
     min-height: 44px;
   }
   .task-action-buttons {

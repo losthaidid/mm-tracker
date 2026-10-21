@@ -1210,36 +1210,83 @@
         `<div class="hub-detail"><span class="hub-kicker">MAIN TASK · ${esc(a.taskLabel(t))}</span><p>${esc(t.priority)} · ${BOARD[taskStatus(t)]}</p>${standup?.taskContext(t.id) || ''}<h3>Remarks</h3><p class="prewrap hub-sensitive">${esc(t.remarks) || 'No remarks yet.'}</p><h3>Feedback</h3><p class="prewrap hub-sensitive">${esc(t.feedback) || 'No feedback yet.'}</p>${btn('task-feedback', 'Add feedback', 'data-id="' + esc(id) + '"', 'small')}<h3>Subtasks</h3>${t.subTasks.map(s => `<div class="hub-card"><strong>${esc(s.title)}</strong><span class="hub-badge">${esc(s.status)}</span><p class="prewrap">${esc(s.remarks)}</p><p class="prewrap">${esc(s.feedback)}</p><div class="actions">${subtaskCompletionButton(t, s, true)}${btn('subtask-edit', 'Edit', 'data-parent="' + esc(id) + '" data-id="' + esc(s.id) + '"', 'small')}${btn('timer-new', '▶ Track time', 'data-kind="task" data-id="' + esc(id) + '" data-sub="' + esc(s.id) + '"', 'small')}</div></div>`).join('') || '<p>No subtasks yet.</p>'}<div class="modal-actions">${btn('task-edit', 'Edit main task', 'data-id="' + esc(id) + '"')}${btn('subtask-edit', '＋ Add subtask', 'data-parent="' + esc(id) + '"')}</div></div>`
       );
     }
-    function taskFeedback(id) {
+    const updateForms = {
+      tasks: {
+        id: 'hubTaskFeedback',
+        field: 'feedback',
+        title: 'Add feedback',
+        label: 'feedback',
+        record: 'Task',
+        kicker: 'MAIN TASK',
+      },
+      specs: {
+        id: 'hubItemFeedback',
+        field: 'feedback',
+        title: 'Add feedback',
+        label: 'feedback',
+        record: 'Project item',
+        kicker: 'PROJECT ITEM',
+      },
+      tickets: {
+        id: 'hubTicketUpdate',
+        field: 'history',
+        title: 'Status update',
+        label: 'status update',
+        record: 'Ticket',
+        kicker: 'TICKET',
+      },
+    };
+    function recordUpdate(kind, id) {
+      const config = updateForms[kind];
       if (!a.cloud().ready || !a.cloud().user)
-        throw Error('Finish signing in before adding feedback.');
-      const task = a.state().tasks.find(t => t.id === id);
-      if (!task) throw Error('Task no longer exists.');
+        throw Error('Finish signing in before adding an update.');
+      const record = a.state()[kind].find(t => t.id === id);
+      if (!record) throw Error(config.record + ' no longer exists.');
+      const reference =
+          kind === 'tasks'
+            ? a.taskLabel(record)
+            : kind === 'specs'
+              ? a.itemLabel(record)
+              : record.ticket,
+        history = record[config.field] || '',
+        input = kind === 'tickets' ? 'newHistory' : 'feedback';
       a.openModal(
-        'Add feedback',
-        `<form id="hubTaskFeedback" class="task-feedback-form" data-id="${esc(id)}" data-owner="${esc(a.cloud().user.id)}"><div class="task-feedback-context"><span class="hub-kicker">MAIN TASK · ${esc(a.taskLabel(task))}</span><h3 class="hub-sensitive">${esc(task.task)}</h3></div><label for="hubTaskFeedbackText">New feedback</label><textarea id="hubTaskFeedbackText" name="feedback" maxlength="32767" required autofocus aria-describedby="hubTaskFeedbackHint"></textarea><p id="hubTaskFeedbackHint" class="hub-meta">Date and time are added when you save. Earlier feedback is kept.</p>${task.feedback ? `<details class="task-feedback-history"><summary>Earlier feedback</summary><p class="prewrap hub-sensitive">${esc(task.feedback)}</p></details>` : ''}<div class="modal-actions">${btn('close', 'Cancel')}<button type="submit" class="primary">Save feedback</button></div></form>`
+        config.title,
+        `<form id="${config.id}" class="task-feedback-form" data-kind="${kind}" data-id="${esc(id)}" data-owner="${esc(a.cloud().user.id)}"><div class="task-feedback-context"><span class="hub-kicker">${config.kicker} · ${esc(reference)}</span><h3 class="hub-sensitive">${esc(record.task || record.description)}</h3></div><label for="${config.id}Text">New ${config.label}</label><textarea id="${config.id}Text" name="${input}" maxlength="${kind === 'tickets' ? 10000 : 32767}" required autofocus aria-describedby="${config.id}Hint"></textarea><p id="${config.id}Hint" class="hub-meta">Date and time are added when you save. Earlier ${kind === 'tickets' ? 'updates are' : 'feedback is'} kept.</p>${history ? `<details class="task-feedback-history"><summary>Earlier ${kind === 'tickets' ? 'updates' : 'feedback'}</summary><p class="prewrap hub-sensitive">${esc(history)}</p></details>` : ''}<div class="modal-actions">${btn('close', 'Cancel')}<button type="submit" class="primary">Save ${config.label}</button></div></form>`
       );
     }
-    function saveTaskFeedback(form) {
+    function saveRecordUpdate(form) {
+      const kind = form.dataset.kind,
+        config = updateForms[kind];
+      if (!config || form.id !== config.id) throw Error('Reopen the update form before saving.');
       if (form.dataset.saved === 'true') return;
       if (!a.cloud().ready || !a.cloud().user || form.dataset.owner !== a.cloud().user.id)
-        throw Error('Finish signing in and reopen Add feedback before saving.');
-      if (!form.isConnected || !$('modal').open || $('hubTaskFeedback') !== form)
-        throw Error('Reopen Add feedback before saving.');
-      const text = form.elements.namedItem('feedback').value.trim();
-      if (!text) throw Error('Enter feedback before saving.');
+        throw Error('Finish signing in and reopen ' + config.title + ' before saving.');
+      if (!form.isConnected || !$('modal').open || $(config.id) !== form)
+        throw Error('Reopen ' + config.title + ' before saving.');
+      const text = form.elements
+        .namedItem(kind === 'tickets' ? 'newHistory' : 'feedback')
+        .value.trim();
+      if (!text) throw Error('Enter ' + config.label + ' before saving.');
       const savedAt = new Date(),
         stamp = dateOf(savedAt).split('-').reverse().join('-') + ' ' + clock(savedAt);
-      const ok = save((h, state) => {
-        const task = state.tasks.find(t => t.id === form.dataset.id);
-        if (!task) throw Error('Task no longer exists.');
-        const feedback = (task.feedback ? task.feedback + '\n\n' : '') + text + ' [' + stamp + ']';
-        if (feedback.length > 32767)
-          throw Error(
-            'Feedback history is full. Shorten this update or edit earlier feedback to make room.'
-          );
-        task.feedback = feedback;
-      }, 'Feedback added.');
+      const ok = save(
+        (h, state) => {
+          const record = state[kind].find(t => t.id === form.dataset.id);
+          if (!record) throw Error(config.record + ' no longer exists.');
+          if (kind === 'tickets') a.appendTicketHistory(record, text);
+          else
+            record.feedback =
+              (record.feedback ? record.feedback + '\n\n' : '') + text + ' [' + stamp + ']';
+          if (record[config.field].length > 32767)
+            throw Error(
+              kind === 'tickets'
+                ? 'Status update history is full. Shorten this update or edit earlier history to make room.'
+                : 'Feedback history is full. Shorten this update or edit earlier feedback to make room.'
+            );
+        },
+        kind === 'tickets' ? 'Status update added.' : 'Feedback added.'
+      );
       if (ok) {
         form.dataset.saved = 'true';
         a.closeModal();
@@ -2424,7 +2471,7 @@
     }
     /** Refresh the workspace shell and feature decorations after app.js renders a screen. */
     function afterRender(tab) {
-      const feedbackForm = $('hubTaskFeedback');
+      const feedbackForm = document.querySelector('.task-feedback-form, #historyForm');
       if (
         feedbackForm &&
         $('modal').open &&
@@ -2624,7 +2671,15 @@
         return;
       }
       if (action === 'task-feedback') {
-        taskFeedback(id);
+        recordUpdate('tasks', id);
+        return;
+      }
+      if (action === 'item-feedback') {
+        recordUpdate('specs', id);
+        return;
+      }
+      if (action === 'ticket-update') {
+        recordUpdate('tickets', id);
         return;
       }
       if (action === 'subtask-edit') {
@@ -3012,8 +3067,8 @@
     function submit(form) {
       const values = Object.fromEntries(new FormData(form)),
         id = form.dataset.id;
-      if (form.id === 'hubTaskFeedback') {
-        saveTaskFeedback(form);
+      if (Object.values(updateForms).some(config => config.id === form.id)) {
+        saveRecordUpdate(form);
         return;
       }
       if (form.id === 'hubFocusForm') {

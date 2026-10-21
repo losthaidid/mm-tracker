@@ -219,6 +219,7 @@
       'description',
       'status',
       'remarks',
+      'feedback',
       'priority',
       'expectedDate',
       'dueDate',

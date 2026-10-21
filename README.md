@@ -87,6 +87,10 @@ The Tasks tab displays each main title with its own sub-tasks. Use **Add sub-tas
 
 Use **Add feedback** on a main task card, in Board view, or in task Details to post a quick update without opening the main editor. Saving appends the feedback and the device's current local date and time, keeping earlier feedback. The same feedback history appears on the task, syncs with the account, and stays in JSON backups and Excel's **Task notes** sheet. Remarks and sub-task feedback remain separate.
 
+Project item cards and their Traceability view also show **Feedback updates** with an **Add feedback** button. Each save appends the local date and time, preserving earlier feedback, remarks, status and sub-items. The history stays visible on the item, can be corrected in **Edit item**, and is included in account saves, JSON backups and Excel's **Project notes** sheet.
+
+Tickets have a quick **Status update** button on each card. Save a written update directly, with its date and time, and see it in **Latest update** and **History tracker**. The Status update form in ticket Details uses the same journal. Earlier history is kept, and the ticket's status selector remains independent. Account saves, backups and Excel's **Ticket updates** sheet retain the journal.
+
 ## Schedule viewing and precise times
 
 Select a booking to view its dates, exact times, duration, linked task/project and notes. Choose **Edit activity** to make changes. Go-Live milestones in Schedule also open in display mode before editing. Empty grid cells and **Plan this day** create a new booking.
