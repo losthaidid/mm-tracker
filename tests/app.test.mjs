@@ -2164,6 +2164,61 @@ test('Schedule project items: renames display current labels and deleted items r
  const legacy=copy(api.state());for(const row of [...legacy.schedule,...legacy.projectPlans])for(const key of ['itemId','subItemId','itemTitle','subItemTitle'])delete row[key];assert.equal(api.parseBackup(api.payload(legacy)).schedule[0].text,'Historical booking updated');const invalid=copy(api.state());invalid.schedule[0].itemTitle={bad:true};assert.throws(()=>api.parseBackup(api.payload(invalid)),/schedule project item/);const mismatch=copy(api.state());mismatch.schedule[0].subItemId='wrong-sub';assert.throws(()=>api.parseBackup(api.payload(mismatch)),/do not match/);
  api.openRangeEditor('2026-10-20','09:15');f=document.getElementById('scheduleForm');f.elements.namedItem('itemId').value='';f.elements.namedItem('itemId').dispatchEvent(new ctx.window.Event('change',{bubbles:true}));api.saveRange(f);await settle();assert.equal(api.state().schedule[0].subItemId,'');assert.equal(api.state().projectPlans[0].itemId,'');api.validate(api.state());
 });
+async function companyScheduleFixture(ctx){
+ const {api,document}=ctx;
+ addCompany(api,document,'Company A');addCompany(api,document,'Company B');addCompany(api,document,'Company without items');
+ const [companyA,companyB,emptyCompany]=api.state().projectCompanies;
+ const a=await addProjectDeliverable(ctx,'MM-A'),b=await addProjectDeliverable(ctx,'MM-B'),unassigned=await addProjectDeliverable(ctx,'MM-GENERAL');
+ api.mutate(d=>{d.specs.find(item=>item.id===a.itemId).companyId=companyA.id;d.specs.find(item=>item.id===b.itemId).companyId=companyB.id;});
+ await settle();return{a,b,unassigned,companyA,companyB,emptyCompany};
+}
+function changeBookingField(window,form,name,value){
+ const field=form.elements.namedItem(name);field.value=value;field.dispatchEvent(new window.Event('change',{bubbles:true}));
+}
+test('Schedule company items: company changes filter items and clear incompatible sub-items without replacing typed fields',async t=>{
+ const ctx=await app(t),{api,document,window,db}=ctx,{a,b,unassigned,companyA,companyB,emptyCompany}=await companyScheduleFixture(ctx);
+ const f=await projectItemBooking(ctx,a),writes=db.calls.length;
+ const items=()=>[...f.elements.namedItem('itemId').options].map(option=>option.value);
+ assert.deepEqual(items(),['',a.itemId,b.itemId,unassigned.itemId]);
+ changeBookingField(window,f,'companyId',companyA.id);
+ assert.deepEqual(items(),['',a.itemId]);assert.equal(f.elements.namedItem('itemId').value,a.itemId);assert.equal(f.elements.namedItem('subItemId').value,a.subItemId);
+ assert.match(document.getElementById('bookingItemHint').textContent,/selected company/);
+ changeBookingField(window,f,'companyId',companyB.id);
+ assert.equal(document.getElementById('scheduleForm'),f);assert.deepEqual(items(),['',b.itemId]);assert.equal(f.elements.namedItem('itemId').value,'');assert.equal(f.elements.namedItem('subItemId').value,'');assert.equal(f.elements.namedItem('subItemId').disabled,true);assert.equal(f.elements.namedItem('subItemId').options.length,1);
+ assert.equal(f.elements.namedItem('text').value,'Check the saved design');assert.equal(f.elements.namedItem('title').value,'Configuration review');assert.equal(f.elements.namedItem('endTime').value,'10:45');
+ changeBookingField(window,f,'itemId',b.itemId);f.elements.namedItem('subItemId').value=b.subItemId;
+ changeBookingField(window,f,'companyId',emptyCompany.id);assert.deepEqual(items(),['']);assert.equal(f.elements.namedItem('subItemId').disabled,true);
+ changeBookingField(window,f,'companyId','');assert.deepEqual(items(),['',a.itemId,b.itemId,unassigned.itemId]);await settle();assert.equal(db.calls.length,writes);
+});
+test('Schedule company items: save guards, reopening and project Calendar edits respect the selected company',async t=>{
+ const ctx=await app(t),{api,document,window,db}=ctx,{a,b,companyA,companyB}=await companyScheduleFixture(ctx);
+ let f=await projectItemBooking(ctx,a);changeBookingField(window,f,'companyId',companyB.id);
+ const bad=document.createElement('option');bad.value=a.itemId;f.elements.namedItem('itemId').append(bad);f.elements.namedItem('itemId').value=a.itemId;
+ const writes=db.calls.length;assert.throws(()=>api.saveRange(f),/project item.*selected company/);assert.equal(db.calls.length,writes);assert.equal(api.state().schedule.length,0);bad.remove();
+ changeBookingField(window,f,'companyId',companyA.id);changeBookingField(window,f,'itemId',a.itemId);f.elements.namedItem('subItemId').value=a.subItemId;api.saveRange(f);await settle();
+ assert.equal(db.row.document.data.projectPlans[0].companyId,companyA.id);assert.ok(db.row.document.data.schedule.every(row=>row.itemId===a.itemId&&row.subItemId===a.subItemId));
+ api.openRangeEditor('2026-10-20','09:15');f=document.getElementById('scheduleForm');assert.equal(f.elements.namedItem('itemId').value,a.itemId);assert.equal(f.elements.namedItem('subItemId').value,a.subItemId);assert.equal(f.querySelector('#bookingItem option[value="'+b.itemId+'"]'),null);
+ const planId=api.state().projectPlans[0].id;api.editPlan(planId);f=document.getElementById('planForm');assert.equal(f.elements.namedItem('itemId').value,a.itemId);changeBookingField(window,f,'companyId',companyB.id);assert.equal(f.elements.namedItem('itemId').value,'');assert.equal(f.elements.namedItem('subItemId').disabled,true);
+ f.elements.namedItem('itemId').append(bad);f.elements.namedItem('itemId').value=a.itemId;const planWrites=db.calls.length;assert.throws(()=>api.savePlan(f),/project item.*selected company/);assert.equal(db.calls.length,planWrites);bad.remove();
+ changeBookingField(window,f,'itemId',b.itemId);f.elements.namedItem('subItemId').value=b.subItemId;api.savePlan(f);await settle();assert.ok(api.state().schedule.every(row=>row.companyId===companyB.id&&row.itemId===b.itemId&&row.subItemId===b.subItemId));
+ const reopened=await app(t,{remote:copy(db.row),login:false});await reopened.api.loadCloud(sessionUser);reopened.api.openRangeEditor('2026-10-20','09:15');const saved=reopened.document.getElementById('scheduleForm');assert.equal(saved.elements.namedItem('companyId').value,companyB.id);assert.equal(saved.elements.namedItem('itemId').value,b.itemId);assert.equal(saved.elements.namedItem('subItemId').value,b.subItemId);assert.equal(saved.querySelector('#bookingItem option[value="'+a.itemId+'"]'),null);api.validate(api.state());
+});
+test('Schedule company items: older cross-company bookings load safely and editors remove the incompatible selection',async t=>{
+ const ctx=await app(t),{api,document,window,db}=ctx,{a,b,companyA,companyB}=await companyScheduleFixture(ctx);
+ let f=await projectItemBooking(ctx,a);changeBookingField(window,f,'companyId',companyA.id);api.saveRange(f);await settle();
+ // Reproduce a booking the previous project-only dropdown allowed to be saved.
+ api.mutate(d=>{for(const row of [...d.projectPlans,...d.schedule])Object.assign(row,{companyId:companyB.id,companyName:companyB.name});});await settle();
+ const reopened=await app(t,{remote:copy(db.row),login:false});await reopened.api.loadCloud(sessionUser);const other=reopened.api;assert.equal(other.state().schedule[0].itemId,a.itemId);
+ other.editPlan(other.state().projectPlans[0].id);f=reopened.document.getElementById('planForm');assert.equal(f.elements.namedItem('itemId').value,'');assert.equal(f.elements.namedItem('subItemId').disabled,true);assert.equal(f.querySelector('#bookingItem option[value="'+a.itemId+'"]'),null);assert.ok(f.querySelector('#bookingItem option[value="'+b.itemId+'"]'));
+ other.openRangeEditor('2026-10-20','09:15');f=reopened.document.getElementById('scheduleForm');assert.equal(f.elements.namedItem('itemId').value,'');assert.equal(f.elements.namedItem('subItemId').options.length,1);assert.equal(other.state().schedule[0].itemId,a.itemId);other.saveRange(f);await settle();assert.ok(other.state().schedule.every(row=>row.companyId===companyB.id&&!row.itemId&&!row.subItemId));other.validate(other.state());
+});
+test('Schedule company items: deleted historical links stay in their original company and cannot follow a company change',async t=>{
+ const ctx=await app(t),{api,document,window,db}=ctx,{a,companyA,companyB}=await companyScheduleFixture(ctx);
+ let f=await projectItemBooking(ctx,a);changeBookingField(window,f,'companyId',companyA.id);api.saveRange(f);await settle();api.mutate(d=>d.specs=d.specs.filter(item=>item.id!==a.itemId));await settle();
+ api.openRangeEditor('2026-10-20','09:15');f=document.getElementById('scheduleForm');assert.equal(f.elements.namedItem('itemId').value,a.itemId);assert.match(f.elements.namedItem('itemId').selectedOptions[0].textContent,/saved item/);assert.equal(f.elements.namedItem('subItemId').value,a.subItemId);api.saveRange(f);await settle();
+ api.openRangeEditor('2026-10-20','09:15');f=document.getElementById('scheduleForm');changeBookingField(window,f,'companyId',companyB.id);assert.equal(f.querySelector('#bookingItem option[value="'+a.itemId+'"]'),null);assert.equal(f.elements.namedItem('subItemId').disabled,true);
+ const bad=document.createElement('option');bad.value=a.itemId;f.elements.namedItem('itemId').append(bad);f.elements.namedItem('itemId').value=a.itemId;const writes=db.calls.length;assert.throws(()=>api.saveRange(f),/project item.*selected project/);assert.equal(db.calls.length,writes);bad.remove();api.saveRange(f);await settle();assert.ok(api.state().schedule.every(row=>row.companyId===companyB.id&&!row.itemId&&!row.subItemId));
+});
 test('workspace Momo discovery letter stays attached during travel and dragging on phone and laptop without cloud writes',async t=>{
  for(const width of [375,1280]){
   const ctx=await app(t,{styles:true}),{api,document,window,db,frames}=ctx;Object.defineProperty(window,'innerWidth',{configurable:true,value:width});Object.defineProperty(window,'innerHeight',{configurable:true,value:800});window.dispatchEvent(new window.Event('resize'));const task=addMainTask(api,document,'Follow up discovery');api.mutate(d=>{d.tasks[0].boardStatus='blocked';});await settle();assert.equal(api.hub.moments.deliver(),true);const letter=document.getElementById('momoDiscovery'),pet=document.getElementById('hubPet'),writes=db.calls.length,before=pet.style.left;assert.equal(letter.closest('#hubPet'),pet);assert.equal(window.getComputedStyle(letter).position,'absolute');assert.ok(parseFloat(window.getComputedStyle(letter).minWidth)>=44);api.hub.life.travel(20,100,()=>{},1600);assert.equal(api.hub.life.busy(),true);let frame=[...frames.values()].at(-1);frames.clear();frame(window.performance.now()+800);assert.notEqual(pet.style.left,before);assert.equal(letter.closest('#hubPet'),pet);api.hub.moments.tick();assert.equal(document.getElementById('momoDiscovery'),letter);assert.equal(letter.style.left,'');assert.equal(letter.style.top,'');

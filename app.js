@@ -878,6 +878,10 @@ function projectChange(el) {
     updateScheduleSubItemField(el.form);
     return true;
   }
+  if (el.id === 'bookingCompany' && ['scheduleForm', 'planForm'].includes(el.form?.id)) {
+    updateScheduleItemFields(el.form);
+    return true;
+  }
   if (el.id === 'scheduleKind') {
     changeScheduleKind(el);
     return true;
@@ -1611,8 +1615,16 @@ function scheduleItemContext(row, d = state) {
       sub?.title || row.subItemTitle || plan?.subItemTitle || (subItemId ? 'Saved sub-item' : ''),
   };
 }
-function scheduleItemOptions(projectId, selected = '', savedTitle = '') {
-  const items = state.specs.filter(item => item.projectId === projectId),
+function scheduleItemInScope(item, projectId, companyId) {
+  return item.projectId === projectId && (!companyId || item.companyId === companyId);
+}
+function scheduleItemHint(companyId) {
+  return companyId
+    ? 'Only items from the selected company. Leave blank for general project work.'
+    : 'Choose an item maintained in this project, or select a company to narrow the list.';
+}
+function scheduleItemOptions(projectId, companyId = '', selected = '', savedTitle = '') {
+  const items = state.specs.filter(item => scheduleItemInScope(item, projectId, companyId)),
     former = selected && !state.specs.some(item => item.id === selected);
   return `<option value="">No project item / general project work</option>${items.map(item => `<option value="${esc(item.id)}" data-item-title="${esc(item.description)}"${item.id === selected ? ' selected' : ''}>${esc(projectItemLabel(item) + ' · ' + item.description)}</option>`).join('')}${former ? `<option value="${esc(selected)}" data-item-title="${esc(savedTitle)}" selected>${esc(savedTitle || 'Project item')} (saved item)</option>` : ''}`;
 }
@@ -1623,20 +1635,33 @@ function scheduleSubItemOptions(itemId, selected = '', savedTitle = '') {
 }
 function scheduleItemFields(row) {
   const projectId = scheduleCompanyProject(row),
-    context = scheduleItemContext(row);
+    companyId = row.companyId || '';
   if (!projectId) return '';
-  return `<div class="wide schedule-item-field"><label for="bookingItem">Project item <span class="muted">(optional)</span></label><select id="bookingItem" name="itemId" data-project-scope="${esc(projectId)}" aria-describedby="bookingItemHint">${scheduleItemOptions(projectId, context.itemId, context.itemTitle)}</select><p class="hint" id="bookingItemHint">Choose an item maintained in this project, or leave blank for general project work.</p></div><div class="wide schedule-item-field"><label for="bookingSubItem">Sub-item <span class="muted">(optional)</span></label><select id="bookingSubItem" name="subItemId" data-item-scope="${esc(context.itemId)}"${context.itemId ? '' : ' disabled'}>${scheduleSubItemOptions(context.itemId, context.subItemId, context.subItemTitle)}</select></div>`;
+  const context = scheduleItemContext(row),
+    item = state.specs.find(item => item.id === context.itemId),
+    selected = !item || scheduleItemInScope(item, projectId, companyId) ? context.itemId : '';
+  return `<div class="wide schedule-item-field"><label for="bookingItem">Project item <span class="muted">(optional)</span></label><select id="bookingItem" name="itemId" data-project-scope="${esc(projectId)}" data-company-scope="${esc(companyId)}" aria-describedby="bookingItemHint">${scheduleItemOptions(projectId, companyId, selected, context.itemTitle)}</select><p class="hint" id="bookingItemHint">${scheduleItemHint(companyId)}</p></div><div class="wide schedule-item-field"><label for="bookingSubItem">Sub-item <span class="muted">(optional)</span></label><select id="bookingSubItem" name="subItemId" data-item-scope="${esc(selected)}"${selected ? '' : ' disabled'}>${scheduleSubItemOptions(selected, selected ? context.subItemId : '', context.subItemTitle)}</select></div>`;
 }
 function updateScheduleItemFields(form) {
   const select = form.elements.namedItem('itemId');
   if (!select) return;
   const projectId =
       form.elements.namedItem(form.id === 'planForm' ? 'projectId' : 'linkId')?.value || '',
+    companyId = form.elements.namedItem('companyId')?.value || '',
     sameProject = select.dataset.projectScope === projectId,
-    selected = sameProject ? select.value : '',
-    title = sameProject ? select.selectedOptions[0]?.dataset.itemTitle || '' : '';
-  select.innerHTML = scheduleItemOptions(projectId, selected, title);
+    item = state.specs.find(item => item.id === select.value),
+    // Deleted item snapshots remain available only within their original scope.
+    keepItem =
+      sameProject &&
+      (item
+        ? scheduleItemInScope(item, projectId, companyId)
+        : select.dataset.companyScope === companyId),
+    selected = keepItem ? select.value : '',
+    title = keepItem ? select.selectedOptions[0]?.dataset.itemTitle || '' : '';
+  select.innerHTML = scheduleItemOptions(projectId, companyId, selected, title);
   select.dataset.projectScope = projectId;
+  select.dataset.companyScope = companyId;
+  form.querySelector('#bookingItemHint').textContent = scheduleItemHint(companyId);
   updateScheduleSubItemField(form);
 }
 function updateScheduleSubItemField(form) {
@@ -1662,8 +1687,14 @@ function readScheduleItem(form, previous, row) {
   const projectId = scheduleCompanyProject(row),
     item = state.specs.find(item => item.id === itemId),
     samePrevious = previous?.itemId === itemId && scheduleCompanyProject(previous) === projectId;
-  if (item ? item.projectId !== projectId : !samePrevious)
+  if (
+    item
+      ? item.projectId !== projectId
+      : !samePrevious || (previous.companyId || '') !== (row.companyId || '')
+  )
     throw Error('Choose a project item from the selected project.');
+  if (item && row.companyId && item.companyId !== row.companyId)
+    throw Error('Choose a project item from the selected company.');
   const sub = item?.subItems.find(sub => sub.id === subItemId);
   if (
     subItemId &&
@@ -1750,7 +1781,7 @@ function saveRange(form) {
         : s.date === draft.originalDate && s.time === draft.originalTime
     ),
     company = readScheduleCompany(form, oldBooking || oldPlan, { kind, linkId }),
-    itemLink = readScheduleItem(form, oldBooking || oldPlan, { kind, linkId }),
+    itemLink = readScheduleItem(form, oldBooking || oldPlan, { kind, linkId, ...company }),
     leaveData = window.WorkHubLeave.read(form, kind),
     travel = window.WorkHubClaims.read(form, kind),
     claimContext = window.WorkHubClaims.context(form, kind, true);
@@ -1894,11 +1925,12 @@ function savePlan(form) {
   const value = k => form.elements.namedItem(k)?.value || '',
     id = form.dataset.id || uid(),
     old = state.projectPlans.find(p => p.id === id),
+    company = readScheduleCompany(form, old, { kind: 'project', linkId: value('projectId') }),
     p = {
       id,
       projectId: value('projectId'),
-      ...readScheduleCompany(form, old, { kind: 'project', linkId: value('projectId') }),
-      ...readScheduleItem(form, old, { kind: 'project', linkId: value('projectId') }),
+      ...company,
+      ...readScheduleItem(form, old, { kind: 'project', linkId: value('projectId'), ...company }),
       title: value('title').trim(),
       activity: value('activity'),
       text: value('text'),
