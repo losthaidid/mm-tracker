@@ -33,11 +33,11 @@
     E.validateProfile(p); return p;
   }
   function install(a) {
-    let key = '', snap = null, actions = [], cursor = -1, timer = 0, playing = false, saved = '', editing = '', loop = false, flowView = 'split', baseline = null, drag = null;
+    let key = '', snap = null, actions = [], cursor = -1, timer = 0, playing = false, saved = '', editing = '', loop = false, flowView = 'split', baseline = null, drag = null, pointerDrag = null;
     const $ = id => document.getElementById(id);
     const contextKey = c => JSON.stringify([c.owner, c.projectId, c.demo, c.proposal?.id, c.proposal?.profile, c.process?.scenario]);
     function stop() { if (timer) root.clearInterval(timer); timer = 0; playing = false; }
-    function reset() { stop(); key = ''; snap = null; actions = []; cursor = -1; saved = editing = ''; baseline = drag = null; }
+    function reset() { stop(); clearStockDrag(); key = ''; snap = null; actions = []; cursor = -1; saved = editing = ''; baseline = drag = null; }
     function ensure() {
       const c = a.context(), next = contextKey(c);
       if (key !== next) {
@@ -163,6 +163,7 @@
     }
     document.addEventListener('dragstart', event => {
       const el = event.target.closest?.('[data-ss-stock]'); if (!el) return;
+      if (pointerDrag) { event.preventDefault(); return; }
       try { a.guard(); ensure(); stop(); drag = { key, cursor, from: el.dataset.ssStock }; event.dataTransfer?.setData('text/plain', 'mm-studio-stock'); if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'; }
       catch (err) { event.preventDefault(); a.tell(err.message, true); }
     });
@@ -173,6 +174,39 @@
       try { a.guard(); ensure(); if (old.key !== key || old.cursor !== cursor) throw Error('The scenario changed. Pick up the stock again.'); transfer(old.from, zone.dataset.ssDrop); } catch (err) { a.tell(err.message, true); }
     });
     document.addEventListener('dragend', () => { drag = null; });
+    // Pointer capture also supports touch and avoids native HTML-drag differences.
+    function clearStockDrag() {
+      if (pointerDrag) { pointerDrag.ghost?.remove(); try { pointerDrag.source.releasePointerCapture?.(pointerDrag.pointerId); } catch {} }
+      pointerDrag = null;
+      document.querySelectorAll('.sx-storage-zone.is-drag-over').forEach(el => el.classList.remove('is-drag-over'));
+    }
+    document.addEventListener('pointerdown', event => {
+      const source = event.target.closest?.('[data-ss-stock]'); if (!source || event.button > 0) return;
+      try {
+        a.guard(); ensure(); stop(); clearStockDrag();
+        pointerDrag = { key, cursor, source, from: source.dataset.ssStock, pointerId: event.pointerId, x: event.clientX, y: event.clientY, moved: false, ghost: null };
+        source.setPointerCapture?.(event.pointerId); event.preventDefault();
+      } catch (err) { clearStockDrag(); a.tell(err.message, true); }
+    });
+    document.addEventListener('pointermove', event => {
+      const d = pointerDrag; if (!d || d.pointerId !== event.pointerId) return;
+      if (!d.source.isConnected || d.key !== key || d.cursor !== cursor) { clearStockDrag(); return; }
+      if (!d.moved && Math.hypot(event.clientX - d.x, event.clientY - d.y) < 7) return;
+      d.moved = true; event.preventDefault();
+      if (!d.ghost) { d.ghost = document.createElement('div'); d.ghost.className = 'sx-stock-ghost hub-sensitive'; d.ghost.setAttribute('aria-hidden', 'true'); d.ghost.textContent = '▧ Stock from ' + d.from; const host = $('modal')?.open ? $('modal') : document.body; host.append(d.ghost); }
+      const host = d.ghost.parentElement, rect = host.getBoundingClientRect();
+      d.ghost.style.left = event.clientX - rect.left + host.scrollLeft + 12 + 'px'; d.ghost.style.top = event.clientY - rect.top + host.scrollTop + 12 + 'px';
+      const target = document.elementFromPoint?.(event.clientX, event.clientY)?.closest?.('[data-ss-drop]');
+      document.querySelectorAll('.sx-storage-zone.is-drag-over').forEach(el => el.classList.remove('is-drag-over')); target?.classList.add('is-drag-over');
+    }, { passive: false });
+    document.addEventListener('pointerup', event => {
+      const d = pointerDrag; if (!d || d.pointerId !== event.pointerId) return;
+      const target = document.elementFromPoint?.(event.clientX, event.clientY)?.closest?.('[data-ss-drop]'); clearStockDrag();
+      if (!d.moved || !target || target.dataset.ssDrop === d.from) return;
+      try { a.guard(); ensure(); if (d.key !== key || d.cursor !== cursor) throw Error('The scenario changed. Pick up the stock again.'); transfer(d.from, target.dataset.ssDrop); } catch (err) { a.tell(err.message, true); }
+    });
+    document.addEventListener('pointercancel', clearStockDrag);
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') clearStockDrag(); });
     document.addEventListener('change', event => {
       if (event.target.id === 'ssSimLoop') loop = event.target.checked;
       const form = event.target.form, material = event.target.closest?.('[data-material]');
@@ -181,7 +215,8 @@
         if (mode) { mode.disabled = !detached; if (!detached) mode.value = M.mode({ quantityUpdate: !!form.elements.namedItem('materialQuantity')?.checked, valueUpdate: !!form.elements.namedItem('materialValue')?.checked }); }
       }
     });
-    document.addEventListener('visibilitychange', () => { if (document.hidden) { stop(); paint(); } });
+    document.addEventListener('visibilitychange', () => { if (document.hidden) { clearStockDrag(); stop(); paint(); } });
+    $('modal')?.addEventListener('close', clearStockDrag);
     document.addEventListener('input', event => { if (event.target.closest?.('#ssTrialProfile, #ssTransactionForm')) { stop(); const b = document.querySelector('[data-ss-sim="play"]'); if (b) b.textContent = '▶ Play'; } });
     return { render, handle, submit, stop, reset, restore, refresh, play, advance, applyMaterial, snapshot: () => ({ key, snap: snap && E.copy(snap), actions: E.copy(actions), cursor, playing }) };
   }
