@@ -8,6 +8,8 @@ Personal process rehearsal: `rehearsal-engine.js` validates saved graphs, scenar
 
 Project reporting: [project-standup-engine.js](../project-standup-engine.js) handles progress totals, recorded update times and Action/task links; [project-standup.js](../project-standup.js) supplies the Overview card, expanded report and Actions forms; [project-standup.css](../project-standup.css) controls its responsive layout. See [PROJECT-STANDUP.md](PROJECT-STANDUP.md) for usage and storage notes.
 
+Product/process solutioning: [solution-engine.js](../solution-engine.js) owns blueprint relationships, decisions, kept-run inputs, delivery links and the pure SAP MM model. [solution-demo.js](../solution-demo.js) supplies the fictional business; [solution-studio.js](../solution-studio.js) builds the discovery/design/review screens; [solution-simulation.js](../solution-simulation.js) manages local trial inputs and playback; [solution-studio.css](../solution-studio.css) controls the appearance and effects. Start with [SOLUTION-STUDIO.md](SOLUTION-STUDIO.md) for workflow, SAP sources and the explicit transaction coverage.
+
 **Start with [Editing guide](EDITING-GUIDE.md).** For appearance changes, use [custom.css](../custom.css).
 For feature-specific changes, find the matching file below. JavaScript (`.js`) controls behaviour;
 CSS (`.css`) controls appearance; HTML supplies the initial page structure.
