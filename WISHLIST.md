@@ -12,6 +12,10 @@ On 20 October 2026, Request inbox, End-of-day ritual, Personal learning roadmap 
 
 Kept on 21 October 2026: **2 · Waiting on** — add a field beside project items and sub-items in the Daily stand-up summary to record who needs to respond, such as the business team, ABAP, BASIS or a named person. This is a wishlist selection; implementation has not been requested yet. No batch assigned.
 
+## Pending reporting enhancement
+
+Kept on 21 October 2026: **1 · Stand-up Briefing Builder** — prepare a ready-to-copy report from project updates, grouped into completed yesterday, working on today, blockers and decisions needed. Preview and edit the report before copying it to Teams or email. This is a wishlist selection only; implementation has not been requested. No batch assigned.
+
 ## Earlier completed selections
 
 The seven selected items are now part of the existing account document. The tracker keeps its current sign-in, saving, backup and restore workflows. No database migration is needed.
