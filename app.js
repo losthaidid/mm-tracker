@@ -7161,7 +7161,7 @@ function viewBooking(date, time) {
   );
 }
 function subTaskCard(task, sub) {
-  return `<article class="task-child status-${statusClass(sub.status)}"><div class="task-child-head"><strong>${esc(sub.title)}</strong>${tag(sub.status)}${WorkHubStudio.subtaskCompletionButton(task, sub)}<button class="small" data-action="edit-task-sub" data-parent="${esc(task.id)}" data-id="${esc(sub.id)}">Edit</button></div><dl class="task-child-notes"><div><dt>Remarks</dt><dd>${esc(sub.remarks) || 'No remarks yet'}</dd></div><div><dt>Feedback</dt><dd>${esc(sub.feedback) || 'No feedback yet'}</dd></div></dl></article>`;
+  return `<article class="task-child status-${statusClass(sub.status)}" data-subtask-id="${esc(sub.id)}"><div class="task-child-head"><strong>${esc(sub.title)}</strong>${tag(sub.status)}${WorkHubStudio.subtaskCompletionButton(task, sub)}<button class="small" data-action="edit-task-sub" data-parent="${esc(task.id)}" data-id="${esc(sub.id)}">Edit</button></div><dl class="task-child-notes"><div><dt>Remarks</dt><dd>${esc(sub.remarks) || 'No remarks yet'}</dd></div><div><dt>Feedback</dt><dd>${esc(sub.feedback) || 'No feedback yet'}</dd></div></dl><div class="task-child-actions">${WorkHubStudio.subtaskFeedbackButton(task, sub)}</div></article>`;
 }
 function editTaskSub(parentId, id = '') {
   const task = state.tasks.find(task => task.id === parentId),

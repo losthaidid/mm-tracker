@@ -342,3 +342,9 @@ For a **Project** booking in **Schedule → Plan activity**, choose the project,
 Item links and readable title snapshots use the existing account autosave and JSON backups. Current item names appear after renaming; saved titles keep past bookings readable if an item is removed. Tracked work sessions use the same links. Excel’s Schedule sheet includes Project item and Sub-item columns. Older bookings remain supported.
 
 Momo’s discovery envelope now belongs to his floating container. It travels and drags with him on phone and laptop, with no extra cloud saves or position polling. Tap the envelope to open its linked discovery; existing quiet, privacy and reduced-motion controls still apply.
+
+### Quick feedback for task sub-tasks
+
+Each sub-task has **Add feedback** beside its feedback in the Tasks list and inside Task Details, including Details opened from the board. Its quick form keeps the main task title visible and preselects that child. **Feedback for** can switch between the main task and its sub-tasks without losing the typed draft; the earlier-history preview changes with that choice. Saving appends the current date and time to the chosen target only. Main-task feedback, siblings, remarks and statuses stay independent.
+
+Sub-task feedback uses the existing account autosave and backups, remains editable in the sub-task editor, and appears in Excel’s Task notes sheet. Cancelled, deleted-target, full-history and conflicting saves preserve records and drafts. No database migration is needed.
