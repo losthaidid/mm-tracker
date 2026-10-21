@@ -2336,7 +2336,7 @@ function validateMMAreas(d) {
 function mmAreaEditorRow(area, projectId) {
   const used = state.projectProcessMappings.filter(
     m => m.projectId === projectId && m.area === area.name
-  ).length;
+  ).length + (state.workhub?.projectPeople?.activities || []).filter(a => a.projectId === projectId && a.areaId === area.id).length;
   return `<div class="mm-area-row" data-area-id="${esc(area.id)}"><div><label class="sr-only" for="mm-name-${esc(area.id)}">Area name</label><input id="mm-name-${esc(area.id)}" data-area-name maxlength="100" value="${esc(area.name)}" required placeholder="SAP MM area name"><small class="hint">${used} mapped item${used === 1 ? '' : 's'}</small></div><label class="check-label"><input type="checkbox" data-area-visible${area.visible ? ' checked' : ''}>Show</label><div class="actions"><button type="button" class="small" data-action="mm-area-up" aria-label="Move area up">↑</button><button type="button" class="small" data-action="mm-area-down" aria-label="Move area down">↓</button><button type="button" class="small danger" data-action="mm-area-remove"${used ? ' disabled title="Hide this area to keep its mapped records"' : ''}>Remove</button></div></div>`;
 }
 function openMMAreaManager() {
@@ -3862,7 +3862,7 @@ function renderProjectOverview(m) {
     statuses = [...new Set([...OPTIONS.specStatus, ...m.items.map(s => s.status)])],
     attention = m.overdue.slice(0, 5),
     gateDone = m.gates.filter(g => g.status !== 'Pending').length;
-  return `<div class="dashboard-grid">${hub?.standup?.card(p.id) || ''}<section class="panel box"><h2>Project overview</h2><div class="view-details" style="margin-top:16px"><div><div class="detail-label">Current phase</div><div class="detail-value">${esc(p.phase)} · ${projectPhasePercent(p)}%</div></div><div><div class="detail-label">Health · automatic</div><div class="detail-value">${healthBadge(health)}<small class="health-summary">${esc(health.summary)}</small></div></div><div><div class="detail-label">Go-Live</div><div class="detail-value">${goLiveInfo(p)}</div></div><div class="wide"><div class="detail-label">Next milestone</div><div class="detail-value">${esc(p.nextMilestone) || 'Not set'}</div></div></div>${projectAlerts(p, m)}<h3 class="section-label">Project item progress</h3><div class="status-breakdown">${
+  return `<div class="dashboard-grid">${hub?.standup?.card(p.id) || ''}${hub?.people?.card(p.id) || ''}<section class="panel box"><h2>Project overview</h2><div class="view-details" style="margin-top:16px"><div><div class="detail-label">Current phase</div><div class="detail-value">${esc(p.phase)} · ${projectPhasePercent(p)}%</div></div><div><div class="detail-label">Health · automatic</div><div class="detail-value">${healthBadge(health)}<small class="health-summary">${esc(health.summary)}</small></div></div><div><div class="detail-label">Go-Live</div><div class="detail-value">${goLiveInfo(p)}</div></div><div class="wide"><div class="detail-label">Next milestone</div><div class="detail-value">${esc(p.nextMilestone) || 'Not set'}</div></div></div>${projectAlerts(p, m)}<h3 class="section-label">Project item progress</h3><div class="status-breakdown">${
     statuses
       .map(s => {
         const n = m.items.filter(i => i.status === s).length;
@@ -4717,6 +4717,7 @@ function renderProjectDashboard() {
     ['calendar', 'Timeline calendar'],
     ['items', 'Project items'],
     ['companies', 'Companies & processes'],
+    ['people', 'People & responsibilities'],
     ['gates', 'Phase gates'],
     ['feedback', 'Phase Feedback'],
   ]
@@ -4726,7 +4727,7 @@ function renderProjectDashboard() {
     )
     .join(
       ''
-    )}</div><button class="primary" data-action="new-plan">Plan activity</button></div>${projectView === 'calendar' ? renderProjectCalendar() : projectView === 'items' ? renderProjectSpecs() : projectView === 'companies' ? renderProjectCompanies() : projectView === 'gates' ? renderPhaseGates() : projectView === 'feedback' ? renderPhaseFeedback() : renderProjectOverview(m) + watchlistPanel()}`;
+    )}</div><button class="primary" data-action="new-plan">Plan activity</button></div>${projectView === 'calendar' ? renderProjectCalendar() : projectView === 'items' ? renderProjectSpecs() : projectView === 'companies' ? renderProjectCompanies() : projectView === 'people' ? hub?.people?.render(p.id) || '' : projectView === 'gates' ? renderPhaseGates() : projectView === 'feedback' ? renderPhaseFeedback() : renderProjectOverview(m) + watchlistPanel()}`;
 }
 
 function gateDueState(g) {
@@ -8651,6 +8652,8 @@ let legacyBrowserCache = { raw: null, value: null };
 function hasTrackerRecords(d) {
   if (
     d.workhub?.recipients?.companies?.length ||
+    d.workhub?.projectPeople?.people?.length ||
+    d.workhub?.projectPeople?.activities?.length ||
     d.workhub?.validator?.templates?.length ||
     d.workhub?.validator?.runs?.length
   )
@@ -9634,6 +9637,7 @@ hub = WorkHubStudio.install({
   rangeSegments,
   overlaps: bookingOverlaps,
   download,
+  manageMMAreas: openMMAreaManager,
   statusOptions: { tickets: OPTIONS.status, specs: OPTIONS.specStatus, subtasks: SUBITEM_STATUSES },
   openSubItems,
   latestHistory,
