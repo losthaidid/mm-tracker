@@ -20,6 +20,16 @@ Kept on 21 October 2026: **1 · Stand-up Briefing Builder** — prepare a ready-
 
 Kept on 21 October 2026: **42 · Go-live support cockpit** — a focused command centre for go-live days, bringing together critical issues, business contacts, upcoming checkpoints and the latest updates, with prominent alerts for urgent work. This is a wishlist selection only; implementation has not been requested. No batch assigned.
 
+## Pending Material Type Explorer enhancements
+
+Kept on 21 October 2026: selections **1–5** from the Material Type Explorer discussion. Wishlist only; implementation has not been requested. No batch assigned.
+
+1. **Help me choose wizard** — ask about storage, quantity/value tracking and procurement to explain suitable profiles and points to confirm.
+2. **Interactive behaviour cards** — explain purchasing, goods receipt, goods issue, transfers and accounting through conditions and animated examples.
+3. **Change-and-compare sandbox** — change a setting and compare its impact using the same transaction sequence.
+4. **Configuration dependencies** — distinguish material-type settings, purchase-order settings and other configuration that influence behaviour.
+5. **Material-master preparation checklist** — prepare the information to confirm for the proposed design, including units, organisational levels, purchasing data, valuation settings and account assignments.
+
 ## Earlier completed selections
 
 The seven selected items are now part of the existing account document. The tracker keeps its current sign-in, saving, backup and restore workflows. No database migration is needed.
