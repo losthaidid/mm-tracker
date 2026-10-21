@@ -8691,6 +8691,10 @@ function hasTrackerRecords(d) {
     d.workhub?.solutionStudio?.processes?.length ||
     d.workhub?.solutionStudio?.proposals?.length ||
     d.workhub?.solutionStudio?.runs?.length ||
+    d.workhub?.solutionStudio?.materialTypes?.length ||
+    d.workhub?.solutionStudio?.businessRules?.length ||
+    d.workhub?.solutionStudio?.workshopNotes?.length ||
+    d.workhub?.solutionStudio?.preparations?.length ||
     d.workhub?.validator?.templates?.length ||
     d.workhub?.validator?.runs?.length
   )

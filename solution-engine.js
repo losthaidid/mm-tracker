@@ -6,12 +6,13 @@
  */
 (function (root) {
   'use strict';
-  const VERSION = 'mm-core-2026-10-21.1';
+  const VERSION = 'mm-core-2026-10-21.2';
+  const VERSIONS = ['mm-core-2026-10-21.1', VERSION];
   const MODES = { valuated: 'Valuated stock', quantity: 'Quantity-only stock · UNBW', nonstock: 'Non-stock · NLAG' };
   const STATUS = ['Exploring', 'Proposed', 'Under review', 'Agreed'];
   const SYSTEMS = ['ECC', 'S/4HANA'];
   const TRACKING = { manual: 'Spreadsheet / manual stock', valuated: 'SAP valuated stock', quantity: 'SAP quantity-only stock', nonstock: 'Direct consumption / non-stock', unknown: 'Not confirmed' };
-  const LIMITS = { products: 1000, processes: 1500, proposals: 4000, decisions: 4000, runs: 500, deliveries: 2000 };
+  const LIMITS = { products: 1000, processes: 1500, proposals: 4000, decisions: 4000, runs: 500, deliveries: 2000, materialTypes: 1000, businessRules: 4000, workshopNotes: 4000, preparations: 4000 };
   const SOURCES = [
     ['Stock and consumption', 'https://learning.sap.com/courses/business-processes-in-sap-s-4hana-sourcing-procurement/comparing-procurement-processes-for-stock-and-consumption'],
     ['UNBW and NLAG', 'https://learning.sap.com/courses/inventory-management-and-physical-inventory-in-sap-s-4hana/posting-goods-movements-for-material-types-unbw-and-nlag'],
@@ -43,6 +44,8 @@
   function upgrade(d) {
     if (!d.workhub) d.workhub = {};
     if (d.workhub.solutionStudio === undefined) d.workhub.solutionStudio = { version: 1, products: [], processes: [], proposals: [], decisions: [], runs: [], deliveries: [] };
+    // Additive upgrade: older backups retain their saved runs and core definitions.
+    for (const k of ['materialTypes', 'businessRules', 'workshopNotes', 'preparations']) if (d.workhub.solutionStudio[k] === undefined) d.workhub.solutionStudio[k] = [];
     return d;
   }
   const records = (d, pid) => { project(d, pid); return Object.fromEntries(Object.keys(LIMITS).map(k => [k, data(d)[k].filter(r => r.projectId === pid)])); };
@@ -53,6 +56,7 @@
       !num(p.standardPrice, 1000000, 2) || !num(p.poPrice, 1000000, 2) || !num(p.overTolerance, 100, 2) ||
       ['grAllowed', 'grNonValuated', 'unlimited', 'negativeConfig', 'negativeMaterial'].some(k => typeof p[k] !== 'boolean'))
       throw Error('Check the simulation profile: quantities (up to 3 decimals), prices (up to 2), tolerance and document controls.');
+    if (p.materialType !== undefined) root.WorkHubSolutionMaterials.validateType(p.materialType);
   }
   function validateActions(actions) {
     if (!Array.isArray(actions) || actions.length > 40) throw Error('A simulation supports up to 40 transactions.');
@@ -69,7 +73,7 @@
         if (!r || !id(r.id) || ids.has(r.id) || !id(r.projectId)) throw Error('Solution Studio records need unique IDs and a project.');
         project(d, r.projectId); ids.add(r.id); maps[k].set(r.id, r);
         counts.set(r.projectId, (counts.get(r.projectId) || 0) + 1);
-        if (counts.get(r.projectId) > ({ products: 200, processes: 250, proposals: 600, decisions: 600, runs: 100, deliveries: 300 }[k])) throw Error('This project has reached its Solution Studio collection limit.');
+        if (counts.get(r.projectId) > ({ products: 200, processes: 250, proposals: 600, decisions: 600, runs: 100, deliveries: 300, materialTypes: 100, businessRules: 600, workshopNotes: 600, preparations: 600 }[k])) throw Error('This project has reached its Solution Studio collection limit.');
       }
     }
     const person = (pid, who) => !who || (d.workhub.projectPeople?.people || []).some(p => p.id === who && p.projectId === pid);
@@ -109,8 +113,9 @@
     for (const p of h.proposals.filter(p => p.status === 'Agreed')) if (!h.decisions.some(r => r.proposalId === p.id && r.outcome === 'Agreed' && JSON.stringify(JSON.parse(r.snapshot).proposal) === JSON.stringify(p))) throw Error('Record agreement for the current proposal design before marking it Agreed.');
     for (const r of h.runs) {
       const p = maps.proposals.get(r.proposalId), s = r.snapshot;
-      if (!text(r.proposalId, 100) || (p && p.projectId !== r.projectId) || !text(r.title, 160) || !r.title.trim() || !date(r.at) || !s || !text(s.productName, 2000) || !text(s.processName, 160) || !text(s.proposalTitle, 160) || !SYSTEMS.includes(s.system) || !text(s.release, 100) || s.engineVersion !== VERSION || !['procurement', 'context'].includes(s.scenario)) throw Error('Check saved simulation snapshots.');
+      if (!text(r.proposalId, 100) || (p && p.projectId !== r.projectId) || !text(r.title, 160) || !r.title.trim() || !date(r.at) || !s || !text(s.productName, 2000) || !text(s.processName, 160) || !text(s.proposalTitle, 160) || !SYSTEMS.includes(s.system) || !text(s.release, 100) || !VERSIONS.includes(s.engineVersion) || !['procurement', 'context'].includes(s.scenario)) throw Error('Check saved simulation snapshots.');
       validateProfile(s.profile); validateActions(r.actions);
+      if (s.engineVersion !== VERSION && s.profile.materialType) throw Error('Material attributes require the current simulation rule version.');
     }
     for (const r of h.deliveries) {
       const p = maps.proposals.get(r.proposalId);
@@ -118,6 +123,7 @@
       if (!p || p.projectId !== r.projectId || !id(r.itemId) || (item && item.projectId !== r.projectId) || !date(r.at) || !Array.isArray(r.taskIds) || r.taskIds.length > 10 || new Set(r.taskIds).size !== r.taskIds.length || r.taskIds.some(x => { const t = (d.tasks || []).find(t => t.id === x); return !id(x) || (t && (t.taskType !== 'Project' || t.linkId !== r.projectId)); }) || !Array.isArray(r.tests) || r.tests.length > 40 || r.tests.some(x => !text(x.title, 2000) || !text(x.expected, 2000))) throw Error('Check linked solution delivery work.');
     }
     if (new Set(h.deliveries.map(r => r.proposalId)).size !== h.deliveries.length) throw Error('This proposal already has linked delivery work.');
+    root.WorkHubSolutionMaterials?.validateRecords(d, h, maps);
     return d;
   }
   /** Clean only deliberate deletions; malformed imported references still fail validation. */
@@ -145,6 +151,7 @@
       if (collection === 'products') for (const p of h.proposals) if (p.status === 'Agreed' && h.processes.some(x => x.id === p.processId && x.productIds.includes(row.id))) p.status = 'Under review';
     }
     if (old) h[collection][h[collection].indexOf(old)] = row; else h[collection].push(row);
+    if (collection === 'processes') for (const r of h.businessRules.filter(r => r.processId === row.id)) r.stepIds = r.stepIds.filter(id => row.steps.some(s => s.id === id));
     validate(d); return row;
   }
   function remove(d, collection, pid, id) {
@@ -157,7 +164,9 @@
     if (proposalIds.size) {
       h.proposals = h.proposals.filter(x => !proposalIds.has(x.id));
       h.decisions = h.decisions.filter(x => !proposalIds.has(x.proposalId));
+      h.preparations = h.preparations.filter(x => !proposalIds.has(x.proposalId));
     }
+    if (collection === 'processes') for (const k of ['businessRules', 'workshopNotes']) h[k] = h[k].filter(x => x.processId !== id);
     validate(d);
   }
   function decision(d, proposalId, values, uid, at) {
@@ -211,8 +220,10 @@
     return [receipt, ...rest.filter(x => x.qty > 0)];
   }
   /** Every unsuccessful transaction leaves the entire simulated state untouched. */
-  function simulate(p, actions, scenario = 'procurement') {
+  function simulate(p, actions, scenario = 'procurement', version = VERSION) {
     validateProfile(p); validateActions(actions);
+    if (!VERSIONS.includes(version)) throw Error('This saved rule version is not supported.');
+    if (version !== VERSION && p.materialType) throw Error('Material attributes require the current simulation rule version.');
     let current = initial(p); const start = copy(current), events = [], receipts = new Map(), stack = [];
     const posting = (account, signed, costObject = '') => ({ account, debit: Math.max(0, signed), credit: Math.max(0, -signed), costObject });
     for (let i = 0; i < actions.length; i++) {
@@ -220,6 +231,11 @@
       let error = null, status = 'error', code = '', message = '', fix = '', postings = [], movement = '', explanation = '', reverseTarget = null;
       const fail = (rule, why, remedy, unsupported = false) => { if (!error) { error = true; code = rule; message = why; fix = remedy; status = unsupported ? 'unsupported' : 'error'; } };
       if (scenario !== 'procurement') fail('COVERAGE', 'This process needs a production, quality or sales model.', 'Keep documenting this process. Use a procurement process for the supported MM simulator.', true);
+      if (version === VERSION && p.materialType) {
+        const why = root.WorkHubSolutionMaterials.coverage(p.materialType);
+        if (why) fail('MATERIAL_SCOPE', why, 'Review the material attributes or document this specialist process outside the core PO model.', true);
+        if (root.WorkHubSolutionMaterials.mode(p.materialType) !== p.mode) fail('MATERIAL_ATTRIBUTES', 'The inventory mode does not match the explicit quantity/value attributes.', 'Apply the material profile again, or adjust its explicit attributes in the material controls.');
+      }
       if (p.grNonValuated || p.accountCategory === 'Other') fail('COVERAGE', 'This profile uses posting behaviour outside the initial model.', 'Use valuated PO goods receipt and either no assignment or a single K assignment. Non-valuated PO GR timing and other assignments are not covered.', true);
       if ((p.mode === 'nonstock' && p.purpose !== 'consumption') || (p.mode === 'quantity' && p.purpose !== 'stock')) fail('PROFILE_PURPOSE', 'Product capability and procurement purpose do not match this supported profile.', p.mode === 'nonstock' ? 'Choose direct consumption for NLAG.' : 'Choose stock procurement for the quantity-only UNBW profile.');
       if (!tracks(p) && p.openingQty !== 0) fail('OPENING_STOCK', 'This scenario does not maintain an inventory balance.', 'Set opening inventory quantity to zero, or choose an inventory profile.');
@@ -293,7 +309,7 @@
       }
       events.push({ index: i, document: error ? '' : doc, movement, action: copy(a), status, code, message, fix, explanation, postings: postings.filter(x => x.debit || x.credit), before, after: copy(current) });
     }
-    return { engineVersion: VERSION, initial: start, events, final: copy(current), activeDocuments: stack.map(x => ({ document: x.doc, type: x.type, actionId: x.actionId })), receipts: [...receipts].map(([reference, r]) => ({ reference, document: r.document, available: r.available / 1000 })) };
+    return { engineVersion: version, initial: start, events, final: copy(current), activeDocuments: stack.map(x => ({ document: x.doc, type: x.type, actionId: x.actionId })), receipts: [...receipts].map(([reference, r]) => ({ reference, document: r.document, available: r.available / 1000 })) };
   }
-  root.WorkHubSolutionEngine = { VERSION, MODES, STATUS, SYSTEMS, TRACKING, LIMITS, SOURCES, RULES, copy, data, project, records, profile, tracks, upgrade, validate, validateProfile, validateActions, prepare, upsert, remove, decision, snapshot, saveRun, delivery, action, defaultActions, simulate };
+  root.WorkHubSolutionEngine = { VERSION, VERSIONS, MODES, STATUS, SYSTEMS, TRACKING, LIMITS, SOURCES, RULES, copy, data, project, records, profile, tracks, upgrade, validate, validateProfile, validateActions, prepare, upsert, remove, decision, snapshot, saveRun, delivery, action, defaultActions, simulate };
 })(window);

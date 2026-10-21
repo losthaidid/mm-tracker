@@ -20,36 +20,28 @@ Kept on 21 October 2026: **1 · Stand-up Briefing Builder** — prepare a ready-
 
 Kept on 21 October 2026: **42 · Go-live support cockpit** — a focused command centre for go-live days, bringing together critical issues, business contacts, upcoming checkpoints and the latest updates, with prominent alerts for urgent work. This is a wishlist selection only; implementation has not been requested. No batch assigned.
 
-## Pending Material Type Explorer enhancements
+## Material Explorer and solution workshops · implemented
 
-Kept on 21 October 2026: selections **1–5** from the Material Type Explorer discussion. Wishlist only; implementation has not been requested. No batch assigned.
+Approved on 21 October 2026, including the final **41 · Physical flow vs document flow** selection. All 14 selected enhancements from this discussion are implemented in Solution Studio; see [the usage guide](docs/MATERIAL-EXPLORER.md).
 
-1. **Help me choose wizard** — ask about storage, quantity/value tracking and procurement to explain suitable profiles and points to confirm.
-2. **Interactive behaviour cards** — explain purchasing, goods receipt, goods issue, transfers and accounting through conditions and animated examples.
-3. **Change-and-compare sandbox** — change a setting and compare its impact using the same transaction sequence.
-4. **Configuration dependencies** — distinguish material-type settings, purchase-order settings and other configuration that influence behaviour.
-5. **Material-master preparation checklist** — prepare the information to confirm for the proposed design, including units, organisational levels, purchasing data, valuation settings and account assignments.
+| Selection | Where to use it |
+| --- | --- |
+| 1 · Help me choose wizard | Material explorer → Help me choose. |
+| 2 · Interactive behaviour cards | Material explorer → Attributes & behaviour. |
+| 3 · Change-and-compare sandbox | Apply a reference to a trial or change simulator inputs; Before & after uses the same sequence. |
+| 4 · Configuration dependencies | Material explorer → What controls this? |
+| 5 · Material-master preparation checklist | Material explorer → Preparation. |
+| 16 · Business discovery interview | Discovery interview → preview answers → Create draft process. |
+| 17 · Visual warehouse sandbox | Simulator → drag stock or use Transfer to move between the two locations. |
+| 18 · Unexpected-event scenarios | Simulator → Introduce a complication. |
+| 23 · Explain at three levels | Design tools → Business user / SAP consultant / Finance. |
+| 25 · Animated accounting companion | Simulator → inventory, consumption, GR/IR and price-difference panels. |
+| 28 · Business-rule cards | Design tools → Business rules; links appear on current-process steps. |
+| 29 · Consultant handover pack | Design tools → Preview handover → Download printable HTML. |
+| 38 · Workshop presentation board | Present workshop → five stages with live simulation and private notes. |
+| 41 · Physical flow vs document flow | Simulator → Physical flow / Document flow / Both together. |
 
-## Pending Solution Studio discovery and simulation enhancements
-
-Kept on 21 October 2026: selections **16–18 and 23**. Wishlist only; implementation has not been requested. No batch assigned.
-
-- **16 · Business discovery interview** — guided questions about buying, storing, consuming, manufacturing and selling; answers build a draft process map for review.
-- **17 · Visual warehouse sandbox** — storage-location zones with draggable simulated materials, animated movements, quantities and effects.
-- **18 · Unexpected-event scenarios** — introduce events such as damaged deliveries, urgent consumption or supplier returns within supported simulation coverage to explore the proposed design.
-- **23 · Explain at three levels** — present the same proposal from Business user, SAP consultant and Finance perspectives.
-
-## Pending Solution Studio accounting, rules and handover enhancements
-
-Kept on 21 October 2026: selections **25, 28 and 29** from the Solution Studio ideas. These numbers are scoped to this discussion and are separate from Batch C selections. Wishlist only; implementation has not been requested. No batch assigned.
-
-- **25 · Animated accounting companion** — simplified inventory, expense and GR/IR panels beside the process; supported transactions animate the relevant amounts with explanations.
-- **28 · Business-rule cards** — capture business rules, attach them to process steps, and identify SAP configuration, workflow or manual-control needs.
-- **29 · Consultant handover pack** — compile an agreed design into business requirements, process maps, material profiles, configuration assumptions, test scenarios and open questions.
-
-## Pending Solution Studio workshop enhancement
-
-Kept on 21 October 2026: **38 · Workshop presentation board** — a large, readable view for screen sharing that moves through business problems, proposed processes and simulations while capturing questions and decisions. Wishlist only; implementation has not been requested. No batch assigned.
+These numbers belong to the Solution Studio discussion and are separate from Batch C. The release also adds the requested material-type reference catalogue, maintained custom profiles and stronger scoped visual effects. Other unselected ideas remain outside this release.
 
 ## Earlier completed selections
 

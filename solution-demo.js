@@ -71,6 +71,22 @@
         h.proposals.push(proposal);
       }
     }
+    // Reference snapshots make the sample useful in Material Explorer and workshops.
+    // They are explicit demo attributes, never assertions about a client's Customizing.
+    const M = root.WorkHubSolutionMaterials;
+    if (M) {
+      const codes = { 'demo-flour': 'ROH', 'demo-pack': 'VERP', 'demo-bread': 'FERT', 'demo-bearing': 'ERSA', 'demo-gloves': 'NLAG' };
+      for (const product of h.products) product.materialType = M.reference(codes[product.id]);
+      for (const proposal of h.proposals) {
+        const p = h.processes.find(p => p.id === proposal.processId), product = h.products.find(x => p.productIds.includes(x.id));
+        proposal.profile = M.applyType(M.reference(proposal.profile.mode === 'quantity' ? 'UNBW' : proposal.profile.mode === 'nonstock' ? 'NLAG' : product?.materialType.code || 'ERSA'), proposal.profile);
+      }
+      const spares = h.processes.find(p => p.id === 'demo-process-spares');
+      spares.interview = { product: 'Maintenance bearings', buy: 'Buyer receives a WhatsApp request and buys a replacement.', store: 'Engineering store records the delivery in a workbook.', consume: 'Technician collects the bearing and reports usage later.', make: '', sell: '', pain: 'Maintenance and Finance cannot reconcile available stock and usage.' };
+      h.businessRules.push({ id: 'demo-rule-approval', projectId: pid, processId: spares.id, title: 'Approve urgent purchases', condition: 'An urgent spare purchase exceeds the agreed business threshold.', response: 'Confirm the approver and retain the approval before committing the order.', owner: 'Maintenance lead / Finance', implementation: 'Workflow', stepIds: [spares.steps[1].id] });
+      h.businessRules.push({ id: 'demo-rule-withdrawal', projectId: pid, processId: spares.id, title: 'Record withdrawals promptly', condition: 'A technician collects a bearing from the store.', response: 'Warehouse records the issue and receiving cost centre at handover.', owner: 'Warehouse', implementation: 'Manual control', stepIds: [spares.steps[3].id] });
+      h.workshopNotes.push({ id: 'demo-workshop-question', projectId: pid, processId: spares.id, kind: 'Question', text: 'Should low-value spares use quantity-only stock, while critical bearings retain quantity and value?', by: 'Mei Ling · Finance', at: '2026-10-21T02:00:00.000Z' });
+    }
     let n = 0;
     E.decision(d, 'demo-proposal-packaging-valuated', { by: 'Mei Ling · Finance / Rajan Kumar · Warehouse', outcome: 'Agreed', note: 'Sample agreement: retain quantity and value visibility for packaging. Confirm standard price and account determination in SAP before implementation.' }, () => 'demo-decision-' + ++n, '2026-10-21T02:00:00.000Z');
     E.saveRun(d, 'demo-proposal-spares-nonstock', { title: 'Learn why non-stock PO GR is valid', actions: [E.action('gr', 100, 'inventory'), E.action('gr', 100, 'consumption'), E.action('issue', 30, 'inventory')] }, () => 'demo-run-' + ++n, '2026-10-21T02:10:00.000Z');
@@ -94,6 +110,7 @@
     for (const r of rows.products) h.products.push({ ...r, ...context, id: ids.get(r.id), ownerId: '' });
     for (const r of rows.processes) h.processes.push({ ...r, ...context, id: ids.get(r.id), ownerId: '', areaId: target.mmAreas.find(a => a.name.toLowerCase() === source.projects[0].mmAreas.find(a => a.id === r.areaId).name.toLowerCase())?.id || '', productIds: r.productIds.map(id => ids.get(id)), steps: r.steps.map(s => ({ ...s, id: ids.get(s.id), actorId: '' })), requirements: r.requirements.map(x => ({ ...x, id: ids.get(x.id) })) });
     for (const r of rows.proposals) h.proposals.push({ ...E.copy(r), ...{ projectId: targetId }, id: ids.get(r.id), processId: ids.get(r.processId), status: 'Exploring', requirementIds: r.requirementIds.map(id => ids.get(id)), steps: r.steps.map(s => ({ ...s, id: uid(), actorId: '', sourceIds: s.sourceIds.map(id => ids.get(id)) })) });
+    for (const r of rows.businessRules) h.businessRules.push({ ...E.copy(r), id: uid(), projectId: targetId, processId: ids.get(r.processId), stepIds: r.stepIds.map(id => ids.get(id)) });
     E.validate(d);
   }
   root.WorkHubSolutionDemo = { create, copyInto };
