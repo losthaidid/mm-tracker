@@ -874,6 +874,10 @@ function projectChange(el) {
     openChargeCodes('projects');
     return true;
   }
+  if (el.id === 'bookingItem' && ['scheduleForm', 'planForm'].includes(el.form?.id)) {
+    updateScheduleSubItemField(el.form);
+    return true;
+  }
   if (el.id === 'scheduleKind') {
     changeScheduleKind(el);
     return true;
@@ -883,6 +887,7 @@ function projectChange(el) {
     (el.id === 'planProject' && el.form?.id === 'planForm')
   ) {
     updateScheduleCompanyField(el.form);
+    updateScheduleItemFields(el.form);
     return true;
   }
   return false;
@@ -989,6 +994,10 @@ function changeRangeKind(el) {
     text: val('text'),
     companyId: val('companyId') || '',
     companyName: f.elements.namedItem('companyId')?.selectedOptions[0]?.dataset.companyName || '',
+    itemId: '',
+    subItemId: '',
+    itemTitle: '',
+    subItemTitle: '',
     kind: el.value,
     linkId: el.value === 'project' ? state.activeProjectId : '',
     activity: '',
@@ -1461,6 +1470,11 @@ function scheduleDisplayText(s, d = state) {
     isToilSchedule(s, d) ? 'TOIL' : '',
     linked,
     scheduleCompanyName(s, d),
+    s.kind === 'project'
+      ? [scheduleItemContext(s, d).itemTitle, scheduleItemContext(s, d).subItemTitle]
+          .filter(Boolean)
+          .join(' → ')
+      : '',
     s.kind === 'project' ? s.location : '',
     s.text,
   ]
@@ -1581,6 +1595,119 @@ function scheduleCompanyBadge(row) {
     ? `<span class="booking-company" title="Company: ${esc(name)}"><span class="booking-company-label">Company</span> ${esc(name)}</span>`
     : '';
 }
+/** Stable Project item links, with readable snapshots for deleted records. */
+function scheduleItemContext(row, d = state) {
+  const plan = row.planId ? d.projectPlans.find(p => p.id === row.planId) : null,
+    itemId = row.itemId || plan?.itemId || '',
+    subItemId = row.subItemId || plan?.subItemId || '',
+    item = d.specs.find(item => item.id === itemId),
+    sub = item?.subItems.find(sub => sub.id === subItemId);
+  return {
+    itemId,
+    subItemId,
+    itemTitle:
+      item?.description || row.itemTitle || plan?.itemTitle || (itemId ? 'Saved project item' : ''),
+    subItemTitle:
+      sub?.title || row.subItemTitle || plan?.subItemTitle || (subItemId ? 'Saved sub-item' : ''),
+  };
+}
+function scheduleItemOptions(projectId, selected = '', savedTitle = '') {
+  const items = state.specs.filter(item => item.projectId === projectId),
+    former = selected && !state.specs.some(item => item.id === selected);
+  return `<option value="">No project item / general project work</option>${items.map(item => `<option value="${esc(item.id)}" data-item-title="${esc(item.description)}"${item.id === selected ? ' selected' : ''}>${esc(projectItemLabel(item) + ' · ' + item.description)}</option>`).join('')}${former ? `<option value="${esc(selected)}" data-item-title="${esc(savedTitle)}" selected>${esc(savedTitle || 'Project item')} (saved item)</option>` : ''}`;
+}
+function scheduleSubItemOptions(itemId, selected = '', savedTitle = '') {
+  const subs = state.specs.find(item => item.id === itemId)?.subItems || [],
+    former = selected && !state.specs.some(item => item.subItems.some(sub => sub.id === selected));
+  return `<option value="">Main item only</option>${subs.map(sub => `<option value="${esc(sub.id)}" data-subitem-title="${esc(sub.title)}"${sub.id === selected ? ' selected' : ''}>${esc(sub.title)}</option>`).join('')}${former ? `<option value="${esc(selected)}" data-subitem-title="${esc(savedTitle)}" selected>${esc(savedTitle || 'Sub-item')} (saved sub-item)</option>` : ''}`;
+}
+function scheduleItemFields(row) {
+  const projectId = scheduleCompanyProject(row),
+    context = scheduleItemContext(row);
+  if (!projectId) return '';
+  return `<div class="wide schedule-item-field"><label for="bookingItem">Project item <span class="muted">(optional)</span></label><select id="bookingItem" name="itemId" data-project-scope="${esc(projectId)}" aria-describedby="bookingItemHint">${scheduleItemOptions(projectId, context.itemId, context.itemTitle)}</select><p class="hint" id="bookingItemHint">Choose an item maintained in this project, or leave blank for general project work.</p></div><div class="wide schedule-item-field"><label for="bookingSubItem">Sub-item <span class="muted">(optional)</span></label><select id="bookingSubItem" name="subItemId" data-item-scope="${esc(context.itemId)}"${context.itemId ? '' : ' disabled'}>${scheduleSubItemOptions(context.itemId, context.subItemId, context.subItemTitle)}</select></div>`;
+}
+function updateScheduleItemFields(form) {
+  const select = form.elements.namedItem('itemId');
+  if (!select) return;
+  const projectId =
+      form.elements.namedItem(form.id === 'planForm' ? 'projectId' : 'linkId')?.value || '',
+    sameProject = select.dataset.projectScope === projectId,
+    selected = sameProject ? select.value : '',
+    title = sameProject ? select.selectedOptions[0]?.dataset.itemTitle || '' : '';
+  select.innerHTML = scheduleItemOptions(projectId, selected, title);
+  select.dataset.projectScope = projectId;
+  updateScheduleSubItemField(form);
+}
+function updateScheduleSubItemField(form) {
+  const itemId = form.elements.namedItem('itemId')?.value || '',
+    select = form.elements.namedItem('subItemId');
+  if (!select) return;
+  const sameItem = select.dataset.itemScope === itemId,
+    selected = sameItem ? select.value : '',
+    title = sameItem ? select.selectedOptions[0]?.dataset.subitemTitle || '' : '';
+  select.innerHTML = scheduleSubItemOptions(itemId, selected, title);
+  select.dataset.itemScope = itemId;
+  select.disabled = !itemId;
+}
+function readScheduleItem(form, previous, row) {
+  const itemId = form.elements.namedItem('itemId')?.value || '',
+    subItemId = form.elements.namedItem('subItemId')?.value || '',
+    empty = { itemId: '', subItemId: '', itemTitle: '', subItemTitle: '' };
+  if (row.kind !== 'project') return empty;
+  if (!itemId) {
+    if (subItemId) throw Error('Choose a project item before selecting a sub-item.');
+    return empty;
+  }
+  const projectId = scheduleCompanyProject(row),
+    item = state.specs.find(item => item.id === itemId),
+    samePrevious = previous?.itemId === itemId && scheduleCompanyProject(previous) === projectId;
+  if (item ? item.projectId !== projectId : !samePrevious)
+    throw Error('Choose a project item from the selected project.');
+  const sub = item?.subItems.find(sub => sub.id === subItemId);
+  if (
+    subItemId &&
+    !sub &&
+    (!samePrevious ||
+      previous.subItemId !== subItemId ||
+      state.specs.some(item => item.subItems.some(sub => sub.id === subItemId)))
+  )
+    throw Error('Choose a sub-item belonging to the selected project item.');
+  return {
+    itemId,
+    subItemId,
+    itemTitle: item?.description || previous?.itemTitle || 'Saved project item',
+    subItemTitle: subItemId ? sub?.title || previous?.subItemTitle || 'Saved sub-item' : '',
+  };
+}
+function validateScheduleItem(row, d) {
+  for (const [key, limit] of [
+    ['itemId', 100],
+    ['subItemId', 100],
+    ['itemTitle', 32767],
+    ['subItemTitle', 500],
+  ])
+    if (row[key] !== undefined && !checkText(row[key], limit))
+      throw Error('Check the schedule project item.');
+  const item = d.specs.find(item => item.id === row.itemId),
+    projectId = scheduleCompanyProject(row, d);
+  if (item && projectId && item.projectId !== projectId)
+    throw Error('The schedule project item must belong to the selected project.');
+  if (
+    row.subItemId &&
+    (!row.itemId ||
+      d.specs.some(
+        other => other.id !== row.itemId && other.subItems.some(sub => sub.id === row.subItemId)
+      ))
+  )
+    throw Error('The schedule sub-item must belong to the selected project item.');
+}
+function scheduleItemBadge(row) {
+  const context = scheduleItemContext(row);
+  return context.itemId
+    ? `<span class="booking-item" title="Project item: ${esc(context.itemTitle)}${context.subItemTitle ? ' → ' + esc(context.subItemTitle) : ''}"><span class="booking-item-label">Item</span> ${esc(context.itemTitle)}${context.subItemTitle ? `<span class="booking-subitem">↳ ${esc(context.subItemTitle)}</span>` : ''}</span>`
+    : '';
+}
 function renderRangeEditor() {
   const s = scheduleDraft,
     tasks = state.tasks.filter(t => !t.archived || t.id === s.linkId);
@@ -1596,7 +1723,7 @@ function renderRangeEditor() {
       .map(([v, l]) => `<option value="${v}"${v === s.kind ? ' selected' : ''}>${l}</option>`)
       .join(
         ''
-      )}</select></div>${window.WorkHubLeave.fields(s)}${window.WorkHubClaims.fields(s, state)}${s.kind === 'task' ? `<div class="wide"><label for="scheduleLink">Task *</label><select id="scheduleLink" name="linkId" required><option value="">Choose a task</option>${tasks.map(t => `<option value="${esc(t.id)}"${t.id === s.linkId ? ' selected' : ''}>[${esc(t.taskType)}] ${esc((t.number ? t.number + '. ' : '') + t.task.slice(0, 105))} · ${esc(taskLinkedLabel(t))}${t.done ? ' (done)' : ''}</option>`).join('')}</select></div>` : s.kind === 'project' ? `<div class="span2"><label for="scheduleLink">Project *</label><select id="scheduleLink" name="linkId" required>${projectOptions(s.linkId || state.activeProjectId)}</select></div><div><label for="scheduleActivity">Project activity</label><select id="scheduleActivity" name="activity">${selectOptions(state.lists.projectActivities, s.activity, '—')}</select></div>${projectLocationField(s.location)}<div class="span2"><label for="bookingTitle">Activity title</label><input id="bookingTitle" name="title" maxlength="500" value="${esc(s.title)}" placeholder="Defaults to the selected activity"></div><div><label for="bookingStatus">Plan status</label><select id="bookingStatus" name="status">${selectOptions(PLAN_STATUS, s.status, 'Choose status')}</select></div>` : ''}${scheduleCompanyField(s)}<div class="wide"><label for="slotText">${window.WorkHubLeave.isLeave(s.kind) ? 'Leave / handover notes' : s.kind === 'custom' ? 'Activity' : 'Additional notes'}</label><textarea id="slotText" name="text" maxlength="32767">${esc(s.text)}</textarea></div></div><p class="hint">The same time range fills every selected date. Weekend project or ticket-linked task time is marked TOIL automatically. Existing bookings are protected.</p><div class="modal-actions"><div>${s.bookingId || state.schedule.some(r => r.date === s.originalDate && r.time === s.originalTime) ? '<button type="button" class="danger" data-action="clear-booking">Delete activity</button>' : ''}</div><div class="actions"><button type="button" data-action="cancel">Cancel</button><button class="primary" type="submit">Save time range</button></div></div></form>`
+      )}</select></div>${window.WorkHubLeave.fields(s)}${window.WorkHubClaims.fields(s, state)}${s.kind === 'task' ? `<div class="wide"><label for="scheduleLink">Task *</label><select id="scheduleLink" name="linkId" required><option value="">Choose a task</option>${tasks.map(t => `<option value="${esc(t.id)}"${t.id === s.linkId ? ' selected' : ''}>[${esc(t.taskType)}] ${esc((t.number ? t.number + '. ' : '') + t.task.slice(0, 105))} · ${esc(taskLinkedLabel(t))}${t.done ? ' (done)' : ''}</option>`).join('')}</select></div>` : s.kind === 'project' ? `<div class="span2"><label for="scheduleLink">Project *</label><select id="scheduleLink" name="linkId" required>${projectOptions(s.linkId || state.activeProjectId)}</select></div><div><label for="scheduleActivity">Project activity</label><select id="scheduleActivity" name="activity">${selectOptions(state.lists.projectActivities, s.activity, '—')}</select></div>${projectLocationField(s.location)}<div class="span2"><label for="bookingTitle">Activity title</label><input id="bookingTitle" name="title" maxlength="500" value="${esc(s.title)}" placeholder="Defaults to the selected activity"></div><div><label for="bookingStatus">Plan status</label><select id="bookingStatus" name="status">${selectOptions(PLAN_STATUS, s.status, 'Choose status')}</select></div>` : ''}${scheduleCompanyField(s)}${scheduleItemFields(s)}<div class="wide"><label for="slotText">${window.WorkHubLeave.isLeave(s.kind) ? 'Leave / handover notes' : s.kind === 'custom' ? 'Activity' : 'Additional notes'}</label><textarea id="slotText" name="text" maxlength="32767">${esc(s.text)}</textarea></div></div><p class="hint">The same time range fills every selected date. Weekend project or ticket-linked task time is marked TOIL automatically. Existing bookings are protected.</p><div class="modal-actions"><div>${s.bookingId || state.schedule.some(r => r.date === s.originalDate && r.time === s.originalTime) ? '<button type="button" class="danger" data-action="clear-booking">Delete activity</button>' : ''}</div><div class="actions"><button type="button" data-action="cancel">Cancel</button><button class="primary" type="submit">Save time range</button></div></div></form>`
   );
   hub?.claims?.updateTravel($('scheduleForm'));
 }
@@ -1623,6 +1750,7 @@ function saveRange(form) {
         : s.date === draft.originalDate && s.time === draft.originalTime
     ),
     company = readScheduleCompany(form, oldBooking || oldPlan, { kind, linkId }),
+    itemLink = readScheduleItem(form, oldBooking || oldPlan, { kind, linkId }),
     leaveData = window.WorkHubLeave.read(form, kind),
     travel = window.WorkHubClaims.read(form, kind),
     claimContext = window.WorkHubClaims.context(form, kind, true);
@@ -1647,6 +1775,7 @@ function saveRange(form) {
         id: planId,
         projectId: linkId,
         ...company,
+        ...itemLink,
         title: value('title').trim() || activity || 'Project activity',
         activity,
         text,
@@ -1672,6 +1801,7 @@ function saveRange(form) {
           kind,
           linkId,
           ...company,
+          ...itemLink,
           activity,
           location,
           bookingId,
@@ -1728,7 +1858,7 @@ function planStatusClass(p, date = '') {
   return isWeekend(date || p.date) ? 'toil' : statusClass(p.status);
 }
 function planRow(p) {
-  return `<button class="plan-row ${planStatusClass(p)}" data-action="view-plan" data-id="${esc(p.id)}"><span class="plan-date">${esc(p.date)}${p.endDate !== p.date ? ' to ' + esc(p.endDate) : ''}<small>${esc(p.time)}–${esc(p.endTime)}</small></span><span class="plan-title">${esc(p.activity || p.title)}${scheduleCompanyBadge(p)}<small>${esc([p.location, p.title !== p.activity ? p.title : '', p.text.slice(0, 100)].filter(Boolean).join(' · '))}${planHasToil(p) ? ' · TOIL' : ''}</small></span><span>${tag(p.status)}</span></button>`;
+  return `<button class="plan-row ${planStatusClass(p)}" data-action="view-plan" data-id="${esc(p.id)}"><span class="plan-date">${esc(p.date)}${p.endDate !== p.date ? ' to ' + esc(p.endDate) : ''}<small>${esc(p.time)}–${esc(p.endTime)}</small></span><span class="plan-title">${esc(p.activity || p.title)}${scheduleCompanyBadge(p)}${scheduleItemBadge(p)}<small>${esc([p.location, p.title !== p.activity ? p.title : '', p.text.slice(0, 100)].filter(Boolean).join(' · '))}${planHasToil(p) ? ' · TOIL' : ''}</small></span><span>${tag(p.status)}</span></button>`;
 }
 
 function viewPlan(id) {
@@ -1737,7 +1867,7 @@ function viewPlan(id) {
   const project = state.projects.find(x => x.id === p.projectId);
   openModal(
     'Planned activity',
-    `<div class="view-details"><div><div class="detail-label">Project</div><div class="detail-value">${esc(project?.name) || '—'}</div></div><div><div class="detail-label">Company</div><div class="detail-value">${esc(scheduleCompanyName(p)) || 'Not specified'}</div></div><div><div class="detail-label">Project activity</div><div class="detail-value">${esc(p.activity) || '—'}</div></div><div><div class="detail-label">Status</div><div class="detail-value">${tag(p.status)}</div></div><div><div class="detail-label">Date range</div><div class="detail-value">${esc(p.date)}${p.endDate !== p.date ? ' to ' + esc(p.endDate) : ''}</div></div><div><div class="detail-label">Time</div><div class="detail-value">${esc(p.time)}–${esc(p.endTime)}</div></div><div><div class="detail-label">Work location</div><div class="detail-value">${esc(p.location) || '—'}</div></div><div class="wide"><div class="detail-label">Activity title</div><div class="detail-value">${esc(p.title)}</div></div><div class="wide"><div class="detail-label">Notes</div><div class="detail-value">${esc(p.text) || '—'}</div></div>${p.actualReviewedAt ? `<div class="wide"><div class="detail-label">Confirmed actual task</div><div class="detail-value">${esc(p.actualTask)} · ${p.actualSame ? 'Same as planned' : 'Different from plan'} · ${esc(p.actualReviewedAt)}</div></div>` : ''}</div><div class="modal-actions"><span>${planHasToil(p) ? '<span class="phase-badge">TOIL</span>' : ''}</span><div class="actions"><button type="button" data-action="cancel">Close</button><button class="primary" type="button" data-action="edit-plan" data-id="${esc(p.id)}">Edit activity</button></div></div>`
+    `<div class="view-details"><div><div class="detail-label">Project</div><div class="detail-value">${esc(project?.name) || '—'}</div></div><div><div class="detail-label">Company</div><div class="detail-value">${esc(scheduleCompanyName(p)) || 'Not specified'}</div></div><div><div class="detail-label">Project item</div><div class="detail-value">${esc(scheduleItemContext(p).itemTitle) || 'General project work'}${scheduleItemContext(p).subItemTitle ? ' → ' + esc(scheduleItemContext(p).subItemTitle) : ''}</div></div><div><div class="detail-label">Project activity</div><div class="detail-value">${esc(p.activity) || '—'}</div></div><div><div class="detail-label">Status</div><div class="detail-value">${tag(p.status)}</div></div><div><div class="detail-label">Date range</div><div class="detail-value">${esc(p.date)}${p.endDate !== p.date ? ' to ' + esc(p.endDate) : ''}</div></div><div><div class="detail-label">Time</div><div class="detail-value">${esc(p.time)}–${esc(p.endTime)}</div></div><div><div class="detail-label">Work location</div><div class="detail-value">${esc(p.location) || '—'}</div></div><div class="wide"><div class="detail-label">Activity title</div><div class="detail-value">${esc(p.title)}</div></div><div class="wide"><div class="detail-label">Notes</div><div class="detail-value">${esc(p.text) || '—'}</div></div>${p.actualReviewedAt ? `<div class="wide"><div class="detail-label">Confirmed actual task</div><div class="detail-value">${esc(p.actualTask)} · ${p.actualSame ? 'Same as planned' : 'Different from plan'} · ${esc(p.actualReviewedAt)}</div></div>` : ''}</div><div class="modal-actions"><span>${planHasToil(p) ? '<span class="phase-badge">TOIL</span>' : ''}</span><div class="actions"><button type="button" data-action="cancel">Close</button><button class="primary" type="button" data-action="edit-plan" data-id="${esc(p.id)}">Edit activity</button></div></div>`
   );
 }
 function editPlan(id = '', date = today()) {
@@ -1757,7 +1887,7 @@ function editPlan(id = '', date = today()) {
   };
   openModal(
     p ? 'Edit planned activity' : 'Plan project activity',
-    `<form id="planForm" data-id="${esc(id)}"><div class="form-grid"><div class="wide"><label for="planProject">Project *</label><select id="planProject" name="projectId">${projectOptions(r.projectId)}</select></div>${scheduleCompanyField(r)}<div class="span2"><label for="planTitle">Activity title *</label><input id="planTitle" name="title" value="${esc(r.title)}" maxlength="500" required></div><div><label for="planActivity">Project activity</label><select id="planActivity" name="activity">${selectOptions(state.lists.projectActivities, r.activity, '—')}</select></div>${scheduleRangeFields(r)}${projectLocationField(r.location)}<div><label for="planStatus">Status</label><select id="planStatus" name="status">${selectOptions(PLAN_STATUS, r.status, 'Choose status')}</select></div><div class="wide"><label for="planNotes">Notes</label><textarea id="planNotes" name="text" maxlength="32767">${esc(r.text)}</textarea></div></div><p class="hint">Times use the 24-hour system. Saving also updates Schedule.</p><div class="modal-actions"><div>${p ? `<button class="danger" type="button" data-action="delete-plan" data-id="${esc(p.id)}">Delete activity</button>` : ''}</div><div class="actions"><button type="button" data-action="cancel">Cancel</button><button class="primary" type="submit">Save activity</button></div></div></form>`
+    `<form id="planForm" data-id="${esc(id)}"><div class="form-grid"><div class="wide"><label for="planProject">Project *</label><select id="planProject" name="projectId">${projectOptions(r.projectId)}</select></div>${scheduleCompanyField(r)}${scheduleItemFields(r)}<div class="span2"><label for="planTitle">Activity title *</label><input id="planTitle" name="title" value="${esc(r.title)}" maxlength="500" required></div><div><label for="planActivity">Project activity</label><select id="planActivity" name="activity">${selectOptions(state.lists.projectActivities, r.activity, '—')}</select></div>${scheduleRangeFields(r)}${projectLocationField(r.location)}<div><label for="planStatus">Status</label><select id="planStatus" name="status">${selectOptions(PLAN_STATUS, r.status, 'Choose status')}</select></div><div class="wide"><label for="planNotes">Notes</label><textarea id="planNotes" name="text" maxlength="32767">${esc(r.text)}</textarea></div></div><p class="hint">Times use the 24-hour system. Saving also updates Schedule.</p><div class="modal-actions"><div>${p ? `<button class="danger" type="button" data-action="delete-plan" data-id="${esc(p.id)}">Delete activity</button>` : ''}</div><div class="actions"><button type="button" data-action="cancel">Cancel</button><button class="primary" type="submit">Save activity</button></div></div></form>`
   );
 }
 function savePlan(form) {
@@ -1768,6 +1898,7 @@ function savePlan(form) {
       id,
       projectId: value('projectId'),
       ...readScheduleCompany(form, old, { kind: 'project', linkId: value('projectId') }),
+      ...readScheduleItem(form, old, { kind: 'project', linkId: value('projectId') }),
       title: value('title').trim(),
       activity: value('activity'),
       text: value('text'),
@@ -1806,6 +1937,10 @@ function savePlan(form) {
             linkId: p.projectId,
             companyId: p.companyId,
             companyName: p.companyName,
+            itemId: p.itemId,
+            subItemId: p.subItemId,
+            itemTitle: p.itemTitle,
+            subItemTitle: p.subItemTitle,
             activity: p.activity,
             location: p.location,
             bookingId: id,
@@ -2782,6 +2917,7 @@ function validateFeaturesV6(d) {
   if (ids.size !== d.projectPlans.length) throw Error('Duplicate project plan IDs.');
   for (const p of d.projectPlans) {
     validateScheduleCompany(p, d);
+    validateScheduleItem(p, d);
     if (
       !checkText(p.id, 100) ||
       !p.id ||
@@ -2805,6 +2941,7 @@ function validateFeaturesV6(d) {
   }
   for (const s of d.schedule) {
     validateScheduleCompany(s, d);
+    validateScheduleItem(s, d);
     if (
       !checkText(s.bookingId, 100) ||
       !checkText(s.planId, 100) ||
@@ -2822,6 +2959,9 @@ function validateFeaturesV6(d) {
         s.location !== p.location ||
         (s.companyId || '') !== (p.companyId || '') ||
         (s.companyName || '') !== (p.companyName || '') ||
+        ['itemId', 'subItemId', 'itemTitle', 'subItemTitle'].some(
+          key => (s[key] || '') !== (p[key] || '')
+        ) ||
         s.time < p.time ||
         s.time >= p.endTime
       )
@@ -6468,7 +6608,7 @@ function renderProjectCalendar() {
     const dayPlans = plans.filter(p => p.date <= date && p.endDate >= date),
       isGoLive = project.goLiveDate === date;
     cells.push(
-      `<div class="calendar-day${date === today() ? ' today' : ''}${isGoLive ? ' go-live-day' : ''}"><button class="calendar-number" data-action="new-plan" data-date="${date}" aria-label="Plan activity on ${date}">${+date.slice(8)}</button>${isGoLive ? goLiveScheduleCard(project, true) : ''}${dayPlans.map(p => `<button class="calendar-event ${planStatusClass(p, date)}" data-action="view-plan" data-id="${esc(p.id)}"><span>${esc(p.time)}–${esc(p.endTime)}${isWeekend(date) ? ' · TOIL' : ''}</span><strong>${esc(p.activity || p.title)}</strong>${scheduleCompanyBadge(p)}<small>${esc(p.status)}${p.location ? ' · ' + esc(p.location) : ''}</small></button>`).join('')}</div>`
+      `<div class="calendar-day${date === today() ? ' today' : ''}${isGoLive ? ' go-live-day' : ''}"><button class="calendar-number" data-action="new-plan" data-date="${date}" aria-label="Plan activity on ${date}">${+date.slice(8)}</button>${isGoLive ? goLiveScheduleCard(project, true) : ''}${dayPlans.map(p => `<button class="calendar-event ${planStatusClass(p, date)}" data-action="view-plan" data-id="${esc(p.id)}"><span>${esc(p.time)}–${esc(p.endTime)}${isWeekend(date) ? ' · TOIL' : ''}</span><strong>${esc(p.activity || p.title)}</strong>${scheduleCompanyBadge(p)}${scheduleItemBadge(p)}<small>${esc(p.status)}${p.location ? ' · ' + esc(p.location) : ''}</small></button>`).join('')}</div>`
     );
   }
   while (cells.length % 7)
@@ -6778,6 +6918,7 @@ function openRangeEditor(date = today(), time = '09:00', taskId = '', createNew 
     title: plan?.title || old?.title || '',
     companyId: old?.companyId || plan?.companyId || '',
     companyName: old?.companyName || plan?.companyName || '',
+    ...scheduleItemContext(old || plan || {}),
     travel: old?.travel ? JSON.parse(JSON.stringify(old.travel)) : null,
     claimType: window.WorkHubClaimsEngine.claimType(old),
     claimLocationName: old?.claimLocationName || '',
@@ -6834,7 +6975,7 @@ function scheduleEntryStatus(entry, date = today(), time = timeNow().slice(0, 5)
 function scheduleEntryCard(entry, compact = false) {
   const slot = entry.slot,
     status = scheduleEntryStatus(entry);
-  return `<button type="button" class="slot workhub-booking${compact ? ' compact' : ''} status-${statusClass(status)}${isToilSchedule(slot) ? ' toil' : ''}" data-schedule-status="${esc(slot.date + '|' + slot.time)}" data-schedule-class="slot workhub-booking${compact ? ' compact' : ''}" data-action="open-booking" data-date="${esc(slot.date)}" data-time="${esc(slot.time)}"><span class="booking-time">${entry.time}–${entry.endTime}${isToilSchedule(slot) ? ' · TOIL' : ''}</span><strong>${esc(scheduleEntryTitle(entry))}</strong>${scheduleCompanyBadge(slot)}${window.WorkHubClaims.badge(slot)}${!compact ? `<span class="booking-context">${esc(scheduleEntryContext(entry))}</span><span class="booking-duration-label">${formatDuration(entry.hours * 60)} · View details ↗</span>` : ''}<span class="slot-state">${esc(status)}</span></button>`;
+  return `<button type="button" class="slot workhub-booking${compact ? ' compact' : ''} status-${statusClass(status)}${isToilSchedule(slot) ? ' toil' : ''}" data-schedule-status="${esc(slot.date + '|' + slot.time)}" data-schedule-class="slot workhub-booking${compact ? ' compact' : ''}" data-action="open-booking" data-date="${esc(slot.date)}" data-time="${esc(slot.time)}"><span class="booking-time">${entry.time}–${entry.endTime}${isToilSchedule(slot) ? ' · TOIL' : ''}</span><strong>${esc(scheduleEntryTitle(entry))}</strong>${scheduleCompanyBadge(slot)}${scheduleItemBadge(slot)}${window.WorkHubClaims.badge(slot)}${!compact ? `<span class="booking-context">${esc(scheduleEntryContext(entry))}</span><span class="booking-duration-label">${formatDuration(entry.hours * 60)} · View details ↗</span>` : ''}<span class="slot-state">${esc(status)}</span></button>`;
 }
 function scheduleMonthMetrics() {
   const entries = monthDates(month).flatMap(scheduleEntries);
@@ -7016,7 +7157,7 @@ function viewBooking(date, time) {
     status = scheduleEntryStatus(entry);
   openModal(
     'Scheduled activity',
-    `<div class="booking-view-hero"><span class="eyebrow">${esc(window.WorkHubLeave.isLeave(slot.kind) ? window.WorkHubLeave.TYPES[slot.kind] : slot.kind === 'task' ? 'Main task' : slot.kind === 'project' ? 'Project activity' : 'Activity')}</span><h3>${esc(scheduleEntryTitle(entry))}</h3><p>${esc(scheduleEntryContext(entry))}</p>${tag(status)}</div><dl class="booking-facts"><div><dt>Company</dt><dd>${esc(scheduleCompanyName(slot)) || 'Not specified'}</dd></div><div><dt>Dates</dt><dd>${esc(dates[0])}${dates.length > 1 ? ' → ' + esc(dates.at(-1)) : ''}</dd></div><div><dt>Time each day</dt><dd>${esc(entry.time)}–${esc(entry.endTime)}</dd></div><div><dt>Duration</dt><dd>${formatDuration(entry.hours * 60)} per day${dates.length > 1 ? ' · ' + formatDuration(block.reduce((sum, row) => sum + slotMinutes(row), 0)) + ' total' : ''}</dd></div><div><dt>Work location</dt><dd>${esc(slot.location) || 'Not specified'}</dd></div></dl>${window.WorkHubLeave.details(slot)}${window.WorkHubClaims.details(slot, state)}<h3 class="section-label">${slot.kind === 'custom' ? 'Activity details' : 'Remarks / notes'}</h3><p class="prewrap">${esc(slot.text) || 'No notes added.'}</p>${plan?.actualReviewedAt ? `<h3 class="section-label">Actual work</h3><p class="prewrap">${esc(plan.actualTask) || 'Same as planned'}</p>` : ''}${slot.kind === 'task' && task?.subTasks?.length ? `<h3 class="section-label">Sub-tasks · ${task.subTasks.filter(sub => sub.status === 'Completed').length}/${task.subTasks.length} complete</h3>${task.subTasks.map(sub => `<p><strong>${esc(sub.title)}</strong> · ${esc(sub.status)}</p>`).join('')}` : ''}<div class="modal-actions"><button type="button" data-action="cancel">Close</button><button type="button" class="primary" data-action="edit-booking" data-date="${esc(date)}" data-time="${esc(entry.slot.time)}">Edit activity</button></div>`
+    `<div class="booking-view-hero"><span class="eyebrow">${esc(window.WorkHubLeave.isLeave(slot.kind) ? window.WorkHubLeave.TYPES[slot.kind] : slot.kind === 'task' ? 'Main task' : slot.kind === 'project' ? 'Project activity' : 'Activity')}</span><h3>${esc(scheduleEntryTitle(entry))}</h3><p>${esc(scheduleEntryContext(entry))}</p>${tag(status)}</div><dl class="booking-facts"><div><dt>Company</dt><dd>${esc(scheduleCompanyName(slot)) || 'Not specified'}</dd></div>${slot.kind === 'project' ? `<div><dt>Project item</dt><dd>${esc(scheduleItemContext(slot).itemTitle) || 'General project work'}</dd></div>${scheduleItemContext(slot).subItemTitle ? `<div><dt>Sub-item</dt><dd>${esc(scheduleItemContext(slot).subItemTitle)}</dd></div>` : ''}` : ''}<div><dt>Dates</dt><dd>${esc(dates[0])}${dates.length > 1 ? ' → ' + esc(dates.at(-1)) : ''}</dd></div><div><dt>Time each day</dt><dd>${esc(entry.time)}–${esc(entry.endTime)}</dd></div><div><dt>Duration</dt><dd>${formatDuration(entry.hours * 60)} per day${dates.length > 1 ? ' · ' + formatDuration(block.reduce((sum, row) => sum + slotMinutes(row), 0)) + ' total' : ''}</dd></div><div><dt>Work location</dt><dd>${esc(slot.location) || 'Not specified'}</dd></div></dl>${window.WorkHubLeave.details(slot)}${window.WorkHubClaims.details(slot, state)}<h3 class="section-label">${slot.kind === 'custom' ? 'Activity details' : 'Remarks / notes'}</h3><p class="prewrap">${esc(slot.text) || 'No notes added.'}</p>${plan?.actualReviewedAt ? `<h3 class="section-label">Actual work</h3><p class="prewrap">${esc(plan.actualTask) || 'Same as planned'}</p>` : ''}${slot.kind === 'task' && task?.subTasks?.length ? `<h3 class="section-label">Sub-tasks · ${task.subTasks.filter(sub => sub.status === 'Completed').length}/${task.subTasks.length} complete</h3>${task.subTasks.map(sub => `<p><strong>${esc(sub.title)}</strong> · ${esc(sub.status)}</p>`).join('')}` : ''}<div class="modal-actions"><button type="button" data-action="cancel">Close</button><button type="button" class="primary" data-action="edit-booking" data-date="${esc(date)}" data-time="${esc(entry.slot.time)}">Edit activity</button></div>`
   );
 }
 function subTaskCard(task, sub) {
@@ -7284,10 +7425,18 @@ reportModel = function (d, asof) {
     tasks = models.find(model => model.name === 'Tasks'),
     items = models.find(model => model.name === 'Project items'),
     schedule = models.find(model => model.name === 'Schedule');
-  schedule.headers.push('End time', 'Duration (minutes)');
-  schedule.widths.push(16, 22);
+  schedule.headers.push('End time', 'Duration (minutes)', 'Project item', 'Sub-item');
+  schedule.widths.push(16, 22, 48, 42);
   const slots = d.schedule.slice().sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
-  schedule.rows.forEach((row, index) => row.push(slotEnd(slots[index]), slotMinutes(slots[index])));
+  schedule.rows.forEach((row, index) => {
+    const context = scheduleItemContext(slots[index], d);
+    row.push(
+      slotEnd(slots[index]),
+      slotMinutes(slots[index]),
+      context.itemTitle,
+      context.subItemTitle
+    );
+  });
   tasks.headers.push(
     'Record type',
     'Main task ID',

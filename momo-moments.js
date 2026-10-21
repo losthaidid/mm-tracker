@@ -115,7 +115,7 @@
       }
     }
     function clearEnvelope() {
-      $('momoDiscovery')?.remove();
+      $('momoDiscoveryAnchor')?.remove();
       envelope = null;
     }
     function layout() {
@@ -124,12 +124,6 @@
       if (!pet) return;
       const x = parseFloat(pet.style.left) || v.x + v.w - 110,
         y = parseFloat(pet.style.top) || v.y + v.h * 0.5;
-      const e = $('momoDiscovery');
-      if (e)
-        Object.assign(e.style, {
-          left: Math.max(v.x + 12, Math.min(v.x + v.w - 62, x - 48)) + 'px',
-          top: Math.max(v.y + 12, Math.min(v.y + v.h - 62, y + 28)) + 'px',
-        });
       const p = $('momoVisitorProp');
       if (p) Object.assign(p.style, { left: x + 34 + 'px', top: y - 21 + 'px' });
     }
@@ -388,7 +382,11 @@
       el.setAttribute('aria-label', named('Open Momo’s desk discovery'));
       el.innerHTML =
         '<svg viewBox="0 0 64 55" aria-hidden="true"><rect x="3" y="8" width="58" height="42" rx="7" fill="#fff0cb" stroke="#96764f" stroke-width="2"/><path d="m5 11 27 22 27-22M5 48l18-18m36 18L41 30" fill="none" stroke="#c9a16c" stroke-width="2"/><path d="m32 24 3 5 6 1-5 4 1 6-5-3-5 3 1-6-5-4 6-1z" fill="#bd8fa9" stroke="#916783"/></svg>';
-      document.body.append(el);
+      // Keep the delivery button separate from Momo's direct-child pickup button.
+      const anchor = document.createElement('span');
+      anchor.id = 'momoDiscoveryAnchor';
+      anchor.append(el);
+      $('hubPet').append(anchor);
       layout();
       discoveryAt = Date.now() + random(360000, 600000);
       return true;

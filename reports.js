@@ -465,6 +465,8 @@
           slot.text,
           slot.location,
           slot.planId || '',
+          slot.itemId || '',
+          slot.subItemId || '',
         ].join('|'),
         end = slot.endTime || String(Number(slot.time.slice(0, 2)) + 1).padStart(2, '0') + ':00',
         prior = bookings.at(-1);
@@ -473,6 +475,8 @@
     }
     const scheduleRows = bookings.map(({ slot: s, start, end }) => {
       const plan = d.projectPlans.find(p => p.id === s.planId),
+        item = d.specs.find(item => item.id === (s.itemId || plan?.itemId)),
+        subItem = item?.subItems.find(sub => sub.id === (s.subItemId || plan?.subItemId)),
         leave = root.WorkHubLeave?.isLeave(s.kind),
         linked = leave
           ? root.WorkHubLeave.TYPES[s.kind]
@@ -506,6 +510,8 @@
           linked,
           s.location || '',
           leave ? s.leave.status : plan?.status || 'Planned',
+          item?.description || s.itemTitle || plan?.itemTitle || '',
+          subItem?.title || s.subItemTitle || plan?.subItemTitle || '',
         ],
         record: 1,
       };
@@ -522,6 +528,8 @@
         C('Related work', 39),
         C('Location', 23),
         C('Status', 21),
+        C('Project item', 48),
+        C('Sub-item', 42),
       ],
       scheduleRows,
       {
