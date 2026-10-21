@@ -1,5 +1,7 @@
 # Product & Process Solution Studio
 
+Material types, discovery interviews, warehouse trials, workshop presentation and handover exports are documented in [the Material Explorer guide](MATERIAL-EXPLORER.md). Earlier `.1` saved-run snapshots remain replayable.
+
 Open **Projects → Solution Studio**, or its card in Project Overview. Your existing project, company and MM area lists remain the starting point.
 
 ## Learn from the complete sample
@@ -68,7 +70,7 @@ Not implemented: moving-average price, invoices/credit memos, tax/freight, FX, m
 
 ## SAP source catalogue
 
-Reviewed 21 October 2026; the implemented version is `mm-core-2026-10-21.1`.
+Reviewed 21 October 2026; the implemented version is `mm-core-2026-10-21.2`.
 
 - [Stock versus consumption procurement and account assignment](https://learning.sap.com/courses/business-processes-in-sap-s-4hana-sourcing-procurement/comparing-procurement-processes-for-stock-and-consumption)
 - [UNBW and NLAG goods movements](https://learning.sap.com/courses/inventory-management-and-physical-inventory-in-sap-s-4hana/posting-goods-movements-for-material-types-unbw-and-nlag)

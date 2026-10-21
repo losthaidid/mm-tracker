@@ -4,7 +4,7 @@
  */
 (function (root) {
   'use strict';
-  const E = root.WorkHubSolutionEngine;
+  const E = root.WorkHubSolutionEngine, M = root.WorkHubSolutionMaterials, V = root.WorkHubSolutionTheatre;
   const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const option = (v, label, current) => `<option value="${esc(v)}"${v === current ? ' selected' : ''}>${esc(label)}</option>`;
   const money = n => 'RM ' + (n / 100).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -15,21 +15,29 @@
     const number = (name, label, max, step = '.001') => `<label>${label}<input id="${prefix + name}" name="${name}" type="number" min="0" max="${max}" step="${step}" value="${p[name]}" required></label>`;
     const input = (name, label) => `<label>${label}<input name="${name}" value="${esc(p[name])}" maxlength="100"></label>`;
     const check = (name, label) => `<label class="ss-check"><input name="${name}" type="checkbox"${p[name] ? ' checked' : ''}>${label}</label>`;
-    return `<div class="ss-form-grid"><label>Material capability<select name="mode">${Object.entries(E.MODES).map(([k, v]) => option(k, v, p.mode)).join('')}</select></label><label>Procurement purpose<select name="purpose">${option('stock', 'Stock procurement', p.purpose)}${option('consumption', 'Direct consumption', p.purpose)}</select></label>${number('openingQty', 'Opening inventory · main location', 1000000)}${number('poQty', 'PO order quantity', 1000000)}${input('sourceLocation', 'Main storage location · same plant')}${input('destinationLocation', 'Second storage location · same plant')}${number('standardPrice', 'Standard price · RM / base unit', 1000000, '.01')}${number('poPrice', 'PO price · RM / base unit', 1000000, '.01')}<label>PO account assignment<select name="accountCategory">${option('', 'None · stock PO', p.accountCategory)}${option('K', 'K · Cost centre', p.accountCategory)}${option('Other', 'Other · not covered', p.accountCategory)}</select></label>${input('costCenter', 'Cost centre · PO assignment / GI')}${input('glAccount', 'Consumption G/L · K-assigned PO')}${number('overTolerance', 'Overdelivery tolerance · %', 100, '.01')}</div><div class="ss-check-grid">${check('grAllowed', 'PO goods receipt expected')}${check('unlimited', 'Unlimited overdelivery')}${check('negativeConfig', 'Negative-stock Customizing in place')}${check('negativeMaterial', 'Material permits negative stock')}${check('grNonValuated', 'PO GR non-valuated · not covered')}</div><p class="ss-muted">One plant, two existing storage locations, one PO item/base unit · MYR · unrestricted stock · standard price · single K assignment. Automatic account determination and storage-location material extension are assumed complete.</p>`;
+    const t = p.materialType;
+    const material = t ? `<fieldset class="sx-material-controls" data-material="${esc(JSON.stringify(t))}"><legend>${esc(t.code)} · explicit material attributes</legend><div class="ss-check-grid"><label class="ss-check"><input name="materialQuantity" type="checkbox"${t.quantityUpdate ? ' checked' : ''}>Quantity updating</label><label class="ss-check"><input name="materialValue" type="checkbox"${t.valueUpdate ? ' checked' : ''}>Value updating</label><label class="ss-check"><input name="materialService" type="checkbox"${t.service ? ' checked' : ''}>Service product</label></div><label>Permitted procurement<select name="materialProcurement">${Object.entries(M.PROCUREMENT).map(([k, v]) => option(k, v, t.procurement)).join('')}</select></label><label class="ss-check"><input name="detachMaterial" type="checkbox">Detach this profile and use the inventory-mode selector</label><p class="ss-muted">Mode derives from quantity/value attributes while attached. Changing a flag does not complete dependent PO settings for you.</p></fieldset>` : '<p class="ss-muted">No material type attached. Choose a reference profile from Material explorer to connect its attributes.</p>';
+    return `${material}<div class="ss-form-grid"><label>Inventory mode${t ? ' · derived while attached' : ''}<select name="mode"${t ? ' disabled' : ''}>${Object.entries(E.MODES).map(([k, v]) => option(k, v, p.mode)).join('')}</select></label><label>Procurement purpose<select name="purpose">${option('stock', 'Stock procurement', p.purpose)}${option('consumption', 'Direct consumption', p.purpose)}</select></label>${number('openingQty', 'Opening inventory · main location', 1000000)}${number('poQty', 'PO order quantity', 1000000)}${input('sourceLocation', 'Main storage location · same plant')}${input('destinationLocation', 'Second storage location · same plant')}${number('standardPrice', 'Standard price · RM / base unit', 1000000, '.01')}${number('poPrice', 'PO price · RM / base unit', 1000000, '.01')}<label>PO account assignment<select name="accountCategory">${option('', 'None · stock PO', p.accountCategory)}${option('K', 'K · Cost centre', p.accountCategory)}${option('Other', 'Other · not covered', p.accountCategory)}</select></label>${input('costCenter', 'Cost centre · PO assignment / GI')}${input('glAccount', 'Consumption G/L · K-assigned PO')}${number('overTolerance', 'Overdelivery tolerance · %', 100, '.01')}</div><div class="ss-check-grid">${check('grAllowed', 'PO goods receipt expected')}${check('unlimited', 'Unlimited overdelivery')}${check('negativeConfig', 'Negative-stock Customizing in place')}${check('negativeMaterial', 'Material permits negative stock')}${check('grNonValuated', 'PO GR non-valuated · not covered')}</div><p class="ss-muted">One plant, two existing storage locations, one PO item/base unit · MYR · unrestricted stock · standard price · single K assignment. Automatic account determination and storage-location material extension are assumed complete.</p>`;
   }
   function readProfile(form) {
     const value = k => form.elements.namedItem(k)?.value || '', p = E.profile(value('mode'));
     for (const k of ['purpose', 'accountCategory', 'costCenter', 'glAccount', 'sourceLocation', 'destinationLocation']) p[k] = value(k).trim();
     for (const k of ['openingQty', 'poQty', 'standardPrice', 'poPrice', 'overTolerance']) p[k] = Number(value(k));
     for (const k of ['grAllowed', 'unlimited', 'negativeConfig', 'negativeMaterial', 'grNonValuated']) p[k] = !!form.elements.namedItem(k)?.checked;
+    const material = form.querySelector('[data-material]');
+    if (material && !form.elements.namedItem('detachMaterial')?.checked) {
+      p.materialType = JSON.parse(material.dataset.material);
+      for (const [key, field] of [['quantityUpdate', 'materialQuantity'], ['valueUpdate', 'materialValue'], ['service', 'materialService']]) p.materialType[key] = !!form.elements.namedItem(field)?.checked;
+      p.materialType.procurement = value('materialProcurement'); p.mode = M.mode(p.materialType);
+    }
     E.validateProfile(p); return p;
   }
   function install(a) {
-    let key = '', snap = null, actions = [], cursor = -1, timer = 0, playing = false, saved = '', editing = '', loop = false;
+    let key = '', snap = null, actions = [], cursor = -1, timer = 0, playing = false, saved = '', editing = '', loop = false, flowView = 'split', baseline = null, drag = null;
     const $ = id => document.getElementById(id);
     const contextKey = c => JSON.stringify([c.owner, c.projectId, c.demo, c.proposal?.id, c.proposal?.profile, c.process?.scenario]);
     function stop() { if (timer) root.clearInterval(timer); timer = 0; playing = false; }
-    function reset() { stop(); key = ''; snap = null; actions = []; cursor = -1; saved = editing = ''; }
+    function reset() { stop(); key = ''; snap = null; actions = []; cursor = -1; saved = editing = ''; baseline = drag = null; }
     function ensure() {
       const c = a.context(), next = contextKey(c);
       if (key !== next) {
@@ -38,8 +46,22 @@
       }
       return c;
     }
-    function restore(run) { stop(); const c = a.context(); key = contextKey(c); snap = E.copy(run.snapshot); actions = E.copy(run.actions); cursor = -1; saved = run.title; editing = ''; }
-    const result = () => snap ? E.simulate(snap.profile, actions, snap.scenario) : null;
+    function restore(run) { stop(); const c = a.context(); key = contextKey(c); snap = E.copy(run.snapshot); actions = E.copy(run.actions); cursor = -1; saved = run.title; editing = ''; baseline = drag = null; }
+    const result = () => snap ? E.simulate(snap.profile, actions, snap.scenario, snap.engineVersion) : null;
+    function applyMaterial(type) {
+      a.guard(); ensure(); if (!snap) throw Error('Create a proposal before applying a material profile.');
+      stop(); baseline = { profile: E.copy(snap.profile), label: 'Before · ' + (snap.profile.materialType?.code || E.MODES[snap.profile.mode]), version: snap.engineVersion };
+      snap.profile = M.applyType(type, snap.profile); snap.engineVersion = E.VERSION; saved = ''; cursor = -1;
+    }
+    function insert(action) {
+      if (actions.length >= 40) throw Error('Remove a transaction before adding another.');
+      const index = cursor + 1, candidate = E.copy(actions); candidate.splice(index, 0, action); E.validateActions(candidate); actions = candidate; cursor = index; saved = ''; editing = ''; refresh();
+    }
+    function transfer(from, to) {
+      a.guard(); ensure(); stop();
+      const qty = Number($('ssWarehouseQty')?.value);
+      const action = E.action('transfer', qty, 'inventory', '', 'Warehouse sandbox · same-plant unrestricted transfer'); action.location = from; action.toLocation = to; insert(action);
+    }
     function stateNow(r) { return cursor >= 0 ? r.events[cursor]?.after || r.final : r.initial; }
     function metrics(r) {
       const s = stateNow(r);
@@ -50,7 +72,11 @@
       const sourceIndex = E.RULES.find(x => x[0] === event?.code)?.[3], source = sourceIndex >= 0 ? E.SOURCES[sourceIndex] : null;
       const from = ['issue', 'transfer'].includes(event?.action.type) ? event.action.location || snap.profile.sourceLocation : event?.action.type === 'return' ? 'Warehouse / recipient' : event?.action.type === 'reverse' ? 'Original document' : 'Supplier';
       const to = event?.action.type === 'transfer' ? event.action.toLocation || snap.profile.destinationLocation : event?.action.type === 'issue' ? 'Department' : event?.action.type === 'return' ? 'Supplier' : event?.action.type === 'reverse' ? 'Reversed effects' : E.tracks(snap.profile) ? event?.action.location || snap.profile.sourceLocation : 'Department';
-      return `<div class="ss-theatre is-${status}" data-sim-status="${status}"><div class="ss-theatre-label"><span>LIVE SCENARIO</span><span>${esc(snap.system)} · ${esc(E.MODES[snap.profile.mode])}</span></div><div class="ss-flow-scene" aria-hidden="true"><div class="ss-flow-node"><span>▤</span><strong>${from}</strong></div><div class="ss-flow-track"><i></i><b class="ss-moving-crate">▧</b></div><div class="ss-flow-gate"><span>${status === 'error' ? '×' : status === 'unsupported' ? '?' : status === 'success' ? '✓' : '◇'}</span><small>${event?.movement ? 'MvT ' + event.movement : status === 'ready' ? 'Ready' : 'Rule check'}</small></div><div class="ss-flow-track"><i></i></div><div class="ss-flow-node"><span>${E.tracks(snap.profile) ? '▦' : '♧'}</span><strong>${to}</strong></div><div class="ss-sparkles">${Array.from({ length: 8 }, (_, i) => `<i style="--spark:${i}"></i>`).join('')}</div></div><div class="ss-theatre-balance"><span>${quantity(state.qty)} in inventory</span><span>${money(state.inventory)} inventory value</span></div><div class="ss-location-balances">${Object.entries(state.locations).map(([name, qty]) => `<span><b>${esc(name)}</b> ${quantity(qty)} units</span>`).join('')}</div></div><div class="ss-outcome is-${status}" role="status"><span class="ss-eyebrow">${event ? `${cursor + 1} / ${actions.length} · ${esc(event.code)} · Simulator message` : 'YOUR SOLUTION, IN MOTION'}</span><h3>${esc(event?.message || 'Follow the product. Understand the consequences.')}</h3><p>${esc(event?.fix || event?.explanation || 'Play the sequence, inspect any transaction, or add your own. Quantities and values change only after a supported transaction passes its checks.')}</p>${event?.action.note ? `<p class="ss-scenario-note">${esc(event.action.note)}</p>` : ''}${source ? `<a href="${esc(source[1])}" target="_blank" rel="noopener noreferrer">SAP source · ${esc(source[0])} ↗</a>` : ''}</div>${event ? `<details class="ss-postings" open><summary>Expected symbolic accounting ${event.postings.length ? '· ' + event.postings.length + ' lines' : '· no posting'}</summary>${event.postings.length ? `<div class="ss-table-scroll"><table><thead><tr><th>Account / effect</th><th>Debit</th><th>Credit</th><th>Cost object</th></tr></thead><tbody>${event.postings.map(p => `<tr><td>${esc(p.account)}</td><td>${p.debit ? money(p.debit) : '—'}</td><td>${p.credit ? money(p.credit) : '—'}</td><td>${esc(p.costObject) || '—'}</td></tr>`).join('')}</tbody></table></div>` : `<p>${status === 'success' ? 'This transaction has no additional FI posting under the selected profile.' : 'The transaction did not change simulated stock or accounting balances.'}</p>`}<p class="ss-muted">${esc(event.explanation)} Symbolic model only; actual G/L determination, invoice, tax, freight and period controls require SAP validation.</p></details>` : ''}`;
+      return `<div class="ss-theatre is-${status}" data-sim-status="${status}"><div class="ss-theatre-label"><span>LIVE SCENARIO</span><span>${esc(snap.system)} · ${esc(E.MODES[snap.profile.mode])}</span></div><div class="ss-flow-scene" aria-hidden="true"><div class="ss-flow-node"><span>▤</span><strong>${esc(from)}</strong></div><div class="ss-flow-track"><i></i><b class="ss-moving-crate">▧</b></div><div class="ss-flow-gate"><span>${status === 'error' ? '×' : status === 'unsupported' ? '?' : status === 'success' ? '✓' : '◇'}</span><small>${event?.movement ? 'MvT ' + event.movement : status === 'ready' ? 'Ready' : 'Rule check'}</small></div><div class="ss-flow-track"><i></i></div><div class="ss-flow-node"><span>${E.tracks(snap.profile) ? '▦' : '♧'}</span><strong>${esc(to)}</strong></div><div class="ss-sparkles">${Array.from({ length: 8 }, (_, i) => `<i style="--spark:${i}"></i>`).join('')}</div></div><div class="ss-theatre-balance"><span>${quantity(state.qty)} in inventory</span><span>${money(state.inventory)} inventory value</span></div><div class="ss-location-balances">${Object.entries(state.locations).map(([name, qty]) => `<span><b>${esc(name)}</b> ${quantity(qty)} units</span>`).join('')}</div></div><div class="ss-outcome is-${status}" role="status"><span class="ss-eyebrow">${event ? `${cursor + 1} / ${actions.length} · ${esc(event.code)} · Simulator message` : 'YOUR SOLUTION, IN MOTION'}</span><h3>${esc(event?.message || 'Follow the product. Understand the consequences.')}</h3><p>${esc(event?.fix || event?.explanation || 'Play the sequence, inspect any transaction, or add your own. Quantities and values change only after a supported transaction passes its checks.')}</p>${event?.action.note ? `<p class="ss-scenario-note">${esc(event.action.note)}</p>` : ''}${source ? `<a href="${esc(source[1])}" target="_blank" rel="noopener noreferrer">SAP source · ${esc(source[0])} ↗</a>` : ''}</div>${event ? `<details class="ss-postings" open><summary>Expected symbolic accounting ${event.postings.length ? '· ' + event.postings.length + ' lines' : '· no posting'}</summary>${event.postings.length ? `<div class="ss-table-scroll"><table><thead><tr><th>Account / effect</th><th>Debit</th><th>Credit</th><th>Cost object</th></tr></thead><tbody>${event.postings.map(p => `<tr><td>${esc(p.account)}</td><td>${p.debit ? money(p.debit) : '—'}</td><td>${p.credit ? money(p.credit) : '—'}</td><td>${esc(p.costObject) || '—'}</td></tr>`).join('')}</tbody></table></div>` : `<p>${status === 'success' ? 'This transaction has no additional FI posting under the selected profile.' : 'The transaction did not change simulated stock or accounting balances.'}</p>`}<p class="ss-muted">${esc(event.explanation)} Symbolic model only; actual G/L determination, invoice, tax, freight and period controls require SAP validation.</p></details>` : ''}`;
+    }
+    function visualStage(r) {
+      const event = r.events[cursor], state = stateNow(r);
+      return `<div class="sx-live-stage" data-flow="${flowView}">${stage(r)}${V.documents(event, snap)}${V.accounting(event, state)}${V.warehouse(state, snap)}</div>`;
     }
     function timeline(r) {
       return r.events.map((event, i) => `<li class="${cursor === i ? 'is-current' : ''}">${button('inspect', `<span class="ss-event-dot ${i <= cursor ? event.status : ''}">${i + 1}</span><span><strong>${esc(names[event.action.type] || event.action.type)}</strong><small>${event.action.type === 'reverse' ? 'Referenced cancellation' : event.action.qty + ' units'} · ${i <= cursor ? event.status : 'Ready to check'}</small></span>`, `data-index="${i}" aria-current="${cursor === i ? 'step' : 'false'}"`)}<div>${button('edit', '✎', `data-id="${esc(event.action.id)}" aria-label="Edit transaction ${i + 1}"`)}${button('remove', '×', `data-id="${esc(event.action.id)}" aria-label="Remove transaction ${i + 1}"`)}</div></li>`).join('') || '<li class="ss-muted">No transactions. Add one below.</li>';
@@ -66,12 +92,12 @@
       ensure();
       if (!snap) return '<div class="ss-empty"><span>▷</span><h3>Give your solution a scenario.</h3><p>Create a proposal first, then explore its quantity and value effects here.</p></div>';
       const r = result();
-      return `<section class="ss-simulator"><div class="ss-sim-heading"><div><span class="ss-eyebrow">${saved ? 'SAVED INPUT SNAPSHOT' : 'LOCAL WHAT-IF WORKSPACE'}</span><h3>${esc(saved || snap.proposalTitle)}</h3><p>${esc(snap.productName)} · ${esc(snap.processName)}</p></div><div class="ss-actions">${button('defaults', '↺ Proposal defaults')}${button('save', 'Keep this run', '', 'ss-primary')}</div></div><div class="ss-model-note"><strong>Core MM learning model</strong><span>Source-based rules · ${esc(E.VERSION)} · target context ${esc(snap.system)}${snap.release ? ' / ' + esc(snap.release) : ''}. Release-specific behaviour is not inferred from this selector.</span></div><div class="ss-metrics" id="ssSimMetrics">${metrics(r)}</div><div class="ss-playback"><div class="ss-actions">${button('restart', '↶', 'aria-label="Restart playback"')}${button('back', '←', 'aria-label="Previous transaction"')}${button('play', playing ? 'Ⅱ Pause' : '▶ Play', '', 'ss-primary')}${button('next', 'Next →')}<label class="ss-check"><input id="ssSimLoop" type="checkbox"${loop ? ' checked' : ''}>Loop</label></div><span id="ssPlaybackState">${cursor < 0 ? 'Ready to explore' : `${cursor + 1} of ${actions.length}`}</span></div><div class="ss-sim-columns"><div id="ssSimStage">${stage(r)}</div><aside class="ss-transaction-panel"><div class="ss-section-head"><h4>Transaction sequence</h4>${button('clear', 'Clear')}</div><ol id="ssSimTimeline" class="ss-sim-timeline">${timeline(r)}</ol>${button('invalid', '✦ Try an invalid transaction', '', 'ss-wide-btn')}${transactionForm(r)}</aside></div><details class="ss-trial-inputs"><summary>Scenario inputs &amp; document controls <span>Trial changes stay local until you keep a run</span></summary><form id="ssTrialProfile" data-session="${esc(key)}">${profileFields(snap.profile)}<button type="submit" class="ss-btn ss-primary">Apply trial inputs &amp; replay</button></form></details><p class="ss-footnote">Simulation checks run before animation. Failed and unsupported attempts leave balances unchanged. Cancelling is limited to the last active GR/GI/311 in this model; supplier return 122 is a separate transaction. Referenced transactions use stable IDs even when the sequence is edited.</p></section>`;
+      return `<section class="ss-simulator"><div class="ss-sim-heading"><div><span class="ss-eyebrow">${saved ? 'SAVED INPUT SNAPSHOT' : 'LOCAL WHAT-IF WORKSPACE'}</span><h3>${esc(saved || snap.proposalTitle)}</h3><p>${esc(snap.productName)} · ${esc(snap.processName)}</p></div><div class="ss-actions">${button('defaults', '↺ Proposal defaults')}${button('save', 'Keep this run', '', 'ss-primary')}</div></div><div class="ss-model-note"><strong>Core MM learning model</strong><span>Source-based rules · ${esc(snap.engineVersion)} · target context ${esc(snap.system)}${snap.release ? ' / ' + esc(snap.release) : ''}. Release-specific behaviour is not inferred from this selector.</span></div><div class="ss-metrics" id="ssSimMetrics">${metrics(r)}</div><div class="ss-playback"><div class="ss-actions">${button('restart', '↶', 'aria-label="Restart playback"')}${button('back', '←', 'aria-label="Previous transaction"')}${button('play', playing ? 'Ⅱ Pause' : '▶ Play', '', 'ss-primary')}${button('next', 'Next →')}<label class="ss-check"><input id="ssSimLoop" type="checkbox"${loop ? ' checked' : ''}>Loop</label></div><span id="ssPlaybackState">${cursor < 0 ? 'Ready to explore' : `${cursor + 1} of ${actions.length}`}</span></div><div class="sx-flow-switch" role="group" aria-label="Physical and document flow">${[['physical', '▧ Physical flow'], ['documents', '▤ Document flow'], ['split', '⇄ Both together']].map(([id, label]) => button('flow', label, `data-view="${id}" aria-pressed="${flowView === id}"`, flowView === id ? 'ss-primary' : '')).join('')}</div><div id="ssTrialComparison">${V.comparison(baseline, snap, actions, snap.scenario)}</div><div class="ss-sim-columns"><div id="ssSimStage">${visualStage(r)}</div><aside class="ss-transaction-panel"><div class="ss-section-head"><h4>Transaction sequence</h4>${button('clear', 'Clear')}</div><ol id="ssSimTimeline" class="ss-sim-timeline">${timeline(r)}</ol>${button('invalid', '✦ Try an invalid transaction', '', 'ss-wide-btn')}<section class="sx-surprises"><span class="ss-eyebrow">INTRODUCE A COMPLICATION</span>${button('surprise', '⚡ Urgent withdrawal', 'data-event="urgent"', 'ss-wide-btn')}${button('surprise', '↩ Damaged delivery → return', 'data-event="damage"', 'ss-wide-btn')}${button('surprise', '▧ Another partial receipt', 'data-event="partial"', 'ss-wide-btn')}<p>Inserts after the selected step. Damage uses a referenced 122 return; quality inspection is separate scope.</p></section>${transactionForm(r)}</aside></div><details class="ss-trial-inputs"><summary>Scenario inputs &amp; document controls <span>Trial changes stay local until you keep a run</span></summary><form id="ssTrialProfile" data-session="${esc(key)}">${profileFields(snap.profile)}<button type="submit" class="ss-btn ss-primary">Apply trial inputs &amp; replay</button></form></details><p class="ss-footnote">Simulation checks run before animation. Failed and unsupported attempts leave balances unchanged. Cancelling is limited to the last active GR/GI/311 in this model; supplier return 122 is a separate transaction. Referenced transactions use stable IDs even when the sequence is edited.</p></section>`;
     }
     function refresh() { const el = document.querySelector('.ss-simulator'); if (el) el.outerHTML = render(); }
     function paint() {
       if (!$('ssSimStage') || !snap) { stop(); return; }
-      const r = result(); $('ssSimStage').innerHTML = stage(r); $('ssSimMetrics').innerHTML = metrics(r); $('ssSimTimeline').innerHTML = timeline(r);
+      const r = result(); $('ssSimStage').innerHTML = visualStage(r); if ($('ssTrialComparison')) $('ssTrialComparison').innerHTML = V.comparison(baseline, snap, actions, snap.scenario); $('ssSimMetrics').innerHTML = metrics(r); $('ssSimTimeline').innerHTML = timeline(r);
       $('ssPlaybackState').textContent = cursor < 0 ? 'Ready to explore' : `${cursor + 1} of ${actions.length}`;
       const play = document.querySelector('[data-ss-sim="play"]'); if (play) play.textContent = playing ? 'Ⅱ Pause' : '▶ Play';
     }
@@ -94,6 +120,14 @@
       a.guard(); ensure(); if (!snap) return true;
       if (op === 'play') { play(); return true; }
       stop();
+      if (op === 'flow') { flowView = ['physical', 'documents', 'split'].includes(el.dataset.view) ? el.dataset.view : 'split'; refresh(); return true; }
+      if (op === 'comparison-close') { baseline = null; refresh(); return true; }
+      if (op === 'warehouse-transfer') { transfer(el.dataset.from, el.dataset.to); return true; }
+      if (op === 'surprise') {
+        const receipt = result().events.slice(0, cursor + 1).filter(e => e.status === 'success' && e.action.type === 'gr').at(-1);
+        const next = el.dataset.event === 'damage' ? E.action('return', 10, E.tracks(snap.profile) ? 'inventory' : 'consumption', receipt?.action.id || '', 'Ten units arrived damaged. Test a referenced supplier return; QM is outside coverage.') : el.dataset.event === 'partial' ? E.action('gr', Math.min(20, Math.max(1, snap.profile.poQty)), E.tracks(snap.profile) ? 'inventory' : 'consumption', '', 'An additional partial delivery arrives. Check remaining PO quantity and tolerance.') : E.action('issue', 50, 'inventory', '', 'Maintenance urgently requests 50 units. Is stock available at this location?');
+        insert(next); return true;
+      }
       if (op === 'restart') cursor = -1;
       if (op === 'back') cursor = Math.max(-1, cursor - 1);
       if (op === 'next') { advance(); return true; }
@@ -115,7 +149,11 @@
       a.guard(); ensure();
       if (!form.isConnected || form.dataset.session !== key) throw Error('Reopen the simulator after changing the account, project or proposal.');
       stop(); const value = k => form.elements.namedItem(k)?.value || '';
-      if (form.id === 'ssTrialProfile') { snap.profile = readProfile(form); saved = ''; cursor = -1; refresh(); return true; }
+      if (form.id === 'ssTrialProfile') {
+        const next = readProfile(form);
+        baseline = { profile: E.copy(snap.profile), label: 'Before · ' + (snap.profile.materialType?.code || E.MODES[snap.profile.mode]), version: snap.engineVersion };
+        snap.profile = next; snap.engineVersion = E.VERSION; saved = ''; cursor = -1; refresh(); return true;
+      }
       const next = E.action(value('type'), Number(value('qty')), value('intent'), value('reference'), value('note').trim()), candidate = E.copy(actions);
       next.location = value('location'); next.toLocation = value('toLocation');
       let index = candidate.length;
@@ -123,10 +161,29 @@
       else { if (actions.length >= 40) throw Error('A simulation supports up to 40 transactions.'); candidate.push(next); }
       E.validateActions(candidate); actions = candidate; cursor = index; saved = ''; editing = ''; refresh(); return true;
     }
-    document.addEventListener('change', event => { if (event.target.id === 'ssSimLoop') loop = event.target.checked; });
+    document.addEventListener('dragstart', event => {
+      const el = event.target.closest?.('[data-ss-stock]'); if (!el) return;
+      try { a.guard(); ensure(); stop(); drag = { key, cursor, from: el.dataset.ssStock }; event.dataTransfer?.setData('text/plain', 'mm-studio-stock'); if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'; }
+      catch (err) { event.preventDefault(); a.tell(err.message, true); }
+    });
+    document.addEventListener('dragover', event => { if (drag && event.target.closest?.('[data-ss-drop]')) event.preventDefault(); });
+    document.addEventListener('drop', event => {
+      const zone = event.target.closest?.('[data-ss-drop]'); if (!zone || !drag) return;
+      event.preventDefault(); const old = drag; drag = null;
+      try { a.guard(); ensure(); if (old.key !== key || old.cursor !== cursor) throw Error('The scenario changed. Pick up the stock again.'); transfer(old.from, zone.dataset.ssDrop); } catch (err) { a.tell(err.message, true); }
+    });
+    document.addEventListener('dragend', () => { drag = null; });
+    document.addEventListener('change', event => {
+      if (event.target.id === 'ssSimLoop') loop = event.target.checked;
+      const form = event.target.form, material = event.target.closest?.('[data-material]');
+      if (form && material) {
+        const mode = form.elements.namedItem('mode'), detached = !!form.elements.namedItem('detachMaterial')?.checked;
+        if (mode) { mode.disabled = !detached; if (!detached) mode.value = M.mode({ quantityUpdate: !!form.elements.namedItem('materialQuantity')?.checked, valueUpdate: !!form.elements.namedItem('materialValue')?.checked }); }
+      }
+    });
     document.addEventListener('visibilitychange', () => { if (document.hidden) { stop(); paint(); } });
     document.addEventListener('input', event => { if (event.target.closest?.('#ssTrialProfile, #ssTransactionForm')) { stop(); const b = document.querySelector('[data-ss-sim="play"]'); if (b) b.textContent = '▶ Play'; } });
-    return { render, handle, submit, stop, reset, restore, refresh, play, advance, snapshot: () => ({ key, snap: snap && E.copy(snap), actions: E.copy(actions), cursor, playing }) };
+    return { render, handle, submit, stop, reset, restore, refresh, play, advance, applyMaterial, snapshot: () => ({ key, snap: snap && E.copy(snap), actions: E.copy(actions), cursor, playing }) };
   }
   root.WorkHubSolutionSimulation = { install, profileFields, readProfile, money, quantity, names };
 })(window);
