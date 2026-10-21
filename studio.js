@@ -1236,7 +1236,28 @@
         kicker: 'TICKET',
       },
     };
-    function recordUpdate(kind, id) {
+    function projectFeedbackTarget(item, subId = '') {
+      if (!subId) return item;
+      const sub = (item.subItems || []).find(sub => sub.id === subId);
+      if (!sub) throw Error('Sub-item no longer exists. Reopen Add feedback to choose an item.');
+      return sub;
+    }
+    function projectFeedbackHistory(item, subId = '') {
+      const target = projectFeedbackTarget(item, subId),
+        label = subId ? 'Sub-item · ' + target.title : 'Main item · ' + item.description;
+      return `<p class="hub-meta hub-sensitive">Feedback for ${esc(label)}</p>${target.feedback ? `<details class="task-feedback-history"><summary>Earlier feedback</summary><p class="prewrap hub-sensitive">${esc(target.feedback)}</p></details>` : '<p class="hub-meta">No feedback yet for this item.</p>'}`;
+    }
+    function refreshProjectFeedbackHistory(form) {
+      if (!a.cloud().ready || form.dataset.owner !== a.cloud().user?.id)
+        throw Error('Finish signing in and reopen Add feedback before continuing.');
+      const item = a.state().specs.find(item => item.id === form.dataset.id);
+      if (!item) throw Error('Project item no longer exists.');
+      $('hubItemFeedbackHistory').innerHTML = projectFeedbackHistory(
+        item,
+        form.elements.namedItem('feedbackTarget').value
+      );
+    }
+    function recordUpdate(kind, id, subId = '') {
       const config = updateForms[kind];
       if (!a.cloud().ready || !a.cloud().user)
         throw Error('Finish signing in before adding an update.');
@@ -1249,10 +1270,20 @@
               ? a.itemLabel(record)
               : record.ticket,
         history = record[config.field] || '',
-        input = kind === 'tickets' ? 'newHistory' : 'feedback';
+        input = kind === 'tickets' ? 'newHistory' : 'feedback',
+        targetField =
+          kind === 'specs'
+            ? `<label for="hubItemFeedbackTarget">Feedback for</label><select id="hubItemFeedbackTarget" name="feedbackTarget"><option value=""${!subId ? ' selected' : ''}>Main item · ${esc(record.description)}</option>${record.subItems.length ? `<optgroup label="Sub-items">${record.subItems.map(sub => `<option value="${esc(sub.id)}"${sub.id === subId ? ' selected' : ''}>Sub-item · ${esc(sub.title)}</option>`).join('')}</optgroup>` : ''}</select>`
+            : '',
+        earlier =
+          kind === 'specs'
+            ? `<div id="hubItemFeedbackHistory" aria-live="polite">${projectFeedbackHistory(record, subId)}</div>`
+            : history
+              ? `<details class="task-feedback-history"><summary>Earlier ${kind === 'tickets' ? 'updates' : 'feedback'}</summary><p class="prewrap hub-sensitive">${esc(history)}</p></details>`
+              : '';
       a.openModal(
         config.title,
-        `<form id="${config.id}" class="task-feedback-form" data-kind="${kind}" data-id="${esc(id)}" data-owner="${esc(a.cloud().user.id)}"><div class="task-feedback-context"><span class="hub-kicker">${config.kicker} · ${esc(reference)}</span><h3 class="hub-sensitive">${esc(record.task || record.description)}</h3></div><label for="${config.id}Text">New ${config.label}</label><textarea id="${config.id}Text" name="${input}" maxlength="${kind === 'tickets' ? 10000 : 32767}" required autofocus aria-describedby="${config.id}Hint"></textarea><p id="${config.id}Hint" class="hub-meta">Date and time are added when you save. Earlier ${kind === 'tickets' ? 'updates are' : 'feedback is'} kept.</p>${history ? `<details class="task-feedback-history"><summary>Earlier ${kind === 'tickets' ? 'updates' : 'feedback'}</summary><p class="prewrap hub-sensitive">${esc(history)}</p></details>` : ''}<div class="modal-actions">${btn('close', 'Cancel')}<button type="submit" class="primary">Save ${config.label}</button></div></form>`
+        `<form id="${config.id}" class="task-feedback-form" data-kind="${kind}" data-id="${esc(id)}" data-owner="${esc(a.cloud().user.id)}"><div class="task-feedback-context"><span class="hub-kicker">${config.kicker} · ${esc(reference)}</span><h3 class="hub-sensitive">${esc(record.task || record.description)}</h3></div>${targetField}<label for="${config.id}Text">New ${config.label}</label><textarea id="${config.id}Text" name="${input}" maxlength="${kind === 'tickets' ? 10000 : 32767}" required autofocus aria-describedby="${config.id}Hint"></textarea><p id="${config.id}Hint" class="hub-meta">Date and time are added when you save. Earlier ${kind === 'tickets' ? 'updates are' : 'feedback is'} kept.</p>${earlier}<div class="modal-actions">${btn('close', 'Cancel')}<button type="submit" class="primary">Save ${config.label}</button></div></form>`
       );
     }
     function saveRecordUpdate(form) {
@@ -1264,6 +1295,9 @@
         throw Error('Finish signing in and reopen ' + config.title + ' before saving.');
       if (!form.isConnected || !$('modal').open || $(config.id) !== form)
         throw Error('Reopen ' + config.title + ' before saving.');
+      const targetControl = kind === 'specs' ? form.elements.namedItem('feedbackTarget') : null;
+      if (kind === 'specs' && !targetControl) throw Error('Reopen Add feedback before saving.');
+      const subId = targetControl?.value || '';
       const text = form.elements
         .namedItem(kind === 'tickets' ? 'newHistory' : 'feedback')
         .value.trim();
@@ -1272,8 +1306,9 @@
         stamp = dateOf(savedAt).split('-').reverse().join('-') + ' ' + clock(savedAt);
       const ok = save(
         (h, state) => {
-          const record = state[kind].find(t => t.id === form.dataset.id);
-          if (!record) throw Error(config.record + ' no longer exists.');
+          const parent = state[kind].find(t => t.id === form.dataset.id);
+          if (!parent) throw Error(config.record + ' no longer exists.');
+          const record = kind === 'specs' ? projectFeedbackTarget(parent, subId) : parent;
           if (kind === 'tickets') a.appendTicketHistory(record, text);
           else
             record.feedback =
@@ -1284,6 +1319,7 @@
                 ? 'Status update history is full. Shorten this update or edit earlier history to make room.'
                 : 'Feedback history is full. Shorten this update or edit earlier feedback to make room.'
             );
+          if (kind === 'specs' && subId) record.updatedAt = savedAt.toISOString();
         },
         kind === 'tickets' ? 'Status update added.' : 'Feedback added.'
       );
@@ -2675,7 +2711,7 @@
         return;
       }
       if (action === 'item-feedback') {
-        recordUpdate('specs', id);
+        recordUpdate('specs', id, el.dataset.sub || '');
         return;
       }
       if (action === 'ticket-update') {
@@ -3462,6 +3498,7 @@
     document.addEventListener('change', event => {
       const el = event.target;
       try {
+        if (el.id === 'hubItemFeedbackTarget') refreshProjectFeedbackHistory(el.form);
         if (el.form?.id === 'hubTheme') previewTheme(el.form);
         if (el.dataset.hubMove) moveTask(el.dataset.hubMove, el.value);
         if (el.id === 'hubProcess') {

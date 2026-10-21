@@ -632,8 +632,7 @@
         el = document.createElement('span');
         el.id = 'hubMomoUmbrella';
         el.setAttribute('aria-hidden', 'true');
-        el.innerHTML =
-          '<svg viewBox="0 0 100 90"><path d="M50 4v73q0 14 12 8" fill="none" stroke="#35566c" stroke-width="4"/><path d="M5 39a45 35 0 0190 0q-12-10-23 0-12-10-22 0-12-10-23 0-12-10-22 0" fill="#c5b7ef" stroke="#35566c" stroke-width="2"/><path d="M50 5q-22 12-23 34M50 5q22 12 22 34" fill="none" stroke="#8a78ba" stroke-width="2"/></svg>';
+        el.innerHTML = root.WorkHubMomoArt.umbrella();
         pet().append(el);
       }
       umbrellaUntil = Date.now() + 11000;

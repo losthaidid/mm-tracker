@@ -53,6 +53,8 @@
 /* Mirroring the canopy around the same centre as the illustrated body keeps its grip attached. */
 #hubPet[data-umbrella='true'][data-facing='left'] #hubMomoUmbrella {
   left: -6%;
+}
+#hubPet[data-umbrella='true'][data-facing='left'] #hubMomoUmbrella svg {
   scale: -1 1;
 }
 #hubPet[data-pose='umbrella-rest'] .pet-body,
