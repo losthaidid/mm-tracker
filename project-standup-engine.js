@@ -243,7 +243,7 @@
       linked.set(
         id,
         [
-          ...(linked.get(id) || []),
+          linked.get(id) || '',
           task?.task || action.text,
           taskStatus(task),
           task?.dueDate || '',
