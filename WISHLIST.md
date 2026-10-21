@@ -39,6 +39,14 @@ Kept on 21 October 2026: selections **16–18 and 23**. Wishlist only; implement
 - **18 · Unexpected-event scenarios** — introduce events such as damaged deliveries, urgent consumption or supplier returns within supported simulation coverage to explore the proposed design.
 - **23 · Explain at three levels** — present the same proposal from Business user, SAP consultant and Finance perspectives.
 
+## Pending Solution Studio accounting, rules and handover enhancements
+
+Kept on 21 October 2026: selections **25, 28 and 29** from the Solution Studio ideas. These numbers are scoped to this discussion and are separate from Batch C selections. Wishlist only; implementation has not been requested. No batch assigned.
+
+- **25 · Animated accounting companion** — simplified inventory, expense and GR/IR panels beside the process; supported transactions animate the relevant amounts with explanations.
+- **28 · Business-rule cards** — capture business rules, attach them to process steps, and identify SAP configuration, workflow or manual-control needs.
+- **29 · Consultant handover pack** — compile an agreed design into business requirements, process maps, material profiles, configuration assumptions, test scenarios and open questions.
+
 ## Earlier completed selections
 
 The seven selected items are now part of the existing account document. The tracker keeps its current sign-in, saving, backup and restore workflows. No database migration is needed.
