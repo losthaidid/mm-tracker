@@ -358,8 +358,16 @@
     const addNote = (project, section, subject, detail) => {
       if (detail) projectNotes.push({ values: [project, section, subject, detail], record: 0 });
     };
-    for (const item of d.specs)
+    for (const item of d.specs) {
       addNote(pname(item.projectId), 'Item feedback', item.description, item.feedback);
+      for (const sub of item.subItems || [])
+        addNote(
+          pname(item.projectId),
+          'Sub-item feedback',
+          item.description + ' · ' + sub.title,
+          sub.feedback
+        );
+    }
     for (const c of d.projectCompanies || [])
       addNote(
         pname(c.projectId),

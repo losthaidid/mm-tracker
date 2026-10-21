@@ -5458,7 +5458,7 @@ function viewItemLinks(id) {
     ];
   openModal(
     `Project item traceability · ${projectItemLabel(item)}`,
-    `<div class="trace-hero"><span class="eyebrow">End-to-end mapping</span><h2>${esc(item.description)}</h2><p>${esc(state.projectCompanies.find(c => c.id === item.companyId)?.name || 'Unassigned')} · Due ${dateLabel(item.dueDate)}</p></div>${mismatches.length ? `<div class="trace-warning"><strong>Company mapping needs review.</strong> ${mismatches.length} linked feedback record${mismatches.length === 1 ? ' uses' : 's use'} a different company. Links were preserved so nothing is lost.</div>` : ''}${projectItemFeedbackPanel(item)}<div class="trace-sections">${sections.map(([name, rows]) => `<section><div><h3>${name}</h3><span>${rows.length}</span></div><div class="trace-records">${rows.join('') || '<p class="muted">No linked records.</p>'}</div></section>`).join('')}</div><div class="modal-actions"><span class="hint">Mappings are created from Phase Feedback and converted actions.</span><button type="button" data-action="cancel">Close</button></div>`
+    `<div class="trace-hero"><span class="eyebrow">End-to-end mapping</span><h2>${esc(item.description)}</h2><p>${esc(state.projectCompanies.find(c => c.id === item.companyId)?.name || 'Unassigned')} · Due ${dateLabel(item.dueDate)}</p></div>${mismatches.length ? `<div class="trace-warning"><strong>Company mapping needs review.</strong> ${mismatches.length} linked feedback record${mismatches.length === 1 ? ' uses' : 's use'} a different company. Links were preserved so nothing is lost.</div>` : ''}${projectItemFeedbackSections(item)}<div class="trace-sections">${sections.map(([name, rows]) => `<section><div><h3>${name}</h3><span>${rows.length}</span></div><div class="trace-records">${rows.join('') || '<p class="muted">No linked records.</p>'}</div></section>`).join('')}</div><div class="modal-actions"><span class="hint">Mappings are created from Phase Feedback and converted actions.</span><button type="button" data-action="cancel">Close</button></div>`
   );
 }
 
@@ -6031,6 +6031,7 @@ function upgradeFeatures(d) {
           title: String(sub.title || sub.name || '').slice(0, 500),
           status,
           remarks: String(sub.remarks || '').slice(0, 32767),
+          feedback: sub.feedback === undefined ? '' : sub.feedback,
           owner: String(sub.owner || '').slice(0, 200),
           dueDate: validDate(String(sub.dueDate || '')) ? String(sub.dueDate || '') : '',
           createdAt: String(sub.createdAt || '').slice(0, 50),
@@ -6065,6 +6066,7 @@ function validateFeatures(d) {
         !sub.title.trim() ||
         !SUBITEM_STATUSES.includes(sub.status) ||
         !checkText(sub.remarks) ||
+        !checkText(sub.feedback) ||
         !checkText(sub.owner, 200) ||
         !validDate(sub.dueDate) ||
         !checkText(sub.createdAt, 50) ||
@@ -6308,8 +6310,18 @@ function renderSubItemSummary(item) {
     )}${m.rows.length > 3 ? `<span class="subitem-chip more">+${m.rows.length - 3} more</span>` : ''}</div>${m.blocked || m.overdue ? `<small>${m.blocked ? m.blocked + ' blocked' : ''}${m.blocked && m.overdue ? ' · ' : ''}${m.overdue ? m.overdue + ' overdue' : ''}</small>` : ''}<button class="small" data-action="manage-subitems" data-id="${esc(item.id)}">Manage sub-items</button></div>`;
 }
 
-function projectItemFeedbackPanel(item) {
-  return `<section class="item-feedback"><div class="item-feedback-heading"><h5>Feedback updates</h5><button type="button" class="small" data-hub="item-feedback" data-id="${esc(item.id)}">Add feedback</button></div><p class="prewrap hub-sensitive"${item.feedback ? ' tabindex="0"' : ''}>${esc(item.feedback) || 'No feedback yet.'}</p></section>`;
+function projectItemFeedbackPanel(item, sub = null) {
+  const record = sub || item;
+  return `<section class="item-feedback${sub ? ' item-feedback-sub' : ''}" data-feedback-item="${esc(item.id)}" data-feedback-sub="${esc(sub?.id || '')}"><div class="item-feedback-heading"><h5 class="hub-sensitive">${sub ? 'Sub-item feedback · ' + esc(sub.title) : 'Main item feedback'}</h5><button type="button" class="small" data-hub="item-feedback" data-id="${esc(item.id)}"${sub ? ` data-sub="${esc(sub.id)}"` : ''}>Add feedback</button></div><p class="prewrap hub-sensitive"${record.feedback ? ' tabindex="0"' : ''}>${esc(record.feedback) || 'No feedback yet.'}</p></section>`;
+}
+function projectItemFeedbackSections(item) {
+  return (
+    projectItemFeedbackPanel(item) +
+    (item.subItems || [])
+      .filter(sub => sub.feedback)
+      .map(sub => projectItemFeedbackPanel(item, sub))
+      .join('')
+  );
 }
 function renderProjectSpecs() {
   const project = activeProject(),
@@ -6325,7 +6337,9 @@ function renderProjectSpecs() {
           {
             ...r,
             company: companyName(r.companyId),
-            subItems: (r.subItems || []).map(s => `${s.title} ${s.status} ${s.owner}`).join(' '),
+            subItems: (r.subItems || [])
+              .map(s => `${s.title} ${s.status} ${s.owner} ${s.remarks} ${s.feedback}`)
+              .join(' '),
           },
           specQuery
         ) &&
@@ -6352,7 +6366,7 @@ function renderProjectSpecs() {
                 trace.plans.length +
                 trace.decisions.length,
               mismatch = trace.feedback.some(f => f.companyId && f.companyId !== r.companyId);
-            return `<article class="process-card item-card${r.status !== 'Completed' && r.dueDate && r.dueDate < today() ? ' item-overdue' : ''}${mismatch ? ' trace-mismatch' : ''}"><div class="process-card-head"><div><button class="process-code trace-code" data-action="view-item-links" data-id="${esc(r.id)}">${esc(projectItemLabel(r))}</button><h4>${esc(r.description) || 'Untitled item'}</h4></div>${tag(r.status)}</div><div class="item-meta"><span>${esc(companyName(r.companyId))}</span><span>Priority ${esc(r.priority) || '—'}</span></div><dl class="item-dates"><div><dt>Expected date</dt><dd>${dateLabel(r.expectedDate)}</dd></div><div><dt>Due date</dt><dd>${dateLabel(r.dueDate)}${r.status !== 'Completed' && r.dueDate && r.dueDate < today() ? '<small>Overdue</small>' : ''}</dd></div></dl>${r.remarks ? `<p class="item-remarks">${esc(r.remarks)}</p>` : ''}${projectItemFeedbackPanel(r)}${subItemTrackedTime(r.id)}${renderSubItemSummary(r)}${mismatch ? '<div class="trace-inline-warning">Company link needs review</div>' : ''}<div class="trace-strip"><button data-action="view-item-links" data-id="${esc(r.id)}"><strong>${trace.feedback.length}</strong><span>phase feedback</span></button><button data-action="view-item-links" data-id="${esc(r.id)}"><strong>${linked}</strong><span>linked actions</span></button></div><div class="item-card-footer"><span>${r.url && /^https?:\/\//i.test(r.url) ? `<a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${esc(r.reference) || 'Open reference'} ↗</a>` : esc(r.reference) || 'No reference'}</span><div class="actions"><button class="small" data-action="manage-subitems" data-id="${esc(r.id)}">Sub-items</button><button class="small" data-action="view-item-links" data-id="${esc(r.id)}">Traceability</button><button class="small" data-action="edit" data-group="specs" data-id="${esc(r.id)}">Edit item</button></div></div></article>`;
+            return `<article class="process-card item-card${r.status !== 'Completed' && r.dueDate && r.dueDate < today() ? ' item-overdue' : ''}${mismatch ? ' trace-mismatch' : ''}"><div class="process-card-head"><div><button class="process-code trace-code" data-action="view-item-links" data-id="${esc(r.id)}">${esc(projectItemLabel(r))}</button><h4>${esc(r.description) || 'Untitled item'}</h4></div>${tag(r.status)}</div><div class="item-meta"><span>${esc(companyName(r.companyId))}</span><span>Priority ${esc(r.priority) || '—'}</span></div><dl class="item-dates"><div><dt>Expected date</dt><dd>${dateLabel(r.expectedDate)}</dd></div><div><dt>Due date</dt><dd>${dateLabel(r.dueDate)}${r.status !== 'Completed' && r.dueDate && r.dueDate < today() ? '<small>Overdue</small>' : ''}</dd></div></dl>${r.remarks ? `<p class="item-remarks">${esc(r.remarks)}</p>` : ''}${projectItemFeedbackSections(r)}${subItemTrackedTime(r.id)}${renderSubItemSummary(r)}${mismatch ? '<div class="trace-inline-warning">Company link needs review</div>' : ''}<div class="trace-strip"><button data-action="view-item-links" data-id="${esc(r.id)}"><strong>${trace.feedback.length}</strong><span>phase feedback</span></button><button data-action="view-item-links" data-id="${esc(r.id)}"><strong>${linked}</strong><span>linked actions</span></button></div><div class="item-card-footer"><span>${r.url && /^https?:\/\//i.test(r.url) ? `<a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${esc(r.reference) || 'Open reference'} ↗</a>` : esc(r.reference) || 'No reference'}</span><div class="actions"><button class="small" data-action="manage-subitems" data-id="${esc(r.id)}">Sub-items</button><button class="small" data-action="view-item-links" data-id="${esc(r.id)}">Traceability</button><button class="small" data-action="edit" data-group="specs" data-id="${esc(r.id)}">Edit item</button></div></div></article>`;
           })
           .join('')}</div>`
       : '<div class="governance-empty"><strong>No matching project items</strong><p>Choose another company or status, clear the search, or add a project item.</p></div>'
@@ -6365,7 +6379,7 @@ function openSubItems(parentId) {
   const m = subItemMetrics(item);
   openModal(
     `Sub-items · ${projectItemLabel(item)}`,
-    `<div class="subitem-hero"><div><span class="eyebrow">${esc(item.description)}</span><h2>${m.completed} of ${m.rows.length} completed</h2><p>${m.blocked} blocked · ${m.overdue} overdue</p></div><div class="subitem-ring" style="--completion:${m.percent}%"><strong>${m.percent}%</strong></div></div><div class="subitem-manager-list">${m.rows.map(sub => `<div class="subitem-manager-row${sub.status === 'Blocked' ? ' blocked' : ''}${sub.status !== 'Completed' && sub.dueDate && sub.dueDate < today() ? ' overdue' : ''}"><div><strong>${esc(sub.title)}</strong><small>${sub.owner ? `Owner: ${esc(sub.owner)}` : 'No owner'}${sub.dueDate ? ` · Due ${esc(sub.dueDate)}` : ''}</small>${sub.remarks ? `<p class="prewrap">${esc(sub.remarks)}</p>` : ''}${subItemTrackedTime(item.id, sub.id)}</div><select data-subitem-status="${esc(parentId)}" data-subitem-id="${esc(sub.id)}" aria-label="Status for ${esc(sub.title)}">${SUBITEM_STATUSES.map(v => `<option${v === sub.status ? ' selected' : ''}>${esc(v)}</option>`).join('')}</select><div class="actions subitem-work-actions">${subItemTimerButton(item, sub)}<button class="small" data-action="edit-subitem" data-parent="${esc(parentId)}" data-id="${esc(sub.id)}">Edit</button><button class="small danger" data-action="delete-subitem" data-parent="${esc(parentId)}" data-id="${esc(sub.id)}">Delete</button></div></div>`).join('') || '<div class="governance-empty"><strong>No sub-items yet</strong><p>Break this deliverable into smaller trackable actions.</p></div>'}</div><div class="modal-actions"><button type="button" data-action="cancel">Close</button><button class="primary" data-action="new-subitem" data-parent="${esc(parentId)}">+ Add sub-item</button></div>`
+    `<div class="subitem-hero"><div><span class="eyebrow">${esc(item.description)}</span><h2>${m.completed} of ${m.rows.length} completed</h2><p>${m.blocked} blocked · ${m.overdue} overdue</p></div><div class="subitem-ring" style="--completion:${m.percent}%"><strong>${m.percent}%</strong></div></div><div class="subitem-manager-list">${m.rows.map(sub => `<div class="subitem-manager-row${sub.status === 'Blocked' ? ' blocked' : ''}${sub.status !== 'Completed' && sub.dueDate && sub.dueDate < today() ? ' overdue' : ''}"><div><strong>${esc(sub.title)}</strong><small>${sub.owner ? `Owner: ${esc(sub.owner)}` : 'No owner'}${sub.dueDate ? ` · Due ${esc(sub.dueDate)}` : ''}</small>${sub.remarks ? `<p class="prewrap">${esc(sub.remarks)}</p>` : ''}${projectItemFeedbackPanel(item, sub)}${subItemTrackedTime(item.id, sub.id)}</div><select data-subitem-status="${esc(parentId)}" data-subitem-id="${esc(sub.id)}" aria-label="Status for ${esc(sub.title)}">${SUBITEM_STATUSES.map(v => `<option${v === sub.status ? ' selected' : ''}>${esc(v)}</option>`).join('')}</select><div class="actions subitem-work-actions">${subItemTimerButton(item, sub)}<button class="small" data-action="edit-subitem" data-parent="${esc(parentId)}" data-id="${esc(sub.id)}">Edit</button><button class="small danger" data-action="delete-subitem" data-parent="${esc(parentId)}" data-id="${esc(sub.id)}">Delete</button></div></div>`).join('') || '<div class="governance-empty"><strong>No sub-items yet</strong><p>Break this deliverable into smaller trackable actions.</p></div>'}</div><div class="modal-actions"><button type="button" data-action="cancel">Close</button><button class="primary" data-action="new-subitem" data-parent="${esc(parentId)}">+ Add sub-item</button></div>`
   );
 }
 
@@ -6377,7 +6391,7 @@ function editSubItem(parentId, id = '') {
   const row = old || { title: '', status: 'Not started', owner: '', dueDate: '' };
   openModal(
     old ? 'Edit sub-item' : 'Add sub-item',
-    `<form id="subItemForm" data-parent="${esc(parentId)}" data-id="${esc(id)}"><div class="manual-entry-hero"><span class="eyebrow">Parent item</span><strong>${esc(projectItemLabel(item))} · ${esc(item.description)}</strong></div><div class="form-grid"><div class="wide"><label for="subItemTitle">Sub-item *</label><input id="subItemTitle" name="title" maxlength="500" value="${esc(row.title)}" required placeholder="Describe the smaller action or deliverable"></div><div><label for="subItemStatus">Status *</label><select id="subItemStatus" name="status" required>${SUBITEM_STATUSES.map(v => `<option${v === row.status ? ' selected' : ''}>${esc(v)}</option>`).join('')}</select></div><div><label for="subItemOwner">Owner</label><input id="subItemOwner" name="owner" maxlength="200" value="${esc(row.owner)}"></div><div><label for="subItemDue">Due date</label><input id="subItemDue" name="dueDate" type="date" min="1900-01-01" max="9999-12-31" value="${esc(row.dueDate)}"></div><div class="wide"><label for="subItemRemarks">Remarks</label><textarea id="subItemRemarks" name="remarks" maxlength="32767">${esc(row.remarks || '')}</textarea></div></div><div class="modal-actions"><button type="button" data-action="subitem-back" data-parent="${esc(parentId)}">Back to sub-items</button><button class="primary" type="submit">Save sub-item</button></div></form>`
+    `<form id="subItemForm" data-parent="${esc(parentId)}" data-id="${esc(id)}"><div class="manual-entry-hero"><span class="eyebrow">Parent item</span><strong>${esc(projectItemLabel(item))} · ${esc(item.description)}</strong></div><div class="form-grid"><div class="wide"><label for="subItemTitle">Sub-item *</label><input id="subItemTitle" name="title" maxlength="500" value="${esc(row.title)}" required placeholder="Describe the smaller action or deliverable"></div><div><label for="subItemStatus">Status *</label><select id="subItemStatus" name="status" required>${SUBITEM_STATUSES.map(v => `<option${v === row.status ? ' selected' : ''}>${esc(v)}</option>`).join('')}</select></div><div><label for="subItemOwner">Owner</label><input id="subItemOwner" name="owner" maxlength="200" value="${esc(row.owner)}"></div><div><label for="subItemDue">Due date</label><input id="subItemDue" name="dueDate" type="date" min="1900-01-01" max="9999-12-31" value="${esc(row.dueDate)}"></div><div class="wide"><label for="subItemRemarks">Remarks</label><textarea id="subItemRemarks" name="remarks" maxlength="32767">${esc(row.remarks || '')}</textarea></div><div class="wide"><label for="subItemFeedback">Feedback updates</label><textarea id="subItemFeedback" name="feedback" maxlength="32767">${esc(row.feedback || '')}</textarea></div></div><div class="modal-actions"><button type="button" data-action="subitem-back" data-parent="${esc(parentId)}">Back to sub-items</button><button class="primary" type="submit">Save sub-item</button></div></form>`
   );
 }
 
@@ -6398,6 +6412,7 @@ function saveSubItem(form) {
     title,
     status,
     remarks: value('remarks').trim(),
+    feedback: form.elements.namedItem('feedback')?.value ?? old?.feedback ?? '',
     owner: value('owner').trim(),
     dueDate: value('dueDate'),
     createdAt: old?.createdAt || now,
@@ -7340,7 +7355,7 @@ reportModel = function (d, asof) {
         sub.owner,
         sub.dueDate,
         sub.remarks,
-        '',
+        sub.feedback || '',
       ]);
   return models;
 };

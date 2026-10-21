@@ -117,17 +117,29 @@ body #hubMomoUmbrella {
   left: 10%;
   top: -48%;
   width: 96%;
-  height: 90%;
+  height: 140%;
   pointer-events: none;
   transform: none;
   animation: none;
-  z-index: 3;
+  z-index: auto;
 }
 #hubMomoUmbrella svg {
   width: 100%;
   height: 100%;
   display: block;
   overflow: visible;
+  position: absolute;
+  inset: 0;
+}
+#hubMomoUmbrella .momo-umbrella-back {
+  z-index: -1;
+}
+#hubMomoUmbrella .momo-umbrella-front {
+  z-index: 3;
+}
+/* The bent sleeve and hand are painted above the shaft, clear of the face. */
+#hubPet[data-umbrella='true'] .momo-arm-right {
+  visibility: hidden;
 }
 body:not([data-motion='off']) #hubPet[data-pose='umbrella-walk'] .pet-body {
   animation: none;

@@ -8,28 +8,38 @@
 <link rel="stylesheet" href="../studio.css?v=20261017-momo-anime">
 <link rel="stylesheet" href="../workspace-upgrades.css?v=20261017-momo-anime">
 <link rel="stylesheet" href="../momo-anime.css?v=20261017-momo-render-fix2">
+<link rel="stylesheet" href="../momo-world.css?v=20261021-umbrella-hand-1">
+<link rel="stylesheet" href="../momo-behaviour.css?v=20261021-umbrella-hand-1">
 <style>
 body{margin:0;padding:32px;background:#fff7df;font-family:system-ui;color:#31434a}
 main{max-width:560px;margin:auto}h1{font-size:24px;margin:0 0 8px}p{line-height:1.5}
-.stage{height:340px;position:relative;border:1px solid #ded5be;border-radius:18px;background:#fffaf0;margin:24px 0}
-#hubPet{position:absolute!important;left:calc(50% - 100px)!important;top:50px!important;right:auto!important;width:200px!important;height:222px!important}
+.stage{height:410px;position:relative;border:1px solid #ded5be;border-radius:18px;background:#fffaf0;margin:24px 0}
+#hubPet{position:absolute!important;left:calc(50% - 100px)!important;top:130px!important;right:auto!important;width:200px!important;height:200px!important}
 .poses{display:flex;gap:8px;flex-wrap:wrap}button{font:inherit}
+body[data-small="true"] #hubPet{width:112px!important;height:112px!important;left:calc(50% - 56px)!important}
+body[data-small="true"] .stage{max-width:340px;margin-inline:auto}
 </style>
 </head>
 <body data-motion="calm">
 <main><h1>Momo visual check</h1><p>Live artwork and styles, without account data. Move your cursor to check his eyes, then select a pose.</p>
 <div class="stage"><aside id="hubPet" data-pose="idle" data-expression="curious"><button type="button" aria-label="Momo anime boy"></button></aside></div>
-<div class="poses"><button data-pose="idle">Standing</button><button data-pose="startled">Startled</button><button data-pose="held">Picked up</button><button data-pose="annoyed">Annoyed</button><button data-pose="idle-sit">Chair</button><button data-pose="idle-sleep">Sleeping</button></div>
+<div class="poses"><button data-pose="idle">Standing</button><button data-pose="startled">Startled</button><button data-pose="held">Picked up</button><button data-pose="annoyed">Annoyed</button><button data-pose="idle-sit">Chair</button><button data-pose="idle-sleep">Sleeping</button><button data-pose="umbrella-walk">Umbrella walk</button><button data-pose="umbrella-rest">Umbrella rest</button><button data-control="mirror">Turn around</button><button data-control="small">Small size</button><button data-control="motion">Toggle motion</button></div>
 </main>
-<script src="../momo-art.js?v=20261017-momo-render-fix2"></script>
+<script src="../momo-art.js?v=20261021-umbrella-hand-1"></script>
 <script>
 const pet=document.getElementById('hubPet');
+pet.dataset.facing='right';
 pet.querySelector('button').innerHTML=WorkHubMomoArt.svg('glasses');
 // This page lives one directory below the app; keep image paths relative to it.
 pet.querySelectorAll('.momo-part-image').forEach(image=>image.setAttribute('href','../'+image.getAttribute('href')));
 WorkHubMomoArt.mount(pet);
 document.querySelector('.poses').addEventListener('click',event=>{
+ if(event.target.dataset.control==='mirror'){pet.dataset.facing=pet.dataset.facing==='left'?'right':'left';return;}
+ if(event.target.dataset.control==='small'){document.body.dataset.small=String(document.body.dataset.small!=='true');return;}
+ if(event.target.dataset.control==='motion'){document.body.dataset.motion=document.body.dataset.motion==='off'?'calm':'off';return;}
  const pose=event.target.dataset.pose;if(!pose)return;
+ document.getElementById('hubMomoUmbrella')?.remove();pet.removeAttribute('data-umbrella');
+ if(pose.startsWith('umbrella-')){const el=document.createElement('span');el.id='hubMomoUmbrella';el.setAttribute('aria-hidden','true');el.innerHTML=WorkHubMomoArt.umbrella();pet.append(el);pet.dataset.umbrella='true';}
  pet.dataset.pose=pose;pet.dataset.expression=({startled:'surprised',held:'surprised',annoyed:'annoyed','idle-sleep':'sleepy'})[pose]||'curious';
  if(pose==='idle-sit')pet.dataset.chairPhase='whistle';else pet.removeAttribute('data-chair-phase');
 });

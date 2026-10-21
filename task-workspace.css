@@ -76,6 +76,7 @@ body .task-action-cluster .task-action-feedback {
 }
 .task-feedback-form {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   min-width: 0;
 }
@@ -125,6 +126,13 @@ body .task-action-cluster .task-action-feedback {
   margin: 0;
   font-size: 13px;
   color: var(--hub-text, #51445f);
+}
+.item-feedback-sub {
+  border-left: 3px solid var(--hub-accent, #8463ab);
+}
+#hubItemFeedbackHistory {
+  display: grid;
+  gap: 8px;
 }
 .item-feedback p {
   margin: 10px 0 0;

@@ -11,6 +11,31 @@
 (function (root) {
   'use strict';
   const ATLAS = './assets/momo/anime-rig.webp?v=20261017-momo-render-fix';
+  // Keep the sleeve, fingers and shaft in one layer so the grip follows a mirrored canopy.
+  function umbrella() {
+    return `<svg class="momo-umbrella-back" viewBox="0 0 100 140" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+ <path d="M50 4v102" fill="none" stroke="#35566c" stroke-width="2.2" stroke-linecap="round"/>
+ <path d="M5 39a45 35 0 0190 0q-12-10-23 0-12-10-22 0-12-10-23 0-12-10-22 0" fill="#c5b7ef" stroke="#35566c" stroke-width="2"/>
+ <path d="M50 5q-22 12-23 34M50 5q22 12 22 34" fill="none" stroke="#8a78ba" stroke-width="2"/>
+</svg><svg class="momo-umbrella-front" viewBox="0 0 100 140" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+ <defs>
+  <linearGradient id="momo-umbrella-sleeve" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#b7dacb"/><stop offset=".45" stop-color="#85b5a5"/><stop offset="1" stop-color="#477b70"/></linearGradient>
+  <radialGradient id="momo-umbrella-skin" cx="35%" cy="25%"><stop stop-color="#ffe5cf"/><stop offset=".7" stop-color="#f6c7ab"/><stop offset="1" stop-color="#dca58e"/></radialGradient>
+ </defs>
+ <path class="momo-umbrella-shaft" d="M50 102v20q0 14 10 7" fill="none" stroke="#35566c" stroke-width="2.2" stroke-linecap="round"/>
+ <g class="momo-umbrella-grip">
+  <path class="momo-umbrella-sleeve" d="M56 98q6-1 8 9l3 8q0 5-4 5-3 1-6-2l-8-6q-3-3 0-6l4-1 6 5-3-7Z" fill="url(#momo-umbrella-sleeve)" stroke="#527f73" stroke-width=".7" stroke-linejoin="round"/>
+  <path d="m60 103 2 7m-4 5 5 2" fill="none" stroke="#d3e8db" stroke-width=".9" stroke-linecap="round" opacity=".7"/>
+  <path d="m48 111 6-1 3 4-5 3-5-3Z" fill="url(#momo-umbrella-sleeve)" stroke="#527f73" stroke-width=".7"/>
+  <g class="momo-umbrella-hand" fill="url(#momo-umbrella-skin)" stroke="#c5917f" stroke-width=".55" stroke-linecap="round" stroke-linejoin="round">
+   <path d="M48 101q-3 0-3 3v5q0 4 4 4h3q3-1 3-4v-4q-1-3-3-3Z"/>
+   <path d="M49 104q-4-3-4 1l1 5q1 2 3 1l2-4"/>
+   <path d="m49 105 4 .3m-4 2.4 4 .3m-3 2.3h2.5" fill="none" opacity=".8"/>
+   <path d="m47 103 3-.3" fill="none" stroke="#fff0df" stroke-width=".9"/>
+  </g>
+ </g>
+</svg>`;
+  }
   function accessory(name) {
     if (name === 'none') return '';
     if (name === 'helmet')
@@ -92,5 +117,5 @@
     };
     image.src = source;
   }
-  root.WorkHubMomoArt = Object.freeze({ svg, accessory, mount });
+  root.WorkHubMomoArt = Object.freeze({ svg, accessory, mount, umbrella });
 })(window);
