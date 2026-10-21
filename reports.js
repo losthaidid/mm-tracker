@@ -351,13 +351,15 @@
       itemRows,
       {
         status: 3,
-        note: 'Sub-items follow their parent item. Their owner and remarks are retained on their own row.',
+        note: 'Sub-items follow their parent item. Their owner and remarks are retained on their own row. Item feedback updates are in Project notes.',
       }
     );
     const projectNotes = [];
     const addNote = (project, section, subject, detail) => {
       if (detail) projectNotes.push({ values: [project, section, subject, detail], record: 0 });
     };
+    for (const item of d.specs)
+      addNote(pname(item.projectId), 'Item feedback', item.description, item.feedback);
     for (const c of d.projectCompanies || [])
       addNote(
         pname(c.projectId),

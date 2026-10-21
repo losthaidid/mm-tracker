@@ -23,6 +23,11 @@
     '>' +
     label +
     '</button>';
+  const updateButton = t =>
+    '<button type="button" class="small ticket-quick-update" data-hub="ticket-update" data-id="' +
+    esc(t.id) +
+    '">Status update</button>';
+  const updateTime = t => [t.historyDate, t.historyTime].filter(Boolean).join(' ');
   function card(t, o) {
     const percent = Math.round((o.complete / o.total) * 100);
     return (
@@ -51,7 +56,7 @@
       '">' +
       o.statusOptions +
       '</select><section class="ticket-history-preview"><div class="ticket-update-heading"><span class="eyebrow">Latest update</span><time>' +
-      esc(t.historyDate || 'No update yet') +
+      esc(updateTime(t) || 'No update yet') +
       '</time></div><p class="hub-sensitive">' +
       esc(o.latest || 'Add a first update to leave a useful next step.') +
       '</p></section><div class="ticket-progress-title"><span>Milestones</span><strong>' +
@@ -74,6 +79,7 @@
       '</span></div><div class="ticket-card-footer"><span>' +
       o.checked +
       '</span><div class="actions">' +
+      updateButton(t) +
       button('detail', 'View details ↗', t) +
       button('edit', 'Edit', t, 'data-group="tickets"') +
       '</div></div></article>'
@@ -95,7 +101,7 @@
       '</span></div></div>' +
       button('edit', 'Edit ticket', t, 'data-group="tickets"') +
       '</header><div class="ticket-detail-tools"></div><div class="ticket-detail-layout"><main class="ticket-detail-main"><section class="ticket-detail-update"><div class="ticket-section-heading"><div><span class="ticket-kicker">THE LATEST CHAPTER</span><h3>Latest update</h3></div><time>' +
-      esc(t.historyDate || 'Awaiting an update') +
+      esc(updateTime(t) || 'Awaiting an update') +
       '</time></div><p class="hub-sensitive">' +
       esc(o.latest || 'Your next update can start the story.') +
       '</p></section><div class="ticket-detail-milestones"><div class="ticket-milestone-overview"><div><span class="ticket-kicker">ONE STEP AT A TIME</span><h3>Delivery progress</h3></div><strong>' +
@@ -114,9 +120,11 @@
       esc(t.history || 'No history recorded yet.') +
       '</div></details><form id="historyForm" data-id="' +
       esc(t.id) +
-      '"><label for="newHistory">Add a history update</label><textarea id="newHistory" name="newHistory" required maxlength="10000" rows="4" placeholder="What changed? What needs following up?"></textarea><div class="actions"><button class="primary" type="submit">＋ Add dated update</button>' +
+      '" data-owner="' +
+      esc(o.owner) +
+      '"><label for="newHistory">Status update</label><textarea id="newHistory" name="newHistory" required maxlength="10000" rows="4" aria-describedby="ticketUpdateHint" placeholder="What changed? What needs following up?"></textarea><div class="actions"><button class="primary" type="submit">Save status update</button>' +
       button('check-ticket', 'Mark checked today', t) +
-      '</div><p class="hint">New or changed progress remarks are added here with the date and time. Status changes do not add history entries. You can also add an update above.</p></form></section></main><aside class="ticket-facts"><span class="ticket-kicker">AT A GLANCE</span><h3>Ticket facts</h3><dl>' +
+      '</div><p id="ticketUpdateHint" class="hint">Date and time are added when you save. Earlier updates are kept. New or changed progress remarks also appear in this history.</p></form></section></main><aside class="ticket-facts"><span class="ticket-kicker">AT A GLANCE</span><h3>Ticket facts</h3><dl>' +
       o.facts
         .map(
           ([label, v]) =>

@@ -108,6 +108,7 @@ const FIELDS = {
     ['expectedDate', 'Expected date', 'date'],
     ['dueDate', 'Due date', 'date'],
     ['remarks', 'Remarks', 'textarea'],
+    ['feedback', 'Feedback updates', 'textarea'],
     ['reference', 'Reference File'],
     ['url', 'Reference link', 'url'],
   ],
@@ -488,6 +489,7 @@ function detail(id) {
       statusTag: tag(t.status),
       priorityTag: tag(t.priority),
       latest: latestHistory(t),
+      owner: cloud.user?.id || '',
       milestoneHtml: p
         ? milestonePanel(p)
         : `<button data-action="new-progress" data-ticket="${esc(t.ticket)}">Add progress tracker</button>`,
@@ -495,6 +497,11 @@ function detail(id) {
   );
 }
 function saveHistory(form) {
+  if (form.dataset.saved === 'true') return;
+  if (!cloud.ready || !cloud.user || form.dataset.owner !== cloud.user.id)
+    throw Error('Finish signing in and reopen the ticket before saving.');
+  if (!form.isConnected || !$('modal').open || $('historyForm') !== form)
+    throw Error('Reopen the ticket before saving.');
   const id = form.dataset.id,
     text = form.elements.namedItem('newHistory').value.trim();
   if (!text) throw Error('Enter a history update.');
@@ -502,9 +509,16 @@ function saveHistory(form) {
     const t = d.tickets.find(t => t.id === id);
     if (!t) throw Error('Ticket not found.');
     autoHistory(t, text);
+    if (t.history.length > 32767)
+      throw Error(
+        'Status update history is full. Shorten this update or edit earlier history to make room.'
+      );
   });
-  detail(id);
-  if (ok) tell('History update saved and timestamped.');
+  if (ok) {
+    form.dataset.saved = 'true';
+    detail(id);
+    tell('Status update saved and timestamped.');
+  }
 }
 
 function saveProgress(form) {
@@ -2566,6 +2580,7 @@ function upgradeFeaturesV6(d) {
       if (s.companyId === undefined) s.companyId = '';
       if (s.expectedDate === undefined) s.expectedDate = '';
       if (s.dueDate === undefined) s.dueDate = '';
+      if (s.feedback === undefined) s.feedback = '';
       if (!s.itemType) s.itemType = 'RICEFW ID';
       if (!d.lists.projectItemTypes.includes(s.itemType)) d.lists.projectItemTypes.push(s.itemType);
       if (s.itemId === undefined) s.itemId = s.ricefw || '';
@@ -5443,7 +5458,7 @@ function viewItemLinks(id) {
     ];
   openModal(
     `Project item traceability · ${projectItemLabel(item)}`,
-    `<div class="trace-hero"><span class="eyebrow">End-to-end mapping</span><h2>${esc(item.description)}</h2><p>${esc(state.projectCompanies.find(c => c.id === item.companyId)?.name || 'Unassigned')} · Due ${dateLabel(item.dueDate)}</p></div>${mismatches.length ? `<div class="trace-warning"><strong>Company mapping needs review.</strong> ${mismatches.length} linked feedback record${mismatches.length === 1 ? ' uses' : 's use'} a different company. Links were preserved so nothing is lost.</div>` : ''}<div class="trace-sections">${sections.map(([name, rows]) => `<section><div><h3>${name}</h3><span>${rows.length}</span></div><div class="trace-records">${rows.join('') || '<p class="muted">No linked records.</p>'}</div></section>`).join('')}</div><div class="modal-actions"><span class="hint">Mappings are created from Phase Feedback and converted actions.</span><button type="button" data-action="cancel">Close</button></div>`
+    `<div class="trace-hero"><span class="eyebrow">End-to-end mapping</span><h2>${esc(item.description)}</h2><p>${esc(state.projectCompanies.find(c => c.id === item.companyId)?.name || 'Unassigned')} · Due ${dateLabel(item.dueDate)}</p></div>${mismatches.length ? `<div class="trace-warning"><strong>Company mapping needs review.</strong> ${mismatches.length} linked feedback record${mismatches.length === 1 ? ' uses' : 's use'} a different company. Links were preserved so nothing is lost.</div>` : ''}${projectItemFeedbackPanel(item)}<div class="trace-sections">${sections.map(([name, rows]) => `<section><div><h3>${name}</h3><span>${rows.length}</span></div><div class="trace-records">${rows.join('') || '<p class="muted">No linked records.</p>'}</div></section>`).join('')}</div><div class="modal-actions"><span class="hint">Mappings are created from Phase Feedback and converted actions.</span><button type="button" data-action="cancel">Close</button></div>`
   );
 }
 
@@ -6293,6 +6308,9 @@ function renderSubItemSummary(item) {
     )}${m.rows.length > 3 ? `<span class="subitem-chip more">+${m.rows.length - 3} more</span>` : ''}</div>${m.blocked || m.overdue ? `<small>${m.blocked ? m.blocked + ' blocked' : ''}${m.blocked && m.overdue ? ' · ' : ''}${m.overdue ? m.overdue + ' overdue' : ''}</small>` : ''}<button class="small" data-action="manage-subitems" data-id="${esc(item.id)}">Manage sub-items</button></div>`;
 }
 
+function projectItemFeedbackPanel(item) {
+  return `<section class="item-feedback"><div class="item-feedback-heading"><h5>Feedback updates</h5><button type="button" class="small" data-hub="item-feedback" data-id="${esc(item.id)}">Add feedback</button></div><p class="prewrap hub-sensitive"${item.feedback ? ' tabindex="0"' : ''}>${esc(item.feedback) || 'No feedback yet.'}</p></section>`;
+}
 function renderProjectSpecs() {
   const project = activeProject(),
     all = activeSpecs().filter(r => !hub?.batchA || hub.batchA.matches('specs', r.id)),
@@ -6334,7 +6352,7 @@ function renderProjectSpecs() {
                 trace.plans.length +
                 trace.decisions.length,
               mismatch = trace.feedback.some(f => f.companyId && f.companyId !== r.companyId);
-            return `<article class="process-card item-card${r.status !== 'Completed' && r.dueDate && r.dueDate < today() ? ' item-overdue' : ''}${mismatch ? ' trace-mismatch' : ''}"><div class="process-card-head"><div><button class="process-code trace-code" data-action="view-item-links" data-id="${esc(r.id)}">${esc(projectItemLabel(r))}</button><h4>${esc(r.description) || 'Untitled item'}</h4></div>${tag(r.status)}</div><div class="item-meta"><span>${esc(companyName(r.companyId))}</span><span>Priority ${esc(r.priority) || '—'}</span></div><dl class="item-dates"><div><dt>Expected date</dt><dd>${dateLabel(r.expectedDate)}</dd></div><div><dt>Due date</dt><dd>${dateLabel(r.dueDate)}${r.status !== 'Completed' && r.dueDate && r.dueDate < today() ? '<small>Overdue</small>' : ''}</dd></div></dl>${r.remarks ? `<p class="item-remarks">${esc(r.remarks)}</p>` : ''}${subItemTrackedTime(r.id)}${renderSubItemSummary(r)}${mismatch ? '<div class="trace-inline-warning">Company link needs review</div>' : ''}<div class="trace-strip"><button data-action="view-item-links" data-id="${esc(r.id)}"><strong>${trace.feedback.length}</strong><span>feedback</span></button><button data-action="view-item-links" data-id="${esc(r.id)}"><strong>${linked}</strong><span>linked actions</span></button></div><div class="item-card-footer"><span>${r.url && /^https?:\/\//i.test(r.url) ? `<a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${esc(r.reference) || 'Open reference'} ↗</a>` : esc(r.reference) || 'No reference'}</span><div class="actions"><button class="small" data-action="manage-subitems" data-id="${esc(r.id)}">Sub-items</button><button class="small" data-action="view-item-links" data-id="${esc(r.id)}">Traceability</button><button class="small" data-action="edit" data-group="specs" data-id="${esc(r.id)}">Edit item</button></div></div></article>`;
+            return `<article class="process-card item-card${r.status !== 'Completed' && r.dueDate && r.dueDate < today() ? ' item-overdue' : ''}${mismatch ? ' trace-mismatch' : ''}"><div class="process-card-head"><div><button class="process-code trace-code" data-action="view-item-links" data-id="${esc(r.id)}">${esc(projectItemLabel(r))}</button><h4>${esc(r.description) || 'Untitled item'}</h4></div>${tag(r.status)}</div><div class="item-meta"><span>${esc(companyName(r.companyId))}</span><span>Priority ${esc(r.priority) || '—'}</span></div><dl class="item-dates"><div><dt>Expected date</dt><dd>${dateLabel(r.expectedDate)}</dd></div><div><dt>Due date</dt><dd>${dateLabel(r.dueDate)}${r.status !== 'Completed' && r.dueDate && r.dueDate < today() ? '<small>Overdue</small>' : ''}</dd></div></dl>${r.remarks ? `<p class="item-remarks">${esc(r.remarks)}</p>` : ''}${projectItemFeedbackPanel(r)}${subItemTrackedTime(r.id)}${renderSubItemSummary(r)}${mismatch ? '<div class="trace-inline-warning">Company link needs review</div>' : ''}<div class="trace-strip"><button data-action="view-item-links" data-id="${esc(r.id)}"><strong>${trace.feedback.length}</strong><span>phase feedback</span></button><button data-action="view-item-links" data-id="${esc(r.id)}"><strong>${linked}</strong><span>linked actions</span></button></div><div class="item-card-footer"><span>${r.url && /^https?:\/\//i.test(r.url) ? `<a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${esc(r.reference) || 'Open reference'} ↗</a>` : esc(r.reference) || 'No reference'}</span><div class="actions"><button class="small" data-action="manage-subitems" data-id="${esc(r.id)}">Sub-items</button><button class="small" data-action="view-item-links" data-id="${esc(r.id)}">Traceability</button><button class="small" data-action="edit" data-group="specs" data-id="${esc(r.id)}">Edit item</button></div></div></article>`;
           })
           .join('')}</div>`
       : '<div class="governance-empty"><strong>No matching project items</strong><p>Choose another company or status, clear the search, or add a project item.</p></div>'
@@ -7291,11 +7309,23 @@ reportModel = function (d, asof) {
     'Sub-item status',
     'Sub-item owner',
     'Sub-item due date',
-    'Sub-item remarks'
+    'Sub-item remarks',
+    'Item feedback'
   );
-  items.widths.push(20, 24, 65, 24, 65, 22, 28, 20, 70);
+  items.widths.push(20, 24, 65, 24, 65, 22, 28, 20, 70, 70);
   items.rows.forEach((row, index) =>
-    row.push('Project item', d.specs[index].id, d.specs[index].description, '', '', '', '', '', '')
+    row.push(
+      'Project item',
+      d.specs[index].id,
+      d.specs[index].description,
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      d.specs[index].feedback || ''
+    )
   );
   for (const item of d.specs)
     for (const sub of item.subItems || [])
@@ -7310,6 +7340,7 @@ reportModel = function (d, asof) {
         sub.owner,
         sub.dueDate,
         sub.remarks,
+        '',
       ]);
   return models;
 };
@@ -9434,6 +9465,8 @@ hub = WorkHubStudio.install({
   entries: scheduleEntries,
   entryTitle: scheduleEntryTitle,
   taskLabel: taskLinkedLabel,
+  itemLabel: projectItemLabel,
+  appendTicketHistory: autoHistory,
   rangeSegments,
   overlaps: bookingOverlaps,
   download,
