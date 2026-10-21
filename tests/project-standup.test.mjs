@@ -85,3 +85,16 @@ test('stand-up search reads live linked tasks, falls back to removed instruction
   d.tasks = [];
   assert.deepEqual(Array.from(E.search(d, 'p', 'Email removed')[0].subItemIds), ['s']);
 });
+
+test('stand-up search retains every Action when an item has several follow-ups', () => {
+  const d = state(); let n = 0;
+  E.upsertAction(d, input, now, () => 'task-' + ++n);
+  E.upsertAction(d, { ...input, id: 'action-2', text: 'Call finance about costing' }, now, () => 'task-' + ++n);
+  assert.equal(E.search(d, 'p', 'Email the owner').length, 1);
+  assert.equal(E.search(d, 'p', 'Call finance').length, 1);
+  assert.deepEqual(Array.from(E.search(d, 'p', 'Email costing')[0].subItemIds), ['s']);
+  d.tasks[0].task = 'Request approval';
+  assert.equal(E.search(d, 'p', 'Email the owner').length, 0);
+  assert.equal(E.search(d, 'p', 'Request approval').length, 1);
+  assert.equal(E.search(d, 'p', 'Call finance').length, 1);
+});
