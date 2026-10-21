@@ -16,6 +16,10 @@ Kept on 21 October 2026: **2 · Waiting on** — add a field beside project item
 
 Kept on 21 October 2026: **1 · Stand-up Briefing Builder** — prepare a ready-to-copy report from project updates, grouped into completed yesterday, working on today, blockers and decisions needed. Preview and edit the report before copying it to Teams or email. This is a wishlist selection only; implementation has not been requested. No batch assigned.
 
+## Pending go-live enhancement
+
+Kept on 21 October 2026: **42 · Go-live support cockpit** — a focused command centre for go-live days, bringing together critical issues, business contacts, upcoming checkpoints and the latest updates, with prominent alerts for urgent work. This is a wishlist selection only; implementation has not been requested. No batch assigned.
+
 ## Earlier completed selections
 
 The seven selected items are now part of the existing account document. The tracker keeps its current sign-in, saving, backup and restore workflows. No database migration is needed.
