@@ -801,8 +801,10 @@
             '</span><div class="hub-header-copy"><h1 id="hubSiteTitle"></h1><p id="hubSiteSubtitle"></p></div>';
         }
         $('hubSiteTitle').textContent = prefs().workspace;
+        if (a.cloud().ready) root.WorkHubStartup?.name(prefs().workspace);
         $('hubSiteSubtitle').textContent = data().headerSubtitle || '';
-        document.title = prefs().workspace;
+        if (a.cloud().ready || !document.documentElement.hasAttribute('data-workhub-startup'))
+          document.title = prefs().workspace;
         const settings = header.querySelector('.settings-panel');
         if (settings && !$('hubSettingsHeader')) {
           const group = document.createElement('div');

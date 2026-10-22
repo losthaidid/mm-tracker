@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 const window = {};
-for (const file of ['solution-materials.js', 'solution-engine.js', 'solution-demo.js']) runInNewContext(readFileSync(new URL('../' + file, import.meta.url), 'utf8'), { window });
+for (const file of ['solution-materials.js', 'solution-valuation.js', 'solution-engine.js', 'solution-demo.js']) runInNewContext(readFileSync(new URL('../' + file, import.meta.url), 'utf8'), { window });
 const E = window.WorkHubSolutionEngine, M = window.WorkHubSolutionMaterials, D = window.WorkHubSolutionDemo;
 const copy = x => JSON.parse(JSON.stringify(x));
 test('materials: explicit attributes determine the outcome independently of the type code', () => {

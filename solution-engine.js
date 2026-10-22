@@ -6,8 +6,8 @@
  */
 (function (root) {
   'use strict';
-  const VERSION = 'mm-core-2026-10-21.2';
-  const VERSIONS = ['mm-core-2026-10-21.1', VERSION];
+  const V = root.WorkHubSolutionValuation, VERSION = V.VERSION;
+  const VERSIONS = ['mm-core-2026-10-21.1', 'mm-core-2026-10-21.2', VERSION];
   const MODES = { valuated: 'Valuated stock', quantity: 'Quantity-only stock · UNBW', nonstock: 'Non-stock · NLAG' };
   const STATUS = ['Exploring', 'Proposed', 'Under review', 'Agreed'];
   const SYSTEMS = ['ECC', 'S/4HANA'];
@@ -22,6 +22,9 @@
     ['Negative stock', 'https://learning.sap.com/courses/inventory-management-and-physical-inventory-in-sap-s-4hana/allowing-negative-stock'],
     ['Cancellations and returns', 'https://learning.sap.com/courses/inventory-management-and-physical-inventory-in-sap-s-4hana/posting-cancellations-return-deliveries-and-returns'],
     ['Storage-location transfers', 'https://learning.sap.com/courses/inventory-management-and-physical-inventory-in-sap-s-4hana/performing-stock-transfers-between-storage-locations'],
+    ['S/V price control and MAP', 'https://learning.sap.com/courses/business-processes-in-sap-s-4hana-sourcing-procurement/analyzing-material-valuation'],
+    ['Batch management', 'https://learning.sap.com/courses/optimizing-advanced-logistics-and-analytics-in-sap-s-4hana-cloud-public-edition/exploring-batch-management-blf-_a5f5f6ac-d3ac-489c-954a-6e3079e8cd0c'],
+    ['Split valuation', 'https://learning.sap.com/courses/inventory-management-and-physical-inventory-in-sap-s-4hana/configuring-split-valuation'],
   ];
   const RULES = [
     ['INVENTORY_CAPABILITY', 'Receipt destination', 'NLAG does not update inventory. A PO receipt for consumption remains possible.', 1],
@@ -32,7 +35,12 @@
     ['NEGATIVE_STOCK', 'Goods issue', 'Negative unrestricted stock needs both the model’s configuration and material permissions.', 5],
     ['REFERENCE', 'Returns / cancellation', 'Return delivery and cancellation are distinct. The initial model cancels only the last active GR/GI/311.', 6],
     ['STORAGE_TRANSFER', 'One-step transfer 311', 'Move unrestricted stock between two configured storage locations in the same plant. Plant quantity and value stay unchanged; no FI posting.', 7],
-    ['COVERAGE', 'Supported boundary', 'One product, one PO item, unrestricted stock, standard price, single K assignment, MYR; no invoice, tax, QM/EWM or special stock.', -1],
+    ['MOVING_AVERAGE', 'Moving average price · V', 'PO receipts add receipt value; issues consume at the current average stock value. Prices remain separate per valuation type.', 8],
+    ['BATCH_REQUIRED', 'Batch-managed stock', 'Identify the batch for stock movements; availability is checked for that batch and location.', 9],
+    ['BATCH_STOCK', 'Batch availability', 'Stock in another batch cannot cover a withdrawal from the selected batch.', 9],
+    ['VALUATION_TYPE', 'Split valuation', 'Select a maintained valuation type. Each type has independent quantity, value, price control and valuation class.', 10],
+    ['BATCH_VALUATION', 'Batch and valuation type', 'A batch retains one valuation-type assignment within this one-plant model.', 10],
+    ['COVERAGE', 'Supported boundary', 'One product, one PO item, unrestricted stock, S/V price, optional batches and explicit split valuation, single K assignment, MYR; no invoice, tax, QM/EWM or special stock.', -1],
   ];
   const copy = x => JSON.parse(JSON.stringify(x));
   const text = (v, n = 8000) => typeof v === 'string' && v.length <= n && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(v);
@@ -49,7 +57,7 @@
     return d;
   }
   const records = (d, pid) => { project(d, pid); return Object.fromEntries(Object.keys(LIMITS).map(k => [k, data(d)[k].filter(r => r.projectId === pid)])); };
-  const profile = mode => ({ mode: mode || 'valuated', purpose: mode === 'nonstock' ? 'consumption' : 'stock', openingQty: 0, sourceLocation: 'MAIN', destinationLocation: 'LINE', standardPrice: 10, poPrice: 12, poQty: 100, grAllowed: true, grNonValuated: false, accountCategory: mode && mode !== 'valuated' ? 'K' : '', costCenter: 'MAINT-1100', glAccount: mode && mode !== 'valuated' ? 'Consumption account' : '', overTolerance: 0, unlimited: false, negativeConfig: false, negativeMaterial: false });
+  const profile = mode => ({ mode: mode || 'valuated', purpose: mode === 'nonstock' ? 'consumption' : 'stock', openingQty: 0, sourceLocation: 'MAIN', destinationLocation: 'LINE', standardPrice: 10, poPrice: 12, poQty: 100, grAllowed: true, grNonValuated: false, accountCategory: mode && mode !== 'valuated' ? 'K' : '', costCenter: 'MAINT-1100', glAccount: mode && mode !== 'valuated' ? 'Consumption account' : '', overTolerance: 0, unlimited: false, negativeConfig: false, negativeMaterial: false, ...V.defaults() });
   function validateProfile(p) {
     if (!p || !Object.hasOwn(MODES, p.mode) || !['stock', 'consumption'].includes(p.purpose) || !['', 'K', 'Other'].includes(p.accountCategory) ||
       !text(p.costCenter, 100) || !text(p.glAccount, 100) || ['sourceLocation', 'destinationLocation'].some(k => !text(p[k], 40) || !p[k].trim() || ['__proto__', 'prototype', 'constructor'].includes(p[k])) || !num(p.openingQty, 1000000) || !num(p.poQty, 1000000) ||
@@ -57,11 +65,13 @@
       ['grAllowed', 'grNonValuated', 'unlimited', 'negativeConfig', 'negativeMaterial'].some(k => typeof p[k] !== 'boolean'))
       throw Error('Check the simulation profile: quantities (up to 3 decimals), prices (up to 2), tolerance and document controls.');
     if (p.materialType !== undefined) root.WorkHubSolutionMaterials.validateType(p.materialType);
+    V.validate(p);
   }
   function validateActions(actions) {
     if (!Array.isArray(actions) || actions.length > 40) throw Error('A simulation supports up to 40 transactions.');
     if (new Set(actions.map(x => x?.id)).size !== actions.length) throw Error('Simulation transaction IDs must be unique.');
     for (const x of actions) if (!x || !id(x.id) || !text(x.type, 40) || !text(x.intent, 40) || !text(x.reference, 100) || !text(x.location, 40) || !text(x.toLocation, 40) || !num(x.qty, 1000000) || !text(x.note, 500)) throw Error('Check the simulation transactions.');
+    for (const x of actions) V.validateAction(x);
   }
   function validate(d) {
     const h = data(d);
@@ -115,7 +125,8 @@
       const p = maps.proposals.get(r.proposalId), s = r.snapshot;
       if (!text(r.proposalId, 100) || (p && p.projectId !== r.projectId) || !text(r.title, 160) || !r.title.trim() || !date(r.at) || !s || !text(s.productName, 2000) || !text(s.processName, 160) || !text(s.proposalTitle, 160) || !SYSTEMS.includes(s.system) || !text(s.release, 100) || !VERSIONS.includes(s.engineVersion) || !['procurement', 'context'].includes(s.scenario)) throw Error('Check saved simulation snapshots.');
       validateProfile(s.profile); validateActions(r.actions);
-      if (s.engineVersion !== VERSION && s.profile.materialType) throw Error('Material attributes require the current simulation rule version.');
+      if (s.engineVersion === VERSIONS[0] && s.profile.materialType) throw Error('Material attributes require the current simulation rule version.');
+      V.checkVersion(s.profile, r.actions, s.engineVersion);
     }
     for (const r of h.deliveries) {
       const p = maps.proposals.get(r.proposalId);
@@ -210,20 +221,24 @@
     return Number(sign * ((raw * sign + 500n) / 1000n));
   };
   const tracks = p => p.mode !== 'nonstock' && p.purpose === 'stock';
-  function initial(p) { return { qty: tracks(p) ? q(p.openingQty) : 0, inventory: tracks(p) && p.mode === 'valuated' ? amount(q(p.openingQty), p.standardPrice) : 0, locations: Object.fromEntries([[p.destinationLocation, 0], [p.sourceLocation, tracks(p) ? q(p.openingQty) : 0]]), consumedQty: 0, expense: 0, grir: 0, variance: 0, netReceived: 0 }; }
+  function initial(p) { return V.initial(p, { qty: tracks(p) ? q(p.openingQty) : 0, inventory: tracks(p) && p.mode === 'valuated' ? amount(q(p.openingQty), p.standardPrice) : 0, locations: Object.fromEntries([[p.destinationLocation, 0], [p.sourceLocation, tracks(p) ? q(p.openingQty) : 0]]), consumedQty: 0, expense: 0, grir: 0, variance: 0, netReceived: 0 }); }
   let serial = 0;
   const action = (type = 'gr', qty = 100, intent = 'inventory', reference = '', note = '') => ({ id: 'txn-' + (++serial) + '-' + Math.random().toString(36).slice(2, 9), type, qty, intent, reference, location: '', toLocation: '', note });
   function defaultActions(p) {
     const inventory = tracks(p), qty = Math.min(100, p.poQty);
     const receipt = action('gr', qty, inventory ? 'inventory' : 'consumption');
     const rest = inventory ? [action('transfer', Math.min(20, qty), 'inventory'), action('issue', Math.min(30, Math.max(0, qty - 20)), 'inventory'), action('return', Math.min(10, Math.max(0, qty - 50)), 'inventory', receipt.id)] : [action('return', Math.min(10, qty), 'consumption', receipt.id)];
-    return [receipt, ...rest.filter(x => x.qty > 0)];
+    const actions = [receipt, ...rest.filter(x => x.qty > 0)];
+    for (const a of actions) { if (p.batchManaged) a.batch = 'BATCH-001'; if (p.splitValuation) a.valuationType = p.valuationTypes[0]?.code || ''; }
+    return actions;
   }
   /** Every unsuccessful transaction leaves the entire simulated state untouched. */
   function simulate(p, actions, scenario = 'procurement', version = VERSION) {
     validateProfile(p); validateActions(actions);
     if (!VERSIONS.includes(version)) throw Error('This saved rule version is not supported.');
-    if (version !== VERSION && p.materialType) throw Error('Material attributes require the current simulation rule version.');
+    if (version === VERSIONS[0] && p.materialType) throw Error('Material attributes require the current simulation rule version.');
+    V.checkVersion(p, actions, version);
+    if (p.splitValuation) return V.split(p, actions, scenario, version, simulate);
     let current = initial(p); const start = copy(current), events = [], receipts = new Map(), stack = [];
     const posting = (account, signed, costObject = '') => ({ account, debit: Math.max(0, signed), credit: Math.max(0, -signed), costObject });
     for (let i = 0; i < actions.length; i++) {
@@ -231,7 +246,7 @@
       let error = null, status = 'error', code = '', message = '', fix = '', postings = [], movement = '', explanation = '', reverseTarget = null;
       const fail = (rule, why, remedy, unsupported = false) => { if (!error) { error = true; code = rule; message = why; fix = remedy; status = unsupported ? 'unsupported' : 'error'; } };
       if (scenario !== 'procurement') fail('COVERAGE', 'This process needs a production, quality or sales model.', 'Keep documenting this process. Use a procurement process for the supported MM simulator.', true);
-      if (version === VERSION && p.materialType) {
+      if (version !== VERSIONS[0] && p.materialType) {
         const why = root.WorkHubSolutionMaterials.coverage(p.materialType);
         if (why) fail('MATERIAL_SCOPE', why, 'Review the material attributes or document this specialist process outside the core PO model.', true);
         if (root.WorkHubSolutionMaterials.mode(p.materialType) !== p.mode) fail('MATERIAL_ATTRIBUTES', 'The inventory mode does not match the explicit quantity/value attributes.', 'Apply the material profile again, or adjust its explicit attributes in the material controls.');
@@ -258,6 +273,20 @@
         if (units > (current.locations[location] || 0) && !negativeAllowed) fail('NEGATIVE_STOCK', 'Insufficient unrestricted stock in ' + location + ' for this transfer.', 'Receive stock or reduce the transfer quantity.');
       }
       const receipt = receipts.get(a.reference);
+      let batch = a.batch || (a.type === 'return' ? receipt?.batch : '') || '';
+      if (p.batchManaged) {
+        if (!inventory) fail('BATCH_SCOPE', 'Batch-stock tracking requires a quantity-managed inventory scenario.', 'Use stock procurement. Batch tracking for direct consumption is outside this learning model.', true);
+        if (a.type !== 'reverse' && !batch) fail('BATCH_REQUIRED', 'Choose a batch for this stock movement.', 'Enter a batch at receipt, then use that batch for issue or transfer. Referenced returns inherit their original batch.');
+        if (['issue', 'transfer', 'return'].includes(a.type) && units > V.batchQty(current, batch, location)) fail('BATCH_STOCK', 'Insufficient stock for batch ' + batch + ' in ' + location + '.', 'Choose a batch with enough stock in this location or receive/transfer the same batch first. Other batches do not cover this withdrawal.');
+        if (a.type === 'return' && receipt?.batch && receipt.batch !== batch) fail('BATCH_REFERENCE', 'This return uses a different batch from its original receipt.', 'Use the batch on the referenced goods receipt.');
+      } else if (a.batch) fail('BATCH_NOT_ACTIVE', 'Batch management is not enabled for this profile.', 'Clear the batch or enable batch-managed stock in the scenario inputs.');
+      const map = V.isMAP(p) && p.mode === 'valuated' && inventory;
+      if (a.valuationType) fail('VALUATION_TYPE', 'This profile does not use split valuation.', 'Clear the valuation type or enable split valuation and maintain its types.');
+      if (map && ['issue', 'transfer', 'return'].includes(a.type) && units > current.qty) fail('MAP_SCOPE', 'Negative total stock with MAP is outside this learning model.', 'Receive enough stock before withdrawing. Negative-stock valuation and its price-difference rules need separate SAP verification.', true);
+      if (map && a.type === 'return' && receipt && units <= receipt.available) {
+        const value = amount(current.netReceived, p.poPrice) - amount(current.netReceived - units, p.poPrice), remainder = current.inventory - value;
+        if (remainder < 0 || (current.qty === units && remainder !== 0)) fail('MAP_SCOPE', 'This return needs stock-coverage or residual-value accounting outside the model.', 'Use a smaller return or verify the required inventory/price-difference posting in SAP. No simulated balances will change.', true);
+      }
       if (a.type === 'return') {
         if (!receipt || units > receipt.available) fail('REFERENCE', 'Choose a successful goods receipt with enough quantity still eligible for return.', 'Reference its SIM document and reduce the return quantity if needed.');
         if (inventory && units > (current.locations[location] || 0) && !negativeAllowed) fail('NEGATIVE_STOCK', 'Not enough available stock in ' + location + ' for this supplier return.', 'Return only the available quantity from this location.');
@@ -274,10 +303,11 @@
           postings = reverseTarget.postings.map(x => ({ ...x, debit: x.credit, credit: x.debit }));
           movement = reverseTarget.type === 'gr' ? '102' : reverseTarget.type === 'transfer' ? '312' : '202';
           message = 'Posting cancelled with reference to ' + reverseTarget.doc + '.'; explanation = 'The original quantity and symbolic accounting effects are reversed. Last-active-posting scope only.';
+          batch = reverseTarget.batch || '';
         } else {
           const sign = a.type === 'return' ? -1 : 1,
             poValue = sign * (amount(current.netReceived + sign * units, p.poPrice) - current.grir),
-            stockValue = a.type === 'issue'
+            stockValue = map ? a.type === 'issue' ? V.roundRatio(current.inventory, units, current.qty) : poValue : a.type === 'issue'
               ? current.inventory - amount(current.qty - units, p.standardPrice)
               : sign * (amount(current.qty + sign * units, p.standardPrice) - current.inventory);
           if (a.type === 'gr' || a.type === 'return') {
@@ -292,9 +322,9 @@
               if (!inventory) current.consumedQty += sign * units;
               postings = [posting(p.glAccount || 'Consumption', sign * poValue, p.costCenter), posting('GR/IR · WRX', -sign * poValue)];
             }
-            if (a.type === 'gr') { movement = '101'; receipts.set(a.id, { available: units, document: doc }); message = inventory ? 'Goods received into ' + (p.mode === 'quantity' ? 'quantity-only stock.' : 'valuated stock.') : 'Goods received for direct consumption.'; }
+            if (a.type === 'gr') { movement = '101'; receipts.set(a.id, { available: units, document: doc, ...(p.batchManaged ? { batch } : {}) }); message = inventory ? 'Goods received into ' + (p.mode === 'quantity' ? 'quantity-only stock.' : 'valuated stock.') : 'Goods received for direct consumption.'; }
             else { movement = '122'; receipt.available -= units; message = 'Supplier return recorded against ' + receipt.document + '.'; }
-            explanation = inventory && p.mode === 'valuated' ? 'Stock uses standard price; GR/IR uses PO price. Any difference is shown in price differences.' : inventory ? 'UNBW: quantity is tracked. Purchase cost is recognised at GR; a later GI does not charge it again.' : 'No inventory quantity or inventory value is created. The cost is assigned to the consumption account and cost centre.';
+            explanation = map ? 'Stock and GR/IR use the PO receipt value in this no-invoice scenario. Moving average price is the remaining inventory value divided by stock quantity; a referenced return removes its PO receipt value.' : inventory && p.mode === 'valuated' ? 'Stock uses standard price; GR/IR uses PO price. Any difference is shown in price differences.' : inventory ? 'UNBW: quantity is tracked. Purchase cost is recognised at GR; a later GI does not charge it again.' : 'No inventory quantity or inventory value is created. The cost is assigned to the consumption account and cost centre.';
           } else if (a.type === 'transfer') {
             movement = '311'; current.locations[location] -= units; current.locations[toLocation] += units;
             message = 'Stock transferred from ' + location + ' to ' + toLocation + '.';
@@ -302,12 +332,18 @@
           } else {
             movement = '201'; current.qty -= units; current.locations[location] -= units; current.consumedQty += units;
             if (p.mode === 'valuated') { current.inventory -= stockValue; current.expense += stockValue; postings = [posting('Consumption · GBB/VBR', stockValue, p.costCenter), posting('Inventory · BSX', -stockValue)]; }
-            message = 'Goods issued to ' + p.costCenter + '.'; explanation = p.mode === 'quantity' ? 'Quantity and consumption statistics change. No additional FI cost is posted: the purchase cost was recognised at GR.' : 'Stock quantity and standard-price inventory value decrease. Consumption cost increases by the same standard value.';
+            message = 'Goods issued to ' + p.costCenter + '.'; explanation = p.mode === 'quantity' ? 'Quantity and consumption statistics change. No additional FI cost is posted: the purchase cost was recognised at GR.' : map ? 'The issue uses the current moving average cost from inventory value and quantity. Consumption increases by that issue value. Monetary rounding is applied once to the posting.' : 'Stock quantity and standard-price inventory value decrease. Consumption cost increases by the same standard value.';
           }
-          stack.push({ doc, actionId: a.id, type: a.type, before, receipts: priorReceipts, postings: copy(postings) });
+          if (p.batchManaged) {
+            if (a.type === 'gr' || a.type === 'return') V.moveBatch(current, batch, location, (a.type === 'gr' ? 1 : -1) * units);
+            else { V.moveBatch(current, batch, location, -units); if (a.type === 'transfer') V.moveBatch(current, batch, toLocation, units); }
+          }
+          if (map && current.qty > 0) current.mapPrice = current.inventory * 10 / current.qty;
+          stack.push({ doc, actionId: a.id, type: a.type, before, receipts: priorReceipts, postings: copy(postings), batch });
         }
       }
-      events.push({ index: i, document: error ? '' : doc, movement, action: copy(a), status, code, message, fix, explanation, postings: postings.filter(x => x.debit || x.credit), before, after: copy(current) });
+      if (!error && map && a.type === 'gr') code = 'MOVING_AVERAGE';
+      events.push({ index: i, document: error ? '' : doc, movement, action: copy(a), status, code, message, fix, explanation, postings: postings.filter(x => x.debit || x.credit), before, after: copy(current), ...(version === VERSION ? { batch, valuationClass: p.valuationClass || '', valuationType: '', priceControl: p.priceControl || 'S' } : {}) });
     }
     return { engineVersion: version, initial: start, events, final: copy(current), activeDocuments: stack.map(x => ({ document: x.doc, type: x.type, actionId: x.actionId })), receipts: [...receipts].map(([reference, r]) => ({ reference, document: r.document, available: r.available / 1000 })) };
   }

@@ -81,7 +81,7 @@ Unagreed proposals are marked **DRAFT**. Saved runs are replayed from their reco
 
 The current rule version is `mm-core-2026-10-21.2`. Earlier `.1` snapshots, which predate material attributes, remain supported. New material-specific controls require `.2` and are saved with that version. Existing core inventory and integer-money calculations are preserved.
 
-Services, production-only profiles and value-only inventory updates report **outside model** for this physical PO simulator. ECC/S/4HANA is target context, not a release-specific emulator. The inventory model continues to exclude invoices, tax/freight, moving-average valuation, special stock, QM/EWM, sales, production and cross-plant flows. See [the base coverage guide](SOLUTION-STUDIO.md).
+Services, production-only profiles and value-only inventory updates report **outside model** for this physical PO simulator. ECC/S/4HANA is target context, not a release-specific emulator. The inventory model supports S/V prices, valuation classes, manual batches and explicit split-valuation types. It excludes invoices, tax/freight, special stock, QM/EWM, sales, production, cross-plant flows, automatic category X and batch classification/expiry/automatic determination. See [the base coverage guide](SOLUTION-STUDIO.md).
 
 Effects include luminous movement trails, receiving pulses, success shockwaves, blocked-movement impacts, document flow, floating accounting deltas and animated warehouse shelves. They use CSS, run inside the Studio and respect device reduced motion and the existing Animations Off setting. No downloaded video, sound or per-frame cloud writes are introduced.
 

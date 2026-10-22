@@ -12,7 +12,42 @@
   } catch {}
   let finished = false,
     blocked = false,
+    workspaceName = 'Your workspace',
     message = 'Getting your workspace ready…';
+
+  function showName(value) {
+    workspaceName =
+      typeof value === 'string' &&
+      value.trim() &&
+      value.length <= 200 &&
+      !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value)
+        ? value.trim()
+        : 'Your workspace';
+    const brand = document.getElementById('workhubStartupBrand');
+    if (brand) brand.textContent = workspaceName;
+    if (!finished) document.title = workspaceName;
+  }
+  // Reuse only the matching account's existing recovery copy for its display name.
+  // The stored session is a branding hint; app.js still verifies the actual session.
+  function account(project, userId) {
+    let name;
+    try {
+      if (project && userId) {
+        const cache = JSON.parse(
+          localStorage.getItem('mm-tracker.cloud.v1:' + project + ':' + userId)
+        );
+        name = cache?.document?.data?.workhub?.preferences?.workspace;
+      }
+    } catch {}
+    showName(name);
+  }
+  try {
+    const { project } = JSON.parse(document.getElementById('cloudConfig').textContent),
+      session = JSON.parse(localStorage.getItem('mm-tracker.auth.v1:' + project));
+    account(project, session?.user?.id);
+  } catch {
+    showName();
+  }
 
   function showMessage(value) {
     message = value;
@@ -42,6 +77,7 @@
     'DOMContentLoaded',
     () => {
       if (finished) return;
+      showName(workspaceName);
       showMessage(message);
       document.getElementById('workhubStartupReload')?.addEventListener('click', event => {
         event.preventDefault();
@@ -52,6 +88,11 @@
   );
 
   root.WorkHubStartup = {
+    account,
+    name: showName,
+    brand() {
+      showName(workspaceName);
+    },
     message(value) {
       if (!finished && !blocked) showMessage(value);
     },

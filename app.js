@@ -8972,6 +8972,7 @@ function queueCloudReview(row, cache) {
 /** Load one signed-in account. Generation checks reject responses from a previous account/session. */
 async function loadCloud(session) {
   if (!session?.user) {
+    window.WorkHubStartup?.account(cloudConfig.project, null);
     cloud.generation++;
     cloud.user = null;
     cloud.ready = false;
@@ -8997,6 +8998,7 @@ async function loadCloud(session) {
   cloud.generation++;
   const generation = cloud.generation;
   cloud.user = session.user;
+  window.WorkHubStartup?.account(cloudConfig.project, cloud.user.id);
   cloud.ready = false;
   cloud.loading = true;
   cloud.error = false;

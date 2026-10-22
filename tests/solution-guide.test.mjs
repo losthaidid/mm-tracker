@@ -4,7 +4,7 @@ import { runInNewContext } from 'node:vm';
 import { test } from 'node:test';
 
 const window = {};
-for (const file of ['solution-materials.js', 'solution-engine.js', 'solution-demo.js', 'solution-guide.js'])
+for (const file of ['solution-materials.js', 'solution-valuation.js', 'solution-engine.js', 'solution-demo.js', 'solution-guide.js'])
   runInNewContext(readFileSync(new URL('../' + file, import.meta.url), 'utf8'), { window });
 const E = window.WorkHubSolutionEngine, G = window.WorkHubSolutionGuide;
 

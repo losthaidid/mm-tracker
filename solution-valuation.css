@@ -1,0 +1,257 @@
+/* Stock valuation stays close to the transaction explanation and fits a phone. */
+.sv-profile {
+  border: 1px solid #d2dfc9;
+  border-radius: 16px;
+  padding: 20px;
+  margin: 16px 0;
+  background: #f5f8f0;
+  min-width: 0;
+}
+.sv-profile legend {
+  color: #3f674b;
+  font-weight: 750;
+  padding: 0 8px;
+}
+.sv-profile > p,
+.sv-profile details,
+.sv-split-settings > p {
+  font-size: 12px;
+  line-height: 1.7;
+  color: #5c6b57;
+}
+.sv-profile details {
+  margin-top: 16px;
+}
+.sv-profile summary {
+  cursor: pointer;
+  font-weight: 650;
+}
+.sv-profile [hidden],
+.ss-form-grid label[hidden] {
+  display: none !important;
+}
+.sv-profile input:read-only {
+  background: #eaf0e4;
+  color: #3d644a;
+}
+.sv-split-settings {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid #d2dfc9;
+}
+.sv-types {
+  display: grid;
+  gap: 14px;
+  margin: 16px 0;
+}
+.sv-type-row {
+  border: 1px solid #d9dfce;
+  border-radius: 13px;
+  background: #fffef9;
+  padding: 16px;
+}
+.sv-type-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  color: #47634e;
+}
+.sv-example-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 0;
+}
+.sv-example-links > span {
+  font-size: 11px;
+  color: #5b725d;
+}
+.sv-example-links .ss-btn {
+  font-size: 11px;
+}
+.sv-valuation,
+.sv-batches {
+  min-width: 0;
+  padding: 20px;
+  margin: 16px 0;
+  border: 1px solid #d6e0cb;
+  border-radius: 18px;
+  background: linear-gradient(130deg, #f0f6e8, #fffdf7);
+}
+.sv-valuation h4,
+.sv-batches h4 {
+  margin: 6px 0 12px;
+  color: #34583e;
+  font-size: 17px;
+}
+.sv-price-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.sv-price-cards > article {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #d9e2cf;
+  border-radius: 13px;
+  background: #fffefa;
+  animation: sv-arrive 0.6s ease both;
+}
+.sv-price-cards small {
+  display: block;
+  color: #68795d;
+  margin-bottom: 10px;
+  font-size: 11px;
+}
+.sv-price-cards > article > span,
+.sv-price-cards > article > strong {
+  display: block;
+  color: #3b6648;
+  font-size: 20px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.sv-price-cards i {
+  font-style: normal;
+  color: #91a873;
+  padding: 0 4px;
+}
+.sv-price-cards p {
+  font-size: 11px;
+  color: #66765f;
+  line-height: 1.7;
+  margin: 10px 0 0;
+}
+.sv-valuation .ss-table-scroll,
+.sv-batches .ss-table-scroll {
+  margin-top: 15px;
+  border-radius: 12px;
+}
+.sv-valuation table,
+.sv-batches table {
+  min-width: 0;
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+.sv-valuation th,
+.sv-valuation td,
+.sv-batches th,
+.sv-batches td {
+  padding: 12px 8px;
+  font-size: 11px;
+  text-align: left;
+  border-bottom: 1px solid #dfe7d5;
+  overflow-wrap: anywhere;
+  color: #435d46;
+}
+.sv-valuation th small,
+.sv-batches th small {
+  display: block;
+  font-size: 10px;
+  font-weight: 400;
+  margin-top: 5px;
+}
+.sv-valuation thead,
+.sv-batches thead {
+  background: #e7eedf;
+}
+.sv-valuation tr.is-selected,
+.sv-batches tr.is-selected {
+  background: #e5f0da;
+  box-shadow: inset 3px 0 #83a468;
+}
+.sv-batch-tag {
+  border: 1px solid #b8cea7;
+  border-radius: 99px;
+  padding: 7px 11px;
+  font-size: 11px;
+  color: #3a6343;
+  background: #fafff3;
+  overflow-wrap: anywhere;
+}
+.sx-warehouse > .sx-section-title {
+  flex-wrap: wrap;
+}
+.sx-warehouse > .sx-section-title label {
+  max-width: 100%;
+}
+.sx-warehouse > .sx-section-title select {
+  min-width: 0;
+  max-width: 180px;
+  padding: 8px;
+  border-radius: 9px;
+  border: 1px solid #c7d6bb;
+  background: #fffef8;
+  color: #47634a;
+}
+.sv-example-cards > h3 {
+  color: #3b6047;
+  margin: 8px 0 20px;
+}
+@keyframes sv-arrive {
+  from {
+    opacity: 0.4;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (max-width: 760px) {
+  .sv-profile,
+  .sv-valuation,
+  .sv-batches {
+    padding: 15px;
+  }
+  .sv-type-row {
+    padding: 13px;
+  }
+  .sv-price-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sv-valuation .sx-section-title,
+  .sv-batches .sx-section-title {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .sv-valuation th,
+  .sv-valuation td,
+  .sv-batches th,
+  .sv-batches td {
+    padding: 10px 5px;
+    font-size: 10px;
+  }
+  .sv-example-links .ss-btn {
+    flex: 1 1 140px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sv-price-cards > article {
+    animation: none;
+  }
+}
+body[data-motion='off'] .sv-price-cards > article,
+body.hub-motion-paused .sv-price-cards > article {
+  animation: none;
+}
+
+.sv-posting-class {
+  display: block;
+  margin-top: 5px;
+  color: #62785b;
+  font-size: 10px;
+}
+
+@media (max-width: 760px) {
+  .sv-price-cards > article > span {
+    font-size: 18px;
+  }
+  .sv-price-cards > article > span > strong {
+    white-space: nowrap;
+  }
+}

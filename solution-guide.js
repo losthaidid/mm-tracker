@@ -66,7 +66,7 @@
     [
       'value',
       'Value updating / valuation',
-      'The profile permits inventory value. In this model, valuated stock uses a fixed standard price.',
+      'The profile permits inventory value. Valuated stock uses its selected S (standard) or V (moving average) price control. Split valuation maintains a price for each type.',
       'At a standard price of RM 10, receiving 100 units into valuated stock adds RM 1,000 to inventory.',
     ],
     [
@@ -85,7 +85,7 @@
       'gi',
       'GI / goods issue',
       'A withdrawal from managed stock for a receiving cost centre in this model.',
-      'Movement 201 reduces the chosen location. Valuated stock moves its standard-price cost into consumption.',
+      'Movement 201 reduces the chosen location. Valuated stock uses the selected type’s standard price or current MAP for the consumption posting.',
     ],
     [
       'transfer',
@@ -96,7 +96,7 @@
     [
       'grir',
       'GR/IR / price difference',
-      'GR/IR is the symbolic goods-receipt accrual here. Price difference separates the PO price from the fixed standard price.',
+      'GR/IR is the symbolic goods-receipt accrual here. Under S price control, price difference separates PO price from standard price. A normal V receipt adds its PO value to stock.',
       'For 100 units at PO price RM 12 and standard price RM 10: inventory RM 1,000, GR/IR credit RM 1,200 and price difference debit RM 200. Invoice clearing is outside this model.',
     ],
     [
@@ -118,6 +118,12 @@
       'ERSA and UNBW are starting references. Confirm quantity/value updating and dependent client configuration; the code alone does not decide every posting.',
     ],
   ];
+  TERMS.push(
+    ['map', 'Moving average price / V', 'MAP values current stock by its total inventory value divided by its quantity. Receipts can change the average; an issue uses the current average cost.', '100 units at RM10 plus 100 units received at RM12 = RM2,200 / 200 = RM11 per unit. A 30-unit issue costs RM330 before monetary rounding.'],
+    ['batch', 'Batch-managed stock', 'A batch identifies a physical lot. Quantities are tracked separately for each batch and storage location. Batch management alone does not create a separate valuation price.', 'LOT-A can have 40 units and LOT-B 60 units. An issue of 50 from LOT-A stops even though the material has 100 units in total.'],
+    ['valuation', 'Valuation class', 'The valuation class groups materials or valuation types for automatic account determination. It is one input to G/L selection, alongside transaction and organisational configuration.', 'Classes 3000 and 3100 are editable illustrations here. BSX, WRX and PRD stay symbolic; these codes do not identify your real G/L accounts.'],
+    ['split', 'Valuation category / valuation type', 'A category defines why a material is split; its valuation types carry separate quantities, stock values, classes and S/V prices. The total header uses V.', 'LOCAL can use MAP and class 3000 while IMPORT uses standard price and class 3100. A batch remains assigned to one type within this one-plant model.']
+  );
   const HELP = {
     discovery: [
       'Capture the business before choosing SAP.',
@@ -310,7 +316,7 @@
         .join(
           ''
         )}</div><p class="sg-caption">These buttons open the fictional sample. The simulator checks the explicit profile, PO settings and movement; material type codes alone do not decide the outcome.</p></section>
-      <section class="sg-readiness"><div class="sg-section-title"><div><span class="sg-kicker">${c.isDemo ? 'WHAT THE SAMPLE ALREADY CONTAINS' : 'YOUR SELECTED DESIGN'}</span><h3>What is captured so far?</h3></div><span>${done} / ${checks.length} checkpoints present</span></div><p>These checkpoints show recorded content. They do not certify SAP configuration or business acceptance.</p><ul>${checks.map(([title, complete, op, detail], i) => `<li><span class="sg-check ${complete ? 'is-done' : ''}" aria-label="${complete ? 'Present' : 'Not yet recorded'}">${complete ? '✓' : i + 1}</span><div><strong>${title}</strong><small>${detail}</small></div><span>${complete ? 'Present' : 'Not yet'}</span></li>`).join('')}</ul><div class="ss-actions">${btn('pane', 'Open the current business process →', 'data-pane="discovery"', true)}${btn('pane', 'Understand material behaviour', 'data-pane="materials"')}${btn('pane', 'Find interviews & presentation tools', 'data-pane="tools"')}</div></section></section>`;
+      ${root.WorkHubSolutionValuationUI.examples()}<section class="sg-readiness"><div class="sg-section-title"><div><span class="sg-kicker">${c.isDemo ? 'WHAT THE SAMPLE ALREADY CONTAINS' : 'YOUR SELECTED DESIGN'}</span><h3>What is captured so far?</h3></div><span>${done} / ${checks.length} checkpoints present</span></div><p>These checkpoints show recorded content. They do not certify SAP configuration or business acceptance.</p><ul>${checks.map(([title, complete, op, detail], i) => `<li><span class="sg-check ${complete ? 'is-done' : ''}" aria-label="${complete ? 'Present' : 'Not yet recorded'}">${complete ? '✓' : i + 1}</span><div><strong>${title}</strong><small>${detail}</small></div><span>${complete ? 'Present' : 'Not yet'}</span></li>`).join('')}</ul><div class="ss-actions">${btn('pane', 'Open the current business process →', 'data-pane="discovery"', true)}${btn('pane', 'Understand material behaviour', 'data-pane="materials"')}${btn('pane', 'Find interviews & presentation tools', 'data-pane="tools"')}</div></section></section>`;
   }
 
   function intro(pane, c) {
@@ -483,7 +489,7 @@
           before: event.before.locations[location] || 0,
           after: event.after.locations[location] || 0,
         });
-    return `<section class="sg-narrator is-${esc(event.status)}" data-explained-event="${esc(event.action.id)}"><header><span class="sg-kicker">STEP ${cursor + 1} OF ${count} · ${ok ? 'SUPPORTED TRANSACTION SUCCEEDED' : unsupported ? 'OUTSIDE THIS LEARNING MODEL' : 'STOPPED BY A RULE'}</span><span class="sg-event-seal" aria-hidden="true">${ok ? '✓' : unsupported ? '?' : '×'}</span></header><h3>${title}</h3><p class="sg-request">${esc(request)}</p><div class="sg-explain-route" aria-hidden="true"><span>Request received</span><i>→</i><span>${ok ? 'Checks passed' : unsupported ? 'Coverage boundary' : 'Rule stopped it'}</span><i>→</i><span>${ok ? 'Effects recorded' : 'Balances retained'}</span></div><div class="sg-reason"><strong>${ok ? 'Why this result makes sense' : unsupported ? 'What the result means' : 'The rule to understand'}</strong><p>${esc(ok ? event.explanation : event.message)}</p>${!ok ? `<strong>What to try next</strong><p>${esc(event.fix || 'Review the selected proposal and its supported coverage.')}</p>` : ''}</div><div class="sg-balance-changes" aria-label="Before and after this transaction">${changes
+    return `<section class="sg-narrator is-${esc(event.status)}" data-explained-event="${esc(event.action.id)}"><header><span class="sg-kicker">STEP ${cursor + 1} OF ${count} · ${ok ? 'SUPPORTED TRANSACTION SUCCEEDED' : unsupported ? 'OUTSIDE THIS LEARNING MODEL' : 'STOPPED BY A RULE'}</span><span class="sg-event-seal" aria-hidden="true">${ok ? '✓' : unsupported ? '?' : '×'}</span></header><h3>${title}</h3><p class="sg-request">${esc(request)}${event.valuationType ? ` · Valuation type ${esc(event.valuationType)}` : ''}${event.batch ? ` · Batch ${esc(event.batch)}` : ''}</p><div class="sg-explain-route" aria-hidden="true"><span>Request received</span><i>→</i><span>${ok ? 'Checks passed' : unsupported ? 'Coverage boundary' : 'Rule stopped it'}</span><i>→</i><span>${ok ? 'Effects recorded' : 'Balances retained'}</span></div><div class="sg-reason"><strong>${ok ? 'Why this result makes sense' : unsupported ? 'What the result means' : 'The rule to understand'}</strong><p>${esc(ok ? event.explanation : event.message)}</p>${!ok ? `<strong>What to try next</strong><p>${esc(event.fix || 'Review the selected proposal and its supported coverage.')}</p>` : ''}</div><div class="sg-balance-changes" aria-label="Before and after this transaction">${changes
       .map(x => {
         const delta = x.after - x.before,
           format = x.format === 'money' ? money : n => qty(n) + ' units';

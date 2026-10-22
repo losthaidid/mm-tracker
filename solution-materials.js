@@ -42,6 +42,9 @@
     if (next.mode === 'quantity') next.purpose = 'stock';
     if (next.mode !== 'valuated' || next.purpose === 'consumption') { next.accountCategory = 'K'; next.glAccount ||= 'Consumption account'; }
     else next.accountCategory = '';
+    if (next.splitValuation && (next.mode !== 'valuated' || next.purpose !== 'stock')) throw Error('Turn off split valuation and review opening stock before changing to a non-valuated or consumption profile.');
+    if (next.mode !== 'valuated') next.priceControl = 'S';
+    if (!E.tracks(next)) { next.batchManaged = false; next.openingBatch = ''; }
     return next;
   }
   function coverage(t) {
@@ -63,7 +66,7 @@
       ['procurement', 'Procurement route', PROCUREMENT[t.procurement] + '; confirm permitted and material-specific procurement settings.'],
       ...(t.views.includes('Purchasing') ? [['purchasing', 'Purchasing data', 'Purchasing group, order unit, planned delivery time and receipt tolerances.']] : []),
       ...(t.quantityUpdate ? [['stock', 'Inventory setup', 'Maintain required storage views/extensions, issue unit and stock controls.']] : []),
-      ...(t.valueUpdate ? [['valuation', 'Valuation setup', 'Confirm valuation class, price control, price and automatic account determination. The model uses standard price.']] : []),
+      ...(t.valueUpdate ? [['valuation', 'Valuation setup', 'Confirm valuation class, price control, price and automatic account determination. Choose S or V; confirm each valuation type and its class when split valuation is enabled.']] : []),
       ...(!t.valueUpdate || profile?.purpose === 'consumption' ? [['assignment', 'Consumption assignment', 'Confirm the PO account assignment and cost object. This model supports single K and a consumption G/L.']] : []),
       ...(t.service ? [['service', 'Service acceptance design', 'Confirm service product group, item category, acceptance and invoice process with the relevant team.']] : []),
       ['testing', 'SAP acceptance tests', 'Verify the agreed scenarios and accounting in the target SAP system.'],
@@ -83,7 +86,7 @@
     if (!proposal) return 'Create a proposal to explain the proposed design.';
     const p = proposal.profile, t = p.materialType, subject = product?.name || 'The selected products';
     if (t && coverage(t)) return `${subject} · ${t.code}: ${coverage(t)} ${level === 'finance' ? 'Confirm the cost-recognition, valuation and reconciliation design with Finance in the target system.' : level === 'consultant' ? `Target ${proposal.system}; confirm the specialist process, material attributes, item category and document controls before testing.` : 'The business process can be documented here; its posting consequences need confirmation in SAP.'}`;
-    if (level === 'finance') return `${subject}: ${p.mode === 'valuated' && p.purpose === 'stock' ? 'inventory is carried at the model’s standard price; PO-price differences are separated. Consumption moves value to expense.' : p.mode === 'quantity' ? 'purchase cost is expensed at GR in the supported K scenario; subsequent quantity issues create no second expense.' : 'the account-assigned receipt records consumption cost without building inventory.'} GR/IR is shown separately; invoices, tax and moving-average valuation are outside the model. Confirm G/L determination and cost ownership.`;
+    if (level === 'finance') return `${subject}: ${p.mode === 'valuated' && p.purpose === 'stock' ? 'inventory uses the selected S/V price control, independently for each maintained valuation type. Under S, purchase-price differences are separated; under V, receipt value updates MAP. Consumption uses the applicable valuation price.' : p.mode === 'quantity' ? 'purchase cost is expensed at GR in the supported K scenario; subsequent quantity issues create no second expense.' : 'the account-assigned receipt records consumption cost without building inventory.'} GR/IR is shown separately; invoice valuation and tax are outside the model. Confirm G/L determination and cost ownership.`;
     if (level === 'consultant') return `${proposal.system} · ${t?.code || p.mode} · ${p.purpose} procurement · ${p.accountCategory || 'no'} PO assignment. ${t ? `Explicit quantity/value updating: ${t.quantityUpdate}/${t.valueUpdate}. ` : ''}${process?.objective || ''} Confirm material views, valuation-area settings, account determination and PO controls. ${proposal.assumptions || 'Record the configuration assumptions before agreement.'}`;
     return `${subject}: ${proposal.approach || (p.mode === 'nonstock' ? 'purchase for immediate use' : 'record receipts and later withdrawals')}. ${p.mode === 'valuated' && p.purpose === 'stock' ? 'The team can see remaining quantity and stock value.' : p.mode === 'quantity' ? 'The team can see remaining quantity, while purchase costs are recognised earlier.' : 'Purchases go to consumption; this proposal keeps no inventory balance.'} ${proposal.benefits || ''}`;
   }
