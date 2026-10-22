@@ -30,7 +30,7 @@
    * Read the chunks directly, and always release/cancel the reader on exit.
    * See mozilla/pdf.js#21557. Keep this workaround outside the supplied library.
    */
-  async function readTextItems(page, alive = () => true) {
+  async function readTextItems(page, alive = () => true, styles = {}) {
     const reader = page.streamTextContent().getReader(),
       items = [];
     let complete = false;
@@ -43,6 +43,7 @@
           complete = true;
           return items;
         }
+        Object.assign(styles, chunk.value.styles || {});
         for (const item of chunk.value.items) items.push(item);
       }
     } finally {
@@ -99,15 +100,27 @@
         progress(`Reading page ${n} of ${pdf.numPages}…`);
         const page = await pdf.getPage(n),
           v = page.getViewport({ scale: 1 });
-        if (v.rotation !== 0)
-          throw Error('This statement has rotated pages. Use the original upright TNG export.');
-        const text = await readTextItems(page, alive),
+        const styles = {},
+          text = await readTextItems(page, alive, styles),
           ops = await page.getOperatorList();
         const items = text
           .filter(i => i.str)
           .map(i => {
             const point = v.convertToViewportPoint(i.transform[4], i.transform[5]);
-            return { str: i.str, x: point[0], y: point[1] - i.height, w: i.width, h: i.height };
+            const style = styles[i.fontName],
+              ascent = Number.isFinite(style?.ascent) ? Math.max(0, Math.min(2, style.ascent)) : 1,
+              descent = Number.isFinite(style?.descent)
+                ? Math.max(-1, Math.min(0, style.descent))
+                : -0.2;
+            return {
+              str: i.str,
+              x: point[0],
+              y: point[1] - i.height,
+              w: i.width,
+              h: i.height,
+              inkTop: point[1] - i.height * ascent,
+              inkBottom: point[1] - i.height * descent,
+            };
           });
         pages.push({ width: v.width, height: v.height, items, lines: borders(ops, lib, v) });
       }
@@ -167,9 +180,14 @@
       scale = page.width / row.width,
       r = row.rect,
       h = row.headerRect;
+    const headerPage =
+      includeHeader && row.headerPage && row.headerPage !== row.page
+        ? await session.renderPage(row.headerPage)
+        : page;
+    const headerScale = headerPage.width / row.width;
     const out = document.createElement('canvas'),
       gap = includeHeader ? 10 : 0;
-    const headerHeight = includeHeader ? Math.ceil(h.h * scale) : 0;
+    const headerHeight = includeHeader ? Math.ceil(h.h * headerScale) : 0;
     out.width = Math.ceil(r.w * scale);
     out.height = Math.ceil(r.h * scale) + headerHeight + gap;
     const ctx = out.getContext('2d');
@@ -177,11 +195,11 @@
     ctx.fillRect(0, 0, out.width, out.height);
     if (includeHeader)
       ctx.drawImage(
-        page,
-        h.x * scale,
-        h.y * scale,
-        h.w * scale,
-        h.h * scale,
+        headerPage,
+        h.x * headerScale,
+        h.y * headerScale,
+        h.w * headerScale,
+        h.h * headerScale,
         0,
         0,
         out.width,
@@ -208,7 +226,7 @@
       )
     );
   const filename = row =>
-    `tng-${row.date}-${row.section === 'online' ? 'online' : 'offline'}-${row.transactionNo.replace(/[^a-z0-9-]/gi, '').slice(0, 60) || 'manual'}.png`;
+    `tng-${row.date}-${['online', 'offline', 'ewallet'].includes(row.section) ? row.section : 'manual'}-${row.transactionNo.replace(/[^a-z0-9-]/gi, '').slice(0, 60) || 'manual'}.png`;
   /** Lay source crops edge-to-edge beneath one journey caption. No giant combined canvas:
    * each row is embedded individually so long journeys can paginate without exhausting memory.
    */
@@ -258,7 +276,7 @@
       let priorHeader = '';
       for (const row of group.rows) {
         if (!alive()) throw Error('Export cancelled.');
-        const headerKey = `${row.page}|${row.section}|${JSON.stringify(row.headerRect)}`;
+        const headerKey = `${row.headerPage || row.page}|${row.section}|${JSON.stringify(row.headerRect)}`;
         let withHeader = includeHeader && headerKey !== priorHeader;
         let canvas = await crop(session, row, withHeader);
         let factor = Math.min(523 / canvas.width, 640 / canvas.height);

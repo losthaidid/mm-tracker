@@ -49,6 +49,15 @@ test('PDF text extraction cancels a stale account read and releases its lock', a
   assert.deepEqual(fixture.calls, { cancelled: 1, released: 1 });
 });
 
+test('PDF text extraction retains streamed font metrics without changing original text items', async () => {
+  const item = { str: 'Wrapped reference', fontName: 'demo', height: 10 }, styles = {};
+  const chunks = [{ value: { items: [item], styles: { demo: { ascent: .72, descent: -.21 } } } }, { done: true }];
+  const fixture = pageStream(async () => chunks.shift());
+  assert.deepEqual(Array.from(await readTextItems(fixture.page, () => true, styles)), [item]);
+  assert.equal(styles.demo.descent, -.21);
+  assert.equal(item.inkBottom, undefined);
+});
+
 test('PDF text extraction preserves read failures even when cancellation fails', async () => {
   const original = Error('Broken text stream');
   const fixture = pageStream(async () => { throw original; });

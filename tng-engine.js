@@ -1,6 +1,6 @@
 /**
  * TNG statement rules and coordinates, independent of the browser/PDF library.
- * Reads the two Customer Transactions Statement tables. Money stays in integer sen.
+ * Retains both card tables and dispatches eWallet history to its separate reader. Money stays in integer sen.
  * PDF bytes and unselected transactions are temporary; only confirmed expenses are saved.
  */
 (function (root) {
@@ -13,8 +13,8 @@
       .trim();
   const dateValid = value => root.WorkHubClaimsEngine.validDate(value);
   function date(value) {
-    const m = clean(value).match(/\b(\d{2})\/(\d{2})\/(\d{4})\b/);
-    const result = m ? `${m[3]}-${m[2]}-${m[1]}` : '';
+    const m = clean(value).match(/\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/);
+    const result = m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : '';
     return dateValid(result) ? result : '';
   }
   function cents(value) {
@@ -52,6 +52,8 @@
   function parsePages(pages) {
     if (!Array.isArray(pages) || !pages.length || pages.length > MAX_PAGES)
       throw Error('Choose a statement with 1–60 pages.');
+    if (root.WorkHubTngWallet?.matches(pages))
+      return root.WorkHubTngWallet.parse(pages, { MAX_ROWS, clean, date, cents, clampRect });
     const rows = [],
       warnings = [];
     let serial = '',
@@ -207,7 +209,7 @@
     }
     if (!tables || !rows.length)
       throw Error(
-        'No supported TNG card transaction table was found. Use a text-based Customer Transactions Statement; scanned PDFs need OCR.'
+        'No supported TNG transaction table was found. Use a text-based Customer Transactions Statement or eWallet Transaction History; scanned PDFs need OCR.'
       );
     if (!serial)
       warnings.push(
@@ -252,6 +254,8 @@
   function sourceKey(cardKey, row) {
     return `${cardKey}|${row.section}|${row.transactionNo}`;
   }
+  const isExcluded = row =>
+    ['reload', 'credit', 'transfer', 'unsuccessful', 'unsupported'].includes(row.kind);
   /** Evidence always follows the transaction date/time, even when the ledger uses posted dates. */
   function evidenceGroups(rows) {
     const groups = new Map();
@@ -311,12 +315,14 @@
       !/^[a-f0-9]{64}$/.test(s.fileHash) ||
       !text(s.fileName, 200) ||
       !text(s.transactionNo, 100) ||
-      !['online', 'offline'].includes(s.section) ||
+      !['online', 'offline', 'ewallet'].includes(s.section) ||
       !dateValid(s.transactionDate) ||
       !dateValid(s.postedDate) ||
       !Number.isInteger(s.page) ||
       s.page < 1 ||
       s.page > MAX_PAGES ||
+      (s.headerPage !== undefined &&
+        (!Number.isInteger(s.headerPage) || s.headerPage < 1 || s.headerPage > MAX_PAGES)) ||
       !Number.isFinite(s.width) ||
       s.width < 1 ||
       s.width > 3000 ||
@@ -348,10 +354,10 @@
         row.description.length > 300 ||
         !Object.hasOwn(root.WorkHubClaimsEngine.CATEGORIES, row.category) ||
         row.errors?.length ||
-        ['reload', 'credit'].includes(row.kind)
+        isExcluded(row)
       )
         throw Error(
-          'Review the selected dates, amounts and transaction types first. Reloads and refunds cannot be imported as expenses.'
+          'Review the selected dates, amounts and transaction types first. Reloads, credits, transfers and unsuccessful or unknown transactions cannot be imported as expenses.'
         );
       const key = row.manual ? '' : sourceKey(source.cardKey, row);
       if (key && (keys.has(key) || duplicate(d, key)))
@@ -402,6 +408,7 @@
           height: row.height,
           rect: { ...row.rect },
           headerRect: { ...row.headerRect },
+          ...(row.headerPage !== undefined ? { headerPage: row.headerPage } : {}),
         };
         validateSource(e.tngSource);
       }
@@ -423,6 +430,7 @@
     matches,
     evidenceGroups,
     sourceKey,
+    isExcluded,
     duplicate,
     validateSource,
     expenses,
