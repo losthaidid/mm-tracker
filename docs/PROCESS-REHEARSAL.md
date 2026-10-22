@@ -18,7 +18,7 @@ A saved process automatically plays on opening and loops after its route ends. D
 
 Choose **Cosy desk**, **Blueprint** or **Control room** scenery; **quiet**, **balanced** or **expressive** effects; and 0.5×, 1×, 1.5× or 2× speed. Playback pauses for open dialogs, editing, hidden pages, Focus, privacy and presentation modes. Global motion Off and system reduced-motion settings stop automatic advancement and special effects; manual Next/Previous remain available.
 
-Sound defaults to **on** at a comfortable volume. It uses short locally generated Web Audio tones, with no external audio downloads. Browsers may require your first click/tap before audio begins; the button displays that state. Use the mute button or volume slider. Leaving the scene, hiding the page or changing account stops current tones.
+Sound is enabled in the saved preferences, but waits for a browser gesture. Click **Enable sound** to hear an immediate preview; the button then becomes **Mute sound**. Playback and manual Next/Previous or journal selections use short locally generated tones, with no external audio downloads. Reduced-motion and Animations Off still allow explicitly requested step sounds. The volume slider is independent; at zero, the status explains why the scene is silent. The status also reports unavailable or blocked audio and lets you retry. Leaving the scene, hiding the page or changing account stops current tones; a pending audio start cannot block playback controls or reactivate muted sound.
 
 ## Scenarios, failure injection and rewind
 

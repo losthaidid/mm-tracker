@@ -5,16 +5,21 @@
   const ICONS={task:'✓',document:'▤',decision:'◇',approval:'✦',result:'⚑'};
   function install(a) {
     let owner='',processId='',scenarioId='',selected='',editing=false,zoom=1,wasVisible=false,paused=false,raf=0,last=0,elapsed=0,index=0,loops=0,route=null,lastModel='',paintKey='',overrides={},drag=null,suppressClick=0;
-    let audio=null,audioReady=false,notes=[],demo=null,editorSnapshot=null,reverse=null;
+    let audio=null,audioReady=false,audioPending=null,audioEpoch=0,audioError='',notes=[],demo=null,editorSnapshot=null,reverse=null;
     const $=id=>document.getElementById(id), prefs=()=>a.state().workhub.rehearsal.preferences;
     const guard=expected=>{if(!a.ready()||!a.owner()||(expected&&expected!==a.owner()))throw Error('Sign in and reopen your rehearsal.');};
     const now=()=>new Date().toISOString(), uid=()=>root.crypto.randomUUID();
     const button=(action,label,attributes='',cls='small')=>`<button type="button" class="${cls}" data-rehearsal="${action}" ${attributes}>${label}</button>`;
-    function clearAudio() {for(const n of notes){try{n.stop();}catch{}}notes=[];try{audio?.suspend()?.catch(()=>{});}catch{}}
+    function syncAudio() {
+      const button=$('rehearsalSound'),status=$('rehearsalAudioStatus');
+      if(button){button.textContent=soundLabel();button.setAttribute('aria-pressed',String(!!prefs().sound&&audioReady&&audio?.state==='running'));}
+      if(status)status.textContent=audioMessage();
+    }
+    function clearAudio() {audioEpoch++;audioPending=null;audioReady=false;for(const n of notes){try{n.stop();}catch{}}notes=[];try{audio?.suspend()?.catch(()=>{});}catch{}syncAudio();}
     function resetOwner() {
       if(owner===a.owner())return;
       owner=a.owner();reverse=null;processId='';scenarioId='';selected='';editing=false;overrides={};lastModel='';route=null;elapsed=0;index=0;loops=0;paused=false;
-      clearAudio();try{audio?.close()?.catch(()=>{});}catch{}audio=null;audioReady=false;editorSnapshot=null;drag=null;
+      clearAudio();try{audio?.close()?.catch(()=>{});}catch{}audio=null;audioReady=false;audioError='';editorSnapshot=null;drag=null;
       demo=E.seed('__demo__',now());
     }
     function model() {
@@ -33,25 +38,47 @@
     function motionOff(){return a.prefs?.().motion==='off'||root.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;}
     function blocked(){return document.hidden||motionOff()||editing||!!document.querySelector('dialog[open]')||document.body.matches('.hub-private,.hub-present,.hub-focus');}
     function stopFrame(){if(raf)root.cancelAnimationFrame(raf);raf=0;last=0;clearAudio();}
-    function soundLabel(){return !prefs().sound?'Sound off':audioReady?'Sound on':'Sound on · tap to enable';}
-    async function unlock() {
-      if(!a.ready()||!$('rehearsalRoot')||!prefs().sound||motionOff()||document.hidden)return;
-      const identity=a.owner();try{
-        const Audio=root.AudioContext||root.webkitAudioContext;if(!Audio)return;
-        if(!audio)audio=new Audio();await audio.resume();
-        if(a.owner()!==identity){try{await audio.close();}catch{}audio=null;return;}
-        audioReady=audio.state==='running';const label=$('rehearsalSound');if(label)label.textContent=soundLabel();
-      }catch{audioReady=false;}
+    // Motion preferences stop animation, while explicitly requested sound remains available.
+    function audioBlocked(){return !a.ready()||owner!==a.owner()||!$('rehearsalRoot')||document.hidden||editing||!!document.querySelector('dialog[open]')||document.body.matches('.hub-private,.hub-present,.hub-focus');}
+    function soundLabel(){return prefs().sound&&audioPending?'Enabling sound…':prefs().sound&&audioReady&&audio?.state==='running'?'Mute sound':'Enable sound';}
+    function audioMessage(){return audioError||(!prefs().sound?'Sound is off.':prefs().volume===0?'Volume is zero. Raise it to hear step sounds.':audioReady&&audio?.state==='running'?'Sound ready · short tones at each step.':audioPending?'Waiting for browser audio. Playback controls remain available.':'Click Enable sound to hear a preview and step sounds.');}
+    function unlock() {
+      if(audioBlocked()||!prefs().sound)return Promise.resolve(false);
+      if(audio?.state==='running'){audioReady=true;audioError='';syncAudio();return Promise.resolve(true);}
+      if(audioPending)return audioPending.promise;
+      const identity=owner,epoch=++audioEpoch;
+      try{
+        const Audio=root.AudioContext||root.webkitAudioContext;
+        if(!Audio){audioError='Sound is unavailable in this browser.';syncAudio();return Promise.resolve(false);}
+        if(!audio||audio.state==='closed'){
+          const context=audio=new Audio();
+          context.onstatechange=()=>{if(context!==audio)return;audioReady=context.state==='running'&&prefs().sound&&!audioBlocked();syncAudio();};
+        }
+        const context=audio,request={promise:null};audioError='';audioPending=request;
+        // Call resume synchronously within the click; a pending browser prompt must not stall controls.
+        request.promise=Promise.resolve(context.resume()).then(()=>{
+          if(context!==audio||epoch!==audioEpoch||identity!==a.owner()||audioBlocked()||!prefs().sound){
+            if(context!==audio||audioBlocked()||!prefs().sound)try{context.suspend()?.catch(()=>{});}catch{}
+            return false;
+          }
+          audioReady=context.state==='running';return audioReady;
+        },()=>{if(context===audio&&epoch===audioEpoch){audioReady=false;audioError='Sound could not start. Click Enable sound to try again.';}return false;}).finally(()=>{if(audioPending===request)audioPending=null;syncAudio();});
+        syncAudio();return request.promise;
+      }catch{audioPending=null;audioReady=false;audioError='Sound could not start. Click Enable sound to try again.';syncAudio();return Promise.resolve(false);}
+    }
+    function cue() {
+      const identity=owner,currentRoute=route,at=index;
+      void unlock().then(ok=>{if(ok&&identity===a.owner()&&currentRoute===route&&at===index)tone(route?.entries[index]);});
     }
     function tone(entry) {
-      if(!audioReady||!audio||audio.state!=='running'||!prefs().sound||blocked()||prefs().volume===0)return;
-      const identity=owner,frequencies=entry.outcome==='failure'?[174,146]:entry.type==='approval'?[523,659,784]:entry.type==='document'?[330,440]:[392,523];
+      if(!entry||!audioReady||!audio||audio.state!=='running'||!prefs().sound||audioBlocked()||prefs().volume===0)return;
+      const frequencies=entry.outcome==='failure'?[174,146]:entry.type==='approval'?[523,659,784]:entry.type==='document'?[330,440]:[392,523];
       for(let i=0;i<frequencies.length;i++){
         const osc=audio.createOscillator(),gain=audio.createGain(),t=audio.currentTime+i*0.065;
         osc.type=entry.outcome==='failure'?'triangle':'sine';osc.frequency.setValueAtTime(frequencies[i],t);
-        gain.gain.setValueAtTime(0,t);gain.gain.linearRampToValueAtTime(prefs().volume*0.065,t+0.018);gain.gain.exponentialRampToValueAtTime(0.0001,t+0.24);
+        gain.gain.setValueAtTime(0,t);gain.gain.linearRampToValueAtTime(prefs().volume*0.12,t+0.018);gain.gain.exponentialRampToValueAtTime(0.0001,t+0.24);
         osc.connect(gain);gain.connect(audio.destination);osc.start(t);osc.stop(t+0.26);notes.push(osc);
-        osc.onended=()=>{osc.disconnect();gain.disconnect();notes=notes.filter(n=>n!==osc);if(identity!==owner)clearAudio();};
+        osc.onended=()=>{osc.disconnect();gain.disconnect();notes=notes.filter(n=>n!==osc);};
       }
     }
     function positions(){return new Map(model().steps.map(s=>[s.id,drag?.id===s.id?{...s,x:drag.x,y:drag.y}:s]));}
@@ -68,7 +95,7 @@
       const oldForm=$('rehearsalStepForm');
       if(editing&&oldForm&&oldForm.dataset.owner===a.owner()){const clone=oldForm.cloneNode(true);for(const field of oldForm.elements){const target=clone.elements.namedItem(field.name);if(target&&'value' in target)target.value=field.value;}editorSnapshot=clone;}
       const p=model();if(!route)rebuild();
-      return `<section id="rehearsalRoot" class="rehearsal-workspace" data-owner="${esc(owner)}" data-theme="${prefs().theme}" data-effects="${prefs().effects}"><header class="rehearsal-hero"><div><span class="hub-kicker">YOUR PERSONAL PROCESS THEATRE</span><h2>Process Rehearsal</h2><p>Build the flow. Watch it happen. Explore a different outcome.</p></div><div class="actions">${button('new','＋ New process','','primary')}${p.id==='__demo__'?button('keep','Save this example'):button('duplicate','Duplicate')}${p.id!=='__demo__'?button('settings','Process settings'):''}</div></header><div class="rehearsal-selection"><label>Process<select id="rehearsalProcess">${a.state().workhub.rehearsal.processes.map(x=>`<option value="${esc(x.id)}"${x.id===p.id?' selected':''}>${esc(x.name)}</option>`).join('')}<option value="__demo__"${p.id==='__demo__'?' selected':''}>Sample · Procure to pay</option></select></label><label>Scenario<select id="rehearsalScenario">${p.scenarios.map(s=>`<option value="${esc(s.id)}"${s.id===scenarioId?' selected':''}>${esc(s.name)}</option>`).join('')}</select></label>${p.id!=='__demo__'?button('scenario','Edit scenario')+button('scenario-add','＋ Scenario'):''}<span class="rehearsal-local-label">Sample playback · no SAP posting</span></div><div class="rehearsal-layout"><div class="rehearsal-stage"><div class="rehearsal-stage-bar"><div><strong>${esc(p.name)}</strong><span id="rehearsalStatus" aria-live="polite"></span></div><div class="actions">${p.id!=='__demo__'?button('add-step','＋ Step')+button('layout','Auto arrange'):''}${button('zoom-out','−','aria-label="Zoom out"')}${button('zoom-in','＋','aria-label="Zoom in"')}</div></div>${graph(p)}<div class="rehearsal-values"><div class="rehearsal-values-title"><strong>Sample values</strong><span>Changes follow your definitions</span></div><div id="rehearsalValues"></div></div><div class="rehearsal-playbar">${button('back','↶','aria-label="Previous step / rewind"')}${button('play','Pause','id="rehearsalPlay"','primary small')}${button('next','↷','aria-label="Next step"')}${button('restart','Restart')}<label>Speed<select id="rehearsalSpeed">${[0.5,1,1.5,2].map(v=>`<option value="${v}"${v===prefs().speed?' selected':''}>${v}×</option>`).join('')}</select></label>${button('sound',soundLabel(),'id="rehearsalSound" aria-label="Toggle rehearsal sound"')}<label>Volume<input id="rehearsalVolume" aria-label="Rehearsal volume" type="range" min="0" max="1" step="0.05" value="${prefs().volume}"></label></div></div><aside id="rehearsalInspector" class="rehearsal-inspector"></aside></div><div class="rehearsal-options"><label>Scenery<select id="rehearsalTheme">${[['desk','Cosy desk'],['blueprint','Blueprint'],['control','Control room']].map(([v,l])=>`<option value="${v}"${prefs().theme===v?' selected':''}>${l}</option>`).join('')}</select></label><label>Effects<select id="rehearsalEffects">${['quiet','balanced','expressive'].map(v=>`<option${prefs().effects===v?' selected':''}>${v}</option>`).join('')}</select></label><label class="check-label"><input id="rehearsalExplore" type="checkbox"${prefs().explore?' checked':''}>Explore scenarios automatically</label><span>Playback loops. Editing pauses the scene.</span></div><section class="rehearsal-journal"><div><h3>Rehearsal journal</h3><span id="rehearsalJournalHeading">Current route</span></div><ol id="rehearsalJournal" aria-live="off"></ol></section></section>`;
+      return `<section id="rehearsalRoot" class="rehearsal-workspace" data-owner="${esc(owner)}" data-theme="${prefs().theme}" data-effects="${prefs().effects}"><header class="rehearsal-hero"><div><span class="hub-kicker">YOUR PERSONAL PROCESS THEATRE</span><h2>Process Rehearsal</h2><p>Build the flow. Watch it happen. Explore a different outcome.</p></div><div class="actions">${button('new','＋ New process','','primary')}${p.id==='__demo__'?button('keep','Save this example'):button('duplicate','Duplicate')}${p.id!=='__demo__'?button('settings','Process settings'):''}</div></header><div class="rehearsal-selection"><label>Process<select id="rehearsalProcess">${a.state().workhub.rehearsal.processes.map(x=>`<option value="${esc(x.id)}"${x.id===p.id?' selected':''}>${esc(x.name)}</option>`).join('')}<option value="__demo__"${p.id==='__demo__'?' selected':''}>Sample · Procure to pay</option></select></label><label>Scenario<select id="rehearsalScenario">${p.scenarios.map(s=>`<option value="${esc(s.id)}"${s.id===scenarioId?' selected':''}>${esc(s.name)}</option>`).join('')}</select></label>${p.id!=='__demo__'?button('scenario','Edit scenario')+button('scenario-add','＋ Scenario'):''}<span class="rehearsal-local-label">Sample playback · no SAP posting</span></div><div class="rehearsal-layout"><div class="rehearsal-stage"><div class="rehearsal-stage-bar"><div><strong>${esc(p.name)}</strong><span id="rehearsalStatus" aria-live="polite"></span></div><div class="actions">${p.id!=='__demo__'?button('add-step','＋ Step')+button('layout','Auto arrange'):''}${button('zoom-out','−','aria-label="Zoom out"')}${button('zoom-in','＋','aria-label="Zoom in"')}</div></div>${graph(p)}<div class="rehearsal-values"><div class="rehearsal-values-title"><strong>Sample values</strong><span>Changes follow your definitions</span></div><div id="rehearsalValues"></div></div><div class="rehearsal-playbar">${button('back','↶','aria-label="Previous step / rewind"')}${button('play','Pause','id="rehearsalPlay"','primary small')}${button('next','↷','aria-label="Next step"')}${button('restart','Restart')}<label>Speed<select id="rehearsalSpeed">${[0.5,1,1.5,2].map(v=>`<option value="${v}"${v===prefs().speed?' selected':''}>${v}×</option>`).join('')}</select></label>${button('sound',soundLabel(),'id="rehearsalSound" aria-pressed="false" aria-describedby="rehearsalAudioStatus"')}<label>Volume<input id="rehearsalVolume" aria-label="Rehearsal volume" type="range" min="0" max="1" step="0.05" value="${prefs().volume}"></label></div><p id="rehearsalAudioStatus" class="hub-meta" role="status">${esc(audioMessage())}</p></div><aside id="rehearsalInspector" class="rehearsal-inspector"></aside></div><div class="rehearsal-options"><label>Scenery<select id="rehearsalTheme">${[['desk','Cosy desk'],['blueprint','Blueprint'],['control','Control room']].map(([v,l])=>`<option value="${v}"${prefs().theme===v?' selected':''}>${l}</option>`).join('')}</select></label><label>Effects<select id="rehearsalEffects">${['quiet','balanced','expressive'].map(v=>`<option${prefs().effects===v?' selected':''}>${v}</option>`).join('')}</select></label><label class="check-label"><input id="rehearsalExplore" type="checkbox"${prefs().explore?' checked':''}>Explore scenarios automatically</label><span>Playback loops. Editing pauses the scene.</span></div><section class="rehearsal-journal"><div><h3>Rehearsal journal</h3><span id="rehearsalJournalHeading">Current route</span></div><ol id="rehearsalJournal" aria-live="off"></ol></section></section>`;
     }
     function detailHTML(step) {
       if(!step)return '<p>Select a step to inspect it.</p>';
@@ -82,7 +109,7 @@
       const view=$('rehearsalViewport');if(!view||motionOff()||prefs().effects==='quiet'||typeof view.scrollTo!=='function')return;
       view.scrollTo({left:Math.max(0,step.x*zoom-view.clientWidth/2+105*zoom),top:Math.max(0,step.y*zoom-view.clientHeight/2+50*zoom),behavior:'smooth'});
     }
-    function paint() {
+    function paint(playSound=true) {
       const rootEl=$('rehearsalRoot');if(!rootEl||!route)return;
       if(reverse&&motionOff()){index=reverse.target;reverse=null;elapsed=0;paintKey='';}
       const p=model(),entry=route.entries[index],display=entry||route.entries.at(-1),duration=entry?entry.duration*1000:3200,phase=entry?Math.min(1,elapsed/duration):1,key=index+'|'+(entry?phase>=0.55:'end');
@@ -103,7 +130,7 @@
         $('rehearsalJournal').innerHTML=reached.map((e,i)=>`<li data-outcome="${e.outcome}"${i===index?' aria-current="step"':''}>${button('journal',`<span>${i+1}</span><strong>${esc(e.title)}</strong><small>${e.outcome==='failure'?'Exception':e.nextId?'Handoff':'Result'}</small>`,`data-index="${i}"`)}</li>`).join('');
         $('rehearsalJournalHeading').textContent=scenario(p).name+' · loop '+(loops+1);
         if(!editing&&display){const detailId=paused&&selected?selected:display.id;selected=detailId;$('rehearsalInspector').innerHTML=detailHTML(p.steps.find(s=>s.id===detailId));}
-        if(moved&&entry){const step=p.steps.find(s=>s.id===entry.id);if(step&&!paused&&!blocked())camera(step);if(!paused)tone(entry);}
+        if(moved&&entry){const step=p.steps.find(s=>s.id===entry.id);if(step&&!paused&&!blocked())camera(step);if(!paused&&playSound)tone(entry);}
       }
       if(reverse){const prev=p.steps.find(s=>s.id===route.entries[reverse.target]?.id),current=p.steps.find(s=>s.id===route.entries[reverse.source]?.id),token=$('rehearsalToken');if(prev&&current&&token){const point=E.point(prev,current,1-Math.min(1,reverse.elapsed/850));token.hidden=false;token.style.left=point.x+'px';token.style.top=point.y+'px';token.dataset.type=prev.type;token.dataset.outcome='success';$('rehearsalStatus').textContent='Rewinding · '+prev.title;for(const edge of rootEl.querySelectorAll('.rehearsal-edge'))edge.dataset.active=String(edge.dataset.from===prev.id&&edge.dataset.to===current.id);}return;}
       const token=$('rehearsalToken'),from=entry&&p.steps.find(s=>s.id===entry.id),to=entry&&p.steps.find(s=>s.id===entry.nextId);
@@ -112,7 +139,7 @@
     function tick(t) {
       raf=0;if(!$('rehearsalRoot')||!a.ready()||owner!==a.owner()){stopFrame();return;}
       if(!last)last=t;const dt=Math.min(150,Math.max(0,t-last));last=t;
-      if(reverse&&!blocked()){reverse.elapsed+=dt*prefs().speed;if(reverse.elapsed>=850){index=reverse.target;reverse=null;elapsed=0;selected='';paintKey='';}}
+      if(reverse&&!blocked()){reverse.elapsed+=dt*prefs().speed;if(reverse.elapsed>=850){index=reverse.target;reverse=null;elapsed=0;selected='';paintKey='';cue();}}
       else if(!paused&&!blocked()&&route?.entries.length) {
         elapsed+=dt*prefs().speed;const entry=route.entries[index],duration=entry?entry.duration*1000:3200;
         if(elapsed>=duration){elapsed=0;index++;if(index>route.entries.length){loops++;if(prefs().explore){const p=model(),n=p.scenarios.findIndex(s=>s.id===scenarioId);scenarioId=p.scenarios[(n+1)%p.scenarios.length].id;overrides={};}rebuild();}}
@@ -128,7 +155,7 @@
       const p=model(),key=owner+'|'+p.id+'|'+p.updatedAt+'|'+scenarioId;
       if(!wasVisible){paused=false;elapsed=0;index=0;}
       if(key!==lastModel||!wasVisible){lastModel=key;rebuild();}
-      wasVisible=true;if(editing&&editorSnapshot&&editorSnapshot.dataset.owner===owner){$('rehearsalInspector').replaceChildren(editorSnapshot);editorSnapshot=null;}paintKey='';paint();if(!raf)raf=root.requestAnimationFrame(tick);
+      wasVisible=true;if(editing&&editorSnapshot&&editorSnapshot.dataset.owner===owner){$('rehearsalInspector').replaceChildren(editorSnapshot);editorSnapshot=null;}paintKey='';paint();syncAudio();if(!raf)raf=root.requestAnimationFrame(tick);
     }
     function saved(p){return p.id!=='__demo__';}
     function saveMutation(fn) {guard(owner);return a.mutate(d=>{const p=d.workhub.rehearsal.processes.find(p=>p.id===processId);if(!p)throw Error('Save the example before editing.');fn(p,d);p.updatedAt=now();});}
@@ -192,7 +219,13 @@
     function setPreference(key,value) {guard(owner);a.mutate(d=>{d.workhub.rehearsal.preferences[key]=value;});if(key==='sound'&&!value)clearAudio();}
     function moveStep(id,x,y) {paused=true;saveMutation(p=>{const s=p.steps.find(s=>s.id===id);if(!s)throw Error('Step no longer exists.');s.x=Math.max(0,Math.min(4000,x));s.y=Math.max(0,Math.min(4000,y));});}
     async function handle(el) {
-      guard(owner);const identity=owner,action=el.dataset.rehearsal,id=el.dataset.id,p=model();await unlock();guard(identity);
+      guard(owner);const action=el.dataset.rehearsal,id=el.dataset.id,p=model();
+      if(action==='sound'){
+        if(prefs().sound&&(audioPending||audioReady&&audio?.state==='running')){setPreference('sound',false);audioError='';syncAudio();}
+        else {if(!prefs().sound)setPreference('sound',true);cue();}
+        return;
+      }
+      void unlock();
       if(action==='new'){a.openModal('New personal process',`<form id="rehearsalNewForm" data-owner="${esc(owner)}"><label>Process name<input name="name" required maxlength="300" value="My process"></label><label>Start with<select name="template"><option value="example">Procure-to-pay example</option><option value="blank">Blank process</option></select></label><button type="submit" class="primary">Create process</button></form>`);return;}
       if(action==='keep'||action==='duplicate'){saveCopy(false,action==='keep'?'My procure-to-pay rehearsal':'');return;}
       if(action==='settings'){processEditor();return;}
@@ -211,20 +244,18 @@
       if(action==='remove-image'){$('rehearsalStepForm').elements.namedItem('image').value='';$('rehearsalImagePreview').innerHTML='';return;}
       if(action==='cancel-edit'){editing=false;paused=true;$('rehearsalInspector').innerHTML=detailHTML(p.steps.find(s=>s.id===selected));return;}
       if(action==='inspect'){if(Date.now()<suppressClick)return;inspect(id);return;}
-      if(action==='success'||action==='failure'){if(!route.entries.some(entry=>entry.id===id)){a.tell('This step is outside the current route. Choose a scenario that reaches it.');return;}overrides[id]=action;const at=index;rebuild();index=Math.min(at,route.entries.length-1);paused=false;paintKey='';paint();return;}
-      if(action==='journal'){reverse=null;selected='';index=Math.max(0,Math.min(route.entries.length-1,Number(el.dataset.index)));elapsed=0;paused=true;editing=false;paintKey='';paint();return;}
-      if(action==='play'){if(reverse){reverse=null;paused=true;paintKey='';paint();return;}if(editing){a.tell('Save or cancel the step editor first.');return;}paused=!paused;selected='';paintKey='';paint();return;}
-      if(action==='restart'){selected='';overrides={};rebuild();paused=false;editing=false;paint();return;}
+      if(action==='success'||action==='failure'){if(!route.entries.some(entry=>entry.id===id)){a.tell('This step is outside the current route. Choose a scenario that reaches it.');return;}overrides[id]=action;const at=index;rebuild();index=Math.min(at,route.entries.length-1);paused=false;paintKey='';paint(false);cue();return;}
+      if(action==='journal'){reverse=null;selected='';index=Math.max(0,Math.min(route.entries.length-1,Number(el.dataset.index)));elapsed=0;paused=true;editing=false;paintKey='';paint();cue();return;}
+      if(action==='play'){if(reverse){reverse=null;paused=true;paintKey='';paint();return;}if(editing){a.tell('Save or cancel the step editor first.');return;}paused=!paused;selected='';paintKey='';paint(false);if(!paused)cue();else clearAudio();return;}
+      if(action==='restart'){selected='';overrides={};rebuild();paused=false;editing=false;paint(false);cue();return;}
       if(action==='back'&&index>0&&index<route.entries.length&&!motionOff()&&!editing){paused=true;reverse={source:index,target:index-1,elapsed:0};paintKey='';paint();return;}
-      if(action==='back'||action==='next'){reverse=null;if(editing){a.tell('Save or cancel the step editor first.');return;}selected='';index=Math.max(0,Math.min(route.entries.length-1,index+(action==='back'?-1:1)));elapsed=0;paused=true;paintKey='';paint();return;}
-      if(action==='sound'){setPreference('sound',!prefs().sound);if(prefs().sound)await unlock();return;}
+      if(action==='back'||action==='next'){reverse=null;if(editing){a.tell('Save or cancel the step editor first.');return;}selected='';index=Math.max(0,Math.min(route.entries.length-1,index+(action==='back'?-1:1)));elapsed=0;paused=true;paintKey='';paint();cue();return;}
       if(action==='zoom-in'||action==='zoom-out'){zoom=Math.max(0.5,Math.min(1.5,zoom+(action==='zoom-in'?0.1:-0.1)));a.render();}
     }
     document.addEventListener('click',event=>{
       const el=event.target.closest?.('[data-rehearsal]');if(!el)return;event.preventDefault();void handle(el).catch(err=>a.tell(err.message,true));
     });
     document.addEventListener('pointerdown',event=>{
-      if($('rehearsalRoot'))void unlock();
       const handle=event.target.closest?.('[data-rehearsal-drag]');if(!handle||event.button>0)return;
       try{guard(owner);const s=model().steps.find(s=>s.id===handle.dataset.rehearsalDrag);if(!s)return;paused=true;event.preventDefault();drag={id:s.id,x:s.x,y:s.y,baseX:s.x,baseY:s.y,startX:event.clientX,startY:event.clientY,owner,process:model().id,moved:false};handle.setPointerCapture?.(event.pointerId);}catch(err){a.tell(err.message,true);}
     });
@@ -246,11 +277,11 @@
         if(id==='rehearsalProcess'){processId=el.value;scenarioId='';lastModel='';overrides={};route=null;editing=false;paused=false;
           if(processId==='__demo__'){demo=E.seed('__demo__',now());}a.render();return;}
         if(id==='rehearsalScenario'){scenarioId=el.value;lastModel='';overrides={};rebuild();paused=false;a.render();return;}
-        const fields={rehearsalSpeed:'speed',rehearsalVolume:'volume',rehearsalTheme:'theme',rehearsalEffects:'effects',rehearsalExplore:'explore'},key=fields[id];if(key)setPreference(key,el.type==='checkbox'?el.checked:['speed','volume'].includes(key)?Number(el.value):el.value);
+        const fields={rehearsalSpeed:'speed',rehearsalVolume:'volume',rehearsalTheme:'theme',rehearsalEffects:'effects',rehearsalExplore:'explore'},key=fields[id];if(key){setPreference(key,el.type==='checkbox'?el.checked:['speed','volume'].includes(key)?Number(el.value):el.value);if(key==='volume'){if(prefs().volume===0)clearAudio();else cue();}syncAudio();}
       }catch(err){a.tell(err.message,true);}
     });
-    document.addEventListener('visibilitychange',()=>{last=0;if(document.hidden)clearAudio();});
-    return {render,mount,saveForm,stepEditor,scenarioEditor,model,plan:()=>route,snapshot:()=>({index,elapsed,paused,editing,scenarioId,processId,loops,sound:audioReady,rewinding:!!reverse}),tick,stop:stopFrame};
+    document.addEventListener('visibilitychange',()=>{last=0;if(document.hidden)clearAudio();else if(audio&&!paused)cue();else if(audio)void unlock();});
+    return {render,mount,saveForm,stepEditor,scenarioEditor,model,plan:()=>route,snapshot:()=>({index,elapsed,paused,editing,scenarioId,processId,loops,sound:audioReady&&audio?.state==='running'&&prefs().sound,audioPending:!!audioPending,audioError,rewinding:!!reverse}),tick,stop:stopFrame};
   }
   root.WorkHubRehearsal={install};
 })(window);
