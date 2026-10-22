@@ -113,5 +113,36 @@
     for (const r of rows.businessRules) h.businessRules.push({ ...E.copy(r), id: uid(), projectId: targetId, processId: ids.get(r.processId), stepIds: r.stepIds.map(id => ids.get(id)) });
     E.validate(d);
   }
-  root.WorkHubSolutionDemo = { create, copyInto };
+  /** Local worked examples: no project records, decisions or saved runs are copied. */
+  function inventoryCase(kind) {
+    if (!['map', 'batch', 'split'].includes(kind)) throw Error('Choose a stock-valuation example.');
+    const E = root.WorkHubSolutionEngine, V = root.WorkHubSolutionValuation, d = create(), id = 'demo-proposal-spares-valuated', proposal = E.data(d).proposals.find(p => p.id === id);
+    let p = { ...proposal.profile, valuationClass: '3000' }, actions;
+    if (kind === 'map') {
+      Object.assign(p, { priceControl: 'V', movingAveragePrice: 10, openingQty: 100 });
+      proposal.title = 'MAP · opening stock RM10 + receipt RM12';
+      actions = E.defaultActions(p);
+    } else if (kind === 'batch') {
+      Object.assign(p, { batchManaged: true, openingQty: 40, openingBatch: 'LOT-A' });
+      proposal.title = 'Batch stock · LOT-A and LOT-B stay separate';
+      const gr = Object.assign(E.action('gr', 60), { batch: 'LOT-B' });
+      actions = [gr, Object.assign(E.action('transfer', 20), { batch: 'LOT-B' }), Object.assign(E.action('issue', 50, 'inventory', '', 'LOT-A has only 40 units, even though total stock is 100.'), { batch: 'LOT-A' }), Object.assign(E.action('issue', 10), { batch: 'LOT-A' }), Object.assign(E.action('return', 10, 'inventory', gr.id), { batch: 'LOT-B' })];
+    } else {
+      Object.assign(p, { priceControl: 'V', splitValuation: true, valuationCategory: 'H', openingQty: 140, batchManaged: true, openingBatch: '', valuationTypes: [
+        { ...V.typeDefaults('LOCAL'), openingQty: 100, openingBatch: 'LOC-OPEN' },
+        { ...V.typeDefaults('IMPORT'), priceControl: 'S', valuationClass: '3100', openingQty: 40, standardPrice: 14, movingAveragePrice: 14, openingBatch: 'IMP-OPEN' },
+      ] });
+      proposal.title = 'Split valuation · LOCAL MAP / IMPORT standard price';
+      const gr = Object.assign(E.action('gr', 50), { valuationType: 'LOCAL', batch: 'LOC-NEW' });
+      const other = Object.assign(E.action('gr', 50), { valuationType: 'IMPORT', batch: 'IMP-NEW' });
+      const move = Object.assign(E.action('transfer', 20), { valuationType: 'IMPORT', batch: 'IMP-NEW' });
+      actions = [gr, other, Object.assign(E.action('issue', 10), { valuationType: 'LOCAL', batch: 'LOC-NEW' }), move, E.action('reverse', 0, 'inventory', move.id), Object.assign(E.action('return', 10, 'inventory', gr.id), { valuationType: 'LOCAL', batch: 'LOC-NEW' })];
+    }
+    proposal.profile = p;
+    proposal.approach = kind === 'split' ? 'Keep LOCAL and IMPORT quantities, classes and valuation prices separate. Batch assignments identify which partial stock moves.' : kind === 'map' ? 'Value receipts at PO price and consume stock at the current moving average price.' : 'Identify the batch at receipt and check availability for the selected batch and storage location.';
+    proposal.assumptions = 'Fictional learning example. One plant, unrestricted stock and no invoice postings. Valuation classes and category/type keys are illustrative; confirm client configuration.';
+    E.validate(d);
+    return { demo: d, proposalId: id, run: { title: proposal.title, snapshot: E.snapshot(d, id), actions } };
+  }
+  root.WorkHubSolutionDemo = { create, copyInto, inventoryCase };
 })(window);

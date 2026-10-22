@@ -243,6 +243,11 @@
         if (mode === 'quantity') { proposalId = 'demo-proposal-spares-quantity'; simulator.reset(); refresh(); }
         simulator.advance(); document.querySelector('.sg-narrator')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }); return true;
       }
+      if (op === 'learn-inventory') {
+        const sample = D.inventoryCase(el.dataset.kind); simulator.reset(); demo = sample.demo; sourceChosen = true; isDemo = true; tour = -1; pane = 'simulation';
+        productId = 'demo-bearing'; processId = 'demo-process-spares'; proposalId = sample.proposalId; companyFilter = query = ''; refresh();
+        simulator.restore(sample.run); simulator.refresh(); simulator.advance(); document.querySelector('.sv-valuation, .sv-batches')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }); return true;
+      }
       if (op === 'start-interview') {
         simulator.reset(); sourceChosen = true; isDemo = false; tour = -1; pane = 'tools'; productId = processId = proposalId = companyFilter = query = ''; refresh();
         const control = document.createElement('button'); control.dataset.sx = 'interview'; experience.handle(control); return true;

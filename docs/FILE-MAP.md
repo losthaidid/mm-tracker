@@ -136,3 +136,6 @@ An `*-engine.js` file usually contains rules and calculations. Its matching `.js
 contains forms and interaction. Its matching `.css` file styles those forms.
 
 Project people: [project-people-engine.js](../project-people-engine.js) validates contacts, hierarchy and responsibilities; [project-people.js](../project-people.js) supplies the workspace and forms; [project-people-files.js](../project-people-files.js) exports PNG/Excel; [project-people.css](../project-people.css) styles the chart and mobile list. See [PROJECT-PEOPLE.md](PROJECT-PEOPLE.md).
+
+- `solution-valuation.js`: pure S/V price, batch and split-valuation rules; historical run compatibility.
+- `solution-valuation-ui.js` / `solution-valuation.css`: valuation controls, class context, stock ledgers and worked-example entry points.
