@@ -73,7 +73,7 @@ The display shows plant stock, inventory value, consumption cost, net PO receipt
 
 ### Product and valuation profiles
 
-- **Valuated stock:** inventory at standard price, GR/IR at PO price, difference to symbolic price differences. Separate PO and standard prices are maintained.
+- **Valuated stock:** choose S or V. Under S, inventory uses standard price and purchase-price differences use symbolic price differences. Under V, receipts use PO value and issues use current MAP. GR/IR uses PO price. Each split-valuation type keeps its own price control.
 - **Quantity-only stock / UNBW baseline:** quantities are managed; no inventory value. Under the supported valuated-GR K assignment, PO GR recognises purchase cost. Later GI changes quantity and consumption statistics, with no additional FI cost.
 - **Non-stock / NLAG baseline:** an account-assigned PO GR for consumption is valid. No inventory quantity/value is created. An attempted stock receipt, stock issue or storage transfer fails with an explanation.
 - **Valuated material, direct-consumption purpose:** with K assignment, receipt records consumption rather than inventory.
@@ -112,7 +112,7 @@ Saved snapshots from `mm-core-2026-10-21.1` and `.2` replay with their original 
 
 One product, one base unit, one PO item, one plant, two preconfigured/extended storage locations, MYR, unrestricted-use own stock, S/V valuation, optional manual batches and explicit split-valuation types, and single K assignment. Automatic account determination is assumed complete. The rule catalogue uses readable simulator codes, not invented SAP error IDs.
 
-Not implemented: invoices/credit memos, tax/freight, FX, multiple assignments, posting periods/authorisations, services, split valuation, special stock, stock-type/material/cross-plant transfers, two-step transfers/STOs, batch classification/expiry/automatic determination, category X automatic batch valuation, QM/EWM, PP production postings or SD/customer returns. An unmodelled transaction shows **Not covered** and does not alter balances. Delivery completed is not treated as an unconditional GR prohibition.
+Not implemented: invoices/credit memos, tax/freight, FX, multiple assignments, posting periods/authorisations, services, special stock, stock-type/material/cross-plant transfers, two-step transfers/STOs, batch classification/expiry/automatic determination, category X automatic batch valuation, QM/EWM, PP production postings or SD/customer returns. An unmodelled transaction shows **Not covered** and does not alter balances. Delivery completed is not treated as an unconditional GR prohibition.
 
 ## SAP source catalogue
 
