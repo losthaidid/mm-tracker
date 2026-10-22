@@ -3,13 +3,19 @@
 ## TNG: review first, save when ready
 
 1. Open **Schedule → TNG PDF extractor** beside the monthly claims summary.
-2. Choose **Client site claims** or **Special claims**, then choose or drop a text-based TNG **Customer Transactions Statement** PDF. The supported offline and online card tables are read on your device.
+2. Choose **Client site claims** or **Special claims**, then choose or drop a text-based TNG **Customer Transactions Statement** PDF. The existing offline and online card tables remain supported. You can also choose a **TNG Wallet Transaction History** eWallet PDF, including its native landscape rotation and pages without repeated headings. Both formats are read on your device.
 3. Choose a date range or one or more date chips. **Journey / exit date** is the default; **Posted date** is available when required. Filters change the view, not your previous selections.
 4. Use **Match on-site dates** to suggest tolls on scheduled visits of the chosen claim type, including one-off destinations. Review personal trips yourself. If there are several visits that day, choose the correct allocation; the app does not guess the company or client.
-5. Select the expenses you want. Reloads and refunds remain separate and cannot enter expense totals. **Edit** corrects an extracted draft; it never changes the source PDF image. **Manual entry** creates a draft without invented PDF evidence.
+5. Select the expenses you want. Reloads, credits/refunds, wallet transfers and unsuccessful or unknown wallet transaction types remain separate and cannot enter expense totals. **Edit** corrects an extracted draft; it never changes the source PDF image. **Manual entry** creates a draft without invented PDF evidence.
 6. Choose **Save selected expenses**. This adds the confirmed records to the existing expense ledger in one save and updates Schedule's monthly claim totals. Wait for **Saved to Supabase** before leaving.
 
-Opening, parsing, filtering, matching and cropping never save an expense automatically. Saved PDF transactions remain selected for evidence; they are no longer counted as new expenses. The same card/section/transaction reference is blocked from being imported again, including in overlapping statements. Without a readable card serial, duplicate checks cover the exact file only; a warning asks you to check existing expenses.
+Opening, parsing, filtering, matching and cropping never save an expense automatically. Saved PDF transactions remain selected for evidence; they are no longer counted as new expenses. The same card or wallet/section/transaction reference is blocked from being imported again, including in overlapping statements. Without a readable card serial or wallet ID, duplicate checks cover the exact file only; a warning asks you to check existing expenses.
+
+### eWallet dates, money and evidence
+
+The **Amount (RM)** column supplies the transaction amount; **Wallet Balance** never supplies an expense amount. Wrapped references are joined for duplicate checking. RFID Payment is treated as toll spending; successful Payment and parking rows are reviewable. Receiving money, reloads and wallet transfers are excluded. Failed/pending and unrecognised types remain visible with an excluded label. Nothing saves until confirmed.
+
+For eWallet rows, **Transaction / Details date** uses the printed Details date/time when present; otherwise it uses the Date column and leaves time blank. **Statement / posted date** preserves the Date column; the export does not explicitly label it a posting date. A missing toll time needs review before a To / Return evidence PDF. Crops for continuation pages can copy the actual table headings from the first source page while retaining the transaction crop from its own page.
 
 ### Crop and download the relevant records
 
@@ -31,9 +37,9 @@ The original PDF and unselected rows stay in memory on the current device; they 
 
 ### Limits and privacy
 
-This first version supports the supplied upright, text-based TNG card-statement layout, not arbitrary PDF layouts, scanned images, password-protected files or OCR. Limits: 20 MB, 60 pages, 3,000 transactions per import, 200 crops per export and the existing 5,000-entry expense ledger. Unknown tables/invalid rows are reported for review. No tax or employer-claim eligibility is inferred.
+Supported formats are the original text-based TNG Customer Transactions Statement card tables and the supplied landscape TNG Wallet Transaction History eWallet layout. Arbitrary PDF layouts, scanned images, password-protected files and OCR remain outside coverage. Limits: 20 MB, 60 pages, 3,000 transactions per import, 200 crops per export and the existing 5,000-entry expense ledger. Unknown tables/invalid rows are reported for review. No tax or employer-claim eligibility is inferred.
 
-Dates are preserved as calendar dates; amounts use integer sen. Statement bytes, card serials and account numbers are not saved. A card fingerprint supports duplicate checks. Signing out or switching accounts clears the temporary review and invalidates pending reads/exports and manual forms. Do not commit a real statement or extracted private fixture to the public repository.
+Dates are preserved as calendar dates; amounts use integer sen. Statement bytes, card serials and account numbers are not saved. A card or wallet fingerprint supports duplicate checks. Signing out or switching accounts clears the temporary review and invalidates pending reads/exports and manual forms. Do not commit a real statement or extracted private fixture to the public repository.
 
 ## Troubleshooting Lab: automatic live results
 

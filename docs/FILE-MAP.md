@@ -53,7 +53,8 @@ CSS (`.css`) controls appearance; HTML supplies the initial page structure.
 | [app.js](../app.js), [base.css](../base.css) | Schedule views, exact minute intervals, bookings, project-calendar links and the original form layouts. |
 | [claims-engine.js](../claims-engine.js) | Location/rate rules, booking travel snapshots, client/special claim types, integer-sen calculations, monthly totals and CSV output. |
 | [claims.js](../claims.js), [claims.css](../claims.css) | Maintainable mileage locations, claim type and one-off destinations, travel fields, monthly summary and other-expense ledger. |
-| [tng-engine.js](../tng-engine.js) | Positioned statement-table parsing, integer-sen amounts, on-site suggestions, duplicate identities and confirmed expense/source validation. No PDF library or account writes. |
+| [tng-wallet.js](../tng-wallet.js) | Separate eWallet history reader: dynamic columns, wrapped references, continuation pages, payment exclusions and source header-page coordinates. |
+| [tng-engine.js](../tng-engine.js) | Original offline/online card parsing plus eWallet dispatch, integer-sen amounts, on-site suggestions, duplicate identities and confirmed expense/source validation. No PDF library or account writes. |
 | [tng-files.js](../tng-files.js) | Lazy local PDF.js loading, source-page rendering, faithful row crops and PNG/PDF/ZIP evidence generation. Client PDFs combine dated To/Return crops with editable captions; special claims keep individual crops. PDF bytes stay in memory. |
 | [tng.js](../tng.js), [tng.css](../tng.css) | Schedule's TNG review desk, date filters, manual drafts, visit allocation, bounded crop controls and explicit expense saves. |
 | [recipients-engine.js](../recipients-engine.js) | Email validation, bulk parsing, duplicates, To/Cc/Bcc grouping and plain address output. |

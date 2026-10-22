@@ -51,7 +51,7 @@
     const openNow = () => !!$('tngStudio') && !!$('modal')?.open;
     const alive = (token, account) => a.ready() && a.owner() === account && generation === token;
     const selectable = r =>
-      !['reload', 'credit'].includes(r.kind) &&
+      !E.isExcluded(r) &&
       !r.errors.length &&
       (!savedExpense(r) || C.claimType(savedExpense(r)) === claimType);
     const editable = r => selectable(r) && !isDuplicate(r);
@@ -154,10 +154,10 @@
     function rowHTML(r) {
       const dup = isDuplicate(r),
         visits = E.matches(a.state(), day(r), claimType);
-      return `<tr class="${r.selected ? 'is-selected ' : ''}${dup ? 'is-duplicate' : ''}"><td><input type="checkbox" data-tng-select="${esc(r.id)}" aria-label="Select ${esc(r.transactionNo || r.description)}"${r.selected ? ' checked' : ''}${selectable(r) ? '' : ' disabled'}></td><td><strong>${esc(day(r) || 'Review date')}</strong><small>${esc(r.time)}${r.date !== r.postedDate ? ' · Posted ' + esc(r.postedDate) : ''}</small></td><td><strong class="hub-sensitive">${esc(r.description || 'Review description')}</strong><small>${esc(r.manual ? 'Manual entry' : r.type + ' · ' + r.section + ' · p' + r.page)}</small>${r.errors.length ? '<small class="tng-error">' + esc(r.errors.join(' · ')) + '</small>' : ''}</td><td><span class="tng-kind" data-kind="${r.kind}">${esc(r.kind === 'reload' ? 'Reload · excluded' : r.kind === 'credit' ? 'Refund · excluded' : r.manual ? 'Manual' : C.CATEGORIES[r.category])}</span><small>${dup ? 'Already imported · ' + esc(C.CLAIM_TYPES[C.claimType(savedExpense(r))]) : r.saved ? 'Saved to expenses' : ''}</small></td><td class="tng-money">${r.amountCents === null ? 'Review' : C.money(r.amountCents)}</td><td><select data-tng-booking="${esc(r.id)}" aria-label="Link visit for ${esc(r.transactionNo || r.description)}"${r.kind === 'reload' || r.kind === 'credit' ? ' disabled' : ''}><option value="">${visits.length > 1 ? 'Choose one of ' + visits.length + ' visits' : 'No linked visit'}</option>${options(
+      return `<tr class="${r.selected ? 'is-selected ' : ''}${dup ? 'is-duplicate' : ''}"><td><input type="checkbox" data-tng-select="${esc(r.id)}" aria-label="Select ${esc(r.transactionNo || r.description)}"${r.selected ? ' checked' : ''}${selectable(r) ? '' : ' disabled'}></td><td><strong>${esc(day(r) || 'Review date')}</strong><small>${esc(r.time)}${r.date !== r.postedDate ? (r.section === 'ewallet' ? ' · Statement ' : ' · Posted ') + esc(r.postedDate) : ''}</small></td><td><strong class="hub-sensitive">${esc(r.description || 'Review description')}</strong><small>${esc(r.manual ? 'Manual entry' : r.type + ' · ' + r.section + ' · p' + r.page)}</small>${r.errors.length ? '<small class="tng-error">' + esc(r.errors.join(' · ')) + '</small>' : ''}</td><td><span class="tng-kind" data-kind="${r.kind}">${esc(r.kind === 'reload' ? 'Reload · excluded' : r.kind === 'credit' ? 'Credit / refund · excluded' : r.kind === 'transfer' ? 'Transfer · excluded' : r.kind === 'unsuccessful' ? 'Not successful · excluded' : r.kind === 'unsupported' ? 'Unknown type · excluded' : r.manual ? 'Manual' : C.CATEGORIES[r.category])}</span><small>${dup ? 'Already imported · ' + esc(C.CLAIM_TYPES[C.claimType(savedExpense(r))]) : r.saved ? 'Saved to expenses' : ''}</small></td><td class="tng-money">${r.amountCents === null ? 'Review' : C.money(r.amountCents)}</td><td><select data-tng-booking="${esc(r.id)}" aria-label="Link visit for ${esc(r.transactionNo || r.description)}"${E.isExcluded(r) ? ' disabled' : ''}><option value="">${visits.length > 1 ? 'Choose one of ' + visits.length + ' visits' : 'No linked visit'}</option>${options(
         visits.map(v => [v.key, [v.locationName, v.title, v.project].filter(Boolean).join(' · ')]),
         r.bookingKey
-      )}</select>${visits.length > 1 && !r.bookingKey ? '<small>Several visits: please allocate</small>' : ''}</td><td><div class="tng-row-actions">${!r.manual ? button('preview', 'Crop', `data-id="${esc(r.id)}"`, 'small') : ''}${!dup && !['reload', 'credit'].includes(r.kind) ? button('edit', 'Edit', `data-id="${esc(r.id)}"`, 'small') : ''}${r.manual ? button('remove', 'Remove', `data-id="${esc(r.id)}"`, 'small') : ''}</div></td></tr>`;
+      )}</select>${visits.length > 1 && !r.bookingKey ? '<small>Several visits: please allocate</small>' : ''}</td><td><div class="tng-row-actions">${!r.manual ? button('preview', 'Crop', `data-id="${esc(r.id)}"`, 'small') : ''}${!dup && !E.isExcluded(r) ? button('edit', 'Edit', `data-id="${esc(r.id)}"`, 'small') : ''}${r.manual ? button('remove', 'Remove', `data-id="${esc(r.id)}"`, 'small') : ''}</div></td></tr>`;
     }
     function editorHTML() {
       if (!editing) return '';
@@ -169,7 +169,7 @@
         category: 'toll',
         notes: '',
       };
-      return `<form id="tngRowForm" data-owner="${esc(owner)}" data-generation="${generation}" data-id="${esc(r.id || '')}"><div class="tng-editor-head"><h3>${r.id ? 'Review transaction' : 'Add a manual expense'}</h3>${button('cancel-edit', 'Close', '', 'small')}</div><div class="form-grid"><div><label>Transaction date<input type="date" name="date" value="${esc(r.date)}" required></label></div><div><label>Posted date<input type="date" name="postedDate" value="${esc(r.postedDate)}" required></label></div><div><label>Transaction time<input type="time" name="time" step="1" value="${esc(r.time || '')}"></label></div><div><label>Amount (RM)<input type="number" name="amount" min="0.01" max="1000000" step="0.01" value="${r.amountCents === null ? '' : (r.amountCents / 100).toFixed(2)}" required></label></div><div><label>Category<select name="category">${options(Object.entries(C.CATEGORIES), r.category)}</select></label></div><div class="wide"><label>Description<input name="description" maxlength="300" value="${esc(r.description)}" required></label></div><div class="wide"><label>Notes<textarea name="notes" maxlength="2000">${esc(r.notes || '')}</textarea></label></div></div><p class="hint">${r.id && !r.manual ? 'Corrections affect your expense draft. The source crop stays faithful to the PDF.' : 'Manual entries join your selected expenses. They have no PDF crop.'}</p><button class="primary" type="submit">Keep in review</button></form>`;
+      return `<form id="tngRowForm" data-owner="${esc(owner)}" data-generation="${generation}" data-id="${esc(r.id || '')}"><div class="tng-editor-head"><h3>${r.id ? 'Review transaction' : 'Add a manual expense'}</h3>${button('cancel-edit', 'Close', '', 'small')}</div><div class="form-grid"><div><label>Transaction date<input type="date" name="date" value="${esc(r.date)}" required></label></div><div><label>${r.section === 'ewallet' ? 'Statement / posted date' : 'Posted date'}<input type="date" name="postedDate" value="${esc(r.postedDate)}" required></label></div><div><label>Transaction time<input type="time" name="time" step="1" value="${esc(r.time || '')}"></label></div><div><label>Amount (RM)<input type="number" name="amount" min="0.01" max="1000000" step="0.01" value="${r.amountCents === null ? '' : (r.amountCents / 100).toFixed(2)}" required></label></div><div><label>Category<select name="category">${options(Object.entries(C.CATEGORIES), r.category)}</select></label></div><div class="wide"><label>Description<input name="description" maxlength="300" value="${esc(r.description)}" required></label></div><div class="wide"><label>Notes<textarea name="notes" maxlength="2000">${esc(r.notes || '')}</textarea></label></div></div><p class="hint">${r.id && !r.manual ? 'Corrections affect your expense draft. The source crop stays faithful to the PDF.' : 'Manual entries join your selected expenses. They have no PDF crop.'}</p><button class="primary" type="submit">Keep in review</button></form>`;
     }
     function previewHTML() {
       const r = rows.find(r => r.id === preview);
@@ -185,10 +185,18 @@
       const shown = visible(),
         size = 50;
       page = Math.max(0, Math.min(page, Math.max(0, Math.ceil(shown.length / size) - 1)));
-      return `<section id="tngStudio" class="tng-studio"><div class="tng-hero"><div><span class="hub-kicker">A LITTLE LESS PAPERWORK</span><h2>TNG statement desk</h2><p>Find your travel days. Review the details. Keep the evidence.</p></div><div class="tng-hero-mark" aria-hidden="true">▤<span>↗</span></div></div><div class="tng-claim-type"><label for="tngClaimType">Claim type<select id="tngClaimType">${options(Object.entries(C.CLAIM_TYPES), claimType)}</select></label><p>${claimType === 'client-site' ? 'Combined To / Return evidence with editable captions.' : 'Original evidence format. No journey grouping.'} Saved rows of the other claim type stay in their own pack.</p></div><div class="tng-upload" id="tngDrop"><div><strong>${session ? esc(session.source.fileName) : 'Drop your TNG card statement here'}</strong><p>${session ? session.source.pages + ' pages · ' + rows.filter(r => !r.manual).length + ' extracted records' : 'Offline and online card transactions · PDF up to 20 MB'}</p></div><label class="tng-file-label">${busy ? 'Reading…' : session ? 'Choose another PDF' : 'Choose PDF'}<input type="file" id="tngFile" accept=".pdf,application/pdf"${busy ? ' disabled' : ''}></label>${session ? button('clear', 'Clear PDF', '', 'small') : ''}</div><div class="tng-notice" id="tngMessage" role="status"${message ? '' : ' hidden'}>${esc(message)}</div>${warnings.length ? '<div class="tng-warning">' + warnings.map(esc).join('<br>') + '</div>' : ''}<div class="tng-summary">${totals()}</div>${evidenceHTML()}<div class="tng-main"><div class="tng-review"><div class="tng-filters"><label>From<input type="date" id="tngFrom" value="${esc(from)}"></label><label>To<input type="date" id="tngTo" value="${esc(to)}"></label><label>Date basis<select id="tngBasis">${options(
+      return `<section id="tngStudio" class="tng-studio"><div class="tng-hero"><div><span class="hub-kicker">A LITTLE LESS PAPERWORK</span><h2>TNG statement desk</h2><p>Find your travel days. Review the details. Keep the evidence.</p></div><div class="tng-hero-mark" aria-hidden="true">▤<span>↗</span></div></div><div class="tng-claim-type"><label for="tngClaimType">Claim type<select id="tngClaimType">${options(Object.entries(C.CLAIM_TYPES), claimType)}</select></label><p>${claimType === 'client-site' ? 'Combined To / Return evidence with editable captions.' : 'Original evidence format. No journey grouping.'} Saved rows of the other claim type stay in their own pack.</p></div><div class="tng-upload" id="tngDrop"><div><strong>${session ? esc(session.source.fileName) : 'Drop your TNG card or eWallet statement here'}</strong><p>${session ? session.source.pages + ' pages · ' + rows.filter(r => !r.manual).length + ' extracted records' : 'Card statements and eWallet transaction history · PDF up to 20 MB'}</p></div><label class="tng-file-label">${busy ? 'Reading…' : session ? 'Choose another PDF' : 'Choose PDF'}<input type="file" id="tngFile" accept=".pdf,application/pdf"${busy ? ' disabled' : ''}></label>${session ? button('clear', 'Clear PDF', '', 'small') : ''}</div><div class="tng-notice" id="tngMessage" role="status"${message ? '' : ' hidden'}>${esc(message)}</div>${warnings.length ? '<div class="tng-warning">' + warnings.map(esc).join('<br>') + '</div>' : ''}<div class="tng-summary">${totals()}</div>${evidenceHTML()}<div class="tng-main"><div class="tng-review"><div class="tng-filters"><label>From<input type="date" id="tngFrom" value="${esc(from)}"></label><label>To<input type="date" id="tngTo" value="${esc(to)}"></label><label>Date basis<select id="tngBasis">${options(
         [
-          ['transaction', 'Journey / exit date'],
-          ['posted', 'Posted date'],
+          [
+            'transaction',
+            rows.some(r => r.section === 'ewallet')
+              ? 'Transaction / Details date'
+              : 'Journey / exit date',
+          ],
+          [
+            'posted',
+            rows.some(r => r.section === 'ewallet') ? 'Statement / posted date' : 'Posted date',
+          ],
         ],
         basis
       )}</select></label><label>Show<select id="tngKind">${options(
@@ -198,10 +206,13 @@
           ['parking', 'Parking'],
           ['other', 'Other spending'],
           ['reload', 'Reloads'],
-          ['credit', 'Refunds'],
+          ['credit', 'Credits / refunds'],
+          ['transfer', 'Transfers · excluded'],
+          ['unsuccessful', 'Unsuccessful · excluded'],
+          ['unsupported', 'Unknown type · excluded'],
         ],
         filter
-      )}</select></label></div><p class="tng-date-note">Journey date follows Exit Date & Time. Posted dates may be later. Date and category filters change the view; your selected rows remain selected.</p><div class="tng-dates">${datesHTML()}</div><div class="tng-review-actions">${button('match', '↗ Match on-site dates', '', 'primary')}${button('select-visible', 'Select visible expenses')}${button('clear-selection', 'Clear selection')}${button('all-dates', 'All dates')}${button('manual', '＋ Manual entry')}</div>${editorHTML()}<div class="tng-table-wrap"><table class="tng-table"><thead><tr><th>Select</th><th>Date / time</th><th>Transaction</th><th>Type / status</th><th>Amount</th><th>Link to a visit</th><th>Review</th></tr></thead><tbody>${
+      )}</select></label></div><p class="tng-date-note">${rows.some(r => r.section === 'ewallet') ? 'eWallet transaction dates/times follow Details when printed; Statement/posted date follows the Date column. Missing times remain blank.' : 'Journey date follows Exit Date & Time. Posted dates may be later.'} Date and category filters change the view; your selected rows remain selected.</p><div class="tng-dates">${datesHTML()}</div><div class="tng-review-actions">${button('match', '↗ Match on-site dates', '', 'primary')}${button('select-visible', 'Select visible expenses')}${button('clear-selection', 'Clear selection')}${button('all-dates', 'All dates')}${button('manual', '＋ Manual entry')}</div>${editorHTML()}<div class="tng-table-wrap"><table class="tng-table"><thead><tr><th>Select</th><th>Date / time</th><th>Transaction</th><th>Type / status</th><th>Amount</th><th>Link to a visit</th><th>Review</th></tr></thead><tbody>${
         shown
           .slice(page * size, (page + 1) * size)
           .map(rowHTML)
@@ -402,7 +413,7 @@
         selected: true,
         bookingKey: '',
       };
-      if (old && !editable(old) && !old.errors.length)
+      if (old && (E.isExcluded(old) || (!editable(old) && !old.errors.length)))
         throw Error('This transaction cannot be edited as a new expense.');
       Object.assign(row, {
         date: val('date'),
