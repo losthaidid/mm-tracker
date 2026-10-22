@@ -47,7 +47,7 @@ test('startup uses the returning account website name before feature assets load
   window.eval(source);
   brand.textContent = 'Your workspace';
   document.getElementById('workhubStartup').prepend(brand);
-  window.WorkHubStartup.brand();
+  window.eval(readFileSync(new URL('../startup-brand.js', import.meta.url), 'utf8'));
   assert.equal(brand.textContent, name);
 });
 
