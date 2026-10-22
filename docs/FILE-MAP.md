@@ -21,7 +21,7 @@ CSS (`.css`) controls appearance; HTML supplies the initial page structure.
 | File | Responsibility | Useful starting point |
 | --- | --- | --- |
 | [index.html](../index.html) | Page metadata, initial header/login/dialog markup, empty starter data and asset load order. | Browser title, initial wording, stylesheet/script references. |
-| [startup.js](../startup.js) | Covers the original HTML until the current workspace or sign-in screen is ready; handles slow/interrupted loading. Critical loading-screen styles and markup are in `index.html`. | `message`, `finish`, the 12-second recovery message. No record writes. |
+| [startup.js](../startup.js) | Covers the original HTML until the current workspace or sign-in screen is ready; handles slow/interrupted loading. Uses the matching account's saved website title from its existing recovery copy, then the loaded cloud preference. Critical loading-screen styles and markup are in `index.html`. | `account`, `name`, `brand`, `message`, `finish`, the 12-second recovery message. No record writes. |
 | [app.js](../app.js) | Core records, Tickets/Tasks editors, Projects/governance, Schedule, workbook utilities, login and autosave. Extracted from the old inline script. | `FIELDS`, `render`, `mutate`, `saveEdit`, `saveCloud`. Numbered section comments explain the major areas. |
 | [base.css](../base.css) | Original shared styles for pages, forms, dialogs, tables, Projects and Schedule. Extracted from the old inline style. | Shared selectors; later feature sheets can override these rules. |
 | [custom.css](../custom.css) | Your own style overrides, loaded last. Contains commented examples. | Start here for simple appearance changes. |

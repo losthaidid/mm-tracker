@@ -335,6 +335,20 @@ test('startup: returning visitors stay covered through session lookup and slow r
  assert.equal(document.getElementById('hubSiteTitle').textContent,'A calm desk');assert.equal(document.body.dataset.hubTheme,'forest');assert.equal(document.getElementById('cloudGate').hidden,true);assert.equal(db.calls.length,0);
 });
 
+test('startup: a renamed website stays branded during reload and follows verified account changes',async t=>{
+ const seed=await app(t);seed.api.mutate(d=>{d.workhub.preferences.workspace='My renamed space 🌿';});await settle();
+ const storage=Object.fromEntries(Array.from({length:seed.window.localStorage.length},(_,i)=>{const k=seed.window.localStorage.key(i);return[k,seed.window.localStorage.getItem(k)];}));
+ storage['mm-tracker.auth.v1:aaotojqkiewbhtnrlcur']=JSON.stringify({user:{id:seed.api.cloud.user.id}});
+ let resolveSession,resolveRow;const session=new Promise(resolve=>resolveSession=resolve),row=new Promise(resolve=>resolveRow=resolve);
+ const ctx=await app(t,{login:false,storage,sessionLookup:()=>session,read:()=>row}),{api,document,db}=ctx,brand=document.getElementById('workhubStartupBrand');
+ assert.equal(brand.textContent,'My renamed space 🌿');assert.equal(document.title,'My renamed space 🌿');assert.equal(document.documentElement.dataset.workhubStartup,'loading');
+ resolveSession({data:{session:{user:{id:seed.api.cloud.user.id}}},error:null});await settle();assert.equal(brand.textContent,'My renamed space 🌿');
+ const data=seed.api.emptyState();data.workhub.preferences.workspace='Renamed on another device';resolveRow({data:{document:JSON.parse(seed.api.payload(data)),revision:2,mutation_id:'remote'},error:null});await settle();
+ assert.equal(brand.textContent,'Renamed on another device');assert.equal(document.getElementById('hubSiteTitle').textContent,brand.textContent);assert.equal(db.calls.length,0);
+ db.read=()=>new Promise(()=>{});void api.loadCloud({user:{id:'22222222-2222-4222-8222-222222222222'}});await settle();assert.equal(brand.textContent,'Your workspace');
+ await api.loadCloud(null);assert.equal(brand.textContent,'Your workspace');assert.equal(db.calls.length,0);
+});
+
 test('startup: failed session lookup exposes styled recovery for returned and rejected errors',async t=>{
  for(const sessionLookup of [async()=>({data:{session:null},error:{message:'Session unavailable'}}),async()=>{throw Error('Network unavailable');}]){
   const {document,api,db}=await app(t,{login:false,sessionLookup});
