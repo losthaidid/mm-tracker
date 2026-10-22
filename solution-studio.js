@@ -5,7 +5,7 @@
  */
 (function (root) {
   'use strict';
-  const E = root.WorkHubSolutionEngine, D = root.WorkHubSolutionDemo, S = root.WorkHubSolutionSimulation;
+  const E = root.WorkHubSolutionEngine, D = root.WorkHubSolutionDemo, S = root.WorkHubSolutionSimulation, G = root.WorkHubSolutionGuide;
   const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const uid = () => root.crypto?.randomUUID?.() || 'solution-' + Date.now().toString(36) + Math.random().toString(36).slice(2);
   const button = (action, label, attrs = '', cls = '') => `<button type="button" class="ss-btn ${cls}" data-ss="${action}" ${attrs}>${label}</button>`;
@@ -15,7 +15,7 @@
   const select = (name, label, rows, selected = '', blank = '') => `<label>${label}<select name="${name}">${blank ? option('', blank, selected) : ''}${rows.map(([id, title]) => option(id, title, selected)).join('')}</select></label>`;
   const stamp = at => new Date(at).toLocaleString('en-MY', { timeZone: 'Asia/Kuala_Lumpur', dateStyle: 'medium', timeStyle: 'short' });
   function install(a) {
-    let owner = '', pid = '', demo = D.create(), isDemo = true, sourceChosen = false, companyFilter = '', productId = '', processId = '', proposalId = '', pane = 'discovery', query = '', dialog = null, tour = -1;
+    let owner = '', pid = '', demo = D.create(), isDemo = true, sourceChosen = false, companyFilter = '', productId = '', processId = '', proposalId = '', pane = 'start', query = '', dialog = null, tour = -1;
     const $ = id => document.getElementById(id), state = () => isDemo ? demo : a.state(), viewPid = () => isDemo ? demo.activeProjectId : pid;
     const rows = () => E.records(state(), viewPid()), process = () => rows().processes.find(p => p.id === processId), proposal = () => rows().proposals.find(p => p.id === proposalId);
     const people = () => (state().workhub.projectPeople?.people || []).filter(p => p.projectId === viewPid());
@@ -32,8 +32,8 @@
     const experience = root.WorkHubSolutionExperience.install({
       context: () => ({ owner, pid, projectId: viewPid(), isDemo, d: state(), rows: rows(), productId, process: process(), proposal: proposal() }),
       guard, save, refresh, simulator, tell: a.tell, openModal: a.openModal, closeModal: a.closeModal,
-      showPane(next) { simulator.stop(); pane = next; refresh(); document.querySelector('#ssWorkspace .ss-pane-body, #ssWorkspace .sx-material-explorer, #ssWorkspace .sx-design-tools')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }); },
-      selectProcess(product, process) { simulator.reset(); productId = product; processId = process; proposalId = companyFilter = ''; pane = 'discovery'; refresh(); },
+      showPane(next) { simulator.stop(); tour = -1; pane = next; refresh(); document.querySelector('#ssWorkspace .ss-pane-body, #ssWorkspace .sx-material-explorer, #ssWorkspace .sx-design-tools')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }); },
+      selectProcess(product, process) { simulator.reset(); productId = product; processId = process; proposalId = companyFilter = ''; tour = -1; pane = 'discovery'; refresh(); },
     });
     function selectDefaults() {
       const r = rows(), products = r.products.filter(p => !companyFilter || p.companyId === companyFilter);
@@ -45,7 +45,7 @@
     function sync() {
       if (owner !== a.owner() || pid !== a.state().activeProjectId) {
         simulator.reset(); if (dialog && $('ssStudioForm')) a.closeModal();
-        owner = a.owner(); pid = a.state().activeProjectId; dialog = null; query = companyFilter = productId = processId = proposalId = ''; pane = 'discovery'; tour = -1;
+        owner = a.owner(); pid = a.state().activeProjectId; dialog = null; query = companyFilter = productId = processId = proposalId = ''; pane = 'start'; tour = -1;
         demo = D.create(); sourceChosen = false; isDemo = !E.records(a.state(), pid).products.length && !E.records(a.state(), pid).processes.length;
         if (isDemo) { productId = 'demo-bearing'; processId = 'demo-process-spares'; }
       }
@@ -73,18 +73,11 @@
       const r = E.records(a.state(), projectId);
       return `<button class="ss-overview-card" type="button" data-action="project-view" data-view="solution"><span class="ss-overview-symbol" aria-hidden="true">◇</span><span><small>UNDERSTAND · DESIGN · DEMONSTRATE</small><strong>Product &amp; Process Solution Studio</strong><span>${r.products.length} products · ${r.processes.length} processes · ${r.proposals.filter(p => p.status === 'Agreed').length} agreed solutions</span></span><b aria-hidden="true">↗</b></button>`;
     }
-    function tourBar() {
-      if (tour < 0) return '';
-      const items = [
-        ['Meet the business', 'Meridian makes bread. Open product cards to see why ingredients, packaging and spares need different handling.'],
-        ['Understand the current process', 'Follow the AS-IS lane. Each step explains who does the work, how it happens and the pain point.'],
-        ['Compare proposed solutions', 'The same maintenance-bearing process has three alternatives. Review the requirement coverage and trade-offs.'],
-        ['Play the consequences', 'Play a 100-unit receipt, a 20-unit location transfer, a 30-unit issue and a 10-unit supplier return. Inspect quantities and symbolic postings at each step.'],
-        ['Challenge the proposal', 'This saved non-stock example tries an inventory receipt, then a valid consumption receipt, then a stock issue. Inspect why each passes or fails.'],
-        ['Record the decision', 'Keep the business feedback and agreement. In your workspace, an agreed proposal can create a project item, three linked tasks and acceptance-test notes.'],
-      ];
-      return `<div class="ss-tour" role="region" aria-label="Guided sample walkthrough"><span class="ss-tour-count">${tour + 1}<small>/ ${items.length}</small></span><div><strong>${items[tour][0]}</strong><p>${items[tour][1]}</p></div><div class="ss-actions">${tour ? button('tour-back', '← Back') : ''}${button(tour === items.length - 1 ? 'tour-close' : 'tour-next', tour === items.length - 1 ? 'Finish tour ✓' : 'Next →', '', 'ss-primary')}${button('tour-close', '×', 'aria-label="Close walkthrough"')}</div></div>`;
+    function guideContext() {
+      return { isDemo, project: E.project(state(), viewPid()), rows: rows(),
+        product: rows().products.find(p => p.id === productId), process: process(), proposal: proposal() };
     }
+    function tourBar() { return G.tourNav(tour); }
     function productTray(r) {
       const products = r.products.filter(p => (!companyFilter || p.companyId === companyFilter) && (!query || [p.name, p.code, p.category, p.purpose].join(' ').toLowerCase().includes(query.toLowerCase())));
       const current = r.products.find(p => p.id === productId);
@@ -119,15 +112,35 @@
       return `<div class="ss-section-head"><div><span class="ss-eyebrow">KEEP THE REASONING CONNECTED</span><h3>Decisions, evidence &amp; delivery</h3></div>${selected ? button('decision', '+ Business feedback', '', 'ss-primary') : ''}</div><div class="ss-review-grid"><section><h4>Business decision trail</h4>${decisions.slice().reverse().map(x => `<article class="ss-decision"><span class="ss-status${x.outcome === 'Agreed' ? ' is-agreed' : ''}">${esc(x.outcome)}</span><h4>${esc(r.proposals.find(p => p.id === x.proposalId)?.title)}</h4><p class="ss-prewrap">${esc(x.note)}</p><small>${esc(x.by)} · ${esc(stamp(x.at))} MYT</small><details><summary>Design snapshot at this decision</summary><pre>${esc(JSON.stringify(JSON.parse(x.snapshot), null, 2))}</pre></details></article>`).join('') || '<p class="ss-muted">Record business feedback, changes requested and agreement here.</p>'}</section><section class="ss-handoff"><span class="ss-eyebrow">FROM AGREEMENT TO ACTION</span><h4>${selected ? esc(selected.title) : 'Choose a proposal'}</h4><p>Create a project item and three linked tasks, with the process acceptance criteria kept as test notes.</p>${selected ? work ? `<p class="ss-success-note">Delivery work is linked. Reopening creates no duplicates.</p>${button('delivery-view', 'Open delivery links', `data-id="${esc(work.id)}"`, 'ss-primary')}` : selected.status === 'Agreed' && !isDemo ? button('delivery', 'Create delivery work ↗', '', 'ss-primary') : `<p class="ss-muted">${isDemo ? 'Demo decisions stay in the sample. Switch to My workspace to create real delivery work.' : 'Record business agreement before creating delivery work.'}</p>` : ''}<h4>Saved simulation evidence</h4><p>${r.runs.length} saved runs in this ${isDemo ? 'demo' : 'project'}. Each keeps its original profile and transactions.</p>${button('runs', 'Browse saved runs')}</section></div>`;
     }
     function render(projectId) {
-      sync(); pid = projectId; selectDefaults(); const r = rows(), p = process(), proposed = proposal();
-      const companies = state().projectCompanies.filter(c => c.projectId === viewPid());
-      return `<section id="ssWorkspace" class="ss-workspace hub-sensitive"><header class="ss-hero"><div><span class="ss-eyebrow">PROJECTS / SOLUTION STUDIO</span><h2>Understand the business.<br><em>Make your solution visible.</em></h2><p>Products, real processes and SAP possibilities—connected in one thoughtful workspace.</p><div class="ss-hero-stats"><span><b>${r.products.length}</b> products / groups</span><span><b>${r.processes.length}</b> processes</span><span><b>${r.proposals.length}</b> possibilities</span></div></div><div class="ss-hero-art" aria-hidden="true"><i></i><span class="ss-art-card a"><small>THE BUSINESS</small><b>▧ Product</b></span><span class="ss-art-card b"><small>THE WAY IT WORKS</small><b>↗ Process</b></span><span class="ss-art-card c"><small>YOUR NEXT POSSIBILITY</small><b>◇ SAP solution</b></span><b class="ss-hero-star">✦</b></div></header><div class="ss-workspace-toolbar"><div class="ss-mode-switch" role="group" aria-label="Blueprint data source">${button('mine', 'My workspace', `aria-pressed="${!isDemo}"`, !isDemo ? 'is-active' : '')}${button('demo', '✦ Demo business', `aria-pressed="${isDemo}"`, isDemo ? 'is-active' : '')}</div><label class="ss-company-filter"><span class="ss-sr-only">Filter company</span><select id="ssCompanyFilter">${option('', 'All companies / project-wide', companyFilter)}${companies.map(c => option(c.id, c.name, companyFilter)).join('')}</select></label><div class="ss-actions">${button('tour', 'Guided sample tour')}${button('rules', 'Rules & coverage')}${button('runs', 'Saved runs')}</div></div>${isDemo ? `<div class="ss-demo-banner"><span>✦</span><div><strong>Meridian Food Manufacturing · Fictional demo business</strong><p>Five product groups, eight processes and ten proposals. Explore and edit freely; demo changes stay in this page session.</p></div><div class="ss-actions">${button('sample-copy', 'Use as starting point')}${button('demo-reset', 'Reset demo')}</div></div>` : `<div class="ss-own-banner"><span>◇</span><p>Your business records save with this project. Link owners from People &amp; responsibilities and classify processes using your maintained MM areas.</p></div>`}${tourBar()}<div class="sx-entry-bar"><span>✦ Explore your design</span><div class="ss-actions"><button class="ss-btn" type="button" data-sx="explorer">Material explorer</button><button class="ss-btn" type="button" data-sx="interview">Discovery interview</button><button class="ss-btn" type="button" data-sx="tools">Design tools</button><button class="ss-btn ss-primary" type="button" data-sx="workshop">Present workshop ↗</button></div></div><div class="ss-body">${productTray(r)}<main class="ss-main">${processStrip(r)}${p ? `<div class="ss-process-context"><span>${esc(companyName(p))}</span><strong>${esc(p.name)}</strong><div>${button('process-edit', 'Edit', `data-id="${esc(p.id)}"`)}</div></div><div class="ss-pane-tabs" role="group" aria-label="Solution workspace sections">${[['discovery', '01 · Current & proposed'], ['proposals', '02 · Solution options'], ['simulation', '03 · Simulator'], ['decisions', '04 · Review & deliver'], ['materials', '05 · Material explorer'], ['tools', '06 · Design tools']].map(([id, label]) => button('pane', label, `data-pane="${id}" aria-pressed="${pane === id}"`, pane === id ? 'is-active' : '')).join('')}</div>${rows().proposals.some(x => x.processId === p.id) ? `<div class="ss-selected-proposal"><label>Current proposal<select id="ssProposalSelect">${r.proposals.filter(x => x.processId === p.id).map(x => option(x.id, x.title + ' · ' + x.status, proposalId)).join('')}</select></label><div class="ss-actions">${button('proposal-new', '+ Alternative')}${button('proposal-edit', 'Edit design', `data-id="${esc(proposed?.id || '')}"`)}</div></div>` : ''}<div class="ss-pane-body">${pane === 'discovery' ? discovery(p, proposed) : pane === 'proposals' ? proposalView(p, proposed) : pane === 'simulation' ? simulator.render() : pane === 'materials' ? experience.renderMaterials() : pane === 'tools' ? experience.renderTools() : decisionsView(p, proposed)}</div>` : pane === 'materials' ? experience.renderMaterials() : pane === 'tools' ? experience.renderTools() : `<div class="ss-empty"><span>◇</span><h3>Every good solution starts with a real business need.</h3><p>Add a product or group, capture the current process, then explore your SAP approach.</p><div class="ss-actions">${button('product-new', '+ Product / group', '', 'ss-primary')}${button('process-new', '+ Shared process')}${button('demo', 'Explore the complete sample')}</div></div>`}</main></div><footer class="ss-footer"><span>Discovery → options → simulation → agreement → delivery</span><span>${isDemo ? 'Demo stays local' : 'Private project records'} · Core MM learning model</span></footer></section>`;
+      sync(); pid = projectId; selectDefaults();
+      const r = rows(), p = process(), proposed = proposal(), c = guideContext(),
+        companies = state().projectCompanies.filter(c => c.projectId === viewPid());
+      // The welcome page keeps the tool catalogue out of the first learning step.
+      let content;
+      if (pane === 'start') content = G.overview(c);
+      else if (pane === 'materials') content = experience.renderMaterials();
+      else if (pane === 'tools') content = experience.renderTools();
+      else if (!p) content = `<div class="ss-empty"><span>◇</span><h3>Begin with a product and a business process.</h3><p>Capture what the business works with, then record how the work happens today.</p><div class="ss-actions">${button('product-new', '+ Product / group', '', 'ss-primary')}${button('process-new', '+ Shared process')}${button('tour', 'Learn with the complete sample')}</div></div>`;
+      else content = pane === 'discovery' ? discovery(p, proposed) : pane === 'proposals' ? proposalView(p, proposed) : pane === 'simulation' ? simulator.render() : decisionsView(p, proposed);
+      const selection = pane !== 'start' && proposed ? `<div class="ss-selected-proposal"><label>Selected solution · used by the simulator<select id="ssProposalSelect">${r.proposals.filter(x => x.processId === p.id).map(x => option(x.id, x.title + ' · ' + x.status, proposalId)).join('')}</select></label><div class="ss-actions">${button('proposal-new', '+ Alternative')}${button('proposal-edit', 'Edit design', `data-id="${esc(proposed.id)}"`)}</div></div>` : '';
+      const navigation = pane === 'start' ? '' : tour >= 0 ? `<div class="sg-walkthrough-screen"><span>Learning in the actual ${pane === 'simulation' ? 'simulator' : pane === 'proposals' ? 'solution options' : pane === 'decisions' ? 'review screen' : 'business process'} below</span>${button('pane', 'Start here', 'data-pane="start"')}</div>` : G.navigation(pane);
+      return `<section id="ssWorkspace" class="ss-workspace sg-readable hub-sensitive">
+        <header class="ss-hero${pane === 'start' ? ' sg-compact-hero' : ''}"><div><span class="ss-eyebrow">PROJECTS / SOLUTION STUDIO</span><h2>${pane === 'start' ? 'Solution Studio' : 'From a business process<br><em>to a clear SAP solution.</em>'}</h2><p>Capture today’s work, compare your options, test the consequences and keep the business decision connected.</p><div class="ss-hero-stats"><span><b>${r.products.length}</b> products / groups</span><span><b>${r.processes.length}</b> processes</span><span><b>${r.proposals.length}</b> proposed solutions</span></div></div><div class="ss-hero-art" aria-hidden="true"><i></i><span class="ss-art-card a"><small>WHAT THEY WORK WITH</small><b>▧ Product</b></span><span class="ss-art-card b"><small>HOW WORK HAPPENS</small><b>↗ Process</b></span><span class="ss-art-card c"><small>YOUR PROPOSED DESIGN</small><b>◇ SAP solution</b></span><b class="ss-hero-star">✦</b></div></header>
+        <div class="ss-workspace-toolbar"><div class="ss-mode-switch" role="group" aria-label="Blueprint data source">${button('mine', 'My workspace', `aria-pressed="${!isDemo}"`, !isDemo ? 'is-active' : '')}${button('demo', '✦ Demo business', `aria-pressed="${isDemo}"`, isDemo ? 'is-active' : '')}</div><label class="ss-company-filter"><span class="ss-sr-only">Filter company</span><select id="ssCompanyFilter">${option('', 'All companies / project-wide', companyFilter)}${companies.map(c => option(c.id, c.name, companyFilter)).join('')}</select></label><div class="ss-actions">${pane === 'start' ? button('rules', 'Rules & coverage') + button('runs', 'Saved runs') : button('pane', 'Start here', 'data-pane="start"') + button('tour', 'Guided sample walkthrough') + button('glossary', 'Explain the words') + button('rules', 'Rules & coverage') + button('runs', 'Saved runs')}</div></div>
+        ${isDemo ? `<div class="ss-demo-banner"><span>✦</span><div><strong>Meridian Food Manufacturing · Fictional demo business</strong><p>Explore the complete example. Demo edits stay in this page session. Use My workspace for your actual project.</p></div><div class="ss-actions">${button('sample-copy', 'Use as starting point')}${button('demo-reset', 'Reset demo')}</div></div>` : `<div class="ss-own-banner"><span>◇</span><p>Your project’s products, processes, proposals and decisions. Use the complete sample whenever you want a worked example.</p></div>`}
+        ${tourBar()}
+        <details class="sg-shortcuts"><summary>Quick tools · material profiles, discovery interview &amp; workshop</summary><div class="sx-entry-bar"><div class="ss-actions"><button class="ss-btn" type="button" data-sx="explorer">Material explorer</button><button class="ss-btn" type="button" data-sx="interview">Discovery interview</button><button class="ss-btn" type="button" data-sx="tools">Design tools</button><button class="ss-btn ss-primary" type="button" data-sx="workshop">Present workshop ↗</button></div></div></details>
+        <div class="ss-body${pane === 'start' ? ' sg-start-layout' : ''}">${pane === 'start' ? '' : productTray(r)}<main class="ss-main">
+          ${navigation}
+          ${pane !== 'start' ? G.context(c) + (tour >= 0 ? G.lesson(tour, c) : G.intro(pane, c)) + processStrip(r) : ''}
+          ${selection}<div class="ss-pane-body">${content}</div>
+        </main></div><footer class="ss-footer"><span>Business story → solution options → test → review → delivery</span><span>${isDemo ? 'Fictional sample · local session' : 'Private project records'} · Core MM learning model</span></footer></section>`;
     }
     function openForm(kind, title, fields, row = null, extra = null) {
       guard(); const token = uid(); dialog = { kind, token, owner, pid, isDemo, id: row?.id || '', snapshot: row ? JSON.stringify(row) : '', extra, processId, proposalId };
       const collection = { product: 'products', process: 'processes', proposal: 'proposals' }[kind];
       const remove = row && collection ? button('record-delete', 'Remove record', `data-collection="${collection}" data-id="${esc(row.id)}"`) : row && kind === 'requirement' && extra.requirementId ? button('requirement-delete', 'Remove requirement', `data-id="${esc(extra.requirementId)}"`) : '';
-      a.openModal(title, `<form id="ssStudioForm" class="ss-form" data-ss-token="${token}"><div class="ss-form-grid">${fields}</div><div class="ss-form-footer"><span>${isDemo ? 'Demo only · not saved to your account' : 'Saved with your private project'}</span><div class="ss-actions">${remove}${button('cancel-form', 'Cancel')}<button type="submit" class="ss-btn ss-primary">${kind === 'delivery' ? 'Create linked work' : kind === 'sample-copy' ? 'Copy sample into project' : kind === 'delete' ? 'Remove record' : 'Save'}</button></div></div></form>`);
+      a.openModal(title, `<form id="ssStudioForm" class="ss-form" data-ss-token="${token}">${G.formHelp(kind)}<div class="ss-form-grid">${fields}</div><div class="ss-form-footer"><span>${isDemo ? 'Demo only · not saved to your account' : 'Saved with your private project'}</span><div class="ss-actions">${remove}${button('cancel-form', 'Cancel')}<button type="submit" class="ss-btn ss-primary">${kind === 'delivery' ? 'Create linked work' : kind === 'sample-copy' ? 'Copy sample into project' : kind === 'delete' ? 'Remove record' : 'Save'}</button></div></div></form>`);
     }
     const companyRows = () => state().projectCompanies.filter(c => c.projectId === viewPid()).map(c => [c.id, c.name]);
     const peopleRows = () => people().map(p => [p.id, p.name + (p.department ? ' · ' + p.department : '')]);
@@ -147,7 +160,7 @@
       const p = process(); if (!p) throw Error('Select a business process first.');
       const currentProduct = rows().products.find(x => x.id === productId) || rows().products.find(x => p.productIds.includes(x.id));
       const old = rows().proposals.find(x => x.id === id), s = old || { title: '', status: 'Exploring', system: 'S/4HANA', release: '', approach: '', benefits: '', limitations: '', assumptions: '', configNotes: '', requirementIds: [], profile: E.profile(Object.hasOwn(E.MODES, currentProduct?.currentTracking) ? currentProduct.currentTracking : 'valuated') };
-      openForm('proposal', old ? 'Edit proposed SAP solution' : 'Propose a SAP approach', input('title', 'Proposal title', s.title, 160, true) + select('status', 'Design maturity', E.STATUS.map(x => [x, x]), s.status) + select('system', 'Target SAP context', E.SYSTEMS.map(x => [x, x]), s.system) + input('release', 'Release / deployment notes', s.release, 100) + textarea('approach', 'Proposed SAP approach', s.approach) + textarea('benefits', 'Business benefits', s.benefits) + textarea('limitations', 'Trade-offs / gaps / development needs', s.limitations) + textarea('assumptions', 'Assumptions and dependencies', s.assumptions) + textarea('configNotes', 'Configuration, tcodes and integration notes', s.configNotes) + `<fieldset class="ss-wide"><legend>Requirements this proposal addresses</legend>${p.requirements.map((r, i) => `<label class="ss-check"><input name="requirementIds" type="checkbox" value="${esc(r.id)}"${s.requirementIds.includes(r.id) ? ' checked' : ''}>R${i + 1} · ${esc(r.text)}</label>`).join('') || '<p class="ss-muted">Add requirements from Current & proposed.</p>'}</fieldset><details class="ss-wide ss-profile-editor" open><summary>Default simulation profile</summary>${S.profileFields(s.profile, 'ssProposal')}</details><p class="ss-wide ss-muted">Business agreement is recorded in Review & deliver. Editing an agreed proposal or its source process returns it to Under review.</p>`, old, { sourceSnapshot: JSON.stringify(p) });
+      openForm('proposal', old ? 'Edit proposed SAP solution' : 'Propose a SAP approach', input('title', 'Proposal title', s.title, 160, true) + select('status', 'Design maturity', E.STATUS.map(x => [x, x]), s.status) + select('system', 'Target SAP context', E.SYSTEMS.map(x => [x, x]), s.system) + input('release', 'Release / deployment notes', s.release, 100) + textarea('approach', 'Proposed SAP approach', s.approach) + textarea('benefits', 'Business benefits', s.benefits) + textarea('limitations', 'Trade-offs / gaps / development needs', s.limitations) + textarea('assumptions', 'Assumptions and dependencies', s.assumptions) + textarea('configNotes', 'Configuration, tcodes and integration notes', s.configNotes) + `<fieldset class="ss-wide"><legend>Requirements this proposal addresses</legend>${p.requirements.map((r, i) => `<label class="ss-check"><input name="requirementIds" type="checkbox" value="${esc(r.id)}"${s.requirementIds.includes(r.id) ? ' checked' : ''}>R${i + 1} · ${esc(r.text)}</label>`).join('') || '<p class="ss-muted">Add requirements from Current & proposed.</p>'}</fieldset><details class="ss-wide ss-profile-editor"><summary>Simulation assumptions · quantities, prices &amp; PO controls</summary><p class="ss-muted">These defaults supply the learning model for this proposal. Save the written design with the values below, or expand and review them before testing.</p>${S.profileFields(s.profile, 'ssProposal')}</details><p class="ss-wide ss-muted">Business agreement is recorded in Review & deliver. Editing an agreed proposal or its source process returns it to Under review.</p>`, old, { sourceSnapshot: JSON.stringify(p) });
     }
     function stepEditor(lane, id = '') {
       const parent = lane === 'to' ? proposal() : process(); if (!parent) throw Error('Choose a process and proposal first.');
@@ -211,16 +224,29 @@
       if (index === 4) proposalId = 'demo-proposal-spares-nonstock';
       simulator.reset(); refresh();
       if (index === 4) { const run = rows().runs.find(x => x.proposalId === 'demo-proposal-spares-nonstock'); if (run) { simulator.restore(run); simulator.refresh(); } }
-      $('ssWorkspace')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+      document.querySelector('.sg-lesson')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
     }
     function handle(el) {
       const op = el.dataset.ss; if (!op) return false; guard();
-      if (['mine', 'demo'].includes(op)) { simulator.reset(); sourceChosen = true; isDemo = op === 'demo'; productId = processId = proposalId = companyFilter = query = ''; tour = -1; refresh(); return true; }
+      if (['mine', 'demo'].includes(op)) { simulator.reset(); sourceChosen = true; isDemo = op === 'demo'; productId = processId = proposalId = companyFilter = query = ''; tour = -1; pane = 'start'; refresh(); return true; }
       if (op === 'demo-reset') { simulator.reset(); demo = D.create(); productId = 'demo-bearing'; processId = 'demo-process-spares'; proposalId = ''; refresh(); return true; }
-      if (op === 'pane') { simulator.stop(); pane = el.dataset.pane; refresh(); return true; }
-      if (op === 'product-select') { simulator.reset(); productId = el.dataset.id; processId = proposalId = ''; refresh(); return true; }
-      if (op === 'process-select') { simulator.reset(); processId = el.dataset.id; proposalId = ''; refresh(); return true; }
-      if (op === 'proposal-select') { simulator.reset(); proposalId = el.dataset.id; refresh(); return true; }
+      if (op === 'pane') { simulator.stop(); tour = -1; pane = ['start','discovery','proposals','simulation','decisions','materials','tools'].includes(el.dataset.pane) ? el.dataset.pane : 'start'; refresh(); return true; }
+      if (op === 'product-select') { simulator.reset(); tour = -1; pane = pane === 'start' ? 'discovery' : pane; productId = el.dataset.id; processId = proposalId = ''; refresh(); return true; }
+      if (op === 'process-select') { simulator.reset(); tour = -1; pane = pane === 'start' ? 'discovery' : pane; processId = el.dataset.id; proposalId = ''; refresh(); return true; }
+      if (op === 'proposal-select') { simulator.reset(); if (tour === 4) tour = -1; proposalId = el.dataset.id; refresh(); return true; }
+      if (op === 'lesson-transaction') { simulator.advance(); document.querySelector('.sg-narrator')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }); return true; }
+      if (op === 'glossary') { simulator.stop(); a.openModal('Solution Studio · words explained', G.glossary(el.dataset.term || '')); return true; }
+      if (op === 'tour-step') { const index = Number(el.dataset.index); if (!Number.isInteger(index) || index < 0 || index > 5) throw Error('Choose a lesson from the walkthrough.'); setTour(index); return true; }
+      if (op === 'learn-case') {
+        const mode = el.dataset.mode; if (!['valuated','quantity','nonstock'].includes(mode)) throw Error('Choose one of the three learning examples.');
+        demo = D.create(); setTour(mode === 'nonstock' ? 4 : 3);
+        if (mode === 'quantity') { proposalId = 'demo-proposal-spares-quantity'; simulator.reset(); refresh(); }
+        simulator.advance(); document.querySelector('.sg-narrator')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }); return true;
+      }
+      if (op === 'start-interview') {
+        simulator.reset(); sourceChosen = true; isDemo = false; tour = -1; pane = 'tools'; productId = processId = proposalId = companyFilter = query = ''; refresh();
+        const control = document.createElement('button'); control.dataset.sx = 'interview'; experience.handle(control); return true;
+      }
       if (op === 'product-new' || op === 'product-edit') productEditor(el.dataset.id || '');
       else if (op === 'process-new' || op === 'process-edit') processEditor(el.dataset.id || '');
       else if (op === 'proposal-new' || op === 'proposal-edit') proposalEditor(el.dataset.id || '');
@@ -319,8 +345,8 @@
     document.addEventListener('change', event => {
       const el = event.target;
       try {
-        if (el.id === 'ssCompanyFilter') { guard(); companyFilter = el.value; productId = processId = proposalId = ''; simulator.reset(); refresh(); }
-        if (el.id === 'ssProposalSelect') { guard(); proposalId = el.value; simulator.reset(); refresh(); }
+        if (el.id === 'ssCompanyFilter') { guard(); tour = -1; companyFilter = el.value; productId = processId = proposalId = ''; simulator.reset(); refresh(); }
+        if (el.id === 'ssProposalSelect') { guard(); if (tour === 4) tour = -1; proposalId = el.value; simulator.reset(); refresh(); }
         if (el.id === 'ssProcessCompany') { guard(); const selected = [...el.form.querySelectorAll('[name="productIds"]:checked')].map(x => x.value); $('ssProcessProducts').innerHTML = productChecks(selected, el.value); }
       } catch (err) { a.tell(err.message, true); }
     });

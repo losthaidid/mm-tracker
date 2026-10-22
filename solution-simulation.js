@@ -4,7 +4,7 @@
  */
 (function (root) {
   'use strict';
-  const E = root.WorkHubSolutionEngine, M = root.WorkHubSolutionMaterials, V = root.WorkHubSolutionTheatre;
+  const E = root.WorkHubSolutionEngine, M = root.WorkHubSolutionMaterials, V = root.WorkHubSolutionTheatre, G = root.WorkHubSolutionGuide;
   const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const option = (v, label, current) => `<option value="${esc(v)}"${v === current ? ' selected' : ''}>${esc(label)}</option>`;
   const money = n => 'RM ' + (n / 100).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -33,7 +33,7 @@
     E.validateProfile(p); return p;
   }
   function install(a) {
-    let key = '', snap = null, actions = [], cursor = -1, timer = 0, playing = false, saved = '', editing = '', loop = false, flowView = 'split', baseline = null, drag = null, pointerDrag = null;
+    let key = '', snap = null, actions = [], cursor = -1, timer = 0, playing = false, saved = '', editing = '', loop = false, pace = 6000, flowView = 'split', baseline = null, drag = null, pointerDrag = null;
     const $ = id => document.getElementById(id);
     const contextKey = c => JSON.stringify([c.owner, c.projectId, c.demo, c.proposal?.id, c.proposal?.profile, c.process?.scenario]);
     function stop() { if (timer) root.clearInterval(timer); timer = 0; playing = false; }
@@ -76,7 +76,7 @@
     }
     function visualStage(r) {
       const event = r.events[cursor], state = stateNow(r);
-      return `<div class="sx-live-stage" data-flow="${flowView}">${stage(r)}${V.documents(event, snap)}${V.accounting(event, state)}${V.warehouse(state, snap)}</div>`;
+      return `<div class="sx-live-stage" data-flow="${flowView}">${G.narration(snap, event, actions.length, cursor)}${stage(r)}${V.documents(event, snap)}${V.accounting(event, state)}${V.warehouse(state, snap)}</div>`;
     }
     function timeline(r) {
       return r.events.map((event, i) => `<li class="${cursor === i ? 'is-current' : ''}">${button('inspect', `<span class="ss-event-dot ${i <= cursor ? event.status : ''}">${i + 1}</span><span><strong>${esc(names[event.action.type] || event.action.type)}</strong><small>${event.action.type === 'reverse' ? 'Referenced cancellation' : event.action.qty + ' units'} · ${i <= cursor ? event.status : 'Ready to check'}</small></span>`, `data-index="${i}" aria-current="${cursor === i ? 'step' : 'false'}"`)}<div>${button('edit', '✎', `data-id="${esc(event.action.id)}" aria-label="Edit transaction ${i + 1}"`)}${button('remove', '×', `data-id="${esc(event.action.id)}" aria-label="Remove transaction ${i + 1}"`)}</div></li>`).join('') || '<li class="ss-muted">No transactions. Add one below.</li>';
@@ -92,7 +92,7 @@
       ensure();
       if (!snap) return '<div class="ss-empty"><span>▷</span><h3>Give your solution a scenario.</h3><p>Create a proposal first, then explore its quantity and value effects here.</p></div>';
       const r = result();
-      return `<section class="ss-simulator"><div class="ss-sim-heading"><div><span class="ss-eyebrow">${saved ? 'SAVED INPUT SNAPSHOT' : 'LOCAL WHAT-IF WORKSPACE'}</span><h3>${esc(saved || snap.proposalTitle)}</h3><p>${esc(snap.productName)} · ${esc(snap.processName)}</p></div><div class="ss-actions">${button('defaults', '↺ Proposal defaults')}${button('save', 'Keep this run', '', 'ss-primary')}</div></div><div class="ss-model-note"><strong>Core MM learning model</strong><span>Source-based rules · ${esc(snap.engineVersion)} · target context ${esc(snap.system)}${snap.release ? ' / ' + esc(snap.release) : ''}. Release-specific behaviour is not inferred from this selector.</span></div><div class="ss-metrics" id="ssSimMetrics">${metrics(r)}</div><div class="ss-playback"><div class="ss-actions">${button('restart', '↶', 'aria-label="Restart playback"')}${button('back', '←', 'aria-label="Previous transaction"')}${button('play', playing ? 'Ⅱ Pause' : '▶ Play', '', 'ss-primary')}${button('next', 'Next →')}<label class="ss-check"><input id="ssSimLoop" type="checkbox"${loop ? ' checked' : ''}>Loop</label></div><span id="ssPlaybackState">${cursor < 0 ? 'Ready to explore' : `${cursor + 1} of ${actions.length}`}</span></div><div class="sx-flow-switch" role="group" aria-label="Physical and document flow">${[['physical', '▧ Physical flow'], ['documents', '▤ Document flow'], ['split', '⇄ Both together']].map(([id, label]) => button('flow', label, `data-view="${id}" aria-pressed="${flowView === id}"`, flowView === id ? 'ss-primary' : '')).join('')}</div><div id="ssTrialComparison">${V.comparison(baseline, snap, actions, snap.scenario)}</div><div class="ss-sim-columns"><div id="ssSimStage">${visualStage(r)}</div><aside class="ss-transaction-panel"><div class="ss-section-head"><h4>Transaction sequence</h4>${button('clear', 'Clear')}</div><ol id="ssSimTimeline" class="ss-sim-timeline">${timeline(r)}</ol>${button('invalid', '✦ Try an invalid transaction', '', 'ss-wide-btn')}<section class="sx-surprises"><span class="ss-eyebrow">INTRODUCE A COMPLICATION</span>${button('surprise', '⚡ Urgent withdrawal', 'data-event="urgent"', 'ss-wide-btn')}${button('surprise', '↩ Damaged delivery → return', 'data-event="damage"', 'ss-wide-btn')}${button('surprise', '▧ Another partial receipt', 'data-event="partial"', 'ss-wide-btn')}<p>Inserts after the selected step. Damage uses a referenced 122 return; quality inspection is separate scope.</p></section>${transactionForm(r)}</aside></div><details class="ss-trial-inputs"><summary>Scenario inputs &amp; document controls <span>Trial changes stay local until you keep a run</span></summary><form id="ssTrialProfile" data-session="${esc(key)}">${profileFields(snap.profile)}<button type="submit" class="ss-btn ss-primary">Apply trial inputs &amp; replay</button></form></details><p class="ss-footnote">Simulation checks run before animation. Failed and unsupported attempts leave balances unchanged. Cancelling is limited to the last active GR/GI/311 in this model; supplier return 122 is a separate transaction. Referenced transactions use stable IDs even when the sequence is edited.</p></section>`;
+      return `<section class="ss-simulator"><div class="ss-sim-heading"><div><span class="ss-eyebrow">${saved ? 'SAVED INPUT SNAPSHOT' : 'LOCAL WHAT-IF WORKSPACE'}</span><h3>${esc(saved || snap.proposalTitle)}</h3><p>${esc(snap.productName)} · ${esc(snap.processName)}</p></div><div class="ss-actions">${button('defaults', '↺ Proposal defaults')}${button('save', 'Keep this run', '', 'ss-primary')}</div></div><details class="sg-simulation-scope"><summary>What this simulator can check · assumptions &amp; target context</summary><p>Practice core PO receipt, cost-centre issue, same-plant location transfer, supplier return and limited referenced cancellation. This is an explanatory model; it does not post to SAP. Target ${esc(snap.system)}${snap.release ? ' / ' + esc(snap.release) : ''}. Rule version ${esc(snap.engineVersion)}; the selector does not infer release-specific behaviour.</p></details><div class="ss-metrics" id="ssSimMetrics">${metrics(r)}</div><div class="ss-playback"><div class="ss-actions">${button('restart', '↶', 'aria-label="Restart playback"')}${button('back', '← Previous', 'aria-label="Previous transaction"')}${button('play', playing ? 'Ⅱ Pause' : '▶ Play', '', 'ss-primary')}${button('next', 'Next transaction →')}<label class="ss-check"><input id="ssSimLoop" type="checkbox"${loop ? ' checked' : ''}>Loop</label></div><label class="ss-learning-pace">Playback pace<select id="ssSimPace">${[[6000, 'Learning · 6 seconds'], [3500, 'Standard · 3.5 seconds'], [2100, 'Fast · 2.1 seconds']].map(([ms, title]) => option(String(ms), title, String(pace))).join('')}</select></label><span id="ssPlaybackState">${cursor < 0 ? 'Ready to explore' : `${cursor + 1} of ${actions.length}`}</span></div><div class="sx-flow-switch" role="group" aria-label="Physical and document flow">${[['physical', '▧ Physical flow'], ['documents', '▤ Document flow'], ['split', '⇄ Both together']].map(([id, label]) => button('flow', label, `data-view="${id}" aria-pressed="${flowView === id}"`, flowView === id ? 'ss-primary' : '')).join('')}</div><div id="ssTrialComparison">${V.comparison(baseline, snap, actions, snap.scenario)}</div><div class="ss-sim-columns"><div id="ssSimStage">${visualStage(r)}</div><aside class="ss-transaction-panel"><div class="ss-section-head"><h4>Transaction sequence</h4>${button('clear', 'Clear')}</div><ol id="ssSimTimeline" class="ss-sim-timeline">${timeline(r)}</ol>${button('invalid', '✦ Try an invalid transaction', '', 'ss-wide-btn')}<section class="sx-surprises"><span class="ss-eyebrow">INTRODUCE A COMPLICATION</span>${button('surprise', '⚡ Urgent withdrawal', 'data-event="urgent"', 'ss-wide-btn')}${button('surprise', '↩ Damaged delivery → return', 'data-event="damage"', 'ss-wide-btn')}${button('surprise', '▧ Another partial receipt', 'data-event="partial"', 'ss-wide-btn')}<p>Inserts after the selected step. Damage uses a referenced 122 return; quality inspection is separate scope.</p></section>${transactionForm(r)}</aside></div><details class="ss-trial-inputs"><summary>Scenario inputs &amp; document controls <span>Trial changes stay local until you keep a run</span></summary><form id="ssTrialProfile" data-session="${esc(key)}">${profileFields(snap.profile)}<button type="submit" class="ss-btn ss-primary">Apply trial inputs &amp; replay</button></form></details><p class="ss-footnote">Simulation checks run before animation. Failed and unsupported attempts leave balances unchanged. Cancelling is limited to the last active GR/GI/311 in this model; supplier return 122 is a separate transaction. Referenced transactions use stable IDs even when the sequence is edited.</p></section>`;
     }
     function refresh() { const el = document.querySelector('.ss-simulator'); if (el) el.outerHTML = render(); }
     function paint() {
@@ -107,12 +107,13 @@
       if (cursor >= actions.length - 1) { if (loop) cursor = -1; else { stop(); paint(); return; } }
       cursor++; const e = result().events[cursor]; if (e.status !== 'success') stop(); paint();
     }
+    function startTimer() { timer = root.setInterval(() => { try { if (document.hidden || !$('ssSimStage')) { stop(); return; } advance(); } catch (err) { stop(); a.tell(err.message, true); } }, pace); }
     function play() {
       a.guard(); ensure();
       if (playing) { stop(); paint(); return; }
       if (cursor >= actions.length - 1) cursor = -1;
       playing = true; advance();
-      if (playing) timer = root.setInterval(() => { try { if (document.hidden || !$('ssSimStage')) { stop(); return; } advance(); } catch (err) { stop(); a.tell(err.message, true); } }, 2100);
+      if (playing) startTimer();
       paint();
     }
     function handle(el) {
@@ -208,6 +209,11 @@
     document.addEventListener('pointercancel', clearStockDrag);
     document.addEventListener('keydown', event => { if (event.key === 'Escape') clearStockDrag(); });
     document.addEventListener('change', event => {
+      if (event.target.id === 'ssSimPace') {
+        try { a.guard(); const next = Number(event.target.value), resume = playing; stop(); pace = [6000,3500,2100].includes(next) ? next : 6000; if (resume) { playing = true; startTimer(); } }
+        catch (err) { stop(); a.tell(err.message, true); }
+        return;
+      }
       if (event.target.id === 'ssSimLoop') loop = event.target.checked;
       const form = event.target.form, material = event.target.closest?.('[data-material]');
       if (form && material) {
@@ -218,7 +224,7 @@
     document.addEventListener('visibilitychange', () => { if (document.hidden) { clearStockDrag(); stop(); paint(); } });
     $('modal')?.addEventListener('close', clearStockDrag);
     document.addEventListener('input', event => { if (event.target.closest?.('#ssTrialProfile, #ssTransactionForm')) { stop(); const b = document.querySelector('[data-ss-sim="play"]'); if (b) b.textContent = '▶ Play'; } });
-    return { render, handle, submit, stop, reset, restore, refresh, play, advance, applyMaterial, snapshot: () => ({ key, snap: snap && E.copy(snap), actions: E.copy(actions), cursor, playing }) };
+    return { render, handle, submit, stop, reset, restore, refresh, play, advance, applyMaterial, snapshot: () => ({ key, snap: snap && E.copy(snap), actions: E.copy(actions), cursor, playing, pace }) };
   }
   root.WorkHubSolutionSimulation = { install, profileFields, readProfile, money, quantity, names };
 })(window);

@@ -4,15 +4,31 @@ Material types, discovery interviews, warehouse trials, workshop presentation an
 
 Open **Projects → Solution Studio**, or its card in Project Overview. Your existing project, company and MM area lists remain the starting point.
 
+## Start here: understand the Studio
+
+The Studio now opens on **Start here**, with a visual map connecting product → process → proposal → test → decision. The welcome actions offer **Teach me with the complete example**, **Start my own discovery interview** and **Explain the words**. Browse all Studio screens opens the full navigation; it is also available on the working screens. The product tray appears when you enter a working screen.
+
+- **Business process:** capture current activities on the AS-IS side and proposed SAP steps on the TO-BE side. Connecting lines show which current activities a proposed step addresses.
+- **Solution options:** compare independent proposals for that process, then select the one to test.
+- **Test the outcome:** the simulator explains the selected transaction's request, reason and before/after balances.
+- **Review & deliver:** keep business feedback and formal agreement, then create linked implementation work when eligible.
+- **Material explorer / Design tools:** supporting tools for material behaviour, discovery interviews, business rules, workshops and handover reports.
+
+Each working screen has a plain-language introduction and expandable **Show me how to use this screen** help. The context card names the current project, product/group, process and selected proposal and identifies fictional versus project records. Start here's six content checkpoints describe what is recorded; they do not certify SAP configuration or acceptance. Saved-run evidence is counted for the selected proposal.
+
+**Explain the words** opens fifteen explanations with examples, including product versus process versus proposal, AS-IS/TO-BE, requirements/acceptance, quantity/value updating, direct consumption, GR/GI, GR/IR, account assignment, material profiles and saved snapshots. Core editors show purpose and example text before their fields. Proposal simulation assumptions are initially collapsed so the written business design comes first; their fields and save behaviour remain available.
+
 ## Learn from the complete sample
 
-An empty Studio opens the **Demo business**: Meridian Food Manufacturing, a fictional bread manufacturer. It has five product groups, seven business users, eight current processes, sixteen requirements, ten proposals, an example business decision and four saved simulation walkthroughs.
+An empty Studio starts with **Demo business → Start here**: Meridian Food Manufacturing, a fictional bread manufacturer. It has five product groups, seven business users, eight current processes, sixteen requirements, ten proposals, an example business decision and four saved simulation walkthroughs.
 
 The product groups are raw ingredients, packaging, finished goods, maintenance spare parts and consumables. Shared approvals and supplier returns demonstrate that a process can apply to several products. Finished-goods production and customer dispatch show discovery and specialist design; their PP/SD/QM transactions are explicitly outside this inventory model.
 
 **Saved runs** also includes 311/312 transfer cancellation, 201/202 and 101/102 cancellation, and partial receipt / overdelivery examples.
 
-Choose **Guided sample tour** to follow the maintenance-bearing example through discovery, three alternatives, playback, an invalid non-stock inventory receipt, a valid consumption receipt and business review. **Reset demo** recreates the sample. Demo edits and demo run saves live only in the page session and do not change your private account records.
+Choose **Teach me with the complete example** or **Guided sample walkthrough** to follow maintenance bearings through six lessons: meet the business, understand today's work, compare the options, watch the consequences, understand a blocked attempt and record the decision. Each lesson explains what you are looking at, gives a concrete action and states the intended takeaway. Direct buttons open the sample product, first activity, comparison, next transaction or review form. Next/previous lesson controls and the numbered lesson navigation move between the actual working screens. The lesson is brought into view; the example buttons bring the transaction explanation into view.
+
+Start here also offers three worked-case buttons: stock with value, quantity-only stock and non-stock consumption. Each opens a fresh fictional example and checks its first transaction. The non-stock example begins with the intentionally blocked inventory receipt; the next transaction demonstrates the valid consumption receipt. Beginning a guided walkthrough or worked case resets the fictional sample. **Reset demo** also recreates the sample. Demo edits and demo run saves live only in the page session and do not change your private account records. **Start my own discovery interview** switches to My workspace and opens the draft interview; it does not copy sample records or save anything until you submit.
 
 **Use as starting point** explicitly copies products, current steps, requirements and proposals into an empty real Studio. Choose the destination company. IDs and area mappings are remapped; sample people remain explanatory role/name text, with no real owner assigned. Sample approvals and run evidence are not copied, and every proposal starts as Exploring. Confirm real client requirements before using the copied design.
 
@@ -40,6 +56,10 @@ An agreed proposal in My workspace can **Create delivery work**: one project ite
 The simulator is a deterministic, source-based learning model. It does not connect to SAP, post documents or verify the client's live Customizing. Trial inputs, playback, comparisons and failed attempts are local. **Keep this run** explicitly saves input transactions, an immutable profile snapshot, target context and the rule version in the private account document. Reopening uses the saved snapshot even after the proposal changes. Deleting a proposal retains its saved run snapshots.
 
 The default stock walkthrough receives 100 units, transfers 20 from MAIN to LINE, issues 30 from MAIN, then returns 10 to the supplier. Inspect any step, play/pause, move forward/back, restart, loop, add/edit/remove transactions and challenge a rule. A failed or unsupported transaction changes no balances and pauses automatic playback. Editing a sequence does not retarget document references: references use stable transaction IDs, not their display positions.
+
+**What just happened?** uses the exact engine event shown by the theatre. It explains the requested movement and reason, then compares before/after stock quantity, inventory value and consumption cost. A location transfer also shows both location changes. Blocked and outside-model attempts have different headings and retain their unchanged balances; rule failures include the engine's suggested next action. Expand **How to read the rest of this screen** to connect the scene, warehouse, documents, accounting companion and transaction sequence.
+
+Playback defaults to **Learning · 6 seconds**, with **Standard · 3.5 seconds** and **Fast · 2.1 seconds** choices. Changing pace while playing reschedules the timer without advancing an extra transaction. **Next transaction** remains available for reading at your own pace. The visual request/check/effects route, changed-value cards, success seal and stopped-attempt reaction illustrate the outcome. Guidance effects respect reduced-motion preferences and the website's motion-off setting. They do not change transaction rules, save records, or add supported SAP transactions.
 
 The display shows plant stock, inventory value, consumption cost, net PO receipts, price differences, GR/IR and quantities in both storage locations. No separate valuation area is invented for the second location.
 
