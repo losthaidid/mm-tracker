@@ -1516,3 +1516,17 @@ body.hub-present .my-day-page * {
     flex-basis: 100%;
   }
 }
+
+.md-time-ghost {
+  position: fixed;
+  z-index: 2000;
+  pointer-events: none;
+  background: #315b43;
+  color: #fff;
+  border-radius: 9px;
+  padding: 9px 13px;
+  font:
+    600 12px/1.4 system-ui,
+    sans-serif;
+  box-shadow: 0 5px 20px #25433230;
+}

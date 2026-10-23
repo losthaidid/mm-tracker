@@ -40,6 +40,7 @@
       gapMinutes = 20,
       replayMinute = 1440,
       drag = null,
+      activityMove = null,
       suppressUntil = 0,
       breakState = null,
       audio = null,
@@ -56,6 +57,7 @@
         replayMinute = 1440;
         breakState = null;
         clearDrag(false);
+        clearActivityMove();
         lastMissionCount = null;
         undo = null;
         activityDrag = null;
@@ -1058,6 +1060,112 @@
       } catch {}
       return old;
     }
+    function clearActivityMove() {
+      if (!activityMove) return null;
+      const old = activityMove;
+      activityMove = null;
+      old.ghost?.remove();
+      old.track?.classList.remove('is-drop-target');
+      try {
+        old.handle.releasePointerCapture?.(old.pointerId);
+      } catch {}
+      return old;
+    }
+    document.addEventListener(
+      'pointerdown',
+      event => {
+        const handle = event.target.closest?.('[data-md-drag="activity"]');
+        if (!handle || event.button > 0) return;
+        try {
+          ready();
+          event.preventDefault();
+          event.stopPropagation();
+          const entry = activity(handle.dataset.id);
+          activityMove = {
+            owner,
+            id: entry.id,
+            base: JSON.stringify(entry),
+            handle,
+            pointerId: event.pointerId,
+            x: event.clientX,
+            y: event.clientY,
+            moved: false,
+            track: handle.closest('[data-widget]').querySelector('[data-md-track]'),
+          };
+          handle.setPointerCapture?.(event.pointerId);
+        } catch (e) {
+          a.tell(e.message, true);
+        }
+      },
+      true
+    );
+    document.addEventListener(
+      'pointermove',
+      event => {
+        if (!activityMove || event.pointerId !== activityMove.pointerId) return;
+        if (!a.ready() || a.owner() !== activityMove.owner) {
+          clearActivityMove();
+          sync();
+          return;
+        }
+        if (
+          !activityMove.moved &&
+          Math.hypot(event.clientX - activityMove.x, event.clientY - activityMove.y) < 6
+        )
+          return;
+        event.preventDefault();
+        activityMove.moved = true;
+        const rect = activityMove.track.getBoundingClientRect();
+        activityMove.inside =
+          event.clientX >= rect.left &&
+          event.clientX <= rect.right &&
+          event.clientY >= rect.top - 10 &&
+          event.clientY <= rect.bottom + 10;
+        const ratio = Math.max(
+          0,
+          Math.min(1, (event.clientX - rect.left) / Math.max(1, rect.width))
+        );
+        activityMove.minute =
+          Math.round(
+            (+activityMove.track.dataset.start +
+              ratio * (+activityMove.track.dataset.end - +activityMove.track.dataset.start)) /
+              15
+          ) * 15;
+        activityMove.track.classList.toggle('is-drop-target', activityMove.inside);
+        if (!activityMove.ghost) {
+          const ghost = document.createElement('div');
+          ghost.className = 'md-time-ghost';
+          ghost.setAttribute('aria-hidden', 'true');
+          document.body.append(ghost);
+          activityMove.ghost = ghost;
+        }
+        activityMove.ghost.textContent = activityMove.inside
+          ? 'Review at ' + E.clock(activityMove.minute)
+          : 'Move onto the hour rail';
+        activityMove.ghost.style.left =
+          Math.min(root.innerWidth - 180, Math.max(8, event.clientX + 12)) + 'px';
+        activityMove.ghost.style.top = Math.max(8, event.clientY - 45) + 'px';
+      },
+      { passive: false }
+    );
+    document.addEventListener('pointerup', event => {
+      if (!activityMove || event.pointerId !== activityMove.pointerId) return;
+      const move = clearActivityMove();
+      if (!move.moved) return;
+      suppressUntil = Date.now() + 400;
+      if (!move.inside) return;
+      try {
+        ready();
+        if (move.owner !== owner || JSON.stringify(activity(move.id)) !== move.base)
+          throw Error(
+            'This activity changed while moving. Review the latest version and try again.'
+          );
+        reschedule(move.id, move.minute);
+      } catch (e) {
+        a.tell(e.message, true);
+      }
+    });
+    document.addEventListener('pointercancel', clearActivityMove);
     document.addEventListener('pointerdown', event => {
       const handle = event.target.closest?.('[data-md-drag="idea"]');
       if (!handle || event.button > 0) return;
@@ -1131,6 +1239,10 @@
     });
     document.addEventListener('pointercancel', () => clearDrag());
     document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && activityMove) {
+        clearActivityMove();
+        return;
+      }
       if (event.key === 'Escape' && drag) {
         clearDrag();
         return;
@@ -1383,7 +1495,7 @@
       if (!owner || document.hidden) return;
       runtime();
       const minute = nowMinute();
-      if (minute !== lastMinute) {
+      if (minute !== lastMinute && !drag && !activityMove && !activityDrag) {
         lastMinute = minute;
         if (!document.querySelector('dialog[open]'))
           for (const id of ['dayJourney', 'upNext', 'gaps']) refresh(id);
