@@ -9,7 +9,8 @@
 (function (root) {
   'use strict';
   const E = root.WorkHubValidatorEngine,
-    F = root.WorkHubValidatorFiles;
+    F = root.WorkHubValidatorFiles,
+    S = root.WorkHubValidatorSetup;
   const esc = v =>
     String(v ?? '').replace(
       /[&<>"']/g,
@@ -135,7 +136,8 @@
       page = 0,
       busy = false,
       refEditing = '',
-      targetRow = -1;
+      targetRow = -1,
+      setupPreview = null;
     function sync() {
       const next = a.owner?.() || '';
       if (next !== owner) {
@@ -154,6 +156,8 @@
         fileName = '';
         busy = false;
         mode = 'columns';
+        setupPreview = null;
+        if ($('valSetupReview')) a.closeModal?.();
       }
       return next;
     }
@@ -199,6 +203,7 @@
     }
     function clearFile() {
       generation++;
+      setupPreview = null;
       book = null;
       headers = [];
       sourceRows = [];
@@ -389,6 +394,8 @@
         (!list.length ? '<p class="val-muted">Your next useful template starts here.</p>' : '') +
         '</div>' +
         btn('new', '＋ New template', '', 'val-wide') +
+        btn('import-setup', 'Import Excel setup', '', 'val-wide val-secondary') +
+        '<a class="val-btn val-wide val-quiet val-setup-download" href="./validation-setup-template.xlsx" download>Download setup template</a><p class="val-setup-help">Create columns, conditions and references together in Excel. Import as a new draft.</p>' +
         btn('import-definition', 'Import definition', '', 'val-wide val-quiet') +
         '<div class="val-library-note">' +
         icon('leaf', 24) +
@@ -459,6 +466,7 @@
       return (
         '<div class="val-section-heading"><div><h3>Give your data a shape</h3><p>Display labels for people. Technical field names for your rules.</p></div>' +
         '<div class="val-actions">' +
+        btn('import-setup', 'Import Excel setup', '', 'val-secondary') +
         btn('field-library', 'Field library', '', 'val-secondary') +
         btn('add-column', '＋ Add column', '', 'val-secondary') +
         '</div>' +
@@ -1441,7 +1449,7 @@
               ] || columnEditor
             )()
           : empty()) +
-        '</main></div><input id="valFile" type="file" accept=".xlsx,.csv,.tsv" hidden><input id="valDefinitionFile" type="file" accept=".json" hidden><input id="valReferenceFile" type="file" accept=".xlsx,.csv,.tsv" hidden></section>'
+        '</main></div><input id="valFile" type="file" accept=".xlsx,.csv,.tsv" hidden><input id="valSetupFile" type="file" accept=".xlsx" hidden><input id="valDefinitionFile" type="file" accept=".json" hidden><input id="valReferenceFile" type="file" accept=".xlsx,.csv,.tsv" hidden></section>'
       );
     }
     async function handle(el) {
@@ -1468,6 +1476,39 @@
       }
       if (action === 'import-definition') {
         $('valDefinitionFile').click();
+        return;
+      }
+      if (action === 'import-setup') {
+        $('valSetupFile').click();
+        return;
+      }
+      if (action === 'cancel-setup') {
+        setupPreview = null;
+        a.closeModal();
+        return;
+      }
+      if (action === 'apply-setup') {
+        if (
+          !setupPreview ||
+          setupPreview.owner !== owner ||
+          setupPreview.token !== generation ||
+          !$('valSetupReview')?.closest('dialog[open]')
+        )
+          throw Error('This preview has changed. Upload the setup workbook again.');
+        const next = setupPreview.template;
+        E.checkSchema(next);
+        draft = next;
+        selected = next.id;
+        baseStamp = '';
+        dirty = true;
+        columnId = next.columns[0].id;
+        ruleId = next.rules[0]?.id || '';
+        version = 'draft';
+        mode = 'columns';
+        clearFile();
+        a.closeModal();
+        say('Excel setup imported as a new draft. Review each tab, then Save draft.');
+        paint();
         return;
       }
       if (!draft) throw Error('Create or choose a template first.');
@@ -1779,6 +1820,46 @@
           .slice(0, 80) || 'validation'
       );
     }
+    async function loadSetupFile(file) {
+      ensure();
+      if (!file || !/\.xlsx$/i.test(file.name))
+        throw Error('Choose an .xlsx setup workbook. Download the setup template to get started.');
+      commitCurrent();
+      const token = ++generation,
+        account = owner;
+      setupPreview = null;
+      busy = true;
+      say('Reading Excel setup…');
+      try {
+        const value = await F.read(file);
+        if (token !== generation || account !== a.owner?.() || !a.ready()) return;
+        const t = S.parse(value);
+        setupPreview = { template: t, token, owner: account };
+        a.openModal(
+          'Review Excel setup',
+          `<section id="valSetupReview" class="val-setup-review"><span class="eyebrow">NEW TEMPLATE DRAFT</span><h3>${esc(t.name)}</h3><p>${esc(t.description || 'Columns, conditions and reference lists from your workbook.')}</p><div class="val-setup-counts">${[
+            [t.columns.length, 'Columns'],
+            [t.rules.length, 'Conditions'],
+            [t.lookups.length, 'Reference lists'],
+            [t.uniqueGroups.length, 'Unique combinations'],
+          ]
+            .map(([n, label]) => `<div><strong>${n}</strong><span>${label}</span></div>`)
+            .join(
+              ''
+            )}</div><div class="val-setup-table"><table><thead><tr><th>Field</th><th>Label</th><th>Type</th><th>Required</th></tr></thead><tbody>${t.columns
+            .slice(0, 8)
+            .map(
+              c =>
+                `<tr><td>${esc(c.key)}</td><td>${esc(c.label)}</td><td>${esc(c.type)}</td><td>${c.required ? 'Yes' : 'No'}</td></tr>`
+            )
+            .join(
+              ''
+            )}</tbody></table></div>${t.columns.length > 8 ? '<p class="hint">First 8 columns shown. All columns will be added.</p>' : ''}${t.lookups.length ? `<p><strong>References:</strong> ${t.lookups.map(l => `${esc(l.name)} (${l.rows.length} rows)`).join(', ')}.</p>` : ''}<p class="hint">Creates a new draft. Your saved templates and published versions stay in place. Reference values become part of the definition when you save.${dirty ? ' Your current unsaved draft will be replaced in the editor. Cancel and save it first if you want to keep those edits.' : ''}</p><div class="modal-actions"><button type="button" data-val="cancel-setup">Cancel</button><button type="button" class="primary" data-val="apply-setup">Create new draft</button></div></section>`
+        );
+      } finally {
+        if (token === generation && account === a.owner?.()) busy = false;
+      }
+    }
     function formSubmit(form) {
       ensure();
       if (form.id === 'valPasteForm') {
@@ -1874,6 +1955,12 @@
         ensure();
         if (el.id === 'valFile') {
           if (el.files[0]) await loadFile(el.files[0]);
+          return;
+        }
+        if (el.id === 'valSetupFile') {
+          const file = el.files[0];
+          el.value = '';
+          if (file) await loadSetupFile(file);
           return;
         }
         if (el.id === 'valReferenceFile') {
@@ -2021,6 +2108,7 @@
       sync,
       handle,
       loadFile,
+      loadSetupFile,
       run,
       saveDraft,
       publish,

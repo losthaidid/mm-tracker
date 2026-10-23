@@ -42,6 +42,7 @@
       ballResumeUntil = 0,
       owner = null;
     function scene(value) {
+      if (nap) return false;
       if (value) {
         endUmbrella();
         endGesture();
@@ -315,7 +316,7 @@
       if (!quiet) a.react('busy', 'Oh! You startled me!', 2200);
     }
     function quip(contextual = false) {
-      if (!safe()) return;
+      if (!safe() || nap) return;
       endGesture();
       reaction = null;
       cancelTravel();
@@ -343,6 +344,7 @@
       pet()?.removeAttribute('data-travel-phase');
     }
     function travel(x, y, onDone = () => {}, duration = 1400, purpose = '') {
+      if (nap && purpose !== 'home') return false;
       a.stop();
       cancelTravel();
       const el = pet();
@@ -413,24 +415,44 @@
     }
 
     function goHome() {
+      if (nap) return;
       endGesture();
+      endUmbrella();
       reaction = null;
-      nap = false;
+      nap = true;
+      rememberNap();
+      if ($('hubPetBubble')) $('hubPetBubble').hidden = true;
+      armed = false;
+      sceneState = null;
+      ballResumeUntil = 0;
       perch = null;
       const p = homePoint();
-      travel(p.x, p.y, () => {
-        nap = true;
-        pose('nap');
-        a.react('sleep', 'A little nap. Tap my home to wake me.');
-      });
+      travel(
+        p.x,
+        p.y,
+        () => {
+          pose('nap');
+        },
+        1400,
+        'home'
+      );
     }
     function wake() {
       endGesture();
       nap = false;
+      rememberNap();
       restUntil = Date.now() + 3000;
       reaction = { until: Date.now() + 1500 };
       pose('stretch');
       a.react('happy', 'I’m here. What shall we work on?');
+    }
+    function rememberNap() {
+      if (!owner) return;
+      try {
+        const key = 'mm-tracker.momo-nap.v1:' + owner;
+        if (nap) localStorage.setItem(key, 'sleeping');
+        else localStorage.removeItem(key);
+      } catch {}
     }
     function layout() {
       const el = pet(),
@@ -479,6 +501,15 @@
         sceneState = null;
         reaction = null;
         nap = false;
+        try {
+          nap = !!owner && localStorage.getItem('mm-tracker.momo-nap.v1:' + owner) === 'sleeping';
+        } catch {}
+        if (nap) {
+          a.stop();
+          a.move(homePoint());
+          pose('nap');
+          if ($('hubPetBubble')) $('hubPetBubble').hidden = true;
+        }
         perch = null;
         held = null;
         ballDrag = null;
@@ -490,10 +521,10 @@
         el.type = 'button';
         el.dataset.momo = 'home';
         el.className = 'hub-private-only';
-        el.title = 'Drag to move Momo’s home · tap to rest or wake · arrow keys also move it';
+        el.title = 'Drag to move Momo’s home · tap to send him home · click Momo to wake him';
         el.setAttribute(
           'aria-label',
-          'Momo’s home. Drag or use arrow keys to move it. Tap to rest or wake Momo.'
+          'Momo’s home. Drag or use arrow keys to move it. Tap to send him home. Click Momo to wake him.'
         );
         el.innerHTML =
           '<svg viewBox="0 0 64 58" aria-hidden="true"><path d="M10 25L32 7l22 18v28H10z" fill="#fff1d5" stroke="#38566a" stroke-width="2"/><path d="M5 27L32 3l27 24" fill="none" stroke="#b883a5" stroke-width="7" stroke-linecap="round"/><path d="M23 53V35a9 9 0 0118 0v18" fill="#8acac4" stroke="#38566a" stroke-width="2"/><path d="M46 10V3h7v14" fill="#deaa8a" stroke="#38566a" stroke-width="2"/></svg><span class="momo-home-grip" aria-hidden="true">⠿</span>';
@@ -509,6 +540,10 @@
       layout();
     }
     function menu() {
+      if (nap) {
+        wake();
+        return;
+      }
       endGesture();
       if (reaction && !nap) pose('idle');
       reaction = null;
@@ -527,7 +562,7 @@
         '<div class="flex-title"><strong>A little time with Momo</strong><button type="button" data-momo="close" aria-label="Close Momo controls">×</button></div><p>My eyes follow you. Bring your cursor close for a surprise, or pick me up for a little protest.</p><div class="momo-menu-actions"><button data-momo="pat">Give a little pat</button><button data-momo="ball">' +
         ($('hubMomoBall') ? 'Put ball away' : 'Play ball') +
         '</button><button data-momo="come">Come here…</button><button data-momo="perch">Find a perch</button><button data-momo="gesture">Show me a little move</button><button data-momo="sit">Unfold a chair & whistle</button><button data-momo="sleep">A tiny sleep break</button><button data-momo="home">' +
-        (nap ? 'Wake up' : 'Go home & nap') +
+        'Go home & nap' +
         '</button><button data-momo="place-home">Put my home here</button><button data-momo="rain">Umbrella moment</button><button data-momo="quip">Tell me something silly</button><button data-momo="theatre">Momo’s tiny theatre</button><button data-momo="discover">Desk discoveries</button><button data-momo="moments-settings">Little moment settings</button><button data-momo="quiet" aria-pressed="' +
         quiet +
         '">' +
@@ -538,6 +573,7 @@
       root.dispatchEvent(new CustomEvent('workhub:momo-menu'));
     }
     function chase() {
+      if (nap) return;
       const ball = $('hubMomoBall');
       if (!ball) return;
       nap = false;
@@ -578,6 +614,7 @@
       chase();
     }
     function findPerch() {
+      if (nap) return;
       const v = viewport(),
         cards = [
           ...document.querySelectorAll(
@@ -616,6 +653,7 @@
     }
     function umbrella() {
       if (
+        nap ||
         !safe() ||
         !pet() ||
         document.body.matches('.hub-private,.hub-focus,.hub-sorting') ||
@@ -796,7 +834,7 @@
           endGesture();
           reaction = null;
           cancelTravel();
-          nap = false;
+          if (nap) wake();
           perch = null;
           held = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false };
           pose('idle');
@@ -859,6 +897,7 @@
           if (action === 'home' && Date.now() < homeSuppress) return;
           $('hubMomoMenu')?.remove();
           if (action === 'close') return;
+          if (nap) return;
           if (['theatre', 'discover', 'moments-settings'].includes(action)) {
             root.dispatchEvent(new CustomEvent('workhub:momo-extra', { detail: { action } }));
             return;
@@ -891,7 +930,7 @@
             restUntil = Date.now() + 5000;
             a.react('happy', 'That’s the spot. Thank you!');
           }
-          if (action === 'home') nap ? wake() : goHome();
+          if (action === 'home') goHome();
           if (action === 'place-home') {
             setHomePixel(
               (parseFloat(pet().style.left) || 0) +
@@ -1036,6 +1075,14 @@
         layout();
         return;
       }
+      if (nap && journey?.purpose !== 'home') {
+        cancelTravel();
+        a.stop();
+        a.move(homePoint());
+        pose('nap');
+        layout();
+        return;
+      }
       if (perch && !perch.isConnected) {
         perch = null;
         pose('idle');
@@ -1089,10 +1136,11 @@
       travel,
       wake,
       goHome,
+      sleeping: () => nap,
       express,
       scene,
       clearForWork() {
-        if (held || homeDrag) return false;
+        if (nap || held || homeDrag) return false;
         cancelTravel(true);
         endGesture();
         endUmbrella();
@@ -1106,7 +1154,8 @@
         return true;
       },
       homePosition: () => ({ ...home }),
-      sceneAvailable: () => !homeDrag && !held && !journey && !armed && !idleGesture && !reaction,
+      sceneAvailable: () =>
+        !nap && !homeDrag && !held && !journey && !armed && !idleGesture && !reaction,
     };
   }
   root.WorkHubMomoLife = { install };

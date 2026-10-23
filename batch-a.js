@@ -1020,7 +1020,9 @@
       }
       if (tab === 'schedule' && !view.querySelector('[data-batch="locations"]')) {
         const target =
-          view.querySelector('.workspace-heading,.panel-top,.schedule-toolbar') || view;
+          view.querySelector('.schedule-heading-controls') ||
+          view.querySelector('.workspace-heading,.panel-top,.schedule-toolbar') ||
+          view;
         target.insertAdjacentHTML(
           'beforeend',
           btn('locations', '◫ Work locations', '', 'batch-location-button')

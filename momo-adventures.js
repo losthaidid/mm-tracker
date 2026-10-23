@@ -1416,11 +1416,12 @@
           );
         const home = $('hubMomoHome');
         if (home) {
-          home.title = 'Drag to move ' + name() + '’s home · tap to rest or wake';
+          home.title =
+            'Drag to move ' + name() + '’s home · tap to send home · click ' + name() + ' to wake';
           home.setAttribute(
             'aria-label',
             name() +
-              '’s home. Drag or use arrow keys to move it. Tap to rest or wake ' +
+              '’s home. Drag or use arrow keys to move it. Tap to send home. To wake, click ' +
               name() +
               '.'
           );
