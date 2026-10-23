@@ -479,7 +479,7 @@
         subItem = item?.subItems.find(sub => sub.id === (s.subItemId || plan?.subItemId)),
         leave = root.WorkHubLeave?.isLeave(s.kind),
         linked = leave
-          ? root.WorkHubLeave.TYPES[s.kind]
+          ? root.WorkHubLeave.name(s.kind, d)
           : s.kind === 'project'
             ? pname(s.linkId)
             : s.kind === 'task'

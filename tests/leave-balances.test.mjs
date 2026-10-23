@@ -59,3 +59,19 @@ test('leave balances: independent year and AL/MC edits use the existing conserva
   const b = { data: state() }, l = copy(b), r = copy(b); l.data.workhub.leaveBalances[0][AL].allowance = 13; r.data.workhub.leaveBalances[0][MC].allowance = 15;
   const result = window.MMTrackerMerge.merge(b, l, r); assert.deepEqual(copy(result.conflicts), []); assert.equal(result.data.workhub.leaveBalances[0][AL].allowance, 13); assert.equal(result.data.workhub.leaveBalances[0][MC].allowance, 15);
 });
+
+
+test('leave types: old documents gain AL/MC definitions without changing saved leave or existing allowances',()=>{
+ const d=state();add(d,'2026-10-20');const before=copy(d.schedule),balance=E.balance(d,'2026',AL).remaining;E.upgrade(d);E.validate(d);assert.deepEqual(copy(d.schedule),before);assert.equal(E.balance(d,'2026',AL).remaining,balance);assert.deepEqual(copy(E.types(d).map(t=>t.code)),['AL','MC']);
+});
+test('leave types: a maintained custom type has independent policies, half-day usage and quota checks',()=>{
+ const d=state();E.upgrade(d);const id='leave-compassionate';d.workhub.leaveTypes.push({id,name:'Compassionate Leave',code:'CL',archived:false});d.workhub.leaveBalances[0][id]={allowance:3,openingUsed:1,weekdays:[1,2,3,4,5]};add(d,'2026-10-20',id,'morning');E.validate(d);assert.equal(E.balance(d,'2026',id).remaining,1.5);assert.equal(E.balance(d,'2026',AL).remaining,2);const p=E.preview(d,{kind:id,date:'2026-10-26',endDate:'2026-10-27',leave:{portion:'full'}});assert.throws(()=>E.assertWithinBalance(d,p.next),/Compassionate Leave.*only 1.5/);
+});
+test('leave types: invalid definitions, duplicates and orphan references are rejected',()=>{
+ const d=state();E.upgrade(d);for(const rows of [null,[],[d.workhub.leaveTypes[0]],[...d.workhub.leaveTypes,{id:'leave-extra',name:'Other Leave',code:'AL',archived:false}],[...d.workhub.leaveTypes,{id:'leave-extra',name:'annual leave',code:'EX',archived:false}],[...d.workhub.leaveTypes,{id:'__proto__',name:'Other Leave',code:'EX',archived:false}]])assert.throws(()=>E.validateTypes(rows),/leave type|AL and MC/i);
+ const bad=copy(d);bad.workhub.leaveTypes=null;assert.throws(()=>E.validate(bad),/leave types/);add(d,'2026-10-20','leave-missing');assert.throws(()=>E.validate(d),/unknown leave type/);d.schedule=[];d.workhub.leaveBalances[0]['leave-missing']={allowance:1,openingUsed:0,weekdays:[1]};assert.throws(()=>E.validate(d),/unknown leave type/);
+});
+test('leave types: archiving keeps historical usage and independent type edits merge by stable ID',()=>{
+ const d=state();E.upgrade(d);d.workhub.leaveTypes[0].archived=true;add(d,'2026-10-20');E.validate(d);assert.equal(E.balance(d,'2026',AL).remaining,1);
+ const base={data:d},local=copy(base),remote=copy(base);local.data.workhub.leaveTypes[0].name='Vacation';remote.data.workhub.leaveTypes[1].name='Sick Leave';const merged=window.MMTrackerMerge.merge(base,local,remote);assert.deepEqual(copy(merged.conflicts),[]);assert.equal(E.type(merged.data,AL).name,'Vacation');assert.equal(E.type(merged.data,MC).name,'Sick Leave');
+});

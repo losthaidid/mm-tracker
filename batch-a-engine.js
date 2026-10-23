@@ -405,7 +405,13 @@
       return h * 60 + m;
     };
     for (const s of d.schedule || []) {
-      if (s.date < start || s.date > end || ['annual-leave', 'medical-leave'].includes(s.kind))
+      if (
+        s.date < start ||
+        s.date > end ||
+        ['annual-leave', 'medical-leave'].includes(s.kind) ||
+        root.WorkHubLeave?.isLeave(s.kind) ||
+        d.workhub?.leaveTypes?.some(t => t.id === s.kind)
+      )
         continue;
       const name = s.location || 'Location not set',
         duration = (s.endTime ? mins(s.endTime) : Math.min(1440, mins(s.time) + 60)) - mins(s.time);

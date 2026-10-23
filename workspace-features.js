@@ -28,7 +28,11 @@
       mcSubmitted: false,
       mcSubmittedDate: '',
     };
-  const isLeave = kind => Object.hasOwn(LEAVE, kind),
+  const isLeave = kind =>
+      Object.hasOwn(LEAVE, kind) ||
+      (typeof kind === 'string' && /^leave-[a-z0-9][a-z0-9-]{0,88}$/.test(kind)),
+    name = (kind, d) =>
+      root.WorkHubLeaveBalancesEngine?.type(d, kind)?.name || LEAVE[kind] || 'Saved leave',
     validDate = v => root.WorkHubReminders.validDate(v),
     text = (v, max = 500) =>
       typeof v === 'string' &&
@@ -38,7 +42,7 @@
     for (const s of d.schedule || [])
       if (isLeave(s.kind)) {
         if (s.leave === undefined) s.leave = { ...LEAVE_DEFAULTS };
-        if (s.title === undefined) s.title = LEAVE[s.kind];
+        if (s.title === undefined) s.title = name(s.kind, d);
       }
     return d;
   }
@@ -59,7 +63,7 @@
           !s.title.trim() ||
           (p.mcSubmitted && !p.mcSubmittedDate) ||
           (!p.mcSubmitted && p.mcSubmittedDate) ||
-          (s.kind === 'annual-leave' && (p.mcSubmitted || p.mcSubmittedDate)) ||
+          (s.kind !== 'medical-leave' && (p.mcSubmitted || p.mcSubmittedDate)) ||
           s.linkId ||
           s.planId ||
           s.activity ||
@@ -68,10 +72,10 @@
           throw Error('Check the leave details and MC submission date.');
       }
   }
-  function leaveFields(s) {
+  function leaveFields(s, d) {
     if (!isLeave(s.kind)) return '';
     const p = { ...LEAVE_DEFAULTS, ...s.leave };
-    return `<section class="leave-editor wide" data-leave-editor><div class="leave-editor-title"><span aria-hidden="true">${s.kind === 'medical-leave' ? '✚' : '☀'}</span><div><h3>${LEAVE[s.kind]}</h3><p>Reserve the time and keep your handover details together.</p></div></div><div class="form-grid"><div><label for="leavePortion">Leave duration</label><select id="leavePortion" name="leavePortion">${Object.entries(
+    return `<section class="leave-editor wide" data-leave-editor><div class="leave-editor-title"><span aria-hidden="true">${s.kind === 'medical-leave' ? '✚' : '☀'}</span><div><h3>${esc(name(s.kind, d))}</h3><p>Reserve the time and keep your handover details together.</p></div></div><div class="form-grid"><div><label for="leavePortion">Leave duration</label><select id="leavePortion" name="leavePortion">${Object.entries(
       PORTIONS
     )
       .map(
@@ -80,16 +84,16 @@
       )
       .join(
         ''
-      )}</select></div><div data-leave-custom-days${p.portion === 'custom' ? '' : ' hidden'}><label for="leaveDaysPerDate">Leave days charged per date</label><input id="leaveDaysPerDate" name="leaveDaysPerDate" type="number" min="0.5" max="1" step="0.5" value="${esc(p.daysPerDate ?? 1)}"${p.portion === 'custom' ? '' : ' disabled'} required><small>Custom hours: choose 0.5 or 1 leave day.</small></div><div><label for="leaveStatus">Approval status</label><select id="leaveStatus" name="leaveStatus">${['Planned', 'Requested', 'Approved'].map(x => `<option${p.status === x ? ' selected' : ''}>${x}</option>`).join('')}</select></div><div class="wide"><label for="leaveTitle">Calendar title</label><input id="leaveTitle" name="leaveTitle" maxlength="500" value="${esc(s.title || LEAVE[s.kind])}" required></div><div><label for="leaveContact">Covering colleague / handover contact</label><input id="leaveContact" name="leaveContact" maxlength="200" value="${esc(p.contact)}" placeholder="Optional"></div><div><label for="leaveReference">Leave request reference</label><input id="leaveReference" name="leaveReference" maxlength="200" value="${esc(p.reference)}" placeholder="Optional"></div>${s.kind === 'medical-leave' ? `<section class="leave-mc wide"><h4>MC submission to HR</h4><div class="form-grid"><div><label for="mcSubmitted">Have you submitted the MC to HR?</label><select id="mcSubmitted" name="mcSubmitted"><option value="no"${!p.mcSubmitted ? ' selected' : ''}>Not yet</option><option value="yes"${p.mcSubmitted ? ' selected' : ''}>Yes, submitted</option></select></div><div id="mcDateField"${p.mcSubmitted ? '' : ' hidden'}><label for="mcSubmittedDate">Date submitted *</label><input id="mcSubmittedDate" name="mcSubmittedDate" type="date" min="1900-01-01" max="9999-12-31" value="${esc(p.mcSubmittedDate)}"${p.mcSubmitted ? ' required' : ''}></div></div><p class="hint">Keep the submission status here; send the actual document through your usual HR channel.</p></section>` : ''}</div><p class="hint">Full-day and half-day presets use working hours. Adjust the start/end times for your own workday. The same hours repeat on each selected date.</p></section>`;
+      )}</select></div><div data-leave-custom-days${p.portion === 'custom' ? '' : ' hidden'}><label for="leaveDaysPerDate">Leave days charged per date</label><input id="leaveDaysPerDate" name="leaveDaysPerDate" type="number" min="0.5" max="1" step="0.5" value="${esc(p.daysPerDate ?? 1)}"${p.portion === 'custom' ? '' : ' disabled'} required><small>Custom hours: choose 0.5 or 1 leave day.</small></div><div><label for="leaveStatus">Approval status</label><select id="leaveStatus" name="leaveStatus">${['Planned', 'Requested', 'Approved'].map(x => `<option${p.status === x ? ' selected' : ''}>${x}</option>`).join('')}</select></div><div class="wide"><label for="leaveTitle">Calendar title</label><input id="leaveTitle" name="leaveTitle" maxlength="500" value="${esc(s.title || name(s.kind, d))}" required></div><div><label for="leaveContact">Covering colleague / handover contact</label><input id="leaveContact" name="leaveContact" maxlength="200" value="${esc(p.contact)}" placeholder="Optional"></div><div><label for="leaveReference">Leave request reference</label><input id="leaveReference" name="leaveReference" maxlength="200" value="${esc(p.reference)}" placeholder="Optional"></div>${s.kind === 'medical-leave' ? `<section class="leave-mc wide"><h4>MC submission to HR</h4><div class="form-grid"><div><label for="mcSubmitted">Have you submitted the MC to HR?</label><select id="mcSubmitted" name="mcSubmitted"><option value="no"${!p.mcSubmitted ? ' selected' : ''}>Not yet</option><option value="yes"${p.mcSubmitted ? ' selected' : ''}>Yes, submitted</option></select></div><div id="mcDateField"${p.mcSubmitted ? '' : ' hidden'}><label for="mcSubmittedDate">Date submitted *</label><input id="mcSubmittedDate" name="mcSubmittedDate" type="date" min="1900-01-01" max="9999-12-31" value="${esc(p.mcSubmittedDate)}"${p.mcSubmitted ? ' required' : ''}></div></div><p class="hint">Keep the submission status here; send the actual document through your usual HR channel.</p></section>` : ''}</div><p class="hint">Full-day and half-day presets use working hours. Adjust the start/end times for your own workday. The same hours repeat on each selected date.</p></section>`;
   }
-  function readLeave(form, kind) {
+  function readLeave(form, kind, d) {
     if (!isLeave(kind)) return {};
     const value = k => form.elements.namedItem(k)?.value || '',
       sent = kind === 'medical-leave' && value('mcSubmitted') === 'yes',
       date = sent ? value('mcSubmittedDate') : '';
     if (sent && !validDate(date)) throw Error('Enter the date you submitted the MC to HR.');
     return {
-      title: value('leaveTitle').trim() || LEAVE[kind],
+      title: value('leaveTitle').trim() || name(kind, d),
       leave: {
         portion: value('leavePortion') || 'custom',
         status: value('leaveStatus') || 'Planned',
@@ -103,16 +107,17 @@
       },
     };
   }
-  function leaveDetails(slot) {
+  function leaveDetails(slot, d) {
     if (!isLeave(slot.kind)) return '';
     const p = slot.leave;
-    return `<section class="leave-booking-details"><h3>Leave details</h3><dl class="booking-facts"><div><dt>Type</dt><dd>${LEAVE[slot.kind]}</dd></div><div><dt>Approval</dt><dd>${esc(p.status)}</dd></div><div><dt>Duration</dt><dd>${esc(PORTIONS[p.portion][0].split(' · ')[0])}</dd></div><div><dt>Cover / handover</dt><dd>${esc(p.contact) || 'Not specified'}</dd></div>${p.reference ? `<div><dt>Request reference</dt><dd>${esc(p.reference)}</dd></div>` : ''}${slot.kind === 'medical-leave' ? `<div><dt>MC submitted to HR</dt><dd class="${p.mcSubmitted ? 'leave-mc-done' : 'leave-mc-pending'}">${p.mcSubmitted ? '✓ Submitted · ' + esc(p.mcSubmittedDate) : 'Not yet submitted'}</dd></div>` : ''}</dl></section>`;
+    return `<section class="leave-booking-details"><h3>Leave details</h3><dl class="booking-facts"><div><dt>Type</dt><dd>${esc(name(slot.kind, d))}</dd></div><div><dt>Approval</dt><dd>${esc(p.status)}</dd></div><div><dt>Duration</dt><dd>${esc(PORTIONS[p.portion][0].split(' · ')[0])}</dd></div><div><dt>Cover / handover</dt><dd>${esc(p.contact) || 'Not specified'}</dd></div>${p.reference ? `<div><dt>Request reference</dt><dd>${esc(p.reference)}</dd></div>` : ''}${slot.kind === 'medical-leave' ? `<div><dt>MC submitted to HR</dt><dd class="${p.mcSubmitted ? 'leave-mc-done' : 'leave-mc-pending'}">${p.mcSubmitted ? '✓ Submitted · ' + esc(p.mcSubmittedDate) : 'Not yet submitted'}</dd></div>` : ''}</dl></section>`;
   }
   root.WorkHubLeave = {
     TYPES: LEAVE,
     PORTIONS,
     DEFAULTS: LEAVE_DEFAULTS,
     isLeave,
+    name,
     upgrade: upgradeLeave,
     validate: validateLeave,
     fields: leaveFields,

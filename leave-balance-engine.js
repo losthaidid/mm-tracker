@@ -6,26 +6,70 @@
 (function (root) {
   'use strict';
   const TYPES = { 'annual-leave': 'Annual leave (AL)', 'medical-leave': 'Medical leave (MC)' };
-  const weekdays = kind => (kind === 'annual-leave' ? [1, 2, 3, 4, 5] : [0, 1, 2, 3, 4, 5, 6]);
+  const BUILTINS = [
+    { id: 'annual-leave', name: 'Annual Leave', code: 'AL', archived: false },
+    { id: 'medical-leave', name: 'Medical Leave', code: 'MC', archived: false },
+  ];
+  const isKind = kind =>
+    typeof kind === 'string' &&
+    (Object.hasOwn(TYPES, kind) || /^leave-[a-z0-9][a-z0-9-]{0,88}$/.test(kind));
+  const types = d => (d?.workhub?.leaveTypes === undefined ? BUILTINS : d.workhub.leaveTypes);
+  const type = (d, kind) => types(d).find(t => t.id === kind);
+  const typeLabel = (d, kind) => {
+    const t = type(d, kind);
+    return t ? t.name + ' (' + t.code + ')' : 'Saved leave';
+  };
+  const weekdays = kind => (kind === 'medical-leave' ? [0, 1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5]);
+  const defaultPolicy = kind => ({ allowance: null, openingUsed: 0, weekdays: weekdays(kind) });
   const validYear = year => typeof year === 'string' && /^(19\d{2}|[2-9]\d{3})$/.test(year);
   const validDays = n =>
     typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 366 && Number.isInteger(n * 2);
-  function defaults(year) {
+  function defaults(year, d) {
     return {
       id: year,
-      ...Object.fromEntries(
-        Object.keys(TYPES).map(kind => [
-          kind,
-          { allowance: null, openingUsed: 0, weekdays: weekdays(kind) },
-        ])
-      ),
+      ...Object.fromEntries(types(d).map(t => [t.id, defaultPolicy(t.id)])),
     };
   }
   function upgrade(d) {
     if (d.workhub && d.workhub.leaveBalances === undefined) d.workhub.leaveBalances = [];
+    if (d.workhub && d.workhub.leaveTypes === undefined)
+      d.workhub.leaveTypes = BUILTINS.map(t => ({ ...t }));
     return d;
   }
+  function validateTypes(rows) {
+    if (!Array.isArray(rows) || rows.length < 2 || rows.length > 30)
+      throw Error('Maintain between 2 and 30 leave types, including AL and MC.');
+    const ids = new Set(),
+      names = new Set(),
+      codes = new Set();
+    for (const t of rows) {
+      if (
+        !t ||
+        !isKind(t.id) ||
+        ids.has(t.id) ||
+        typeof t.name !== 'string' ||
+        !t.name.trim() ||
+        t.name !== t.name.trim() ||
+        t.name.length > 80 ||
+        /[\u0000-\u001f]/.test(t.name) ||
+        typeof t.code !== 'string' ||
+        !/^[A-Z0-9][A-Z0-9-]{0,11}$/.test(t.code) ||
+        typeof t.archived !== 'boolean' ||
+        names.has(t.name.toLowerCase()) ||
+        codes.has(t.code)
+      )
+        throw Error(
+          'Leave type names, codes and IDs must be valid and unique. Use a short code of up to 12 letters, numbers or hyphens.'
+        );
+      ids.add(t.id);
+      names.add(t.name.toLowerCase());
+      codes.add(t.code);
+    }
+    if (!ids.has('annual-leave') || !ids.has('medical-leave'))
+      throw Error('Keep the existing AL and MC types; archive a type instead of removing it.');
+  }
   function validate(d) {
+    validateTypes(types(d));
     const years = d.workhub?.leaveBalances;
     if (!Array.isArray(years) || years.length > 100)
       throw Error('Check the yearly leave allowances.');
@@ -34,8 +78,12 @@
       if (!y || !validYear(y.id) || ids.has(y.id))
         throw Error('Use one leave allowance record per year (1900–9999).');
       ids.add(y.id);
-      for (const kind of Object.keys(TYPES)) {
+      if (Object.keys(y).some(k => k !== 'id' && !type(d, k)))
+        throw Error('An allowance refers to an unknown leave type.');
+      for (const t of types(d)) {
+        const kind = t.id;
         const p = y[kind];
+        if (p === undefined && !Object.hasOwn(TYPES, kind)) continue;
         if (
           !p ||
           (p.allowance !== null && !validDays(p.allowance)) ||
@@ -53,16 +101,19 @@
     }
     for (const s of d.schedule || [])
       if (
-        Object.hasOwn(TYPES, s.kind) &&
+        isKind(s.kind) &&
         s.leave?.daysPerDate !== undefined &&
         ![0.5, 1].includes(s.leave.daysPerDate)
       )
         throw Error('Custom leave must charge either 0.5 or 1 day per date.');
+    for (const s of d.schedule || [])
+      if (isKind(s.kind) && !type(d, s.kind))
+        throw Error(
+          'A booking refers to an unknown leave type. Restore its maintained type before saving.'
+        );
   }
   function policy(d, year, kind) {
-    return (
-      (d.workhub?.leaveBalances || []).find(y => y.id === year)?.[kind] || defaults(year)[kind]
-    );
+    return (d.workhub?.leaveBalances || []).find(y => y.id === year)?.[kind] || defaultPolicy(kind);
   }
   function units(row) {
     const p = row.leave || {};
@@ -162,17 +213,23 @@
   /** Quotas guard new/increased reservations, while allowing older overdrawn records to be reduced. */
   function assertWithinBalance(previous, next) {
     for (const y of next.workhub.leaveBalances)
-      for (const kind of Object.keys(TYPES)) {
+      for (const t of types(next)) {
+        const kind = t.id;
         const after = balance(next, y.id, kind),
           before = balance(previous, y.id, kind);
         if (after.remaining !== null && after.remaining < 0 && after.scheduled > before.scheduled)
           throw Error(
-            `${TYPES[kind]} for ${y.id}: only ${Math.max(0, before.remaining)} day(s) remain. Reduce this range or update your allowance in Settings.`
+            `${typeLabel(next, kind)} for ${y.id}: only ${Math.max(0, before.remaining)} day(s) remain. Reduce this range or update your allowance in Settings.`
           );
       }
   }
   root.WorkHubLeaveBalancesEngine = {
     TYPES,
+    types,
+    type,
+    typeLabel,
+    isKind,
+    validateTypes,
     defaults,
     upgrade,
     validate,

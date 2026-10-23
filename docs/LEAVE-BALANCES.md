@@ -1,6 +1,6 @@
 # Annual leave and MC balances
 
-Open **Settings → Work setup → Annual leave & MC** (or search Settings for “leave”). Choose a calendar year, then maintain the allowance and **Already taken outside Schedule** for AL and MC separately. Leave the allowance blank until it is known; **0** means no allowance. Half-day steps are supported.
+Open **Settings → Work setup → Leave allowances & balances** (or search Settings for “leave”). Choose a calendar year, then maintain the allowance and **Already taken outside Schedule** for AL and MC separately. Leave the allowance blank until it is known; **0** means no allowance. Half-day steps are supported.
 
 For a tracker started in October, enter the days already taken in earlier months in **Already taken outside Schedule**. For example, an AL allowance of 12 and earlier usage of 10 leaves 2 days before scheduled leave. Do not include days already represented in Schedule. You can revise this total later without creating historical bookings. Save each year before using **Open year** to switch years. Settings do not copy entitlements into a new year automatically.
 
@@ -15,3 +15,11 @@ New or increased leave reservations cannot exceed a configured allowance. Editin
 Data is stored under `workhub.leaveBalances`, one stable `id` per year, in the existing private account document. It uses the existing revision-based save, recovery, backup and restore flow; there are no new tables, dependencies or login permissions. Old documents gain only an empty settings list. Opening forms and changing previews do not write records.
 
 `leave-balance-engine.js` owns pure validation/counting/limit rules. `leave-balances.js` owns Settings and balance displays. `workspace-features.js` retains leave/MC details. `app.js` guards Schedule saves and merged pending documents. Regression checks cover entitlement arithmetic, fragments, half-days, custom leave, weekdays, year boundaries, edits, account isolation, cloud/backup reopening, invalid settings and concurrent reservations.
+
+## Maintained leave types
+
+Use **Settings → Work setup → Leave types** or **Schedule → Manage leave types** to add, rename, archive or restore leave types. Names and short codes must be unique. Up to 30 types are supported, including the original AL and MC identities. Archiving hides a type from new bookings; past bookings remain viewable and editable. The original medical type retains its MC-submission fields.
+
+Each active type appears in Schedule’s type dropdown and balance panel as soon as it is saved. Open **Leave allowances & balances** to set its yearly allowance, earlier usage and counting weekdays. New types default to an unset allowance, zero earlier usage and Mon–Fri counting, all maintainable per year. Existing AL/MC balances retain their values and identities. Rename changes the type label; saved calendar titles and times remain unchanged. Backups and account saves include `workhub.leaveTypes` and the corresponding policies. There are no new database tables or permissions.
+
+The Schedule panel shows status, remaining days, allowance, taken-earlier totals and scheduled reservations for each type. Usage bars have text descriptions, overdrawn values remain explicit, and setup buttons focus the matching allowance. Its spacing and card layout adapt to phone widths and the selected theme. Archived types with saved allowances or historical usage remain visible in the balance panel.
