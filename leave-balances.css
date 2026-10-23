@@ -1,0 +1,146 @@
+/* Account-owned leave allowances and Schedule previews. */
+.leave-balance-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.leave-balance-heading h2,
+.leave-balance-heading h3 {
+  margin: 0;
+}
+.leave-balance-cards,
+.leave-allowance-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.leave-balance-card {
+  min-width: 0;
+  padding: 16px 18px;
+  border: 1px solid var(--hub-border);
+  border-radius: 14px;
+  background: var(--hub-surface);
+}
+.leave-balance-card > span {
+  display: block;
+  color: var(--hub-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.leave-balance-card > strong {
+  display: block;
+  margin-top: 7px;
+  color: var(--hub-text);
+  font-size: 1.35rem;
+}
+.leave-balance-card strong small {
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+.leave-balance-card p {
+  margin: 8px 0 0;
+  color: var(--hub-muted);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+.leave-range-balances {
+  padding: 18px;
+  border: 1px solid var(--hub-border);
+  border-radius: 16px;
+  background: var(--hub-blue-soft);
+}
+.leave-range-balances h3 {
+  font-size: 1rem;
+}
+.leave-range-balances h4 {
+  margin: 12px 0 8px;
+}
+.leave-request-preview {
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: var(--hub-surface);
+  border-radius: 10px;
+  line-height: 1.5;
+  font-size: 0.85rem;
+}
+.leave-request-preview p {
+  margin: 0 0 6px;
+}
+.leave-request-preview small {
+  color: var(--hub-muted);
+}
+.leave-overdrawn {
+  border: 1px solid var(--hub-warning);
+}
+.leave-limit-warning {
+  color: var(--hub-warning);
+  font-weight: 650;
+}
+.leave-year-picker {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.leave-year-picker input {
+  width: 115px;
+}
+.leave-allowance-intro > p {
+  line-height: 1.6;
+}
+.leave-allowance-grid {
+  margin-top: 20px;
+}
+.leave-allowance-type {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--hub-border);
+  border-radius: 14px;
+}
+.leave-allowance-type legend {
+  padding: 0 8px;
+  font-weight: 650;
+}
+.leave-allowance-type > label {
+  display: block;
+  margin: 10px 0 6px;
+}
+.leave-days-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin: 15px 0 8px;
+}
+.leave-weekdays {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+.leave-weekdays label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.8rem;
+}
+.leave-weekdays input {
+  width: auto;
+  margin: 0;
+}
+.leave-settings-preview {
+  margin: 18px 0;
+}
+.leave-settings-preview h3 {
+  font-size: 1rem;
+}
+@media (max-width: 600px) {
+  .leave-balance-cards,
+  .leave-allowance-grid {
+    grid-template-columns: 1fr;
+  }
+  .leave-range-balances {
+    padding: 13px;
+  }
+}

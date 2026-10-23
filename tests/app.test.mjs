@@ -1917,7 +1917,7 @@ test('recipients: account saves, reopened records and JSON backups retain compan
 
 test('grouped Settings: five sections keep all existing actions and section changes stay open',async t=>{
  const {api,document,window,db}=await app(t),ui=api.hub.settingsPanel,menu=document.getElementById('settingsMenu');api.hub.chromeUX.open();await settle();
- assert.equal(document.querySelectorAll('#settingsCategories [role="tab"]').length,5);assert.deepEqual(copy(ui.snapshot().groups.map(g=>[g.id,g.count])),[['workspace',3],['work',6],['companion',4],['data',4],['account',2]]);assert.equal(document.querySelectorAll('.settings-group:not([hidden])').length,1);assert.equal(document.querySelector('.settings-group:not([hidden])').id,'settingsGroup-workspace');assert.equal(document.querySelectorAll('.settings-option').length,19);assert.equal(document.querySelector('#hubSettingsAppearance button'),null);
+ assert.equal(document.querySelectorAll('#settingsCategories [role="tab"]').length,5);assert.deepEqual(copy(ui.snapshot().groups.map(g=>[g.id,g.count])),[['workspace',3],['work',7],['companion',4],['data',4],['account',2]]);assert.equal(document.querySelectorAll('.settings-group:not([hidden])').length,1);assert.equal(document.querySelector('.settings-group:not([hidden])').id,'settingsGroup-workspace');assert.equal(document.querySelectorAll('.settings-option').length,20);assert.equal(document.querySelector('#hubSettingsAppearance button'),null);
  for(const [id,group]of [['hubSettingsHeader','workspace'],['claimSettingsButton','work'],['recipientSettingsButton','work'],['momoAdventureSettings','companion'],['soundscapeSettings','companion'],['backupButton','data'],['cloudSignOut','account']])assert.equal(document.getElementById(id).closest('.settings-group').id,'settingsGroup-'+group);
  document.querySelector('[data-settings-group="work"]').click();assert.equal(menu.open,true);assert.equal(ui.snapshot().active,'work');document.getElementById('recipientSettingsButton').click();await settle();assert.equal(menu.open,false);assert.ok(document.getElementById('recipientDirectory'));api.closeModal();api.hub.chromeUX.open();document.querySelector('[data-settings-group="companion"]').click();document.getElementById('soundscapeSettings').click();await settle();assert.equal(menu.open,false);assert.ok(document.querySelector('#modalBody .soundscape-room'));assert.equal(db.calls.length,0);
 });
@@ -2426,4 +2426,69 @@ test('sub-task quick feedback chooser shows the selected history, keeps typed dr
 test('sub-task quick feedback rejects foreign or deleted children, blank, oversized, conflicting and wrong-account saves while keeping the draft',async t=>{
  const {api,document,window,db}=await app(t),id=addMainTask(api,document,'Protected main task'),sub=addTaskSub(api,document,id,'Chosen subtask','Remarks','Original feedback'),other=addMainTask(api,document,'Other main task'),foreign=addTaskSub(api,document,other,'Foreign subtask','','Foreign feedback');await settle();await hubAction(api,'subtask-feedback',{parent:id,id:sub});const f=document.getElementById('hubTaskFeedback'),target=f.elements.namedItem('feedbackTarget');let calls=db.calls.length;f.elements.namedItem('feedback').value='  ';assert.throws(()=>api.hub.submit(f),/Enter feedback/);f.elements.namedItem('feedback').value='Keep this draft';target.append(new window.Option('Foreign child',foreign));target.value=foreign;assert.throws(()=>api.hub.submit(f),/Sub-task no longer exists/);assert.equal(db.calls.length,calls);target.value=sub;api.cloud.conflict=true;assert.throws(()=>api.hub.submit(f),/reload cloud records/);api.cloud.conflict=false;api.mutate(d=>d.tasks.find(t=>t.id===id).subTasks[0].feedback='x'.repeat(32760));await settle();calls=db.calls.length;assert.throws(()=>api.hub.submit(f),/Feedback history is full/);assert.equal(db.calls.length,calls);assert.equal(f.elements.namedItem('feedback').value,'Keep this draft');api.mutate(d=>d.tasks.find(t=>t.id===id).subTasks=[]);await settle();calls=db.calls.length;assert.throws(()=>api.hub.submit(f),/Sub-task no longer exists/);assert.equal(db.calls.length,calls);assert.equal(api.state().tasks.find(t=>t.id===id).feedback,'');assert.equal(api.state().tasks.find(t=>t.id===other).subTasks[0].feedback,'Foreign feedback');await assert.rejects(hubAction(api,'subtask-feedback',{parent:id,id:sub}),/Sub-task no longer exists/);
  api.closeModal();await hubAction(api,'subtask-feedback',{parent:other,id:foreign});const stale=document.getElementById('hubTaskFeedback');stale.elements.namedItem('feedback').value='Previous account';calls=db.calls.length;api.cloud.user={id:'22222222-2222-4222-8222-222222222222'};api.showTab('tasks');assert.equal(document.getElementById('modal').open,false);assert.throws(()=>api.hub.submit(stale),/signing in/);assert.equal(db.calls.length,calls);assert.equal(stale.elements.namedItem('feedback').value,'Previous account');
+});
+
+
+async function maintainLeave(ctx, year='2026', annual=12, used=10, medical=14, mcUsed=11) {
+ const {api,document}=ctx; api.hub.leaveBalances.settings(year);
+ const f=document.getElementById('leaveBalanceForm');
+ fill(f,{'annual-leave-allowance':String(annual),'annual-leave-used':String(used),'medical-leave-allowance':String(medical),'medical-leave-used':String(mcUsed)});
+ api.hub.leaveBalances.saveSettings(f); await settle(); return f;
+}
+test('leave allowances: searchable Settings saves yearly AL and MC balances through cloud, backup and reload',async t=>{
+ const ctx=await app(t),{api,document,db,window}=ctx;
+ const button=document.getElementById('leaveBalanceSettingsButton'); assert.ok(button); assert.ok(button.closest('#settingsGroup-work'));
+ document.getElementById('settingsSearch').value='annual leave';document.getElementById('settingsSearch').dispatchEvent(new window.Event('input',{bubbles:true}));await settle();assert.equal(button.closest('.settings-entry').hidden,false);
+ api.hub.leaveBalances.settings('2026'); const f=document.getElementById('leaveBalanceForm'), writes=db.calls.length;
+ fill(f,{'annual-leave-allowance':'12','annual-leave-used':'10','medical-leave-allowance':'14','medical-leave-used':'11'});f.elements.namedItem('annual-leave-used').dispatchEvent(new window.Event('input',{bubbles:true}));
+ assert.match(document.getElementById('leaveSettingsPreview').textContent,/2 days remaining/); assert.equal(db.calls.length,writes);
+ f.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));await settle();
+ assert.equal(api.state().workhub.leaveBalances[0]['annual-leave'].openingUsed,10);
+ assert.equal(db.row.document.data.workhub.leaveBalances[0]['medical-leave'].allowance,14);
+ const backup=api.parseBackup(api.payload(api.state()));assert.deepEqual(copy(backup.workhub.leaveBalances),copy(api.state().workhub.leaveBalances));
+ api.setMonth('2026-10');api.showTab('schedule');assert.match(document.getElementById('leaveScheduleBalances').textContent,/2 days remaining.*3 days remaining/s);
+ const restored=await app(t,{remote:copy(db.row),login:false});await restored.api.loadCloud(sessionUser);await settle();assert.equal(restored.window.WorkHubLeaveBalancesEngine.balance(restored.api.state(),'2026','annual-leave').remaining,2);
+});
+test('leave allowances: two remaining AL days may be booked; an extra day is blocked, editing does not double count, deletion releases days',async t=>{
+ const ctx=await app(t),{api,document,window,db}=ctx;await maintainLeave(ctx);
+ let f=await leaveEditor(ctx,'annual-leave',{date:'2026-10-26'});fill(f,{endDate:'2026-10-28'});f.elements.namedItem('endDate').dispatchEvent(new window.Event('input',{bubbles:true}));
+ assert.match(f.querySelector('[data-leave-range-preview]').textContent,/-1 day\(s\) remaining after saving/);assert.match(f.querySelector('.leave-limit-warning').textContent,/only 2 day/);
+ const writes=db.calls.length;assert.throws(()=>api.saveRange(f),/only 2 day/);assert.equal(api.state().schedule.length,0);assert.equal(db.calls.length,writes);
+ fill(f,{endDate:'2026-10-27'});api.saveRange(f);await settle();assert.equal(window.WorkHubLeaveBalancesEngine.balance(api.state(),'2026','annual-leave').remaining,0);
+ api.openRangeEditor('2026-10-26','09:00');f=document.getElementById('scheduleForm');assert.match(f.querySelector('[data-leave-range-preview]').textContent,/0 day\(s\) remaining after saving/);fill(f,{leaveContact:'Updated cover'});api.saveRange(f);await settle();
+ f=await leaveEditor(ctx,'annual-leave',{date:'2026-10-28'});assert.throws(()=>api.saveRange(f),/only 0 day/);api.closeModal();
+ api.closeModal();api.mutate(d=>d.schedule=[]);await settle();assert.equal(window.WorkHubLeaveBalancesEngine.balance(api.state(),'2026','annual-leave').remaining,2);
+});
+test('leave allowances: half-days, custom hours and MC use separate balances and preserve HR submission details',async t=>{
+ const ctx=await app(t),{api,document,window}=ctx;await maintainLeave(ctx);
+ let f=await leaveEditor(ctx,'annual-leave',{date:'2026-10-26'});f.elements.namedItem('leavePortion').value='morning';f.elements.namedItem('leavePortion').dispatchEvent(new window.Event('change',{bubbles:true}));
+ assert.match(f.querySelector('[data-leave-range-preview]').textContent,/0.5 day\(s\) in this range.*1.5 day\(s\) remaining/s);api.saveRange(f);await settle();
+ f=await leaveEditor(ctx,'annual-leave',{date:'2026-10-27'});f.querySelector('[data-action="booking-duration"][data-minutes="45"]').click();await settle();assert.equal(f.querySelector('[data-leave-custom-days]').hidden,false);
+ f.elements.namedItem('leaveDaysPerDate').value='0.5';f.elements.namedItem('leaveDaysPerDate').dispatchEvent(new window.Event('input',{bubbles:true}));assert.match(f.querySelector('[data-leave-range-preview]').textContent,/1 day\(s\) remaining after saving/);api.saveRange(f);await settle();assert.equal(api.state().schedule.at(-1).leave.daysPerDate,.5);
+ f=await leaveEditor(ctx,'medical-leave',{date:'2026-10-28'});fill(f,{mcSubmitted:'yes',mcSubmittedDate:'2026-10-28'});api.saveRange(f);await settle();assert.equal(window.WorkHubLeaveBalancesEngine.balance(api.state(),'2026','medical-leave').remaining,2);assert.equal(window.WorkHubLeaveBalancesEngine.balance(api.state(),'2026','annual-leave').remaining,1);assert.equal(api.state().schedule.at(-1).leave.mcSubmitted,true);api.validate(api.state());
+});
+test('leave allowances: years and weekday policy stay explicit and invalid Settings never write',async t=>{
+ const ctx=await app(t),{api,document,window,db}=ctx;await maintainLeave(ctx);api.hub.leaveBalances.settings('2026');let f=document.getElementById('leaveBalanceForm'), writes=db.calls.length;
+ fill(f,{'annual-leave-allowance':'-1'});assert.throws(()=>api.hub.leaveBalances.saveSettings(f),/leave days/);assert.equal(db.calls.length,writes);
+ fill(f,{'annual-leave-allowance':'12',year:'2027'});assert.throws(()=>api.hub.leaveBalances.saveSettings(f),/Open year/);document.querySelector('[data-leave-balance="load-year"]').click();f=document.getElementById('leaveBalanceForm');assert.equal(f.elements.namedItem('annual-leave-allowance').value,'');assert.equal(f.elements.namedItem('annual-leave-used').value,'0');assert.equal(db.calls.length,writes);api.closeModal();
+ f=await leaveEditor(ctx,'annual-leave',{date:'2026-10-24'});assert.match(f.querySelector('[data-leave-range-preview]').textContent,/0 day\(s\) in this range/);api.closeModal();api.hub.leaveBalances.settings('2026');f=document.getElementById('leaveBalanceForm');f.querySelector('[name="annual-leave-weekday"][value="6"]').checked=true;api.hub.leaveBalances.saveSettings(f);await settle();
+ f=await leaveEditor(ctx,'annual-leave',{date:'2026-10-24'});assert.match(f.querySelector('[data-leave-range-preview]').textContent,/1 day\(s\) in this range/);api.closeModal();
+ f=await leaveEditor(ctx,'annual-leave',{date:'2026-12-31'});fill(f,{endDate:'2027-01-01'});f.elements.namedItem('endDate').dispatchEvent(new window.Event('change',{bubbles:true}));assert.match(f.querySelector('[data-leave-range-preview]').textContent,/2027.*set this year’s allowance/s);assert.match(f.querySelector('[data-leave-balance-years]').textContent,/2026 \/ 2027/);
+});
+test('leave allowances: the settings draft closes on account change and cannot be saved for the next owner',async t=>{
+ const ctx=await app(t),{api,document,db}=ctx;api.hub.leaveBalances.settings('2026');const f=document.getElementById('leaveBalanceForm'), writes=db.calls.length;
+ api.cloud.user={id:'22222222-2222-4222-8222-222222222222',email:'other@example.com'};api.showTab('schedule');assert.equal(document.getElementById('modal').open,false);assert.throws(()=>api.hub.leaveBalances.saveSettings(f),/current account/);assert.equal(db.calls.length,writes);
+});
+
+test('leave allowances: project Plan activity shows balances and stale Settings must be reopened',async t=>{
+ const ctx=await app(t),{api,document,window,db}=ctx;await maintainLeave(ctx);await addProjectDeliverable(ctx);api.editPlan('','2026-10-29');let f=document.getElementById('planForm');assert.match(f.querySelector('[data-leave-range-current]').textContent,/2 days remaining/);f.elements.namedItem('date').value='2027-01-04';f.elements.namedItem('date').dispatchEvent(new window.Event('input',{bubbles:true}));assert.equal(f.querySelector('[data-leave-balance-years]').textContent,'2027');assert.match(f.querySelector('[data-leave-range-current]').textContent,/Allowance not set/);api.closeModal();
+ api.hub.leaveBalances.settings('2026');f=document.getElementById('leaveBalanceForm');api.mutate(d=>d.workhub.leaveBalances[0]['annual-leave'].openingUsed=9);await settle();const writes=db.calls.length;assert.throws(()=>api.hub.leaveBalances.saveSettings(f),/changed while this form/);assert.equal(db.calls.length,writes);assert.equal(api.state().workhub.leaveBalances[0]['annual-leave'].openingUsed,9);
+});
+
+test('leave allowances: concurrent bookings that jointly exceed an allowance require conflict review',async t=>{
+ const {api}=await app(t);api.mutate(d=>{const y={id:'2026','annual-leave':{allowance:1,openingUsed:0,weekdays:[1,2,3,4,5]},'medical-leave':{allowance:null,openingUsed:0,weekdays:[0,1,2,3,4,5,6]}};d.workhub.leaveBalances=[y];});await settle();
+ const base=JSON.parse(api.payload(api.state())),local=copy(base),remote=copy(base);
+ const leave=(date,id)=>({date,time:'09:00',endTime:'10:00',kind:'annual-leave',bookingId:id,planId:'',linkId:'',activity:'',location:'',text:'',title:'Annual Leave',leave:{portion:'full',status:'Planned',contact:'',reference:'',mcSubmitted:false,mcSubmittedDate:''}});
+ local.data.schedule.push(leave('2026-10-26','device-a'));remote.data.schedule.push(leave('2026-10-27','device-b'));
+ const result=api.queueCloudReview({document:remote,revision:2,mutation_id:'other-device'},{document:local,baseDocument:base,pending:local,revision:1});assert.equal(result.conflict,true);assert.equal(result.document.data.schedule.length,1);
 });

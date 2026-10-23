@@ -1744,7 +1744,7 @@ function renderRangeEditor() {
     tasks = state.tasks.filter(t => !t.archived || t.id === s.linkId);
   openModal(
     'Schedule date and time range',
-    `<form id="scheduleForm"><div class="form-grid">${scheduleRangeFields(s)}<div class="wide"><label for="scheduleKind">Schedule type</label><select id="scheduleKind" name="kind">${[
+    `<form id="scheduleForm"><div class="form-grid">${hub?.leaveBalances?.range(s) || ''}${scheduleRangeFields(s)}<div class="wide"><label for="scheduleKind">Schedule type</label><select id="scheduleKind" name="kind">${[
       ['custom', 'Custom activity'],
       ['task', 'Task'],
       ['project', 'Project'],
@@ -1757,6 +1757,7 @@ function renderRangeEditor() {
       )}</select></div>${window.WorkHubLeave.fields(s)}${window.WorkHubClaims.fields(s, state)}${s.kind === 'task' ? `<div class="wide"><label for="scheduleLink">Task *</label><select id="scheduleLink" name="linkId" required><option value="">Choose a task</option>${tasks.map(t => `<option value="${esc(t.id)}"${t.id === s.linkId ? ' selected' : ''}>[${esc(t.taskType)}] ${esc((t.number ? t.number + '. ' : '') + t.task.slice(0, 105))} · ${esc(taskLinkedLabel(t))}${t.done ? ' (done)' : ''}</option>`).join('')}</select></div>` : s.kind === 'project' ? `<div class="span2"><label for="scheduleLink">Project *</label><select id="scheduleLink" name="linkId" required>${projectOptions(s.linkId || state.activeProjectId)}</select></div><div><label for="scheduleActivity">Project activity</label><select id="scheduleActivity" name="activity">${selectOptions(state.lists.projectActivities, s.activity, '—')}</select></div>${projectLocationField(s.location)}<div class="span2"><label for="bookingTitle">Activity title</label><input id="bookingTitle" name="title" maxlength="500" value="${esc(s.title)}" placeholder="Defaults to the selected activity"></div><div><label for="bookingStatus">Plan status</label><select id="bookingStatus" name="status">${selectOptions(PLAN_STATUS, s.status, 'Choose status')}</select></div>` : ''}${scheduleCompanyField(s)}${scheduleItemFields(s)}<div class="wide"><label for="slotText">${window.WorkHubLeave.isLeave(s.kind) ? 'Leave / handover notes' : s.kind === 'custom' ? 'Activity' : 'Additional notes'}</label><textarea id="slotText" name="text" maxlength="32767">${esc(s.text)}</textarea></div></div><p class="hint">The same time range fills every selected date. Weekend project or ticket-linked task time is marked TOIL automatically. Existing bookings are protected.</p><div class="modal-actions"><div>${s.bookingId || state.schedule.some(r => r.date === s.originalDate && r.time === s.originalTime) ? '<button type="button" class="danger" data-action="clear-booking">Delete activity</button>' : ''}</div><div class="actions"><button type="button" data-action="cancel">Cancel</button><button class="primary" type="submit">Save time range</button></div></div></form>`
   );
   hub?.claims?.updateTravel($('scheduleForm'));
+  hub?.leaveBalances?.updateRange($('scheduleForm'));
 }
 /** Validate the edited booking range and write its linked Schedule/project records together. */
 function saveRange(form) {
@@ -1841,6 +1842,7 @@ function saveRange(form) {
           ...claimContext,
           ...leaveData,
         });
+    window.WorkHubLeaveBalancesEngine.assertWithinBalance(state, d);
     d.calendarMonth = date.slice(0, 7);
   });
   month = state.calendarMonth;
@@ -1918,7 +1920,7 @@ function editPlan(id = '', date = today()) {
   };
   openModal(
     p ? 'Edit planned activity' : 'Plan project activity',
-    `<form id="planForm" data-id="${esc(id)}"><div class="form-grid"><div class="wide"><label for="planProject">Project *</label><select id="planProject" name="projectId">${projectOptions(r.projectId)}</select></div>${scheduleCompanyField(r)}${scheduleItemFields(r)}<div class="span2"><label for="planTitle">Activity title *</label><input id="planTitle" name="title" value="${esc(r.title)}" maxlength="500" required></div><div><label for="planActivity">Project activity</label><select id="planActivity" name="activity">${selectOptions(state.lists.projectActivities, r.activity, '—')}</select></div>${scheduleRangeFields(r)}${projectLocationField(r.location)}<div><label for="planStatus">Status</label><select id="planStatus" name="status">${selectOptions(PLAN_STATUS, r.status, 'Choose status')}</select></div><div class="wide"><label for="planNotes">Notes</label><textarea id="planNotes" name="text" maxlength="32767">${esc(r.text)}</textarea></div></div><p class="hint">Times use the 24-hour system. Saving also updates Schedule.</p><div class="modal-actions"><div>${p ? `<button class="danger" type="button" data-action="delete-plan" data-id="${esc(p.id)}">Delete activity</button>` : ''}</div><div class="actions"><button type="button" data-action="cancel">Cancel</button><button class="primary" type="submit">Save activity</button></div></div></form>`
+    `<form id="planForm" data-id="${esc(id)}"><div class="form-grid">${hub?.leaveBalances?.range(r) || ''}<div class="wide"><label for="planProject">Project *</label><select id="planProject" name="projectId">${projectOptions(r.projectId)}</select></div>${scheduleCompanyField(r)}${scheduleItemFields(r)}<div class="span2"><label for="planTitle">Activity title *</label><input id="planTitle" name="title" value="${esc(r.title)}" maxlength="500" required></div><div><label for="planActivity">Project activity</label><select id="planActivity" name="activity">${selectOptions(state.lists.projectActivities, r.activity, '—')}</select></div>${scheduleRangeFields(r)}${projectLocationField(r.location)}<div><label for="planStatus">Status</label><select id="planStatus" name="status">${selectOptions(PLAN_STATUS, r.status, 'Choose status')}</select></div><div class="wide"><label for="planNotes">Notes</label><textarea id="planNotes" name="text" maxlength="32767">${esc(r.text)}</textarea></div></div><p class="hint">Times use the 24-hour system. Saving also updates Schedule.</p><div class="modal-actions"><div>${p ? `<button class="danger" type="button" data-action="delete-plan" data-id="${esc(p.id)}">Delete activity</button>` : ''}</div><div class="actions"><button type="button" data-action="cancel">Cancel</button><button class="primary" type="submit">Save activity</button></div></div></form>`
   );
 }
 function savePlan(form) {
@@ -2366,9 +2368,15 @@ function validateMMAreas(d) {
   }
 }
 function mmAreaEditorRow(area, projectId) {
-  const used = state.projectProcessMappings.filter(
-    m => m.projectId === projectId && m.area === area.name
-  ).length + (state.workhub?.projectPeople?.activities || []).filter(a => a.projectId === projectId && a.areaId === area.id).length + (state.workhub?.solutionStudio?.processes || []).filter(p => p.projectId === projectId && p.areaId === area.id).length;
+  const used =
+    state.projectProcessMappings.filter(m => m.projectId === projectId && m.area === area.name)
+      .length +
+    (state.workhub?.projectPeople?.activities || []).filter(
+      a => a.projectId === projectId && a.areaId === area.id
+    ).length +
+    (state.workhub?.solutionStudio?.processes || []).filter(
+      p => p.projectId === projectId && p.areaId === area.id
+    ).length;
   return `<div class="mm-area-row" data-area-id="${esc(area.id)}"><div><label class="sr-only" for="mm-name-${esc(area.id)}">Area name</label><input id="mm-name-${esc(area.id)}" data-area-name maxlength="100" value="${esc(area.name)}" required placeholder="SAP MM area name"><small class="hint">${used} mapped item${used === 1 ? '' : 's'}</small></div><label class="check-label"><input type="checkbox" data-area-visible${area.visible ? ' checked' : ''}>Show</label><div class="actions"><button type="button" class="small" data-action="mm-area-up" aria-label="Move area up">↑</button><button type="button" class="small" data-action="mm-area-down" aria-label="Move area down">↓</button><button type="button" class="small danger" data-action="mm-area-remove"${used ? ' disabled title="Hide this area to keep its mapped records"' : ''}>Remove</button></div></div>`;
 }
 function openMMAreaManager() {
@@ -7154,6 +7162,7 @@ function setBookingEnd(form, value) {
   updateBookingDuration(form);
 }
 function updateBookingDuration(form) {
+  hub?.leaveBalances?.updateRange(form);
   const box = form?.querySelector('[data-booking-duration]');
   if (!box) return;
   try {
@@ -8949,6 +8958,7 @@ function queueCloudReview(row, cache) {
       try {
         const document = { ...row.document, version: 9, data: result.data };
         parseBackup(JSON.stringify(document));
+        window.WorkHubLeaveBalancesEngine.assertWithinBalance(row.document.data, document.data);
         return {
           document,
           pending: MMTrackerMerge.sameRecords(document, row.document) ? null : document,

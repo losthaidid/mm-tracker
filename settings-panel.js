@@ -81,6 +81,11 @@
       'On-site locations, distances and mileage rates.',
       'site schedule kilometre km cost claim expense travel mileage',
     ],
+    leaveBalanceSettingsButton: [
+      'work',
+      'Yearly annual leave and MC allowances, usage and remaining days.',
+      'annual leave al medical mc sick allowance balance entitlement used schedule days holiday',
+    ],
     recipientSettingsButton: [
       'work',
       'Company email lists, ready to copy.',

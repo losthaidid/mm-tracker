@@ -51,6 +51,8 @@ CSS (`.css`) controls appearance; HTML supplies the initial page structure.
 | Files | What they control |
 | --- | --- |
 | [app.js](../app.js), [base.css](../base.css) | Schedule views, exact minute intervals, bookings, project-calendar links and the original form layouts. |
+| [leave-balance-engine.js](../leave-balance-engine.js) | Yearly AL / MC allowances, earlier leave usage, half-day counting, weekday policies and reservation limits. |
+| [leave-balances.js](../leave-balances.js), [leave-balances.css](../leave-balances.css) | Settings → Annual leave & MC, Schedule balances and live after-save previews. See [LEAVE-BALANCES.md](LEAVE-BALANCES.md). |
 | [claims-engine.js](../claims-engine.js) | Location/rate rules, booking travel snapshots, client/special claim types, integer-sen calculations, monthly totals and CSV output. |
 | [claims.js](../claims.js), [claims.css](../claims.css) | Maintainable mileage locations, claim type and one-off destinations, travel fields, monthly summary and other-expense ledger. |
 | [tng-wallet.js](../tng-wallet.js) | Separate eWallet history reader: dynamic columns, wrapped references, continuation pages, payment exclusions and source header-page coordinates. |
