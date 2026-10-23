@@ -63,6 +63,8 @@ CSS (`.css`) controls appearance; HTML supplies the initial page structure.
 | [recipients.js](../recipients.js), [recipients.css](../recipients.css) | Company/contact forms, list search, undo, copy preview and clipboard fallback. |
 | [company-process-template.xlsx](../company-process-template.xlsx) | Downloadable company/process import template. Import parsing is in `app.js`. |
 
+My Day: [my-day-engine.js](../my-day-engine.js) handles bounded daily plans, estimates, canvas records and time calculations; [my-day.js](../my-day.js) supplies the interactive widgets and local break clocks; [my-day.css](../my-day.css) styles the dashboard and effects. Existing widget sorting and timers stay in `studio.js`. See [MY-DAY.md](MY-DAY.md).
+
 ## Investigation and validation tools
 
 | Files | What they control |

@@ -9694,6 +9694,22 @@ hub = WorkHubStudio.install({
     openRangeEditor(today(), '09:00', '', true);
   },
   viewBooking,
+  newActivity(date, time) {
+    openRangeEditor(date, time, '', true);
+  },
+  editTime(date, time, nextStart, nextEnd) {
+    openRangeEditor(date, time);
+    const form = $('scheduleForm');
+    form.elements.namedItem('time').value = nextStart;
+    setBookingEnd(form, nextEnd);
+    updateBookingDuration(form);
+  },
+  scheduleTask(id, date, start, end) {
+    openRangeEditor(date, start, id, true);
+    const form = $('scheduleForm');
+    setBookingEnd(form, end);
+    updateBookingDuration(form);
+  },
   entries: scheduleEntries,
   entryTitle: scheduleEntryTitle,
   taskLabel: taskLinkedLabel,
