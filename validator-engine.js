@@ -511,6 +511,106 @@
     if (values.some(v => v === null)) return { rows: [], count: 0 };
     return cache.get(key).get(JSON.stringify(values)) || { rows: [], count: 0 };
   }
+  /** Offer maintained values for one field; tuple lookups retain the other mapped values. */
+  function suggestions(t, row, fieldKey, query = '') {
+    checkSchema(t);
+    const field = t.columns.find(c => c.key === fieldKey);
+    if (!field) throw Error('Choose an existing field.');
+    const candidates = new Map(),
+      cache = new Map();
+    const add = (value, source, detail = '') => {
+      if (blank(value) || comparable(value, field) === comparable(own(row, fieldKey), field))
+        return;
+      const key = JSON.stringify(comparable(value, field));
+      if (!candidates.has(key)) candidates.set(key, { value: String(value), source, detail });
+    };
+    for (const value of tokens(field.values)) add(value, 'Allowed values');
+    for (const rule of t.rules) {
+      const c = rule.assertion;
+      if (
+        !rule.enabled ||
+        c.field !== fieldKey ||
+        !testGroup(rule.when, row, t, cache) ||
+        !['lookup', 'lookupTuple', 'in'].includes(c.operator)
+      )
+        continue;
+      if (c.operator === 'in') {
+        tokens(c.value).forEach(v => add(v, rule.name));
+        continue;
+      }
+      const list = t.lookups.find(l => l.id === c.lookupId);
+      const pairs =
+        c.operator === 'lookupTuple'
+          ? c.pairs
+          : [{ field: c.field, referenceColumn: c.lookupColumn }];
+      const target = pairs.find(p => p.field === fieldKey);
+      if (!list || !target) continue;
+      for (const reference of list.rows) {
+        if (
+          !pairs
+            .filter(p => p.field !== fieldKey)
+            .every(p => {
+              const f = t.columns.find(f => f.key === p.field),
+                value = comparable(own(row, p.field), f);
+              return (
+                value !== null &&
+                value === comparable(reference[list.headers.indexOf(p.referenceColumn)], f)
+              );
+            })
+        )
+          continue;
+        const detail = [list.nameColumn, ...(list.descriptionColumns || [])]
+          .filter(Boolean)
+          .map(h => reference[list.headers.indexOf(h)])
+          .filter(Boolean)
+          .join(' · ');
+        add(reference[list.headers.indexOf(target.referenceColumn)], list.name, detail);
+      }
+    }
+    const q = String(query).trim().toLocaleLowerCase(),
+      current = String(own(row, fieldKey)).trim().toLocaleLowerCase();
+    const valid = value => {
+      const v = normalized(value, field),
+        n = comparable(value, field),
+        trial = { ...row, [fieldKey]: value };
+      if (
+        n === null ||
+        (field.type === 'integer' && !Number.isInteger(n)) ||
+        (field.type === 'date' && !date(v))
+      )
+        return false;
+      if (
+        (field.minLength !== '' && v.length < Number(field.minLength)) ||
+        (field.maxLength !== '' && v.length > Number(field.maxLength))
+      )
+        return false;
+      if (
+        ['integer', 'decimal'].includes(field.type) &&
+        ((field.min !== '' && n < Number(field.min)) || (field.max !== '' && n > Number(field.max)))
+      )
+        return false;
+      if (field.values && !tokens(field.values).some(x => comparable(x, field) === n)) return false;
+      if (field.format && !FORMATS[field.format].test(v)) return false;
+      return t.rules.every(
+        r =>
+          !r.enabled ||
+          r.assertion.field !== fieldKey ||
+          !testGroup(r.when, trial, t, cache) ||
+          testCondition(r.assertion, trial, t, cache)
+      );
+    };
+    const choices = [...candidates.values()].filter(
+      c =>
+        (!q || [c.value, c.source, c.detail].some(v => v.toLocaleLowerCase().includes(q))) &&
+        valid(c.value)
+    );
+    choices.sort(
+      (a, b) =>
+        Number(b.value.toLocaleLowerCase().startsWith(current)) -
+          Number(a.value.toLocaleLowerCase().startsWith(current)) || a.value.localeCompare(b.value)
+    );
+    return { total: choices.length, choices: choices.slice(0, 30) };
+  }
   function referenceDetails(t, row, cache = new Map()) {
     const conditions = [],
       seen = new Set(),
@@ -916,6 +1016,7 @@
     testGroup,
     referenceRows,
     referenceDetails,
+    suggestions,
     describe,
     headerKey,
     autoMap,

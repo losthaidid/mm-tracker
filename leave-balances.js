@@ -73,8 +73,87 @@
       editingSnapshot = '',
       editingTypesSnapshot = '',
       rangeDraft = null,
-      typeDraft = null;
+      typeDraft = null,
+      holidayDraft = null;
     const thisYear = () => a.today().slice(0, 4);
+    const holidayYear = year =>
+      (a.state().workhub.publicHolidays || []).filter(h => h.id.startsWith(year + '-'));
+    function holidayRow(h = {}) {
+      return `<div class="leave-holiday-row"><label>Holiday date<input type="date" data-holiday-date min="1900-01-01" max="9999-12-31" value="${esc(h.id || '')}" required></label><label>Holiday name<input data-holiday-name maxlength="120" value="${esc(h.name || '')}" placeholder="e.g. Office public holiday" required></label><button type="button" data-leave-balance="holiday-remove" aria-label="Remove holiday">Remove</button></div>`;
+    }
+    function holidays(year = thisYear()) {
+      if (!a.ready()) return;
+      if (!E.validYear(year)) throw Error('Choose a year from 1900 to 9999.');
+      holidayDraft = { owner: a.owner(), year, snapshot: JSON.stringify(holidayYear(year)) };
+      a.openModal(
+        'Public holiday calendar',
+        `<form id="leaveHolidayForm" data-year="${year}"><div class="leave-allowance-intro"><h3>Your workplace holidays · ${year}</h3><p>Maintain the dates observed by your workplace, including substitute holidays. These dates are not fetched automatically.</p><div class="leave-year-picker"><label for="leaveHolidayYear">Calendar year</label><input id="leaveHolidayYear" type="number" min="1900" max="9999" value="${year}"><button type="button" data-leave-balance="holiday-year">Open year</button></div><p class="hint">Save before opening another year. Annual Leave excludes these dates by default. Other leave types follow their Exclude public holidays setting in yearly allowances.</p></div><div id="leaveHolidayRows">${holidayYear(
+          year
+        )
+          .sort((a, b) => a.id.localeCompare(b.id))
+          .map(holidayRow)
+          .join(
+            ''
+          )}</div><button type="button" data-leave-balance="holiday-add">＋ Add holiday</button><p class="hint">Adding or removing a holiday recalculates existing leave reservations for that year. Booking dates and hours stay in Schedule.</p><div id="leaveHolidayPreview" aria-live="polite"></div><div class="modal-actions"><button type="button" data-action="cancel">Cancel</button><button type="submit" class="primary">Save holidays</button></div></form>`
+      );
+      updateHolidays($('leaveHolidayForm'));
+    }
+    function readHolidays(form) {
+      if (
+        !holidayDraft ||
+        !a.ready() ||
+        holidayDraft.owner !== a.owner() ||
+        form !== $('leaveHolidayForm') ||
+        !form.closest('dialog[open]') ||
+        form.dataset.year !== holidayDraft.year
+      )
+        throw Error('Reopen the holiday calendar for this account.');
+      const year = form.dataset.year;
+      if ($('leaveHolidayYear').value.trim() !== year)
+        throw Error('Use Open year before saving a different year.');
+      const rows = [...form.querySelectorAll('.leave-holiday-row')].map(el => ({
+        id: el.querySelector('[data-holiday-date]').value,
+        name: el.querySelector('[data-holiday-name]').value.trim(),
+      }));
+      if (rows.some(h => !h.id.startsWith(year + '-')))
+        throw Error('Every holiday must be in the selected calendar year.');
+      const next = {
+        ...a.state(),
+        workhub: {
+          ...a.state().workhub,
+          publicHolidays: [
+            ...(a.state().workhub.publicHolidays || []).filter(h => !h.id.startsWith(year + '-')),
+            ...rows,
+          ],
+        },
+      };
+      E.validate(next);
+      return next;
+    }
+    function updateHolidays(form) {
+      if (!form) return;
+      try {
+        const next = readHolidays(form);
+        $('leaveHolidayPreview').innerHTML =
+          `<h3>Balance after saving · ${form.dataset.year}</h3>${cards(next, form.dataset.year)}`;
+      } catch (error) {
+        $('leaveHolidayPreview').textContent = error.message;
+      }
+    }
+    function saveHolidays(form) {
+      const next = readHolidays(form);
+      if (holidayDraft.snapshot !== JSON.stringify(holidayYear(form.dataset.year)))
+        throw Error('These holidays changed while you were editing. Reopen the calendar.');
+      const ok = a.mutate(d => {
+        d.workhub.publicHolidays = next.workhub.publicHolidays;
+      });
+      if (ok) {
+        holidayDraft = null;
+        a.closeModal();
+        a.tell('Public holidays saved. Leave balances recalculated.');
+      }
+      return ok;
+    }
     function manageTypes() {
       if (!a.ready()) return;
       typeDraft = null;
@@ -142,17 +221,17 @@
       editingTypesSnapshot = JSON.stringify(E.types(d));
       a.openModal(
         'Leave allowances & balances',
-        `<form id="leaveBalanceForm" data-year="${year}"><div class="leave-allowance-intro"><p>Set the allowance for each calendar year. Planned, requested and approved leave in Schedule all reserve days.</p><div class="leave-year-picker"><label for="leaveBalanceYear">Allowance year</label><input id="leaveBalanceYear" name="year" type="number" min="1900" max="9999" step="1" value="${year}" required><button type="button" data-leave-balance="load-year">Open year</button></div><p class="hint">Use Open year to switch years. Save your edits before opening another year; Open year loads that year’s saved allowances.</p></div>${cards(d, year)}<div class="leave-allowance-grid">${E.types(
+        `<form id="leaveBalanceForm" data-year="${year}"><div class="leave-allowance-intro"><p>Set the allowance for each calendar year. Planned, requested and approved leave in Schedule all reserve days.</p><div class="leave-year-picker"><label for="leaveBalanceYear">Allowance year</label><input id="leaveBalanceYear" name="year" type="number" min="1900" max="9999" step="1" value="${year}" required><button type="button" data-leave-balance="load-year">Open year</button></div><button type="button" data-leave-balance="holidays" data-year="${year}">Public holiday calendar</button><p class="hint">Use Open year to switch years. Save your edits before opening another year; Open year loads that year’s saved allowances.</p></div>${cards(d, year)}<div class="leave-allowance-grid">${E.types(
           d
         )
           .map(t => {
             const kind = t.id;
             const p = saved[kind];
-            return `<fieldset class="leave-allowance-type"><legend>${esc(label(kind, d))}${t.archived ? ' · archived' : ''}</legend><label for="${kind}-allowance">Yearly allowance (days)</label><input id="${kind}-allowance" name="${kind}-allowance" type="number" min="0" max="366" step="0.5" value="${p.allowance ?? ''}" placeholder="Not set"><label for="${kind}-used">Already taken outside Schedule (days)</label><input id="${kind}-used" name="${kind}-used" type="number" min="0" max="366" step="0.5" value="${p.openingUsed}" required><p class="hint">Enter leave taken in earlier months, or any leave not recorded in Schedule. Leave already in Schedule is counted automatically; do not include it again here.</p><span class="leave-days-label" id="${kind}-weekdays-label">Count leave on</span><div class="leave-weekdays" role="group" aria-labelledby="${kind}-weekdays-label">${DAYS.map(([day, name]) => `<label><input type="checkbox" name="${kind}-weekday" value="${day}"${p.weekdays.includes(day) ? ' checked' : ''}>${name}</label>`).join('')}</div></fieldset>`;
+            return `<fieldset class="leave-allowance-type"><legend>${esc(label(kind, d))}${t.archived ? ' · archived' : ''}</legend><label for="${kind}-allowance">Yearly allowance (days)</label><input id="${kind}-allowance" name="${kind}-allowance" type="number" min="0" max="366" step="0.5" value="${p.allowance ?? ''}" placeholder="Not set"><label for="${kind}-used">Already taken outside Schedule (days)</label><input id="${kind}-used" name="${kind}-used" type="number" min="0" max="366" step="0.5" value="${p.openingUsed}" required><p class="hint">Enter leave taken in earlier months, or any leave not recorded in Schedule. Leave already in Schedule is counted automatically; do not include it again here.</p><span class="leave-days-label" id="${kind}-weekdays-label">Count leave on</span><div class="leave-weekdays" role="group" aria-labelledby="${kind}-weekdays-label">${DAYS.map(([day, name]) => `<label><input type="checkbox" name="${kind}-weekday" value="${day}"${p.weekdays.includes(day) ? ' checked' : ''}>${name}</label>`).join('')}</div><label class="check-label"><input type="checkbox" name="${kind}-holidays"${E.policy(d, year, kind).excludeHolidays ? ' checked' : ''}>Exclude maintained public holidays</label></fieldset>`;
           })
           .join(
             ''
-          )}</div><p class="hint">Full day = 1 day; morning / afternoon = 0.5 day. Custom hours let you choose 0.5 or 1 day. Dates outside the selected weekdays are not charged. Public holidays are not detected automatically. A blank allowance keeps that type unlimited until you set it.</p><p class="hint">For example: 12 days allowed − 10 used outside Schedule = 2 days available before any scheduled leave. Removing a booking restores its reserved days.</p><div id="leaveSettingsPreview" class="leave-settings-preview" role="status" aria-live="polite"></div><div class="modal-actions"><button type="button" data-action="cancel">Cancel</button><button type="submit" class="primary">Save allowances</button></div></form>`
+          )}</div><p class="hint">Full day = 1 day; morning / afternoon = 0.5 day. Custom hours let you choose 0.5 or 1 day. Dates outside the selected weekdays are not charged. Public holidays are maintained in your holiday calendar and excluded when selected above. A blank allowance keeps that type unlimited until you set it.</p><p class="hint">For example: 12 days allowed − 10 used outside Schedule = 2 days available before any scheduled leave. Removing a booking restores its reserved days.</p><div id="leaveSettingsPreview" class="leave-settings-preview" role="status" aria-live="polite"></div><div class="modal-actions"><button type="button" data-action="cancel">Cancel</button><button type="submit" class="primary">Save allowances</button></div></form>`
       );
       updateSettings($('leaveBalanceForm'));
       if (E.type(d, kind)) $(kind + '-allowance')?.focus();
@@ -177,6 +256,7 @@
           weekdays: [...form.querySelectorAll(`[name="${kind}-weekday"]:checked`)].map(el =>
             Number(el.value)
           ),
+          excludeHolidays: !!form.elements.namedItem(kind + '-holidays')?.checked,
         };
       }
       E.validate({
@@ -287,6 +367,8 @@
         rangeDraft = null;
         if ($('leaveBalanceForm') || $('leaveTypeForm') || $('leaveTypesManager')) a.closeModal();
         typeDraft = null;
+        holidayDraft = null;
+        if ($('leaveHolidayForm')) a.closeModal();
       }
       const host =
         $('hubSettingsAppearance') || document.querySelector('#settingsMenu .settings-panel');
@@ -310,12 +392,26 @@
       if ($('leaveTypeSettingsButton')) $('leaveTypeSettingsButton').hidden = !a.ready();
       if (tab !== 'schedule' || !a.ready()) return;
       const schedule = document.querySelector('#view .schedule-workspace');
+      if (schedule)
+        for (const h of holidayYear(a.month().slice(0, 4))) {
+          if (!h.id.startsWith(a.month())) continue;
+          const day = schedule
+            .querySelector('[data-action="schedule-day"][data-date="' + h.id + '"]')
+            ?.closest('.workhub-day');
+          if (day && !day.querySelector('.leave-holiday-badge')) {
+            const badge = document.createElement('span');
+            badge.className = 'leave-holiday-badge';
+            badge.textContent = h.name;
+            badge.title = 'Public holiday · ' + h.name;
+            day.querySelector('.day-bookings')?.prepend(badge);
+          }
+        }
       if (schedule && !$('leaveScheduleBalances')) {
         const section = document.createElement('section'),
           year = a.month().slice(0, 4);
         section.id = 'leaveScheduleBalances';
         section.className = 'panel leave-schedule-balances';
-        section.innerHTML = `<div class="leave-balance-heading"><div><span class="eyebrow">YOUR TIME OFF</span><h2>Leave balances · ${year}</h2><p class="leave-balance-subtitle">A clear view of the days you have, have taken and have planned.</p></div><div class="leave-heading-actions"><button type="button" data-leave-balance="types">Manage leave types</button><button type="button" class="leave-maintain-button" data-leave-balance="settings" data-year="${year}">Maintain allowances <span aria-hidden="true">↗</span></button></div></div>${cards(a.state(), year, true)}<div class="leave-balance-footer"><span class="leave-info-icon" aria-hidden="true">i</span><p><strong>Allowance − taken earlier − scheduled = remaining.</strong> Taken earlier means leave outside Schedule. Planned, requested and approved bookings reserve days for the whole year.</p></div>`;
+        section.innerHTML = `<div class="leave-balance-heading"><div><span class="eyebrow">YOUR TIME OFF</span><h2>Leave balances · ${year}</h2><p class="leave-balance-subtitle">A clear view of the days you have, have taken and have planned.</p></div><div class="leave-heading-actions"><button type="button" data-leave-balance="holidays" data-year="${year}">Public holidays</button><button type="button" data-leave-balance="types">Manage leave types</button><button type="button" class="leave-maintain-button" data-leave-balance="settings" data-year="${year}">Maintain allowances <span aria-hidden="true">↗</span></button></div></div>${cards(a.state(), year, true)}<div class="leave-balance-footer"><span class="leave-info-icon" aria-hidden="true">i</span><p><strong>Allowance − taken earlier − scheduled = remaining.</strong> Taken earlier means leave outside Schedule. Planned, requested and approved bookings reserve days for the whole year.</p></div>`;
         schedule.prepend(section);
       }
     }
@@ -329,11 +425,29 @@
         if (b.dataset.leaveBalance === 'types') manageTypes();
         if (b.dataset.leaveBalance === 'new-type') editType();
         if (b.dataset.leaveBalance === 'edit-type') editType(b.dataset.kind);
+        if (b.dataset.leaveBalance === 'holidays') holidays(b.dataset.year || thisYear());
+        if (b.dataset.leaveBalance === 'holiday-year') holidays($('leaveHolidayYear').value.trim());
+        if (b.dataset.leaveBalance === 'holiday-add') {
+          if ($('leaveHolidayRows').children.length >= 366)
+            throw Error('Use at most 366 holidays in one year.');
+          $('leaveHolidayRows').insertAdjacentHTML('beforeend', holidayRow());
+        }
+        if (b.dataset.leaveBalance === 'holiday-remove') b.closest('.leave-holiday-row').remove();
+        if (b.dataset.leaveBalance.startsWith('holiday-')) updateHolidays($('leaveHolidayForm'));
       } catch (error) {
         a.tell(error.message, true);
       }
     });
     document.addEventListener('submit', event => {
+      if (event.target.id === 'leaveHolidayForm') {
+        event.preventDefault();
+        try {
+          saveHolidays(event.target);
+        } catch (error) {
+          a.tell(error.message, true);
+        }
+        return;
+      }
       if (event.target.id === 'leaveTypeForm') {
         event.preventDefault();
         try {
@@ -353,11 +467,23 @@
     });
     for (const name of ['input', 'change'])
       document.addEventListener(name, event => {
+        if (event.target.form?.id === 'leaveHolidayForm') updateHolidays(event.target.form);
         if (event.target.form?.id === 'leaveBalanceForm') updateSettings(event.target.form);
         if (['scheduleForm', 'planForm'].includes(event.target.form?.id))
           updateRange(event.target.form);
       });
-    return { mount, settings, saveSettings, range, updateRange, manageTypes, editType, saveType };
+    return {
+      mount,
+      settings,
+      saveSettings,
+      range,
+      updateRange,
+      manageTypes,
+      editType,
+      saveType,
+      holidays,
+      saveHolidays,
+    };
   }
   root.WorkHubLeaveBalances = { install };
 })(window);

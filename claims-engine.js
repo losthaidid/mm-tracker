@@ -56,6 +56,8 @@
   function upgrade(d) {
     if (d?.workhub && d.workhub.claims === undefined)
       d.workhub.claims = { locations: [], expenses: [] };
+    if (d?.workhub?.claims && d.workhub.claims.submissions === undefined)
+      d.workhub.claims.submissions = [];
     return d;
   }
   function validateTravel(t) {
@@ -88,6 +90,49 @@
       h.expenses.length > 5000
     )
       throw Error('Check the mileage locations and expense records.');
+    const submissions = h.submissions === undefined ? [] : h.submissions;
+    if (
+      !Array.isArray(submissions) ||
+      submissions.length > 1200 ||
+      new Set(submissions.map(s => s?.id)).size !== submissions.length
+    )
+      throw Error('Maintain one claims submission per month.');
+    for (const s of submissions) {
+      if (
+        !s ||
+        !validMonth(s.id) ||
+        !['draft', 'submitted', 'paid'].includes(s.status) ||
+        ![s.submittedCents, s.paidCents].every(
+          n => Number.isSafeInteger(n) && n >= 0 && n <= 1000000000000
+        ) ||
+        s.paidCents > s.submittedCents ||
+        !line(s.reference, 160) ||
+        !text(s.notes, 2000) ||
+        !line(s.updatedAt, 50) ||
+        !Number.isFinite(Date.parse(s.updatedAt))
+      )
+        throw Error('Check the claims status, amounts and reference.');
+      if (s.status === 'draft') {
+        if (s.submittedDate || s.paidDate || s.submittedCents || s.paidCents)
+          throw Error('Draft claims cannot include submitted or paid amounts.');
+      } else {
+        if (
+          !validDate(s.submittedDate) ||
+          s.submittedCents < 1 ||
+          (s.status === 'paid' && s.paidCents !== s.submittedCents) ||
+          (s.status === 'submitted' && s.paidCents === s.submittedCents)
+        )
+          throw Error(
+            'Enter a submission date and positive amount; fully paid claims use Paid status.'
+          );
+        if (
+          s.paidCents ? !validDate(s.paidDate) || s.paidDate < s.submittedDate : s.paidDate !== ''
+        )
+          throw Error(
+            'Payment date must be on or after submission, and is required for paid amounts.'
+          );
+      }
+    }
     const ids = new Set(),
       names = new Set();
     for (const l of h.locations) {
@@ -256,6 +301,7 @@
       );
     return {
       month,
+      submission: submission(d, month),
       mileage,
       expenses,
       mileageCents,
@@ -269,6 +315,20 @@
         mileage.filter(t => !t.travel.claimable).reduce((n, t) => n + t.amountCents, 0) +
         expenses.filter(e => !e.claimable).reduce((n, e) => n + e.amountCents, 0),
     };
+  }
+  function submission(d, month) {
+    if (!validMonth(month)) throw Error('Choose a valid claim month.');
+    const s = (d.workhub?.claims?.submissions || []).find(s => s.id === month) || {
+      id: month,
+      status: 'draft',
+      submittedDate: '',
+      paidDate: '',
+      submittedCents: 0,
+      paidCents: 0,
+      reference: '',
+      notes: '',
+    };
+    return { ...s, outstandingCents: s.submittedCents - s.paidCents };
   }
   const money = cents =>
       'RM ' +
@@ -371,5 +431,6 @@
     rate,
     km,
     csv,
+    submission,
   };
 })(window);

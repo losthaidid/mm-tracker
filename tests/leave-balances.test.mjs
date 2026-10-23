@@ -75,3 +75,18 @@ test('leave types: archiving keeps historical usage and independent type edits m
  const d=state();E.upgrade(d);d.workhub.leaveTypes[0].archived=true;add(d,'2026-10-20');E.validate(d);assert.equal(E.balance(d,'2026',AL).remaining,1);
  const base={data:d},local=copy(base),remote=copy(base);local.data.workhub.leaveTypes[0].name='Vacation';remote.data.workhub.leaveTypes[1].name='Sick Leave';const merged=window.MMTrackerMerge.merge(base,local,remote);assert.deepEqual(copy(merged.conflicts),[]);assert.equal(E.type(merged.data,AL).name,'Vacation');assert.equal(E.type(merged.data,MC).name,'Sick Leave');
 });
+
+
+test('holidays: maintained dates exclude annual leave once, retain MC and respect explicit policies across years', () => {
+ const d=state(); E.upgrade(d);d.workhub.publicHolidays=[{id:'2026-10-26',name:'Workplace holiday'},{id:'2026-10-24',name:'Weekend holiday'},{id:'2027-01-01',name:'New Year'}];
+ add(d,'2026-10-26');add(d,'2026-10-24',AL,'full','weekend');add(d,'2026-10-26',MC,'morning','mc');E.validate(d);
+ assert.equal(E.balance(d,'2026',AL).scheduled,0);assert.equal(E.balance(d,'2026',MC).scheduled,.5);
+ d.workhub.leaveBalances[0][AL].excludeHolidays=false;assert.equal(E.balance(d,'2026',AL).scheduled,1);
+ d.workhub.leaveBalances[0][MC].excludeHolidays=true;assert.equal(E.balance(d,'2026',MC).scheduled,0);
+ const p=E.preview(d,{kind:AL,date:'2026-12-31',endDate:'2027-01-01',leave:{portion:'full'}});assert.equal(p.rows[0].requested,1);assert.equal(p.rows[1].requested,0);
+ assert.equal(E.policy(d,'2027',AL).excludeHolidays,true);
+});
+test('holidays: invalid restored calendars fail and independent dates merge without rewriting bookings',()=>{
+ const d=state();E.upgrade(d);for(const bad of [null,false,[{id:'2026-02-30',name:'Bad'}],[{id:'2026-10-26',name:''}],[{id:'2026-10-26',name:'A'},{id:'2026-10-26',name:'B'}]]){const x=copy(d);x.workhub.publicHolidays=bad;assert.throws(()=>E.validate(x),/Public holidays/);}
+ const b={data:d},l=copy(b),r=copy(b);l.data.workhub.publicHolidays.push({id:'2026-10-26',name:'A'});r.data.workhub.publicHolidays.push({id:'2026-10-27',name:'B'});const m=window.MMTrackerMerge.merge(b,l,r);assert.deepEqual(copy(m.conflicts),[]);assert.equal(m.data.workhub.publicHolidays.length,2);
+});

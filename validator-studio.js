@@ -137,7 +137,8 @@
       busy = false,
       refEditing = '',
       targetRow = -1,
-      setupPreview = null;
+      setupPreview = null,
+      correction = null;
     function sync() {
       const next = a.owner?.() || '';
       if (next !== owner) {
@@ -157,6 +158,8 @@
         busy = false;
         mode = 'columns';
         setupPreview = null;
+        correction = null;
+        if ($('valCorrectionReview')) a.closeModal?.();
         if ($('valSetupReview')) a.closeModal?.();
       }
       return next;
@@ -204,6 +207,7 @@
     function clearFile() {
       generation++;
       setupPreview = null;
+      correction = null;
       book = null;
       headers = [];
       sourceRows = [];
@@ -1269,7 +1273,31 @@
                     esc(rows[i][c.key]) +
                     '" maxlength="32000" title="' +
                     esc(found.map(x => x.message).join('\n') || 'Edit this value') +
-                    '"></td>'
+                    '">' +
+                    (found.length &&
+                    (c.values ||
+                      t.rules.some(
+                        r =>
+                          r.enabled &&
+                          r.assertion.field === c.key &&
+                          ['lookup', 'lookupTuple', 'in'].includes(r.assertion.operator)
+                      ))
+                      ? btn(
+                          'suggest',
+                          'Suggest correction',
+                          'data-index="' +
+                            i +
+                            '" data-field="' +
+                            esc(c.key) +
+                            '" aria-label="Suggest correction for row ' +
+                            (headerRow + i + 1) +
+                            ' ' +
+                            esc(c.label) +
+                            '"',
+                          'val-suggest-button'
+                        )
+                      : '') +
+                    '</td>'
                   );
                 })
                 .join('') +
@@ -1509,6 +1537,14 @@
         a.closeModal();
         say('Excel setup imported as a new draft. Review each tab, then Save draft.');
         paint();
+        return;
+      }
+      if (action === 'suggest') {
+        openCorrections(Number(el.dataset.index), el.dataset.field);
+        return;
+      }
+      if (action === 'apply-correction') {
+        applyCorrection(Number(el.dataset.choice));
         return;
       }
       if (!draft) throw Error('Create or choose a template first.');
@@ -1820,6 +1856,73 @@
           .slice(0, 80) || 'validation'
       );
     }
+    function openCorrections(index, field) {
+      if (!result || !rows[index] || !resultSchema)
+        throw Error('Run validation before choosing a correction.');
+      if (!Number.isInteger(Number(mapping[field])) || Number(mapping[field]) < 0)
+        throw Error('Map this field to an upload column before choosing a correction.');
+      const column = resultSchema.columns.find(c => c.key === field);
+      if (!column) throw Error('Choose an existing field.');
+      correction = {
+        owner,
+        token: generation,
+        index,
+        field,
+        row: JSON.stringify(rows[index]),
+        schema: JSON.stringify(activeSchema()),
+        choices: [],
+      };
+      a.openModal(
+        'Suggested corrections',
+        `<section id="valCorrectionReview"><span class="eyebrow">ROW ${headerRow + index + 1} · ${esc(column.label)}</span><h3>Choose a maintained value</h3><p>Current value: <strong>${esc(rows[index][field] || '(blank)')}</strong></p><p class="hint">Reference combinations keep the other mapped values in this row. Review your choice, then rerun validation to check the whole row. The original file on your device is unchanged.</p><label for="valSuggestionSearch">Search reference choices</label><input id="valSuggestionSearch" type="search" maxlength="120" placeholder="Search code, name or description"><div id="valSuggestionChoices" class="val-suggestion-choices" aria-live="polite"></div></section>`
+      );
+      paintCorrections();
+    }
+    function paintCorrections() {
+      if (!correction || correction.owner !== a.owner?.() || correction.token !== generation)
+        return;
+      const result = E.suggestions(
+        activeSchema(),
+        rows[correction.index],
+        correction.field,
+        $('valSuggestionSearch')?.value || ''
+      );
+      correction.choices = result.choices;
+      $('valSuggestionChoices').innerHTML =
+        `<p class="hint">${result.total} valid choice(s)${result.total > 30 ? ' · first 30 shown; search to narrow the list' : ''}.</p>${result.choices.length ? result.choices.map((c, index) => `<button type="button" data-val="apply-correction" data-choice="${index}"><strong>${esc(c.value)}</strong>${c.detail ? `<span>${esc(c.detail)}</span>` : ''}<small>${esc(c.source)}</small><span class="val-correction-apply">Apply value ↗</span></button>`).join('') : '<p>No maintained choices match this field and the current reference combination. Check the other mapped fields or update your reference list.</p>'}`;
+    }
+    function applyCorrection(choice) {
+      if (
+        !correction ||
+        correction.owner !== a.owner?.() ||
+        correction.token !== generation ||
+        !$('valCorrectionReview')?.closest('dialog[open]') ||
+        correction.row !== JSON.stringify(rows[correction.index]) ||
+        correction.schema !== JSON.stringify(activeSchema())
+      )
+        throw Error(
+          'This correction preview changed. Run validation and open the suggestions again.'
+        );
+      if (!Number.isInteger(choice) || !correction.choices[choice])
+        throw Error('Choose an available correction.');
+      const { index, field } = correction,
+        value = correction.choices[choice].value,
+        source = Number(mapping[field]);
+      if (!Number.isInteger(source) || source < 0)
+        throw Error('Map the field before applying a correction.');
+      rows[index][field] = value;
+      sourceRows[index][source] = value;
+      generation++;
+      correction = null;
+      result = null;
+      resultSchema = null;
+      filter = 'all';
+      page = Math.floor(index / 25);
+      targetRow = index;
+      a.closeModal();
+      say('Correction applied to this upload. Run validation again to check the updated rows.');
+      paint();
+    }
     async function loadSetupFile(file) {
       ensure();
       if (!file || !/\.xlsx$/i.test(file.name))
@@ -1946,6 +2049,7 @@
       }
     });
     document.addEventListener('input', event => {
+      if (event.target.id === 'valSuggestionSearch') paintCorrections();
       if (event.target.closest?.('#valColumnForm,#valRuleForm,#valMetaForm')) mark();
     });
     document.addEventListener('change', event => {
@@ -2109,6 +2213,8 @@
       handle,
       loadFile,
       loadSetupFile,
+      openCorrections,
+      applyCorrection,
       run,
       saveDraft,
       publish,

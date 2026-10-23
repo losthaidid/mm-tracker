@@ -1,6 +1,118 @@
 /* claims.css — Mileage settings, booking travel fields and monthly claim/expense ledger.
    See docs/FILE-MAP.md. Keep rule order: later selectors can override earlier ones. */
 /* A calm claim strip, reusable route cards and an expense ledger. */
+.claim-submission-strip {
+  padding-top: 18px;
+  border-top: 1px solid var(--hub-border);
+}
+.claim-submission-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.claim-submission-heading p {
+  margin: 6px 0 0;
+  color: var(--hub-muted);
+  font-size: 0.73rem;
+}
+.claim-submission-status {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--hub-surface-soft);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.claim-submission-status[data-status='paid'] {
+  background: var(--hub-mint);
+}
+.claim-submission-status[data-status='submitted'] {
+  background: var(--hub-yellow);
+}
+.claim-submission-heading button {
+  min-height: 40px;
+  font-size: 0.75rem;
+}
+.claim-payment-totals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0 0;
+}
+.claim-payment-totals div {
+  padding: 12px 14px;
+  background: var(--hub-surface);
+  border: 1px solid var(--hub-border);
+  border-radius: 12px;
+  min-width: 0;
+}
+.claim-payment-totals dt {
+  color: var(--hub-muted);
+  font-size: 0.7rem;
+}
+.claim-payment-totals dd {
+  margin: 4px 0 0;
+  font-size: 1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.claim-submission-fields {
+  margin: 18px 0;
+  padding: 16px;
+  border: 1px solid var(--hub-border);
+  border-radius: 13px;
+}
+.claim-tracking-month {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 20px 0;
+}
+.claim-tracking-list {
+  display: grid;
+  gap: 10px;
+}
+.claim-tracking-list article {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 15px;
+  border: 1px solid var(--hub-border);
+  border-radius: 13px;
+}
+.claim-tracking-list article div {
+  min-width: 0;
+}
+.claim-tracking-list :is(small, span) {
+  display: block;
+  color: var(--hub-muted);
+  font-size: 0.73rem;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .claim-payment-totals {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .claim-payment-totals div {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+  }
+  .claim-submission-heading .actions {
+    width: 100%;
+  }
+  .claim-submission-heading button {
+    flex: 1;
+  }
+}
 .claim-context-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

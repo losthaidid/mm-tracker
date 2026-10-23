@@ -59,3 +59,16 @@ test('claims engine: claim types split mileage and receipts without repricing hi
  next.schedule.at(-1).claimType='client-site';assert.throws(()=>E.validate(next),/same claim type/);
  for(const bad of ['other',null,42]){const invalid=copy(d);invalid.workhub.claims.expenses[0].claimType=bad;assert.throws(()=>E.validate(invalid),/expense date/);}
 });
+
+
+const submission=(patch={})=>({id:'2026-10',status:'submitted',submittedDate:'2026-10-20',paidDate:'2026-10-21',submittedCents:10000,paidCents:2500,reference:'OCT-001',notes:'Partial payment',updatedAt:stamp,...patch});
+test('claims tracking: actual submission and partial payment remain fixed when estimates change',()=>{
+ const d=state();E.upgrade(d);d.workhub.claims.submissions.push(submission());E.validate(d);assert.equal(E.summary(d,'2026-10').submission.outstandingCents,7500);
+ d.workhub.claims.expenses.push(expense('cost','2026-10-19','toll',500));assert.equal(E.summary(d,'2026-10').totalCents,500);assert.equal(E.submission(d,'2026-10').submittedCents,10000);
+ d.workhub.claims.submissions[0]=submission({status:'paid',paidCents:10000});E.validate(d);assert.equal(E.submission(d,'2026-10').outstandingCents,0);assert.equal(E.submission(d,'2026-09').status,'draft');
+});
+test('claims tracking: malformed records, excess payments and inconsistent dates or statuses fail',()=>{
+ for(const patch of [{status:'other'},{submittedCents:0},{paidCents:10001},{paidCents:.5},{paidDate:'2026-10-19'},{paidDate:'2026-02-30'},{submittedDate:'2026-02-30'},{status:'paid'},{paidCents:10000},{paidCents:0},{status:'draft'}]){const d=state();d.workhub.claims.submissions=[submission(patch)];assert.throws(()=>E.validate(d),/claims|submission|Payment/i);}
+ for(const records of [null,false,[submission(),submission()]]){const d=state();d.workhub.claims.submissions=records;assert.throws(()=>E.validate(d),/submission/);}
+ const d=state();d.workhub.claims.submissions=[submission({status:'draft',submittedDate:'',paidDate:'',submittedCents:0,paidCents:0})];E.validate(d);
+});
