@@ -156,84 +156,121 @@
           (s.title + ' ' + s.category + ' ' + s.body).toLowerCase().includes(q)
       );
     }
+    function collectionName() {
+      return bundle === 'none'
+        ? 'Unbundled'
+        : data().bundles.find(b => b.id === bundle)?.name || 'All snippets';
+    }
     function cards() {
       const snippets = snippetRows();
       return (
-        '<div class="wl-result-line"><span>' +
+        '<div class="wl-result-line"><h3>' +
+        esc(collectionName()) +
+        '</h3><span role="status">' +
         snippets.length +
         ' message' +
         (snippets.length === 1 ? '' : 's') +
-        '</span><span>Compose · review · copy</span></div><div class="wl-snippet-grid">' +
+        '</span></div><div class="wl-snippet-grid">' +
         snippets
-          .map(
-            s =>
-              '<article class="wl-snippet"><div class="wl-snippet-top"><span class="wl-document" aria-hidden="true">≡</span><span class="wl-eyebrow">' +
-              esc(
-                s.category || data().bundles.find(b => b.id === s.bundleId)?.name || 'YOUR WORDS'
-              ) +
+          .map(s => {
+            const keys = E.placeholders(s.body),
+              bundleName = data().bundles.find(b => b.id === s.bundleId)?.name;
+            return (
+              '<article class="wl-snippet"><div class="wl-snippet-content"><div class="wl-snippet-top"><span class="wl-document" aria-hidden="true">≡</span><span class="wl-eyebrow hub-sensitive">' +
+              esc(s.category || bundleName || 'YOUR WORDS') +
               '</span></div><h3 class="hub-sensitive">' +
               esc(s.title) +
               '</h3><p class="wl-excerpt hub-sensitive">' +
-              esc(s.body.slice(0, 190)) +
-              (s.body.length > 190 ? '…' : '') +
-              '</p><div class="wl-placeholder-tags">' +
-              E.placeholders(s.body)
+              esc(s.body.slice(0, 360)) +
+              (s.body.length > 360 ? '…' : '') +
+              '</p></div><div class="wl-snippet-details"><div class="wl-details-heading"><span>Personalise before copying</span><b>' +
+              keys.length +
+              ' field' +
+              (keys.length === 1 ? '' : 's') +
+              '</b></div><div class="wl-placeholder-tags hub-sensitive">' +
+              keys
                 .slice(0, 6)
                 .map(k => '<code>{' + esc(k) + '}</code>')
                 .join('') +
-              '</div><div class="wl-card-actions">' +
-              btn('compose', 'Use snippet', 'data-id="' + esc(s.id) + '"', 'wl-primary') +
-              btn('snippet-edit', 'Edit', 'data-id="' + esc(s.id) + '"') +
-              btn('snippet-remove', 'Remove', 'data-id="' + esc(s.id) + '"', 'wl-quiet') +
+              (keys.length > 6
+                ? '<span class="wl-more-fields">+' + (keys.length - 6) + ' more</span>'
+                : '') +
+              (!keys.length
+                ? '<span class="wl-ready-note">No fields to fill. Ready to review.</span>'
+                : '') +
+              '</div><p class="wl-bundle-caption hub-sensitive">Bundle · ' +
+              esc(bundleName || 'Unbundled') +
+              '</p></div><div class="wl-card-actions">' +
+              btn(
+                'compose',
+                'Use snippet <span aria-hidden="true">↗</span>',
+                'data-id="' + esc(s.id) + '"',
+                'wl-primary'
+              ) +
+              btn(
+                'snippet-edit',
+                'Edit',
+                'data-id="' + esc(s.id) + '" aria-label="Edit ' + esc(s.title) + '"'
+              ) +
+              btn(
+                'snippet-remove',
+                'Remove',
+                'data-id="' + esc(s.id) + '" aria-label="Remove ' + esc(s.title) + '"',
+                'wl-quiet'
+              ) +
               '</div></article>'
-          )
+            );
+          })
           .join('') +
         '</div>' +
         (!snippets.length
-          ? '<div class="wl-empty"><span aria-hidden="true">✎</span><h3>A good message, ready next time.</h3><p>Keep the wording you use often. Add placeholders for the details that change.</p>' +
-            btn('snippet-edit', 'Create a snippet', '', 'wl-primary') +
-            btn('snippet-example', 'Add an editable example', '', 'wl-soft') +
-            '</div>'
+          ? query || bundle
+            ? '<div class="wl-empty"><span aria-hidden="true">⌕</span><h3>' +
+              (query ? 'No matching snippets.' : 'No messages in this bundle yet.') +
+              '</h3><p>Try another search or show all your snippets.</p>' +
+              btn('snippet-reset', 'Show all snippets', '', 'wl-soft') +
+              '</div>'
+            : '<div class="wl-empty"><span aria-hidden="true">✎</span><h3>Your next good message starts here.</h3><p>Save wording you use often, then personalise the details each time.</p>' +
+              btn('snippet-edit', 'Create a snippet', '', 'wl-primary') +
+              btn('snippet-example', 'Add an editable example', '', 'wl-soft') +
+              '</div>'
           : '')
       );
     }
     function render() {
       ready();
+      const bundleButton = (id, name, count) =>
+        btn(
+          'bundle',
+          '<span class="wl-bundle-name">' + esc(name) + '</span><b>' + count + '</b>',
+          'data-id="' + esc(id) + '" aria-pressed="' + (bundle === id) + '"',
+          bundle === id ? 'is-active' : ''
+        );
       return (
-        '<section class="wl-workspace"><header class="wl-hero"><div><span class="wl-eyebrow">YOUR COMMUNICATION SHELF</span><h2>The right words, ready.</h2><p>Reusable messages with a little room for the details.</p></div><div class="wl-actions">' +
+        '<section class="wl-workspace wl-snippets-page" aria-label="Snippets library"><header class="wl-hero"><div class="wl-hero-copy"><span class="wl-eyebrow">YOUR COMMUNICATION SHELF</span><h2>The right words, ready.</h2><p>Keep your best wording. Make every message your own.</p><div class="wl-library-summary"><span><b>' +
+        data().snippets.length +
+        '</b> saved message' +
+        (data().snippets.length === 1 ? '' : 's') +
+        '</span><span><b>' +
+        data().bundles.length +
+        '</b> bundle' +
+        (data().bundles.length === 1 ? '' : 's') +
+        '</span></div></div><div class="wl-actions">' +
         btn('bundles', 'Manage bundles', '', 'wl-soft') +
         btn('snippet-edit', '＋ New snippet', '', 'wl-primary') +
-        '</div></header><div class="wl-library-layout"><aside class="wl-sidebar"><span class="wl-eyebrow">YOUR BUNDLES</span>' +
-        btn(
-          'bundle',
-          'All snippets <b>' + data().snippets.length + '</b>',
-          'data-id=""',
-          !bundle ? 'is-active' : ''
-        ) +
+        '</div></header><div class="wl-library-layout"><aside class="wl-sidebar" aria-label="Filter snippets by bundle"><span class="wl-eyebrow">YOUR BUNDLES</span>' +
+        bundleButton('', 'All snippets', data().snippets.length) +
         data()
           .bundles.map(b =>
-            btn(
-              'bundle',
-              esc(b.name) +
-                ' <b>' +
-                data().snippets.filter(s => s.bundleId === b.id).length +
-                '</b>',
-              'data-id="' + esc(b.id) + '"',
-              bundle === b.id ? 'is-active' : ''
-            )
+            bundleButton(b.id, b.name, data().snippets.filter(s => s.bundleId === b.id).length)
           )
           .join('') +
-        btn(
-          'bundle',
-          'Unbundled <b>' + data().snippets.filter(s => !s.bundleId).length + '</b>',
-          'data-id="none"',
-          bundle === 'none' ? 'is-active' : ''
-        ) +
-        '<div class="wl-sidebar-note"><span>✉</span><p>Your message stays yours.<br>Review it, then copy it.</p></div></aside><main><label class="wl-search">Find a message<input id="wlSnippetSearch" type="search" value="' +
+        bundleButton('none', 'Unbundled', data().snippets.filter(s => !s.bundleId).length) +
+        '<div class="wl-sidebar-note"><span aria-hidden="true">✉</span><h3>A little less retyping.</h3><p>Choose a message, fill in its fields, then review and copy.</p></div></aside><div class="wl-library-main"><div class="wl-search-bar"><label class="wl-search">Find a message<input id="wlSnippetSearch" type="search" value="' +
         esc(query) +
-        '" placeholder="Search wording, title or category"></label><div id="wlSnippetCards">' +
+        '" placeholder="Search title, category or message…" aria-controls="wlSnippetCards"></label><span class="wl-search-note">Your wording, ready to reuse.</span></div><div id="wlSnippetCards">' +
         cards() +
-        '</div></main></div></section>'
+        '</div></div></div></section>'
       );
     }
     function snippetEditor(id = '') {
@@ -764,6 +801,12 @@
       }
       if (action === 'choose-snippet') {
         chooseSnippet(kind, id);
+        return;
+      }
+      if (action === 'snippet-reset') {
+        bundle = query = '';
+        a.render();
+        $('wlSnippetSearch')?.focus();
         return;
       }
       if (action === 'bundle') {
