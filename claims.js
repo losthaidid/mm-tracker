@@ -396,7 +396,7 @@
       });
     }
     function summaryHTML(m) {
-      return `<div class="claim-summary-copy"><span class="hub-kicker">${esc(monthLabel(m.month))} · MONTHLY CLAIMS</span><div class="claim-summary-main"><strong>${E.money(m.totalCents)}</strong><span>Claimable estimate</span></div><small>Scheduled mileage + recorded claimable expenses</small><div class="claim-type-totals">${Object.entries(
+      return `<div class="claim-summary-heading"><div><span class="hub-kicker">YOUR MONTH AT A GLANCE</span><h3>Monthly claims</h3></div><span class="claim-summary-month">${esc(monthLabel(m.month))}</span></div><div class="claim-summary-body"><div class="claim-summary-copy"><div class="claim-summary-main"><span>Claimable estimate</span><strong>${E.money(m.totalCents)}</strong></div><p>Scheduled mileage + recorded claimable expenses</p><div class="claim-type-totals">${Object.entries(
         E.CLAIM_TYPES
       )
         .map(
@@ -405,7 +405,7 @@
         )
         .join(
           ''
-        )}</div></div><dl class="claim-summary-breakdown"><div><dt>Mileage</dt><dd>${E.money(m.mileageCents)}</dd><small>${E.km(m.distanceKm)} km · ${m.visits} visit${m.visits === 1 ? '' : 's'}</small></div><div><dt>TnG / toll</dt><dd>${E.money(m.tollCents)}</dd></div><div><dt>Other expenses</dt><dd>${E.money(m.otherCents)}</dd></div></dl><div class="claim-summary-actions"><button type="button" data-claim="add-expense">＋ Add expense</button><button type="button" data-claim="review">Review / export</button></div>`;
+        )}</div></div><dl class="claim-summary-breakdown"><div><dt>Mileage</dt><dd>${E.money(m.mileageCents)}</dd><small>${E.km(m.distanceKm)} km · ${m.visits} visit${m.visits === 1 ? '' : 's'}</small></div><div><dt>TnG / toll</dt><dd>${E.money(m.tollCents)}</dd><small>Claimable toll expenses</small></div><div><dt>Other expenses</dt><dd>${E.money(m.otherCents)}</dd><small>Parking, meals &amp; other costs</small></div></dl></div><div class="claim-summary-footer"><p>Includes planned visits in the selected month.</p><div class="claim-summary-actions"><button type="button" data-claim="add-expense">＋ Add expense</button><button type="button" data-claim="review">Review / export <span aria-hidden="true">↗</span></button></div></div>`;
     }
     function expenseRows(rows) {
       return rows
@@ -475,7 +475,9 @@
         if (heading) heading.after(bar);
         else host.prepend(bar);
       }
+      const extractor = bar.querySelector('[data-tng="open"]');
       bar.innerHTML = summaryHTML(m);
+      if (extractor) bar.querySelector('.claim-summary-actions').prepend(extractor);
       let ledger = $('claimExpenseLedger');
       if (!ledger) {
         ledger = document.createElement('section');

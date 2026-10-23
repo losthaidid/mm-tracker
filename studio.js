@@ -455,6 +455,7 @@
       } catch {}
     }
     function react(mood = 'busy', message = '', duration = 4000) {
+      if (life?.sleeping?.()) return;
       document.body.dataset.mascotMood = mood;
       if (
         ![

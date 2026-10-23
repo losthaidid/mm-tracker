@@ -1,6 +1,63 @@
 /* validator-studio.css — Validation Studio template editor, column/rule cards and result tables.
    See docs/FILE-MAP.md. Keep rule order: later selectors can override earlier ones. */
 /* Warm paper, sage glass and small, purposeful movements. */
+.val-setup-help {
+  margin: 8px 0 12px;
+  font-size: 0.72rem;
+  line-height: 1.6;
+  color: var(--hub-muted);
+}
+.validation-studio .val-setup-download {
+  display: flex;
+  justify-content: center;
+  text-decoration: none;
+}
+.val-setup-review > h3 {
+  margin: 8px 0;
+  font-size: 1.3rem;
+  overflow-wrap: anywhere;
+}
+.val-setup-review > p {
+  font-size: 0.84rem;
+  color: var(--hub-muted);
+}
+.val-setup-counts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 20px 0;
+}
+.val-setup-counts > div {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  border: 1px solid var(--hub-border);
+  border-radius: 13px;
+  background: var(--hub-surface-soft);
+}
+.val-setup-counts strong {
+  font-size: 1.35rem;
+}
+.val-setup-counts span {
+  font-size: 0.71rem;
+  color: var(--hub-muted);
+}
+.val-setup-table {
+  max-height: 340px;
+  overflow: auto;
+  border: 1px solid var(--hub-border);
+  border-radius: 12px;
+}
+.val-setup-table :is(th, td) {
+  padding: 11px;
+  font-size: 0.76rem;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .val-setup-counts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 .validation-studio {
   --val-ink: #344943;
   --val-muted: #78847b;

@@ -71,6 +71,7 @@ CSS (`.css`) controls appearance; HTML supplies the initial page structure.
 | [lab-workshop.js](../lab-workshop.js), [lab-workshop.css](../lab-workshop.css) | Visual investigation board, experiments, gestures and reactions; automatic saved-result loops and local Pause/Stop/speed controls. |
 | [validator-engine.js](../validator-engine.js) | Template/field/rule definitions, schema checks, row validation, lookup checks and CSV helpers. |
 | [validator-files.js](../validator-files.js) | Local CSV/TSV/XLSX reading and template/results workbook exports. |
+| [validator-setup.js](../validator-setup.js), [validation-setup-template.xlsx](../validation-setup-template.xlsx) | Excel setup import for columns, conditions, reference lists and unique combinations. Previewed as a new draft before saving. |
 | [validator-studio.js](../validator-studio.js), [validator-studio.css](../validator-studio.css) | Template designer, upload mapping and results screens. Uploaded rows remain in memory. |
 
 ## Momo, scenery, focus and sound

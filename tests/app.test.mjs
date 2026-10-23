@@ -18,7 +18,7 @@ async function app(t,{storage={},rpcError=null,remote=null,login=true,styles=fal
  const dom=new JSDOM(html,{url:'https://losthaidid.github.io/mm-tracker/',runScripts:'outside-only',pretendToBeVisual:true});
  const {window}=dom;
  t.after(()=>window.close());
- window.TextEncoder=TextEncoder;window.TextDecoder=TextDecoder;window.Blob=Blob;
+ window.TextEncoder=TextEncoder;window.TextDecoder=TextDecoder;window.Blob=Blob;window.setImmediate=setImmediate;window.clearImmediate=clearImmediate;
  const intervals=[],frames=new Map();let nextFrame=1;
  window.setTimeout=()=>0;window.setInterval=(callback,ms)=>{intervals.push({callback,ms});return intervals.length;};
  window.requestAnimationFrame=callback=>{const id=nextFrame++;frames.set(id,callback);return id;};window.cancelAnimationFrame=id=>frames.delete(id);
@@ -1074,7 +1074,7 @@ test('Momo has live glossy anime eyes and pickup reactions stay local',async t=>
 
 test('Momo can go home, wake, play ball, perch and move away when a card is used',async t=>{
  const {api,document,window,db,frames}=await app(t),pet=document.getElementById('hubPet');const finish=()=>{for(const [id,fn]of [...frames]){frames.delete(id);fn(window.performance.now()+10000);}};
- pet.querySelector('button').click();await settle();assert.ok(document.getElementById('hubMomoMenu'));document.querySelector('[data-momo="place-home"]').click();assert.ok(window.localStorage.getItem('mm-tracker.momo-home.v2'));document.getElementById('hubMomoHome').click();finish();assert.equal(pet.dataset.pose,'nap');document.getElementById('hubMomoHome').click();assert.equal(pet.dataset.pose,'stretch');
+ pet.querySelector('button').click();await settle();assert.ok(document.getElementById('hubMomoMenu'));document.querySelector('[data-momo="place-home"]').click();assert.ok(window.localStorage.getItem('mm-tracker.momo-home.v2'));document.getElementById('hubMomoHome').click();finish();assert.equal(pet.dataset.pose,'nap');document.getElementById('hubMomoHome').click();assert.equal(pet.dataset.pose,'nap');pet.querySelector(':scope > button').click();assert.equal(pet.dataset.pose,'stretch');
  api.hub.life.menu();document.querySelector('[data-momo="ball"]').click();assert.ok(document.getElementById('hubMomoBall'));finish();assert.equal(pet.dataset.pose,'play');
  const card=document.querySelector('[data-widget]');card.getBoundingClientRect=()=>({left:200,top:250,width:400,height:200,right:600,bottom:450});api.hub.life.menu();document.querySelector('[data-momo="perch"]').click();finish();assert.equal(pet.dataset.pose,'perch');pointer(window,card,'pointerdown',300,300);assert.equal(pet.dataset.pose,'walk');finish();document.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(document.getElementById('hubMomoBall'),null);assert.equal(db.calls.length,0);
 });
@@ -2513,4 +2513,144 @@ test('maintained leave types: invalid duplicates and changed accounts cannot sav
 });
 test('maintained leave types: card setup focuses the matching allowance and changed type lists protect open drafts',async t=>{
  const ctx=await app(t),{api,document,db}=ctx,id=await addLeaveType(ctx);api.closeModal();api.setMonth('2026-10');api.showTab('schedule');document.querySelector('.leave-balance-card[data-leave-kind="'+id+'"] [data-leave-balance="settings"]').click();let f=document.getElementById('leaveBalanceForm');assert.equal(document.activeElement,f.elements.namedItem(id+'-allowance'));const writes=db.calls.length;api.mutate(d=>d.workhub.leaveTypes.push({id:'leave-study',name:'Study Leave',code:'SL',archived:false}));await settle();assert.throws(()=>api.hub.leaveBalances.saveSettings(f),/Leave types changed/);assert.equal(db.calls.length,writes+1);api.closeModal();api.hub.leaveBalances.settings('2026');assert.ok(document.getElementById('leaveBalanceForm').elements.namedItem('leave-study-allowance'));
+});
+
+test('Excel setup UI: preview creates a new draft, retains existing releases, and saves through cloud and backup', async t => {
+  const { api, document, db } = await app(t), ui = api.hub.validator;
+  api.showTab('validator');
+  await ui.handle({ dataset: { val: 'example' } });
+  ui.publish(); await settle();
+  const saved = copy(api.state().workhub.validator.templates[0]), writes = db.calls.length;
+  const bytes = readFileSync(new URL('../validation-setup-template.xlsx', import.meta.url));
+  await ui.loadSetupFile({ name: 'setup.xlsx', size: bytes.length, arrayBuffer: async () => bytes });
+  assert.ok(document.querySelector('#valSetupReview'));
+  assert.match(document.getElementById('valSetupReview').textContent, /6Columns/);
+  assert.equal(db.calls.length, writes);
+  assert.equal(ui.snapshot().draft.id, saved.id);
+  await ui.handle(document.querySelector('[data-val="apply-setup"]'));
+  assert.equal(document.querySelector('dialog[open]'), null);
+  const draft = ui.snapshot().draft;
+  assert.notEqual(draft.id, saved.id);
+  assert.equal(draft.columns.length, 6);
+  assert.equal(draft.rules.length, 3);
+  assert.equal(draft.lookups[1].rows[0][1], '0001');
+  assert.equal(ui.snapshot().dirty, true);
+  assert.equal(db.calls.length, writes);
+  assert.equal(ui.saveDraft(), true); await settle();
+  assert.equal(api.state().workhub.validator.templates.length, 2);
+  assert.deepEqual(copy(api.state().workhub.validator.templates[0]), saved);
+  const backup = api.parseBackup(api.payload(api.state()));
+  assert.equal(backup.workhub.validator.templates[1].rules.length, 3);
+  const reopened = await app(t, { remote: copy(db.row), login: false });
+  await reopened.api.loadCloud(sessionUser); await settle();
+  assert.equal(reopened.api.state().workhub.validator.templates[1].lookups[1].rows[0][1], '0001');
+});
+
+test('Excel setup UI: invalid files, cancelled previews and changed drafts preserve the current work without saves', async t => {
+  const { api, document, db, window } = await app(t), ui = api.hub.validator;
+  api.showTab('validator');
+  await ui.handle({ dataset: { val: 'example' } });
+  const bytes = readFileSync(new URL('../validation-setup-template.xlsx', import.meta.url));
+  const original = copy(ui.snapshot().draft), writes = db.calls.length;
+  await assert.rejects(ui.loadSetupFile({ name: 'data.csv', size: 10 }), /xlsx setup/);
+  assert.deepEqual(copy(ui.snapshot().draft), original);
+  await ui.loadSetupFile({ name: 'setup.xlsx', size: bytes.length, arrayBuffer: async () => bytes });
+  await ui.handle(document.querySelector('[data-val="cancel-setup"]'));
+  assert.deepEqual(copy(ui.snapshot().draft), original);
+  let release;
+  const pending = ui.loadSetupFile({ name: 'late.xlsx', size: bytes.length, arrayBuffer: () => new Promise(resolve => { release = resolve; }) });
+  const field = document.querySelector('#valMetaForm [name="name"]');
+  field.value = 'Keep my updated draft'; field.dispatchEvent(new window.Event('input', { bubbles: true }));
+  release(bytes); await pending;
+  assert.equal(document.querySelector('dialog[open]'), null);
+  ui.saveDraft(); await settle();
+  assert.equal(api.state().workhub.validator.templates[0].name, 'Keep my updated draft');
+  assert.equal(db.calls.length, writes + 1);
+});
+
+test('Excel setup UI: late reads and stale preview buttons cannot cross accounts', async t => {
+  const { api, document } = await app(t), ui = api.hub.validator;
+  api.showTab('validator');
+  const bytes = readFileSync(new URL('../validation-setup-template.xlsx', import.meta.url));
+  await ui.loadSetupFile({ name: 'setup.xlsx', size: bytes.length, arrayBuffer: async () => bytes });
+  const oldApply = document.querySelector('[data-val="apply-setup"]');
+  api.cloud.user = { id: '22222222-2222-4222-8222-222222222222', email: 'other@example.com' };
+  ui.sync();
+  assert.equal(document.querySelector('dialog[open]'), null);
+  await assert.rejects(ui.handle(oldApply), /preview has changed/);
+  let release;
+  const pending = ui.loadSetupFile({ name: 'late.xlsx', size: bytes.length, arrayBuffer: () => new Promise(resolve => { release = resolve; }) });
+  api.cloud.user = sessionUser; ui.sync(); release(bytes); await pending;
+  assert.equal(document.querySelector('dialog[open]'), null);
+  assert.equal(ui.snapshot().draft, null);
+  assert.equal(api.state().workhub.validator.templates.length, 0);
+});
+
+test('requested companion naps survive scenes, work avoidance, weather, home clicks and navigation until the companion is activated', async t => {
+  const { api, document, window, frames, db } = await app(t, { adventures: true });
+  const life = api.hub.life, pet = document.getElementById('hubPet');
+  let now = window.Date.now(); window.Date.now = () => now;
+  life.goHome();
+  for (const [id, fn] of [...frames]) { frames.delete(id); fn(window.performance.now() + 10000); }
+  life.tick();
+  assert.equal(life.sleeping(), true);
+  assert.equal(pet.dataset.pose, 'nap');
+  assert.equal(life.clearForWork(), false);
+  assert.equal(life.sceneAvailable(), false);
+  assert.equal(life.scene({ pose: 'lab-cower' }), false);
+  assert.equal(life.umbrella(), false);
+  assert.equal(life.gesture('wave'), false);
+  document.getElementById('hubMomoHome').click();
+  await api.hub.handle({ dataset: { hub: 'celebrate' } });
+  api.showTab('schedule');
+  document.getElementById('month').focus();
+  now += 3600000;
+  life.tick(); api.hub.adventures.tick(); life.tick();
+  assert.equal(pet.dataset.pose, 'nap');
+  assert.equal(life.sleeping(), true);
+  document.activeElement.blur();
+  pet.querySelector(':scope > button').click();
+  assert.equal(life.sleeping(), false);
+  assert.equal(pet.dataset.pose, 'stretch');
+  assert.equal(db.calls.length, 0);
+});
+
+test('an interrupted trip home still settles into the requested nap', async t => {
+  const { api, document, window, frames } = await app(t), life = api.hub.life;
+  life.goHome();
+  api.editRecord('tasks');
+  for (const [id, fn] of [...frames]) { frames.delete(id); fn(window.performance.now() + 1000); }
+  life.tick();
+  assert.equal(life.sleeping(), true);
+  assert.equal(document.getElementById('hubPet').dataset.pose, 'nap');
+  api.closeModal(); life.tick();
+  assert.equal(document.getElementById('hubPet').dataset.pose, 'nap');
+});
+
+test('claims actions retain the PDF extractor after an expense refresh and deletion undo', async t => {
+  const ctx = await app(t), { api, document } = ctx;
+  api.showTab('schedule');
+  const expense = await claimExpense(ctx);
+  assert.equal(document.querySelectorAll('#claimMonthSummary [data-tng="open"]').length, 1);
+  document.querySelector('[data-claim="delete-expense"][data-id="' + expense + '"]').click();
+  await settle();
+  document.querySelector('[data-claim="undo-delete"]').click(); await settle();
+  assert.equal(document.querySelectorAll('#claimMonthSummary [data-tng="open"]').length, 1);
+  document.querySelector('#claimMonthSummary [data-tng="open"]').click();
+  assert.match(document.getElementById('modalTitle').textContent, /TNG/);
+});
+
+test('requested companion naps persist locally for the same account and clear only on companion activation', async t => {
+  const { api, window } = await app(t);
+  api.hub.life.goHome();
+  const key = 'mm-tracker.momo-nap.v1:11111111-1111-4111-8111-111111111111';
+  assert.equal(window.localStorage.getItem(key), 'sleeping');
+  const reopened = await app(t, { storage: { [key]: 'sleeping' } });
+  assert.equal(reopened.api.hub.life.sleeping(), true);
+  assert.equal(reopened.document.getElementById('hubPet').dataset.pose, 'nap');
+  reopened.document.querySelector('#hubPet > button').click();
+  assert.equal(reopened.api.hub.life.sleeping(), false);
+  assert.equal(reopened.window.localStorage.getItem(key), null);
+  const other = await app(t, { storage: { 'mm-tracker.momo-nap.v1:another-owner': 'sleeping' } });
+  assert.equal(other.api.hub.life.sleeping(), false);
 });
