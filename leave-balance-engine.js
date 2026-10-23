@@ -20,7 +20,12 @@
     return t ? t.name + ' (' + t.code + ')' : 'Saved leave';
   };
   const weekdays = kind => (kind === 'medical-leave' ? [0, 1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5]);
-  const defaultPolicy = kind => ({ allowance: null, openingUsed: 0, weekdays: weekdays(kind) });
+  const defaultPolicy = kind => ({
+    allowance: null,
+    openingUsed: 0,
+    weekdays: weekdays(kind),
+    excludeHolidays: kind === 'annual-leave',
+  });
   const validYear = year => typeof year === 'string' && /^(19\d{2}|[2-9]\d{3})$/.test(year);
   const validDays = n =>
     typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 366 && Number.isInteger(n * 2);
@@ -31,6 +36,7 @@
     };
   }
   function upgrade(d) {
+    if (d.workhub && d.workhub.publicHolidays === undefined) d.workhub.publicHolidays = [];
     if (d.workhub && d.workhub.leaveBalances === undefined) d.workhub.leaveBalances = [];
     if (d.workhub && d.workhub.leaveTypes === undefined)
       d.workhub.leaveTypes = BUILTINS.map(t => ({ ...t }));
@@ -69,6 +75,23 @@
       throw Error('Keep the existing AL and MC types; archive a type instead of removing it.');
   }
   function validate(d) {
+    const holidays = d.workhub?.publicHolidays === undefined ? [] : d.workhub.publicHolidays;
+    if (
+      !Array.isArray(holidays) ||
+      holidays.length > 5000 ||
+      new Set(holidays.map(h => h?.id)).size !== holidays.length ||
+      holidays.some(
+        h =>
+          !h ||
+          !root.WorkHubReminders.validDate(h.id) ||
+          typeof h.name !== 'string' ||
+          !h.name.trim() ||
+          h.name !== h.name.trim() ||
+          h.name.length > 120 ||
+          /[\u0000-\u001f]/.test(h.name)
+      )
+    )
+      throw Error('Public holidays need unique dates and names of up to 120 characters.');
     validateTypes(types(d));
     const years = d.workhub?.leaveBalances;
     if (!Array.isArray(years) || years.length > 100)
@@ -86,6 +109,7 @@
         if (p === undefined && !Object.hasOwn(TYPES, kind)) continue;
         if (
           !p ||
+          (p.excludeHolidays !== undefined && typeof p.excludeHolidays !== 'boolean') ||
           (p.allowance !== null && !validDays(p.allowance)) ||
           !validDays(p.openingUsed) ||
           !Array.isArray(p.weekdays) ||
@@ -113,7 +137,10 @@
         );
   }
   function policy(d, year, kind) {
-    return (d.workhub?.leaveBalances || []).find(y => y.id === year)?.[kind] || defaultPolicy(kind);
+    return {
+      ...defaultPolicy(kind),
+      ...(d.workhub?.leaveBalances || []).find(y => y.id === year)?.[kind],
+    };
   }
   function units(row) {
     const p = row.leave || {};
@@ -126,6 +153,7 @@
   /** Group hourly fragments by booking/date, then cap each date at one day per leave type. */
   function scheduled(d, year, kind) {
     const p = policy(d, year, kind),
+      holidays = new Set((d.workhub?.publicHolidays || []).map(h => h.id)),
       groups = new Map(),
       dates = new Map();
     for (const row of d.schedule || []) {
@@ -136,6 +164,7 @@
       )
         continue;
       if (!p.weekdays.includes(new Date(row.date + 'T00:00:00Z').getUTCDay())) continue;
+      if (p.excludeHolidays && holidays.has(row.date)) continue;
       const key =
         row.date +
         '|' +
@@ -234,6 +263,7 @@
     upgrade,
     validate,
     validYear,
+    policy,
     balance,
     scheduled,
     dates,

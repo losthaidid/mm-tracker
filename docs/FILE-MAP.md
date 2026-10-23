@@ -51,10 +51,10 @@ CSS (`.css`) controls appearance; HTML supplies the initial page structure.
 | Files | What they control |
 | --- | --- |
 | [app.js](../app.js), [base.css](../base.css) | Schedule views, exact minute intervals, bookings, project-calendar links and the original form layouts. |
-| [leave-balance-engine.js](../leave-balance-engine.js) | Maintained leave types, yearly allowances, earlier usage, half-day counting, weekday policies and reservation limits. |
-| [leave-balances.js](../leave-balances.js), [leave-balances.css](../leave-balances.css) | Settings → Leave types / Leave allowances & balances, Schedule cards and live after-save previews. See [LEAVE-BALANCES.md](LEAVE-BALANCES.md). |
-| [claims-engine.js](../claims-engine.js) | Location/rate rules, booking travel snapshots, client/special claim types, integer-sen calculations, monthly totals and CSV output. |
-| [claims.js](../claims.js), [claims.css](../claims.css) | Maintainable mileage locations, claim type and one-off destinations, travel fields, monthly summary and other-expense ledger. |
+| [leave-balance-engine.js](../leave-balance-engine.js) | Maintained leave types, yearly allowances, earlier usage, half-day counting, weekday/public holiday policies and reservation limits. |
+| [leave-balances.js](../leave-balances.js), [leave-balances.css](../leave-balances.css) | Settings → Leave types / Leave allowances & balances, maintained public holiday calendar, Schedule cards and live after-save previews. See [LEAVE-BALANCES.md](LEAVE-BALANCES.md). |
+| [claims-engine.js](../claims-engine.js) | Location/rate rules, booking travel snapshots, client/special claim types, integer-sen calculations, monthly totals, recorded submission/payment snapshots and CSV output. |
+| [claims.js](../claims.js), [claims.css](../claims.css) | Maintainable mileage locations, claim type and one-off destinations, travel fields, monthly summary, claims status/history tracker and other-expense ledger. |
 | [tng-wallet.js](../tng-wallet.js) | Separate eWallet history reader: dynamic columns, wrapped references, continuation pages, payment exclusions and source header-page coordinates. |
 | [tng-engine.js](../tng-engine.js) | Original offline/online card parsing plus eWallet dispatch, integer-sen amounts, on-site suggestions, duplicate identities and confirmed expense/source validation. No PDF library or account writes. |
 | [tng-files.js](../tng-files.js) | Lazy local PDF.js loading, source-page rendering, faithful row crops and PNG/PDF/ZIP evidence generation. Client PDFs combine dated To/Return crops with editable captions; special claims keep individual crops. PDF bytes stay in memory. |
@@ -69,10 +69,10 @@ CSS (`.css`) controls appearance; HTML supplies the initial page structure.
 | --- | --- |
 | [workbench.js](../workbench.js), [workbench.css](../workbench.css) | Quick status actions, record previews and troubleshooting case records. |
 | [lab-workshop.js](../lab-workshop.js), [lab-workshop.css](../lab-workshop.css) | Visual investigation board, experiments, gestures and reactions; automatic saved-result loops and local Pause/Stop/speed controls. |
-| [validator-engine.js](../validator-engine.js) | Template/field/rule definitions, schema checks, row validation, lookup checks and CSV helpers. |
+| [validator-engine.js](../validator-engine.js) | Template/field/rule definitions, schema checks, row validation, lookup checks, context-aware correction suggestions and CSV helpers. |
 | [validator-files.js](../validator-files.js) | Local CSV/TSV/XLSX reading and template/results workbook exports. |
 | [validator-setup.js](../validator-setup.js), [validation-setup-template.xlsx](../validation-setup-template.xlsx) | Excel setup import for columns, conditions, reference lists and unique combinations. Previewed as a new draft before saving. |
-| [validator-studio.js](../validator-studio.js), [validator-studio.css](../validator-studio.css) | Template designer, upload mapping and results screens. Uploaded rows remain in memory. |
+| [validator-studio.js](../validator-studio.js), [validator-studio.css](../validator-studio.css) | Template designer, upload mapping, correction picker and results screens. Uploaded rows remain in memory. |
 
 ## Momo, scenery, focus and sound
 

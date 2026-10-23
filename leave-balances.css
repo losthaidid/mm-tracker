@@ -428,3 +428,37 @@ body .workspace-v10 .panel.leave-schedule-balances {
   gap: 6px;
   border-bottom: 0;
 }
+.leave-holiday-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.7fr) minmax(0, 1.5fr) auto;
+  align-items: end;
+  gap: 12px;
+  margin: 12px 0;
+  padding: 14px;
+  border: 1px solid var(--hub-border);
+  border-radius: 13px;
+  background: var(--hub-surface-soft);
+}
+.leave-holiday-row label {
+  min-width: 0;
+  font-size: 0.78rem;
+}
+.leave-holiday-row input {
+  width: 100%;
+  margin-top: 5px;
+}
+.leave-holiday-badge {
+  display: block;
+  margin: 3px 0;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: var(--hub-yellow);
+  color: var(--hub-text);
+  font-size: 0.64rem;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .leave-holiday-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

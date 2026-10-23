@@ -2654,3 +2654,40 @@ test('requested companion naps persist locally for the same account and clear on
   const other = await app(t, { storage: { 'mm-tracker.momo-nap.v1:another-owner': 'sleeping' } });
   assert.equal(other.api.hub.life.sleeping(), false);
 });
+
+test('suggested corrections update only the chosen uploaded value, survive remapping and stay out of cloud', async t => {
+ const {api,document,window,db}=await app(t),ui=api.hub.validator;api.showTab('validator');await ui.handle({dataset:{val:'example'}});
+ const text='Request ID,Request type,Owner,Amount,Start date,End date\nPRIVATE-001,Wrong,Aisha,25,2026-10-20,2026-10-21\nPRIVATE-002,Standard,Mira,30,2026-10-20,2026-10-21';
+ await ui.loadFile({name:'data.csv',size:text.length,text:async()=>text});window.setTimeout=callback=>{queueMicrotask(callback);return 0;};await ui.run();await settle();
+ const before=copy(ui.snapshot().rows),writes=db.calls.length;assert.equal(ui.snapshot().result.errors,1);assert.ok(document.querySelector('[data-val="suggest"][data-field="TYPE"]'));
+ ui.openCorrections(0,'TYPE');const choice=[...document.querySelectorAll('[data-val="apply-correction"]')].find(b=>b.querySelector('strong').textContent==='Standard');assert.ok(choice);ui.applyCorrection(Number(choice.dataset.choice));
+ assert.equal(ui.snapshot().rows[0].TYPE,'Standard');assert.deepEqual(copy(ui.snapshot().rows[1]),before[1]);assert.equal(ui.snapshot().result,null);assert.equal(db.calls.length,writes);
+ await ui.run();await settle();assert.equal(ui.snapshot().result.errors,0);assert.equal(ui.snapshot().rows[0].TYPE,'Standard');assert.equal(api.payload(api.state()).includes('PRIVATE-001'),false);assert.equal(JSON.stringify(db.row).includes('PRIVATE-001'),false);
+ ui.openCorrections(0,'TYPE');window.setTimeout=()=>0;api.cloud.user=null;api.cloud.ready=false;api.showTab('home');assert.equal(document.querySelector('dialog[open]'),null);assert.throws(()=>ui.applyCorrection(0),/preview changed/);
+});
+
+test('holiday calendar saves, marks Schedule, recalculates leave and persists through backup and cloud reload', async t => {
+ const ctx=await app(t),{api,document,window,db}=ctx;await maintainLeave(ctx);let f=await leaveEditor(ctx,'annual-leave',{date:'2026-10-26'});api.saveRange(f);await settle();const bookings=copy(api.state().schedule);
+ api.hub.leaveBalances.holidays('2026');document.querySelector('[data-leave-balance="holiday-add"]').click();f=document.getElementById('leaveHolidayForm');f.querySelector('[data-holiday-date]').value='2026-10-26';f.querySelector('[data-holiday-name]').value='Office <img src=x> holiday';api.hub.leaveBalances.saveHolidays(f);await settle();
+ assert.deepEqual(copy(api.state().schedule),bookings);assert.equal(window.WorkHubLeaveBalancesEngine.balance(api.state(),'2026','annual-leave').remaining,2);api.setMonth('2026-10');api.showTab('schedule');assert.match(document.querySelector('.leave-holiday-badge').textContent,/Office <img src=x> holiday/);assert.equal(document.querySelector('.leave-holiday-badge img'),null);
+ assert.equal(api.parseBackup(api.payload(api.state())).workhub.publicHolidays[0].id,'2026-10-26');const next=await app(t,{remote:copy(db.row),login:false});await next.api.loadCloud(sessionUser);assert.equal(next.window.WorkHubLeaveBalancesEngine.balance(next.api.state(),'2026','annual-leave').remaining,2);
+ api.hub.leaveBalances.holidays('2026');f=document.getElementById('leaveHolidayForm');document.querySelector('[data-leave-balance="holiday-remove"]').click();api.hub.leaveBalances.saveHolidays(f);await settle();assert.equal(window.WorkHubLeaveBalancesEngine.balance(api.state(),'2026','annual-leave').remaining,1);
+});
+
+test('holiday calendar rejects changed years, concurrent edits and stale account forms without writes',async t=>{
+ const {api,document,db}=await app(t);api.hub.leaveBalances.holidays('2026');const f=document.getElementById('leaveHolidayForm');document.getElementById('leaveHolidayYear').value='2027';let writes=db.calls.length;assert.throws(()=>api.hub.leaveBalances.saveHolidays(f),/Open year/);assert.equal(db.calls.length,writes);document.getElementById('leaveHolidayYear').value='2026';api.mutate(d=>d.workhub.publicHolidays.push({id:'2026-10-26',name:'Changed elsewhere'}));await settle();writes=db.calls.length;assert.throws(()=>api.hub.leaveBalances.saveHolidays(f),/changed while/);assert.equal(db.calls.length,writes);
+ api.cloud.user={id:'22222222-2222-4222-8222-222222222222'};api.showTab('schedule');assert.throws(()=>api.hub.leaveBalances.saveHolidays(f),/Reopen/);assert.equal(db.calls.length,writes);
+});
+
+test('claims status tracks partial and full payment, keeps estimates separate, and reopens from cloud and backup',async t=>{
+ const ctx=await app(t),{api,document,window,db}=ctx;await claimExpense(ctx);api.hub.claims.submissionForm('2026-10');let f=document.getElementById('claimSubmissionForm');fill(f,{status:'submitted',submittedDate:'2026-10-20',submittedAmount:'100.00',paidAmount:'25.00',paidDate:'2026-10-21',submissionReference:'OCT <img src=x>'});api.hub.claims.saveSubmission(f);await settle();
+ assert.equal(window.WorkHubClaimsEngine.submission(api.state(),'2026-10').outstandingCents,7500);await claimExpense(ctx,{amount:'50.00'});assert.equal(window.WorkHubClaimsEngine.submission(api.state(),'2026-10').submittedCents,10000);api.hub.claims.tracking();assert.match(document.getElementById('modal').textContent,/RM 75.00 outstanding/);assert.equal(document.querySelector('.claim-tracking img'),null);
+ assert.equal(api.parseBackup(api.payload(api.state())).workhub.claims.submissions[0].paidCents,2500);const next=await app(t,{remote:copy(db.row),login:false});await next.api.loadCloud(sessionUser);assert.equal(next.window.WorkHubClaimsEngine.submission(next.api.state(),'2026-10').outstandingCents,7500);
+ api.hub.claims.submissionForm('2026-10');f=document.getElementById('claimSubmissionForm');f.elements.namedItem('status').value='paid';f.elements.namedItem('status').dispatchEvent(new window.Event('change',{bubbles:true}));api.hub.claims.saveSubmission(f);await settle();assert.equal(window.WorkHubClaimsEngine.submission(api.state(),'2026-10').outstandingCents,0);
+ const expenses=copy(api.state().workhub.claims.expenses);api.hub.claims.submissionForm('2026-10');f=document.getElementById('claimSubmissionForm');f.elements.namedItem('status').value='draft';api.hub.claims.saveSubmission(f);await settle();assert.equal(window.WorkHubClaimsEngine.submission(api.state(),'2026-10').submittedCents,0);assert.deepEqual(copy(api.state().workhub.claims.expenses),expenses);
+});
+
+test('claims status rejects excess payment, concurrent edits and stale owner forms without writes',async t=>{
+ const {api,document,db}=await app(t);api.hub.claims.submissionForm('2026-10');let f=document.getElementById('claimSubmissionForm');fill(f,{status:'submitted',submittedDate:'2026-10-20',submittedAmount:'100',paidAmount:'101',paidDate:'2026-10-21'});let writes=db.calls.length;assert.throws(()=>api.hub.claims.saveSubmission(f),/claims status/);assert.equal(db.calls.length,writes);fill(f,{paidAmount:'0',paidDate:''});api.hub.claims.saveSubmission(f);await settle();
+ api.hub.claims.submissionForm('2026-10');f=document.getElementById('claimSubmissionForm');api.mutate(d=>d.workhub.claims.submissions[0].reference='Changed elsewhere');await settle();writes=db.calls.length;assert.throws(()=>api.hub.claims.saveSubmission(f),/changed while/);assert.equal(db.calls.length,writes);api.cloud.user={id:'22222222-2222-4222-8222-222222222222'};api.showTab('schedule');assert.throws(()=>api.hub.claims.saveSubmission(f),/current account/);assert.equal(db.calls.length,writes);
+});

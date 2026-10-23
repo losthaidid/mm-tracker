@@ -134,7 +134,8 @@
     let owner = '',
       page = 0,
       monthSeen = '',
-      lastDeleted = null;
+      lastDeleted = null,
+      submissionDraft = null;
     const thisMonth = () => a.month(),
       day = () => {
         const selected = a.day?.();
@@ -157,6 +158,8 @@
         page = 0;
         monthSeen = '';
         lastDeleted = null;
+        submissionDraft = null;
+        if ($('claimSubmissionForm')) a.closeModal();
       }
     }
     function settings() {
@@ -395,6 +398,124 @@
         year: 'numeric',
       });
     }
+    const submissionLabels = { draft: 'Draft', submitted: 'Submitted', paid: 'Paid' };
+    function submissionHTML(m) {
+      const s = m.submission;
+      return `<section class="claim-submission-strip" aria-label="Claims submission status"><div class="claim-submission-heading"><div><span class="claim-submission-status" data-status="${s.status}">${submissionLabels[s.status]}</span><p>${s.status === 'draft' ? 'Track this month from submission to payment.' : 'Submitted ' + esc(s.submittedDate) + (s.paidDate ? ' · Last payment ' + esc(s.paidDate) : '')}</p></div><div class="actions"><button type="button" data-claim="tracking">Claims tracker</button><button type="button" data-claim="submission" data-month="${m.month}">Update status</button></div></div><dl class="claim-payment-totals">${[
+        ['Submitted', s.submittedCents],
+        ['Paid', s.paidCents],
+        ['Outstanding', s.outstandingCents],
+      ]
+        .map(
+          ([name, cents]) =>
+            `<div><dt>${name}</dt><dd>${s.status === 'draft' ? '—' : E.money(cents)}</dd></div>`
+        )
+        .join(
+          ''
+        )}</dl>${s.status !== 'draft' && s.submittedCents !== m.totalCents ? '<p class="hint">The current estimate differs from the recorded submission. Your submitted amount stays fixed until you edit it.</p>' : ''}</section>`;
+    }
+    function tracking() {
+      if (!a.ready()) return;
+      const rows = [...(data().submissions || [])].sort((a, b) => b.id.localeCompare(a.id)),
+        outstanding = rows.reduce((sum, s) => sum + s.submittedCents - s.paidCents, 0);
+      a.openModal(
+        'Monthly claims tracker',
+        `<section class="claim-tracking"><span class="eyebrow">SUBMISSIONS & PAYMENTS</span><h3>${E.money(outstanding)} outstanding</h3><p class="hint">Track actual submitted and received amounts. This records payment status; it does not send a claim or make a payment.</p><div class="claim-tracking-month"><label for="claimTrackingMonth">Claim month</label><input id="claimTrackingMonth" type="month" min="1900-01" max="9999-12" value="${thisMonth()}"><button type="button" data-claim="tracking-open">Open month</button></div><div class="claim-tracking-list">${
+          rows
+            .slice(0, 36)
+            .map(
+              s =>
+                `<article><div><strong>${esc(monthLabel(s.id))}</strong><small>${submissionLabels[s.status]}${s.reference ? ' · ' + esc(s.reference) : ''}</small><span>Submitted ${E.money(s.submittedCents)} · Paid ${E.money(s.paidCents)} · Outstanding ${E.money(s.submittedCents - s.paidCents)}</span></div><button type="button" data-claim="submission" data-month="${s.id}">Edit</button></article>`
+            )
+            .join('') || '<p>No months tracked yet. Open a month to record its submission.</p>'
+        }</div>${rows.length > 36 ? '<p class="hint">Showing the latest 36 tracked months. Open any other month using the picker above. Outstanding includes all tracked months.</p>' : ''}</section>`
+      );
+    }
+    function submissionForm(month = thisMonth()) {
+      if (!a.ready()) return;
+      const s = E.submission(a.state(), month),
+        m = E.summary(a.state(), month);
+      submissionDraft = { owner: a.owner(), month, snapshot: JSON.stringify(s) };
+      a.openModal(
+        'Claims status · ' + monthLabel(month),
+        `<form id="claimSubmissionForm"><p class="hint">Current claimable estimate: ${E.money(m.totalCents)}. Record the amount you actually submitted. Later expense changes do not change that amount.</p><label for="claimSubmissionStatus">Status</label><select id="claimSubmissionStatus" name="status">${options(Object.entries(submissionLabels), s.status)}</select><fieldset class="claim-submission-fields"><div class="form-grid">${input('submittedDate', 'Submission date', s.submittedDate || a.today(), 'date', 'min="1900-01-01" max="9999-12-31" required')}${input('submittedAmount', 'Submitted amount (RM)', ((s.submittedCents || m.totalCents) / 100).toFixed(2), 'number', 'min="0.01" max="10000000000" step="0.01" required')}${input('paidAmount', 'Total received so far (RM)', (s.paidCents / 100).toFixed(2), 'number', 'min="0" max="10000000000" step="0.01" required')}${input('paidDate', 'Last payment date', s.paidDate, 'date', 'min="1900-01-01" max="9999-12-31"')}</div><p class="hint">For a partial payment, keep Submitted status and enter the total received so far. Paid records the full submitted amount as received.</p></fieldset>${input('submissionReference', 'Submission reference', s.reference, 'text', 'maxlength="160"')}<label for="claimSubmissionNotes">Notes</label><textarea id="claimSubmissionNotes" name="notes" maxlength="2000">${esc(s.notes)}</textarea><p class="hint">Saving Draft clears this month’s submission and payment amounts and dates. It keeps your mileage and expenses.</p><div class="modal-actions"><button type="button" data-action="cancel">Cancel</button><button type="submit" class="primary">Save claim status</button></div></form>`
+      );
+      updateSubmission($('claimSubmissionForm'));
+    }
+    function updateSubmission(form) {
+      const get = name => form.elements.namedItem(name),
+        status = get('status').value;
+      form.querySelector('fieldset').disabled = status === 'draft';
+      get('paidAmount').disabled = status === 'paid';
+      if (status === 'paid') {
+        get('paidAmount').value = get('submittedAmount').value;
+        if (!get('paidDate').value) get('paidDate').value = a.today();
+      }
+      get('paidDate').required = status !== 'draft' && Number(get('paidAmount').value) > 0;
+    }
+    function saveSubmission(form) {
+      if (
+        !a.ready() ||
+        !submissionDraft ||
+        submissionDraft.owner !== a.owner() ||
+        form !== $('claimSubmissionForm') ||
+        !form.closest('dialog[open]')
+      )
+        throw Error('Reopen claims status for the current account.');
+      const current = E.submission(a.state(), submissionDraft.month);
+      if (JSON.stringify(current) !== submissionDraft.snapshot)
+        throw Error('This claim status changed while you were editing. Reopen it before saving.');
+      const get = name => form.elements.namedItem(name).value,
+        status = get('status'),
+        amount = name => Math.round(Number(get(name)) * 100);
+      const row = {
+        id: submissionDraft.month,
+        status,
+        submittedDate: status === 'draft' ? '' : get('submittedDate'),
+        submittedCents: status === 'draft' ? 0 : amount('submittedAmount'),
+        paidCents:
+          status === 'draft'
+            ? 0
+            : status === 'paid'
+              ? amount('submittedAmount')
+              : amount('paidAmount'),
+        paidDate:
+          status === 'draft' || (status !== 'paid' && amount('paidAmount') === 0)
+            ? ''
+            : get('paidDate'),
+        reference: get('submissionReference').trim(),
+        notes: get('notes'),
+        updatedAt: new Date().toISOString(),
+      };
+      if (status !== 'draft')
+        for (const name of status === 'paid'
+          ? ['submittedAmount']
+          : ['submittedAmount', 'paidAmount'])
+          if (!get(name).trim() || !/^\d+(?:\.\d{1,2})?$/.test(get(name)))
+            throw Error('Enter RM amounts with up to two decimal places.');
+      const next = {
+        ...a.state(),
+        workhub: {
+          ...a.state().workhub,
+          claims: {
+            ...data(),
+            submissions: [...(data().submissions || []).filter(s => s.id !== row.id), row],
+          },
+        },
+      };
+      E.validate(next);
+      if (
+        save(d => {
+          d.workhub.claims.submissions = [
+            ...(d.workhub.claims.submissions || []).filter(s => s.id !== row.id),
+            row,
+          ];
+        }, 'Claim status saved.')
+      ) {
+        submissionDraft = null;
+        a.closeModal();
+      }
+    }
     function summaryHTML(m) {
       return `<div class="claim-summary-heading"><div><span class="hub-kicker">YOUR MONTH AT A GLANCE</span><h3>Monthly claims</h3></div><span class="claim-summary-month">${esc(monthLabel(m.month))}</span></div><div class="claim-summary-body"><div class="claim-summary-copy"><div class="claim-summary-main"><span>Claimable estimate</span><strong>${E.money(m.totalCents)}</strong></div><p>Scheduled mileage + recorded claimable expenses</p><div class="claim-type-totals">${Object.entries(
         E.CLAIM_TYPES
@@ -478,6 +599,7 @@
       const extractor = bar.querySelector('[data-tng="open"]');
       bar.innerHTML = summaryHTML(m);
       if (extractor) bar.querySelector('.claim-summary-actions').prepend(extractor);
+      bar.insertAdjacentHTML('beforeend', submissionHTML(m));
       let ledger = $('claimExpenseLedger');
       if (!ledger) {
         ledger = document.createElement('section');
@@ -489,6 +611,7 @@
     }
     document.addEventListener('input', event => {
       const f = event.target.form;
+      if (f?.id === 'claimSubmissionForm') updateSubmission(f);
       if (
         f?.id === 'scheduleForm' &&
         (event.target.name.startsWith('travel') ||
@@ -498,6 +621,7 @@
     });
     document.addEventListener('change', event => {
       const f = event.target.form;
+      if (f?.id === 'claimSubmissionForm') updateSubmission(f);
       if (
         f?.id === 'scheduleForm' &&
         (event.target.name.startsWith('travel') ||
@@ -519,11 +643,17 @@
     document.addEventListener(
       'submit',
       event => {
-        if (!['claimLocationForm', 'claimExpenseForm'].includes(event.target.id)) return;
+        if (
+          !['claimLocationForm', 'claimExpenseForm', 'claimSubmissionForm'].includes(
+            event.target.id
+          )
+        )
+          return;
         event.preventDefault();
         event.stopImmediatePropagation();
         try {
-          if (event.target.id === 'claimLocationForm') saveLocation(event.target);
+          if (event.target.id === 'claimSubmissionForm') saveSubmission(event.target);
+          else if (event.target.id === 'claimLocationForm') saveLocation(event.target);
           else saveExpense(event.target);
         } catch (error) {
           a.tell(error.message, true);
@@ -542,6 +672,18 @@
         try {
           const action = b.dataset.claim,
             id = b.dataset.id;
+          if (action === 'submission') {
+            submissionForm(b.dataset.month);
+            return;
+          }
+          if (action === 'tracking') {
+            tracking();
+            return;
+          }
+          if (action === 'tracking-open') {
+            submissionForm($('claimTrackingMonth').value);
+            return;
+          }
           if (action === 'settings') settings();
           else if (action === 'edit-location') locationForm(id);
           else if (action === 'archive-location') {
@@ -611,6 +753,9 @@
       review,
       saveLocation,
       saveExpense,
+      submissionForm,
+      saveSubmission,
+      tracking,
       summary: () => E.summary(a.state(), thisMonth()),
     };
   }
