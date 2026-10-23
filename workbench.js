@@ -476,8 +476,12 @@
           ...projectLocations().map(l => [locationHue(l), 'Project · ' + l]),
           [32, 'Task'],
           [310, 'Ticket / ticket-linked task'],
-          [264, 'Annual Leave'],
-          [182, 'Medical Leave'],
+          ...root.WorkHubLeaveBalancesEngine.types(state())
+            .filter(t => !t.archived || state().schedule.some(s => s.kind === t.id))
+            .map(t => [
+              t.id === 'annual-leave' ? 264 : t.id === 'medical-leave' ? 182 : 210,
+              t.name,
+            ]),
           [210, 'Other activity'],
         ]
           .map(

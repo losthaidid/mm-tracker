@@ -83,8 +83,13 @@
     ],
     leaveBalanceSettingsButton: [
       'work',
-      'Yearly annual leave and MC allowances, usage and remaining days.',
+      'Yearly leave allowances, earlier usage and remaining days.',
       'annual leave al medical mc sick allowance balance entitlement used schedule days holiday',
+    ],
+    leaveTypeSettingsButton: [
+      'work',
+      'Add, rename or archive the leave types available in Schedule.',
+      'leave types annual al medical mc sick unpaid compassionate emergency custom category',
     ],
     recipientSettingsButton: [
       'work',
