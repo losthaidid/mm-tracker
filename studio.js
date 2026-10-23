@@ -27,6 +27,9 @@
     desk: 'Your growing workspace',
     focus: 'Focus timer',
     knowledge: 'Knowledge shortcut',
+    ...Object.fromEntries(
+      Object.entries(root.WorkHubMyDayEngine.WIDGETS).map(([id, value]) => [id, value[0]])
+    ),
   };
   const DEFAULTS = {
     name: '',
@@ -75,6 +78,7 @@
         span: ['today', 'journey'].includes(id) ? 'wide' : 'normal',
       }));
     if (h.ticketClosures === undefined) h.ticketClosures = [];
+    root.WorkHubMyDayEngine.upgrade(d);
     root.WorkHubReminders?.upgrade(d);
     if (h.headerSubtitle === undefined) h.headerSubtitle = 'Your work, your rhythm.';
     root.WorkHubWorkbench?.upgrade(d);
@@ -99,6 +103,7 @@
     return d;
   }
   function validate(d) {
+    root.WorkHubMyDayEngine.validate(d);
     root.WorkHubWorkbench?.validate(d);
     root.WorkHubValidatorEngine?.validateState(d);
     root.WorkHubBatchEngine?.validate(d);
@@ -285,7 +290,8 @@
       settingsPanel = null,
       projectDates = null,
       processDeck = null,
-      chromeUX = null;
+      chromeUX = null,
+      myDay = null;
     const reminders = root.WorkHubReminders?.install({
       ...a,
       hubAction: el => handle(el),
@@ -987,6 +993,7 @@
       return `<h3>${esc(p.name)}</h3><div class="hub-journey">${phases.map((phase, n) => `<div class="hub-phase ${n < i ? 'done' : n === i ? 'current' : ''}"><span>${n < i ? '✓' : n + 1}</span><strong>${esc(phase)}</strong></div>`).join('')}</div>${btn('project', 'Open project', 'data-id="' + esc(p.id) + '"', 'small')}`;
     }
     function widget(id) {
+      if (Object.hasOwn(root.WorkHubMyDayEngine.WIDGETS, id)) return myDay?.widget(id) || '';
       const s = a.state(),
         open = s.tasks.filter(
           t => !t.done && !t.archived && !root.WorkHubReminders.isSnoozed(s, 'tasks', t.id, today())
@@ -1042,14 +1049,43 @@
       return '';
     }
     function dashboard() {
-      const h = new Date().getHours(),
-        greeting = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
-      return `<section class="hub">${head('YOUR PERSONAL WORKSPACE', greeting + (prefs().name ? ', ' + prefs().name : ''), prefs().workspace + ' · Make room for good work.', btn('layout', 'Arrange dashboard'))}<p class="hub-drag-hint">${icon('drag')} Make it yours. Drag the dotted handles to rearrange your dashboard.</p><div class="hub-layout">${data()
+      const symbols = {
+        today: '◷',
+        tasks: '✓',
+        waiting: '↗',
+        journey: '⚑',
+        achievements: '✦',
+        desk: '❀',
+        focus: '◉',
+        knowledge: '▤',
+      };
+      return `<section class="hub my-day-page">${myDay.hero()}${myDay.toolbar()}<div class="hub-layout">${data()
         .widgets.filter(w => w.id !== 'desk' || prefs().desk)
-        .map(
-          w =>
-            `<section class="hub-card hub-widget" data-span="${w.span}" draggable="true" data-widget="${w.id}"><div class="hub-widget-head"><h3><span class="hub-widget-symbol">${{ today: '◷', tasks: '✓', waiting: '↗', journey: '⚑', achievements: '✦', desk: '❀', focus: '◉', knowledge: '▤' }[w.id]}</span>${WIDGETS[w.id]}</h3><div class="hub-widget-actions"><button type="button" class="hub-drag-handle" data-hub="drag-help" data-hub-drag="widget" aria-label="Drag ${WIDGETS[w.id]} to rearrange, or use up and down arrow keys" title="Drag to rearrange">${icon('drag')}</button>${btn('widget-up', '↑', 'data-id="' + w.id + '" aria-label="Move ' + WIDGETS[w.id] + ' up"', 'small')}${btn('widget-size', w.span === 'wide' ? '↙' : '↔', 'data-id="' + w.id + '" aria-label="Resize ' + WIDGETS[w.id] + '"', 'small')}</div></div>${widget(w.id)}</section>`
-        )
+        .map(w => {
+          const handle = `<button type="button" class="hub-drag-handle" data-hub="drag-help" data-hub-drag="widget" aria-label="Drag ${WIDGETS[w.id]} to rearrange, or use up and down arrow keys" title="Drag to rearrange">${icon('drag')}</button>`;
+          const controls =
+            btn(
+              'widget-up',
+              '↑',
+              'data-id="' + w.id + '" aria-label="Move ' + WIDGETS[w.id] + ' up"',
+              'small'
+            ) +
+            btn(
+              'widget-size',
+              w.span === 'wide' ? '↙' : '↔',
+              'data-id="' + w.id + '" aria-label="Resize ' + WIDGETS[w.id] + '"',
+              'small'
+            );
+          return myDay.wrapper(
+            w.id,
+            WIDGETS[w.id],
+            symbols[w.id] || root.WorkHubMyDayEngine.WIDGETS[w.id]?.[1] || '✧',
+            w.span,
+            widget(w.id),
+            handle,
+            controls
+          );
+        })
         .join('')}</div></section>`;
     }
     function layoutEditor() {
@@ -2551,6 +2587,7 @@
       batchA?.sync();
       validator?.sync();
       library?.sync();
+      myDay?.sync();
       standup?.sync();
       people?.sync();
       solution?.sync();
@@ -2566,6 +2603,7 @@
       library?.mount();
       people?.mount();
       mountUndo();
+      myDay?.mount();
       document.body.classList.toggle('hub-focus', !!focus);
       const extra = $('hubBoardToggle');
       if (extra) extra.remove();
@@ -3671,9 +3709,30 @@
         }
       }
       focusPanel?.tick();
+      myDay?.tick();
       if (Date.now() - lastInteraction > 120000 && !petWalk)
         document.body.dataset.mascotMood = 'sleep';
     }, 1000);
+    myDay = root.WorkHubMyDay.install({
+      ...a,
+      ready: () => a.cloud().ready,
+      owner: () => a.cloud().user?.id || '',
+      prefs,
+      layout: layoutEditor,
+      focus: focusSnapshot,
+      startFocus: (minutes, taskId) =>
+        startFocus({
+          elements: { namedItem: k => ({ value: k === 'minutes' ? String(minutes) : taskId }) },
+        }),
+      pauseFocus,
+      endFocus,
+      task: taskDetail,
+      completeTask: id => moveTask(id, 'done'),
+      track: id => timerEditor('task', id),
+      pauseWork: () => {
+        if (timerDraft?.runningSince) pauseTimer();
+      },
+    });
     life = root.WorkHubMomoLife?.install({
       prefs: () => themePreview || prefs(),
       ready: () => a.cloud().ready,
@@ -3845,6 +3904,7 @@
       owner: () => a.cloud().user?.id || '',
     });
     return {
+      myDay,
       settingsPanel,
       recipients,
       claims,
