@@ -1502,3 +1502,17 @@ body.hub-present .my-day-page * {
   animation: none !important;
   transition: none !important;
 }
+
+.md-group-tag {
+  padding: 2px 5px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+}
+@media (max-width: 560px) {
+  .md-group-editor > div {
+    flex-wrap: wrap;
+  }
+  .md-group-editor .md-field {
+    flex-basis: 100%;
+  }
+}

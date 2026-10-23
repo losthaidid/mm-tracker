@@ -290,8 +290,9 @@
     }
     function garden() {
       const n = completeCount(),
-        total = current().missions.length;
-      return `<div class="md-growing-garden" data-growth="${n}" aria-label="${n} completed priorities"><div class="md-garden-sky"></div>${[0, 1, 2].map((_, i) => `<button type="button" class="md-garden-plant${i < n ? ' has-bloom' : ''}" style="--plant:${i}" data-md="garden-detail" data-index="${i}" aria-label="${i < n ? 'View completed priority' : 'View daily priorities'}"><i class="md-stem"></i><i class="md-leaf md-leaf-left"></i><i class="md-leaf"></i><span>${i < n ? '✿' : '❧'}</span></button>`).join('')}<div class="md-garden-ground"></div></div><h4 class="md-garden-title">${n ? 'Small steps, taking root.' : 'A little room to grow.'}</h4>${meta(`${n} of ${total || 'your'} daily priorities complete. Select a plant to see its task.`)}${button('missions', 'Choose priorities')}`;
+        total = current().missions.length,
+        completed = current().missions.map(id => state().tasks.some(t => t.id === id && t.done));
+      return `<div class="md-growing-garden" data-growth="${n}" aria-label="${n} completed priorities"><div class="md-garden-sky"></div>${[0, 1, 2].map((_, i) => `<button type="button" class="md-garden-plant${completed[i] ? ' has-bloom' : ''}" style="--plant:${i}" data-md="garden-detail" data-index="${i}" aria-label="${completed[i] ? 'View completed priority' : 'View daily priorities'}"><i class="md-stem"></i><i class="md-leaf md-leaf-left"></i><i class="md-leaf"></i><span>${completed[i] ? '✿' : '❧'}</span></button>`).join('')}<div class="md-garden-ground"></div></div><h4 class="md-garden-title">${n ? 'Small steps, taking root.' : 'A little room to grow.'}</h4>${meta(`${n} of ${total || 'your'} daily priorities complete. Select a plant to see its task.`)}${button('missions', 'Choose priorities')}`;
     }
     function terrarium() {
       const b = breakState,
@@ -322,7 +323,7 @@
         })
         .join(
           ''
-        )}</svg>${ideas.map(x => `<article class="md-idea md-color-${x.color}${selected.has(x.id) ? ' is-selected' : ''}" data-idea="${esc(x.id)}" style="left:${x.x}px;top:${x.y}px"><div class="md-idea-head"><label class="md-idea-select"><input type="checkbox" data-md-select="${esc(x.id)}" aria-label="Select ${esc(x.title)}"${selected.has(x.id) ? ' checked' : ''}><span>${esc(h.groups.find(g => g.id === x.groupId)?.name || 'Idea')}</span></label><button type="button" class="md-idea-handle" data-md-drag="idea" data-id="${esc(x.id)}" aria-label="Move idea ${esc(x.title)}. Use arrow keys to move." title="Drag to move; arrow keys also work">⠿</button></div><h4 class="hub-sensitive">${esc(x.title)}</h4><p class="hub-sensitive">${esc(x.notes.slice(0, 110))}</p><div class="md-idea-actions">${button('idea-edit', 'Edit', `data-id="${esc(x.id)}" aria-label="Edit idea ${esc(x.title)}"`)}${x.taskId && state().tasks.some(t => t.id === x.taskId) ? button('task', 'Open task', `data-id="${esc(x.taskId)}"`) : ''}</div></article>`).join('') || `<div class="md-canvas-welcome"><span aria-hidden="true">✧</span><h4>A place for thoughts to take shape.</h4><p>Add ideas, move them around and make connections.<br>Select ideas when you’re ready to turn them into tasks.</p>${button('idea-new', 'Add your first idea', '', 'md-primary')}</div>`}</div></div>${meta('Your ideas, groups and positions save with your account. Use an idea’s dotted handle to move it; the widget’s handle rearranges the dashboard.')}`;
+        )}</svg>${ideas.map(x => `<article class="md-idea md-color-${x.color}${selected.has(x.id) ? ' is-selected' : ''}" data-idea="${esc(x.id)}" style="left:${x.x}px;top:${x.y}px"><div class="md-idea-head"><label class="md-idea-select"><input type="checkbox" data-md-select="${esc(x.id)}" aria-label="Select ${esc(x.title)}"${selected.has(x.id) ? ' checked' : ''}><span class="md-group-tag md-color-${h.groups.find(g => g.id === x.groupId)?.color || 'sage'}">${esc(h.groups.find(g => g.id === x.groupId)?.name || 'Idea')}</span></label><button type="button" class="md-idea-handle" data-md-drag="idea" data-id="${esc(x.id)}" aria-label="Move idea ${esc(x.title)}. Use arrow keys to move." title="Drag to move; arrow keys also work">⠿</button></div><h4 class="hub-sensitive">${esc(x.title)}</h4><p class="hub-sensitive">${esc(x.notes.slice(0, 110))}</p><div class="md-idea-actions">${button('idea-edit', 'Edit', `data-id="${esc(x.id)}" aria-label="Edit idea ${esc(x.title)}"`)}${x.taskId && state().tasks.some(t => t.id === x.taskId) ? button('task', 'Open task', `data-id="${esc(x.taskId)}"`) : ''}</div></article>`).join('') || `<div class="md-canvas-welcome"><span aria-hidden="true">✧</span><h4>A place for thoughts to take shape.</h4><p>Add ideas, move them around and make connections.<br>Select ideas when you’re ready to turn them into tasks.</p>${button('idea-new', 'Add your first idea', '', 'md-primary')}</div>`}</div></div>${meta('Your ideas, groups and positions save with your account. Use an idea’s dotted handle to move it; the widget’s handle rearranges the dashboard.')}`;
     }
     function widget(id) {
       sync();
@@ -462,7 +463,13 @@
         `<div class="md-wide md-group-editor">${store()
           .groups.map(
             g =>
-              `<div>${field('group-' + g.id, 'Group name', g.name, 'text', 'required maxlength="80"')}${button('group-delete', 'Remove', `data-id="${esc(g.id)}" aria-label="Remove group ${esc(g.name)}"`)}</div>`
+              `<div>${field('group-' + g.id, 'Group name', g.name, 'text', 'required maxlength="80"')}${select(
+                'color-' + g.id,
+                'Group colour',
+                E.COLORS.map(k => [k, k[0].toUpperCase() + k.slice(1)]),
+                g.color,
+                null
+              )}${button('group-delete', 'Remove', `data-id="${esc(g.id)}" aria-label="Remove group ${esc(g.name)}"`)}</div>`
           )
           .join(
             ''
@@ -982,7 +989,10 @@
         }, 'Idea saved to your canvas.');
       } else if (f.id === 'mdGroups') {
         ok = save((d, h) => {
-          for (const g of h.groups) g.name = get('group-' + g.id);
+          for (const g of h.groups) {
+            g.name = get('group-' + g.id);
+            g.color = get('color-' + g.id);
+          }
           if (get('newName'))
             h.groups.push({ id: E.uid(), name: get('newName'), color: get('newColor') });
         }, 'Canvas groups saved.');

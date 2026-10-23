@@ -221,6 +221,7 @@
       if (prior) {
         prior.start = Math.min(prior.start, start);
         prior.end = Math.max(prior.end, end);
+        prior.intervals.push({ start, end });
         continue;
       }
       const task = (d.tasks || []).find(t => t.id === row.linkId),
@@ -229,7 +230,15 @@
         row.kind === 'task'
           ? task?.task || row.text || 'Task activity'
           : plan?.title || row.title || row.activity || row.text || 'Scheduled activity';
-      map.set(id, { id, start, end, title: title.slice(0, 500), row, kind: row.kind });
+      map.set(id, {
+        id,
+        start,
+        end,
+        title: title.slice(0, 500),
+        row,
+        kind: row.kind,
+        intervals: [{ start, end }],
+      });
     }
     return [...map.values()].sort((a, b) => a.start - b.start);
   }
@@ -251,7 +260,9 @@
     let cursor = start;
     const out = [];
     for (const [a, b] of union(
-      agenda(d, date).map(x => [Math.max(start, x.start), Math.min(end, x.end)])
+      agenda(d, date).flatMap(x =>
+        x.intervals.map(p => [Math.max(start, p.start), Math.min(end, p.end)])
+      )
     )) {
       if (a > cursor) out.push({ start: cursor, end: a, minutes: a - cursor });
       cursor = Math.max(cursor, b);
@@ -267,18 +278,19 @@
     // Classify each occupied minute once, even when importing overlapping legacy rows.
     const slots = new Map();
     for (const a of agenda(d, date))
-      for (let m = Math.max(start, a.start); m < Math.min(end, a.end); m++)
-        if (!slots.has(m))
-          slots.set(
-            m,
-            a.kind === 'task'
-              ? 'task'
-              : a.kind === 'project'
-                ? 'project'
-                : a.kind === 'custom'
-                  ? 'custom'
-                  : 'leave'
-          );
+      for (const p of a.intervals)
+        for (let m = Math.max(start, p.start); m < Math.min(end, p.end); m++)
+          if (!slots.has(m))
+            slots.set(
+              m,
+              a.kind === 'task'
+                ? 'task'
+                : a.kind === 'project'
+                  ? 'project'
+                  : a.kind === 'custom'
+                    ? 'custom'
+                    : 'leave'
+            );
     for (const k of slots.values()) sums[k]++;
     return { ...sums, free: end - start - slots.size, total: end - start };
   }
@@ -307,7 +319,8 @@
           last = Math.max(last, b);
         }
       }
-      if (!s.intervals?.length && seconds) seconds = Math.min(seconds, s.seconds || seconds);
+      if (!s.intervals?.length && seconds)
+        seconds = Math.min(seconds, Number.isFinite(s.seconds) ? Math.max(0, s.seconds) : seconds);
       if (seconds > 0)
         result.push({
           id: s.id,
@@ -325,7 +338,14 @@
   function snapshot(d, date) {
     return agenda(d, date)
       .filter(x => !x.row.sourceSessionId)
-      .map(x => ({ id: x.id, title: x.title, start: x.start, end: x.end }));
+      .flatMap(x =>
+        x.intervals.map((p, i) => ({
+          id: x.id + '@' + i,
+          title: x.title,
+          start: p.start,
+          end: p.end,
+        }))
+      );
   }
   function convertIdeas(d, ids, date) {
     const h = store(d),
