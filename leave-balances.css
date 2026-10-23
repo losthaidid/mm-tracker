@@ -393,3 +393,38 @@ body .workspace-v10 .panel.leave-schedule-balances {
     font-size: 2rem;
   }
 }
+
+/* Keep planning forms compact when several types are maintained. */
+.leave-range-balances .leave-balance-cards,
+#leaveBalanceForm .leave-balance-cards {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 10px;
+}
+.leave-range-balances .leave-balance-card,
+#leaveBalanceForm .leave-balance-card {
+  padding: 14px;
+  border-radius: 13px;
+}
+.leave-range-balances .leave-card-icon,
+.leave-range-balances .leave-card-status,
+.leave-range-balances .leave-usage-track,
+#leaveBalanceForm .leave-card-icon,
+#leaveBalanceForm .leave-card-status,
+#leaveBalanceForm .leave-usage-track {
+  display: none;
+}
+.leave-range-balances .leave-card-value,
+#leaveBalanceForm .leave-card-value {
+  margin: 10px 0;
+}
+.leave-range-balances .leave-card-value > strong,
+#leaveBalanceForm .leave-card-value > strong {
+  font-size: 1.6rem;
+}
+.leave-range-balances .leave-balance-stats,
+#leaveBalanceForm .leave-balance-stats {
+  margin: 0;
+  padding: 10px 0 0;
+  gap: 6px;
+  border-bottom: 0;
+}

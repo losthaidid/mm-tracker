@@ -229,7 +229,7 @@
     function range(draft) {
       rangeDraft = { ...draft };
       const year = (draft.date || a.today()).slice(0, 4);
-      return `<section class="leave-range-balances wide" aria-label="Leave balances"><div class="leave-balance-heading"><h3>Leave balance · <span data-leave-balance-years>${year}</span></h3><span class="hint">Maintain in Settings → Annual leave & MC</span></div><div data-leave-range-current>${cards(a.state(), year)}</div><div data-leave-range-preview role="status" aria-live="polite"></div></section>`;
+      return `<section class="leave-range-balances wide" aria-label="Leave balances"><div class="leave-balance-heading"><h3>Leave balance · <span data-leave-balance-years>${year}</span></h3><span class="hint">Maintain in Settings → Leave allowances & balances</span></div><div data-leave-range-current>${cards(a.state(), year)}</div><div data-leave-range-preview role="status" aria-live="polite"></div></section>`;
     }
     function updateRange(form) {
       if (!form?.querySelector('[data-leave-range-current]') || !a.ready()) return;
