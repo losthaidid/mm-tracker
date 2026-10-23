@@ -66,6 +66,7 @@
     root.WorkHubAppearance.upgrade(h.preferences);
     root.WorkHubProjectDates.upgrade(d);
     root.WorkHubLeave.upgrade(d);
+    root.WorkHubLeaveBalancesEngine.upgrade(d);
     root.WorkHubClaimsEngine.upgrade(d);
     root.WorkHubRecipientsEngine.upgrade(d);
     if (h.widgets === undefined)
@@ -110,6 +111,7 @@
     root.WorkHubReminders?.validate(d);
     root.WorkHubProjectDates.validate(d);
     root.WorkHubLeave.validate(d);
+    root.WorkHubLeaveBalancesEngine.validate(d);
     root.WorkHubClaimsEngine.validate(d);
     root.WorkHubRecipientsEngine.validate(d);
     const h = d.workhub;
@@ -277,6 +279,7 @@
       moments = null,
       adventures = null,
       claims = null,
+      leaveBalances = null,
       tng = null,
       recipients = null,
       settingsPanel = null,
@@ -2602,6 +2605,7 @@
       focusPanel?.mount();
       adventures?.mount();
       claims?.mount(tab);
+      leaveBalances?.mount(tab);
       tng?.mount(tab);
       recipients?.mount(tab);
       settingsPanel?.mount();
@@ -3819,6 +3823,11 @@
       ready: () => a.cloud().ready,
       owner: () => a.cloud().user?.id || '',
     });
+    leaveBalances = root.WorkHubLeaveBalances.install({
+      ...a,
+      ready: () => a.cloud().ready,
+      owner: () => a.cloud().user?.id || '',
+    });
     tng = root.WorkHubTng.install({
       ...a,
       ready: () => a.cloud().ready,
@@ -3838,6 +3847,7 @@
       settingsPanel,
       recipients,
       claims,
+      leaveBalances,
       tng,
       adventures,
       batchA,
