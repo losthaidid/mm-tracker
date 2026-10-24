@@ -25,7 +25,7 @@
     journey: 'Project journey',
     achievements: 'Daily achievements',
     desk: 'Your growing workspace',
-    focus: 'Focus timer',
+    focus: 'Focus timer', // Legacy backup ID; My Day upgrades it to the Focus orb.
     knowledge: 'Knowledge shortcut',
     ...Object.fromEntries(
       Object.entries(root.WorkHubMyDayEngine.WIDGETS).map(([id, value]) => [id, value[0]])
@@ -1044,7 +1044,6 @@
       if (id === 'desk') return desk();
       if (id === 'achievements')
         return `<p class="hub-result">${done.length ? '✦ ' + done.length + ' task' + (done.length === 1 ? '' : 's') + ' completed today' : 'Every small step counts.'}</p><p class="hub-meta">${data().sessions.filter(x => x.start.slice(0, 10) === today()).length} work sessions recorded · ${s.tasks.reduce((n, t) => n + (t.subTasks || []).filter(x => x.status === 'Completed').length, 0)} subtasks complete</p>${btn('celebrate', 'A little celebration', '', 'small')}`;
-      if (id === 'focus') return focusWidget();
       if (id === 'knowledge')
         return `${empty('Make knowledge easy to find', 'Keep useful fixes, T-codes and testing notes.', btn('navigate', 'Open notebook', 'data-tab="knowledge"'))}`;
       return '';
@@ -1061,7 +1060,7 @@
         knowledge: '▤',
       };
       return `<section class="hub my-day-page">${myDay.hero()}${myDay.toolbar()}<div class="hub-layout">${data()
-        .widgets.filter(w => w.id !== 'desk' || prefs().desk)
+        .widgets.filter(w => w.id !== 'focus' && (w.id !== 'desk' || prefs().desk))
         .map(w => {
           const handle = `<button type="button" class="hub-drag-handle" data-hub="drag-help" data-hub-drag="widget" aria-label="Drag ${WIDGETS[w.id]} to rearrange, or use up and down arrow keys" title="Drag to rearrange">${icon('drag')}</button>`;
           const controls =
@@ -1096,6 +1095,7 @@
         `<div class="wide"><p>Drag widgets on My day to reorder them, or use their arrow buttons. Choose which widgets to show.</p>${Object.entries(
           WIDGETS
         )
+          .filter(([id]) => id !== 'focus')
           .map(
             ([id, label]) =>
               `<label class="check-label"><input type="checkbox" name="widget" value="${id}"${data().widgets.some(w => w.id === id) ? ' checked' : ''}>${label}</label>`
@@ -3709,6 +3709,7 @@
     setInterval(() => {
       soundscape?.tick();
       processDeck?.tick();
+      myDay?.tick();
       if (document.hidden) return;
       workbench?.tick();
       atmosphere?.tick();
@@ -3728,7 +3729,6 @@
         }
       }
       focusPanel?.tick();
-      myDay?.tick();
       if (Date.now() - lastInteraction > 120000 && !petWalk)
         document.body.dataset.mascotMood = 'sleep';
     }, 1000);
@@ -3749,8 +3749,23 @@
       completeTask: id => moveTask(id, 'done'),
       track: id => timerEditor('task', id),
       pauseWork: () => {
-        if (timerDraft?.runningSince) pauseTimer();
+        if (!timerDraft?.runningSince) return null;
+        const token = { id: timerDraft.id, started: timerDraft.started };
+        pauseTimer();
+        return token;
       },
+      resumeWork: token => {
+        if (
+          timerDraft?.id === token.id &&
+          timerDraft.started === token.started &&
+          !timerDraft.runningSince
+        )
+          resumeTimer();
+      },
+      resumeFocus: token => {
+        if (focus?.pausedAt && focus.start === token.start) pauseFocus();
+      },
+      soundscape: () => soundscape,
     });
     life = root.WorkHubMomoLife?.install({
       prefs: () => themePreview || prefs(),

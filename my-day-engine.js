@@ -47,6 +47,12 @@
   const store = d => d.workhub.myDay;
   function upgrade(d) {
     if (!d.workhub) d.workhub = {};
+    if (Array.isArray(d.workhub.widgets) && d.workhub.widgets.some(w => w.id === 'focus')) {
+      const orb = d.workhub.widgets.some(w => w.id === 'orb');
+      d.workhub.widgets = d.workhub.widgets.flatMap(w =>
+        w.id === 'focus' ? (orb ? [] : [{ ...w, id: 'orb' }]) : [w]
+      );
+    }
     if (d.workhub.myDay === undefined) {
       d.workhub.myDay = {
         version: 1,

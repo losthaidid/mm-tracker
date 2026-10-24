@@ -42,7 +42,6 @@
       drag = null,
       activityMove = null,
       suppressUntil = 0,
-      breakState = null,
       audio = null,
       lastMissionCount = null;
     const contexts = new WeakMap();
@@ -53,6 +52,20 @@
       settings: () => store().settings,
       layout: a.layout,
     });
+    const rest = root.WorkHubRestRoom.install({
+      ready: a.ready,
+      owner: a.owner,
+      prefs: a.prefs,
+      motion: () => a.prefs().motion !== 'off' && store().settings.effects !== 'calm',
+      focus: a.focus,
+      pauseFocus: a.pauseFocus,
+      resumeFocus: a.resumeFocus,
+      pauseWork: a.pauseWork,
+      resumeWork: a.resumeWork,
+      soundscape: a.soundscape,
+      tell: a.tell,
+      change: () => refresh('terrarium'),
+    });
     function sync() {
       const next = a.ready() ? a.owner() : '';
       if (next !== owner) {
@@ -62,7 +75,6 @@
         activeGroup = radarKind = '';
         upIndex = 0;
         replayMinute = 1440;
-        breakState = null;
         clearDrag(false);
         clearActivityMove();
         lastMissionCount = null;
@@ -75,6 +87,7 @@
         document.querySelectorAll('.md-celebration').forEach(x => x.remove());
       }
       visual.sync();
+      rest.sync();
       return next;
     }
     function ready() {
@@ -320,17 +333,9 @@
       return `<div class="md-growing-garden" data-growth="${n}" aria-label="${n} completed priorities"><div class="md-garden-sky"></div>${[0, 1, 2].map((_, i) => `<button type="button" class="md-garden-plant${completed[i] ? ' has-bloom' : ''}" style="--plant:${i}" data-md="garden-detail" data-index="${i}" aria-label="${completed[i] ? 'View completed priority' : 'View daily priorities'}"><i class="md-stem"></i><i class="md-leaf md-leaf-left"></i><i class="md-leaf"></i><span>${completed[i] ? '✿' : '❧'}</span></button>`).join('')}<div class="md-garden-ground"></div></div><h4 class="md-garden-title">${n ? 'Small steps, taking root.' : 'A little room to grow.'}</h4>${meta(`${n} of ${total || 'your'} daily priorities complete. Select a plant to see its task.`)}${button('missions', 'Choose priorities')}`;
     }
     function terrarium() {
-      const b = breakState,
-        seconds = b
-          ? Math.max(
-              0,
-              Math.ceil(
-                ((b.pausedAt || Date.now()) >= b.end ? 0 : b.end - (b.pausedAt || Date.now())) /
-                  1000
-              )
-            )
-          : store().settings.breakMinutes * 60;
-      return `<div class="md-terrarium${b && !b.pausedAt ? ' is-resting' : ''}"><div class="md-glass"><div class="md-glass-shine"></div><div class="md-terra-moon"></div><i class="md-terra-plant"></i><i class="md-terra-plant second"></i><div class="md-terra-earth"></div><span class="md-firefly"></span><span class="md-firefly second"></span></div><div class="md-break-time" data-md-break-clock>${clockText(seconds)}</div></div><p class="md-break-caption" data-md-break-caption>${b ? esc(b.label) + (b.pausedAt ? ' · paused' : ' · a moment for yourself') : 'A small pause, a little fresh perspective.'}</p><div class="md-break-options">${button('break-start', 'Rest your eyes', 'data-label="Rest your eyes"')}${button('break-start', 'Stretch', 'data-label="Stretch"')}${button('break-start', 'Step away', 'data-label="Step away"')}</div><div class="md-center-actions">${button('break-pause', b?.pausedAt ? 'Resume break' : 'Pause break', !b ? 'disabled' : '')}${button('break-end', 'End break', !b ? 'disabled' : '')}</div>${meta('Starting a break pauses active work and focus timers. Resume them when you’re ready. Adjust the break length in Effects & hours.')}`;
+      const b = rest.snapshot(),
+        seconds = b ? b.seconds : store().settings.breakMinutes * 60;
+      return `<div class="md-terrarium${b && !b.pausedAt && !b.complete ? ' is-resting' : ''}"><div class="md-glass"><div class="md-glass-shine"></div><div class="md-terra-moon"></div><i class="md-terra-plant"></i><i class="md-terra-plant second"></i><div class="md-terra-earth"></div><span class="md-firefly"></span><span class="md-firefly second"></span></div><div class="md-break-time" data-md-break-clock>${clockText(seconds)}</div></div><p class="md-break-caption" data-md-break-caption>${b ? (b.complete ? 'Your break is over. Resume work when you’re ready.' : esc(b.label) + (b.pausedAt ? ' · paused' : ' · a moment for yourself')) : 'A full-screen garden, a calmer soundscape, a moment for yourself.'}</p><div class="md-break-options">${b ? button('break-open', 'Open rest terrarium') : button('break-start', 'Rest your eyes', 'data-label="Rest your eyes"') + button('break-start', 'Stretch', 'data-label="Stretch"') + button('break-start', 'Step away', 'data-label="Step away"')}</div><div class="md-center-actions">${b?.complete ? button('break-resume', 'Resume work', '', 'md-primary') : button('break-pause', b?.pausedAt ? 'Resume break' : 'Pause break', !b ? 'disabled' : '') + button('break-end', 'End break', !b ? 'disabled' : '')}</div>${meta('Starting opens a full-screen break with its own music and pauses active work and focus timers. Resume work only when you choose. Set the break length in Effects & hours.')}`;
     }
     function canvas() {
       const h = store(),
@@ -798,30 +803,23 @@
         return;
       }
       if (action === 'break-start') {
-        unlockAudio();
-        a.pauseWork();
-        if (a.focus().active && !a.focus().paused) a.pauseFocus();
-        breakState = {
-          owner,
-          label: el.dataset.label,
-          start: Date.now(),
-          end: Date.now() + store().settings.breakMinutes * 60000,
-        };
-        refresh('terrarium');
+        rest.start(el.dataset.label, store().settings.breakMinutes * 60);
         return;
       }
       if (action === 'break-pause') {
-        if (!breakState) return;
-        if (breakState.pausedAt) {
-          breakState.end += Date.now() - breakState.pausedAt;
-          delete breakState.pausedAt;
-        } else breakState.pausedAt = Date.now();
-        refresh('terrarium');
+        rest.pause();
         return;
       }
       if (action === 'break-end') {
-        breakState = null;
-        refresh('terrarium');
+        rest.finish(false);
+        return;
+      }
+      if (action === 'break-open') {
+        rest.open();
+        return;
+      }
+      if (action === 'break-resume') {
+        rest.resume();
         return;
       }
       if (action === 'idea-new') {
@@ -1481,20 +1479,6 @@
             )
           ) + '%';
       }
-      if (breakState) {
-        const seconds = Math.max(
-          0,
-          Math.ceil((breakState.end - (breakState.pausedAt || Date.now())) / 1000)
-        );
-        if ($('view')?.querySelector('[data-md-break-clock]'))
-          document.querySelector('[data-md-break-clock]').textContent = clockText(seconds);
-        if (!seconds && !breakState.pausedAt) {
-          breakState = null;
-          refresh('terrarium');
-          tone();
-          a.tell('Your break is complete. Return when you’re ready.');
-        }
-      }
     }
     function mount() {
       sync();
@@ -1514,11 +1498,13 @@
         );
       }
       visual.mount();
+      rest.tick();
       runtime();
     }
     let lastMinute = -1;
     function tick() {
       sync();
+      rest.tick();
       if (!owner || document.hidden) return;
       runtime();
       const minute = nowMinute();
@@ -1530,6 +1516,7 @@
     }
     return {
       visual,
+      rest,
       hero,
       toolbar,
       wrapper,
@@ -1546,7 +1533,7 @@
       evening,
       estimate,
       canvas,
-      breakSnapshot: () => (breakState ? { ...breakState } : null),
+      breakSnapshot: rest.snapshot,
     };
   }
   root.WorkHubMyDay = { install };
