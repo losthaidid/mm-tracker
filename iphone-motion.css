@@ -1,0 +1,189 @@
+/* iPhone-only rendering budget. The head script selects this before feature CSS loads.
+   Keep moving scenery; avoid document-sized textures, masked rotors and live backdrop blur.
+   Privacy redaction uses filter, not backdrop-filter, and is intentionally left intact. */
+html[data-render-profile='iphone'] body * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+html[data-render-profile='iphone'] body *::before,
+html[data-render-profile='iphone'] body *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+html[data-render-profile='iphone'] dialog::backdrop {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Never animate/filter the entire, potentially very tall, record page on an iPhone. */
+html[data-render-profile='iphone'] body #view > .fx-stage {
+  animation: none !important;
+  filter: none;
+  will-change: auto;
+}
+html[data-render-profile='iphone'] body .fx-surface.fx-visible {
+  animation: none !important;
+}
+html[data-render-profile='iphone'] .fx-ribbon {
+  width: 230px;
+  height: 220px;
+  left: -60px;
+  top: 80px;
+  border: 0;
+  background: radial-gradient(ellipse, #74ccad40, #9ecbb622 40%, transparent 72%);
+  filter: none;
+  box-shadow: none;
+}
+html[data-render-profile='iphone'] .fx-ribbon:nth-child(2) {
+  left: 55%;
+  top: 60vh;
+  background: radial-gradient(ellipse, #baa2df40, #d8c99420 40%, transparent 72%);
+  box-shadow: none;
+}
+html[data-render-profile='iphone'] .fx-orbit {
+  width: 220px;
+  height: 220px;
+}
+html[data-render-profile='iphone'] :is(.fx-dust, .fx-comet, .fx-orbit) {
+  display: block;
+  box-shadow: none;
+}
+html[data-render-profile='iphone'] :is(.fx-orbit::after, .fx-shockwave) {
+  box-shadow: none;
+}
+html[data-render-profile='iphone'] .fx-comet {
+  width: 120px;
+}
+
+/* A tiny travelling edge glint replaces the rotor that was 4.6 times each card's size.
+   JavaScript limits active glints to six near the viewport, including on long record lists. */
+html[data-render-profile='iphone'] .fx-panel-aura {
+  inset: 1px auto auto 12%;
+  width: 96px;
+  height: 3px;
+  padding: 0;
+  border-radius: 4px;
+  background: #90bba518;
+  -webkit-mask: none;
+  mask: none;
+}
+html[data-render-profile='iphone'] .fx-panel-aura::before {
+  inset: 0 auto auto 0;
+  width: 36px;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #d7bf74, #88c2a8, transparent);
+  animation: iphone-edge-glint 4s ease-in-out infinite alternate;
+  animation-play-state: paused;
+}
+html[data-render-profile='iphone']
+  body[data-spectacle='spectacle']
+  .fx-visible
+  > .fx-panel-aura::before {
+  animation-play-state: running;
+}
+html[data-render-profile='iphone'] body[data-spectacle='spectacle'] #hubSiteTitle {
+  animation: none;
+  text-shadow: none;
+}
+html[data-render-profile='iphone']
+  body[data-spectacle='spectacle']
+  #tabs
+  button[aria-current='page']::after {
+  inset: 0;
+}
+
+/* Preserve the forest, water, wildlife and light movement without blur sampling or 3D cards. */
+html[data-render-profile='iphone'] .mv-atmosphere i {
+  width: 260px;
+  height: 260px;
+  filter: none;
+}
+html[data-render-profile='iphone'] .mv-widget-shell {
+  transform: none !important;
+  will-change: auto;
+}
+html[data-render-profile='iphone'] :is(.mv-aurora i, .mv-landscape) {
+  filter: none !important;
+}
+html[data-render-profile='iphone'] .mv-light-beams {
+  inset: 0;
+  mix-blend-mode: normal;
+}
+html[data-render-profile='iphone'] .my-day-page[data-mv-motion='flow'] .mv-river-body {
+  animation: iphone-water-light 3s ease-in-out infinite alternate;
+}
+html[data-render-profile='iphone'] :is(.mv-motes i, .mv-tap-ripple, .mv-ripple) {
+  box-shadow: none;
+}
+html[data-render-profile='iphone']
+  :is(
+    .mv-motes i:nth-child(n + 9),
+    .mv-wind-leaves > g:nth-child(n + 7),
+    .mv-milestone b:nth-of-type(n + 13)
+  ) {
+  display: none;
+}
+html[data-render-profile='iphone'] .mv-milestone b {
+  text-shadow: none;
+}
+html[data-render-profile='iphone']
+  body[data-spectacle='spectacle']
+  :is(.world-scene > path, .world-window-weather) {
+  animation: none;
+  filter: none;
+}
+
+/* The terrarium retains its plants, fireflies, water rings and orbiting lights. */
+html[data-render-profile='iphone'] :is(.rest-halo, .rest-glass-light, .rest-water, .rest-aurora i) {
+  filter: none;
+}
+html[data-render-profile='iphone'] .rest-aurora i {
+  width: 85%;
+  border-width: 12px;
+  box-shadow: none;
+}
+html[data-render-profile='iphone'] .rest-aurora i:nth-child(n + 3),
+html[data-render-profile='iphone'] .rest-firefly:nth-of-type(n + 9) {
+  display: none;
+}
+html[data-render-profile='iphone']
+  :is(.rest-firefly, .rest-star-ring::before, .rest-star-ring::after, .rest-moon) {
+  box-shadow: none;
+}
+html[data-render-profile='iphone'] .rest-room .rest-moon {
+  box-shadow: none;
+}
+html[data-render-profile='iphone']
+  .rest-room[data-motion='flow']:not([data-phase='paused'])
+  .rest-globe {
+  animation: iphone-rest-breathe 4.5s ease-in-out infinite;
+}
+html[data-render-profile='iphone']
+  .rest-room[data-motion='flow']:not([data-phase='paused'])
+  .rest-moon {
+  animation: iphone-moon-float 4s ease-in-out infinite alternate;
+}
+@keyframes iphone-edge-glint {
+  to {
+    transform: translateX(60px);
+    opacity: 0.5;
+  }
+}
+@keyframes iphone-water-light {
+  from {
+    opacity: 0.8;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes iphone-rest-breathe {
+  50% {
+    transform: scale(1.04) translateY(-6px);
+  }
+}
+@keyframes iphone-moon-float {
+  to {
+    transform: translate(-14px, -18px) scale(1.08);
+  }
+}

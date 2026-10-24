@@ -162,3 +162,26 @@ Effects are local decorations. Feedback is capped, offscreen panel borders pause
 panels are unobserved, and hidden pages release interaction effects. Motion Off, device reduced
 motion, Privacy and Present suppress the spectacle. My Day Calm still stops its scenery. No
 animation writes records or changes the existing drag, resize, timer or form actions.
+
+
+## iPhone rendering budget
+
+`render-profile.js` runs in the head before feature styles. Only an iPhone user-agent or
+`navigator.platform === 'iPhone'` selects the lighter path; iPad, Android and desktop browsers
+retain the full effects even at narrow window widths. The selection is local and does not
+rewrite account preferences. `iphone-motion.css` is gated by that early profile.
+
+On iPhone, global decoration creates two bounded gradient ribbons, one orbit, twelve particles
+and two comets. Click feedback is capped at 28 nodes and panel glints at six intersecting panels.
+Small travelling glints replace oversized masked rotors. Whole-page filter/arrival animations,
+3D widget tilt, animated panel shadows and backdrop blurs are removed from this profile. Moving
+trees, river currents, ripples, wildlife and terrarium plants/lights remain. Privacy text blur,
+motion-off/reduced-motion controls, drag coordinates, records and the break alarm are preserved.
+
+The profile and computed styles can be tested in a simulated iPhone browser path; this does not
+measure real iPhone GPU memory or establish that a particular device crash is resolved.
+
+Music playback gain is higher for both focus tracks and all three rest tracks at the same slider
+positions. Focus music keeps the existing output compressor; rest music retains full-volume
+signal headroom. Volume zero, mute, pause, separate focus/rest preferences, and the alarm's
+independent gain and explicit Resume work behavior are retained.

@@ -3,11 +3,23 @@
   'use strict';
   const body = document.body,
     view = document.getElementById('view'),
+    iphone = root.WorkHubRenderProfile?.iphone === true,
+    budget = root.WorkHubRenderProfile?.budget || {
+      ribbons: 3,
+      orbits: 3,
+      particles: 32,
+      comets: 5,
+      reactions: 140,
+      rings: 3,
+      burst: 22,
+      panels: Infinity,
+    },
     reduced = root.matchMedia?.('(prefers-reduced-motion: reduce)'),
     surfaces =
       '.hub-card,.mv-widget-shell,.ticket-folio,.task-main-card,.wl-snippet,.panel.box,.val-summary,.claim-summary,.project-banner,.hub-head,.workspace-v10 > header,.bl-library-mark',
     layer = document.createElement('div');
-  const observedSurfaces = new Set();
+  const observedSurfaces = new Set(),
+    visibleSurfaces = new Set();
   let queued = false,
     lastStage = null,
     lastTrail = 0,
@@ -15,7 +27,7 @@
     lastY = 0;
   layer.id = 'hubSpectacle';
   layer.setAttribute('aria-hidden', 'true');
-  layer.innerHTML = `<div class="fx-sky">${Array.from({ length: 3 }, (_, i) => `<i class="fx-ribbon" style="--i:${i}"></i>`).join('')}${Array.from({ length: 3 }, (_, i) => `<i class="fx-orbit" style="--i:${i}"></i>`).join('')}${Array.from({ length: 32 }, (_, i) => `<i class="fx-dust" style="--i:${i};--x:${(i * 37) % 100}%;--y:${(i * 61) % 100}%;--travel:${45 + ((i * 23) % 110)}px"></i>`).join('')}${Array.from({ length: 5 }, (_, i) => `<i class="fx-comet" style="--i:${i};top:${8 + i * 19}%;left:${35 + ((i * 17) % 60)}%"></i>`).join('')}</div><div class="fx-reactions"></div>`;
+  layer.innerHTML = `<div class="fx-sky">${Array.from({ length: budget.ribbons }, (_, i) => `<i class="fx-ribbon" style="--i:${i}"></i>`).join('')}${Array.from({ length: budget.orbits }, (_, i) => `<i class="fx-orbit" style="--i:${i}"></i>`).join('')}${Array.from({ length: budget.particles }, (_, i) => `<i class="fx-dust" style="--i:${i};--x:${(i * 37) % 100}%;--y:${(i * 61) % 100}%;--travel:${45 + ((i * 23) % 110)}px"></i>`).join('')}${Array.from({ length: budget.comets }, (_, i) => `<i class="fx-comet" style="--i:${i};top:${8 + i * 19}%;left:${35 + ((i * 17) % 60)}%"></i>`).join('')}</div><div class="fx-reactions"></div>`;
   body.append(layer);
   const reactions = layer.querySelector('.fx-reactions');
   const allowed = () =>
@@ -31,10 +43,21 @@
   const visibility =
     typeof root.IntersectionObserver === 'function'
       ? new root.IntersectionObserver(
-          entries =>
-            entries.forEach(({ target, isIntersecting }) =>
-              target.classList.toggle('fx-visible', isIntersecting)
-            ),
+          entries => {
+            for (const { target, isIntersecting } of entries) {
+              if (isIntersecting) visibleSurfaces.add(target);
+              else {
+                visibleSurfaces.delete(target);
+                target.classList.remove('fx-visible');
+              }
+              if (!iphone) target.classList.toggle('fx-visible', isIntersecting);
+            }
+            if (iphone) {
+              let count = 0;
+              for (const target of visibleSurfaces)
+                target.classList.toggle('fx-visible', count++ < budget.panels);
+            }
+          },
           { rootMargin: '80px' }
         )
       : null;
@@ -45,6 +68,7 @@
       if (!el.isConnected) {
         visibility?.unobserve(el);
         observedSurfaces.delete(el);
+        visibleSurfaces.delete(el);
       }
     }
     const stage = view?.firstElementChild;
@@ -60,7 +84,7 @@
       if (visibility && !observedSurfaces.has(el)) {
         visibility.observe(el);
         observedSurfaces.add(el);
-      } else if (!visibility) el.classList.add('fx-visible');
+      } else if (!visibility) el.classList.toggle('fx-visible', !iphone);
       if (!el.querySelector(':scope > .fx-panel-aura')) {
         const aura = document.createElement('span');
         aura.className = 'fx-panel-aura';
@@ -85,11 +109,12 @@
       lastTrail = 0;
       visibility?.disconnect();
       observedSurfaces.clear();
+      visibleSurfaces.clear();
     } else scheduleDress();
   }
   function effect(className, x, y, dx = 0, dy = 0, i = 0) {
     // Rapid clicking cannot accumulate unlimited DOM or animation work.
-    while (reactions.childElementCount >= 140) reactions.firstElementChild.remove();
+    while (reactions.childElementCount >= budget.reactions) reactions.firstElementChild.remove();
     const el = document.createElement('i');
     el.className = className;
     el.style.cssText = `left:${x}px;top:${y}px;--dx:${dx}px;--dy:${dy}px;--i:${i}`;
@@ -100,7 +125,13 @@
   document.addEventListener(
     'pointermove',
     event => {
-      if (!allowed() || event.buttons || busy(event.target) || event.pointerType === 'touch')
+      if (
+        iphone ||
+        !allowed() ||
+        event.buttons ||
+        busy(event.target) ||
+        event.pointerType === 'touch'
+      )
         return;
       const now = root.performance?.now() || Date.now();
       if (now - lastTrail < 42 || Math.hypot(event.clientX - lastX, event.clientY - lastY) < 7)
@@ -123,13 +154,13 @@
         x = event.clientX || rect.left + rect.width / 2,
         y = event.clientY || rect.top + rect.height / 2,
         navigation = !!control.closest('#tabs');
-      for (let i = 0; i < 3; i++) effect('fx-shockwave', x, y, 0, 0, i);
-      for (let i = 0; i < (navigation ? 22 : 14); i++) {
+      for (let i = 0; i < budget.rings; i++) effect('fx-shockwave', x, y, 0, 0, i);
+      for (let i = 0; i < (navigation ? budget.burst : Math.min(14, budget.burst)); i++) {
         const angle = i * 2.39996,
           distance = 55 + (i % 5) * 23;
         effect('fx-burst-star', x, y, Math.cos(angle) * distance, Math.sin(angle) * distance, i);
       }
-      if (navigation) effect('fx-scene-sweep', x, y);
+      if (navigation && !iphone) effect('fx-scene-sweep', x, y);
     },
     { capture: true, passive: true }
   );
@@ -152,6 +183,7 @@
     reactions.replaceChildren();
     visibility?.disconnect();
     observedSurfaces.clear();
+    visibleSurfaces.clear();
   });
   root.addEventListener('pageshow', sync);
   root.WorkHubSpectacle = { sync };

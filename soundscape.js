@@ -69,7 +69,7 @@
       for (const k of Object.keys(NAMES))
         gain(
           channels[k],
-          (mix[k] / 100) * (k === 'lofi' ? 1.8 : k === 'cafe' ? 0.16 : k === 'forest' ? 0.2 : 0.36)
+          (mix[k] / 100) * (k === 'lofi' ? 2.8 : k === 'cafe' ? 0.16 : k === 'forest' ? 0.2 : 0.36)
         );
       persist();
       paint();
