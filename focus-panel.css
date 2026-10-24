@@ -1,6 +1,7 @@
 /* focus-panel.css — Draggable mini focus timer, compact audio controls and phone layout.
    See docs/FILE-MAP.md. Keep rule order: later selectors can override earlier ones. */
-#focusModeButton {
+#focusModeButton,
+#breakTerrariumButton {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -8,6 +9,33 @@
 #focusModeButton[aria-expanded='true'] {
   background: var(--hub-accent-soft, #ede6f6);
   border-color: var(--hub-accent, #8d70a5);
+}
+#hubToolbar .hub-focus-shortcuts {
+  display: flex;
+  flex: 0 1 auto;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+#hubToolbar #focusShortcuts > button {
+  flex: 1 1 auto;
+  max-width: none;
+  text-align: center;
+  justify-content: center;
+  color: var(--hub-ink);
+}
+#hubToolbar .hub-focus-shortcuts svg {
+  flex-shrink: 0;
+}
+@media (max-width: 650px) {
+  #hubToolbar .hub-focus-shortcuts {
+    flex: 1 1 100%;
+    gap: 7px;
+  }
+  #hubToolbar #focusShortcuts > button {
+    flex: 1 1 0;
+    min-width: 0;
+  }
 }
 #focusPanel {
   position: fixed;
