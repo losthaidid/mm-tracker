@@ -662,9 +662,9 @@ body[data-motion='calm'] {
   left: -30vw;
   top: -35vh;
   border-radius: 50%;
-  border: 40px solid #4dcbad29;
+  border: 55px solid #4dcbad44;
   box-shadow:
-    0 0 65px #68d9c144,
+    0 0 65px #68d9c166,
     inset 0 0 75px #a38bef30;
   filter: blur(8px);
   transform-origin: 80% 70%;
@@ -674,14 +674,14 @@ body[data-motion='calm'] {
 .fx-ribbon:nth-child(2) {
   left: 50vw;
   top: 15vh;
-  border-color: #b59bed24;
+  border-color: #b59bed40;
   box-shadow: 0 0 65px #9f94d444;
   animation-duration: 14s;
 }
 .fx-ribbon:nth-child(3) {
   top: 75vh;
   left: 5vw;
-  border-color: #e5c77130;
+  border-color: #e5c7714d;
   box-shadow: 0 0 55px #e3c78638;
   animation-duration: 9s;
 }
@@ -729,13 +729,13 @@ body[data-motion='calm'] {
 }
 .fx-comet {
   position: absolute;
-  width: 190px;
+  width: 240px;
   height: 2px;
   border-radius: 50%;
   background: linear-gradient(90deg, transparent, #b8a0db, #5eaa98);
   box-shadow: 16px 0 15px #72c4af77;
   opacity: 0;
-  animation: fx-comet-flight calc(6s + var(--i) * 1.4s) ease-out infinite;
+  animation: fx-comet-flight calc(4s + var(--i) * 1.1s) ease-out infinite;
   animation-delay: calc(var(--i) * -2.3s);
 }
 .fx-surface {

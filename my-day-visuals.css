@@ -1704,6 +1704,28 @@ body[data-hub-theme='dark'] .mv-widget-kicker {
 .my-day-page[data-mv-motion='flow'] .mv-atmosphere i {
   animation: mv-sun-bloom 5s ease-in-out infinite alternate;
 }
+.my-day-page[data-effects='playful'][data-mv-motion='flow'] .mv-light-beams {
+  animation-duration: 3.2s;
+  opacity: 0.85;
+}
+.my-day-page[data-effects='playful'][data-mv-motion='flow'] .mv-sun-rays {
+  animation-duration: 14s;
+}
+.my-day-page[data-effects='playful'][data-mv-motion='flow'] .mv-aurora i {
+  animation-duration: 3.5s;
+}
+.my-day-page[data-effects='playful'][data-mv-motion='flow'] .mv-tree {
+  animation-name: mv-tree-storm;
+  animation-duration: 2.8s;
+}
+@keyframes mv-tree-storm {
+  from {
+    transform: rotate(-9deg) skewX(-3deg);
+  }
+  to {
+    transform: rotate(12deg) skewX(3deg);
+  }
+}
 @keyframes mv-tree-gust {
   from {
     transform: rotate(-6deg) skewX(-2deg);
