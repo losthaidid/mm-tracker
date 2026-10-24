@@ -15,7 +15,7 @@ test('production loads existing local assets, engines before interfaces, and the
  assert.equal(new Set(scripts).size,scripts.length);
  assert.equal(scripts.at(-1),'app.js');assert.equal(styles[0],'base.css');assert.equal(styles.at(-1),'custom.css');
  for(const [before,after]of [['vendor/jszip.min.js','app.js'],['tng-wallet.js','tng-engine.js'],['tng-engine.js','tng-files.js'],['studio.js','app.js'],['my-day-engine.js','my-day.js'],['my-day-visuals.js','my-day.js'],['my-day.js','studio.js'],['validator-engine.js','validator-studio.js'],['validator-files.js','validator-studio.js'],['leave-balance-engine.js','leave-balances.js'],['leave-balances.js','studio.js'],['claims-engine.js','claims.js'],['recipients-engine.js','recipients.js'],['work-library-engine.js','work-library.js']])assert.ok(scripts.indexOf(before)<scripts.indexOf(after),before+' before '+after);
- for(const [before,after]of [['rest-audio.js','rest-room.js'],['rest-room.js','my-day.js']])assert.ok(scripts.indexOf(before)<scripts.indexOf(after));
+ for(const [before,after]of [['presentation-break.js','focus-panel.js'],['rest-audio.js','rest-room.js'],['rest-room.js','my-day.js']])assert.ok(scripts.indexOf(before)<scripts.indexOf(after));
  assert.ok(styles.indexOf('my-day.css')<styles.indexOf('my-day-visuals.css'));assert.ok(styles.indexOf('my-day-visuals.css')<styles.indexOf('rest-room.css'));
  assert.ok([...document.querySelectorAll('script:not([src])')].every(s=>s.type==='application/json'),'page only embeds JSON, not executable application code');
  const seed=JSON.parse(document.getElementById('seedData').textContent);

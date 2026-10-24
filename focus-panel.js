@@ -46,6 +46,7 @@
     String(Math.floor(n / 60)).padStart(2, '0') + ':' + String(n % 60).padStart(2, '0');
   function install(a) {
     const $ = id => document.getElementById(id);
+    const presentationBreak = root.WorkHubPresentationBreak?.install(a);
     let owner = '',
       opened = false,
       minimized = false,
@@ -86,6 +87,7 @@
       if (!a.ready()) throw Error('Sign in to open Focus mode.');
     }
     function syncOwner() {
+      presentationBreak?.sync();
       const next = a.owner();
       if (next !== owner) {
         const prior = owner;
@@ -146,6 +148,19 @@
       if (reminder && reminder.nextElementSibling !== shortcuts) reminder.after(shortcuts);
       else if (shortcuts.parentElement !== bar) bar.append(shortcuts);
       shortcuts.hidden = !a.ready();
+      let presentation = $('presentationBreakButton');
+      if (presentationBreak && !presentation) {
+        presentation = document.createElement('button');
+        presentation.id = 'presentationBreakButton';
+        presentation.type = 'button';
+        presentation.dataset.pb = 'open';
+        presentation.setAttribute('aria-haspopup', 'dialog');
+        presentation.innerHTML = art('expand', 15) + '<span>Presentation break</span>';
+      }
+      if (presentation) {
+        if (shortcuts.nextElementSibling !== presentation) shortcuts.after(presentation);
+        presentation.hidden = !a.ready();
+      }
     }
     function build() {
       if ($('focusPanel')) return;
@@ -249,6 +264,7 @@
       el.style.top = top + ry * position.y + 'px';
     }
     function refresh(force = false) {
+      presentationBreak?.sync();
       const el = $('focusPanel');
       if (!el) return;
       const s = a.focus(),
