@@ -2693,6 +2693,41 @@ test('claims status rejects excess payment, concurrent edits and stale owner for
 });
 
 const mdAction=(ui,action,extra={})=>ui.handle({dataset:{md:action,...extra}});
+test('My Day design: chapters preserve saved order and sizes, survive widget refresh and offer an empty view',async t=>{
+ const {api,document,window,db}=await app(t);api.showTab('home');await settle();
+ const layout=copy(api.state().workhub.widgets),before=copy(api.state()),calls=db.calls.length;
+ const ids=()=>[...document.querySelectorAll('.hub-layout>[data-widget]')].map(x=>x.dataset.widget);
+ const initial=ids();document.querySelector('[data-mv="view"][data-view="work"]').click();
+ assert.equal(document.querySelector('.my-day-page').dataset.mvView,'work');
+ assert.ok([...document.querySelectorAll('.hub-layout>[data-widget]:not([hidden])')].every(x=>window.WorkHubMyDayVisuals.phase(x.dataset.widget)==='work'));
+ assert.deepEqual(ids(),initial);assert.equal(document.querySelector('[data-widget="today"]').hidden,true);
+ await mdAction(api.hub.myDay,'expand',{id:'tasks'});
+ assert.equal(document.querySelector('.my-day-page').dataset.mvView,'work');assert.equal(document.querySelector('[data-widget="tasks"] [data-md="expand"]').getAttribute('aria-expanded'),'true');
+ document.querySelector('[data-mv="view"][data-view="all"]').click();assert.deepEqual(ids(),initial);assert.ok([...document.querySelectorAll('.hub-layout>[data-widget]')].every(x=>!x.hidden));
+ assert.deepEqual(copy(api.state().workhub.widgets),layout);assert.deepEqual(copy(api.state()),before);assert.equal(db.calls.length,calls);
+ api.mutate(d=>d.workhub.widgets=d.workhub.widgets.filter(x=>window.WorkHubMyDayVisuals.phase(x.id)!=='reflect'));api.showTab('home');await settle();const saved=db.calls.length;
+ document.querySelector('[data-mv="view"][data-view="reflect"]').click();assert.equal(document.querySelector('.mv-no-widgets').hidden,false);assert.equal(document.querySelectorAll('.hub-layout>[data-widget]:not([hidden])').length,0);assert.equal(db.calls.length,saved);
+});
+test('My Day design: live widget previews cancel cleanly and a released drop saves exactly once',async t=>{
+ const {api,document,window,db}=await app(t);api.showTab('home');await settle();
+ const ids=()=>[...document.querySelectorAll('.hub-layout>[data-widget]')].map(x=>x.dataset.widget),initial=ids(),layout=copy(api.state().workhub.widgets),calls=db.calls.length;
+ const start=()=>{const source=document.querySelector('[data-widget="today"]'),target=document.querySelector('[data-widget="tasks"]');document.elementFromPoint=()=>target;pointer(window,source.querySelector('[data-hub-drag]'),'pointerdown',100,100);pointer(window,document,'pointermove',200,200);return source;};
+ let source=start();assert.notDeepEqual(ids(),initial);assert.equal(source.classList.contains('mv-sort-space'),true);assert.deepEqual(copy(api.state().workhub.widgets),layout);assert.equal(db.calls.length,calls);
+ pointer(window,document,'pointercancel',200,200);assert.deepEqual(ids(),initial);assert.equal(document.querySelector('.mv-sort-space,.hub-sort-ghost'),null);assert.deepEqual(copy(api.state().workhub.widgets),layout);
+ source=start();document.elementFromPoint=()=>source;pointer(window,document,'pointermove',201,201);pointer(window,document,'pointerup',201,201);await settle();assert.equal(db.calls.length,calls+1);assert.equal(api.state().workhub.widgets[0].id,'tasks');assert.equal(api.state().workhub.widgets[1].id,'today');assert.equal(document.querySelector('.mv-sort-space,.hub-sort-ghost'),null);
+});
+test('My Day design: chart categories drill down without writes and motion guards stop decorative work',async t=>{
+ const {api,document,window,db}=await app(t);reminderClock(window,'2026-10-24T09:00:00');
+ api.openRangeEditor('2026-10-24','09:00','',true);let f=document.getElementById('scheduleForm');fill(f,{text:'Planning session'});api.saveRange(f);
+ api.mutate(d=>{d.workhub.widgets.push({id:'radar',span:'normal'});d.workhub.myDay.settings.effects='ambient';d.workhub.preferences.motion='playful';});api.showTab('home');await settle();const calls=db.calls.length,ui=api.hub.myDay;
+ document.querySelector('[data-md="radar"][data-kind="custom"]').click();await settle();assert.match(document.querySelector('.md-drilldown').textContent,/Planning session/);assert.equal(document.querySelector('[data-md="radar"][data-kind="custom"]').getAttribute('aria-pressed'),'true');
+ document.querySelector('[data-md="radar"][data-kind="free"]').click();await settle();assert.match(document.querySelector('.md-drilldown').textContent,/Free time/);document.querySelector('[data-md="radar"][data-kind="free"]').click();await settle();assert.equal(document.querySelector('.md-drilldown'),null);assert.equal(db.calls.length,calls);
+ let reduced=false;window.matchMedia=()=>({matches:reduced});ui.visual.sync();assert.equal(document.querySelector('.my-day-page').dataset.mvMotion,'flow');
+ let cancelled=0,started=0;window.Element.prototype.animate=()=>{started++;return{cancel(){cancelled++;},finished:new Promise(()=>{})};};api.showTab('tasks');api.showTab('home');assert.ok(started>0);reduced=true;ui.visual.sync();assert.equal(document.querySelector('.my-day-page').dataset.mvMotion,'still');assert.ok(cancelled>0);
+ reduced=false;document.body.classList.add('hub-private');ui.visual.sync();assert.equal(document.querySelector('.my-day-page').dataset.mvMotion,'still');document.body.classList.remove('hub-private');
+ Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new window.Event('visibilitychange'));assert.equal(document.querySelector('.my-day-page').dataset.mvMotion,'still');Object.defineProperty(document,'hidden',{configurable:true,value:false});ui.visual.sync();assert.equal(document.querySelector('.my-day-page').dataset.mvMotion,'flow');
+ document.querySelector('[data-mv="view"][data-view="work"]').click();api.cloud.user={id:'22222222-2222-4222-8222-222222222222'};api.showTab('home');assert.equal(document.querySelector('.my-day-page').dataset.mvView,'all');assert.equal(db.calls.length,calls);
+});
 test('My Day: canvas ideas, groups and connections persist through cloud reload and backup, with idempotent task conversion',async t=>{
  const {api,document,window,db}=await app(t),ui=api.hub.myDay;api.showTab('home');
  await mdAction(ui,'groups');let f=document.getElementById('mdGroups');fill(f,{newName:'Fresh ideas'});ui.submit(f);const group=api.state().workhub.myDay.groups[0].id;

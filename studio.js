@@ -2832,6 +2832,7 @@
         return;
       }
       if (action === 'widget-up') {
+        myDay?.visual?.captureLayout();
         save(h => {
           const i = h.widgets.findIndex(w => w.id === id);
           if (i > 0) [h.widgets[i - 1], h.widgets[i]] = [h.widgets[i], h.widgets[i - 1]];
@@ -2839,6 +2840,7 @@
         return;
       }
       if (action === 'widget-size') {
+        myDay?.visual?.captureLayout();
         save(h => {
           const w = h.widgets.find(w => w.id === id);
           w.span = w.span === 'wide' ? 'normal' : 'wide';
@@ -3367,10 +3369,11 @@
     // Pointer-based sorting works with a mouse or touch; only handles capture gestures.
     let sorting = null,
       sortSuppressClickUntil = 0;
-    function clearSort() {
+    function clearSort(committing = false) {
       if (!sorting) return null;
       const done = sorting;
       sorting = null;
+      if (done.type === 'widget') myDay?.visual?.endSort(committing);
       done.ghost?.remove();
       done.source.classList.remove('hub-dragging');
       document
@@ -3384,6 +3387,7 @@
     }
     function reorderWidget(id, targetId) {
       if (id === targetId) return;
+      myDay?.visual?.captureLayout();
       save(h => {
         const from = h.widgets.findIndex(w => w.id === id),
           to = h.widgets.findIndex(w => w.id === targetId);
@@ -3426,7 +3430,9 @@
           const ghost = sorting.source.cloneNode(true);
           ghost.removeAttribute('id');
           ghost.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
-          ghost.className = 'hub-sort-ghost hub-card';
+          ghost.className =
+            'hub-sort-ghost hub-card' +
+            (sorting.source.closest('.my-day-page') ? ' mv-sort-ghost' : '');
           ghost.setAttribute('aria-hidden', 'true');
           ghost.inert = true;
           const rect = sorting.source.getBoundingClientRect();
@@ -3453,8 +3459,10 @@
         document
           .querySelectorAll('.hub-drop-target')
           .forEach(el => el.classList.remove('hub-drop-target'));
-        sorting.target = target && target !== sorting.source ? target : null;
+        if (!(sorting.type === 'widget' && target === sorting.source && sorting.target))
+          sorting.target = target && target !== sorting.source ? target : null;
         sorting.target?.classList.add('hub-drop-target');
+        if (sorting.type === 'widget') myDay?.visual?.previewSort(sorting.source, sorting.target);
         if (event.clientY < 65) root.scrollBy?.(0, -14);
         else if (event.clientY > root.innerHeight - 65) root.scrollBy?.(0, 14);
         if (sorting.type === 'task') {
@@ -3470,7 +3478,7 @@
     );
     document.addEventListener('pointerup', event => {
       if (!sorting || event.pointerId !== sorting.pointerId) return;
-      const done = clearSort();
+      const done = clearSort(!!sorting.target && sorting.moved);
       if (!done.moved) return;
       sortSuppressClickUntil = Date.now() + 600;
       event.preventDefault();
