@@ -17,9 +17,10 @@ body.rest-room-open {
   overflow-x: hidden;
   overscroll-behavior: contain;
   color: #e7efe2;
-  background:
+  --rest-background:
     radial-gradient(ellipse at 75% 28%, #34675f80, transparent 48%),
     linear-gradient(135deg, #102b31, #193b3c 55%, #234d45);
+  background: var(--rest-background);
   font:
     14px/1.6 system-ui,
     sans-serif;
@@ -728,4 +729,33 @@ body.hub-private .rest-room *,
 body.hub-present .rest-room * {
   animation: none !important;
   transition: none !important;
+}
+
+/* Fullscreen is requested on the content, since dialogs cannot be fullscreen targets. */
+.rest-room-shell:fullscreen {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  margin: 0;
+  overflow: auto;
+  overflow-x: hidden;
+  background: var(--rest-background);
+}
+.rest-room-top-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.rest-fullscreen-status {
+  font-size: 11px;
+  line-height: 1.7;
+  color: #bdcfc2;
+  margin: 12px 0 0;
+}
+@media (max-width: 640px) {
+  .rest-room-top-actions {
+    justify-content: flex-start;
+  }
 }

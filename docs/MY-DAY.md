@@ -196,7 +196,7 @@ independent gain and explicit Resume work behavior are retained.
 
 The shared toolbar has **Break Terrarium** immediately after **Focus mode** on every section.
 It starts the same full-screen rest session using the saved break length in **Effects & hours**.
-An existing break opens again without resetting it. The shared work/focus pause, rest music,
+Starting or reopening a break requests browser full screen directly from the click. The complete rest content enters full screen, including music and Resume work controls. Full screen can be toggled from the rest screen; leaving it keeps the session and paused work intact. Browsers without support or permission retain the full-window terrarium with a status message and retry when available. An existing break opens again without resetting it. The shared work/focus pause, rest music,
 repeating alarm and explicit **Resume work** behavior remain in the same rest controller.
 The shortcut returns focus to itself after resuming and is hidden when signed out.
 

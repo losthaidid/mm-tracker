@@ -16,7 +16,8 @@
       session = null,
       dialog = null,
       trigger = null,
-      resuming = false;
+      resuming = false,
+      fullscreenPending = null;
     const audio = root.WorkHubRestAudio.install({
       ready: () => a.ready() && !!session && session.owner === a.owner(),
       change: () => paintAudio(),
@@ -43,13 +44,66 @@
     function close() {
       audio.stop();
       if (dialog) {
+        // Only leave fullscreen owned by this rest room, never another feature.
+        if (document.fullscreenElement && dialog.contains(document.fullscreenElement))
+          try {
+            void document.exitFullscreen?.().catch(() => {});
+          } catch {}
         try {
           dialog.close();
         } catch {}
         dialog.remove();
         dialog = null;
       }
+      fullscreenPending = null;
       document.body.classList.remove('rest-room-open');
+    }
+    function paintFullscreen(message = '') {
+      if (!dialog) return;
+      const stage = dialog.querySelector('.rest-room-shell'),
+        button = dialog.querySelector('[data-rest="fullscreen"]'),
+        status = dialog.querySelector('[data-rest-fullscreen-status]');
+      button.hidden = typeof stage.requestFullscreen !== 'function';
+      button.disabled = !!fullscreenPending;
+      button.textContent =
+        document.fullscreenElement === stage ? 'Exit full screen' : 'Full screen';
+      button.setAttribute('aria-pressed', String(document.fullscreenElement === stage));
+      status.textContent = message;
+      status.hidden = !message;
+    }
+    async function fullscreen() {
+      const room = dialog,
+        current = session;
+      if (!room || !current || fullscreenPending) return;
+      const stage = room.querySelector('.rest-room-shell');
+      if (document.fullscreenElement === stage) return;
+      const request = { room, current };
+      fullscreenPending = request;
+      paintFullscreen();
+      try {
+        // A dialog itself cannot enter fullscreen. Its complete content can.
+        // Keep this call inside the click gesture; do not await audio first.
+        if (!stage.requestFullscreen) throw Error('Fullscreen unavailable');
+        await stage.requestFullscreen();
+        if (dialog !== room || session !== current || !a.ready() || current.owner !== a.owner()) {
+          if (document.fullscreenElement === stage)
+            void document.exitFullscreen?.().catch(() => {});
+          return;
+        }
+      } catch {
+        if (dialog === room && session === current && a.ready() && current.owner === a.owner())
+          paintFullscreen(
+            'Automatic full screen was unavailable. Your break stays open here; use Full screen to retry if available.'
+          );
+      } finally {
+        if (fullscreenPending === request) {
+          fullscreenPending = null;
+          if (dialog === room) {
+            const button = room.querySelector('[data-rest="fullscreen"]');
+            button.disabled = false;
+          }
+        }
+      }
     }
     function sync() {
       const next = a.ready() ? a.owner() : '';
@@ -99,7 +153,7 @@
       dialog.setAttribute('aria-labelledby', 'restRoomTitle');
       dialog.setAttribute('aria-describedby', 'restRoomDescription');
       dialog.setAttribute('aria-modal', 'true');
-      dialog.innerHTML = `<div class="rest-room-shell"><header class="rest-room-top"><span class="rest-wordmark"><i aria-hidden="true">♧</i> YOUR REST TERRARIUM</span><span class="rest-state-chip" data-rest-phase-label></span></header><div class="rest-room-main"><section class="rest-copy"><span class="rest-kicker" data-rest-label></span><h2 id="restRoomTitle">A little pause.<br><em>A world of calm.</em></h2><p id="restRoomDescription">Let the world wait a moment. Your work and focus timers are safely paused.</p><div class="rest-countdown" role="timer" aria-label="Break time remaining" aria-live="off"><span data-rest-clock>05:00</span><small data-rest-clock-label>TIME JUST FOR YOU</small></div><div class="rest-progress" aria-hidden="true"><i data-rest-progress></i></div><p class="rest-live-status" role="status" data-rest-status></p><div class="rest-room-actions"><button type="button" class="rest-primary" data-rest="pause">Pause break</button><button type="button" data-rest="end">End break early</button><button type="button" class="rest-primary" data-rest="resume" hidden>Resume work <span aria-hidden="true">↗</span></button></div></section>${scene()}</div><section class="rest-audio-panel" aria-label="Rest soundscape"><div class="rest-music-label"><span aria-hidden="true" class="rest-music-waves"><i></i><i></i><i></i><i></i></span><div><strong>A different rhythm for rest</strong><small>Your focus soundscape stays unchanged.</small></div></div><label class="rest-track-label">Rest soundscape<select data-rest-track aria-label="Rest soundscape">${Object.entries(
+      dialog.innerHTML = `<div class="rest-room-shell"><header class="rest-room-top"><span class="rest-wordmark"><i aria-hidden="true">♧</i> YOUR REST TERRARIUM</span><div class="rest-room-top-actions"><span class="rest-state-chip" data-rest-phase-label></span><button type="button" data-rest="fullscreen" aria-pressed="false">Full screen</button></div></header><p class="rest-fullscreen-status" data-rest-fullscreen-status role="status" hidden></p><div class="rest-room-main"><section class="rest-copy"><span class="rest-kicker" data-rest-label></span><h2 id="restRoomTitle">A little pause.<br><em>A world of calm.</em></h2><p id="restRoomDescription">Let the world wait a moment. Your work and focus timers are safely paused.</p><div class="rest-countdown" role="timer" aria-label="Break time remaining" aria-live="off"><span data-rest-clock>05:00</span><small data-rest-clock-label>TIME JUST FOR YOU</small></div><div class="rest-progress" aria-hidden="true"><i data-rest-progress></i></div><p class="rest-live-status" role="status" data-rest-status></p><div class="rest-room-actions"><button type="button" class="rest-primary" data-rest="pause">Pause break</button><button type="button" data-rest="end">End break early</button><button type="button" class="rest-primary" data-rest="resume" hidden>Resume work <span aria-hidden="true">↗</span></button></div></section>${scene()}</div><section class="rest-audio-panel" aria-label="Rest soundscape"><div class="rest-music-label"><span aria-hidden="true" class="rest-music-waves"><i></i><i></i><i></i><i></i></span><div><strong>A different rhythm for rest</strong><small>Your focus soundscape stays unchanged.</small></div></div><label class="rest-track-label">Rest soundscape<select data-rest-track aria-label="Rest soundscape">${Object.entries(
         root.WorkHubRestAudio.TRACKS
       )
         .map(([key, s]) => `<option value="${key}">${s.name} · ${s.detail}</option>`)
@@ -115,6 +169,14 @@
         if (!action) return;
         sync();
         if (!session || session.owner !== a.owner()) return;
+        if (action === 'fullscreen') {
+          const stage = dialog.querySelector('.rest-room-shell');
+          if (document.fullscreenElement === stage)
+            try {
+              void document.exitFullscreen?.().catch(() => {});
+            } catch {}
+          else void fullscreen();
+        }
         if (action === 'pause') pause();
         if (action === 'end') finish(false);
         if (action === 'resume') resume();
@@ -139,7 +201,7 @@
       });
       document.body.append(dialog);
     }
-    function open() {
+    function open(automaticFullscreen = true) {
       sync();
       if (!session) return;
       ensureDialog();
@@ -151,6 +213,7 @@
           .focus();
       }
       paint();
+      if (automaticFullscreen) void fullscreen();
     }
     function paint() {
       if (!session || !dialog) return;
@@ -242,8 +305,10 @@
         complete: false,
         resume: { work, focus, music },
       };
-      open();
+      open(false);
       startSound();
+      // Start audio and request fullscreen synchronously from the same click.
+      void fullscreen();
       notify();
     }
     function pause() {
@@ -310,6 +375,9 @@
       paint();
     }
     document.addEventListener('visibilitychange', tick);
+    document.addEventListener('fullscreenchange', () => {
+      if (dialog) paintFullscreen();
+    });
     document.addEventListener(
       'keydown',
       event => {
