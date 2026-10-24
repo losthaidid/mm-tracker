@@ -86,7 +86,7 @@
           `<g transform="translate(${x} ${y})"><g class="mv-butterfly" style="--i:${i}"><g class="mv-butterfly-wings" fill="${c}"><path d="M0 0C-22-21-24 11 0 4Z"/><path d="M0 0C22-21 24 11 0 4Z"/></g><path d="M0-3V7" stroke="#294f46" stroke-width="2"/></g></g>`
       )
       .join('')}</g>
-    <g class="mv-wind-leaves" fill="#d6d49a">${Array.from({ length: 12 }, (_, i) => `<g transform="translate(${770 + ((i * 71) % 650)} ${170 + ((i * 37) % 220)})"><path style="--i:${i}" d="M0 0Q14-11 19 1Q9 14 0 0Z"/></g>`).join('')}</g></svg><div class="mv-light-beams"></div><div class="mv-aurora"><i></i><i></i></div><div class="mv-shooting-stars"><i></i><i></i></div><div class="mv-scene-haze"></div><div class="mv-motes">${Array.from({ length: 16 }, (_, i) => `<i style="--i:${i};left:${35 + ((i * 17) % 63)}%;top:${15 + ((i * 23) % 70)}%"></i>`).join('')}</div></div>`;
+    <g class="mv-wind-leaves" fill="#d6d49a">${Array.from({ length: 12 }, (_, i) => `<g transform="translate(${770 + ((i * 71) % 650)} ${170 + ((i * 37) % 220)})"><path style="--i:${i}" d="M0 0Q14-11 19 1Q9 14 0 0Z"/></g>`).join('')}</g></svg><div class="mv-light-beams"></div><div class="mv-shooting-stars"><i></i><i></i></div><div class="mv-scene-haze"></div><div class="mv-motes">${Array.from({ length: 16 }, (_, i) => `<i style="--i:${i};left:${35 + ((i * 17) % 63)}%;top:${15 + ((i * 23) % 70)}%"></i>`).join('')}</div></div>`;
   }
   function install(a) {
     let owner = '',

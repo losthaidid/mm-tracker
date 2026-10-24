@@ -533,7 +533,6 @@
         rain: 'Little raindrops racing down the glass. I am cheering for the wobbly one.',
         snow: 'Snowflakes! Every one of them looks like it has taken the afternoon off.',
         rainbow: 'The sky has brought all its favourite colours.',
-        aurora: 'The sky is doing a very slow, very fancy dance.',
         fog: 'The view has wrapped itself in a soft blanket.',
         breeze: 'The leaves are dancing. I should learn that move.',
         cloudy: 'That cloud looks like a biscuit. Most clouds do, if you believe enough.',

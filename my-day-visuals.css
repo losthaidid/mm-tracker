@@ -1102,7 +1102,6 @@
   mix-blend-mode: screen;
   transform-origin: 82% 20%;
 }
-.mv-aurora,
 .mv-shooting-stars {
   display: none;
   position: absolute;
@@ -1110,43 +1109,11 @@
   pointer-events: none;
   overflow: hidden;
 }
-.mv-hero[data-mv-period='night'] :is(.mv-aurora, .mv-shooting-stars) {
+.mv-hero[data-mv-period='night'] .mv-shooting-stars {
   display: block;
 }
 .mv-hero[data-mv-period='night'] :is(.mv-sun-rays, .mv-light-beams, .mv-butterflies) {
   display: none;
-}
-.mv-aurora i {
-  position: absolute;
-  left: 35%;
-  top: 1%;
-  width: 75%;
-  height: 38%;
-  border-radius: 50%;
-  background: linear-gradient(
-    165deg,
-    transparent 25%,
-    #6ee0ac12 29%,
-    #84f2b795 33%,
-    #6ccab360 38%,
-    transparent 48%
-  );
-  filter: blur(10px);
-  transform: rotate(-12deg);
-  opacity: 0.85;
-}
-.mv-aurora i + i {
-  left: 56%;
-  top: 7%;
-  transform: rotate(8deg);
-  opacity: 0.6;
-  background: linear-gradient(
-    160deg,
-    transparent 30%,
-    #a1c7f485 39%,
-    #95dec755 44%,
-    transparent 55%
-  );
 }
 .mv-shooting-stars i {
   position: absolute;
@@ -1227,13 +1194,6 @@
 .my-day-page[data-mv-motion='flow'] .mv-light-beams {
   animation: mv-light-sweep 13s ease-in-out infinite alternate;
 }
-.my-day-page[data-mv-motion='flow'] .mv-aurora i {
-  animation: mv-aurora-drift 15s ease-in-out infinite alternate;
-}
-.my-day-page[data-mv-motion='flow'] .mv-aurora i + i {
-  animation-delay: -6s;
-  animation-direction: alternate-reverse;
-}
 .my-day-page[data-mv-motion='flow'] .mv-shooting-stars i {
   animation: mv-meteor 10s ease-out infinite;
 }
@@ -1256,9 +1216,6 @@
 }
 .my-day-page[data-effects='playful'][data-mv-motion='flow'] .mv-sun-rays {
   animation-duration: 38s;
-}
-.my-day-page[data-effects='playful'][data-mv-motion='flow'] .mv-aurora i {
-  animation-duration: 9s;
 }
 .my-day-page[data-effects='playful'][data-mv-motion='flow'] .mv-hero h2 em {
   animation: mv-title-light 5s ease-in-out infinite alternate;
@@ -1289,12 +1246,6 @@
   to {
     opacity: 0.4;
     transform: rotate(6deg);
-  }
-}
-@keyframes mv-aurora-drift {
-  to {
-    transform: translate(-30px, 10px) rotate(6deg) scaleY(1.35);
-    opacity: 0.45;
   }
 }
 @keyframes mv-meteor {
@@ -1676,11 +1627,6 @@ body[data-hub-theme='dark'] .mv-widget-kicker {
   transform-origin: center;
   animation: mv-sun-bloom 4s ease-in-out infinite alternate;
 }
-.my-day-page[data-mv-motion='flow'] .mv-aurora i {
-  animation-duration: 5s;
-  filter: blur(5px);
-  opacity: 1;
-}
 .my-day-page[data-mv-motion='flow'] .mv-smoke {
   animation: mv-smoke-plume 4.5s ease-out infinite;
 }
@@ -1710,9 +1656,6 @@ body[data-hub-theme='dark'] .mv-widget-kicker {
 }
 .my-day-page[data-effects='playful'][data-mv-motion='flow'] .mv-sun-rays {
   animation-duration: 14s;
-}
-.my-day-page[data-effects='playful'][data-mv-motion='flow'] .mv-aurora i {
-  animation-duration: 3.5s;
 }
 .my-day-page[data-effects='playful'][data-mv-motion='flow'] .mv-tree {
   animation-name: mv-tree-storm;

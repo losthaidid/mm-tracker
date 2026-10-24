@@ -527,16 +527,6 @@ body[data-motion='calm'] {
     opacity: 0.85;
   }
 }
-@keyframes world-aurora {
-  from {
-    transform: scaleY(0.55) skewX(-10deg);
-    opacity: 0.3;
-  }
-  to {
-    transform: scaleY(1.35) skewX(10deg);
-    opacity: 0.85;
-  }
-}
 /* Lab outcomes retain their existing loop durations, pause/stop controls and wire timing. */
 @keyframes lab-result-success {
   0%,
@@ -654,36 +644,6 @@ body[data-motion='calm'] {
   inset: 0;
   pointer-events: none;
   overflow: hidden;
-}
-.fx-ribbon {
-  position: absolute;
-  width: 110vw;
-  height: 65vh;
-  left: -30vw;
-  top: -35vh;
-  border-radius: 50%;
-  border: 55px solid #4dcbad44;
-  box-shadow:
-    0 0 65px #68d9c166,
-    inset 0 0 75px #a38bef30;
-  filter: blur(8px);
-  transform-origin: 80% 70%;
-  animation: fx-aurora-surge 11s ease-in-out infinite alternate;
-  animation-delay: calc(var(--i) * -4s);
-}
-.fx-ribbon:nth-child(2) {
-  left: 50vw;
-  top: 15vh;
-  border-color: #b59bed40;
-  box-shadow: 0 0 65px #9f94d444;
-  animation-duration: 14s;
-}
-.fx-ribbon:nth-child(3) {
-  top: 75vh;
-  left: 5vw;
-  border-color: #e5c7714d;
-  box-shadow: 0 0 55px #e3c78638;
-  animation-duration: 9s;
 }
 .fx-orbit {
   position: absolute;
@@ -866,16 +826,6 @@ body[data-spectacle='spectacle'] :is(.hub-widget-symbol, .mv-metric-icon, .hub-p
   );
   animation: fx-page-sweep 1.1s ease-out both;
 }
-@keyframes fx-aurora-surge {
-  from {
-    transform: translate(-6vw, -6vh) rotate(-16deg) scale(0.9);
-    opacity: 0.6;
-  }
-  to {
-    transform: translate(15vw, 13vh) rotate(22deg) scale(1.2);
-    opacity: 1;
-  }
-}
 @keyframes fx-turn {
   to {
     transform: rotate(360deg);
@@ -1004,10 +954,6 @@ body.rest-room-open #hubSpectacle {
   .fx-orbit:nth-child(2n),
   .fx-comet:nth-child(2n) {
     display: none;
-  }
-  .fx-ribbon {
-    filter: blur(5px);
-    border-width: 24px;
   }
   .fx-orbit {
     width: 320px;

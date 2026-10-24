@@ -139,7 +139,7 @@
       else if (now >= nextWeather) {
         const night = phase === 'night';
         worldWeather = pick(
-          Object.keys(WEATHER).filter(k => (night ? k !== 'sunny' : k !== 'aurora')),
+          Object.keys(WEATHER).filter(k => !night || k !== 'sunny'),
           worldWeather
         );
         nextWeather = now + 90000 + Math.random() * 150000;
