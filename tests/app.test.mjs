@@ -1617,7 +1617,7 @@ test('new Momo gestures stop for editing, scenes, hidden tabs and reduced motion
 test('existing lo-fi volume choices remain local with a stronger music channel and a mix compressor',async t=>{
  const storage={'mm-tracker.soundscape.v1':JSON.stringify({mix:{rain:18,lofi:64},master:45,muted:false,track:'bluehour'})};
  const {api,window,db}=await app(t,{storage}),audio=mockAmbientAudio(window);assert.equal(api.hub.soundscape.snapshot().playing,false);assert.equal(audio.length,0);await api.hub.soundscape.start();const ctx=audio[0],compressor=ctx.nodes.find(n=>n.isCompressor);
- assert.equal(api.hub.soundscape.snapshot().master,45);assert.equal(api.hub.soundscape.snapshot().mix.lofi,64);assert.ok(ctx.nodes.some(n=>Math.abs(n.gain.value-1.152)<.00001));assert.equal(ctx.nodes[0].gain.value,.27);assert.equal(compressor.threshold.value,-6);assert.equal(compressor.ratio.value,8);
+ assert.equal(api.hub.soundscape.snapshot().master,45);assert.equal(api.hub.soundscape.snapshot().mix.lofi,64);assert.ok(ctx.nodes.some(n=>Math.abs(n.gain.value-1.792)<.00001));assert.equal(ctx.nodes[0].gain.value,.27);assert.equal(compressor.threshold.value,-6);assert.equal(compressor.ratio.value,8);
  api.hub.soundscape.stop();assert.equal(compressor.disconnected,true);assert.equal(ctx.nodes[0].disconnected,true);assert.equal(db.calls.length,0);
 });
 
