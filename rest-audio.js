@@ -86,6 +86,26 @@
     }
     return buffer;
   }
+  // A real looping source keeps ringing between ticks, including in a background tab.
+  // Its gain is independent of rest music, so muting a song cannot mute the alarm.
+  function createAlarmBuffer(context) {
+    const rate = Math.min(22050, context.sampleRate),
+      length = Math.round(rate * 3.2),
+      buffer = context.createBuffer(1, length, rate),
+      samples = buffer.getChannelData(0);
+    for (let i = 0; i < length; i++) {
+      const time = i / rate,
+        beat = Math.floor(time / 0.4),
+        t = time % 0.4,
+        frequency = [880, 1108.73, 1318.51, 1108.73][beat % 4],
+        envelope = Math.min(1, t / 0.015) * Math.max(0, 1 - t / 0.37);
+      samples[i] =
+        (Math.sin(2 * Math.PI * frequency * t) + 0.22 * Math.sin(4 * Math.PI * frequency * t)) *
+        envelope *
+        0.32;
+    }
+    return buffer;
+  }
   function install(a) {
     let prefs = { track: 'garden', volume: 45, music: true, alarm: true },
       context = null,
@@ -98,7 +118,6 @@
       active = false,
       paused = false,
       alerting = false,
-      nextChime = 0,
       error = '',
       starting = false;
     try {
@@ -107,7 +126,7 @@
         if (TRACKS[p.track]) prefs.track = p.track;
         if (Number.isFinite(p.volume))
           prefs.volume = Math.max(0, Math.min(100, Math.round(p.volume)));
-        for (const k of ['music', 'alarm']) if (typeof p[k] === 'boolean') prefs[k] = p[k];
+        if (typeof p.music === 'boolean') prefs.music = p.music;
       }
     } catch {}
     const snapshot = () => ({
@@ -167,7 +186,6 @@
       active = false;
       paused = false;
       alerting = false;
-      nextChime = 0;
       stopMusic();
       dispose(alarmNodes);
       alarmNodes = [];
@@ -213,7 +231,6 @@
         apply();
         if (alerting) {
           chime();
-          nextChime = Date.now() + 12000;
         }
       } catch (e) {
         if (token !== generation) return;
@@ -227,24 +244,16 @@
       }
     }
     function chime() {
-      if (!context || context.state !== 'running' || !prefs.alarm || !alerting) return;
-      dispose(alarmNodes);
-      alarmNodes = [];
-      [76, 79, 83, 79].forEach((note, i) => {
-        const osc = context.createOscillator(),
-          g = context.createGain(),
-          at = context.currentTime + i * 0.45;
-        osc.type = 'sine';
-        osc.frequency.value = 440 * 2 ** ((note - 69) / 12);
-        g.gain.setValueAtTime(0, at);
-        g.gain.linearRampToValueAtTime?.(0.2, at + 0.04);
-        g.gain.exponentialRampToValueAtTime(0.001, at + 1.5);
-        osc.connect(g);
-        g.connect(master);
-        osc.start(at);
-        osc.stop(at + 1.6);
-        alarmNodes.push(osc, g);
-      });
+      if (!context || context.state !== 'running' || !alerting || alarmNodes.length) return;
+      const source = context.createBufferSource(),
+        gain = context.createGain();
+      source.buffer = createAlarmBuffer(context);
+      source.loop = true;
+      gain.gain.value = 0.75;
+      source.connect(gain);
+      gain.connect(context.destination);
+      source.start();
+      alarmNodes = [source, gain];
     }
     function finish() {
       active = false;
@@ -253,14 +262,10 @@
       stopMusic();
       if (musicGain) musicGain.gain.setTargetAtTime(0, context.currentTime, 0.1);
       chime();
-      nextChime = Date.now() + 12000;
       emit();
     }
     function tick() {
-      if (alerting && Date.now() >= nextChime) {
-        chime();
-        nextChime = Date.now() + 12000;
-      }
+      if (alerting) chime();
     }
     function change(key, value) {
       if (key === 'track' && TRACKS[value]) {
@@ -272,16 +277,6 @@
       if (key === 'music') {
         prefs.music = !!value;
         if (active && prefs.music && !music) loadTrack();
-      }
-      if (key === 'alarm') {
-        prefs.alarm = !!value;
-        if (!prefs.alarm) {
-          dispose(alarmNodes);
-          alarmNodes = [];
-        } else if (alerting) {
-          chime();
-          nextChime = Date.now() + 12000;
-        }
       }
       persist();
       apply();
@@ -298,13 +293,7 @@
         paused = !!value;
         apply();
       },
-      silence: () => {
-        alerting = false;
-        dispose(alarmNodes);
-        alarmNodes = [];
-        emit();
-      },
     };
   }
-  root.WorkHubRestAudio = { TRACKS, createBuffer, install };
+  root.WorkHubRestAudio = { TRACKS, createBuffer, createAlarmBuffer, install };
 })(window);

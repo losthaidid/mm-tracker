@@ -430,8 +430,8 @@
           'Effects style',
           [
             ['calm', 'Calm · still and simple'],
-            ['ambient', 'Ambient · gentle movement'],
-            ['playful', 'Playful · full sparkle & pointer trails'],
+            ['ambient', 'Cinematic · living landscape'],
+            ['playful', 'Spectacle · extra motion & sparkle'],
           ],
           s.effects,
           null
