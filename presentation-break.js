@@ -15,7 +15,6 @@
       screenDetails = null,
       chosenScreen = null,
       generation = 0,
-      fullscreenOwned = false,
       draft = { message: '', complete: 'Ready to continue', minutes: 5, scene: 'coast' };
     const text = (element, value) => {
       if (element && element.textContent !== value) element.textContent = value;
@@ -28,7 +27,6 @@
     }
     function end(restore = true) {
       generation++;
-      fullscreenOwned = false;
       session = null;
       if (audience) {
         if (document.fullscreenElement && audience.contains(document.fullscreenElement))
@@ -258,11 +256,6 @@
       },
       true
     );
-    document.addEventListener('fullscreenchange', () => {
-      if (audience && document.fullscreenElement && audience.contains(document.fullscreenElement))
-        fullscreenOwned = true;
-      else if (fullscreenOwned) end();
-    });
     root.addEventListener('pagehide', () => {
       end(false);
       closeSettings();

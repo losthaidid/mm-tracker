@@ -241,4 +241,5 @@ Supported browsers can request window-management permission through Choose anoth
 Select the same monitor as the meeting app; the website does not detect the meeting's sharing
 selection. Start requests fullscreen for the audience element on that display. If permission
 or fullscreen support is unavailable, an audience-only viewport remains usable, with a retry
-control and an explanation. Escape returns to the prior page; no record data enters the view.
+control and an explanation. Leaving fullscreen keeps the audience overlay in place; use Back
+to presentation to return to the prior page. No record data enters the view.
