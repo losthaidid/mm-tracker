@@ -1399,52 +1399,10 @@
       );
     }
     function processHub() {
-      const ps = data().processes.filter(p => p.archived === processArchive),
-        p = currentProcess();
-      if (p) processId = p.id;
-      const selected = p?.steps.find(s => s.id === stepId) || p?.steps[0];
-      if (selected) stepId = selected.id;
-      return `<section class="hub process-hub-workspace">${head('YOUR EDITABLE PROCESS EXPLORER', 'SAP Process Hub', 'Connect the process, T-codes and what you know.', btn('process-edit', '＋ New process', '', 'primary'))}<div class="hub-toolbar process-hub-picker"><label>Process<select id="hubProcess">${options(
-        ps.map(p => [p.id, p.name]),
-        p?.id,
-        'Choose a process'
-      )}</select></label>${btn('process-archive-view', processArchive ? 'Show active' : 'Show archived')}${!data().processes.length ? btn('process-example', 'Add editable procurement example') : ''}</div>${
-        p
-          ? `<section class="hub-card process-overview-card"><div class="flex-title"><div><h3>${esc(p.name)}</h3><p>${esc(p.description)}</p></div><div class="actions">${btn('process-edit', 'Edit process', 'data-id="' + esc(p.id) + '"')}${btn('process-archive', p.archived ? 'Restore' : 'Archive', 'data-id="' + esc(p.id) + '"')}${btn('step-edit', '＋ Add step', 'data-process="' + esc(p.id) + '"', 'primary')}${btn('walk', '▷ Walk through', '', 'primary')}</div></div><div class="process-overview-metrics"><span><strong>${p.steps.length}</strong> steps</span><span><strong>${
-              new Set(
-                p.steps.flatMap(s =>
-                  s.tcodes
-                    .split(/[,\n]/)
-                    .map(x => x.trim())
-                    .filter(Boolean)
-                )
-              ).size
-            }</strong> T-codes</span><span><strong>${p.steps.filter(s => s.next.length > 1).length}</strong> branches</span></div><div class="hub-process-map" aria-label="Process steps">${p.steps.map((s, i) => `<div><button type="button" class="hub-step" data-active="${s.id === stepId}" data-hub="step-view" data-id="${esc(s.id)}"><span class="hub-kicker">STEP ${i + 1}</span><strong>${esc(s.title)}</strong><small>${esc(s.tcodes) || 'Add T-codes'}</small></button><div class="hub-connector">${s.next.map(id => `<span>↳ ${esc(p.steps.find(s => s.id === id)?.title || '')}</span>`).join('') || '<span>End of path</span>'}</div></div>`).join('') || empty('Build your process', 'Add a step, then connect its next steps.')}</div></section>${
-              selected
-                ? `<section class="hub-card hub-detail process-step-notebook"><div class="flex-title"><div><span class="hub-kicker">SELECTED STEP</span><h3>${esc(selected.title)}</h3></div><div class="actions">${btn('step-edit', 'Edit step', 'data-process="' + esc(p.id) + '" data-id="' + esc(selected.id) + '"')}${btn('step-up', '↑ Move earlier', 'data-id="' + esc(selected.id) + '"')}${btn('step-delete', 'Delete step', 'data-id="' + esc(selected.id) + '"', 'danger')}</div></div><div class="hub-tags">${selected.tcodes
-                    .split(/[,\n]/)
-                    .filter(Boolean)
-                    .map(t => `<span class="hub-badge">${esc(t.trim())}</span>`)
-                    .join('')}</div><div class="hub-grid">${[
-                    ['Usage notes', selected.notes],
-                    ['Prerequisites', selected.prerequisites],
-                    ['Configuration', selected.configuration],
-                    ['Common errors / solutions', selected.errors],
-                    ['Testing checklist', selected.testing],
-                  ]
-                    .map(
-                      ([label, v]) =>
-                        `<div><h4>${label}</h4><p class="prewrap hub-sensitive">${esc(v) || 'No details yet.'}</p></div>`
-                    )
-                    .join('')}</div>${recordLinks(selected)}</section>`
-                : ''
-            }`
-          : empty(
-              'Your process library starts here',
-              'Create your own flow, or add an editable procurement example.',
-              btn('process-edit', 'Create process')
-            )
-      }</section>`;
+      return (
+        rehearsal?.render() ||
+        '<section class="hub"><h2>Process Hub</h2><p>Refresh this page to load the process canvas.</p></section>'
+      );
     }
     function processEditor(id = '') {
       const p = data().processes.find(p => p.id === id) || {};
@@ -1793,7 +1751,6 @@
     function studio() {
       const tools = {
         theme: 'Theme studio',
-        simulator: 'Process Rehearsal',
         tcodes: 'SAP T-codes',
         focus: 'Focus room',
         journey: 'Project journey',
@@ -1801,6 +1758,7 @@
         wrap: 'Daily wrap-up',
         sessions: 'Work sessions',
       };
+      if (!Object.hasOwn(tools, currentTool)) currentTool = 'theme';
       return `<section class="hub">${head('A WORKSPACE WITH PERSONALITY', 'Studio', 'Useful tools. A little play. Everything in its place.')}<div class="hub-toolbar">${Object.entries(
         tools
       )
@@ -1809,7 +1767,7 @@
         )
         .join(
           ''
-        )}</div>${currentTool === 'theme' ? themeStudio() : currentTool === 'simulator' ? rehearsal?.render() || '' : currentTool === 'tcodes' ? tcodes?.render() || '' : currentTool === 'focus' ? `<section class="hub-card">${focusWidget()}${prefs().desk ? desk() : ''}</section>` : currentTool === 'journey' ? `<section class="hub-card">${journey()}</section>` : currentTool === 'scrapbook' ? scrapbook() : currentTool === 'wrap' ? dailySummary() : sessionsView()}</section>`;
+        )}</div>${currentTool === 'theme' ? themeStudio() : currentTool === 'tcodes' ? tcodes?.render() || '' : currentTool === 'focus' ? `<section class="hub-card">${focusWidget()}${prefs().desk ? desk() : ''}</section>` : currentTool === 'journey' ? `<section class="hub-card">${journey()}</section>` : currentTool === 'scrapbook' ? scrapbook() : currentTool === 'wrap' ? dailySummary() : sessionsView()}</section>`;
     }
     function timerKey() {
       return a.cloud().user ? 'mm-tracker.timer.v1:' + a.cloud().user.id : null;
@@ -2395,7 +2353,11 @@
           title: n.title + ' ' + n.tcodes,
           type: 'note-view',
         })),
-        ...data().processes.map(p => ({ id: p.id, title: p.name, type: 'process-open' })),
+        ...root.WorkHubRehearsalEngine.library(a.state()).map(p => ({
+          id: p.id,
+          title: p.name,
+          type: 'process-open',
+        })),
       ]
         .filter(x => x.title.toLowerCase().includes(q))
         .slice(0, 30);
@@ -2893,10 +2855,15 @@
         return;
       }
       if (action === 'process-edit') {
-        processEditor(id);
+        navigate('processhub');
+        if (id) {
+          rehearsal?.open(id);
+          rehearsal?.beginDraft(false, rehearsal.model());
+        } else rehearsal?.beginDraft(true);
         return;
       }
       if (action === 'process-open') {
+        rehearsal?.open(id);
         processId = id;
         stepId = '';
         a.closeModal();
@@ -2971,7 +2938,7 @@
         $('settingsMenu').open = false;
         currentTool = el.dataset.tool;
         a.closeModal();
-        navigate('studio');
+        navigate(currentTool === 'simulator' ? 'processhub' : 'studio');
         return;
       }
       if (action === 'theme-export') {
@@ -3839,6 +3806,8 @@
     });
     rehearsal = root.WorkHubRehearsal?.install({
       ...a,
+      active: () => viewTab === 'processhub',
+      recordLinks,
       ready: () => a.cloud().ready,
       owner: () => a.cloud().user?.id || '',
       prefs: () => themePreview || prefs(),

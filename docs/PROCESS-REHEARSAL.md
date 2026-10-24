@@ -1,42 +1,50 @@
-# Personal Process Rehearsal and SAP T-code library
+# Process Hub and the SAP T-code library
 
-Open **Studio → Process Rehearsal**. It replaces the former numeric Document Simulator. Existing saved numeric inputs remain in backups for compatibility; the old calculator form is removed.
+Open **Process Hub** in the main navigation. Process Rehearsal is now part of this workspace and no longer appears in Studio. Existing rehearsal and Process Hub libraries appear together in the Saved process dropdown. Opening them does not copy or rewrite saved records.
 
-## Start and maintain a process
+## Create a process
 
-The initial procure-to-pay example is a local preview and creates no saved process. **Save this example** creates your editable copy. **New process** can use the example or a blank two-step flow. Save as many as 100 personal processes, with up to 80 steps per process and 2,000 steps across the account. Processes remain within the existing private account; there is no team login or shared editing.
+Choose **New process** to open a blank, full-screen canvas. Expand **Process information** to maintain its name, intended outcome, owner, revision, audience, description and private presenter notes. The draft starts with a first task and a result; rename, replace or extend them.
 
-A step can be a task, document, decision, approval or result. Maintain its title, responsible person/role, transaction code, prerequisites, instructions, expected result, failure explanation, reference URL and optimized screenshot. Choose its normal next step and optional failure next step. Delete removes incoming links to that step and adjusts the starting step when necessary.
+Drag a **Task**, **Document**, **Decision**, **Approval** or **Result** from the step-type tray onto the canvas. On a touch screen, drag a type or tap it to add. Its detail editor opens alongside the canvas. Maintain the title, owner, instructions, prerequisites, inputs, outputs, expected result, system/tool, typical working time, user-facing explanation, configuration, common errors and testing checklist. Reference codes, URLs, optimized screenshots and links to projects, tickets, project items and knowledge notes are retained.
 
-Drag a step by its dotted handle, or focus the handle and use arrow keys (Shift moves farther). **Auto arrange** lays out the graph. Zoom and scroll let you inspect larger processes. Camera movement follows playback in normal motion modes.
+Set the starting step, normal successor, additional normal routes and optional exception successor in step details. Save the step to continue building. **Save process** also saves an open step editor, then commits the entire process in one account-document update. Changes in the full editor remain a tab-local draft until that action. **Discard changes** confirms before discarding. Reloading or closing a tab with an open draft triggers the browser's unsaved-work warning. Drafts are not recoverable after closing the page and never transfer between accounts.
 
-Opening the step editor pauses the scene. Save resumes playback; Cancel retains a paused reading view. Preferences can change while a draft is open without dropping the draft. Saved-process changes are checked before committing a stale editor.
+**Edit process** opens a full-screen draft of a saved process. A stale-process check prevents overwriting a process that changed while its full editor was open. In normal reference mode, **Edit this step** supports the existing direct Save step workflow. Save/cancel an open step editor before changing steps, scenarios or processes.
 
-## Automatic playback and special effects
+Move cards using their dotted handles, or focus a handle and use arrow keys (Shift moves farther). **Auto arrange**, **Fit**, zoom and canvas scrolling help with larger flows. Deleting a step removes its incoming routes and scenario references and updates the starting step if necessary. Archive/restore and duplicate are available for saved processes. Process information also contains permanent deletion, with confirmation.
 
-A saved process automatically plays on opening and loops after its route ends. Document tokens move between steps; document, approval, decision and result steps have distinct appearances. Active edges light up, approvals receive stamps, successful value updates flash, and exception steps shake and follow the defined failure edge.
+## Reference and presentation views
 
-Choose **Cosy desk**, **Blueprint** or **Control room** scenery; **quiet**, **balanced** or **expressive** effects; and 0.5×, 1×, 1.5× or 2× speed. Playback pauses for open dialogs, editing, hidden pages, Focus, privacy and presentation modes. Global motion Off and system reduced-motion settings stop automatic advancement and special effects; manual Next/Previous remain available.
+Use **View** to switch between Normal, Full screen and Presentation. Saved processes automatically play and loop in all three views. Full-screen creation uses the browser's fullscreen API when permitted, with a full-viewport dialog fallback. Choose Normal view to return to the workspace. Escape follows the browser’s fullscreen/dialog behaviour.
 
-Sound is enabled in the saved preferences, but waits for a browser gesture. Click **Enable sound** to hear an immediate preview; the button then becomes **Mute sound**. Playback and manual Next/Previous or journal selections use short locally generated tones, with no external audio downloads. Reduced-motion and Animations Off still allow explicitly requested step sounds. The volume slider is independent; at zero, the status explains why the scene is silent. The status also reports unavailable or blocked audio and lets you retry. Leaving the scene, hiding the page or changing account stops current tones; a pending audio start cannot block playback controls or reactivate muted sound.
+Presentation shows the same animated graph and current-step explanation, responsibility, prerequisites, inputs, outputs, expected result and screenshot. An optional user-facing explanation replaces internal instructions. Configuration, internal failure details, testing, linked account records and private presenter notes stay in the reference view. Presentation still supports process/scenario selection, pause, restart, manual steps and sound. It does not identify or move to a monitor being shared by a meeting application.
 
-## Scenarios, failure injection and rewind
+## Animation, audio and scenarios
 
-Each process has named scenarios with initial sample values and a saved success/failure choice for every step. Enable **Explore scenarios automatically** to cycle through them at the end of each route.
+Document tokens move between steps, active edges flow, approvals receive stamps, successful value updates flash, exceptions shake and rewind retraces a connector. These are the existing rehearsal effects. Choose Cosy desk, Blueprint or Control room, quiet/balanced/expressive effects, and 0.5x/1x/1.5x/2x speed. Large background effects pause while the full-screen canvas covers the workspace. Library adapters are cached between edits rather than copied every animation frame.
 
-**Follow success** or **What if this fails?** temporarily overrides the selected step's outcome for the current rehearsal. It does not change the saved scenario. A failure with no failure edge ends that route. Repeated graph cycles stop after four visits to a step or 160 entries, show a loop-limit result and restart the presentation; a malformed graph cannot create an unbounded trace.
+Sound waits for a browser gesture. **Enable sound** plays a preview; **Mute sound** and Volume control the locally generated step tones. Sound status explains zero volume, browser blocking and unavailable audio. Pending activation cannot block playback or reactivate muted sound. Leaving, hiding the page or changing accounts stops tones.
 
-Click a step to pause and inspect it, including steps outside the current route. Click a journal event to revisit that point. Previous/Next and Restart change only temporary playback. The journal and changing sample values are rebuilt from the scenario; rewinding does not post, reverse or change real SAP documents.
+Global Animations Off and system reduced-motion settings stop automatic advancement and special effects; manual steps and explicitly requested sound still work. Editing, other open dialogs, hidden pages, Focus, privacy and the global presentation switch pause playback. The Process Hub's own full-screen dialog permits playback.
 
-Initial values use one `Field = value` per line. Numbers remain numeric; other values are plain text. Step changes use `Field = value` or `Field += number`. A reference such as `Received quantity += @Delivery quantity` reads another sample field. Missing fields or invalid numeric additions pause the scenario with an explanation. These are data operations, not executable expressions. At most 30 sample fields and 30 changes per step are accepted.
+Scenarios define initial sample values, success/exception outcomes and choices among additional normal routes. Explore scenarios automatically cycles through scenarios after a route finishes. **Follow success**, **What if this fails?** and alternative-route buttons change the current playback only. Clicking a graph card pauses for inspection; the journal revisits a reached step. Previous/Next/Restart and temporary outcomes do not write records. Cycles stop after four visits per step or 160 trace entries, show a loop-limit result, then restart the presentation.
 
-Routes follow your definitions. The canvas does not infer actual SAP release, posting, authorization, tolerance or business rules.
+Initial sample values use one `Field = value` per line. Step changes use `Field = value` or `Field += number`; `@Other field` reads a sample value. Invalid additions or missing values pause the scenario with an explanation. At most 30 sample fields and 30 changes per step are allowed. These operations do not execute code or post to SAP.
 
-## Screenshots and persistence
+## PDF and PNG exports
 
-Choose PNG, JPEG or WebP up to 5 MB. The browser downsizes the screenshot to at most 1,000 pixels on its longer side, flattens it onto white and saves a compact JPEG. Each encoded screenshot is capped at 180,000 characters, with a 2 MB combined encoded-image budget across saved rehearsals. Reduce/crop images that exceed the limits. The original upload is not retained.
+For a saved process, choose **Export PDF / Image**, select a format and PDF detail level, then **Prepare file** and the ready download link. **PDF in ZIP** provides an alternative if a browser intercepts direct PDF downloads. PNG contains the complete diagram, numbered cards and normal/exception routes. Long card titles may be shortened in the diagram; the PDF contains full titles and step text.
 
-Saved steps, scenarios, images and positions are in `workhub.rehearsal`. Playback, its journal, active route, viewport and temporary overrides remain local. The existing private document, backup/restore and conflict handling are used; no database schema or authentication change is required. Account changes close old editors and reject stale form/file operations.
+**User handout** includes the diagram, process context, user explanations, responsibilities, prerequisites, inputs, outputs, outcomes and routes. **Full reference** also includes private presenter notes, technical and failure details, reference links, sample changes and all defined scenarios. Exports use a snapshot and never change records. Account changes cancel pending exports and invalidate ready links.
+
+PDF pages are drawn individually using browser fonts, preserving Unicode and avoiding remote font/image services. They are image-based pages, so text is not selectable. Long sections paginate instead of being silently truncated. The exporter limits very large guides to 240 pages and explains how to reduce them. PNG diagrams are scaled to a bounded image size; PDF step descriptions remain readable independently of diagram size. Saved screenshot decoding failures are labelled in the PDF.
+
+## Compatibility, limits and persistence
+
+New processes retain the existing limits: 100 rehearsal processes, 80 steps per process and 2,000 steps across that collection; 20 scenarios per process. Older Process Hub processes retain their previous 200-step allowance and IDs. They save back to their original collection with canvas/scenario extensions; normal branches, notes, configuration, errors, tests and account links are preserved. Existing backups require no manual migration.
+
+PNG/JPEG/WebP uploads accept up to 5 MB, optimize to at most 1,000 pixels on the longer side, and flatten to JPEG. Encoded screenshots are limited to 180,000 characters each and 2 MB combined across both libraries. Original uploads are not retained. All saved data uses the existing account document, backup/restore and conflict handling, without database-schema or authentication changes. Animation state, journals, viewport and temporary outcomes remain local.
 
 ## SAP T-codes
 
@@ -58,7 +66,3 @@ Personal changes are saved in `workhub.tcodes`, up to 2,000 unique codes. Editin
 - [Classic release strategies](https://help.sap.com/docs/SUPPORT_CONTENT/spmm/3362168095.html)
 - [S/4HANA supplier/BP simplification list](https://help.sap.com/doc/f2591a6901344c97a5e2029cc8f3703e/2021/en-US/SIMPL_OP2021.pdf)
 - [On-premise troubleshooting tools](https://help.sap.com/docs/signavio-process-intelligence/onboarding-and-data-integration-guide/troubleshooting-data-collection-sap-on-premise-systems)
-
-## Verification
-
-The branch workflow runs the existing full application/database suite plus dedicated graph, scenario, library, account, playback, editor and audio checks. Browser visual QA is unavailable in the current session. Source files have comments and appear in the file map for later personal changes.
