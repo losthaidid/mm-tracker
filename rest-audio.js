@@ -159,7 +159,7 @@
         master.gain.setTargetAtTime((prefs.volume / 100) * 0.8, context.currentTime, 0.12);
       if (musicGain)
         musicGain.gain.setTargetAtTime(
-          active && !paused && prefs.music ? 1.6 : 0,
+          active && !paused && prefs.music ? 3 : 0,
           context.currentTime,
           0.2
         );
