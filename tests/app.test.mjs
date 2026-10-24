@@ -955,7 +955,7 @@ test('the page security policy permits its shipped styles and Momo artwork with 
 
 test('privacy and presentation clicks visibly change the screen and restore on exit',async t=>{
  const {api,document,window,db}=await app(t,{styles:true});addMainTask(api,document,'Private rollout title');await settle();api.showTab('home');const writes=db.calls.length;
- document.querySelector('#hubToolbar [data-hub="privacy"]').click();await settle();
+ document.querySelector('#hubToolbar [data-hub="privacy"]').click();await settle();assert.equal(document.querySelector('.my-day-page').dataset.mvMotion,'still');
  const title=document.querySelector('[data-widget="tasks"] .hub-sensitive');assert.match(window.getComputedStyle(title).filter,/blur\(/);assert.match(document.getElementById('hubViewStatus').textContent,/Privacy is on/);assert.equal(document.querySelector('#hubToolbar [data-hub="privacy"]').getAttribute('aria-pressed'),'true');
  document.querySelector('#hubToolbar [data-hub="presentation"]').click();await settle();
  assert.equal(window.getComputedStyle(document.getElementById('hubToolbar')).display,'none');assert.equal(window.getComputedStyle(document.getElementById('hubPet')).display,'none');assert.equal(window.getComputedStyle(document.getElementById('hubSidebar')).display,'none');assert.ok(document.getElementById('hubExitPresentation'));

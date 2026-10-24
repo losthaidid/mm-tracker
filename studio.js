@@ -912,6 +912,7 @@
       if (!present) exit?.remove();
       if (present) stopCompanionWalk();
       atmosphere?.sync();
+      myDay?.visual?.sync();
     }
     function heroArt() {
       return '<div class="hub-hero-art" aria-hidden="true"><svg viewBox="0 0 280 170" fill="none"><ellipse cx="150" cy="145" rx="103" ry="12" fill="#d9e2df"/><circle cx="206" cy="61" r="46" fill="#f8dba4"/><rect x="45" y="41" width="114" height="99" rx="12" transform="rotate(-9 45 41)" fill="#c8dfd6" stroke="#456d68" stroke-width="2"/><rect x="75" y="27" width="118" height="114" rx="12" transform="rotate(8 75 27)" fill="#fffef7" stroke="#2c4359" stroke-width="2"/><path d="M96 57l5 5 10-12M95 82l5 5 10-12M95 107l5 5 10-12" stroke="#328976" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M124 57h43M122 82h40M121 107h28" stroke="#9baab5" stroke-width="4" stroke-linecap="round"/><path d="M204 139v-35M204 111c-28-3-30-22-22-28 13-7 24 10 22 28zM204 101c-1-25 19-29 26-20 7 12-9 22-26 20z" stroke="#366d5b" stroke-width="2" fill="#8bc5a3"/><path d="M188 121h33l-5 24h-23z" fill="#dd967e" stroke="#734f48" stroke-width="2"/><path d="M43 24l3 8 8 3-8 3-3 8-3-8-8-3 8-3 3-8zM239 25l2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5z" fill="#8d7dcb"/><circle cx="241" cy="117" r="4" fill="#e7b26d"/></svg></div>';
