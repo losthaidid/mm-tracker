@@ -192,6 +192,14 @@ signal headroom. Volume zero, mute, pause, separate focus/rest preferences, and 
 independent gain and explicit Resume work behavior are retained.
 
 
+## Break shortcut
+
+The shared toolbar has **Break Terrarium** immediately after **Focus mode** on every section.
+It starts the same full-screen rest session using the saved break length in **Effects & hours**.
+An existing break opens again without resetting it. The shared work/focus pause, rest music,
+repeating alarm and explicit **Resume work** behavior remain in the same rest controller.
+The shortcut returns focus to itself after resuming and is hidden when signed out.
+
 ## Rendering performance
 
 Decorative panel discovery scans the document once when motion starts or resumes. Later DOM

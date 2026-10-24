@@ -22,6 +22,7 @@
     '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' +
     ({
       focus: 'M9 3H4v5m11-5h5v5M4 16v5h5m11-5v5h-5M9 12h6m-3-3v6',
+      rest: 'M8 3h8M9 3v4l-5 9a4 4 0 0 0 3.5 6h9a4 4 0 0 0 3.5-6l-5-9V3M12 17v-5m0 4c-3 0-4-2-3-3 2-1 3 1 3 3Zm0 1c3 0 4-2 3-3-2-1-3 1-3 3Z',
       move: 'M8 5h.01M16 5h.01M8 12h.01M16 12h.01M8 19h.01M16 19h.01',
       sound: 'M3 16c3-8 5 8 9 0s6-8 9-3M3 8c3-8 5 8 9 0s6-8 9-3',
       pause: 'M8 5v14M16 5v14',
@@ -114,12 +115,37 @@
         b.dataset.focus = 'open';
         b.setAttribute('aria-controls', 'focusPanel');
         b.innerHTML = art('focus', 15) + '<span>Focus mode</span>';
-        bar.append(b);
       }
-      const reminder = $('reminderInboxButton');
-      if (reminder && reminder.nextElementSibling !== b) reminder.after(b);
       b.hidden = !a.ready();
       b.setAttribute('aria-expanded', String(opened));
+      let rest = $('breakTerrariumButton');
+      if (!rest) {
+        rest = document.createElement('button');
+        rest.id = 'breakTerrariumButton';
+        rest.type = 'button';
+        // Reuse My Day's existing break action, duration and active-session handling.
+        rest.dataset.md = 'break-start';
+        rest.dataset.label = 'Rest your eyes';
+        rest.setAttribute('aria-haspopup', 'dialog');
+        rest.setAttribute('aria-controls', 'restRoom');
+        rest.title = 'Start a break using your saved break length';
+        rest.innerHTML = art('rest', 15) + '<span>Break Terrarium</span>';
+      }
+      rest.hidden = !a.ready();
+      let shortcuts = $('focusShortcuts');
+      if (!shortcuts) {
+        shortcuts = document.createElement('div');
+        shortcuts.id = 'focusShortcuts';
+        shortcuts.className = 'hub-focus-shortcuts';
+        shortcuts.setAttribute('role', 'group');
+        shortcuts.setAttribute('aria-label', 'Focus and breaks');
+      }
+      if (b.parentElement !== shortcuts) shortcuts.append(b);
+      if (b.nextElementSibling !== rest) b.after(rest);
+      const reminder = $('reminderInboxButton');
+      if (reminder && reminder.nextElementSibling !== shortcuts) reminder.after(shortcuts);
+      else if (shortcuts.parentElement !== bar) bar.append(shortcuts);
+      shortcuts.hidden = !a.ready();
     }
     function build() {
       if ($('focusPanel')) return;
