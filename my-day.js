@@ -178,26 +178,32 @@
     }
     function missions() {
       const d = current(),
-        n = completeCount();
+        n = completeCount(),
+        remaining = d.missions.filter(id => !state().tasks.find(t => t.id === id)?.done);
       return `<div class="md-mission-heading"><div class="md-progress-orbit" style="--progress:${d.missions.length ? (n / d.missions.length) * 100 : 0}%"><b>${n}/${d.missions.length || 3}</b></div><p>Three priorities.<br>Room for everything else.</p>${button('missions', 'Choose')}</div><div class="md-missions">${
-        d.missions
+        remaining
           .map((id, i) => {
             const t = state().tasks.find(x => x.id === id);
             return t
-              ? `<div class="md-mission${t.done ? ' is-done' : ''}"><span>${t.done ? '✓' : String(i + 1).padStart(2, '0')}</span><div><strong class="hub-sensitive">${esc(t.task)}</strong><small>${t.done ? 'Completed' : duration(E.profile(state(), id).minutes) + ' planned'}</small></div>${t.done ? taskButton(t) : taskButton(t, 'Complete', 'complete')}</div>`
+              ? `<div class="md-mission" data-md-priority="${esc(t.id)}"><span>${String(i + 1).padStart(2, '0')}</span><div><strong class="hub-sensitive">${esc(t.task)}</strong><small>${duration(E.profile(state(), id).minutes)} planned</small></div>${taskButton(t, 'Complete', 'complete')}</div>`
               : `<div class="md-mission">A selected task was removed. ${button('missions', 'Choose another')}</div>`;
           })
           .join('') ||
-        blank(
-          'Give today a direction',
-          'Choose up to three tasks you want to move forward.',
-          button('missions', 'Choose my priorities', '', 'md-primary')
-        )
+        (d.missions.length && n === d.missions.length
+          ? blank(
+              'Your intentions, fulfilled.',
+              'Every priority is complete. Enjoy a little room to breathe.'
+            )
+          : blank(
+              'Give today a direction',
+              'Choose up to three tasks you want to move forward.',
+              button('missions', 'Choose my priorities', '', 'md-primary')
+            ))
       }</div>`;
     }
     function orb() {
       const f = a.focus();
-      return `<div class="md-orb-wrap"><div class="md-focus-orb${f.active && !f.paused ? ' is-running' : ''}" data-md-orb style="--orb-progress:${100 * (1 - f.remaining / (f.minutes * 60))}%"><div><span data-md-focus-clock>${clockText(f.remaining)}</span><small data-md-focus-state>${f.active ? (f.paused ? 'Paused' : 'One thing at a time') : 'Ready when you are'}</small></div></div><p class="hub-sensitive" data-md-focus-title>${esc(f.title) || 'A quiet place to begin.'}</p></div><div class="md-center-actions">${button('focus-open', f.active ? 'Adjust focus' : 'Start focus', '', 'md-primary')}${button('focus-pause', f.paused ? 'Resume' : 'Pause', `${!f.active ? ' disabled' : ''}`)}${button('focus-end', 'End', `${!f.active ? ' disabled' : ''}`)}</div>${meta('Uses your existing focus countdown. Use Track work on a task to record time for Plan & reality.')}`;
+      return `<div class="md-orb-wrap"><div class="md-focus-orb${f.active && !f.paused ? ' is-running' : ''}" data-md-orb style="--orb-progress:${100 * (1 - f.remaining / (f.minutes * 60))}%"><i class="mv-orb-orbit" aria-hidden="true"><b></b><b></b></i><div><span data-md-focus-clock>${clockText(f.remaining)}</span><small data-md-focus-state>${f.active ? (f.paused ? 'Paused' : 'One thing at a time') : 'Ready when you are'}</small></div></div><p class="hub-sensitive" data-md-focus-title>${esc(f.title) || 'A quiet place to begin.'}</p></div><div class="md-center-actions">${button('focus-open', f.active ? 'Adjust focus' : 'Start focus', '', 'md-primary')}${button('focus-pause', f.paused ? 'Resume' : 'Pause', `${!f.active ? ' disabled' : ''}`)}${button('focus-end', 'End', `${!f.active ? ' disabled' : ''}`)}</div>${meta('Uses your existing focus countdown. Use Track work on a task to record time for Plan & reality.')}`;
     }
     function radar() {
       const w = E.workload(state(), today()),
@@ -362,8 +368,12 @@
     }
     function missionFields() {
       const d = current(),
-        rows = state().tasks.filter(t => !t.archived || d.missions.includes(t.id));
-      return `<div class="md-wide md-mission-picker"><p>Choose up to three priorities. Completed choices stay visible for today.</p>${rows.map(t => `<label class="md-check"><input type="checkbox" name="mission" value="${esc(t.id)}"${d.missions.includes(t.id) ? ' checked' : ''}><span class="hub-sensitive">${esc(t.task)}${t.done ? ' · completed' : ''}</span></label>`).join('') || '<p>Add a task first, then choose it here.</p>'}</div>`;
+        completed = d.missions.filter(id => state().tasks.find(t => t.id === id)?.done),
+        slots = 3 - completed.length,
+        rows = slots
+          ? state().tasks.filter(t => !t.done && (!t.archived || d.missions.includes(t.id)))
+          : [];
+      return `<div class="md-wide md-mission-picker"><p>${slots === 0 ? 'Your three daily priorities are complete.' : completed.length ? `${completed.length} ${completed.length === 1 ? 'priority' : 'priorities'} already complete. Choose up to ${slots} remaining priorities.` : 'Choose up to three priorities to move forward.'}</p>${completed.map(id => `<input type="hidden" name="mission" value="${esc(id)}">`).join('')}${rows.map(t => `<label class="md-check"><input type="checkbox" name="mission" value="${esc(t.id)}"${d.missions.includes(t.id) ? ' checked' : ''}><span class="hub-sensitive">${esc(t.task)}</span></label>`).join('') || `<p>${slots ? 'No open tasks to choose. ' : ''}Enjoy a little room to breathe.</p>`}</div>`;
     }
     function missionsForm() {
       form('Choose today’s priorities', 'mdMissions', missionFields(), current(), 'day');
@@ -416,7 +426,7 @@
           [
             ['calm', 'Calm · still and simple'],
             ['ambient', 'Ambient · gentle movement'],
-            ['playful', 'Playful · a little more sparkle'],
+            ['playful', 'Playful · full sparkle & pointer trails'],
           ],
           s.effects,
           null
@@ -650,6 +660,7 @@
       }
       if (action === 'complete') {
         unlockAudio();
+        visual.markComplete(id);
         a.completeTask(id);
         return;
       }
@@ -930,7 +941,8 @@
         if (ids.length > 3) throw Error('Choose up to three priorities.');
         if (ids.some(id => !state().tasks.some(t => t.id === id)))
           throw Error('A chosen task no longer exists. Open the plan again.');
-        return ids;
+        const retained = current().missions.filter(id => ids.includes(id));
+        return [...retained, ...ids.filter(id => !retained.includes(id))];
       };
       let ok = false;
       if (f.id === 'mdMissions' || f.id === 'mdMorning') {
