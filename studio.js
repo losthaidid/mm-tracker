@@ -912,6 +912,7 @@
       if (!present) exit?.remove();
       if (present) stopCompanionWalk();
       atmosphere?.sync();
+      myDay?.visual?.sync();
     }
     function heroArt() {
       return '<div class="hub-hero-art" aria-hidden="true"><svg viewBox="0 0 280 170" fill="none"><ellipse cx="150" cy="145" rx="103" ry="12" fill="#d9e2df"/><circle cx="206" cy="61" r="46" fill="#f8dba4"/><rect x="45" y="41" width="114" height="99" rx="12" transform="rotate(-9 45 41)" fill="#c8dfd6" stroke="#456d68" stroke-width="2"/><rect x="75" y="27" width="118" height="114" rx="12" transform="rotate(8 75 27)" fill="#fffef7" stroke="#2c4359" stroke-width="2"/><path d="M96 57l5 5 10-12M95 82l5 5 10-12M95 107l5 5 10-12" stroke="#328976" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M124 57h43M122 82h40M121 107h28" stroke="#9baab5" stroke-width="4" stroke-linecap="round"/><path d="M204 139v-35M204 111c-28-3-30-22-22-28 13-7 24 10 22 28zM204 101c-1-25 19-29 26-20 7 12-9 22-26 20z" stroke="#366d5b" stroke-width="2" fill="#8bc5a3"/><path d="M188 121h33l-5 24h-23z" fill="#dd967e" stroke="#734f48" stroke-width="2"/><path d="M43 24l3 8 8 3-8 3-3 8-3-8-8-3 8-3 3-8zM239 25l2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5z" fill="#8d7dcb"/><circle cx="241" cy="117" r="4" fill="#e7b26d"/></svg></div>';
@@ -2832,6 +2833,7 @@
         return;
       }
       if (action === 'widget-up') {
+        myDay?.visual?.captureLayout();
         save(h => {
           const i = h.widgets.findIndex(w => w.id === id);
           if (i > 0) [h.widgets[i - 1], h.widgets[i]] = [h.widgets[i], h.widgets[i - 1]];
@@ -2839,6 +2841,7 @@
         return;
       }
       if (action === 'widget-size') {
+        myDay?.visual?.captureLayout();
         save(h => {
           const w = h.widgets.find(w => w.id === id);
           w.span = w.span === 'wide' ? 'normal' : 'wide';
@@ -3367,10 +3370,11 @@
     // Pointer-based sorting works with a mouse or touch; only handles capture gestures.
     let sorting = null,
       sortSuppressClickUntil = 0;
-    function clearSort() {
+    function clearSort(committing = false) {
       if (!sorting) return null;
       const done = sorting;
       sorting = null;
+      if (done.type === 'widget') myDay?.visual?.endSort(committing);
       done.ghost?.remove();
       done.source.classList.remove('hub-dragging');
       document
@@ -3384,6 +3388,7 @@
     }
     function reorderWidget(id, targetId) {
       if (id === targetId) return;
+      myDay?.visual?.captureLayout();
       save(h => {
         const from = h.widgets.findIndex(w => w.id === id),
           to = h.widgets.findIndex(w => w.id === targetId);
@@ -3426,7 +3431,9 @@
           const ghost = sorting.source.cloneNode(true);
           ghost.removeAttribute('id');
           ghost.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
-          ghost.className = 'hub-sort-ghost hub-card';
+          ghost.className =
+            'hub-sort-ghost hub-card' +
+            (sorting.source.closest('.my-day-page') ? ' mv-sort-ghost' : '');
           ghost.setAttribute('aria-hidden', 'true');
           ghost.inert = true;
           const rect = sorting.source.getBoundingClientRect();
@@ -3453,8 +3460,20 @@
         document
           .querySelectorAll('.hub-drop-target')
           .forEach(el => el.classList.remove('hub-drop-target'));
-        sorting.target = target && target !== sorting.source ? target : null;
+        const previewGrid = sorting.type === 'widget' && sorting.source.closest('.hub-layout'),
+          overPreview =
+            sorting.target &&
+            previewGrid &&
+            (target === sorting.source || (!target && hit?.closest('.hub-layout') === previewGrid));
+        if (!overPreview) sorting.target = target && target !== sorting.source ? target : null;
         sorting.target?.classList.add('hub-drop-target');
+        if (sorting.type === 'widget') {
+          myDay?.visual?.previewSort(sorting.source, sorting.target);
+          // Reparenting the preview can release capture; keep the gesture bound to its handle.
+          try {
+            sorting.handle.setPointerCapture?.(sorting.pointerId);
+          } catch {}
+        }
         if (event.clientY < 65) root.scrollBy?.(0, -14);
         else if (event.clientY > root.innerHeight - 65) root.scrollBy?.(0, 14);
         if (sorting.type === 'task') {
@@ -3470,7 +3489,7 @@
     );
     document.addEventListener('pointerup', event => {
       if (!sorting || event.pointerId !== sorting.pointerId) return;
-      const done = clearSort();
+      const done = clearSort(!!sorting.target && sorting.moved);
       if (!done.moved) return;
       sortSuppressClickUntil = Date.now() + 600;
       event.preventDefault();

@@ -46,6 +46,13 @@
       audio = null,
       lastMissionCount = null;
     const contexts = new WeakMap();
+    const visual = root.WorkHubMyDayVisuals.install({
+      ready: a.ready,
+      owner: a.owner,
+      prefs: a.prefs,
+      settings: () => store().settings,
+      layout: a.layout,
+    });
     function sync() {
       const next = a.ready() ? a.owner() : '';
       if (next !== owner) {
@@ -67,6 +74,7 @@
         }
         document.querySelectorAll('.md-celebration').forEach(x => x.remove());
       }
+      visual.sync();
       return next;
     }
     function ready() {
@@ -131,17 +139,26 @@
     }
     function hero() {
       sync();
-      const d = current(),
-        count = completeCount(),
-        hours = new Date().getHours(),
-        phase = hours < 12 ? 'Morning light' : hours < 18 ? 'Afternoon flow' : 'Evening glow';
-      return `<div class="hub-head md-day-intro"><div><span class="md-kicker">${esc(new Date(today() + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }))} · ${phase}</span><h2>A little intention.<br>A day that feels yours.</h2><p>Make room for what matters, one small step at a time.</p><div class="md-hero-actions">${button('morning', d.started ? 'Review my plan' : 'Start my day', '', 'md-primary')}${button('evening', d.closed ? 'Review day’s close' : 'Close my day')}${button('settings', 'Effects & hours')}${button('layout', 'Arrange dashboard')}</div></div><div class="md-hero-scene" aria-label="${count} of ${d.missions.length} daily priorities completed"><div class="md-sun"></div><div class="md-hill md-hill-back"></div><div class="md-hill"></div><div class="md-hero-sprout">${Array.from({ length: Math.max(1, count + 1) }, (_, i) => `<i style="--i:${i}"></i>`).join('')}</div><span class="md-scene-label"><strong>${count}/${d.missions.length || '—'}</strong> priorities complete</span></div></div>`;
+      const d = current();
+      return visual.hero({
+        date: today(),
+        name: a.prefs().name,
+        done: completeCount(),
+        total: d.missions.length,
+        activities: E.agenda(state(), today()).length,
+        open: E.openTasks(state()).length,
+        actions:
+          button('morning', d.started ? 'Review my plan' : 'Start my day', '', 'md-primary') +
+          button('evening', d.closed ? 'Review day’s close' : 'Close my day') +
+          button('settings', 'Effects & hours') +
+          button('layout', 'Arrange dashboard'),
+      });
     }
     function toolbar() {
-      return `<div class="md-workspace-strip"><span><i aria-hidden="true"></i> YOUR DAY, YOUR WAY</span><p>Drag the dotted handles. Resize or expand any widget.</p>${button('layout', 'Choose widgets <span aria-hidden="true">↗</span>')}</div>`;
+      return visual.toolbar();
     }
     function wrapper(id, label, symbol, span, body, handle, controls) {
-      return `<section class="hub-card hub-widget md-widget${expanded.has(id) ? ' md-expanded' : ''}" data-span="${span}" draggable="true" data-widget="${id}"><div class="hub-widget-head"><h3><span class="hub-widget-symbol">${symbol}</span>${esc(label)}</h3><div class="hub-widget-actions">${handle}${controls}${button('expand', expanded.has(id) ? '↙' : '⤢', `data-id="${id}" aria-label="${expanded.has(id) ? 'Collapse' : 'Expand'} ${esc(label)}" aria-expanded="${expanded.has(id)}"`, 'small')}</div></div><div class="md-widget-body">${body}</div></section>`;
+      return `<section class="hub-card hub-widget md-widget${expanded.has(id) ? ' md-expanded' : ''}" data-span="${span}" draggable="true" data-widget="${id}" data-mv-phase="${visual.phase(id)}"><div class="mv-widget-shell"><div class="hub-widget-head"><div class="mv-widget-heading"><span class="mv-widget-kicker"></span><h3><span class="hub-widget-symbol">${symbol}</span>${esc(label)}</h3></div><div class="hub-widget-actions">${handle}${controls}${button('expand', expanded.has(id) ? '↙' : '⤢', `data-id="${id}" aria-label="${expanded.has(id) ? 'Collapse' : 'Expand'} ${esc(label)}" aria-expanded="${expanded.has(id)}"`, 'small')}</div></div><div class="md-widget-body">${body}</div></div></section>`;
     }
     function taskButton(t, label = 'Open', action = 'task') {
       return button(action, label, `data-id="${esc(t.id)}"`);
@@ -563,18 +580,7 @@
         document.body.matches('.hub-private,.hub-present')
       )
         return;
-      const target = document.querySelector('.my-day-page');
-      if (!target) return;
-      target.querySelector('.md-celebration')?.remove();
-      const box = document.createElement('div');
-      box.className = 'md-celebration';
-      box.setAttribute('aria-hidden', 'true');
-      box.innerHTML = Array.from(
-        { length: store().settings.effects === 'playful' ? 20 : 8 },
-        (_, i) => `<i style="--i:${i}">✦</i>`
-      ).join('');
-      target.append(box);
-      setTimeout(() => box.remove(), 2200);
+      visual.celebrate();
       tone();
     }
     function unlockAudio() {
@@ -620,6 +626,7 @@
         return;
       }
       if (action === 'expand') {
+        visual.captureLayout();
         expanded.has(id) ? expanded.delete(id) : expanded.add(id);
         a.render();
         document.querySelector('[data-widget="' + id + '"] [data-md="expand"]')?.focus();
@@ -678,6 +685,13 @@
       if (action === 'up-prev' || action === 'up-next') {
         upIndex += action === 'up-next' ? 1 : -1;
         refresh('upNext');
+        return;
+      }
+      if (action === 'radar') {
+        const kind = el.dataset.kind;
+        if (!['task', 'project', 'custom', 'leave', 'free'].includes(kind)) return;
+        radarKind = radarKind === kind ? '' : kind;
+        refresh('radar');
         return;
       }
       if (action === 'energy') {
@@ -1487,6 +1501,7 @@
           `<div class="md-canvas-undo">${button('undo', '↶ Undo canvas removal')}</div>`
         );
       }
+      visual.mount();
       runtime();
     }
     let lastMinute = -1;
@@ -1502,6 +1517,7 @@
       }
     }
     return {
+      visual,
       hero,
       toolbar,
       wrapper,

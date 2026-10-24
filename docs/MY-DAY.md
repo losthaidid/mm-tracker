@@ -4,6 +4,26 @@ My Day combines the existing dashboard with an interactive planning shelf, a foc
 optional visual effects, a break terrarium and a private thinking canvas. All calculations
 use maintained records and rules; no AI service is called.
 
+## A living landscape
+
+The welcome scene is drawn locally with SVG: mountains, a river, a small cabin and a sky
+that follows the local time of day. Clouds drift, water catches the light, and the night
+scene has a crescent moon and stars. The landscape responds gently to scrolling and pointer
+movement. Glass panels, pointer lighting, animated counters/charts and completion ripples
+coordinate with the same Calm/Ambient/Playful settings in **Effects & hours**.
+
+**Your whole day**, **Make a plan**, **Find your flow** and **Pause & reflect** filter the
+visible widgets without saving or reordering them. Choose Your whole day to see everything
+again. These views reset for a different account. The welcome scene's activity and task
+summaries jump to the relevant widget; Arrange dashboard is offered if that widget is hidden.
+
+Dragging lifts a preview, moves the surrounding cards aside and highlights the destination.
+A cancelled drag restores the original layout; a released drop saves once. Expand/collapse
+and resizing animate between positions while retaining the existing saved sizes and order.
+Decorative effects pause offscreen or when the page is hidden, and respect reduced motion,
+motion off, Privacy and Present modes. The scene and its effects add no database records,
+image uploads, external requests or recurring cloud saves.
+
 ## Keep your layout
 
 The upgrade retains existing widget order and normal/wide sizes. The Day journey,
@@ -84,6 +104,8 @@ Postgres tables, permissions and document version 9 are unchanged.
 - `my-day-engine.js`: upgrades, validation, agenda/gaps, workload, recorded intervals and idea conversion.
 - `my-day.js`: widgets, forms, pointer/keyboard interactions and local clock/effect lifecycle.
 - `my-day.css`: scoped visual design, responsive layouts and reduced-motion rules.
+- `my-day-visuals.js` and `my-day-visuals.css`: the local landscape, chapter views, glass
+  panels, layout transitions, counters, chart entrances and guarded decorative effects.
 - `studio.js`: existing layout and timer integration. `app.js`: standard Schedule editor adapters.
 - `tests/my-day.test.mjs`: pure calculations and bounded records. My Day tests in
   `tests/app.test.mjs` cover persistence, recovery, dragging, stale forms, planning and local clocks.
