@@ -438,6 +438,7 @@
         error,
         track,
         musicRunning: !!musicVoice,
+        starting: !!starting,
       }),
     };
   }

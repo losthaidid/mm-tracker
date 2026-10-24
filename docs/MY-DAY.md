@@ -36,6 +36,9 @@ image uploads, external requests or recurring cloud saves.
 
 The upgrade retains existing widget order and normal/wide sizes. The Day journey,
 Today’s three priorities, Focus orb, Break terrarium and Thinking canvas are appended once.
+The duplicate My Day Focus timer widget is retired: an old saved timer widget becomes the
+Focus orb, or is removed if an orb already exists. An existing orb keeps its position and size.
+The shared countdown engine, floating Focus mode and Studio’s Focus room remain available.
 Use **Arrange dashboard** or **Choose widgets** to show or hide any old or new widget.
 
 Drag each widget’s dotted header handle with a mouse or touch. Its arrow moves it upward;
@@ -78,10 +81,29 @@ The Focus orb uses the existing focus countdown, including adjustable duration a
 A focus countdown does not itself create a work session. Use **Track work** to record work time
 for the existing session history and Plan & reality.
 
-The Break terrarium offers Rest your eyes, Stretch and Step away. Starting it pauses a running
-work timer and active focus countdown. Resume those separately when ready. Breaks can be paused,
-resumed or ended; their clocks stay in memory on the current device and reset on reload/account
-change. Clock ticks do not save cloud records.
+The Break terrarium opens a full-viewport animated glass garden with Rest your eyes, Stretch
+and Step away modes. Starting it pauses a running work timer and active focus countdown and
+pauses the work Soundscape. The garden has a countdown, progress, pause/resume, an explicit
+End break early control, rest music, volume and a separate break-end chime control.
+
+Rest has three original, locally synthesized soundscapes: Cloud garden, Moonlit tide and
+Rain on leaves. These use pads, bells and gentle nature textures, with no focus beat. Rest
+music begins with the break button; its track, volume, music and chime preferences stay on
+the device separately from the work Soundscape. Playback failure leaves the timer usable
+and offers Retry sound. No audio files, cloud uploads or AI service are used.
+
+At zero, rest music stops, the completion view remains open and a gentle chime repeats until
+silenced or acknowledged. Silence chime affects that alert, keeping the future chime
+preference. **Resume work** closes the view and resumes only matching work/focus timers that
+were running before this break, plus a previously playing work Soundscape. Previously paused
+or replaced timers stay paused. Ending early or pressing Escape leads to the same explicit
+resume step without an alarm. Timers exclude the break and pause gaps.
+
+Breaks stay in memory while the website is open, with no recurring cloud saves. Deadline
+checks also run on visibility changes; account changes and leaving the page stop rest audio
+and clear the view without resuming another account’s work. Animation follows Calm, motion
+off and reduced-motion preferences. The rest view’s sound controls are separate from My Day
+priority celebration sounds.
 
 Effects & hours maintains Calm/Ambient/Playful styles, particle and priority-celebration switches,
 working hours and a 1–60 minute break length. Preview controls before saving. Sound is off by
@@ -117,6 +139,8 @@ Postgres tables, permissions and document version 9 are unchanged.
 - `my-day.css`: scoped visual design, responsive layouts and reduced-motion rules.
 - `my-day-visuals.js` and `my-day-visuals.css`: the local landscape, chapter views, glass
   panels, layout transitions, counters, chart entrances and guarded decorative effects.
+- `rest-room.js` and `rest-room.css`: immersive break lifecycle, accessible full-screen view
+  and explicit work resumption. `rest-audio.js`: original rest-only soundscapes and chimes.
 - `studio.js`: existing layout and timer integration. `app.js`: standard Schedule editor adapters.
 - `tests/my-day.test.mjs`: pure calculations and bounded records. My Day tests in
   `tests/app.test.mjs` cover persistence, recovery, dragging, stale forms, planning and local clocks.
