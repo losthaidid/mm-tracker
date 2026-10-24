@@ -3460,10 +3460,20 @@
         document
           .querySelectorAll('.hub-drop-target')
           .forEach(el => el.classList.remove('hub-drop-target'));
-        if (!(sorting.type === 'widget' && target === sorting.source && sorting.target))
-          sorting.target = target && target !== sorting.source ? target : null;
+        const previewGrid = sorting.type === 'widget' && sorting.source.closest('.hub-layout'),
+          overPreview =
+            sorting.target &&
+            previewGrid &&
+            (target === sorting.source || (!target && hit?.closest('.hub-layout') === previewGrid));
+        if (!overPreview) sorting.target = target && target !== sorting.source ? target : null;
         sorting.target?.classList.add('hub-drop-target');
-        if (sorting.type === 'widget') myDay?.visual?.previewSort(sorting.source, sorting.target);
+        if (sorting.type === 'widget') {
+          myDay?.visual?.previewSort(sorting.source, sorting.target);
+          // Reparenting the preview can release capture; keep the gesture bound to its handle.
+          try {
+            sorting.handle.setPointerCapture?.(sorting.pointerId);
+          } catch {}
+        }
         if (event.clientY < 65) root.scrollBy?.(0, -14);
         else if (event.clientY > root.innerHeight - 65) root.scrollBy?.(0, 14);
         if (sorting.type === 'task') {
