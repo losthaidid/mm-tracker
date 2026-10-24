@@ -37,7 +37,7 @@
       const px = x + i * 32,
         py = y + Math.sin(i * 1.9) * 13,
         s = (0.7 + (i % 4) * 0.14) * scale;
-      return `<g transform="translate(${px} ${py}) scale(${s})"><path d="M-3 0 3 0 2-82-2-82Z" fill="var(--mv-trunk)"/><path d="M0-130-32-74-18-74-43-31-20-31-48-2 46-2 20-31 40-31 17-74 31-74Z" fill="currentColor"/><path d="M0-130 0-5 46-2 20-31 40-31 17-74 31-74Z" fill="#102e2e" opacity=".17"/></g>`;
+      return `<g transform="translate(${px} ${py}) scale(${s})"><g class="mv-tree" style="--tree:${i}"><path d="M-3 0 3 0 2-82-2-82Z" fill="var(--mv-trunk)"/><path d="M0-130-32-74-18-74-43-31-20-31-48-2 46-2 20-31 40-31 17-74 31-74Z" fill="currentColor"/><path d="M0-130 0-5 46-2 20-31 40-31 17-74 31-74Z" fill="#102e2e" opacity=".17"/></g></g>`;
     }).join('');
   }
   function scene() {
@@ -48,6 +48,7 @@
       <linearGradient id="mvRoof" x2="0" y2="1"><stop stop-color="#d0ae7e"/><stop offset="1" stop-color="#8c7560"/></linearGradient>
       <radialGradient id="mvGlow"><stop stop-color="#f5d999" stop-opacity=".58"/><stop offset="1" stop-color="#f5d999" stop-opacity="0"/></radialGradient>
       <linearGradient id="mvMist"><stop stop-color="#d3e7cf" stop-opacity="0"/><stop offset=".5" stop-color="#d3e7cf" stop-opacity=".25"/><stop offset="1" stop-color="#d3e7cf" stop-opacity="0"/></linearGradient>
+      <clipPath id="mvRiverClip"><path d="M971 310Q998 336 936 350T861 392Q901 419 1026 415T1189 468L1270 520H793Q807 450 745 423T764 369Q886 337 936 310Z"/></clipPath>
       <mask id="mvMoonShape" maskUnits="userSpaceOnUse" x="0" y="0" width="1440" height="500"><rect width="1440" height="500" fill="white"/><circle class="mv-moon-cutout" cx="1127" cy="111" r="44" fill="black"/></mask>
     </defs>
     <rect width="1440" height="500" fill="url(#mvSky)"/>
@@ -61,7 +62,8 @@
       <g style="color:var(--mv-tree-far)">${trees(665, 334, 17, 0.65)}</g>
     </g>
     <g class="mv-layer mv-layer-valley"><path d="M-40 427Q161 311 386 367T750 324Q920 346 988 312T1490 350L1460 520H-40Z" fill="var(--mv-valley)"/>
-      <path d="M971 310Q998 336 936 350T861 392Q901 419 1026 415T1189 468L1270 520H793Q807 450 745 423T764 369Q886 337 936 310Z" fill="url(#mvRiver)" opacity=".87"/>
+      <path class="mv-river-body" d="M971 310Q998 336 936 350T861 392Q901 419 1026 415T1189 468L1270 520H793Q807 450 745 423T764 369Q886 337 936 310Z" fill="url(#mvRiver)" opacity=".95"/>
+      <g clip-path="url(#mvRiverClip)"><g class="mv-river-caustics" stroke="#fff8d6" fill="none">${Array.from({ length: 16 }, (_, i) => `<path style="--i:${i}" d="M710 ${315 + i * 14}q65-15 130 0t130 0t130 0t130 0"/>`).join('')}</g><path class="mv-river-current" d="M953 305Q1018 337 913 361T821 392Q864 438 1028 435T1220 515" fill="none" stroke="#fff0ba" stroke-width="5"/><g class="mv-river-ripples" fill="none" stroke="#fff5d0">${Array.from({ length: 7 }, (_, i) => `<g transform="translate(${820 + ((i * 47) % 360)} ${375 + i * 22})"><ellipse style="--i:${i}" rx="18" ry="4"/></g>`).join('')}</g></g>
       <g class="mv-water-lines" fill="none" stroke="#f6edc6" stroke-linecap="round" opacity=".46"><path d="M908 352h48m-126 45h72m-46 47h120m74 31h112m-23 29h114" stroke-width="2"/><path d="M944 326h18m-58 42h33m-87 52h63m115 25h56m-21 48h54"/></g>
       <path d="M1015 361q43-44 85-9" fill="none" stroke="#d5c7a1" stroke-width="7"/><path d="M1015 359v-23m16 8v-22m17 13v-20m18 21v-19m17 25v-18m16 31v-21" stroke="#c3b48e" stroke-width="3"/>
     </g>
@@ -84,7 +86,7 @@
           `<g transform="translate(${x} ${y})"><g class="mv-butterfly" style="--i:${i}"><g class="mv-butterfly-wings" fill="${c}"><path d="M0 0C-22-21-24 11 0 4Z"/><path d="M0 0C22-21 24 11 0 4Z"/></g><path d="M0-3V7" stroke="#294f46" stroke-width="2"/></g></g>`
       )
       .join('')}</g>
-    </svg><div class="mv-light-beams"></div><div class="mv-aurora"><i></i><i></i></div><div class="mv-shooting-stars"><i></i><i></i></div><div class="mv-scene-haze"></div><div class="mv-motes">${Array.from({ length: 16 }, (_, i) => `<i style="--i:${i};left:${35 + ((i * 17) % 63)}%;top:${15 + ((i * 23) % 70)}%"></i>`).join('')}</div></div>`;
+    <g class="mv-wind-leaves" fill="#d6d49a">${Array.from({ length: 12 }, (_, i) => `<g transform="translate(${770 + ((i * 71) % 650)} ${170 + ((i * 37) % 220)})"><path style="--i:${i}" d="M0 0Q14-11 19 1Q9 14 0 0Z"/></g>`).join('')}</g></svg><div class="mv-light-beams"></div><div class="mv-aurora"><i></i><i></i></div><div class="mv-shooting-stars"><i></i><i></i></div><div class="mv-scene-haze"></div><div class="mv-motes">${Array.from({ length: 16 }, (_, i) => `<i style="--i:${i};left:${35 + ((i * 17) % 63)}%;top:${15 + ((i * 23) % 70)}%"></i>`).join('')}</div></div>`;
   }
   function install(a) {
     let owner = '',

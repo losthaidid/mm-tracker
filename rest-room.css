@@ -14,6 +14,7 @@ body.rest-room-open {
   max-width: none;
   max-height: none;
   overflow: auto;
+  overflow-x: hidden;
   overscroll-behavior: contain;
   color: #e7efe2;
   background:
@@ -198,6 +199,8 @@ body.rest-room-open {
 }
 .rest-landscape {
   position: relative;
+  min-width: 0;
+  overflow: clip;
   min-height: 500px;
   align-self: stretch;
   display: flex;
@@ -411,27 +414,29 @@ body.rest-room-open {
   font-size: 8px;
   letter-spacing: 0.12em;
 }
-.rest-room[data-motion='flow'][data-phase='resting'] .rest-globe {
-  animation: rest-breathe 10s ease-in-out infinite;
+.rest-room[data-motion='flow']:not([data-phase='paused']) .rest-globe {
+  animation: rest-breathe 4.5s ease-in-out infinite;
 }
-.rest-room[data-motion='flow'][data-phase='resting'] .rest-fern {
-  animation: rest-sway 8s ease-in-out infinite alternate;
+.rest-room[data-motion='flow']:not([data-phase='paused']) .rest-fern {
+  animation: rest-sway 3.5s ease-in-out infinite alternate;
 }
-.rest-room[data-motion='flow'][data-phase='resting'] .rest-fern.second {
+.rest-room[data-motion='flow']:not([data-phase='paused']) .rest-fern.second {
   animation-direction: alternate-reverse;
-  animation-duration: 10s;
+  animation-duration: 4.6s;
 }
-.rest-room[data-motion='flow'][data-phase='resting'] .rest-sprout {
-  animation: rest-sway 9s ease-in-out infinite alternate;
+.rest-room[data-motion='flow']:not([data-phase='paused']) .rest-sprout {
+  animation: rest-sway 4s ease-in-out infinite alternate;
 }
-.rest-room[data-motion='flow'][data-phase='resting'] .rest-firefly {
-  animation: rest-float 8s ease-in-out infinite alternate;
+.rest-room[data-motion='flow']:not([data-phase='paused']) .rest-firefly {
+  animation: rest-float 4.5s ease-in-out infinite alternate;
   animation-delay: calc(var(--i) * -0.6s);
 }
-.rest-room[data-motion='flow'][data-phase='resting'][data-music='playing'] .rest-music-waves i {
+.rest-room[data-motion='flow']:not([data-phase='paused'])[data-music='playing']
+  .rest-music-waves
+  i {
   animation: rest-wave 1.8s ease-in-out infinite alternate;
 }
-.rest-room[data-motion='flow'][data-phase='resting'][data-music='playing']
+.rest-room[data-motion='flow']:not([data-phase='paused'])[data-music='playing']
   .rest-music-waves
   i:nth-child(2n) {
   animation-delay: -0.8s;
@@ -450,7 +455,7 @@ body.rest-room-open {
 }
 @keyframes rest-breathe {
   50% {
-    transform: scale(1.025);
+    transform: scale(1.06) translateY(-8px);
     box-shadow:
       inset 5px 0 20px #d1e6cf12,
       0 0 70px #a6c68b25;
@@ -458,12 +463,12 @@ body.rest-room-open {
 }
 @keyframes rest-sway {
   to {
-    transform: rotate(3deg);
+    transform: rotate(9deg);
   }
 }
 @keyframes rest-float {
   to {
-    transform: translate(12px, -23px);
+    transform: translate(52px, -75px) scale(1.4);
     opacity: 0.18;
   }
 }
@@ -477,6 +482,138 @@ body.rest-room-open {
     box-shadow: 0 0 28px #e6d5a22b;
   }
 }
+/* An unmistakably living glass garden: ribbons, orbiting light, water and drifting mist. */
+.rest-aurora {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.rest-aurora i {
+  position: absolute;
+  left: 5%;
+  top: 10%;
+  width: 110%;
+  height: 45%;
+  border-radius: 50%;
+  border: 30px solid #a8d7b536;
+  filter: blur(12px);
+  transform: rotate(-25deg);
+  box-shadow: 0 0 60px #d6c38c24;
+}
+.rest-aurora i:nth-child(2) {
+  top: 40%;
+  left: -25%;
+  border-color: #8fc7c32b;
+}
+.rest-aurora i:nth-child(3) {
+  top: 60%;
+  left: 10%;
+  border-color: #e3c98326;
+}
+.rest-star-ring {
+  position: absolute;
+  inset: 8%;
+  border: 1px dashed #c3d4b333;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.rest-star-ring:before,
+.rest-star-ring:after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #e3d6a0;
+  box-shadow: 0 0 30px 12px #e2cd9655;
+}
+.rest-star-ring:after {
+  top: auto;
+  bottom: -5px;
+  background: #a8dbb8;
+}
+.rest-room[data-motion='flow']:not([data-phase='paused']) .rest-aurora i {
+  animation: rest-ribbon-flow 7s ease-in-out infinite alternate;
+}
+.rest-room[data-motion='flow']:not([data-phase='paused']) .rest-aurora i:nth-child(2) {
+  animation-delay: -3s;
+  animation-direction: alternate-reverse;
+}
+.rest-room[data-motion='flow']:not([data-phase='paused']) .rest-aurora i:nth-child(3) {
+  animation-delay: -5s;
+}
+.rest-room[data-motion='flow']:not([data-phase='paused']) .rest-star-ring {
+  animation: rest-orbit 18s linear infinite;
+}
+.rest-room[data-motion='flow']:not([data-phase='paused']) .rest-moon {
+  animation: rest-moon-float 4s ease-in-out infinite alternate;
+}
+.rest-room[data-motion='flow']:not([data-phase='paused']) .rest-water {
+  animation: rest-water-rings 3s ease-out infinite;
+}
+.rest-room[data-motion='flow']:not([data-phase='paused']) .rest-glass-light {
+  animation: rest-glass-sweep 6s ease-in-out infinite alternate;
+}
+.rest-room .rest-alarm-note {
+  grid-column: 1 / 3;
+  margin: 0;
+  color: #d8d3a3;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rest-room[data-phase='complete'] .rest-alarm-note {
+  color: #f1dda3;
+  font-weight: 600;
+}
+@keyframes rest-ribbon-flow {
+  from {
+    transform: translate(-25px, -20px) rotate(-25deg) scale(0.9);
+    opacity: 0.5;
+  }
+  to {
+    transform: translate(60px, 45px) rotate(18deg) scale(1.2);
+    opacity: 1;
+  }
+}
+@keyframes rest-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes rest-moon-float {
+  to {
+    transform: translate(-14px, -18px) scale(1.1);
+    box-shadow:
+      0 0 65px 22px #e4dda64b,
+      0 0 130px 40px #d6e0ac28;
+  }
+}
+@keyframes rest-water-rings {
+  from {
+    transform: scale(0.65);
+    opacity: 0.7;
+  }
+  to {
+    transform: scale(1.45);
+    opacity: 0;
+  }
+}
+@keyframes rest-glass-sweep {
+  from {
+    transform: translateX(-30px) rotate(-8deg);
+    opacity: 0.35;
+  }
+  to {
+    transform: translateX(90px) rotate(12deg);
+    opacity: 0.85;
+  }
+}
+
 @media (min-width: 1600px) {
   .rest-room-shell {
     padding-top: 38px;

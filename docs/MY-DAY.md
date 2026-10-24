@@ -84,18 +84,20 @@ for the existing session history and Plan & reality.
 The Break terrarium opens a full-viewport animated glass garden with Rest your eyes, Stretch
 and Step away modes. Starting it pauses a running work timer and active focus countdown and
 pauses the work Soundscape. The garden has a countdown, progress, pause/resume, an explicit
-End break early control, rest music, volume and a separate break-end chime control.
+End break early control, rest music and music volume. The alarm is always enabled.
 
 Rest has three original, locally synthesized soundscapes: Cloud garden, Moonlit tide and
 Rain on leaves. These use pads, bells and gentle nature textures, with no focus beat. Rest
-music begins with the break button; its track, volume, music and chime preferences stay on
+music begins with the break button; its track, volume and music preferences stay on
 the device separately from the work Soundscape. Playback failure leaves the timer usable
 and offers Retry sound. No audio files, cloud uploads or AI service are used.
 
-At zero, rest music stops, the completion view remains open and a gentle chime repeats until
-silenced or acknowledged. Silence chime affects that alert, keeping the future chime
-preference. **Resume work** closes the view and resumes only matching work/focus timers that
-were running before this break, plus a previously playing work Soundscape. Previously paused
+At zero, rest music stops and a continuous looping alarm rings while the completion view
+remains open. There is no silence or dismiss control: **Resume work** stops the alarm, closes
+the view and resumes only matching work/focus timers that
+were running before this break, plus a previously playing work Soundscape. The alarm has an
+independent gain, so rest music volume zero, music off and older chime-off preferences do not
+mute it. Its audio source loops independently of JavaScript timer ticks. Previously paused
 or replaced timers stay paused. Ending early or pressing Escape leads to the same explicit
 resume step without an alarm. Timers exclude the break and pause gaps.
 
@@ -145,3 +147,18 @@ Postgres tables, permissions and document version 9 are unchanged.
 - `tests/my-day.test.mjs`: pure calculations and bounded records. My Day tests in
   `tests/app.test.mjs` cover persistence, recovery, dragging, stale forms, planning and local clocks.
   `tests/database.test.mjs` checks that the account document round-trips through existing RLS/RPC.
+
+
+## Site-wide spectacle
+
+The default motion experience now includes sweeping aurora ribbons, orbiting lights, drifting
+particles, comets, illuminated moving panel borders, page arrivals, pointer trails and click
+shockwaves across all twelve primary sections. Forms and saved drag coordinates remain stable.
+My Day adds independently swaying trees, racing river currents, expanding water rings, windblown
+leaves and stronger clouds, wildlife, sunlight and smoke. The rest garden adds light ribbons,
+orbiting lights, moon drift, water rings and stronger plant and firefly movement.
+
+Effects are local decorations. Feedback is capped, offscreen panel borders pause, disconnected
+panels are unobserved, and hidden pages release interaction effects. Motion Off, device reduced
+motion, Privacy and Present suppress the spectacle. My Day Calm still stops its scenery. No
+animation writes records or changes the existing drag, resize, timer or form actions.
