@@ -76,5 +76,30 @@ test('iPhone CSS removes expensive blur and 3D card layers while preserving priv
   document.body.classList.add('hub-private');await settle();
   assert.match(window.getComputedStyle(document.querySelector('.hub-sensitive')).filter,/blur/);
   const full=setup(t,{styles:true,ua:'Mozilla/5.0 (Macintosh; Intel Mac OS X)',platform:'MacIntel'});await settle();
-  assert.match(full.window.getComputedStyle(full.document.querySelector('.mv-atmosphere i')).filter,/blur/);
+  assert.doesNotMatch(full.window.getComputedStyle(full.document.querySelector('.mv-atmosphere i')).filter,/blur/);
+});
+
+test('small UI updates inspect only their changed branch and new modal cards still receive decoration',async t=>{
+  const {window,document,observers}=setup(t);await settle();
+  const query=document.querySelectorAll.bind(document);let documentScans=0;
+  document.querySelectorAll=selector=>{if(selector.startsWith('.hub-card,.mv-widget-shell,'))documentScans++;return query(selector);};
+  const first=document.querySelector('.hub-card');
+  for(let i=0;i<20;i++){const note=document.createElement('span');note.textContent='Updated label';first.append(note);await settle();note.remove();await settle();}
+  document.body.classList.add('unrelated-ui-state');await settle();
+  assert.equal(documentScans,0,'small updates and unrelated body state must not rescan the workspace');
+  const modal=document.createElement('dialog');modal.innerHTML='<article class="hub-card">A newly opened card</article>';document.body.append(modal);await settle();
+  const card=modal.querySelector('.hub-card');assert.ok(card.classList.contains('fx-surface'));assert.equal(card.querySelectorAll(':scope > .fx-panel-aura').length,1);assert.ok(observers[0].targets.has(card));assert.equal(documentScans,0);
+  modal.remove();await settle();assert.ok(!observers[0].targets.has(card));
+  document.body.dataset.motion='off';window.WorkHubSpectacle.sync();document.body.dataset.motion='playful';window.WorkHubSpectacle.sync();await settle();assert.equal(documentScans,1);assert.ok(observers[0].targets.has(first));assert.equal(first.querySelectorAll(':scope > .fx-panel-aura').length,1);
+});
+
+test('offscreen and covered workspace animation pauses without pausing the visible rest scene',async t=>{
+  const {window,document}=setup(t,{styles:true});await settle();
+  const card=document.querySelector('.hub-card');card.classList.add('mv-out-of-view');
+  assert.equal(window.getComputedStyle(card.querySelector('button')).animationPlayState,'paused');
+  document.body.classList.add('rest-room-open');
+  assert.equal(window.getComputedStyle(document.querySelector('#view')).animationPlayState,'paused');
+  assert.notEqual(window.getComputedStyle(document.querySelector('.rest-moon')).animationPlayState,'paused');
+  document.body.classList.remove('rest-room-open');card.classList.remove('mv-out-of-view');
+  assert.notEqual(window.getComputedStyle(card.querySelector('button')).animationPlayState,'paused');
 });

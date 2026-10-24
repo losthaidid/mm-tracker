@@ -190,3 +190,27 @@ Music playback gain is higher for both focus tracks and all three rest tracks at
 positions. Focus music keeps the existing output compressor; rest music retains full-volume
 signal headroom. Volume zero, mute, pause, separate focus/rest preferences, and the alarm's
 independent gain and explicit Resume work behavior are retained.
+
+
+## Rendering performance
+
+Decorative panel discovery scans the document once when motion starts or resumes. Later DOM
+updates inspect only added branches and release observers for removed cards. Small text updates,
+feedback particles and unrelated body state no longer rescan every panel. Newly opened dialogs
+are included. Existing feedback counts, navigation, motion guards and account data are preserved.
+
+Animated panel borders use a sliding gradient at twice the card width and one card height,
+instead of a rotating texture at 4.6 times both dimensions. Their breathing effect animates the
+border opacity instead of repeatedly repainting card shadows. Section arrivals animate headers
+without a full-page blur. My Day glass cards retain gradients and lighting while avoiding live
+backdrop sampling; only the hovered card uses 3D tilt. Soft page colours use radial gradients
+without blur, and river shimmer uses opacity alongside the moving currents and ripples.
+
+Offscreen scenery pauses its own animation and decorative pseudo-elements. The break dialog
+pauses the covered workspace while its visible plants, water and lights continue to move.
+Pointer lighting reads geometry before writes, updates the current card, and scopes parallax
+variables to the landscape header. Clocks and unchanged labels avoid redundant DOM writes.
+
+In a fictional-account browser preview, 20 small content updates caused 20 document scans and
+720 panel matches before these changes, and zero document scans or panel matches afterward.
+This measures decoration work, not a frame-rate guarantee or physical iPhone performance.

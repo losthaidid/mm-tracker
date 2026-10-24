@@ -24,7 +24,6 @@
   width: 650px;
   height: 650px;
   border-radius: 50%;
-  filter: blur(60px);
   background: radial-gradient(circle, #aec9b030, transparent 70%);
   top: 300px;
   right: -200px;
@@ -524,19 +523,21 @@
   min-height: 100%;
   height: 100%;
   padding: 23px;
-  background: linear-gradient(140deg, #fffff8d9, #f8faf2c9);
+  background: linear-gradient(140deg, #fffff8ed, #f8faf2e8);
   border: 1px solid #d2dfcd;
   border-radius: inherit;
   box-shadow:
     0 8px 25px #2e4c2d08,
     0 1px 3px #31563204,
     inset 0 1px #ffffff;
-  backdrop-filter: blur(14px) saturate(110%);
   overflow: hidden;
   transition:
     box-shadow 0.3s,
     border-color 0.3s,
     transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transform: none;
+}
+.mv-lit .mv-widget-shell {
   transform: perspective(1200px) rotateX(var(--mv-rx, 0deg)) rotateY(var(--mv-ry, 0deg));
 }
 .mv-widget-shell:before {
@@ -994,7 +995,14 @@
 .my-day-page[data-particles='false'] :is(.mv-motes, .mv-stars) {
   display: none;
 }
+.mv-out-of-view,
 .mv-out-of-view * {
+  animation-play-state: paused !important;
+}
+.mv-out-of-view::before,
+.mv-out-of-view::after,
+.mv-out-of-view *::before,
+.mv-out-of-view *::after {
   animation-play-state: paused !important;
 }
 @keyframes mv-cloud-drift {
@@ -1648,7 +1656,13 @@ body[data-hub-theme='dark'] .mv-widget-kicker {
   animation: mv-tree-gust 3.8s ease-in-out infinite alternate;
 }
 .my-day-page[data-mv-motion='flow'] .mv-atmosphere i {
-  animation: mv-sun-bloom 5s ease-in-out infinite alternate;
+  animation: mv-atmosphere-float 5s ease-in-out infinite alternate;
+}
+@keyframes mv-atmosphere-float {
+  to {
+    transform: translate(24px, -18px) scale(1.08);
+    opacity: 0.7;
+  }
 }
 .my-day-page[data-effects='playful'][data-mv-motion='flow'] .mv-light-beams {
   animation-duration: 3.2s;
@@ -1684,10 +1698,10 @@ body[data-hub-theme='dark'] .mv-widget-kicker {
 }
 @keyframes mv-river-light {
   from {
-    filter: brightness(0.95);
+    opacity: 0.8;
   }
   to {
-    filter: brightness(1.3) saturate(1.3);
+    opacity: 1;
   }
 }
 @keyframes mv-water-ring {

@@ -707,6 +707,7 @@ body[data-motion='calm'] {
   border-radius: inherit;
   padding: 2px;
   overflow: hidden;
+  contain: strict;
   pointer-events: none;
   z-index: 2;
   -webkit-mask:
@@ -722,28 +723,20 @@ body[data-motion='calm'] {
 .fx-panel-aura:before {
   content: '';
   position: absolute;
-  inset: -180%;
-  background: conic-gradient(
-    from 0deg,
-    transparent 0 45%,
-    #74bda38c 50%,
-    #f1d587 55%,
-    #b59bdd 59%,
-    transparent 65%
-  );
-  animation: fx-turn 5s linear infinite;
+  inset: 0 auto 0 -100%;
+  width: 200%;
+  background: linear-gradient(110deg, #74bda38c, #f1d587, #b59bdd, #74bda38c);
+  animation: fx-border-shimmer 5s ease-in-out infinite alternate;
   animation-play-state: paused;
 }
 body[data-spectacle='spectacle'] .fx-visible > .fx-panel-aura {
   opacity: 0.9;
+  animation: fx-panel-breathe 5s ease-in-out infinite alternate;
 }
 body[data-spectacle='spectacle'] .fx-visible > .fx-panel-aura:before {
   animation-play-state: running;
 }
-body[data-spectacle='spectacle'] .fx-surface.fx-visible {
-  animation: fx-panel-breathe 5s ease-in-out infinite alternate;
-}
-body[data-spectacle='spectacle'] .fx-stage {
+body[data-spectacle='spectacle'] .fx-stage > :is(header, .panel-top) {
   animation: fx-stage-arrive 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 body[data-spectacle='spectacle'] #hubSiteTitle {
@@ -858,27 +851,25 @@ body[data-spectacle='spectacle'] :is(.hub-widget-symbol, .mv-metric-icon, .hub-p
 }
 @keyframes fx-panel-breathe {
   from {
-    box-shadow:
-      0 8px 24px #2f584513,
-      0 0 0 1px #a5c5a11a;
+    opacity: 0.5;
   }
   to {
-    box-shadow:
-      0 14px 32px #638c7826,
-      0 0 23px #b6c79230,
-      0 0 0 1px #a5c5a15a;
+    opacity: 0.95;
+  }
+}
+@keyframes fx-border-shimmer {
+  to {
+    transform: translateX(50%);
   }
 }
 @keyframes fx-stage-arrive {
   from {
     opacity: 0.2;
-    transform: translateY(35px) scale(0.975);
-    filter: blur(4px);
+    transform: translateY(18px);
   }
   to {
     opacity: 1;
     transform: none;
-    filter: none;
   }
 }
 @keyframes fx-title-glow {
@@ -948,6 +939,21 @@ body:is(.hub-private, .hub-present, .hub-sorting) .fx-panel-aura {
 }
 body.rest-room-open #hubSpectacle {
   display: none;
+}
+/* A modal terrarium covers the workspace; only the visible rest scene needs to animate. */
+body.rest-room-open :is(#view, #hubAtmosphere, #hubAtmosphereCard, #hubAtmospherePocket, #hubPet),
+body.rest-room-open
+  :is(#view, #hubAtmosphere, #hubAtmosphereCard, #hubAtmospherePocket, #hubPet)
+  * {
+  animation-play-state: paused !important;
+}
+body.rest-room-open
+  :is(#view, #hubAtmosphere, #hubAtmosphereCard, #hubAtmospherePocket, #hubPet)
+  *::before,
+body.rest-room-open
+  :is(#view, #hubAtmosphere, #hubAtmosphereCard, #hubAtmospherePocket, #hubPet)
+  *::after {
+  animation-play-state: paused !important;
 }
 @media (max-width: 650px) {
   .fx-dust:nth-child(2n),
