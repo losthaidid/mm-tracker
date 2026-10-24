@@ -18,8 +18,12 @@
       '.hub-card,.mv-widget-shell,.ticket-folio,.task-main-card,.wl-snippet,.panel.box,.val-summary,.claim-summary,.project-banner,.hub-head,.workspace-v10 > header,.bl-library-mark',
     layer = document.createElement('div');
   const observedSurfaces = new Set(),
-    visibleSurfaces = new Set();
+    visibleSurfaces = new Set(),
+    pendingRoots = new Set();
   let queued = false,
+    fullScan = true,
+    removePending = false,
+    wasLive = false,
     lastStage = null,
     lastTrail = 0,
     lastX = 0,
@@ -63,20 +67,37 @@
   function dress() {
     queued = false;
     if (!allowed()) return;
-    for (const el of observedSurfaces) {
-      if (!el.isConnected) {
-        visibility?.unobserve(el);
-        observedSurfaces.delete(el);
-        visibleSurfaces.delete(el);
+    if (removePending || fullScan) {
+      for (const el of observedSurfaces) {
+        if (!el.isConnected) {
+          visibility?.unobserve(el);
+          observedSurfaces.delete(el);
+          visibleSurfaces.delete(el);
+        }
       }
+      removePending = false;
     }
     const stage = view?.firstElementChild;
     if (stage && stage !== lastStage) {
       lastStage = stage;
       stage.classList.add('fx-stage');
     }
-    for (const el of document.querySelectorAll(surfaces)) {
-      if (el.closest('#hubSpectacle') || el.matches('input,select,textarea')) continue;
+    const candidates = new Set();
+    if (fullScan) {
+      for (const el of document.querySelectorAll(surfaces)) candidates.add(el);
+      fullScan = false;
+    } else
+      for (const node of pendingRoots) {
+        if (!node.isConnected) continue;
+        let parent = node.parentElement;
+        while (parent && !pendingRoots.has(parent)) parent = parent.parentElement;
+        if (parent) continue;
+        if (node.matches(surfaces)) candidates.add(node);
+        for (const el of node.querySelectorAll(surfaces)) candidates.add(el);
+      }
+    pendingRoots.clear();
+    for (const el of candidates) {
+      if (el.closest('#hubSpectacle')) continue;
       if (!el.classList.contains('fx-surface')) {
         el.classList.add('fx-surface');
       }
@@ -109,7 +130,13 @@
       visibility?.disconnect();
       observedSurfaces.clear();
       visibleSurfaces.clear();
-    } else scheduleDress();
+      pendingRoots.clear();
+      fullScan = true;
+    } else if (!wasLive) {
+      fullScan = true;
+      scheduleDress();
+    }
+    wasLive = live;
   }
   function effect(className, x, y, dx = 0, dy = 0, i = 0) {
     // Rapid clicking cannot accumulate unlimited DOM or animation work.
@@ -163,15 +190,19 @@
     },
     { capture: true, passive: true }
   );
-  if (view)
-    new MutationObserver(records => {
-      if (
-        records.some(r =>
-          [...r.addedNodes].some(n => n.nodeType === 1 && !n.classList.contains('fx-panel-aura'))
-        )
-      )
-        scheduleDress();
-    }).observe(view, { childList: true, subtree: true });
+  // Process changed branches only: clocks, feedback and a small widget update must not
+  // rescan every card. Observing the body also covers newly opened settings/dialogs.
+  new MutationObserver(records => {
+    if (!allowed()) return;
+    for (const record of records) {
+      if (record.target.closest?.('#hubSpectacle')) continue;
+      for (const node of record.addedNodes)
+        if (node.nodeType === 1 && !node.classList.contains('fx-panel-aura'))
+          pendingRoots.add(node);
+      if ([...record.removedNodes].some(node => node.nodeType === 1)) removePending = true;
+    }
+    if (pendingRoots.size || removePending) scheduleDress();
+  }).observe(body, { childList: true, subtree: true });
   new MutationObserver(sync).observe(body, {
     attributes: true,
     attributeFilter: ['class', 'data-motion'],
@@ -183,6 +214,8 @@
     visibility?.disconnect();
     observedSurfaces.clear();
     visibleSurfaces.clear();
+    pendingRoots.clear();
+    wasLive = false;
   });
   root.addEventListener('pageshow', sync);
   root.WorkHubSpectacle = { sync };

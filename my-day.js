@@ -1446,30 +1446,34 @@
       }
     });
     function runtime() {
+      const page = document.querySelector('.my-day-page');
+      if (!page) return;
+      const text = (el, value) => {
+        if (el.textContent !== value) el.textContent = value;
+      };
       const f = a.focus();
-      for (const el of document.querySelectorAll('[data-md-focus-clock]'))
-        el.textContent = clockText(f.remaining);
-      for (const el of document.querySelectorAll('[data-md-focus-state]'))
-        el.textContent = f.active
-          ? f.paused
-            ? 'Paused'
-            : 'One thing at a time'
-          : 'Ready when you are';
-      for (const el of document.querySelectorAll('[data-md-focus-title]'))
-        el.textContent = f.title || 'A quiet place to begin.';
-      for (const el of document.querySelectorAll('[data-md-orb]')) {
-        el.classList.toggle('is-running', f.active && !f.paused);
-        el.style.setProperty('--orb-progress', 100 * (1 - f.remaining / (f.minutes * 60)) + '%');
+      for (const el of page.querySelectorAll('[data-md-focus-clock]'))
+        text(el, clockText(f.remaining));
+      for (const el of page.querySelectorAll('[data-md-focus-state]'))
+        text(el, f.active ? (f.paused ? 'Paused' : 'One thing at a time') : 'Ready when you are');
+      for (const el of page.querySelectorAll('[data-md-focus-title]'))
+        text(el, f.title || 'A quiet place to begin.');
+      for (const el of page.querySelectorAll('[data-md-orb]')) {
+        const running = f.active && !f.paused,
+          progress = 100 * (1 - f.remaining / (f.minutes * 60)) + '%';
+        if (el.classList.contains('is-running') !== running)
+          el.classList.toggle('is-running', running);
+        if (el.style.getPropertyValue('--orb-progress') !== progress)
+          el.style.setProperty('--orb-progress', progress);
       }
-      for (const el of document.querySelectorAll('[data-md="focus-pause"],[data-md="focus-end"]')) {
-        el.disabled = !f.active;
-        if (el.dataset.md === 'focus-pause') el.textContent = f.paused ? 'Resume' : 'Pause';
+      for (const el of page.querySelectorAll('[data-md="focus-pause"],[data-md="focus-end"]')) {
+        if (el.disabled !== !f.active) el.disabled = !f.active;
+        if (el.dataset.md === 'focus-pause') text(el, f.paused ? 'Resume' : 'Pause');
       }
-      for (const el of document.querySelectorAll('[data-md-now]'))
-        el.textContent = E.clock(nowMinute());
-      for (const el of document.querySelectorAll('[data-md-track] .md-now-marker')) {
+      for (const el of page.querySelectorAll('[data-md-now]')) text(el, E.clock(nowMinute()));
+      for (const el of page.querySelectorAll('[data-md-track] .md-now-marker')) {
         const track = el.parentElement;
-        el.style.left =
+        const left =
           Math.max(
             0,
             Math.min(
@@ -1478,6 +1482,7 @@
                 100
             )
           ) + '%';
+        if (el.style.left !== left) el.style.left = left;
       }
     }
     function mount() {

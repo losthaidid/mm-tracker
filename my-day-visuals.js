@@ -98,6 +98,7 @@
       raf = 0,
       lightFrame = 0,
       lastPointer = null,
+      litCard = null,
       effectTimer = 0,
       counterGeneration = 0,
       entered = false,
@@ -121,7 +122,7 @@
       a.prefs().motion !== 'off' &&
       a.settings().effects !== 'calm' &&
       !reduced() &&
-      !document.body.matches('.hub-private,.hub-present');
+      !document.body.matches('.hub-private,.hub-present,.rest-room-open');
     function cancelAnimations() {
       for (const anim of animations) anim.cancel?.();
       animations.clear();
@@ -146,13 +147,15 @@
     }
     function resetLight() {
       if (page) {
-        page.style.removeProperty('--mv-pointer-x');
-        page.style.removeProperty('--mv-pointer-y');
-        page.querySelectorAll('.mv-lit').forEach(el => {
-          el.classList.remove('mv-lit');
-          el.style.removeProperty('--mv-rx');
-          el.style.removeProperty('--mv-ry');
-        });
+        const hero = page.querySelector('.mv-hero');
+        hero?.style.removeProperty('--mv-pointer-x');
+        hero?.style.removeProperty('--mv-pointer-y');
+      }
+      if (litCard) {
+        litCard.classList.remove('mv-lit');
+        litCard.style.removeProperty('--mv-rx');
+        litCard.style.removeProperty('--mv-ry');
+        litCard = null;
       }
     }
     function sync() {
@@ -160,6 +163,7 @@
       if (owner !== next) {
         endSort();
         clearEffects();
+        resetLight();
         owner = next;
         view = 'all';
         page = null;
@@ -197,7 +201,8 @@
         const label = hero.querySelector('[data-mv-period-name]');
         if (label) label.textContent = PHASE_NAMES[when];
       }
-      page.dataset.mvMotion = allowed() ? 'flow' : 'still';
+      const motion = allowed() ? 'flow' : 'still';
+      if (page.dataset.mvMotion !== motion) page.dataset.mvMotion = motion;
       if (!a.settings().celebrations && burstNode) {
         clearTimeout(effectTimer);
         burstNode.remove();
@@ -354,7 +359,7 @@
           }
           const t = Math.min(1, (now - start) / 700),
             v = Math.round(previous + (target - previous) * (1 - Math.pow(1 - t, 3)));
-          el.textContent = String(v);
+          if (el.textContent !== String(v)) el.textContent = String(v);
           if (t < 1) {
             const id = root.requestAnimationFrame(n => {
               frames.delete(id);
@@ -457,7 +462,8 @@
             },
             { rootMargin: '80px' }
           );
-          for (const node of page.querySelectorAll('.mv-hero,.md-widget')) observer.observe(node);
+          for (const node of page.querySelectorAll('.mv-hero,.md-widget,.mv-atmosphere i'))
+            observer.observe(node);
         }
       }
       if (pending) {
@@ -563,7 +569,9 @@
         return;
       const { x, y, target } = lastPointer,
         hero = page.querySelector('.mv-hero'),
-        h = hero?.getBoundingClientRect();
+        h = hero?.getBoundingClientRect(),
+        card = target?.closest?.('.md-widget'),
+        r = card?.getBoundingClientRect();
       if (
         a.settings().effects === 'playful' &&
         a.settings().particles &&
@@ -575,26 +583,24 @@
         sparkPoint = { x, y };
         touchEffect('pointer-spark', x, y);
       }
-      if (h) {
-        page.style.setProperty(
+      if (h && h.bottom >= 0 && h.top <= root.innerHeight) {
+        hero.style.setProperty(
           '--mv-pointer-x',
           String(Math.max(-1, Math.min(1, ((x - h.left) / h.width) * 2 - 1)))
         );
-        page.style.setProperty(
+        hero.style.setProperty(
           '--mv-pointer-y',
           String(Math.max(-1, Math.min(1, ((y - h.top) / h.height) * 2 - 1)))
         );
       }
-      const card = target?.closest?.('.md-widget');
-      page.querySelectorAll('.mv-lit').forEach(el => {
-        if (el !== card) {
-          el.classList.remove('mv-lit');
-          el.style.setProperty('--mv-rx', '0deg');
-          el.style.setProperty('--mv-ry', '0deg');
-        }
-      });
-      if (card && card.closest('.my-day-page')) {
-        const r = card.getBoundingClientRect();
+      if (litCard && litCard !== card) {
+        litCard.classList.remove('mv-lit');
+        litCard.style.removeProperty('--mv-rx');
+        litCard.style.removeProperty('--mv-ry');
+        litCard = null;
+      }
+      if (r && card.closest('.my-day-page')) {
+        litCard = card;
         card.classList.add('mv-lit');
         card.style.setProperty('--mv-light-x', x - r.left + 'px');
         card.style.setProperty('--mv-light-y', y - r.top + 'px');
@@ -626,12 +632,13 @@
           root.requestAnimationFrame?.(() => {
             raf = 0;
             if (!allowed() || !page) return;
-            const rect = page.querySelector('.mv-hero')?.getBoundingClientRect();
-            if (rect)
-              page.style.setProperty(
-                '--mv-scroll',
-                Math.max(-100, Math.min(350, -rect.top)) + 'px'
-              );
+            const hero = page.querySelector('.mv-hero'),
+              rect = hero?.getBoundingClientRect();
+            if (rect) {
+              const value = Math.max(-100, Math.min(350, -rect.top)) + 'px';
+              if (hero.style.getPropertyValue('--mv-scroll') !== value)
+                hero.style.setProperty('--mv-scroll', value);
+            }
           }) || 0;
       },
       { passive: true }
