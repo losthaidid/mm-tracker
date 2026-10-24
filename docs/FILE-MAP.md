@@ -146,3 +146,5 @@ Project people: [project-people-engine.js](../project-people-engine.js) validate
 
 - `solution-valuation.js`: pure S/V price, batch and split-valuation rules; historical run compatibility.
 - `solution-valuation-ui.js` / `solution-valuation.css`: valuation controls, class context, stock ledgers and worked-example entry points.
+
+Presentation breaks: [presentation-break.js](../presentation-break.js) owns custom audience messages, timestamp countdowns, screen selection and fullscreen fallback; [presentation-break.css](../presentation-break.css) supplies three lightweight landscape scenes. The shared Focus toolbar creates the launch button and supplies its existing tick and owner guard. No database writes or personal timer actions.

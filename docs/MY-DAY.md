@@ -222,3 +222,23 @@ variables to the landscape header. Clocks and unchanged labels avoid redundant D
 In a fictional-account browser preview, 20 small content updates caused 20 document scans and
 720 panel matches before these changes, and zero document scans or panel matches afterward.
 This measures decoration work, not a frame-rate guarantee or physical iPhone performance.
+
+
+## Presentation breaks
+
+**Presentation break** in the shared toolbar opens an audience setup with a custom message
+(up to 240 characters), a 1–180 minute countdown, an editable completion message and three
+separate landscapes: Coastal dawn, Mountain dusk and Night sky. Text renders as plain text,
+including line breaks. Messages stay in memory and clear when the account changes.
+
+The audience view contains only the chosen text, countdown, scenery and presentation controls.
+Its silent countdown does not operate the personal terrarium, focus timer, work timer or music.
+Pause/resume preserves remaining time; expiry stays at 00:00 until Back to presentation.
+Elapsed time is reconciled from timestamps, including after a hidden tab. The existing Focus
+tick updates it without another recurring interval. Scenery uses bounded local CSS layers.
+
+Supported browsers can request window-management permission through Choose another screen.
+Select the same monitor as the meeting app; the website does not detect the meeting's sharing
+selection. Start requests fullscreen for the audience element on that display. If permission
+or fullscreen support is unavailable, an audience-only viewport remains usable, with a retry
+control and an explanation. Escape returns to the prior page; no record data enters the view.
