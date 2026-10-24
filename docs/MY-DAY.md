@@ -12,6 +12,14 @@ scene has a crescent moon and stars. The landscape responds gently to scrolling 
 movement. Glass panels, pointer lighting, animated counters/charts and completion ripples
 coordinate with the same Calm/Ambient/Playful settings in **Effects & hours**.
 
+Sunbeams sweep across the daytime scene, butterflies flutter above the valley, and the night
+sky adds aurora ribbons and occasional shooting stars. Widgets reveal as they enter view,
+the focus orb has orbiting lights, and buttons respond with a ripple. Playful adds bounded
+pointer sparkles. The particle switch also controls butterflies, shooting stars and trails.
+Completing a priority creates a brief burst near the task, with expanding rings and a small
+win message. Switching Privacy or motion settings, hiding the page or changing accounts
+clears transient feedback immediately. These effects do not save account records.
+
 **Your whole day**, **Make a plan**, **Find your flow** and **Pause & reflect** filter the
 visible widgets without saving or reordering them. Choose Your whole day to see everything
 again. These views reset for a different account. The welcome scene's activity and task
@@ -43,7 +51,10 @@ the dashboard temporarily, and Collapse returns it to its saved size and positio
   existing overlap, company, leave, project and record validation. Clicking the time handle
   also opens that editor. The dashboard itself is not rearranged by an activity drag.
 - **Today’s three priorities:** complete a task through the existing task workflow. Completed
-  priorities remain visible for the day and contribute to the growing scene.
+  tasks leave the active list and priority picker immediately. Their records, daily progress
+  and growing-scene blooms remain intact. Today’s intention shows the remaining count. Once
+  everything is complete, a quiet success state replaces the list. Completed choices still
+  count toward the existing three-priority daily limit when choosing remaining priorities.
 - **Workload balance:** explore scheduled tasks, projects, other activities, unavailable time
   and free time. Select a category for the underlying activities. Working hours are maintained
   in Effects & hours; overlapping legacy intervals are counted once.

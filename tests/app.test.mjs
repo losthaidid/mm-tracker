@@ -2693,6 +2693,22 @@ test('claims status rejects excess payment, concurrent edits and stale owner for
 });
 
 const mdAction=(ui,action,extra={})=>ui.handle({dataset:{md:action,...extra}});
+test('My Day intention: completed priorities leave active lists and choices while progress and task history survive',async t=>{
+ const {api,document,window,db}=await app(t);reminderClock(window,'2026-10-24T09:00:00');
+ const ids=['Finished priority','Focus remaining','Another finished task'].map(x=>addMainTask(api,document,x));
+ api.mutate(d=>{window.WorkHubMyDayEngine.day(d,'2026-10-24',true).missions=ids.slice(0,2);for(const i of [0,2]){d.tasks[i].done=true;d.tasks[i].doneDate='2026-10-24';}d.workhub.widgets.push({id:'garden',span:'normal'});});api.showTab('home');await settle();const calls=db.calls.length,ui=api.hub.myDay;
+ const active=document.querySelector('[data-widget="missions"]');assert.equal(active.querySelectorAll('.md-mission').length,1);assert.match(active.textContent,/Focus remaining/);assert.doesNotMatch(active.textContent,/Finished priority/);assert.equal(active.querySelector('.md-progress-orbit b').textContent,'1/2');assert.match(document.querySelector('.mv-hero-metric strong').textContent,/1 left/);assert.ok(document.querySelector('.md-garden-plant.has-bloom'));assert.equal(db.calls.length,calls);
+ ui.missionsForm();let f=document.getElementById('mdMissions');assert.doesNotMatch(f.textContent,/Finished priority|Another finished task/);assert.equal(f.querySelectorAll('[name="mission"][type="checkbox"]').length,1);assert.equal(f.querySelector('[name="mission"][type="hidden"]').value,ids[0]);ui.submit(f);await settle();assert.deepEqual(copy(api.state().workhub.myDay.days[0].missions),ids.slice(0,2));assert.equal(api.state().tasks.length,3);assert.equal(api.state().tasks[0].done,true);
+ await mdAction(ui,'complete',{id:ids[1]});await settle();assert.equal(document.querySelectorAll('[data-widget="missions"] .md-mission').length,0);assert.match(document.querySelector('[data-widget="missions"]').textContent,/Your intentions, fulfilled/);assert.match(document.querySelector('.mv-hero-metric strong').textContent,/0 left/);assert.equal(document.querySelectorAll('.md-garden-plant.has-bloom').length,2);assert.equal(api.state().tasks.length,3);assert.equal(api.state().workhub.myDay.days[0].missions.length,2);
+});
+test('My Day effects: feedback is bounded, decorative and removed immediately when motion becomes unavailable',async t=>{
+ const {api,document,window,db}=await app(t);api.mutate(d=>d.workhub.myDay.settings.effects='playful');api.showTab('home');await settle();const ui=api.hub.myDay,calls=db.calls.length;
+ for(let i=0;i<30;i++)document.querySelector('[data-mv="view"][data-view="all"]').click();assert.equal(document.querySelector('.mv-touch-effects').childElementCount,18);assert.equal(document.querySelector('.mv-touch-effects').getAttribute('aria-hidden'),'true');
+ ui.visual.celebrate();assert.equal(document.querySelectorAll('.mv-milestone .mv-ripple').length,3);assert.equal(document.querySelectorAll('.mv-milestone b').length,32);assert.ok(document.querySelector('.mv-sun-rays'));assert.ok(document.querySelector('.mv-aurora'));assert.ok(document.querySelector('.mv-butterflies'));assert.equal(db.calls.length,calls);
+ document.querySelector('#hubToolbar [data-hub="privacy"]').click();await settle();assert.equal(document.querySelector('.mv-milestone,.mv-touch-effects'),null);assert.equal(document.querySelector('.my-day-page').dataset.mvMotion,'still');ui.visual.celebrate();assert.equal(document.querySelector('.mv-milestone'),null);
+ document.querySelector('#hubToolbar [data-hub="privacy"]').click();await settle();window.matchMedia=()=>({matches:true});ui.visual.sync();document.querySelector('[data-mv="view"][data-view="plan"]').click();assert.equal(document.querySelector('.mv-touch-effects'),null);assert.equal(db.calls.length,calls);
+ window.matchMedia=()=>({matches:false});ui.visual.sync();ui.visual.celebrate();assert.ok(document.querySelector('.mv-milestone'));api.showTab('tasks');assert.equal(document.querySelector('.mv-milestone,.mv-touch-effects'),null);assert.equal(db.calls.length,calls);
+});
 test('My Day design: chapters preserve saved order and sizes, survive widget refresh and offer an empty view',async t=>{
  const {api,document,window,db}=await app(t);api.showTab('home');await settle();
  const layout=copy(api.state().workhub.widgets),before=copy(api.state()),calls=db.calls.length;

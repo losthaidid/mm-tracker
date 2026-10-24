@@ -52,7 +52,7 @@
     </defs>
     <rect width="1440" height="500" fill="url(#mvSky)"/>
     <g class="mv-stars">${Array.from({ length: 25 }, (_, i) => `<circle cx="${470 + ((i * 173) % 950)}" cy="${22 + ((i * 43) % 175)}" r="${i % 3 === 0 ? 1.5 : 0.8}" style="--i:${i}"/>`).join('')}</g>
-    <g class="mv-layer mv-layer-sky"><circle class="mv-celestial-halo" cx="1110" cy="125" r="160" fill="url(#mvGlow)"/><circle class="mv-celestial" cx="1110" cy="125" r="49" fill="#f1d79b" mask="url(#mvMoonShape)"/>
+    <g class="mv-layer mv-layer-sky"><g transform="translate(1110 125)"><g class="mv-sun-rays" stroke="#f5dfac" stroke-width="2">${Array.from({ length: 24 }, (_, i) => `<path d="M72 0H190" transform="rotate(${i * 15})"/>`).join('')}</g></g><circle class="mv-celestial-halo" cx="1110" cy="125" r="160" fill="url(#mvGlow)"/><circle class="mv-celestial" cx="1110" cy="125" r="49" fill="#f1d79b" mask="url(#mvMoonShape)"/>
       <g class="mv-cloud mv-cloud-one" fill="#d9e7db" opacity=".25"><path d="M645 99q33-26 70-5 6-38 42-30 29-22 54 7 43-8 60 28Z"/><path d="M978 60q18-15 40-5 18-28 49-5 22-6 35 10Z"/></g>
       <g class="mv-cloud mv-cloud-two" fill="#e4ecdc" opacity=".2"><path d="M1122 198q27-24 63-11 3-24 34-20 34-15 55 15 43-6 60 15Z"/></g>
     </g>
@@ -75,7 +75,16 @@
     <g class="mv-layer mv-layer-front"><path d="M-20 503Q147 444 276 481T616 492L640 530H-20Z" fill="#183d37"/><g class="mv-fern" fill="#537d61"><path d="M1355 530q-11-78 51-144-12 81-51 144Z"/><path d="M1350 530q-41-53-22-119 31 52 22 119Z"/><path d="M1343 530q-52-28-61-77 47 21 61 77Z"/></g>
       <g fill="#d5d5a2"><circle cx="1274" cy="436" r="2"/><circle cx="1228" cy="464" r="2.4"/><circle cx="1323" cy="409" r="2"/></g>
     </g>
-    </svg><div class="mv-scene-haze"></div><div class="mv-motes">${Array.from({ length: 12 }, (_, i) => `<i style="--i:${i};left:${45 + ((i * 17) % 53)}%;top:${20 + ((i * 23) % 65)}%"></i>`).join('')}</div></div>`;
+    <g class="mv-butterflies">${[
+      [995, 265, '#e7d5a2'],
+      [1260, 288, '#b9d7cd'],
+    ]
+      .map(
+        ([x, y, c], i) =>
+          `<g transform="translate(${x} ${y})"><g class="mv-butterfly" style="--i:${i}"><g class="mv-butterfly-wings" fill="${c}"><path d="M0 0C-22-21-24 11 0 4Z"/><path d="M0 0C22-21 24 11 0 4Z"/></g><path d="M0-3V7" stroke="#294f46" stroke-width="2"/></g></g>`
+      )
+      .join('')}</g>
+    </svg><div class="mv-light-beams"></div><div class="mv-aurora"><i></i><i></i></div><div class="mv-shooting-stars"><i></i><i></i></div><div class="mv-scene-haze"></div><div class="mv-motes">${Array.from({ length: 16 }, (_, i) => `<i style="--i:${i};left:${35 + ((i * 17) % 63)}%;top:${15 + ((i * 23) % 70)}%"></i>`).join('')}</div></div>`;
   }
   function install(a) {
     let owner = '',
@@ -91,10 +100,16 @@
       counterGeneration = 0,
       entered = false,
       observedPage = null,
-      landed = '';
+      landed = '',
+      burstNode = null,
+      touchLayer = null,
+      completionPoint = null,
+      lastSpark = 0,
+      sparkPoint = null;
     const animations = new Set(),
       numbers = new Map(),
       charts = new Map(),
+      revealed = new Set(),
       counterJobs = new Map(),
       frames = new Set();
     const reduced = () => !!root.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -118,6 +133,15 @@
       for (const id of frames) root.cancelAnimationFrame?.(id);
       frames.clear();
     }
+    function clearEffects() {
+      clearTimeout(effectTimer);
+      burstNode?.remove();
+      touchLayer?.remove();
+      burstNode = touchLayer = null;
+      page?.classList.remove('mv-day-lit');
+      completionPoint = null;
+      sparkPoint = null;
+    }
     function resetLight() {
       if (page) {
         page.style.removeProperty('--mv-pointer-x');
@@ -133,6 +157,7 @@
       const next = a.ready() ? a.owner() : '';
       if (owner !== next) {
         endSort();
+        clearEffects();
         owner = next;
         view = 'all';
         page = null;
@@ -141,14 +166,15 @@
         observedPage = null;
         numbers.clear();
         charts.clear();
+        revealed.clear();
         stopCounters();
         cancelAnimations();
         observer?.disconnect();
         observer = null;
-        clearTimeout(effectTimer);
       }
       const live = document.querySelector('.my-day-page');
       if (!live) {
+        clearEffects();
         observer?.disconnect();
         observer = null;
         resetLight();
@@ -156,6 +182,7 @@
         observedPage = null;
         entered = false;
         charts.clear();
+        revealed.clear();
         stopCounters();
         cancelAnimations();
         return;
@@ -169,7 +196,16 @@
         if (label) label.textContent = PHASE_NAMES[when];
       }
       page.dataset.mvMotion = allowed() ? 'flow' : 'still';
+      if (!a.settings().celebrations && burstNode) {
+        clearTimeout(effectTimer);
+        burstNode.remove();
+        burstNode = null;
+        page.classList.remove('mv-day-lit');
+      }
+      if (!a.settings().particles)
+        touchLayer?.querySelectorAll('.mv-pointer-spark').forEach(el => el.remove());
       if (!allowed()) {
+        clearEffects();
         resetLight();
         stopCounters();
         cancelAnimations();
@@ -180,7 +216,7 @@
         greeting = data.name
           ? `A little space for ${esc(data.name)}.`
           : 'A little space for yourself.';
-      return `<div class="mv-atmosphere" aria-hidden="true"><i></i><i></i><i></i></div><header class="hub-head md-day-intro mv-hero" data-mv-period="${when}">${scene()}<div class="mv-hero-shade"></div><div class="mv-hero-content"><div class="mv-hero-eyebrow"><span class="mv-status-orbit" aria-hidden="true"></span><span>YOUR WORKSPACE, IN BLOOM</span><span class="mv-edition">MY DAY</span></div><p class="mv-day-label">${esc(new Date(data.date + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }))} <i></i> <span data-mv-period-name>${PHASE_NAMES[when]}</span></p><h2>Your day.<br><em>A world of possibility.</em></h2><p class="mv-welcome">${greeting} Give your ideas room, find your rhythm, and let the small wins grow.</p><div class="md-hero-actions">${data.actions}</div></div><div class="mv-scene-note"><span class="mv-note-mark" aria-hidden="true">✧</span><span>SMALL STEPS. NEW PERSPECTIVES.</span></div><div class="mv-hero-metrics"><button type="button" data-md="missions" class="mv-hero-metric"><span class="mv-metric-icon" aria-hidden="true">✧</span><span><small>Today’s intention</small><strong>${data.done}<span> / ${data.total || '—'}</span></strong><em>priorities complete</em></span><i class="mv-metric-track" style="--mv-meter:${data.total ? (data.done / data.total) * 100 : 0}%"></i></button><button type="button" data-mv="jump" data-target="dayJourney" class="mv-hero-metric"><span class="mv-metric-icon" aria-hidden="true">◷</span><span><small>Room to make progress</small><strong>${data.activities}<span> planned</span></strong><em>activities on your calendar</em></span><span class="mv-metric-arrow" aria-hidden="true">↗</span></button><button type="button" data-mv="jump" data-target="tasks" class="mv-hero-metric"><span class="mv-metric-icon" aria-hidden="true">↗</span><span><small>One step at a time</small><strong>${data.open}<span> open</span></strong><em>tasks ready for your next step</em></span><span class="mv-metric-arrow" aria-hidden="true">↗</span></button></div></header>`;
+      return `<div class="mv-atmosphere" aria-hidden="true"><i></i><i></i><i></i></div><header class="hub-head md-day-intro mv-hero" data-mv-period="${when}">${scene()}<div class="mv-hero-shade"></div><div class="mv-hero-content"><div class="mv-hero-eyebrow"><span class="mv-status-orbit" aria-hidden="true"></span><span>YOUR WORKSPACE, IN BLOOM</span><span class="mv-edition">MY DAY</span></div><p class="mv-day-label">${esc(new Date(data.date + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }))} <i></i> <span data-mv-period-name>${PHASE_NAMES[when]}</span></p><h2>Your day.<br><em>A world of possibility.</em></h2><p class="mv-welcome">${greeting} Give your ideas room, find your rhythm, and let the small wins grow.</p><div class="md-hero-actions">${data.actions}</div></div><div class="mv-scene-note"><span class="mv-note-mark" aria-hidden="true">✧</span><span>SMALL STEPS. NEW PERSPECTIVES.</span></div><div class="mv-hero-metrics"><button type="button" data-md="missions" class="mv-hero-metric"><span class="mv-metric-icon" aria-hidden="true">✧</span><span><small>Today’s intention</small><strong>${Math.max(0, data.total - data.done)}<span> left</span></strong><em>${data.total ? (data.done === data.total ? 'today’s priorities complete' : 'priorities to move forward') : 'choose your priorities'}</em></span><i class="mv-metric-track" style="--mv-meter:${data.total ? (data.done / data.total) * 100 : 0}%"></i></button><button type="button" data-mv="jump" data-target="dayJourney" class="mv-hero-metric"><span class="mv-metric-icon" aria-hidden="true">◷</span><span><small>Room to make progress</small><strong>${data.activities}<span> planned</span></strong><em>activities on your calendar</em></span><span class="mv-metric-arrow" aria-hidden="true">↗</span></button><button type="button" data-mv="jump" data-target="tasks" class="mv-hero-metric"><span class="mv-metric-icon" aria-hidden="true">↗</span><span><small>One step at a time</small><strong>${data.open}<span> open</span></strong><em>tasks ready for your next step</em></span><span class="mv-metric-arrow" aria-hidden="true">↗</span></button></div></header>`;
     }
     function toolbar() {
       return `<div class="mv-dashboard-nav"><div><span class="mv-section-kicker">A PLACE FOR GOOD WORK</span><h3>Your personal landscape</h3></div><div class="mv-view-switch" role="group" aria-label="Dashboard sections">${Object.entries(
@@ -375,6 +411,19 @@
         }
       }
     }
+    function reveal(el) {
+      const id = el.dataset.widget;
+      if (!id || el.hidden || revealed.has(id) || !allowed()) return;
+      revealed.add(id);
+      animate(
+        el,
+        [
+          { opacity: 0.15, transform: 'translateY(30px) scale(.975)' },
+          { opacity: 1, transform: 'none' },
+        ],
+        { duration: 650 }
+      );
+    }
     function mount() {
       sync();
       if (!page) return;
@@ -398,7 +447,10 @@
             entries => {
               for (const entry of entries) {
                 entry.target.classList.toggle('mv-out-of-view', !entry.isIntersecting);
-                if (entry.isIntersecting) animateCharts(entry.target);
+                if (entry.isIntersecting) {
+                  animateCharts(entry.target);
+                  reveal(entry.target);
+                }
               }
             },
             { rootMargin: '80px' }
@@ -410,16 +462,8 @@
         const before = pending;
         pending = null;
         flip(before);
-      } else if (!entered && allowed())
-        for (const [i, el] of [...page.querySelectorAll('.hub-layout > [data-widget]')].entries())
-          animate(
-            el,
-            [
-              { opacity: 0.4, transform: 'translateY(12px)' },
-              { opacity: 1, transform: 'none' },
-            ],
-            { duration: 450, delay: Math.min(i, 4) * 45 }
-          );
+      } else if (!entered && !observer)
+        for (const el of page.querySelectorAll('.hub-layout > [data-widget]')) reveal(el);
       if (landed) {
         const el = [...page.querySelectorAll('[data-widget]')]
           .find(x => x.dataset.widget === landed)
@@ -442,18 +486,68 @@
     function celebrate() {
       if (!page || !allowed() || !a.settings().celebrations) return;
       clearTimeout(effectTimer);
-      page.querySelector('.mv-milestone')?.remove();
+      burstNode?.remove();
       page.classList.remove('mv-day-lit');
       const box = document.createElement('div');
       box.className = 'mv-milestone';
       box.setAttribute('aria-hidden', 'true');
-      box.innerHTML = `<i class="mv-ripple"></i>${Array.from({ length: a.settings().effects === 'playful' ? 18 : 9 }, (_, i) => `<b style="--i:${i}">✦</b>`).join('')}`;
-      page.append(box);
+      const point = completionPoint || {
+          x: root.innerWidth / 2,
+          y: Math.min(root.innerHeight * 0.45, 420),
+        },
+        count = a.settings().effects === 'playful' ? 32 : 20;
+      completionPoint = null;
+      box.style.setProperty(
+        '--mv-burst-x',
+        Math.max(32, Math.min(root.innerWidth - 32, point.x)) + 'px'
+      );
+      box.style.setProperty(
+        '--mv-burst-y',
+        Math.max(70, Math.min(root.innerHeight - 100, point.y)) + 'px'
+      );
+      box.innerHTML = `${Array.from({ length: 3 }, (_, i) => `<i class="mv-ripple" style="--i:${i}"></i>`).join('')}${Array.from(
+        { length: count },
+        (_, i) => {
+          const angle = (i / count) * Math.PI * 2,
+            range = 80 + (i % 4) * 27;
+          return `<b style="--i:${i};--dx:${Math.cos(angle) * range}px;--dy:${Math.sin(angle) * range - 55}px">${i % 3 ? '✦' : '●'}</b>`;
+        }
+      ).join('')}<span class="mv-win-note">A little win. A brighter day.</span>`;
+      burstNode = box;
+      document.body.append(box);
       page.classList.add('mv-day-lit');
       effectTimer = setTimeout(() => {
         box.remove();
+        if (burstNode === box) burstNode = null;
         page?.classList.remove('mv-day-lit');
-      }, 2200);
+      }, 2600);
+    }
+    function markComplete(id) {
+      if (!page || !allowed()) return;
+      const row = [...page.querySelectorAll('[data-md-priority]')].find(
+          el => el.dataset.mdPriority === id
+        ),
+        r = row?.getBoundingClientRect();
+      if (r && r.bottom > 0 && r.top < root.innerHeight)
+        completionPoint = { x: r.left + r.width * 0.6, y: r.top + r.height / 2 };
+    }
+    function touchEffect(kind, x, y) {
+      if (!page || !allowed()) return;
+      let layer = touchLayer;
+      if (!layer) {
+        layer = document.createElement('div');
+        layer.className = 'mv-touch-effects';
+        layer.setAttribute('aria-hidden', 'true');
+        touchLayer = layer;
+        document.body.append(layer);
+      }
+      const dot = document.createElement('i');
+      dot.className = 'mv-' + kind;
+      dot.style.left = x + 'px';
+      dot.style.top = y + 'px';
+      dot.addEventListener('animationend', () => dot.remove(), { once: true });
+      layer.append(dot);
+      while (layer.childElementCount > 18) layer.firstElementChild.remove();
     }
     function light() {
       lightFrame = 0;
@@ -468,6 +562,17 @@
       const { x, y, target } = lastPointer,
         hero = page.querySelector('.mv-hero'),
         h = hero?.getBoundingClientRect();
+      if (
+        a.settings().effects === 'playful' &&
+        a.settings().particles &&
+        target?.closest?.('.my-day-page') &&
+        root.performance.now() - lastSpark > 90 &&
+        (!sparkPoint || Math.hypot(x - sparkPoint.x, y - sparkPoint.y) > 16)
+      ) {
+        lastSpark = root.performance.now();
+        sparkPoint = { x, y };
+        touchEffect('pointer-spark', x, y);
+      }
       if (h) {
         page.style.setProperty(
           '--mv-pointer-x',
@@ -536,6 +641,15 @@
       .matchMedia?.('(prefers-reduced-motion: reduce)')
       .addEventListener?.('change', () => sync());
     document.addEventListener('click', event => {
+      const button = event.target.closest?.('.my-day-page button');
+      if (button && !button.disabled && !document.body.classList.contains('hub-sorting')) {
+        const r = button.getBoundingClientRect();
+        touchEffect(
+          'tap-ripple',
+          event.detail ? event.clientX : r.left + r.width / 2,
+          event.detail ? event.clientY : r.top + r.height / 2
+        );
+      }
       const el = event.target.closest?.('[data-mv]');
       if (!el) return;
       event.preventDefault();
@@ -581,6 +695,7 @@
       previewSort,
       endSort,
       celebrate,
+      markComplete,
       phase,
       period,
       active: allowed,
