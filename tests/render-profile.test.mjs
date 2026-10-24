@@ -7,7 +7,7 @@ const source = name => readFileSync(new URL('../'+name,import.meta.url),'utf8');
 const iphone = 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 CriOS/141.0 Mobile/15E148 Safari/604.1';
 const settle = async () => {for(let i=0;i<12;i++) await Promise.resolve();};
 function setup(t, {ua=iphone,platform='iPhone',styles=false}={}) {
-  const dom = new JSDOM('<body data-motion="playful"><nav id="tabs"><button>Next section</button></nav><main id="view"><section>'+Array.from({length:24},(_,i)=>`<article class="hub-card"><button>Card ${i}</button><input value="Keep my text"></article>`).join('')+'</section></main><div class="fx-ribbon"></div><div class="mv-widget-shell"><span class="hub-sensitive">Private note</span></div><div class="rest-room" data-phase="complete"><div class="rest-moon"></div></div></body>',{url:'https://losthaidid.github.io/mm-tracker/',runScripts:'outside-only',pretendToBeVisual:true});
+  const dom = new JSDOM('<body data-motion="playful"><nav id="tabs"><button>Next section</button></nav><main id="view"><section>'+Array.from({length:24},(_,i)=>`<article class="hub-card"><button>Card ${i}</button><input value="Keep my text"></article>`).join('')+'</section></main><div class="mv-atmosphere"><i></i></div><div class="mv-widget-shell"><span class="hub-sensitive">Private note</span></div><div class="rest-room" data-phase="complete"><div class="rest-moon"></div></div></body>',{url:'https://losthaidid.github.io/mm-tracker/',runScripts:'outside-only',pretendToBeVisual:true});
   t.after(()=>dom.window.close());
   const {window}=dom, {document}=window;
   Object.defineProperty(window.navigator,'userAgent',{value:ua,configurable:true});
@@ -38,7 +38,7 @@ test('render profile targets iPhone browsers and keeps iPad, Android, Mac and de
 test('iPhone effects cap simultaneous glints and reactions, survive navigation, and preserve form content',async t=>{
   const {window,document,observers}=setup(t);await settle();
   assert.equal(document.querySelectorAll('#hubSpectacle .fx-dust').length,12);
-  assert.equal(document.querySelectorAll('#hubSpectacle .fx-ribbon').length,2);
+  assert.equal(document.querySelectorAll('#hubSpectacle .fx-ribbon').length,0);
   const cards=[...document.querySelectorAll('.hub-card')],io=observers[0];
   io.callback(cards.map(target=>({target,isIntersecting:true})));
   assert.equal(document.querySelectorAll('.hub-card.fx-visible').length,6);
@@ -60,6 +60,7 @@ test('full rendering keeps its particle count, unlimited visible panels and navi
   const {window,document,observers}=setup(t,{ua:'Mozilla/5.0 (Linux; Android 16)',platform:'Linux armv8l'});await settle();
   assert.equal(document.documentElement.dataset.renderProfile,'full');
   assert.equal(document.querySelectorAll('#hubSpectacle .fx-dust').length,32);
+  assert.equal(document.querySelector('#hubSpectacle .fx-ribbon'),null);
   const cards=[...document.querySelectorAll('.hub-card')];observers[0].callback(cards.map(target=>({target,isIntersecting:true})));
   assert.equal(document.querySelectorAll('.hub-card.fx-visible').length,24);
   document.querySelector('#tabs button').click();assert.ok(document.querySelector('.fx-scene-sweep'));
@@ -68,12 +69,12 @@ test('full rendering keeps its particle count, unlimited visible panels and navi
 
 test('iPhone CSS removes expensive blur and 3D card layers while preserving private-text redaction',async t=>{
   const {window,document}=setup(t,{styles:true});await settle();
-  assert.equal(window.getComputedStyle(document.querySelector('.fx-ribbon')).filter,'none');
+  assert.equal(window.getComputedStyle(document.querySelector('.mv-atmosphere i')).filter,'none');
   assert.equal(window.getComputedStyle(document.querySelector('.mv-widget-shell')).transform,'none');
   assert.equal(window.getComputedStyle(document.querySelector('.mv-widget-shell')).backdropFilter,'none');
   assert.equal(window.getComputedStyle(document.querySelector('.rest-moon')).boxShadow, 'none');
   document.body.classList.add('hub-private');await settle();
   assert.match(window.getComputedStyle(document.querySelector('.hub-sensitive')).filter,/blur/);
   const full=setup(t,{styles:true,ua:'Mozilla/5.0 (Macintosh; Intel Mac OS X)',platform:'MacIntel'});await settle();
-  assert.match(full.window.getComputedStyle(full.document.querySelector('.fx-ribbon')).filter,/blur/);
+  assert.match(full.window.getComputedStyle(full.document.querySelector('.mv-atmosphere i')).filter,/blur/);
 });

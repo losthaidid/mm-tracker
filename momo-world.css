@@ -26,8 +26,7 @@
 [data-weather='snow'] .world-snow,
 [data-weather='fog'] .world-fog,
 [data-weather='rainbow'] .world-rainbow,
-[data-weather='breeze'] .world-breeze,
-[data-weather='aurora'] .world-aurora {
+[data-weather='breeze'] .world-breeze {
   display: inline;
 }
 /* Explicit preview choices override the inherited scene behind the dialog. */
@@ -49,8 +48,7 @@
 #atmospherePreview[data-weather='snow'] .world-snow,
 #atmospherePreview[data-weather='fog'] .world-fog,
 #atmospherePreview[data-weather='rainbow'] .world-rainbow,
-#atmospherePreview[data-weather='breeze'] .world-breeze,
-#atmospherePreview[data-weather='aurora'] .world-aurora {
+#atmospherePreview[data-weather='breeze'] .world-breeze {
   display: inline;
 }
 [data-phase='night'] .world-scenery {
@@ -84,10 +82,6 @@
 }
 .world-fog {
   animation: world-fog 14s ease-in-out infinite alternate;
-}
-.world-aurora {
-  animation: world-aurora 9s ease-in-out infinite alternate;
-  transform-origin: 120px 40px;
 }
 .world-window-options select {
   width: 100%;
@@ -541,16 +535,6 @@ body .momo-elastic-card {
   to {
     transform: translateX(12px);
     opacity: 0.65;
-  }
-}
-@keyframes world-aurora {
-  from {
-    transform: scaleY(0.6) skewX(-6deg);
-    opacity: 0.2;
-  }
-  to {
-    transform: scaleY(1.3) skewX(7deg);
-    opacity: 0.5;
   }
 }
 @keyframes world-visitor-bob {

@@ -13,7 +13,7 @@ movement. Glass panels, pointer lighting, animated counters/charts and completio
 coordinate with the same Calm/Ambient/Playful settings in **Effects & hours**.
 
 Sunbeams sweep across the daytime scene, butterflies flutter above the valley, and the night
-sky adds aurora ribbons and occasional shooting stars. Widgets reveal as they enter view,
+sky adds occasional shooting stars. Widgets reveal as they enter view,
 the focus orb has orbiting lights, and buttons respond with a ripple. Playful adds bounded
 pointer sparkles. The particle switch also controls butterflies, shooting stars and trails.
 Completing a priority creates a brief burst near the task, with expanding rings and a small
@@ -151,18 +151,23 @@ Postgres tables, permissions and document version 9 are unchanged.
 
 ## Site-wide spectacle
 
-The default motion experience now includes sweeping aurora ribbons, orbiting lights, drifting
+The default motion experience includes orbiting lights, drifting
 particles, comets, illuminated moving panel borders, page arrivals, pointer trails and click
 shockwaves across all twelve primary sections. Forms and saved drag coordinates remain stable.
 My Day adds independently swaying trees, racing river currents, expanding water rings, windblown
-leaves and stronger clouds, wildlife, sunlight and smoke. The rest garden adds light ribbons,
-orbiting lights, moon drift, water rings and stronger plant and firefly movement.
+leaves and stronger clouds, wildlife, sunlight and smoke. The rest garden adds orbiting lights,
+moon drift, water rings and stronger plant and firefly movement.
 
 Effects are local decorations. Feedback is capped, offscreen panel borders pause, disconnected
 panels are unobserved, and hidden pages release interaction effects. Motion Off, device reduced
 motion, Privacy and Present suppress the spectacle. My Day Calm still stops its scenery. No
 animation writes records or changes the existing drag, resize, timer or form actions.
 
+
+Aurora layers have been removed from the global overlay, My Day night sky, rest garden and
+storybook window on every device. Their markup, blur styles and animation loops are removed.
+The weather selector offers seven choices; old saved aurora choices fall back to random weather
+locally. Trees, water, wildlife, particles and the other existing animations remain.
 
 ## iPhone rendering budget
 
@@ -171,7 +176,7 @@ animation writes records or changes the existing drag, resize, timer or form act
 retain the full effects even at narrow window widths. The selection is local and does not
 rewrite account preferences. `iphone-motion.css` is gated by that early profile.
 
-On iPhone, global decoration creates two bounded gradient ribbons, one orbit, twelve particles
+On iPhone, global decoration creates one orbit, twelve particles
 and two comets. Click feedback is capped at 28 nodes and panel glints at six intersecting panels.
 Small travelling glints replace oversized masked rotors. Whole-page filter/arrival animations,
 3D widget tilt, animated panel shadows and backdrop blurs are removed from this profile. Moving

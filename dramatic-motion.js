@@ -5,7 +5,6 @@
     view = document.getElementById('view'),
     iphone = root.WorkHubRenderProfile?.iphone === true,
     budget = root.WorkHubRenderProfile?.budget || {
-      ribbons: 3,
       orbits: 3,
       particles: 32,
       comets: 5,
@@ -27,7 +26,7 @@
     lastY = 0;
   layer.id = 'hubSpectacle';
   layer.setAttribute('aria-hidden', 'true');
-  layer.innerHTML = `<div class="fx-sky">${Array.from({ length: budget.ribbons }, (_, i) => `<i class="fx-ribbon" style="--i:${i}"></i>`).join('')}${Array.from({ length: budget.orbits }, (_, i) => `<i class="fx-orbit" style="--i:${i}"></i>`).join('')}${Array.from({ length: budget.particles }, (_, i) => `<i class="fx-dust" style="--i:${i};--x:${(i * 37) % 100}%;--y:${(i * 61) % 100}%;--travel:${45 + ((i * 23) % 110)}px"></i>`).join('')}${Array.from({ length: budget.comets }, (_, i) => `<i class="fx-comet" style="--i:${i};top:${8 + i * 19}%;left:${35 + ((i * 17) % 60)}%"></i>`).join('')}</div><div class="fx-reactions"></div>`;
+  layer.innerHTML = `<div class="fx-sky">${Array.from({ length: budget.orbits }, (_, i) => `<i class="fx-orbit" style="--i:${i}"></i>`).join('')}${Array.from({ length: budget.particles }, (_, i) => `<i class="fx-dust" style="--i:${i};--x:${(i * 37) % 100}%;--y:${(i * 61) % 100}%;--travel:${45 + ((i * 23) % 110)}px"></i>`).join('')}${Array.from({ length: budget.comets }, (_, i) => `<i class="fx-comet" style="--i:${i};top:${8 + i * 19}%;left:${35 + ((i * 17) % 60)}%"></i>`).join('')}</div><div class="fx-reactions"></div>`;
   body.append(layer);
   const reactions = layer.querySelector('.fx-reactions');
   const allowed = () =>

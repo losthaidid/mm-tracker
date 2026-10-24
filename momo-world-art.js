@@ -138,7 +138,6 @@
     fog: 'Misty',
     breeze: 'Breezy',
     rainbow: 'Rainbow after rain',
-    aurora: 'Dreamy aurora',
   };
   const weatherMarkup =
     '<g class="world-window-weather"><g class="world-rain" stroke="#9bb9ce" stroke-width="1">' +
@@ -177,7 +176,7 @@
           '"/>'
       )
       .join('') +
-    '</g><g class="world-breeze" stroke="#e7e9d4" stroke-width="2" opacity=".8"><path d="M17 43h72q17-13 23 0M106 63h91q20-12 23 0M34 81h82"/></g><g class="world-aurora" fill="none" stroke-width="17" opacity=".35"><path d="M-20 28q53 55 95 4t85 8 90-13" stroke="#a3d5b4"/><path d="M-15 42q50 28 94-2t81 20 90-24" stroke="#c4ace0"/></g></g>';
+    '</g><g class="world-breeze" stroke="#e7e9d4" stroke-width="2" opacity=".8"><path d="M17 43h72q17-13 23 0M106 63h91q20-12 23 0M34 81h82"/></g></g>';
   const finales = {
     balloons: svg(
       '<ellipse cx="32" cy="23" rx="18" ry="21" fill="currentColor" opacity=".8"/><path d="m28 44 4-5 4 5M32 44q-8 9 0 18" fill="none" stroke="#728894" stroke-width="1.5"/><path d="M22 14q-5 5-4 10" stroke="#fff5e9" stroke-width="3"/>'

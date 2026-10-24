@@ -24,22 +24,6 @@ html[data-render-profile='iphone'] body #view > .fx-stage {
 html[data-render-profile='iphone'] body .fx-surface.fx-visible {
   animation: none !important;
 }
-html[data-render-profile='iphone'] .fx-ribbon {
-  width: 230px;
-  height: 220px;
-  left: -60px;
-  top: 80px;
-  border: 0;
-  background: radial-gradient(ellipse, #74ccad40, #9ecbb622 40%, transparent 72%);
-  filter: none;
-  box-shadow: none;
-}
-html[data-render-profile='iphone'] .fx-ribbon:nth-child(2) {
-  left: 55%;
-  top: 60vh;
-  background: radial-gradient(ellipse, #baa2df40, #d8c99420 40%, transparent 72%);
-  box-shadow: none;
-}
 html[data-render-profile='iphone'] .fx-orbit {
   width: 220px;
   height: 220px;
@@ -102,7 +86,7 @@ html[data-render-profile='iphone'] .mv-widget-shell {
   transform: none !important;
   will-change: auto;
 }
-html[data-render-profile='iphone'] :is(.mv-aurora i, .mv-landscape) {
+html[data-render-profile='iphone'] .mv-landscape {
   filter: none !important;
 }
 html[data-render-profile='iphone'] .mv-light-beams {
@@ -134,15 +118,9 @@ html[data-render-profile='iphone']
 }
 
 /* The terrarium retains its plants, fireflies, water rings and orbiting lights. */
-html[data-render-profile='iphone'] :is(.rest-halo, .rest-glass-light, .rest-water, .rest-aurora i) {
+html[data-render-profile='iphone'] :is(.rest-halo, .rest-glass-light, .rest-water) {
   filter: none;
 }
-html[data-render-profile='iphone'] .rest-aurora i {
-  width: 85%;
-  border-width: 12px;
-  box-shadow: none;
-}
-html[data-render-profile='iphone'] .rest-aurora i:nth-child(n + 3),
 html[data-render-profile='iphone'] .rest-firefly:nth-of-type(n + 9) {
   display: none;
 }

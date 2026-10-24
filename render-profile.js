@@ -7,7 +7,6 @@
   const budget = Object.freeze(
     iphone
       ? {
-          ribbons: 2,
           orbits: 1,
           particles: 12,
           comets: 2,
@@ -17,7 +16,6 @@
           panels: 6,
         }
       : {
-          ribbons: 3,
           orbits: 3,
           particles: 32,
           comets: 5,
