@@ -1544,8 +1544,8 @@ test('leave custom minutes and overlap protection preserve existing work and req
  const ctx=await app(t),{api,document,window}=ctx;addBooking(api,document,'11:00','12:00',{date:'2026-10-20'});await settle();const existing=copy(api.state().schedule);let f=await leaveEditor(ctx);fill(f,{time:'10:15',endTime:'12:30',leavePortion:'custom'});assert.throws(()=>api.saveRange(f),/overlaps/);assert.deepEqual(copy(api.state().schedule),existing);fill(f,{time:'13:15',endTime:'14:45'});api.saveRange(f);await settle();const leave=api.state().schedule.filter(s=>s.kind==='annual-leave');assert.equal(leave[0].time,'13:15');assert.equal(leave.at(-1).endTime,'14:45');const report=window.WorkHubReports.build(api.state(),{asOf:'2026-10-20'});assert.equal(report.sheets.find(s=>s.name==='Schedule').rows.length,2);const old=api.parseBackup(JSON.stringify({app:'mm-ticket-tracker',version:9,data:{...copy(api.state()),schedule:existing}}));assert.equal(old.schedule[0].kind,'custom');assert.equal(old.schedule[0].leave,undefined);
 });
 
-test('Process Hub opens an accessible presentation with the maintained steps and keyboard navigation without writes',async t=>{
- const {api,document,window,db}=await app(t);await hubAction(api,'process-example');api.showTab('processhub');const calls=db.calls.length;assert.ok(document.querySelector('.process-overview-metrics'));document.querySelector('[data-hub="walk"]').click();await settle();assert.ok(document.getElementById('processDeck'));assert.ok(document.getElementById('modal').classList.contains('process-presentation-modal'));assert.match(document.getElementById('processSlideTitle').textContent,/Purchase requisition/);assert.match(document.getElementById('processDeck').textContent,/ME51N/);document.dispatchEvent(new window.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true}));assert.match(document.getElementById('processSlideTitle').textContent,/Purchase order/);assert.equal(api.hub.processDeck.snapshot().index,1);document.querySelector('[data-deck="prev"]').click();assert.equal(api.hub.processDeck.snapshot().index,0);document.querySelector('[data-deck="jump"][data-index="3"]').click();assert.match(document.getElementById('processSlideTitle').textContent,/Invoice verification/);document.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));assert.equal(document.getElementById('modal').open,false);assert.equal(document.getElementById('modal').classList.contains('process-presentation-modal'),false);assert.equal(db.calls.length,calls);
+test('legacy Process Hub presentation retains maintained steps and keyboard navigation without writes',async t=>{
+ const {api,document,window,db}=await app(t);await hubAction(api,'process-example');api.showTab('processhub');const calls=db.calls.length;assert.ok(document.getElementById('rehearsalRoot'));api.hub.processDeck.open(api.state().workhub.processes[0].id);await settle();assert.ok(document.getElementById('processDeck'));assert.ok(document.getElementById('modal').classList.contains('process-presentation-modal'));assert.match(document.getElementById('processSlideTitle').textContent,/Purchase requisition/);assert.match(document.getElementById('processDeck').textContent,/ME51N/);document.dispatchEvent(new window.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true}));assert.match(document.getElementById('processSlideTitle').textContent,/Purchase order/);assert.equal(api.hub.processDeck.snapshot().index,1);document.querySelector('[data-deck="prev"]').click();assert.equal(api.hub.processDeck.snapshot().index,0);document.querySelector('[data-deck="jump"][data-index="3"]').click();assert.match(document.getElementById('processSlideTitle').textContent,/Invoice verification/);document.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));assert.equal(document.getElementById('modal').open,false);assert.equal(document.getElementById('modal').classList.contains('process-presentation-modal'),false);assert.equal(db.calls.length,calls);
 });
 
 test('Process presentations pause at branches and on hidden pages, and cannot autoplay forever around loops',async t=>{
@@ -2270,7 +2270,7 @@ test('Schedule companies: changing booking types preserves company choices for t
 });
 
 test('rehearsal UI: opening the replacement starts a local looping preview with sound enabled by default',async t=>{
- const {api,document,db}=await app(t);api.hub.setTool('simulator');api.showTab('studio');const r=api.hub.rehearsal;
+ const {api,document,db}=await app(t);api.showTab('processhub');const r=api.hub.rehearsal;
  assert.ok(document.getElementById('rehearsalRoot'));assert.equal(document.getElementById('hubSimulator'),null);assert.equal(api.state().workhub.rehearsal.preferences.sound,true);assert.equal(r.snapshot().paused,false);assert.equal(db.calls.length,0);
  assert.ok(document.querySelectorAll('.rehearsal-node').length>=8);assert.equal(r.plan().entries.length,6);
  for(let n=1;n<=420;n++)r.tick(n*150);
@@ -2278,7 +2278,7 @@ test('rehearsal UI: opening the replacement starts a local looping preview with 
 });
 
 test('rehearsal UI: save example, edit a step and retain snapshots through cloud saving and backup',async t=>{
- const {api,document,window,db}=await app(t);api.hub.setTool('simulator');api.showTab('studio');document.querySelector('[data-rehearsal="keep"]').click();await settle();
+ const {api,document,window,db}=await app(t);api.showTab('processhub');document.querySelector('[data-rehearsal="keep"]').click();await settle();
  const r=api.hub.rehearsal,p=api.state().workhub.rehearsal.processes[0];assert.ok(p);assert.notEqual(p.id,'__demo__');r.stepEditor('po');let f=document.getElementById('rehearsalStepForm');
  assert.equal(r.snapshot().paused,true);assert.equal(r.snapshot().editing,true);f.elements.namedItem('instruction').value='Review the order with my checklist';f.elements.namedItem('changes').value='Ordered quantity = 120\nOrder value = 1200';r.saveForm(f);await settle();
  assert.equal(api.state().workhub.rehearsal.processes[0].steps[0].instruction,'Review the order with my checklist');assert.equal(r.snapshot().editing,false);assert.equal(r.snapshot().paused,false);
@@ -2287,7 +2287,7 @@ test('rehearsal UI: save example, edit a step and retain snapshots through cloud
 });
 
 test('rehearsal UI: scenario changes, rewind, failure routes and off-route inspection remain deterministic',async t=>{
- const {api,document,window}=await app(t);api.hub.setTool('simulator');api.showTab('studio');const r=api.hub.rehearsal;
+ const {api,document,window}=await app(t);api.showTab('processhub');const r=api.hub.rehearsal;
  const select=document.getElementById('rehearsalScenario');select.value='partial';select.dispatchEvent(new window.Event('change',{bubbles:true}));assert.equal(r.plan().values['Received quantity'],60);assert.ok(r.plan().entries.some(e=>e.id==='followup'));
  document.querySelector('[data-rehearsal="inspect"][data-id="rework"]').click();await settle();assert.match(document.getElementById('rehearsalInspector').textContent,/Revise rejected order/);
  document.querySelector('[data-rehearsal="failure"][data-id="rework"]').click();await settle();assert.ok(r.plan().entries.length>0);assert.match(document.getElementById('toast').textContent,/outside the current route/);
@@ -2295,9 +2295,9 @@ test('rehearsal UI: scenario changes, rewind, failure routes and off-route inspe
 });
 
 test('rehearsal UI: account switches reject stale step editors and motion off stops automatic advance',async t=>{
- const {api,document}=await app(t);api.hub.setTool('simulator');api.showTab('studio');document.querySelector('[data-rehearsal="keep"]').click();await settle();const r=api.hub.rehearsal;r.stepEditor('po');const stale=document.getElementById('rehearsalStepForm');stale.elements.namedItem('title').value='Private old draft';
+ const {api,document}=await app(t);api.showTab('processhub');document.querySelector('[data-rehearsal="keep"]').click();await settle();const r=api.hub.rehearsal;r.stepEditor('po');const stale=document.getElementById('rehearsalStepForm');stale.elements.namedItem('title').value='Private old draft';
  api.cloud.user={id:'22222222-2222-4222-8222-222222222222'};api.showTab('home');assert.throws(()=>r.saveForm(stale),/Sign in/);
- api.mutate(d=>{d.workhub.preferences.motion='off';});api.hub.setTool('simulator');api.showTab('studio');const before=r.snapshot().index;for(let n=1;n<=80;n++)r.tick(n*150);assert.equal(r.snapshot().index,before);
+ api.mutate(d=>{d.workhub.preferences.motion='off';});api.showTab('processhub');const before=r.snapshot().index;for(let n=1;n<=80;n++)r.tick(n*150);assert.equal(r.snapshot().index,before);
 });
 
 test('T-code UI: version filters, custom maintenance, favourites and archival use private autosave',async t=>{
@@ -2316,14 +2316,14 @@ test('T-code UI: stale account forms and invalid duplicate codes cannot overwrit
 test('rehearsal UI: audio waits for a gesture, respects mute and keyboard positioning preserves focus',async t=>{
  const {api,document,window}=await app(t);let starts=0,suspends=0;
  class AudioMock{constructor(){this.state='suspended';this.currentTime=0;this.destination={};}async resume(){this.state='running';}async suspend(){suspends++;this.state='suspended';}async close(){this.state='closed';}createOscillator(){return{frequency:{setValueAtTime(){}},connect(){},disconnect(){},start(){starts++;},stop(){}};}createGain(){return{gain:{setValueAtTime(){},linearRampToValueAtTime(){},exponentialRampToValueAtTime(){}},connect(){},disconnect(){}};}}
- window.AudioContext=AudioMock;api.hub.setTool('simulator');api.showTab('studio');assert.equal(starts,0);
+ window.AudioContext=AudioMock;api.showTab('processhub');assert.equal(starts,0);
  document.querySelector('[data-rehearsal="play"]').click();await settle();document.querySelector('[data-rehearsal="play"]').click();await settle();assert.ok(starts>0);
  document.querySelector('[data-rehearsal="sound"]').click();await settle();assert.equal(api.state().workhub.rehearsal.preferences.sound,false);assert.ok(suspends>0);
  document.querySelector('[data-rehearsal="keep"]').click();await settle();const old=api.state().workhub.rehearsal.processes[0].steps[0].x,handle=document.querySelector('[data-rehearsal-drag="po"]');handle.focus();handle.dispatchEvent(new window.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));await settle();assert.equal(api.state().workhub.rehearsal.processes[0].steps[0].x,old+10);assert.equal(document.activeElement.dataset.rehearsalDrag,'po');
 });
 
 test('rehearsal UI: rewind visibly retraces the previous connector before restoring its step',async t=>{
- const {api,document}=await app(t);api.hub.setTool('simulator');api.showTab('studio');const r=api.hub.rehearsal;
+ const {api,document}=await app(t);api.showTab('processhub');const r=api.hub.rehearsal;
  document.querySelector('[data-rehearsal="next"]').click();await settle();assert.equal(r.snapshot().index,1);
  document.querySelector('[data-rehearsal="back"]').click();await settle();assert.equal(r.snapshot().rewinding,true);const token=document.getElementById('rehearsalToken'),start=token.style.left;assert.equal(token.hidden,false);
  r.tick(150);r.tick(300);r.tick(450);assert.notEqual(token.style.left,start);
@@ -2844,4 +2844,21 @@ test('Spectacle: every section keeps the shared living effects, navigation burst
 });
 test('Spectacle: motion off, privacy, reduced motion and hidden pages clear feedback; drag and input gestures stay untouched',async t=>{
  const {window,document,db}=await app(t);await settle();const ui=window.WorkHubSpectacle,control=document.querySelector('#tabs button');control.dispatchEvent(new window.MouseEvent('click',{bubbles:true,clientX:80,clientY:150}));assert.ok(document.querySelector('.fx-reactions').childElementCount);document.body.dataset.motion='off';ui.sync();assert.equal(document.getElementById('hubSpectacle').hidden,true);assert.equal(document.querySelector('.fx-reactions').childElementCount,0);document.body.dataset.motion='playful';document.body.classList.add('hub-private');ui.sync();assert.equal(document.getElementById('hubSpectacle').hidden,true);document.body.classList.remove('hub-private');window.matchMedia=()=>({matches:true});ui.sync();assert.equal(document.body.dataset.spectacle,'off');window.matchMedia=()=>({matches:false});ui.sync();document.body.classList.add('hub-sorting');control.dispatchEvent(new window.MouseEvent('click',{bubbles:true,clientX:80,clientY:150}));assert.equal(document.querySelector('.fx-reactions').childElementCount,0);document.body.classList.remove('hub-sorting');Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new window.Event('visibilitychange'));assert.equal(document.getElementById('hubSpectacle').hidden,true);assert.equal(db.calls.length,0);
+});
+
+
+test('Process Hub: rehearsal leaves Studio and a new full-screen canvas saves its graph with one document write',async t=>{
+ const {api,document,window,db}=await app(t);api.showTab('studio');assert.equal(document.querySelector('[data-tool="simulator"]'),null);api.showTab('processhub');assert.equal(document.querySelectorAll('#rehearsalRoot').length,1);
+ const before=db.calls.length;document.querySelector('[data-rehearsal="new"]').click();await settle();assert.ok(document.getElementById('processHubOverlay').open);assert.equal(db.calls.length,before);
+ let f=document.getElementById('processHubDetails');fill(f,{name:'Request handling',objective:'Explain the flow',processOwner:'Service lead',revision:'v2',presenterNotes:'Private prompts'});
+ document.querySelector('[data-step-type="approval"]').click();await settle();f=document.getElementById('rehearsalStepForm');fill(f,{title:'Review request',instruction:'Check the details',inputs:'Request form',outputs:'Decision',configuration:'Internal setup',testing:'Verify both routes',audienceText:'We review your request'});
+ document.querySelector('[data-rehearsal="save-draft"]').click();await settle();assert.equal(db.calls.length,before+1);const p=api.state().workhub.rehearsal.processes[0];assert.equal(p.name,'Request handling');assert.equal(p.steps[2].inputs,'Request form');assert.equal(p.presenterNotes,'Private prompts');assert.equal(api.parseBackup(JSON.stringify(db.row.document)).workhub.rehearsal.processes[0].steps[2].configuration,'Internal setup');
+ const view=document.getElementById('processHubView');view.value='present';view.dispatchEvent(new window.Event('change',{bubbles:true}));assert.doesNotMatch(document.getElementById('processHubOverlay').textContent,/Private prompts|Internal setup/);api.hub.rehearsal.setMode('normal',false);assert.equal(document.getElementById('processHubOverlay'),null);assert.equal(document.getElementById('rehearsalProcess').value,p.id);
+ const reloaded=await app(t,{remote:copy(db.row),login:false});await reloaded.api.loadCloud(sessionUser);reloaded.api.showTab('processhub');assert.equal(reloaded.api.hub.rehearsal.model().steps[2].testing,'Verify both routes');
+});
+
+test('Process Hub: old hub records play and edit without copying or losing their maintained information',async t=>{
+ const {api,document,window,db}=await app(t);await hubAction(api,'process-example');api.mutate(d=>{const p=d.workhub.processes[0];p.steps[0].next=[p.steps[1].id,p.steps[2].id];p.steps[0].configuration='Existing configuration';p.steps[0].testing='Existing tests';p.steps[0].errors='Existing solution';});await settle();
+ api.showTab('processhub');const old=api.state().workhub.processes[0];api.hub.rehearsal.open(old.id);api.showTab('processhub');const calls=db.calls.length;for(let n=1;n<100;n++)api.hub.rehearsal.tick(n*150);assert.equal(db.calls.length,calls);assert.equal(api.state().workhub.rehearsal.processes.length,0);
+ document.querySelector('[data-rehearsal="edit-process"]').click();await settle();api.hub.rehearsal.stepEditor(old.steps[0].id);const f=document.getElementById('rehearsalStepForm');assert.equal(f.elements.namedItem('configuration').value,'Existing configuration');fill(f,{expected:'A maintained result'});document.querySelector('[data-rehearsal="save-draft"]').click();await settle();const updated=api.state().workhub.processes[0];assert.equal(updated.steps[0].testing,'Existing tests');assert.equal(updated.steps[0].expected,'A maintained result');assert.deepEqual(copy(updated.steps[0].next),old.steps[0].next);assert.equal(api.state().workhub.rehearsal.processes.length,0);api.validate(api.state());api.parseBackup(JSON.stringify(db.row.document));
 });
