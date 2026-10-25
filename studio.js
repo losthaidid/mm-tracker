@@ -271,6 +271,7 @@
     let batchA = null,
       validator = null,
       library = null,
+      batchC = null,
       standup = null,
       people = null,
       solution = null,
@@ -1757,6 +1758,7 @@
         scrapbook: 'Scrapbook',
         wrap: 'Daily wrap-up',
         sessions: 'Work sessions',
+        screenshots: 'Screenshot tools',
       };
       if (!Object.hasOwn(tools, currentTool)) currentTool = 'theme';
       return `<section class="hub">${head('A WORKSPACE WITH PERSONALITY', 'Studio', 'Useful tools. A little play. Everything in its place.')}<div class="hub-toolbar">${Object.entries(
@@ -1767,7 +1769,7 @@
         )
         .join(
           ''
-        )}</div>${currentTool === 'theme' ? themeStudio() : currentTool === 'tcodes' ? tcodes?.render() || '' : currentTool === 'focus' ? `<section class="hub-card">${focusWidget()}${prefs().desk ? desk() : ''}</section>` : currentTool === 'journey' ? `<section class="hub-card">${journey()}</section>` : currentTool === 'scrapbook' ? scrapbook() : currentTool === 'wrap' ? dailySummary() : sessionsView()}</section>`;
+        )}</div>${currentTool === 'screenshots' ? batchC?.cards() || '' : currentTool === 'theme' ? themeStudio() : currentTool === 'tcodes' ? tcodes?.render() || '' : currentTool === 'focus' ? `<section class="hub-card">${focusWidget()}${prefs().desk ? desk() : ''}</section>` : currentTool === 'journey' ? `<section class="hub-card">${journey()}</section>` : currentTool === 'scrapbook' ? scrapbook() : currentTool === 'wrap' ? dailySummary() : sessionsView()}</section>`;
     }
     function timerKey() {
       return a.cloud().user ? 'mm-tracker.timer.v1:' + a.cloud().user.id : null;
@@ -2550,6 +2552,7 @@
       batchA?.sync();
       validator?.sync();
       library?.sync();
+      batchC?.sync();
       myDay?.sync();
       standup?.sync();
       people?.sync();
@@ -3824,6 +3827,11 @@
       owner: () => a.cloud().user?.id || '',
       hubAction: handle,
     });
+    batchC = root.WorkHubBatchC?.install({
+      ...a,
+      ready: () => a.cloud().ready,
+      owner: () => a.cloud().user?.id || '',
+    });
     people = root.WorkHubProjectPeople?.install({
       ...a,
       ready: () => a.cloud().ready,
@@ -3917,6 +3925,7 @@
       batchA,
       validator,
       library,
+      batchC,
       standup,
       people,
       solution,
