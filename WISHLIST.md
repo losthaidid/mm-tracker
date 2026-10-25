@@ -14,6 +14,10 @@ The Momo behaviour enhancements in [Batch B](BATCH-B.md) are implemented, includ
 
 On 20 October 2026, Request inbox, End-of-day ritual, Personal learning roadmap and Show-me-how walkthroughs were removed from the wishlist at the user's request.
 
+## Pending presentation enhancement
+
+Kept on 25 October 2026: **97 · Private presentation annotations** — draw temporary highlights or arrows over the audience view from private presenter controls, then clear them without editing the saved process. This is a wishlist selection only; implementation has not been requested. No batch assigned. The number refers to the current functional-ideas discussion.
+
 ## Pending stand-up enhancement
 
 Kept on 21 October 2026: **2 · Waiting on** — add a field beside project items and sub-items in the Daily stand-up summary to record who needs to respond, such as the business team, ABAP, BASIS or a named person. This is a wishlist selection; implementation has not been requested yet. No batch assigned.
