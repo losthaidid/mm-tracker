@@ -1,0 +1,179 @@
+/* Clothing and props share the original rig coordinate system and its single mirror. */
+#hubPet g#hubMomoUmbrella {
+  position: static;
+  left: auto;
+  top: auto;
+  width: auto;
+  height: auto;
+  transform: none;
+  scale: 1;
+  animation: none;
+  pointer-events: none;
+}
+#hubPet[data-umbrella='true'] .momo-arm-right {
+  visibility: hidden !important;
+}
+#hubPet[data-umbrella='true'] .momo-arm-left {
+  transform: rotate(-4deg) !important;
+  animation: none !important;
+}
+#hubPet[data-umbrella='true'] .pet-body {
+  animation: none !important;
+  transform: none !important;
+  transform-origin: 70px 145px !important;
+}
+#hubPet .momo-umbrella-front,
+#hubPet .momo-umbrella-back {
+  pointer-events: none;
+}
+.momo-hobby-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  gap: 10px;
+  margin: 20px 0;
+}
+.momo-hobby-grid button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  text-align: left;
+}
+.momo-hobby-grid button span {
+  font-size: 25px;
+  color: var(--hub-accent);
+}
+#hubPet[data-pose='hobby'] .pet-body {
+  animation: momo-hobby-breathe 5s ease-in-out infinite;
+}
+#hubPet[data-pose='hobby'] .momo-arm-left {
+  animation: none;
+  transform: rotate(-28deg);
+}
+#hubPet[data-pose='hobby'] .momo-arm-right {
+  animation: none;
+  transform: rotate(28deg);
+}
+#hubPet .momo-hobby-prop {
+  pointer-events: none;
+  transform-box: view-box;
+  transform-origin: 70px 115px;
+}
+#hubPet[data-pose='hobby'] .mh-tool {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: momo-hobby-tool 2.8s ease-in-out infinite alternate;
+}
+#hubPet .mh-steam,
+#hubPet .mh-note {
+  animation: momo-hobby-steam 3s ease-in-out infinite;
+}
+#hubPet .mh-sprout {
+  transform-origin: 71px 114px;
+  animation: momo-hobby-tool 4s ease-in-out infinite alternate;
+}
+@keyframes momo-hobby-tool {
+  from {
+    transform: rotate(-3deg);
+  }
+  to {
+    transform: rotate(3deg);
+  }
+}
+@keyframes momo-hobby-steam {
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-4px);
+  }
+}
+@keyframes momo-hobby-breathe {
+  50% {
+    transform: translateY(-1px);
+  }
+}
+body[data-motion='off'] #hubPet .momo-hobby-prop *,
+body[data-motion='off'] #hubPet[data-pose='hobby'] .pet-body {
+  animation: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  #hubPet .momo-hobby-prop *,
+  #hubPet[data-pose='hobby'] .pet-body {
+    animation: none !important;
+  }
+}
+body[data-photo-background] {
+  isolation: isolate;
+  background-image: none !important;
+}
+#workspacePhoto {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+  background: var(--hub-bg, #f8f7f2);
+}
+#workspacePhoto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: var(--photo-strength, 0.4);
+}
+body[data-photo-background='hero'] #workspacePhoto {
+  display: none;
+}
+body:is([data-photo-background='hero'], [data-photo-background='both']) .mv-hero {
+  background-image: var(--workspace-photo) !important;
+  background-size: cover;
+  background-position: center;
+}
+body:is([data-photo-background='hero'], [data-photo-background='both']) .mv-hero .mv-scene {
+  display: none;
+}
+body:is([data-photo-background='page'], [data-photo-background='both']) .mv-atmosphere {
+  background: transparent;
+}
+.photo-gallery {
+  display: grid;
+  gap: 14px;
+}
+.photo-gallery .photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  gap: 12px;
+}
+.photo-gallery article {
+  padding: 10px;
+  border: 1px solid var(--hub-border);
+  border-radius: 12px;
+  background: var(--hub-surface);
+}
+.photo-gallery article[data-active='true'] {
+  outline: 2px solid var(--hub-accent);
+}
+.photo-gallery img {
+  width: 100%;
+  height: 95px;
+  object-fit: cover;
+  border-radius: 7px;
+}
+.photo-gallery .actions {
+  flex-wrap: wrap;
+}
+.photo-gallery label {
+  display: grid;
+  gap: 7px;
+}
+@media print {
+  #workspacePhoto {
+    display: none;
+  }
+  body[data-photo-background] {
+    background: var(--hub-bg) !important;
+  }
+}

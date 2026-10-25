@@ -45,6 +45,10 @@
     mascotName: 'Momo',
     roaming: true,
     accessory: 'glasses',
+    outfit: 'daily',
+    outfitPalette: 'daily',
+    hobbies: true,
+    displayMode: 'auto',
     density: 'comfortable',
     desk: true,
   };
@@ -250,11 +254,13 @@
       !root.WorkHubAppearance.BACKGROUNDS.some(([id]) => id === p.background) ||
       !['calm', 'playful', 'off'].includes(p.motion) ||
       !['comfortable', 'compact'].includes(p.density) ||
-      !['glasses', 'helmet', 'party', 'none'].includes(p.accessory) ||
+      !['auto', 'smooth', 'full'].includes(p.displayMode) ||
+      !root.WorkHubMomoWardrobe.ACCESSORIES.some(([id]) => id === p.accessory) ||
       !['sounds', 'mascot', 'roaming', 'desk'].every(k => typeof p[k] === 'boolean')
     )
       throw Error('Check the theme settings.');
     root.WorkHubAppearance.validate(p);
+    root.WorkHubMomoWardrobe.validate(p);
     if (
       !Array.isArray(h.widgets) ||
       h.widgets.length > Object.keys(WIDGETS).length ||
@@ -295,7 +301,9 @@
       processDeck = null,
       chromeUX = null,
       myDay = null,
-      experience = null;
+      experience = null,
+      wardrobe = null,
+      backgrounds = null;
     const reminders = root.WorkHubReminders?.install({
       ...a,
       hubAction: el => handle(el),
@@ -400,6 +408,7 @@
       );
       themes.custom = p.accent;
       root.WorkHubAppearance.apply(p);
+      root.WorkHubRenderProfile?.setMode(p.displayMode);
       document.body.dataset.hubTheme = p.theme;
       document.body.dataset.motion = p.motion;
       document.body.dataset.density = p.density;
@@ -425,8 +434,7 @@
         luminance > 0.179 ? '#000000' : '#ffffff'
       );
       if ($('hubPet')) $('hubPet').hidden = !p.mascot || !a.cloud().ready;
-      const acc = $('hubPetAccessory');
-      if (acc) acc.innerHTML = root.WorkHubMomoArt.accessory(p.accessory);
+      root.WorkHubMomoWardrobe.apply(p, a.cloud().user?.id || '');
       if (!p.roaming || !p.mascot || p.motion === 'off') stopCompanionWalk();
       atmosphere?.sync();
     }
@@ -1535,7 +1543,7 @@
           ]),
           ['custom', 'Custom colours', p.accent],
         ];
-      return `<div class="hub-theme-layout"><section class="hub-card hub-theme-controls"><div class="flex-title"><div><span class="hub-kicker">MAKE YOURSELF AT HOME</span><h3>Your space, your style</h3><p>Try a look, then save it to your account.</p></div><div class="actions">${btn('theme-export', 'Export')}${btn('theme-import', 'Import')}</div></div><form id="hubTheme"><section class="hub-theme-section"><h4>Choose your colours</h4><input type="hidden" name="theme" value="${esc(p.theme)}"><div class="hub-palette-options" role="group" aria-label="Workspace colour palette">${palettes.map(([id, name, color]) => btn('theme-choice', '<span class="hub-palette-swatch" style="--palette:' + color + '"></span><span>' + name + '</span>', 'data-theme-choice="' + id + '" aria-pressed="' + (id === p.theme) + '"', 'hub-palette-choice')).join('')}</div><div class="form-grid">${field('accent', 'Your custom colour', p.accent, 'color')}${select('background', 'Page background', root.WorkHubAppearance.BACKGROUNDS, p.background, 'Choose background')}</div>${root.WorkHubAppearance.fields(p)}</section><section class="hub-theme-section"><h4>Text & layout</h4><div class="form-grid">${select(
+      return `<div class="hub-theme-layout"><section class="hub-card hub-theme-controls"><div class="flex-title"><div><span class="hub-kicker">MAKE YOURSELF AT HOME</span><h3>Your space, your style</h3><p>Try a look, then save it to your account.</p></div><div class="actions">${btn('theme-export', 'Export')}${btn('theme-import', 'Import')}</div></div><form id="hubTheme"><section class="hub-theme-section"><h4>Choose your colours</h4><input type="hidden" name="theme" value="${esc(p.theme)}"><div class="hub-palette-options" role="group" aria-label="Workspace colour palette">${palettes.map(([id, name, color]) => btn('theme-choice', '<span class="hub-palette-swatch" style="--palette:' + color + '"></span><span>' + name + '</span>', 'data-theme-choice="' + id + '" aria-pressed="' + (id === p.theme) + '"', 'hub-palette-choice')).join('')}</div><div class="form-grid">${field('accent', 'Your custom colour', p.accent, 'color')}${select('background', 'Page background', root.WorkHubAppearance.BACKGROUNDS, p.background, 'Choose background')}</div>${root.WorkHubAppearance.fields(p)}<div class="actions"><button type="button" data-photo="open">My background pictures</button></div></section><section class="hub-theme-section"><h4>Text & layout</h4><div class="form-grid">${select(
         'font',
         'Typography',
         [
@@ -1578,15 +1586,20 @@
       )}${select(
         'accessory',
         (p.mascotName || 'Momo') + '’s accessory',
-        [
-          ['glasses', 'Review glasses'],
-          ['helmet', 'Project helmet'],
-          ['party', 'Party hat'],
-          ['none', 'None'],
-        ],
+        root.WorkHubMomoWardrobe.ACCESSORIES,
         p.accessory,
         'Choose accessory'
-      )}<div class="wide">${[
+      )}${select(
+        'displayMode',
+        'Display rendering',
+        [
+          ['auto', 'Automatic · adapt to the display'],
+          ['smooth', 'Smooth · TVs and high-resolution monitors'],
+          ['full', 'Full effects'],
+        ],
+        p.displayMode
+      )}${root.WorkHubMomoWardrobe.fields(p)}<div class="wide">${[
+        ['hobbies', 'Let him enjoy quiet, automatic hobbies'],
         ['mascot', 'Show ' + (p.mascotName || 'Momo') + ', your companion'],
         ['roaming', 'Let ' + (p.mascotName || 'Momo') + ' wander around the screen'],
         ['sounds', 'Play a soft sound when work is completed'],
@@ -1598,7 +1611,7 @@
         )
         .join(
           ''
-        )}</div></div><p class="hub-meta">Your companion pauses while you type or drag him. Your device’s reduced-motion setting is respected.</p></section><div class="actions"><button type="submit" class="primary">Save theme</button>${btn('theme-reset-preview', 'Discard preview')}</div><p id="hubThemeStatus" class="hub-meta" role="status">${themePreview ? 'Preview only · save to keep this look.' : 'Your saved appearance is active.'}</p></form><input type="file" id="hubThemeFile" accept=".json,application/json" hidden></section><aside class="hub-card hub-theme-preview"><span class="hub-kicker">LIVE PREVIEW</span><h3>A little more you.</h3><p>See your colours, type and spacing come together.</p><div class="hub-preview-mini"><span class="hub-badge">YOUR WORKSPACE</span><h3>A good day starts here.</h3><p>One clear task. A little progress.</p><div class="hub-preview-sample"><span class="hub-preview-dot">✓</span><span><strong>Review the next step</strong><small>Ready when you are</small></span></div><div class="hub-progress"><span style="width:68%"></span></div>${btn('celebrate', 'Try a celebration', '', 'primary')}</div><p class="hub-meta">Your saved look follows your account on phone and laptop.</p></aside></div>`;
+        )}</div></div><p class="hub-meta"><button type="button" data-momo-style="gallery">Wardrobe & hobbies</button><br>Your companion pauses while you type or drag him. Your device’s reduced-motion setting is respected.</p></section><div class="actions"><button type="submit" class="primary">Save theme</button>${btn('theme-reset-preview', 'Discard preview')}</div><p id="hubThemeStatus" class="hub-meta" role="status">${themePreview ? 'Preview only · save to keep this look.' : 'Your saved appearance is active.'}</p></form><input type="file" id="hubThemeFile" accept=".json,application/json" hidden></section><aside class="hub-card hub-theme-preview"><span class="hub-kicker">LIVE PREVIEW</span><h3>A little more you.</h3><p>See your colours, type and spacing come together.</p><div class="hub-preview-mini"><span class="hub-badge">YOUR WORKSPACE</span><h3>A good day starts here.</h3><p>One clear task. A little progress.</p><div class="hub-preview-sample"><span class="hub-preview-dot">✓</span><span><strong>Review the next step</strong><small>Ready when you are</small></span></div><div class="hub-progress"><span style="width:68%"></span></div>${btn('celebrate', 'Try a celebration', '', 'primary')}</div><p class="hub-meta">Your saved look follows your account on phone and laptop.</p></aside></div>`;
     }
     function previewTheme(form) {
       const p = themeValues(form),
@@ -2645,6 +2658,8 @@
       leaveBalances?.mount(tab);
       tng?.mount(tab);
       recipients?.mount(tab);
+      wardrobe?.mount();
+      backgrounds?.mount();
       experience?.mount();
       settingsPanel?.mount();
       rehearsal?.mount();
@@ -2709,8 +2724,8 @@
       };
       for (const k of Object.keys(v)) if (k.startsWith('color-')) delete v[k];
       v.radius = Number(v.radius);
-      for (const k of ['sounds', 'mascot', 'roaming', 'desk'])
-        v[k] = form.elements.namedItem(k).checked;
+      for (const k of ['sounds', 'mascot', 'roaming', 'desk', 'hobbies'])
+        v[k] = form.elements.namedItem(k)?.checked ?? prefs()[k];
       return v;
     }
     async function handle(el) {
@@ -3716,6 +3731,7 @@
       if (document.hidden) return;
       workbench?.tick();
       atmosphere?.tick();
+      wardrobe?.tick();
       experience?.tick();
       adventures?.tick();
       life?.tick();
@@ -3949,6 +3965,24 @@
       ready: () => a.cloud().ready,
       owner: () => a.cloud().user?.id || '',
     });
+    wardrobe = root.WorkHubMomoWardrobe.install({
+      ready: () => a.cloud().ready,
+      owner: () => a.cloud().user?.id || '',
+      prefs: () => themePreview || prefs(),
+      life: () => life,
+      openModal: a.openModal,
+      closeModal: a.closeModal,
+      tell: a.tell,
+      appearance: () => handle({ dataset: { hub: 'tool', tool: 'theme' } }),
+    });
+    root.addEventListener('workhub:momo-wardrobe', () => wardrobe.gallery());
+    backgrounds = root.WorkHubPhotoBackground?.install({
+      ready: () => a.cloud().ready,
+      owner: () => a.cloud().user?.id || '',
+      openModal: a.openModal,
+      closeModal: a.closeModal,
+      tell: a.tell,
+    });
     experience = root.WorkHubExperience?.install({
       ...a,
       ready: () => a.cloud().ready,
@@ -3985,6 +4019,8 @@
       focusSnapshot,
       reminders,
       life,
+      wardrobe,
+      backgrounds,
       atmosphere,
       workbench,
       soundscape,
