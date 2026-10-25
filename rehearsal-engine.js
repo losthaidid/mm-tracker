@@ -1,7 +1,21 @@
 /** Personal process rehearsals: bounded graph playback and sample values, never SAP posting. */
 (function rehearsalEngine(root) {
   'use strict';
-  const TYPES = ['task', 'document', 'decision', 'approval', 'result'],
+  const TYPES = [
+      'task',
+      'document',
+      'decision',
+      'approval',
+      'result',
+      'organization',
+      'company',
+      'plant',
+      'storage',
+      'material',
+      'batch',
+      'valuation',
+      'group',
+    ],
     THEMES = ['desk', 'blueprint', 'control'];
   const copy = v => JSON.parse(JSON.stringify(v)),
     text = (v, max = 32767) => typeof v === 'string' && v.length <= max;
@@ -21,6 +35,189 @@
     'itemId',
     'noteId',
   ];
+
+  const TYPE_LABELS = {
+    task: 'Task',
+    document: 'Document',
+    decision: 'Decision',
+    approval: 'Approval',
+    result: 'Result',
+    organization: 'Organization level',
+    company: 'Company code',
+    plant: 'Plant',
+    storage: 'Storage location',
+    material: 'Material',
+    batch: 'Batch',
+    valuation: 'Valuation',
+    group: 'Step group',
+  };
+  const TYPE_ICONS = {
+    task: '✓',
+    document: '▤',
+    decision: '◇',
+    approval: '✦',
+    result: '⚑',
+    organization: '▦',
+    company: '▥',
+    plant: '♧',
+    storage: '▧',
+    material: '◈',
+    batch: '▣',
+    valuation: '◉',
+    group: '⊞',
+  };
+  const ENTITY_FIELDS = [
+    ['companyCode', 'Company code'],
+    ['plant', 'Plant'],
+    ['storageLocation', 'Storage location'],
+    ['materialCode', 'Material code'],
+    ['materialType', 'Material type'],
+    ['batch', 'Batch'],
+    ['valuationClass', 'Valuation class'],
+    ['valuationType', 'Valuation type'],
+    ['unit', 'Unit of measure'],
+  ];
+  function validateCanvas(p) {
+    const ids = new Set(p.steps.map(s => s.id));
+    if (
+      p.links !== undefined &&
+      (!p.links ||
+        typeof p.links !== 'object' ||
+        Array.isArray(p.links) ||
+        ['projectId', 'noteId'].some(k => p.links[k] !== undefined && !text(p.links[k], 100)))
+    )
+      throw Error('Check process project and knowledge links.');
+    for (const step of p.steps) {
+      if (
+        step.entity !== undefined &&
+        (!step.entity ||
+          Array.isArray(step.entity) ||
+          typeof step.entity !== 'object' ||
+          Object.keys(step.entity).some(
+            k => !ENTITY_FIELDS.some(f => f[0] === k) || !text(step.entity[k], 300)
+          ))
+      )
+        throw Error('Check the organization or material information.');
+      if (
+        step.stackParent !== undefined &&
+        step.stackParent !== '' &&
+        (!ids.has(step.stackParent) || step.stackParent === step.id)
+      )
+        throw Error('Choose a different existing magnetic parent.');
+      const seen = new Set([step.id]);
+      let parent = step.stackParent;
+      while (parent) {
+        if (seen.has(parent)) throw Error('Magnetic step groups cannot form a cycle.');
+        seen.add(parent);
+        parent = p.steps.find(s => s.id === parent)?.stackParent;
+      }
+    }
+    if (p.annotations === undefined) return;
+    if (!Array.isArray(p.annotations) || p.annotations.length > 100)
+      throw Error('Keep up to 100 process annotations.');
+    const marks = new Set();
+    for (const m of p.annotations) {
+      if (
+        !m ||
+        !text(m.id, 100) ||
+        !m.id ||
+        marks.has(m.id) ||
+        !['text', 'arrow', 'pen'].includes(m.type) ||
+        !/^#[0-9a-f]{6}$/i.test(m.color) ||
+        !Number.isFinite(m.x) ||
+        !Number.isFinite(m.y) ||
+        Math.abs(m.x) > 8000 ||
+        Math.abs(m.y) > 8000 ||
+        !Number.isFinite(m.width) ||
+        m.width < 1 ||
+        m.width > 20 ||
+        (m.anchorId !== undefined && m.anchorId !== '' && !ids.has(m.anchorId))
+      )
+        throw Error('Check the process annotation.');
+      marks.add(m.id);
+      if (m.type === 'text') {
+        if (
+          !text(m.text, 1000) ||
+          !m.text.trim() ||
+          !Number.isFinite(m.fontSize) ||
+          m.fontSize < 8 ||
+          m.fontSize > 96 ||
+          !Number.isFinite(m.w) ||
+          m.w < 40 ||
+          m.w > 2000 ||
+          !Number.isFinite(m.h) ||
+          m.h < 25 ||
+          m.h > 1600
+        )
+          throw Error('Check the text box dimensions and text.');
+      } else if (
+        !Array.isArray(m.points) ||
+        m.points.length < 2 ||
+        m.points.length > 300 ||
+        m.points.some(
+          pt =>
+            !Array.isArray(pt) ||
+            pt.length !== 2 ||
+            pt.some(n => !Number.isFinite(n) || Math.abs(n) > 8000)
+        )
+      )
+        throw Error('Check the arrow or pen points.');
+    }
+  }
+  function connect(p, from, to) {
+    const a = p.steps.find(s => s.id === from),
+      b = p.steps.find(s => s.id === to);
+    if (!a || !b || from === to) throw Error('Connect two different existing steps.');
+    if (connections(a).includes(to)) return;
+    if (a.decision) {
+      if (a.decision.answers.length >= 6)
+        throw Error(
+          'A decision supports six named paths. Edit its answers to change a destination.'
+        );
+      a.decision.answers.push({ label: 'Route ' + (a.decision.answers.length + 1), next: to });
+      a.alternatives = (a.alternatives || []).concat(to);
+    } else if (!a.next) a.next = to;
+    else a.alternatives = (a.alternatives || []).concat(to);
+  }
+  function removeStep(p, id) {
+    const removed = p.steps.find(s => s.id === id);
+    if (!removed) return;
+    if (p.steps.length <= 1) throw Error('Keep at least one process step.');
+    p.annotations = (p.annotations || []).map(m => {
+      if (m.anchorId !== id) return m;
+      const next = { ...m, x: m.x + removed.x, y: m.y + removed.y };
+      delete next.anchorId;
+      return next;
+    });
+    p.steps = p.steps.filter(s => s.id !== id);
+    if (p.startId === id) p.startId = p.steps[0].id;
+    for (const step of p.steps) {
+      if (step.next === id) step.next = '';
+      if (step.failNext === id) step.failNext = '';
+      step.alternatives = (step.alternatives || []).filter(to => to !== id);
+      if (step.stackParent === id) delete step.stackParent;
+      if (step.decision) {
+        const q = step.decision;
+        q.answers = q.answers.filter(a => a.next !== id);
+        if (q.answers.length < 2) delete step.decision;
+        else {
+          if (!q.answers.some(a => a.next === step.next)) step.next = q.answers[0].next;
+          if (q.defaultNext !== undefined) q.defaultNext = step.next;
+          step.alternatives = q.answers.map(a => a.next).filter(to => to && to !== step.next);
+        }
+      }
+    }
+    for (const scenario of p.scenarios) {
+      delete scenario.choices[id];
+      for (const [from, to] of Object.entries(scenario.routes || {}))
+        if (from === id || to === id) delete scenario.routes[from];
+      for (const [from, to] of Object.entries(scenario.routes || {})) {
+        const step = p.steps.find(s => s.id === from);
+        if (step && ![step.next, ...(step.alternatives || [])].includes(to))
+          delete scenario.routes[from];
+      }
+    }
+  }
   const BASE_TIME = '1970-01-01T00:00:00.000Z';
   const stamp = v => text(v, 50) && !!v && Number.isFinite(Date.parse(v));
   const link = v => v === '' || (text(v, 2000) && /^https?:\/\/[^\s<>"]+$/i.test(v));
@@ -143,6 +340,7 @@
         process.scenarios.length > 20
       )
         throw Error('Check the saved process.');
+      validateCanvas(process);
       ids.add(process.id);
       totalSteps += process.steps.length;
       const stepIds = new Set(process.steps.map(s => s.id));
@@ -301,6 +499,8 @@
   }
   function normalize(p) {
     const value = copy(p);
+    value.annotations ||= [];
+    value.links ||= { projectId: '', noteId: '' };
     for (const k of PROCESS_FIELDS) if (value[k] === undefined) value[k] = '';
     if (value.archived === undefined) value.archived = false;
     for (const s of value.steps) {
@@ -364,6 +564,8 @@
       old.archived = value.archived;
       old.canvas = {
         version: 1,
+        annotations: value.annotations,
+        links: value.links,
         startId: value.startId,
         scenarios: value.scenarios,
         createdAt: value.createdAt,
@@ -643,6 +845,12 @@
     connections,
     PROCESS_FIELDS,
     STEP_FIELDS,
+    TYPE_LABELS,
+    TYPE_ICONS,
+    ENTITY_FIELDS,
+    validateCanvas,
+    connect,
+    removeStep,
     upgrade,
     validate,
     values,

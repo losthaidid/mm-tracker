@@ -17,7 +17,14 @@
       panel = null,
       preview = null,
       timer = 0,
-      lastSent = 0;
+      lastSent = 0,
+      canvasUI = null,
+      publicOverlay = null,
+      publicView = null,
+      launchEpoch = 0,
+      launchPlacement = '',
+      previousTitle = null;
+    const rich = !!(a.canvas && root.WorkHubProcessCanvas);
     let cover = false,
       held = null,
       breakSession = null,
@@ -67,6 +74,7 @@
       if (laserFrame) root.cancelAnimationFrame(laserFrame);
       laserFrame = 0;
       preview?.pointer(null);
+      publicView?.pointer(null);
       send('workhub-audience-pointer', { pointer: null });
     }
     function pointLaser(event, host) {
@@ -76,6 +84,7 @@
           laserFrame = 0;
           if (!live() || !panel || tool !== 'laser') return;
           preview?.pointer(laser);
+          publicView?.pointer(laser);
           if (connected()) send('workhub-audience-pointer', { pointer: laser });
         });
     }
@@ -177,6 +186,8 @@
     function closePanel() {
       clearLaser();
       tool = 'move';
+      canvasUI?.destroy();
+      canvasUI = null;
       preview?.destroy();
       preview = null;
       if (panel) {
@@ -190,6 +201,21 @@
       markFrame = 0;
     }
     function close() {
+      launchEpoch++;
+      if (previousTitle !== null) {
+        document.title = previousTitle;
+        previousTitle = null;
+      }
+      document.body.classList.remove('pc-presenting');
+      publicView?.destroy();
+      publicView = null;
+      if (publicOverlay) {
+        const stage = publicOverlay.firstElementChild;
+        if (document.fullscreenElement === stage) void document.exitFullscreen?.().catch(() => {});
+        publicOverlay.close();
+        publicOverlay.remove();
+        publicOverlay = null;
+      }
       send('workhub-audience-end');
       try {
         popup?.close();
@@ -223,6 +249,10 @@
       }
       if (popup) {
         try {
+          if (rich && popup.closed) {
+            close();
+            return;
+          }
           if (popup.closed) {
             ready = false;
             notice('Audience window closed. Open it again when ready.');
@@ -264,7 +294,9 @@
       }
       if (!force && root.performance.now() - lastSent < 240) return;
       lastSent = root.performance.now();
-      const snapshot = publicState(),
+      canvasUI?.sync();
+      const raw = publicState(),
+        snapshot = canvasUI && !held && !cover && !breakSession ? canvasUI.snapshot(raw) : raw,
         key = snapshot.kind + '|' + snapshot.title + '|' + snapshot.active;
       if (sceneKey && sceneKey !== key) {
         marks = [];
@@ -285,15 +317,22 @@
         options: { textScale, overview, camera, mapOnly },
       };
       if (connected()) send('workhub-audience-state', payload);
+      publicView?.update(payload.snapshot, payload.marks, payload.options);
       preview?.update(payload.snapshot, payload.marks, {
         ...payload.options,
         selected: selectedMark,
         interactive: true,
+        ...canvasUI?.options(),
       });
       updateControls();
     }
     function updateControls() {
       if (!panel) return;
+      if (rich && publicOverlay) {
+        audienceFull = document.fullscreenElement === publicOverlay.firstElementChild;
+        const title = 'Audience · ' + a.snapshot().title;
+        if (document.title !== title) document.title = title;
+      }
       const info = a.privateInfo(),
         state = a.snapshot(),
         key = JSON.stringify([info.processId, info.scenarioId, info.processes, info.scenarios]);
@@ -351,10 +390,16 @@
               ? 'Connected · audience screen held'
               : breakSession
                 ? 'Connected · presentation break'
-                : 'Connected · share only the audience window'
+                : rich
+                  ? 'Connected · share the original audience window; keep this private canvas unshared'
+                  : 'Connected · share only the audience window'
         );
       else if (popup && !ready)
-        notice('Waiting for audience window. If it was closed, select Open audience window.');
+        notice(
+          rich
+            ? 'Opening private controls…'
+            : 'Waiting for audience window. If it was closed, select Open audience window.'
+        );
       else
         notice(
           connectionError || 'Audience connection interrupted. Reopen the window to reconnect.'
@@ -363,7 +408,9 @@
       if (display)
         display.textContent = audienceFull
           ? 'Audience is in true fullscreen · Esc exits'
-          : 'Audience is windowed · click Start full screen in the audience window if requested';
+          : rich
+            ? 'Audience fills its window · native fullscreen was not granted by this browser'
+            : 'Audience is windowed · click Start full screen in the audience window if requested';
       const markStatus = panel.querySelector('[data-presenter-mark-status]');
       if (markStatus)
         markStatus.textContent =
@@ -375,12 +422,102 @@
       const update = panel.querySelector('[data-presenter="update-text"]');
       if (update)
         update.textContent =
-          marks[selectedMark]?.type === 'text' ? 'Update selected text' : 'Update last text';
+          rich || marks[selectedMark]?.type === 'text'
+            ? 'Update selected text'
+            : 'Update last text';
       const remove = panel.querySelector('[data-presenter="delete-mark"]');
-      if (remove) remove.disabled = selectedMark < 0;
+      if (remove) remove.disabled = rich ? !canvasUI?.state().selected : selectedMark < 0;
       const locked = !!(held || cover || breakSession);
       for (const b of panel.querySelectorAll('[data-playback-control]')) b.disabled = locked;
       for (const b of choices.querySelectorAll('button')) b.disabled = locked;
+    }
+
+    function adoptControls() {
+      if (!rich || !popup || !panel) return;
+      try {
+        if (panel.ownerDocument !== popup.document) {
+          panel.close();
+          popup.document.body.replaceChildren();
+          popup.document.body.append(panel);
+          panel.showModal();
+        }
+        popup.focus();
+      } catch {
+        notice('Private controls could not open. End this presentation and launch it again.');
+      }
+    }
+    function startPublicStage() {
+      if (!rich) {
+        openWindow();
+        return;
+      }
+      const epoch = ++launchEpoch;
+      launchPlacement =
+        'popup,left=' +
+        Math.round((root.screenX || 0) + 40) +
+        ',top=' +
+        Math.round((root.screenY || 0) + 40) +
+        ',width=' +
+        Math.min(1440, root.screen?.availWidth || 1280) +
+        ',height=' +
+        Math.min(1000, root.screen?.availHeight || 850);
+      if (publicOverlay) {
+        try {
+          popup?.focus();
+        } catch {}
+        return;
+      }
+      previousTitle = document.title;
+      document.body.classList.add('pc-presenting');
+      publicOverlay = document.createElement('dialog');
+      publicOverlay.id = 'processAudienceOverlay';
+      publicOverlay.innerHTML =
+        '<section id="processAudienceStage" aria-label="Audience presentation"></section>';
+      publicOverlay.addEventListener('cancel', e => {
+        e.preventDefault();
+        close();
+      });
+      document.body.append(publicOverlay);
+      publicOverlay.showModal();
+      const stage = publicOverlay.firstElementChild;
+      publicView = root.WorkHubAudienceView.create(stage);
+      publish(true);
+      // Same sequence as Presentation Break: the click requests fullscreen on
+      // the current document's audience-only stage before opening the companion.
+      let request;
+      try {
+        request = a.screens
+          ? a.screens.fullscreen(stage)
+          : stage.requestFullscreen?.({ navigationUI: 'hide' });
+      } catch {
+        request = false;
+      }
+      Promise.resolve(request)
+        .catch(() => false)
+        .then(() => {
+          if (epoch !== launchEpoch || !live() || !publicOverlay) {
+            if (document.fullscreenElement === stage)
+              void document.exitFullscreen?.().catch(() => {});
+            return;
+          }
+          audienceFull = document.fullscreenElement === stage;
+          openWindow();
+          if (!popup) {
+            publicView.destroy();
+            publicView = null;
+            publicOverlay.close();
+            publicOverlay.remove();
+            publicOverlay = null;
+            if (document.fullscreenElement === stage)
+              void document.exitFullscreen?.().catch(() => {});
+            notice(
+              'Allow pop-ups for the private presenter window, then close these controls and launch Presenter controls again.'
+            );
+          } else if (!audienceFull)
+            notice(
+              'The audience fills the window. This browser did not allow native fullscreen; Esc returns to the workspace.'
+            );
+        });
     }
     function openWindow() {
       if (!live()) return;
@@ -397,19 +534,26 @@
       ready = false;
       lastSeen = 0;
       connectionError = '';
-      const url = new URL('audience.html', base);
+      const url = new URL(rich ? 'presenter-window.html' : 'audience.html', base);
       url.hash = token;
       url.searchParams.set('fullscreen', '1');
       popup = root.open(
         url.href,
         'workhub-audience-' + token,
-        a.screens?.features() || 'popup,width=1280,height=800'
+        rich ? launchPlacement : a.screens?.features() || 'popup,width=1280,height=800'
       );
       if (!popup) {
-        connectionError =
-          'The audience window was blocked. Allow pop-ups for this site, then select Open audience window.';
+        connectionError = rich
+          ? 'Allow pop-ups for the private presenter window, then end this presentation and launch Presenter controls again.'
+          : 'The audience window was blocked. Allow pop-ups for this site, then select Open audience window.';
         notice(connectionError);
-        a.tell?.('Allow pop-ups for this site, then choose Open audience window.');
+        if (rich) {
+          const hint = panel.querySelector('[data-pc-notice]');
+          if (hint) hint.textContent = connectionError;
+          document.body.classList.remove('pc-presenting');
+          if (previousTitle !== null) document.title = previousTitle;
+        }
+        a.tell?.(connectionError);
       }
     }
     function open() {
@@ -440,7 +584,8 @@
         preview = root.WorkHubAudienceView.create(host);
         panel.addEventListener('cancel', e => {
           e.preventDefault();
-          closePanel();
+          if (rich) close();
+          else closePanel();
         });
         panel.addEventListener('click', event => {
           const b = event.target.closest('[data-presenter]');
@@ -743,9 +888,33 @@
             publish(true);
           }
         });
+        if (rich) {
+          panel.classList.add('pc-presenter');
+          for (const b of panel.querySelectorAll(
+            '[data-presenter="window"],[data-presenter="fullscreen"],[data-presenter="expand"],[data-presenter="close-panel"]'
+          ))
+            b.remove();
+          const stage = document.createElement('div');
+          stage.className = 'pc-stage';
+          host.replaceWith(stage);
+          stage.append(host);
+          canvasUI = root.WorkHubProcessCanvas.install({
+            panel,
+            host,
+            stage,
+            canvas: a.canvas,
+            live: () => live() && !held && !cover && !breakSession,
+            info: a.privateInfo,
+            command: a.command,
+            camera: () => preview?.camera(),
+            setTool,
+            publish: () => publish(true),
+          });
+        }
         infoKey = '';
       }
-      openWindow();
+      if (rich) startPublicStage();
+      else openWindow();
       if (!timer)
         timer = root.setInterval(() => {
           sync();
@@ -852,15 +1021,22 @@
         return;
       if (
         event.data.type === 'workhub-audience-ready' ||
-        event.data.type === 'workhub-audience-heartbeat'
+        event.data.type === 'workhub-audience-heartbeat' ||
+        event.data.type === 'workhub-presenter-ready' ||
+        event.data.type === 'workhub-presenter-heartbeat'
       ) {
         ready = true;
         lastSeen = Date.now();
+        if (rich) adoptControls();
         publish(true);
-        if (event.data.type === 'workhub-audience-ready') void fullscreenAudience();
+        if (!rich && event.data.type === 'workhub-audience-ready') void fullscreenAudience();
       } else if (event.data.type === 'workhub-audience-fullscreen') {
         audienceFull = event.data.fullscreen === true;
         updateControls();
+      } else if (event.data.type === 'workhub-presenter-blur') {
+        clearLaser();
+      } else if (event.data.type === 'workhub-presenter-closed') {
+        close();
       } else if (event.data.type === 'workhub-audience-closed') {
         ready = false;
         notice('Audience window closed. Open it again when ready.');
@@ -887,6 +1063,7 @@
         selectedMark,
         camera: camera ? { ...camera } : null,
         audienceFull,
+        canvas: canvasUI?.state() || null,
       }),
     };
   }

@@ -7,7 +7,7 @@
         /[&<>"']/g,
         c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
       );
-  const ICONS = { task: '✓', document: '▤', decision: '◇', approval: '✦', result: '⚑' };
+  const ICONS = E.TYPE_ICONS;
   function install(a) {
     let owner = '',
       processId = '',
@@ -191,7 +191,7 @@
     }
     function otherDialog() {
       return !!document.querySelector(
-        'dialog[open]:not(#processHubOverlay):not(#processPresenter)'
+        'dialog[open]:not(#processHubOverlay):not(#processPresenter):not(#processAudienceOverlay)'
       );
     }
     function blocked() {
@@ -389,18 +389,72 @@
         .join('');
     }
     function graph(p) {
-      const width = Math.max(850, ...p.steps.map(s => s.x + 270)),
-        height = Math.max(440, ...p.steps.map(s => s.y + 180));
-      return `<div id="rehearsalViewport" class="rehearsal-viewport" tabindex="0" aria-label="Process canvas. Scroll to explore."><div class="rehearsal-extent" style="width:${width * zoom}px;height:${height * zoom}px"><div id="rehearsalBoard" class="rehearsal-board" style="width:${width}px;height:${height}px;transform:scale(${zoom})"><svg class="rehearsal-wires" width="${width}" height="${height}" aria-hidden="true"><defs><marker id="rehearsalArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z"></path></marker></defs>${edges(p)}</svg>${p.steps.map(s => `<article class="rehearsal-node" data-node="${esc(s.id)}" data-type="${s.type}" style="left:${s.x}px;top:${s.y}px">${p.id !== '__demo__' ? `<button type="button" class="rehearsal-drag" data-rehearsal-drag="${esc(s.id)}" aria-label="Move ${esc(s.title)}. Drag or use arrow keys.">⠿</button>` : ''}<button type="button" class="rehearsal-node-main" data-rehearsal="inspect" data-id="${esc(s.id)}"><span class="rehearsal-node-icon">${ICONS[s.type]}</span><span><small>${esc(s.type)}${s.tcode ? ' · ' + esc(s.tcode) : ''}</small><strong>${esc(s.title)}</strong></span></button><span class="rehearsal-node-state" aria-hidden="true"></span><div class="rehearsal-particles" aria-hidden="true">${Array.from({ length: 6 }, (_, i) => `<i style="--particle:${i}"></i>`).join('')}</div></article>`).join('')}<div id="rehearsalToken" class="rehearsal-token" aria-hidden="true"><span>▤</span></div><div class="rehearsal-scene-specks" aria-hidden="true"></div></div></div></div>`;
+      const size = root.WorkHubProcessCanvasArt?.dimensions(p),
+        width = size?.width || Math.max(850, ...p.steps.map(s => s.x + 270)),
+        height = size?.height || Math.max(440, ...p.steps.map(s => s.y + 180));
+      return `<div id="rehearsalViewport" class="rehearsal-viewport" tabindex="0" aria-label="Process canvas. Scroll to explore."><div class="rehearsal-extent" style="width:${width * zoom}px;height:${height * zoom}px"><div id="rehearsalBoard" class="rehearsal-board" style="width:${width}px;height:${height}px;transform:scale(${zoom})"><svg class="rehearsal-wires" width="${width}" height="${height}" aria-hidden="true"><defs><marker id="rehearsalArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z"></path></marker></defs>${edges(p)}<g class="pc-saved-annotations">${root.WorkHubProcessCanvasArt?.svg(p) || ''}</g></svg>${p.steps.map(s => `<article class="rehearsal-node" data-node="${esc(s.id)}" data-type="${s.type}" style="left:${s.x}px;top:${s.y}px">${p.id !== '__demo__' ? `<button type="button" class="rehearsal-drag" data-rehearsal-drag="${esc(s.id)}" aria-label="Move ${esc(s.title)}. Drag or use arrow keys.">⠿</button>` : ''}<button type="button" class="rehearsal-node-main" data-rehearsal="inspect" data-id="${esc(s.id)}"><span class="rehearsal-node-icon">${ICONS[s.type]}</span><span><small>${esc(s.type)}${s.tcode ? ' · ' + esc(s.tcode) : ''}</small><strong>${esc(s.title)}</strong></span></button><span class="rehearsal-node-state" aria-hidden="true"></span><div class="rehearsal-particles" aria-hidden="true">${Array.from({ length: 6 }, (_, i) => `<i style="--particle:${i}"></i>`).join('')}</div></article>`).join('')}<div id="rehearsalToken" class="rehearsal-token" aria-hidden="true"><span>▤</span></div><div class="rehearsal-scene-specks" aria-hidden="true"></div></div></div></div>`;
     }
     function captureDraftFields() {
       const form = $('processHubDetails');
       if (!draft || !form || form.dataset.owner !== a.owner()) return;
       for (const key of ['name', 'notes', ...E.PROCESS_FIELDS])
         draft[key] = form.elements.namedItem(key).value;
+      draft.links ||= {};
+      for (const key of ['projectId', 'noteId'])
+        draft.links[key] = form.elements.namedItem('pc-' + key)?.value ?? draft.links[key] ?? '';
     }
     function palette() {
-      return `<aside class="ph-palette" aria-label="Step types"><span class="hub-kicker">BUILD YOUR FLOW</span><h3>Step types</h3><p>Drag onto the canvas, or tap to add.</p>${E.TYPES.map(type => button('palette', `<b>${ICONS[type]}</b><span>${type[0].toUpperCase() + type.slice(1)}<small>${{ task: 'An action to perform', document: 'Create or check a record', decision: 'Choose a route', approval: 'Review and authorise', result: 'An outcome or finish' }[type]}</small></span>`, `data-type="${type}" draggable="true" data-step-type="${type}"`, 'ph-step-type')).join('')}<div class="ph-palette-tip"><strong>Make the connection</strong><p>Open a step to set its normal, alternative and exception routes. Move cards by their dotted handles.</p></div></aside>`;
+      return `<aside class="ph-palette" aria-label="Step types"><span class="hub-kicker">BUILD YOUR FLOW</span><h3>Step types</h3><p>Drag onto the canvas, or tap to add.</p>${E.TYPES.map(type => button('palette', `<b>${ICONS[type]}</b><span>${type[0].toUpperCase() + type.slice(1)}<small>${{ task: 'An action to perform', document: 'Create or check a record', decision: 'Choose a route', approval: 'Review and authorise', result: 'An outcome or finish' }[type] || E.TYPE_LABELS[type]}</small></span>`, `data-type="${type}" draggable="true" data-step-type="${type}"`, 'ph-step-type')).join('')}<div class="ph-palette-tip"><strong>Make the connection</strong><p>Open a step to set its normal, alternative and exception routes. Move cards by their dotted handles.</p></div></aside>`;
+    }
+    function canvasLinks(p, prefix = 'pc-') {
+      return [
+        ['projectId', 'Related project', a.state().projects || [], 'name'],
+        ['noteId', 'Knowledge note', a.state().workhub.notes || [], 'title'],
+      ]
+        .map(
+          ([key, label, rows, title]) =>
+            '<label>' +
+            label +
+            '<select name="' +
+            prefix +
+            key +
+            '"><option value="">None</option>' +
+            rows
+              .map(
+                r =>
+                  '<option value="' +
+                  esc(r.id) +
+                  '"' +
+                  (p.links?.[key] === r.id ? ' selected' : '') +
+                  '>' +
+                  esc(r[title]) +
+                  '</option>'
+              )
+              .join('') +
+            (p.links?.[key] && !rows.some(r => r.id === p.links[key])
+              ? '<option selected value="' +
+                esc(p.links[key]) +
+                '">Saved reference (unavailable)</option>'
+              : '') +
+            '</select></label>'
+        )
+        .join('');
+    }
+    function entityFields(s) {
+      return (
+        '<details class="pc-entity-fields"><summary>Organization, material & valuation information</summary>' +
+        E.ENTITY_FIELDS.map(
+          ([key, label]) =>
+            '<label>' +
+            label +
+            '<input name="entity-' +
+            key +
+            '" maxlength="300" value="' +
+            esc(s.entity?.[key] || '') +
+            '"></label>'
+        ).join('') +
+        '</details>'
+      );
     }
     function processFields(p) {
       const field = (key, label, large = false) =>
@@ -417,7 +471,7 @@
         )
         .join(
           ''
-        )}</select></label>${field('objective', 'Purpose / intended outcome', true)}${field('notes', 'Description & context', true)}${field('presenterNotes', 'Private presenter notes (hidden in presentation)', true)}</form></details>`;
+        )}</select></label>${field('objective', 'Purpose / intended outcome', true)}${field('notes', 'Description & context', true)}${field('presenterNotes', 'Private presenter notes (hidden in presentation)', true)}${canvasLinks(p)}</form></details>`;
     }
     function render() {
       captureDraftFields();
@@ -1074,7 +1128,7 @@
       if (!saved(p)) throw Error('Save the example first.');
       a.openModal(
         'Process settings',
-        `<form id="rehearsalProcessForm" data-owner="${esc(owner)}" data-process="${esc(p.id)}" data-updated="${esc(p.updatedAt)}"><label>Process name<input name="name" required maxlength="300" value="${esc(p.name)}"></label><label>Description / context<textarea name="notes" maxlength="32767">${esc(p.notes)}</textarea></label>${E.PROCESS_FIELDS.map(k => `<label>${{ objective: 'Purpose / intended outcome', audience: 'Audience / use', processOwner: 'Process owner', revision: 'Version / revision', presenterNotes: 'Private presenter notes' }[k]}<textarea name="${k}" maxlength="32767">${esc(p[k])}</textarea></label>`).join('')}<label>Starting step<select name="startId">${p.steps.map(s => `<option value="${esc(s.id)}"${s.id === p.startId ? ' selected' : ''}>${esc(s.title)}</option>`).join('')}</select></label><div class="modal-actions">${button('delete-process', 'Delete process', '', 'danger small')}<button class="primary" type="submit">Save process</button></div></form>`
+        `<form id="rehearsalProcessForm" data-owner="${esc(owner)}" data-process="${esc(p.id)}" data-updated="${esc(p.updatedAt)}"><label>Process name<input name="name" required maxlength="300" value="${esc(p.name)}"></label><label>Description / context<textarea name="notes" maxlength="32767">${esc(p.notes)}</textarea></label>${canvasLinks(p)}${E.PROCESS_FIELDS.map(k => `<label>${{ objective: 'Purpose / intended outcome', audience: 'Audience / use', processOwner: 'Process owner', revision: 'Version / revision', presenterNotes: 'Private presenter notes' }[k]}<textarea name="${k}" maxlength="32767">${esc(p[k])}</textarea></label>`).join('')}<label>Starting step<select name="startId">${p.steps.map(s => `<option value="${esc(s.id)}"${s.id === p.startId ? ' selected' : ''}>${esc(s.title)}</option>`).join('')}</select></label><div class="modal-actions">${button('delete-process', 'Delete process', '', 'danger small')}<button class="primary" type="submit">Save process</button></div></form>`
       );
     }
     function scenarioEditor(id = scenarioId) {
@@ -1147,7 +1201,7 @@
           .map(r => `<option value="${esc(r.code)}">${esc(r.title)}</option>`)
           .join(
             ''
-          )}</datalist>${field('owner', 'Who handles it', 'text', 200)}${field('prerequisites', 'Before you start', 'textarea')}${field('instruction', 'Instructions', 'textarea')}${field('expected', 'Expected result', 'textarea')}${field('failure', 'If it fails / common errors & solutions', 'textarea')}${decisionFields(step, p)}${field('inputs', 'Inputs / required information', 'textarea')}${field('outputs', 'Outputs / deliverables', 'textarea')}${field('system', 'System / tool', 'text', 300)}${field('workingTime', 'Typical working time (separate from playback)', 'text', 300)}${field('audienceText', 'Explanation to show users (optional)', 'textarea')}${field('configuration', 'Configuration / setup notes', 'textarea')}${field('testing', 'Testing / verification checklist', 'textarea')}<label>Normal next step<select name="next"><option value="">End route</option>${p.steps.map(s => `<option value="${esc(s.id)}"${s.id === step.next ? ' selected' : ''}>${esc(s.title)}</option>`).join('')}</select></label><fieldset><legend>Additional normal routes</legend>${p.steps
+          )}</datalist>${field('owner', 'Who handles it', 'text', 200)}${field('prerequisites', 'Before you start', 'textarea')}${field('instruction', 'Instructions', 'textarea')}${field('expected', 'Expected result', 'textarea')}${field('failure', 'If it fails / common errors & solutions', 'textarea')}${decisionFields(step, p)}${field('inputs', 'Inputs / required information', 'textarea')}${field('outputs', 'Outputs / deliverables', 'textarea')}${field('system', 'System / tool', 'text', 300)}${field('workingTime', 'Typical working time (separate from playback)', 'text', 300)}${entityFields(step)}${field('audienceText', 'Explanation to show users (optional)', 'textarea')}${field('configuration', 'Configuration / setup notes', 'textarea')}${field('testing', 'Testing / verification checklist', 'textarea')}<label>Normal next step<select name="next"><option value="">End route</option>${p.steps.map(s => `<option value="${esc(s.id)}"${s.id === step.next ? ' selected' : ''}>${esc(s.title)}</option>`).join('')}</select></label><fieldset><legend>Additional normal routes</legend>${p.steps
           .filter(s => s.id !== id)
           .map(
             s =>
@@ -1187,6 +1241,7 @@
           row.notes = value('notes');
           row.startId = value('startId');
           for (const k of E.PROCESS_FIELDS) row[k] = value(k);
+          row.links = { projectId: value('pc-projectId'), noteId: value('pc-noteId') };
         });
         a.closeModal();
       } else if (form.id === 'rehearsalScenarioForm') {
@@ -1223,6 +1278,12 @@
         if (!old) throw Error('Step no longer exists.');
         const step = {
           ...old,
+          entity: Object.fromEntries(
+            E.ENTITY_FIELDS.map(([k]) => [
+              k,
+              form.elements.namedItem('entity-' + k)?.value || old.entity?.[k] || '',
+            ])
+          ),
           title: value('title').trim(),
           type: value('type'),
           tcode: value('tcode').trim().toUpperCase(),
@@ -1504,30 +1565,7 @@
         if (p.steps.length > 1 && root.confirm('Delete this step and remove its connections?')) {
           editing = false;
           editorSnapshot = null;
-          saveMutation(row => {
-            row.steps = row.steps.filter(s => s.id !== id);
-            if (row.startId === id) row.startId = row.steps[0].id;
-            for (const s of row.steps) {
-              if (s.next === id) s.next = '';
-              if (s.failNext === id) s.failNext = '';
-              s.alternatives = s.alternatives.filter(x => x !== id);
-              if (s.decision) {
-                s.decision.answers = s.decision.answers.filter(a => a.next !== id);
-                if (s.decision.answers.length < 2) delete s.decision;
-                else if (!s.decision.answers.some(a => a.next === s.next))
-                  s.next = s.decision.answers[0].next;
-                if (s.decision)
-                  s.alternatives = s.decision.answers
-                    .map(a => a.next)
-                    .filter(to => to && to !== s.next);
-              }
-            }
-            for (const scenario of row.scenarios) {
-              delete scenario.choices[id];
-              for (const [from, to] of Object.entries(scenario.routes || {}))
-                if (from === id || to === id) delete scenario.routes[from];
-            }
-          });
+          saveMutation(row => E.removeStep(row, id));
         }
         return;
       }
@@ -2010,6 +2048,7 @@
         kind: 'process',
         title: p.name,
         objective: p.objective,
+        annotations: E.copy(p.annotations || []),
         theme: prefs().theme,
         reduced: motionOff() || prefs().effects === 'quiet',
         speed: prefs().speed,
@@ -2027,7 +2066,15 @@
         outcome: entry?.outcome || 'success',
         count: index + 1,
         total: route?.entries.length || 0,
-        steps: p.steps.map(s => ({ id: s.id, title: s.title, type: s.type, x: s.x, y: s.y })),
+        steps: p.steps.map(s => ({
+          id: s.id,
+          title: s.title,
+          type: s.type,
+          x: s.x,
+          y: s.y,
+          entity: s.entity || {},
+          stackParent: s.stackParent || '',
+        })),
         edges: p.steps.flatMap(s =>
           E.connections(s).map(next => ({
             from: s.id,
@@ -2055,6 +2102,33 @@
     }
     presenter = root.WorkHubPresenter?.install({
       screens,
+      canvas: {
+        // Read-only cached model; the canvas copies only when staging an edit.
+        model: () => model(),
+        references: () => ({
+          projects: (a.state().projects || []).map(r => ({ id: r.id, title: r.name })),
+          notes: (a.state().workhub.notes || []).map(r => ({ id: r.id, title: r.title })),
+        }),
+        save(next, expected) {
+          guard(owner);
+          const current = model();
+          if (current.id === '__demo__')
+            throw Error('Save an editable copy of this process first.');
+          if (current.id !== expected.id || JSON.stringify(current) !== JSON.stringify(expected))
+            throw Error('The process changed. Reopen the canvas item before saving.');
+          const ok = saveMutation(row => {
+            Object.assign(row, E.copy(next));
+          });
+          if (ok !== false) {
+            route = null;
+            rebuild();
+            paused = true;
+            paint(false);
+          }
+          return ok;
+        },
+        copy: () => saveCopy(false),
+      },
       ready: () => a.ready() && !draft && !editing,
       owner: a.owner,
       active: () => !a.active || a.active(),

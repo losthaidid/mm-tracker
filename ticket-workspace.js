@@ -43,6 +43,15 @@
       esc(t.ticket) +
       '</button>' +
       o.priorityTag +
+      (t.status === 'Pending'
+        ? '<button type="button" class="bench-status-badge ticket-object-bookmark" data-bench="object" data-id="' +
+          esc(t.id) +
+          '" aria-label="Change object: ' +
+          esc(t.object || 'Unassigned') +
+          '">▰ ' +
+          esc(t.object || 'Unassigned') +
+          '</button>'
+        : '') +
       '</div><h3 class="hub-sensitive">' +
       esc(t.description) +
       '</h3><div class="ticket-owner-line"><span class="ticket-owner-avatar" aria-hidden="true">' +
@@ -138,6 +147,13 @@
       '</dl></aside></div></div>'
     );
   }
+  function syncPending(form) {
+    if (!form || form.dataset.group !== 'tickets') return;
+    const object = form.elements.namedItem('object'),
+      status = form.elements.namedItem('status');
+    const wrapper = object?.closest('.ticket-editor-fields > div,.form-grid > div');
+    if (wrapper) wrapper.hidden = status?.value !== 'Pending';
+  }
   function decorateEditor() {
     const form = document.getElementById('editForm');
     if (!form || form.dataset.group !== 'tickets' || form.classList.contains('ticket-editor'))
@@ -201,11 +217,12 @@
     }
     if (!grid.children.length) grid.remove();
     const context = form.querySelector('.batch-form-context');
+    syncPending(form);
     if (context) {
       context.classList.add('ticket-context-panel');
       const title = context.querySelector('.batch-section-label>span');
       if (title) title.textContent = 'Work Context';
     }
   }
-  root.WorkHubTicketWorkspace = { card, details, decorateEditor };
+  root.WorkHubTicketWorkspace = { card, details, decorateEditor, syncPending };
 })(window);

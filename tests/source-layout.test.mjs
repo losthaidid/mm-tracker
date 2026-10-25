@@ -30,8 +30,15 @@ test('production and development previews share the supplied ZIP reader',()=>{
 test('audience window loads only its isolated renderer and controller, with no account client',t=>{
  const dom=new JSDOM(readFileSync(new URL('audience.html',root),'utf8'));t.after(()=>dom.window.close());
  const scripts=[...dom.window.document.querySelectorAll('script[src]')].map(s=>s.getAttribute('src').split('?')[0]);
- assert.deepEqual(scripts,['./audience-view.js','./audience.js']);
+ assert.deepEqual(scripts,['./process-canvas-art.js','./audience-view.js','./audience.js']);
  assert.match(dom.window.document.querySelector('meta[http-equiv="Content-Security-Policy"]').content,/connect-src 'none'/);
  const main=new JSDOM(html);t.after(()=>main.window.close());const order=[...main.window.document.querySelectorAll('script[src]')].map(s=>s.getAttribute('src').split('?')[0]);
  assert.ok(order.indexOf('./audience-view.js')<order.indexOf('./presenter.js'));assert.ok(order.indexOf('./presenter.js')<order.indexOf('./rehearsal.js'));
+});
+test('private presenter shell loads no account client and keeps network access closed',t=>{
+ const dom=new JSDOM(readFileSync(new URL('presenter-window.html',root),'utf8'));t.after(()=>dom.window.close());
+ const d=dom.window.document;
+ assert.deepEqual([...d.querySelectorAll('script[src]')].map(s=>s.getAttribute('src').split('?')[0]),['./presenter-window.js']);
+ assert.match(d.querySelector('meta[http-equiv="Content-Security-Policy"]').content,/connect-src 'none'/);
+ assert.equal(d.querySelectorAll('button,input,select').length,0);
 });
