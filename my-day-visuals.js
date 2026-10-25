@@ -267,6 +267,11 @@
       );
     }
     function animate(el, keyframes, options = {}) {
+      if (
+        root.WorkHubRenderProfile?.largeDisplay &&
+        el.matches('.mv-hero,.md-widget,.mv-widget-shell')
+      )
+        return;
       if (!allowed() || typeof el.animate !== 'function') return;
       const animation = el.animate(keyframes, {
         duration: a.settings().effects === 'playful' ? 520 : 360,
@@ -347,7 +352,12 @@
           key = widget.dataset.widget + ':' + index,
           previous = numbers.get(key) ?? 0;
         numbers.set(key, target);
-        if (previous === target || !allowed() || typeof root.requestAnimationFrame !== 'function')
+        if (
+          previous === target ||
+          root.WorkHubRenderProfile?.largeDisplay ||
+          !allowed() ||
+          typeof root.requestAnimationFrame !== 'function'
+        )
           continue;
         const start = root.performance.now();
         counterJobs.set(el, { final: text });
@@ -453,6 +463,10 @@
           observer = new root.IntersectionObserver(
             entries => {
               for (const entry of entries) {
+                if (root.WorkHubRenderProfile?.largeDisplay) {
+                  entry.target.classList.remove('mv-out-of-view');
+                  continue;
+                }
                 entry.target.classList.toggle('mv-out-of-view', !entry.isIntersecting);
                 if (entry.isIntersecting) {
                   animateCharts(entry.target);
@@ -558,6 +572,11 @@
       while (layer.childElementCount > 18) layer.firstElementChild.remove();
     }
     function light() {
+      if (root.WorkHubRenderProfile?.largeDisplay) {
+        lightFrame = 0;
+        resetLight();
+        return;
+      }
       lightFrame = 0;
       if (
         !page ||
@@ -624,6 +643,11 @@
       { passive: true }
     );
     document.addEventListener('pointerleave', () => resetLight());
+    root.addEventListener('workhub:render-profile', () => {
+      resetLight();
+      stopCounters();
+      cancelAnimations();
+    });
     root.addEventListener(
       'scroll',
       () => {

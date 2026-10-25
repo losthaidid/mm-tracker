@@ -578,7 +578,7 @@
         !!a.pinned?.() +
         '">' +
         (a.pinned?.() ? 'Allow automatic movement' : 'Stay here') +
-        '</button><button data-momo="place-home">Put my home here</button><button data-momo="rain">Umbrella moment</button><button data-momo="quip">Tell me something silly</button><button data-momo="theatre">Momo’s tiny theatre</button><button data-momo="discover">Desk discoveries</button><button data-momo="moments-settings">Little moment settings</button><button data-momo="quiet" aria-pressed="' +
+        '</button><button data-momo="wardrobe">Wardrobe & hobbies</button><button data-momo="place-home">Put my home here</button><button data-momo="rain">Umbrella moment</button><button data-momo="quip">Tell me something silly</button><button data-momo="theatre">Momo’s tiny theatre</button><button data-momo="discover">Desk discoveries</button><button data-momo="moments-settings">Little moment settings</button><button data-momo="quiet" aria-pressed="' +
         quiet +
         '">' +
         (quiet ? 'Turn on little chats' : 'Quiet time · pause little chats') +
@@ -682,11 +682,11 @@
       let el = $('hubMomoUmbrella');
       const point = { x: parseFloat(pet().style.left) || 0, y: parseFloat(pet().style.top) || 0 };
       if (!el) {
-        el = document.createElement('span');
+        el = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         el.id = 'hubMomoUmbrella';
         el.setAttribute('aria-hidden', 'true');
         el.innerHTML = root.WorkHubMomoArt.umbrella();
-        pet().append(el);
+        pet().querySelector('.pet-body').append(el);
       }
       umbrellaUntil = Date.now() + 11000;
       restUntil = umbrellaUntil;
@@ -912,6 +912,10 @@
           if (action === 'home' && Date.now() < homeSuppress) return;
           $('hubMomoMenu')?.remove();
           if (action === 'close') return;
+          if (action === 'wardrobe') {
+            root.dispatchEvent(new CustomEvent('workhub:momo-wardrobe'));
+            return;
+          }
           if (action === 'pin') {
             a.pin?.(!a.pinned?.());
             return;
@@ -1184,6 +1188,15 @@
         restUntil = Date.now() + 6000;
         if (!nap) pose('idle');
       },
+      hobbyAvailable: () =>
+        !nap &&
+        !homeDrag &&
+        !held &&
+        !journey &&
+        !armed &&
+        !idleGesture &&
+        !reaction &&
+        !sceneState,
       homePosition: () => ({ ...home }),
       sceneAvailable: () =>
         !nap && !homeDrag && !held && !journey && !armed && !idleGesture && !reaction,

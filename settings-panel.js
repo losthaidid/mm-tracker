@@ -49,7 +49,7 @@
     appearance: [
       'workspace',
       'Colours, themes, spacing and animation.',
-      'theme appearance design font motion density',
+      'theme appearance design font motion density background pictures photo wardrobe clothes accessories hobbies display rendering TV monitor',
     ],
     'tab-visibility': [
       'workspace',

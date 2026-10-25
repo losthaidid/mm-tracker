@@ -153,6 +153,7 @@
     event => {
       if (
         iphone ||
+        root.WorkHubRenderProfile?.largeDisplay ||
         !allowed() ||
         event.buttons ||
         busy(event.target) ||
@@ -173,7 +174,7 @@
   document.addEventListener(
     'click',
     event => {
-      if (!allowed() || busy(event.target)) return;
+      if (!allowed() || root.WorkHubRenderProfile?.largeDisplay || busy(event.target)) return;
       const control = event.target.closest?.('button,a,summary,[role="button"]');
       if (!control || control.disabled) return;
       const rect = control.getBoundingClientRect(),
@@ -186,7 +187,8 @@
           distance = 55 + (i % 5) * 23;
         effect('fx-burst-star', x, y, Math.cos(angle) * distance, Math.sin(angle) * distance, i);
       }
-      if (navigation && !iphone) effect('fx-scene-sweep', x, y);
+      if (navigation && !iphone && !root.WorkHubRenderProfile?.largeDisplay)
+        effect('fx-scene-sweep', x, y);
     },
     { capture: true, passive: true }
   );

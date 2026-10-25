@@ -1,0 +1,51 @@
+/* Keep the living landscape; avoid page-sized GPU textures and repeated 3D promotions on TVs. */
+html[data-large-display='true'] body #view > .fx-stage,
+html[data-large-display='true'] .my-day-page,
+html[data-large-display='true'] .my-day-page .md-widget {
+  animation: none !important;
+  filter: none;
+  will-change: auto;
+}
+html[data-large-display='true'] .my-day-page {
+  isolation: auto;
+}
+html[data-large-display='true'] .mv-atmosphere {
+  display: none;
+}
+html[data-large-display='true'] .mv-widget-shell {
+  transform: none !important;
+  will-change: auto;
+}
+html[data-large-display='true'] .mv-hero,
+html[data-large-display='true'] .mv-widget-shell {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+html[data-large-display='true'] :is(.fx-orbit, .fx-comet, .fx-panel-aura, .fx-scene-sweep) {
+  display: none !important;
+}
+html[data-large-display='true'] #hubSpectacle {
+  left: auto;
+  width: min(650px, 60vw);
+  height: min(400px, 50vh);
+}
+html[data-large-display='true'] .fx-dust:nth-child(n + 9) {
+  display: none;
+}
+html[data-large-display='true'] .fx-dust {
+  box-shadow: none;
+  opacity: 0.35;
+}
+html[data-large-display='true'] :is(.mv-sun-rays, .mv-light-beams) {
+  mix-blend-mode: normal;
+  filter: none;
+}
+html[data-large-display='true'] .mv-light-beams {
+  display: none;
+}
+html[data-large-display='true'] .mv-landscape {
+  filter: none;
+}
+html[data-large-display='true'] .mv-tree:nth-child(2n) {
+  animation-duration: 12s;
+}
