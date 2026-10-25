@@ -7,7 +7,7 @@ function setup(t,{supported=true,reject=false,pending=false}={}) {
  const dom=new JSDOM('<button id="start">Break Terrarium</button>',{url:'https://losthaidid.github.io/mm-tracker/',runScripts:'outside-only'});t.after(()=>dom.window.close());
  const {window}=dom,{document}=window;let now=100000,owner='one',ready=true,active=null,resolveRequest;
  const requests=[],events=[],resumed=[],audio={state:{music:true,playing:false,starting:false,paused:false,track:'garden',volume:60,alarm:true,alerting:false,error:''},snapshot(){return this.state;},start(){events.push('audio');this.state.playing=true;return Promise.resolve();},stop(){this.state.playing=false;this.state.alerting=false;},pause(value){this.state.paused=value;},finish(){this.state.playing=false;this.state.alerting=true;},tick(){},change(key,value){this.state[key]=value;}};
- window.WorkHubRestAudio={TRACKS:{garden:{name:'Cloud garden',detail:'Rest'}},install:()=>audio};window.Date.now=()=>now;
+ window.eval(readFileSync(new URL('../experience-art.js',import.meta.url),'utf8'));window.WorkHubRestAudio={TRACKS:{garden:{name:'Cloud garden',detail:'Rest'}},install:()=>audio};window.Date.now=()=>now;
  window.HTMLDialogElement.prototype.showModal=function(){this.open=true;};window.HTMLDialogElement.prototype.close=function(){this.open=false;};
  Object.defineProperty(document,'fullscreenElement',{get:()=>active,configurable:true});
  document.exitFullscreen=async()=>{events.push('exit');active=null;document.dispatchEvent(new window.Event('fullscreenchange'));};
@@ -36,4 +36,7 @@ test('pending fullscreen cannot reopen an old account session and releases only 
 });
 test('closing rest preserves a different feature fullscreen and page exit releases a terrarium-owned fullscreen',async t=>{
  const c=setup(t);c.start();await settle();const other=c.document.createElement('section');c.document.body.append(other);c.setActive(other);c.account('two');await settle();assert.equal(c.active,other);assert.equal(c.events.includes('exit'),false);c.start();await settle();assert.equal(c.active,c.requests.at(-1));c.window.dispatchEvent(new c.window.Event('pagehide'));await settle();assert.equal(c.active,null);assert.equal(c.room.snapshot(),null);assert.equal(c.document.body.classList.contains('rest-room-open'),false);
+});
+test('observatory scenery changes without resetting a break, music or the persistent end alarm and is stored per account',async t=>{
+ const c=setup(t);c.start();await settle();const d=c.document,select=d.querySelector('[data-rest-scenery]'),before=c.room.snapshot();assert.ok(d.querySelector('.observatory-art'));select.value='observatory';select.dispatchEvent(new c.window.Event('change',{bubbles:true}));assert.equal(c.room.snapshot().scenery,'observatory');assert.equal(c.room.snapshot().end,before.end);assert.equal(c.audio.state.playing,true);c.advance(61000);assert.equal(c.audio.state.alerting,true);assert.equal(c.room.snapshot().scenery,'observatory');d.querySelector('[data-rest="resume"]').click();assert.equal(c.audio.state.alerting,false);c.account('two');c.start();await settle();assert.equal(c.room.snapshot().scenery,'garden');
 });

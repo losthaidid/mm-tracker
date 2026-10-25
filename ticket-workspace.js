@@ -33,7 +33,11 @@
     return (
       '<article class="ticket-queue-card ticket-folio priority-' +
       esc(o.priorityClass) +
-      '"><div class="ticket-card-head"><button class="ticket-button hub-sensitive" data-action="detail" data-id="' +
+      '" data-ticket-state="' +
+      (/(closed|complete|resolved)/i.test(t.status) ? 'closed' : 'active') +
+      '"><span class="ticket-folder-tab" aria-hidden="true">' +
+      esc(t.status) +
+      '</span><div class="ticket-card-head"><button class="ticket-button hub-sensitive" data-action="detail" data-id="' +
       esc(t.id) +
       '">' +
       esc(t.ticket) +

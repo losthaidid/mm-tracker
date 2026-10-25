@@ -89,6 +89,7 @@
     root.WorkHubProjectPeopleEngine?.upgrade(d);
     root.WorkHubSolutionEngine?.upgrade(d);
     root.WorkHubRehearsalEngine?.upgrade(d);
+    root.WorkHubExperienceEngine?.upgrade(d);
     root.WorkHubSapTcodesEngine?.upgrade(d);
     if (h.simulator === undefined)
       h.simulator = {
@@ -112,6 +113,7 @@
     root.WorkHubProjectPeopleEngine?.validate(d);
     root.WorkHubSolutionEngine?.validate(d);
     root.WorkHubRehearsalEngine?.validate(d);
+    root.WorkHubExperienceEngine?.validate(d);
     root.WorkHubSapTcodesEngine?.validate(d);
     root.WorkHubReminders?.validate(d);
     root.WorkHubProjectDates.validate(d);
@@ -292,7 +294,8 @@
       projectDates = null,
       processDeck = null,
       chromeUX = null,
-      myDay = null;
+      myDay = null,
+      experience = null;
     const reminders = root.WorkHubReminders?.install({
       ...a,
       hubAction: el => handle(el),
@@ -428,6 +431,10 @@
       atmosphere?.sync();
     }
     function confetti() {
+      if (experience?.celebrate()) {
+        chime();
+        return;
+      }
       if (prefs().motion === 'off' || root.matchMedia?.('(prefers-reduced-motion: reduce)').matches)
         return;
       const box = document.createElement('div');
@@ -2613,6 +2620,7 @@
       leaveBalances?.mount(tab);
       tng?.mount(tab);
       recipients?.mount(tab);
+      experience?.mount();
       settingsPanel?.mount();
       rehearsal?.mount();
       tcodes?.mount();
@@ -3683,6 +3691,7 @@
       if (document.hidden) return;
       workbench?.tick();
       atmosphere?.tick();
+      experience?.tick();
       adventures?.tick();
       life?.tick();
       moments?.tick();
@@ -3749,12 +3758,14 @@
         !adventures?.snapshot().active &&
         !adventures?.snapshot().bookmark &&
         !moments?.snapshot().active,
+      habitat: () => a.state().workhub.experience?.appearance.habitat || 'auto',
       pet: () => $('hubPet'),
       move: positionCompanion,
       stop: stopCompanionWalk,
       react,
     });
     atmosphere = root.WorkHubAtmosphere?.install({
+      lighting: () => a.state().workhub.experience?.appearance.lighting || 'auto',
       ready: () => a.cloud().ready,
       prefs: () => themePreview || prefs(),
       react,
@@ -3909,6 +3920,15 @@
       ready: () => a.cloud().ready,
       owner: () => a.cloud().user?.id || '',
     });
+    experience = root.WorkHubExperience?.install({
+      ...a,
+      ready: () => a.cloud().ready,
+      owner: () => a.cloud().user?.id || '',
+      prefs: () => themePreview || prefs(),
+      life: () => life,
+      hubAction: handle,
+      react,
+    });
     settingsPanel = root.WorkHubSettings.install({
       ...a,
       ready: () => a.cloud().ready,
@@ -3916,6 +3936,7 @@
     });
     return {
       myDay,
+      experience,
       settingsPanel,
       recipients,
       claims,

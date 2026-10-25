@@ -9671,6 +9671,7 @@ filteredTasks = () =>
 hub = WorkHubStudio.install({
   state: () => state,
   cloud: () => cloud,
+  syncHealth: () => ({ cacheAvailable: !temporary && !!cloud.lastCache }),
   today,
   month: () => month,
   day: () => scheduleDay,

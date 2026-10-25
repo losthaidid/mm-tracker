@@ -455,6 +455,17 @@
       } catch {}
     }
     function layout() {
+      const habitat = $('hubMomoHome');
+      if (habitat?.querySelector('.experience-habitat')) {
+        const preference = a.habitat?.() || 'auto';
+        habitat.dataset.habitat = nap
+          ? 'sleeping'
+          : preference === 'auto'
+            ? idleGesture?.kind === 'sit'
+              ? 'reading'
+              : 'resting'
+            : preference;
+      }
       const el = pet(),
         v = viewport(),
         p = homeAnchor(),
