@@ -9,7 +9,7 @@ const files = readdirSync(new URL('../tests/', import.meta.url))
   .map(f => 'tests/' + f);
 const groups = [
   { label: 'Module and database tests', args: files },
-  ...['^[A-Fa-f]', '^[G-Mg-m]', '^[N-Sn-s]', '^[T-Vt-v]', '^(?![A-Va-v])'].map((pattern, i) => ({
+  ...['^[A-Fa-f]', '^[G-Mg-m]', '^[N-Sn-s]', '^[T-Vt-v]', '^[^A-Va-v]'].map((pattern, i) => ({
     label: `Application tests · group ${i + 1}/5`,
     args: ['--test-name-pattern=' + pattern, 'tests/app.test.mjs'],
   })),
