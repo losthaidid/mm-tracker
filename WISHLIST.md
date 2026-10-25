@@ -4,7 +4,7 @@
 
 The two prioritised items are implemented: **TNG PDF extraction and cropped evidence downloads**, and **continuous Troubleshooting Lab result animations with saved-result autoplay**. See [the usage guide](docs/TNG-AND-LAB.md).
 
-The Momo behaviour enhancements in [Batch B](BATCH-B.md) are implemented, including the later weather consequences, visitor friendships and click-reaction selections. [Batch C](BATCH-C.md) remains pending: 25 · Ticket twin finder and 26 · Sensitive screenshot brush.
+The Momo behaviour enhancements in [Batch B](BATCH-B.md) are implemented, including the later weather consequences, visitor friendships and click-reaction selections. [Batch C](BATCH-C.md) remains pending: 25 · Ticket twin finder, 26 · Sensitive screenshot brush, and 30 · Screenshot guide builder (kept on 25 October 2026).
 
 On 20 October 2026, Request inbox, End-of-day ritual, Personal learning roadmap and Show-me-how walkthroughs were removed from the wishlist at the user's request.
 
