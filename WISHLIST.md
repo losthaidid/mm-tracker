@@ -14,6 +14,19 @@ The Momo behaviour enhancements in [Batch B](BATCH-B.md) are implemented, includ
 
 On 20 October 2026, Request inbox, End-of-day ritual, Personal learning roadmap and Show-me-how walkthroughs were removed from the wishlist at the user's request.
 
+## Pending visual and atmosphere selections
+
+Kept on 25 October 2026. No batch assigned; implementation has not been requested. Numbers refer to the current visual-ideas discussion.
+
+| No. | Enhancement | Saved scope |
+| --- | --- | --- |
+| 241 | Observatory break scene | Add an observatory with a moving telescope/dome, subtle drifting stars, occasional shooting stars and a moon-shaped countdown. Preserve the repeating break-end alarm and explicit Resume work; reduce detail on phones. |
+| 244 | Ticket desk aesthetic | Style tickets as organised case folders with status tabs, clear identifiers/titles, prominent latest updates, ownership/priority/deadline labels and brief selection/opening motion. Preserve existing fields, filters and actions; completed cases use quieter colours. |
+| 247 | Soundscape visual identities | Give soundscapes matching artwork with restrained animation and clear playing, paused and muted states. Keep rest and focus identities distinct. Precise music-rhythm response is outside this selection. |
+| 249 | Companion arrival greetings | Add occasional peeking, waving, stretching or welcome-sign greetings on arrival/return. Avoid typing, focus and presentation interruptions. After Go home and nap, keep the companion asleep until clicked, then permit a greeting. Coordinate with the pending habitat and expressions. |
+
+246 · Floating-island scenery was explicitly excluded from this selection.
+
 ## Pending stand-up enhancement
 
 Kept on 21 October 2026: **2 · Waiting on** — add a field beside project items and sub-items in the Daily stand-up summary to record who needs to respond, such as the business team, ABAP, BASIS or a named person. This is a wishlist selection; implementation has not been requested yet. No batch assigned.
