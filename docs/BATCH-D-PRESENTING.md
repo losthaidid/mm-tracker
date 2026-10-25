@@ -40,4 +40,4 @@ Startup uses the maintained account workspace name when its matching device reco
 
 Tests cover default/interactive routes, repeat visits, legacy save/reload, account-document round trips, export scope, message-origin/source/token checks, stale-window covers, annotation bounds, temporary state, pop-up failure and startup phases/recovery. Browser QA uses fictional local records, including a phone-width simulation; no physical iPhone or multi-monitor meeting app is available in this environment.
 
-`npm test` runs the application suite in four disjoint name groups to avoid accumulating all JSDOM fixtures in one process. Module/database tests run first. This test-runner change does not change browser memory limits.
+`npm test` runs the application suite in five disjoint name groups to avoid accumulating all JSDOM fixtures in one process. Module/database tests run first. This test-runner change does not change browser memory limits.
