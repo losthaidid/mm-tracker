@@ -271,7 +271,12 @@
           const step = positions.get(n.dataset.node);
           if (step) n.setAttribute('transform', 'translate(' + step.x + ',' + step.y + ')');
           n.dataset.active = String(n.dataset.node === data.active);
-          n.dataset.selected = String(n.dataset.node === options.selectedNode);
+          n.dataset.selected = String(
+            !!options.interactive &&
+              (options.selectedNodes
+                ? options.selectedNodes.includes(n.dataset.node)
+                : n.dataset.node === options.selectedNode)
+          );
           n.dataset.type = step?.type || '';
           n.dataset.stacked = String(!!step?.stackParent);
           if (options.interactive && !n.hasAttribute('tabindex')) {

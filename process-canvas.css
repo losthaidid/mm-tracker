@@ -488,3 +488,21 @@ html:has(#processPresenter[open]),
 html:has(#processAudienceOverlay[open]) {
   overflow: hidden;
 }
+
+/* Private desktop-style selection; never included in an audience snapshot. */
+.pc-marquee {
+  position: absolute;
+  z-index: 24;
+  pointer-events: none;
+  border: 1px solid #298aff;
+  background: #298aff30;
+  box-shadow: 0 0 0 1px #c5e0ff55 inset;
+  border-radius: 2px;
+}
+.pc-marquee[hidden] {
+  display: none;
+}
+.pc-stage .av-node[data-selected='true'] > rect {
+  stroke: #298aff;
+  stroke-width: 3;
+}

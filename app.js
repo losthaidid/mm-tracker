@@ -7021,6 +7021,9 @@ function scheduleEntries(date) {
 function scheduleTimeStatus(slot, d = state, date = today(), time = timeNow().slice(0, 5)) {
   if (!slot) return '';
   if (window.WorkHubLeave.isLeave(slot.kind)) return slot.leave.status;
+  // Stopwatch bookings represent work already performed, including retained calendar
+  // entries whose session has since been archived or deleted.
+  if (slot.sessionId) return 'Completed';
   const plan = d.projectPlans.find(plan => plan.id === slot.planId),
     task = slot.kind === 'task' ? d.tasks.find(task => task.id === slot.linkId) : null;
   if (plan?.status === 'Completed' || task?.done) return 'Completed';
@@ -8922,6 +8925,7 @@ function cloudNotice() {
   $('exportButton').disabled = !cloud.ready;
   $('backupButton').disabled = !cloud.ready;
   $('restoreButton').disabled = !cloud.ready || cloud.conflict;
+  $('workspaceResetButton').disabled = !cloud.ready || !!cloud.resetting;
   $('cloudRetry').hidden = !signed || cloud.conflict;
   $('cloudReload').hidden = !signed;
   $('cloudSignOut').hidden = !signed;
@@ -9109,6 +9113,7 @@ async function loadCloud(session) {
 }
 /** Validate and cache a pending document before queuing its asynchronous Supabase upload. */
 function saveCloud(next, restoring = false) {
+  if (cloud.resetting) throw Error('Finish or cancel the account clear review before editing.');
   if (!cloud.user || !cloud.ready) throw Error('Sign in and open your records before editing.');
   if (cloud.conflict) throw Error('Download a backup, then reload cloud records before editing.');
   validate(next);
@@ -9216,6 +9221,7 @@ async function flushCloud() {
 }
 /** Compare remote revision and merge independent edits; unresolved conflicts require visible review. */
 async function refreshCloud(force = false) {
+  if (cloud.resetting) return;
   if (!cloud.user || cloud.busy || cloud.loading || cloud.refreshing) return;
   if (!force) {
     try {
@@ -9622,7 +9628,7 @@ function startCloud() {
     queueActualReview();
   });
   window.addEventListener('beforeunload', e => {
-    if (cloud.pending || cloud.inFlight) {
+    if (cloud.pending || cloud.inFlight || cloud.resetting) {
       e.preventDefault();
       e.returnValue = '';
     }
@@ -9747,6 +9753,65 @@ hub = WorkHubStudio.install({
   },
   ticket(id) {
     detail(id);
+  },
+});
+const workspaceReset = WorkHubWorkspaceReset.install({
+  cloud: () => cloud,
+  state: () => state,
+  payload,
+  validate,
+  empty: emptyState,
+  today,
+  download,
+  openModal,
+  closeModal,
+  tell,
+  timer: () => hub.timer(),
+  checkCache() {
+    if (!temporary && localStorage.getItem(cloud.key) !== cloud.lastCache)
+      throw Error(
+        'Another browser tab changed your records. Reload and make a new backup before clearing.'
+      );
+  },
+  createClient: () =>
+    window.MMTrackerSupabase.createClient(cloudConfig.url, cloudConfig.publishableKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+        storageKey: 'workhub-reset:' + uid(),
+      },
+      global: { fetch: cloudFetch },
+    }),
+  apply(document, revision) {
+    cloud.ready = false;
+    render();
+    applyCloudDocument(document);
+    cloud.revision = revision;
+    cloud.baseDocument = document;
+    cloud.pending = cloud.inFlight = null;
+    cloud.conflict = cloud.error = false;
+    cloud.hasDocument = true;
+    cloud.changeSerial++;
+    cloud.ready = true;
+    cloud.status = 'Saved to Supabase';
+    filterState = { query: '', status: 'Pending', object: '', priority: '' };
+    progressQuery = progressFilter = tasksQuery = specQuery = specFilter = '';
+    taskView = 'active';
+    taskPriority = '';
+    projectView = 'overview';
+    selectedCodeProject = state.activeProjectId;
+    scheduleDraft = null;
+    tab = 'home';
+    persistCloudCache();
+    notice();
+    render();
+  },
+  uncertain() {
+    cloud.conflict = true;
+    cloud.error = true;
+    cloud.status = 'Reload cloud records to check the clear request before editing.';
+    notice();
   },
 });
 WorkHubReports.install({

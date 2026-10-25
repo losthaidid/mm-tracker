@@ -16,6 +16,8 @@ Solution Studio learning: [solution-guide.js](../solution-guide.js) contains the
 For feature-specific changes, find the matching file below. JavaScript (`.js`) controls behaviour;
 CSS (`.css`) controls appearance; HTML supplies the initial page structure.
 
+Current work-session filters, completed Schedule recordings, password-verified cloud reset, process marquee selection, three-period wardrobe and interactive header are documented in [WORKSPACE-TOOLS.md](WORKSPACE-TOOLS.md). `workspace-reset.js` owns the guarded review and isolated password session; its core adapter is in `app.js`. `brand-motion.js` / `brand-motion.css` provide the bounded, interactive header identity.
+
 ## Main page and coordination
 
 | File | Responsibility | Useful starting point |

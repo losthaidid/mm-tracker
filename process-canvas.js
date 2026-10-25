@@ -15,6 +15,7 @@
   function install(a) {
     const { panel, host, stage } = a,
       doc = host.ownerDocument;
+    let nodes = new Set();
     let selected = '',
       node = '',
       draft = null,
@@ -79,7 +80,7 @@
     const quick = doc.createElement('div');
     quick.className = 'pc-quick';
     quick.innerHTML =
-      '<button type="button" data-pc="edit-step">Edit selected step</button><button type="button" data-pc="connect">Connect ports</button><button type="button" data-pc="attach">Attach note / arrow to step</button><button type="button" data-pc="detach">Detach selected</button><button type="button" data-pc="links">Project / knowledge links</button><button type="button" data-pc="undo">Undo canvas edit</button><button type="button" data-pc="copy">Save editable copy</button><button type="button" data-presenter="end">End presentation</button>';
+      '<button type="button" data-pc="select-all">Select all steps</button><button type="button" data-pc="clear-selection">Clear selection</button><button type="button" data-pc="edit-step">Edit selected step</button><button type="button" data-pc="connect">Connect ports</button><button type="button" data-pc="attach">Attach note / arrow to step</button><button type="button" data-pc="detach">Detach selected</button><button type="button" data-pc="links">Project / knowledge links</button><button type="button" data-pc="undo">Undo canvas edit</button><button type="button" data-pc="copy">Save editable copy</button><button type="button" data-presenter="end">End presentation</button>';
     const canvasTools = panel.querySelector('.presenter-canvas-tools'),
       opts = panel.querySelector('.presenter-screen-options'),
       walk = panel.querySelector('.presenter-controls'),
@@ -103,6 +104,18 @@
     notice.setAttribute('data-pc-notice', '');
     notice.setAttribute('role', 'status');
     stage.append(bubbles, notice);
+    const marquee = doc.createElement('div');
+    marquee.className = 'pc-marquee';
+    marquee.hidden = true;
+    marquee.setAttribute('aria-hidden', 'true');
+    stage.append(marquee);
+    function selectionNotice() {
+      notify(
+        nodes.size
+          ? nodes.size + ' steps selected · drag a selected step to move the group.'
+          : 'Drag empty canvas to select steps. Shift / Ctrl adds steps; Ctrl / ⌘ A selects all.'
+      );
+    }
     const hint = panel.querySelector('.presenter-hint');
     if (hint) hint.remove();
     function position(e) {
@@ -189,6 +202,7 @@
       dropPreview = null;
       draft = null;
       gesture = null;
+      marquee.hidden = true;
       editor?.remove();
       editor = null;
       a.publish();
@@ -476,6 +490,15 @@
       const p = a.canvas.model(),
         next = copy(p),
         m = next.annotations.find(m => m.id === selected);
+      if (name === 'select-all' || name === 'clear-selection') {
+        setTool('select');
+        selected = '';
+        nodes = new Set(name === 'select-all' ? model().steps.map(s => s.id) : []);
+        node = [...nodes][0] || '';
+        a.publish();
+        selectionNotice();
+        return;
+      }
       if (name === 'cancel') {
         cleanDraft();
         return;
@@ -708,6 +731,25 @@
         e.stopImmediatePropagation();
         pause();
         const before = a.canvas.model();
+        if (tool === 'select' && !stepId && !markId && !port) {
+          const base = e.shiftKey || e.ctrlKey || e.metaKey ? [...nodes] : [];
+          nodes = new Set(base);
+          selected = node = '';
+          gesture = {
+            kind: 'marquee',
+            id: e.pointerId,
+            start: point,
+            client: [e.clientX, e.clientY],
+            base,
+          };
+          try {
+            stage.setPointerCapture(e.pointerId);
+          } catch {}
+          host.focus({ preventScroll: true });
+          a.publish();
+          selectionNotice();
+          return;
+        }
         if (before.id === '__demo__') {
           notify('Save an editable copy to edit this canvas.');
           return;
@@ -727,6 +769,7 @@
           };
         } else if (tool === 'select' && markId) {
           selected = markId;
+          nodes.clear();
           gesture = {
             ...state,
             kind: e.target.dataset.pcResize ? 'resize' : 'mark',
@@ -737,7 +780,15 @@
           select(markId);
         } else if (tool === 'select' && stepId) {
           selected = '';
-          gesture = { ...state, kind: 'node', node: stepId };
+          if (e.ctrlKey || e.metaKey || e.shiftKey) {
+            if (nodes.has(stepId)) nodes.delete(stepId);
+            else nodes.add(stepId);
+            a.publish();
+            selectionNotice();
+            return;
+          }
+          if (!nodes.has(stepId)) nodes = new Set([stepId]);
+          gesture = { ...state, kind: 'node', node: stepId, nodes: [...nodes] };
           draft = copy(before);
         } else if (tool === 'select') {
           selected = '';
@@ -815,6 +866,29 @@
         if (!point) return;
         const dx = point.x - gesture.start.x,
           dy = point.y - gesture.start.y;
+        if (gesture.kind === 'marquee') {
+          const x = Math.min(point.x, gesture.start.x),
+            y = Math.min(point.y, gesture.start.y),
+            right = Math.max(point.x, gesture.start.x),
+            bottom = Math.max(point.y, gesture.start.y);
+          nodes = new Set(gesture.base);
+          if (Math.hypot(e.clientX - gesture.client[0], e.clientY - gesture.client[1]) > 4)
+            for (const step of model().steps)
+              if (step.x <= right && step.x + 210 >= x && step.y <= bottom && step.y + 100 >= y)
+                nodes.add(step.id);
+          const r = stage.getBoundingClientRect();
+          marquee.hidden = false;
+          Object.assign(marquee.style, {
+            left: Math.min(e.clientX, gesture.client[0]) - r.left + 'px',
+            top: Math.min(e.clientY, gesture.client[1]) - r.top + 'px',
+            width: Math.abs(e.clientX - gesture.client[0]) + 'px',
+            height: Math.abs(e.clientY - gesture.client[1]) + 'px',
+          });
+          node = [...nodes][0] || '';
+          selectionNotice();
+          schedule();
+          return;
+        }
         if (gesture.kind === 'wire') {
           const path = host.querySelector('.pc-wire-preview'),
             from = gesture.before.steps.find(s => s.id === gesture.from);
@@ -844,16 +918,26 @@
           if (m.type === 'arrow') m.points = [m.points[0], pt];
           else if (m.points.length < 300) m.points.push(pt);
         } else if (gesture.kind === 'node') {
-          const old = gesture.original.steps.find(s => s.id === gesture.node),
-            row = draft.steps.find(s => s.id === gesture.node);
-          row.x = A.clamp(old.x + dx, 0, 4000);
-          row.y = A.clamp(old.y + dy, 0, 4000);
-          const children = descendants(draft, row.id);
-          for (const s of draft.steps)
-            if (s.id !== row.id && children.has(s.id)) {
-              const original = gesture.original.steps.find(x => x.id === s.id);
-              s.x = A.clamp(original.x + row.x - old.x, 0, 4000);
-              s.y = A.clamp(original.y + row.y - old.y, 0, 4000);
+          const moving = new Set(gesture.nodes);
+          for (const id of gesture.nodes)
+            for (const child of descendants(gesture.original, id)) moving.add(child);
+          const originals = gesture.original.steps.filter(s => moving.has(s.id)),
+            mx = A.clamp(
+              dx,
+              -Math.min(...originals.map(s => s.x)),
+              4000 - Math.max(...originals.map(s => s.x))
+            ),
+            my = A.clamp(
+              dy,
+              -Math.min(...originals.map(s => s.y)),
+              4000 - Math.max(...originals.map(s => s.y))
+            );
+          for (const row of draft.steps)
+            if (moving.has(row.id)) {
+              const old = originals.find(s => s.id === row.id);
+              row.x = old.x + mx;
+              row.y = old.y + my;
+              if (row.stackParent && !moving.has(row.stackParent)) delete row.stackParent;
             }
         } else {
           const old = gesture.original.annotations.find(m => m.id === gesture.mark),
@@ -874,8 +958,10 @@
     function cancel() {
       dropPreview?.remove();
       dropPreview = null;
+      if (gesture?.kind === 'marquee') nodes = new Set(gesture.base);
       gesture = null;
       draft = null;
+      marquee.hidden = true;
       a.publish();
     }
     stage.addEventListener(
@@ -887,7 +973,13 @@
         const done = gesture,
           point = position(e);
         gesture = null;
+        marquee.hidden = true;
         try {
+          if (done.kind === 'marquee') {
+            a.publish();
+            selectionNotice();
+            return;
+          }
           if (done.kind === 'palette') {
             const r = host.getBoundingClientRect();
             const drop = point || { x: 100, y: 100 };
@@ -939,7 +1031,7 @@
                 )
               );
           }
-          if (done.kind === 'node' && point && !e.altKey) {
+          if (done.kind === 'node' && done.nodes.length === 1 && point && !e.altKey) {
             const row = draft.steps.find(s => s.id === done.node),
               parent = near(draft, point, row.id);
             if (parent) {
@@ -1001,7 +1093,28 @@
         if (e.key === 'Escape' && (gesture || editor)) {
           e.preventDefault();
           e.stopImmediatePropagation();
+          if (gesture?.kind === 'marquee') nodes = new Set(gesture.base);
           cleanDraft();
+          return;
+        }
+        if (e.target.closest('input,textarea,select,[contenteditable="true"]')) return;
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          setTool('select');
+          selected = '';
+          nodes = new Set(model().steps.map(s => s.id));
+          node = [...nodes][0] || '';
+          a.publish();
+          selectionNotice();
+          return;
+        }
+        if (e.key === 'Escape' && nodes.size) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          nodes.clear();
+          node = '';
+          a.publish();
           return;
         }
         if (tool === 'select' && selected) {
@@ -1046,6 +1159,8 @@
           draft = null;
           selected = '';
           node = '';
+          nodes.clear();
+          marquee.hidden = true;
           editor?.remove();
           editor = null;
         }
@@ -1067,8 +1182,9 @@
           annotations: copy(p.annotations || []),
         };
       },
-      options: () => ({ canvasSelection: selected, selectedNode: node }),
+      options: () => ({ canvasSelection: selected, selectedNode: node, selectedNodes: [...nodes] }),
       destroy() {
+        marquee.remove();
         dropPreview?.remove();
         dropPreview = null;
         if (frame) root.cancelAnimationFrame(frame);
@@ -1077,7 +1193,7 @@
         editor?.remove();
         editor = null;
       },
-      state: () => ({ selected, node, editing: !!editor, dragging: !!gesture }),
+      state: () => ({ selected, node, nodes: [...nodes], editing: !!editor, dragging: !!gesture }),
     };
   }
   root.WorkHubProcessCanvas = { install };
