@@ -68,6 +68,8 @@ My Day: [my-day-engine.js](../my-day-engine.js) handles bounded daily plans, est
 
 ## Investigation and validation tools
 
+Batch C: [batch-c-engine.js](../batch-c-engine.js) handles deterministic ticket matching and bounded local guide documents. [batch-c-files.js](../batch-c-files.js) decodes raster images, flattens annotations and exports paginated guides. [batch-c.js](../batch-c.js) supplies ticket previews, Studio launchers, local editors and account cleanup; [batch-c.css](../batch-c.css) styles their responsive layouts. See [BATCH-C.md](../BATCH-C.md). Images and editable drafts are local, with explicit file save/reopen.
+
 | Files | What they control |
 | --- | --- |
 | [workbench.js](../workbench.js), [workbench.css](../workbench.css) | Quick status actions, record previews and troubleshooting case records. |
@@ -122,7 +124,7 @@ My Day: [my-day-engine.js](../my-day-engine.js) handles bounded daily plans, est
 | `tests/*-preview.html` | Manual feature preview pages for Momo, Batch A, Validation Studio and wishlist tools. These are development previews, not extra live application pages. |
 | [README.md](../README.md) | Setup, deployment, cloud saving and feature usage. |
 | [BATCH-A.md](../BATCH-A.md), [WISHLIST.md](../WISHLIST.md), [VALIDATION-STUDIO.md](../VALIDATION-STUDIO.md) | Implemented feature instructions. |
-| [BATCH-B.md](../BATCH-B.md), [BATCH-C.md](../BATCH-C.md), [docs/TNG-AND-LAB.md](TNG-AND-LAB.md) | Implemented Momo behaviour guide, pending ticket discovery/screenshot privacy ideas, TNG review/export and saved Lab playback instructions. |
+| [BATCH-B.md](../BATCH-B.md), [BATCH-C.md](../BATCH-C.md), [docs/TNG-AND-LAB.md](TNG-AND-LAB.md), [BATCH-X.md](../BATCH-X.md) | Implemented Momo, ticket discovery, screenshot privacy/guide tools, TNG review/export and Lab playback; Batch X stores deferred ideas. |
 | [docs/EDITING-GUIDE.md](EDITING-GUIDE.md) | Beginner editing steps, examples and explanation of the application flow. |
 | [docs/SOURCE-CLEANUP.md](SOURCE-CLEANUP.md) | What this cleanup changed and why some compatibility code remains. |
 | [package.json](../package.json), [package-lock.json](../package-lock.json) | Developer commands and pinned tool/library versions. Not needed to run the published site. |

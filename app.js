@@ -434,6 +434,7 @@ function openModal(title, body) {
   hub?.batchA?.decorateModal();
   hub?.library?.decorateModal();
   window.WorkHubTicketWorkspace?.decorateEditor();
+  hub?.batchC?.decorateModal();
   $('modal').classList.toggle(
     'ticket-dialog',
     !!$('modalBody').querySelector('[data-ticket-detail],.ticket-editor')
