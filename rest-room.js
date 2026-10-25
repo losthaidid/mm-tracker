@@ -17,7 +17,8 @@
       dialog = null,
       trigger = null,
       resuming = false,
-      fullscreenPending = null;
+      fullscreenPending = null,
+      scenery = 'garden';
     const audio = root.WorkHubRestAudio.install({
       ready: () => a.ready() && !!session && session.owner === a.owner(),
       change: () => paintAudio(),
@@ -38,6 +39,7 @@
             pausedAt: session.pausedAt,
             complete: session.complete,
             seconds: session.complete ? 0 : seconds(),
+            scenery,
           }
         : null;
     }
@@ -153,13 +155,34 @@
       dialog.setAttribute('aria-labelledby', 'restRoomTitle');
       dialog.setAttribute('aria-describedby', 'restRoomDescription');
       dialog.setAttribute('aria-modal', 'true');
-      dialog.innerHTML = `<div class="rest-room-shell"><header class="rest-room-top"><span class="rest-wordmark"><i aria-hidden="true">♧</i> YOUR REST TERRARIUM</span><div class="rest-room-top-actions"><span class="rest-state-chip" data-rest-phase-label></span><button type="button" data-rest="fullscreen" aria-pressed="false">Full screen</button></div></header><p class="rest-fullscreen-status" data-rest-fullscreen-status role="status" hidden></p><div class="rest-room-main"><section class="rest-copy"><span class="rest-kicker" data-rest-label></span><h2 id="restRoomTitle">A little pause.<br><em>A world of calm.</em></h2><p id="restRoomDescription">Let the world wait a moment. Your work and focus timers are safely paused.</p><div class="rest-countdown" role="timer" aria-label="Break time remaining" aria-live="off"><span data-rest-clock>05:00</span><small data-rest-clock-label>TIME JUST FOR YOU</small></div><div class="rest-progress" aria-hidden="true"><i data-rest-progress></i></div><p class="rest-live-status" role="status" data-rest-status></p><div class="rest-room-actions"><button type="button" class="rest-primary" data-rest="pause">Pause break</button><button type="button" data-rest="end">End break early</button><button type="button" class="rest-primary" data-rest="resume" hidden>Resume work <span aria-hidden="true">↗</span></button></div></section>${scene()}</div><section class="rest-audio-panel" aria-label="Rest soundscape"><div class="rest-music-label"><span aria-hidden="true" class="rest-music-waves"><i></i><i></i><i></i><i></i></span><div><strong>A different rhythm for rest</strong><small>Your focus soundscape stays unchanged.</small></div></div><label class="rest-track-label">Rest soundscape<select data-rest-track aria-label="Rest soundscape">${Object.entries(
+      try {
+        scenery =
+          localStorage.getItem('mm-tracker.rest-scene.v1:' + owner) === 'observatory'
+            ? 'observatory'
+            : 'garden';
+      } catch {}
+      dialog.innerHTML = `<div class="rest-room-shell"><header class="rest-room-top"><span class="rest-wordmark"><i aria-hidden="true">♧</i> YOUR REST TERRARIUM</span><div class="rest-room-top-actions"><label class="rest-scenery-label">Scenery<select data-rest-scenery aria-label="Break scenery"><option value="garden">Glass garden</option>${root.WorkHubExperienceArt ? '<option value="observatory">Moonlit observatory</option>' : ''}</select></label><span class="rest-state-chip" data-rest-phase-label></span><button type="button" data-rest="fullscreen" aria-pressed="false">Full screen</button></div></header><p class="rest-fullscreen-status" data-rest-fullscreen-status role="status" hidden></p><div class="rest-room-main"><section class="rest-copy"><span class="rest-kicker" data-rest-label></span><h2 id="restRoomTitle">A little pause.<br><em>A world of calm.</em></h2><p id="restRoomDescription">Let the world wait a moment. Your work and focus timers are safely paused.</p><div class="rest-countdown" role="timer" aria-label="Break time remaining" aria-live="off"><span data-rest-clock>05:00</span><small data-rest-clock-label>TIME JUST FOR YOU</small></div><div class="rest-progress" aria-hidden="true"><i data-rest-progress></i></div><p class="rest-live-status" role="status" data-rest-status></p><div class="rest-room-actions"><button type="button" class="rest-primary" data-rest="pause">Pause break</button><button type="button" data-rest="end">End break early</button><button type="button" class="rest-primary" data-rest="resume" hidden>Resume work <span aria-hidden="true">↗</span></button></div></section>${scene()}${root.WorkHubExperienceArt?.observatory() || ''}</div><section class="rest-audio-panel" aria-label="Rest soundscape">${root.WorkHubExperienceArt ? '<span class="experience-rest-art" aria-hidden="true">' + root.WorkHubExperienceArt.sound('rest') + '</span>' : ''}<div class="rest-music-label"><span aria-hidden="true" class="rest-music-waves"><i></i><i></i><i></i><i></i></span><div><strong>A different rhythm for rest</strong><small>Your focus soundscape stays unchanged.</small></div></div><label class="rest-track-label">Rest soundscape<select data-rest-track aria-label="Rest soundscape">${Object.entries(
         root.WorkHubRestAudio.TRACKS
       )
         .map(([key, s]) => `<option value="${key}">${s.name} · ${s.detail}</option>`)
         .join(
           ''
         )}</select></label><button type="button" data-rest="music" data-rest-music>Ⅱ Pause rest music</button><label class="rest-volume">Volume <output data-rest-volume-label></output><input type="range" min="0" max="100" step="1" data-rest-volume aria-label="Rest soundscape volume"></label><p class="rest-alarm-note"><span aria-hidden="true">◷</span> Break-end alarm · rings until Resume work</p><button type="button" data-rest="retry" hidden>Retry sound</button><p data-rest-audio-status></p></section><footer class="rest-room-footer"><span>ONE SMALL BREAK CAN CHANGE THE FEEL OF A DAY.</span><span>Resume work only when you choose.</span></footer></div>`;
+      dialog.dataset.scenery = scenery;
+      dialog.querySelector('[data-rest-scenery]').value = scenery;
+      dialog.addEventListener('change', event => {
+        if (
+          !session ||
+          session.owner !== a.owner() ||
+          event.target.dataset.restScenery === undefined
+        )
+          return;
+        scenery = event.target.value === 'observatory' ? 'observatory' : 'garden';
+        dialog.dataset.scenery = scenery;
+        try {
+          localStorage.setItem('mm-tracker.rest-scene.v1:' + owner, scenery);
+        } catch {}
+      });
       dialog.addEventListener('cancel', event => {
         event.preventDefault();
         finish(false);

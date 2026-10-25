@@ -294,6 +294,7 @@
       paint();
     }
     function paint() {
+      root.WorkHubExperience?.paintSound({ mix, playing, muted: muted || master === 0 });
       const status =
         error ||
         (!playing

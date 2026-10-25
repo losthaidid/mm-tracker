@@ -126,6 +126,11 @@
       'Restore records from a saved backup.',
       'restore import upload backup json recovery',
     ],
+    experienceSettingsButton: [
+      'workspace',
+      'Lighting, habitat, greetings and completion moments.',
+      'day night companion expressions greetings celebrations',
+    ],
     cloudRetry: [
       'data',
       'Refresh records or retry waiting changes.',

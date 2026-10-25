@@ -1,0 +1,558 @@
+/* Bounded, scoped workspace art. No aurora, filters or permanent particle loops. */
+body[data-experience-phase]:not([data-experience-phase='off']) #hubSidebar,
+body[data-experience-phase]:not([data-experience-phase='off']) #hubToolbar {
+  background-color: rgba(238, 225, 199, calc(var(--experience-warmth, 0) * 0.28));
+  transition:
+    background-color 60s linear,
+    border-color 60s linear;
+}
+body[data-experience-phase='night'] #hubSidebar,
+body[data-experience-phase='night'] #hubToolbar {
+  background-color: #e9edf1;
+}
+body[data-experience-phase='evening'] #hubHeader {
+  border-bottom-color: #d4b58c;
+}
+.ex-kicker {
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.16em;
+  color: #74866b;
+}
+.experience-rules article,
+.experience-inbox article {
+  padding: 17px;
+  margin: 12px 0;
+  border: 1px solid #d4dfcc;
+  border-radius: 12px;
+  background: #fafbf5;
+}
+.experience-rules article > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 12px;
+}
+.experience-rules small {
+  color: #728068;
+}
+.experience-health h3 {
+  padding: 15px;
+  border-radius: 10px;
+  background: #e3ecda;
+  color: #385b42;
+}
+.experience-health[data-state='waiting'] h3,
+.experience-health[data-state='conflict'] h3 {
+  background: #f8e9cd;
+  color: #745830;
+}
+.experience-health dl {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr;
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid #dbe3d2;
+  border-radius: 12px;
+}
+.experience-health dd {
+  margin: 0;
+  font-weight: 600;
+}
+#experienceRuleInbox,
+#experienceSyncButton {
+  font-size: 12px;
+}
+.ticket-folio {
+  position: relative;
+  overflow: visible !important;
+  border-radius: 4px 18px 18px 18px !important;
+  margin-top: 19px;
+  background: linear-gradient(155deg, #fffdf5, #f6f7ee) !important;
+  border-color: #cbd6c0 !important;
+}
+.ticket-folder-tab {
+  position: absolute;
+  left: -1px;
+  top: -21px;
+  max-width: 75%;
+  height: 23px;
+  padding: 3px 18px;
+  border: 1px solid #cbd6c0;
+  border-bottom: 0;
+  border-radius: 9px 13px 0 0;
+  background: #e0ead7;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ticket-folio[data-ticket-state='closed'] {
+  background: #f5f5ef !important;
+  box-shadow: none !important;
+}
+.ticket-folio[data-ticket-state='closed'] .ticket-folder-tab {
+  background: #e7e9e1;
+  color: #74816e;
+}
+.ticket-folio[data-ticket-state='closed'] .ticket-card-head {
+  opacity: 0.8;
+}
+.ticket-folio .ticket-history-preview {
+  border-left: 3px solid #a9bd91;
+  background: #fffef8;
+}
+.ticket-folio:hover {
+  box-shadow: 0 9px 20px #34543410 !important;
+  transform: translateY(-2px);
+}
+.ticket-detail-workspace {
+  animation: experience-open 0.22s ease-out;
+}
+.experience-sound-art {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding: 22px;
+  margin-bottom: 22px;
+  border: 1px solid #b9d1c5;
+  border-radius: 17px;
+  background: #e9f0e3;
+  color: #496d5d;
+}
+.experience-sound-art svg {
+  flex: 0 0 115px;
+  width: 115px;
+  height: 100px;
+  stroke: currentColor;
+  stroke-width: 2;
+  fill: #fbf5df;
+}
+.experience-sound-art > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.experience-sound-art span {
+  font-size: 9px;
+  letter-spacing: 0.15em;
+}
+.experience-sound-art strong {
+  font:
+    500 25px/1.2 Georgia,
+    serif;
+}
+.experience-sound-art small {
+  font-size: 12px;
+}
+.experience-sound-art[data-kind='rain'] {
+  background: #e5edf1;
+  color: #55798a;
+}
+.experience-sound-art[data-kind='cafe'] {
+  background: #f0e5d9;
+  color: #967657;
+}
+.experience-sound-art[data-kind='fireplace'] {
+  background: #f3e4d2;
+  color: #ac7653;
+}
+.experience-sound-art[data-kind='lofi'] {
+  background: #eae7f1;
+  color: #7a7095;
+}
+.experience-sound-art .sx-rain {
+  animation: sx-rain 3s linear infinite;
+}
+.experience-sound-art .sx-steam {
+  animation: sx-steam 4s ease-in-out infinite;
+}
+.experience-sound-art .sx-leaves {
+  transform-origin: 60px 82px;
+  animation: sx-leaf 5s ease-in-out infinite alternate;
+}
+.experience-sound-art .sx-record {
+  transform-origin: 60px 50px;
+  animation: sx-record 18s linear infinite;
+}
+.experience-sound-art .sx-flame {
+  transform-origin: 60px 80px;
+  animation: sx-leaf 2s ease-in-out infinite alternate;
+}
+.experience-sound-art:not([data-state='playing']) * {
+  animation-play-state: paused;
+}
+.experience-sound-art[data-state='muted'] svg {
+  opacity: 0.45;
+}
+.observatory-art {
+  display: none;
+  position: relative;
+  width: 100%;
+  min-height: 430px;
+  border-radius: 50% 50% 18px 18px;
+  overflow: hidden;
+  background: linear-gradient(#132b46, #304b69 75%, #1d3a4d);
+  align-self: center;
+}
+.observatory-art svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.observatory-art > span {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  right: 12px;
+  text-align: center;
+  letter-spacing: 0.17em;
+  font: 9px system-ui;
+  color: #cedbc9;
+}
+.obs-stars {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle, #f4e7bc 1px, transparent 2px) 17px 21px/59px 67px,
+    radial-gradient(circle, #d5e8f3 1px, transparent 2px) 35px 41px/103px 97px;
+  animation: obs-stars 7s ease-in-out infinite alternate;
+}
+.obs-moon {
+  position: absolute;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: #f0e7c4;
+  top: 12%;
+  left: 70%;
+  box-shadow: inset -12px -3px #c9d1bc;
+}
+.obs-telescope {
+  transform-origin: 295px 322px;
+  animation: obs-turn 22s ease-in-out infinite alternate;
+}
+.obs-dome {
+  transform-origin: 300px 300px;
+  animation: obs-dome 28s ease-in-out infinite alternate;
+}
+.obs-shooting {
+  position: absolute;
+  left: 15%;
+  top: 12%;
+  width: 65px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #f9e9c0);
+  transform: rotate(25deg);
+  animation: obs-shoot 24s linear infinite;
+}
+.rest-room[data-scenery='observatory'] .rest-landscape {
+  display: none;
+}
+.rest-room[data-scenery='observatory'] .observatory-art {
+  display: block;
+}
+.rest-room[data-scenery='observatory'] .rest-countdown {
+  position: relative;
+  border-radius: 50%;
+  padding: 20px 15px;
+  max-width: 290px;
+  background: #e5e7da;
+  color: #20383e;
+  box-shadow: inset -13px 0 #cad3bf;
+}
+.rest-scenery-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  color: #75836d;
+}
+.rest-scenery-label select {
+  font: 12px system-ui;
+  max-width: 170px;
+  padding: 7px;
+  border: 1px solid #c4d1bd;
+  border-radius: 20px;
+  background: #f5f5ed;
+  color: #456450;
+}
+#restRoom[data-motion='still'] .observatory-art * {
+  animation: none;
+}
+#hubMomoHome .experience-habitat {
+  width: 100%;
+  height: 100%;
+}
+.habitat-book,
+.habitat-sleep {
+  display: none;
+}
+#hubMomoHome[data-habitat='reading'] .habitat-book {
+  display: block;
+}
+#hubMomoHome[data-habitat='reading'] .habitat-cushion {
+  display: none;
+}
+#hubMomoHome[data-habitat='sleeping'] .habitat-sleep {
+  display: block;
+  animation: habitat-sleep 4s ease-in-out infinite;
+}
+#hubMomoHome[data-habitat='sleeping'] .habitat-lamp {
+  opacity: 0.4;
+}
+#hubPet[data-experience-reaction='greeting'] {
+  animation: experience-wave 0.8s ease-in-out 3;
+  transform-origin: 50% 90%;
+}
+#hubPet[data-experience-reaction='complete'] {
+  animation: experience-hop 0.65s ease-out 2;
+}
+#hubPet[data-experience-reaction='return'] {
+  animation: experience-stretch 1.4s ease-in-out;
+}
+.experience-celebration {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 200;
+  overflow: hidden;
+}
+.experience-celebration i {
+  position: absolute;
+  left: calc(10% + var(--i) * 9%);
+  bottom: 8%;
+  font-style: normal;
+  font-size: 28px;
+  color: #9bb379;
+  animation: experience-grow 2.2s ease-out both;
+  animation-delay: calc(var(--i) * 50ms);
+}
+.experience-celebration[data-style='lantern'] i {
+  color: #c49a61;
+  font-size: 22px;
+  animation-name: experience-rise;
+}
+.experience-celebration[data-style='star'] i {
+  color: #c5ad6d;
+  bottom: 24%;
+  animation-name: experience-star;
+}
+@keyframes experience-open {
+  from {
+    opacity: 0.65;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes sx-rain {
+  to {
+    transform: translateY(14px);
+  }
+}
+@keyframes sx-steam {
+  50% {
+    opacity: 0.3;
+    transform: translateY(-5px);
+  }
+}
+@keyframes sx-leaf {
+  to {
+    transform: rotate(3deg);
+  }
+}
+@keyframes sx-record {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes obs-stars {
+  to {
+    opacity: 0.45;
+  }
+}
+@keyframes obs-turn {
+  to {
+    transform: rotate(-7deg);
+  }
+}
+@keyframes obs-dome {
+  to {
+    transform: scaleX(0.97);
+  }
+}
+@keyframes obs-shoot {
+  0%,
+  93%,
+  100% {
+    opacity: 0;
+  }
+  94% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(25deg);
+  }
+  98% {
+    opacity: 0;
+    transform: translate(190px, 100px) rotate(25deg);
+  }
+}
+@keyframes habitat-sleep {
+  50% {
+    opacity: 0.4;
+    transform: translateY(-3px);
+  }
+}
+@keyframes experience-wave {
+  50% {
+    transform: rotate(-5deg);
+  }
+}
+@keyframes experience-hop {
+  50% {
+    transform: translateY(-9px);
+  }
+}
+@keyframes experience-stretch {
+  50% {
+    transform: scaleY(1.04);
+  }
+}
+@keyframes experience-grow {
+  0% {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+  25% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.9);
+  }
+}
+@keyframes experience-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-160px);
+  }
+}
+@keyframes experience-star {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1.2) rotate(20deg);
+  }
+}
+body[data-motion='off'] .experience-sound-art *,
+body[data-motion='off'] #hubMomoHome *,
+body[data-motion='off'] #hubPet[data-experience-reaction] {
+  animation: none;
+}
+body.hub-private .experience-celebration,
+body.hub-present .experience-celebration {
+  display: none;
+}
+@media (max-width: 600px) {
+  .observatory-art {
+    min-height: 300px;
+  }
+  .obs-shooting {
+    display: none;
+  }
+  .obs-stars {
+    background-size:
+      95px 110px,
+      150px 150px;
+  }
+  .obs-dome {
+    animation: none;
+  }
+  .rest-scenery-label {
+    font-size: 0;
+  }
+  .experience-sound-art {
+    padding: 15px;
+    gap: 14px;
+  }
+  .experience-sound-art svg {
+    width: 80px;
+    flex-basis: 80px;
+  }
+  .experience-sound-art strong {
+    font-size: 21px;
+  }
+  .experience-health dl {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .ticket-folio {
+    margin-top: 22px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .observatory-art *,
+  .experience-sound-art *,
+  #hubMomoHome .habitat-sleep,
+  #hubPet[data-experience-reaction],
+  .experience-celebration *,
+  .ticket-detail-workspace {
+    animation: none !important;
+  }
+  body[data-experience-phase] * {
+    transition-duration: 0s !important;
+  }
+}
+
+body[data-experience-paused='true'] .experience-sound-art *,
+body[data-experience-paused='true'] #hubMomoHome * {
+  animation-play-state: paused;
+}
+
+.rest-audio-panel {
+  position: relative;
+}
+.experience-rest-art {
+  position: absolute;
+  right: 14px;
+  top: 9px;
+  width: 48px;
+  height: 42px;
+  color: #a58b61;
+  opacity: 0.65;
+  pointer-events: none;
+}
+.experience-rest-art svg {
+  width: 100%;
+  height: 100%;
+  fill: #e9dab4;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+.rest-room[data-scenery='observatory'] .rest-countdown [data-rest-clock],
+.rest-room[data-scenery='observatory'] .rest-countdown small {
+  color: #20383e;
+  opacity: 1;
+}

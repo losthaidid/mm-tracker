@@ -6,7 +6,7 @@ The two prioritised items are implemented: **TNG PDF extraction and cropped evid
 
 The Momo behaviour enhancements in [Batch B](BATCH-B.md) are implemented, including the later weather consequences, visitor friendships and click-reaction selections. [Batch C](BATCH-C.md) is implemented: 25 · Ticket twin finder, 26 · Sensitive screenshot brush, and 30 · Screenshot guide builder. See its usage and local-file notes before sharing an editable guide.
 
-[Batch D](BATCH-D.md) is partially implemented: **4 · Interactive process decisions**, **42 · Presentation control panel**, **97 · Private presentation annotations**, and **209 · Elegant loading scenes** are complete. **7, 10, 193, 196, 198 and 204** remain pending. See [the usage guide](docs/BATCH-D-PRESENTING.md).
+[Batch D](BATCH-D.md) is implemented: **4, 7, 10, 42, 97, 193, 196, 198, 204 and 209**. See [the presentation guide](docs/BATCH-D-PRESENTING.md) and [the workspace experience guide](docs/WORKSPACE-EXPERIENCE.md).
 
 [Batch E](BATCH-E.md) was kept on 25 October 2026: **51 · Work handover mode**. These are wishlist selections; implementation has not been requested.
 
@@ -14,16 +14,16 @@ The Momo behaviour enhancements in [Batch B](BATCH-B.md) are implemented, includ
 
 On 20 October 2026, Request inbox, End-of-day ritual, Personal learning roadmap and Show-me-how walkthroughs were removed from the wishlist at the user's request.
 
-## Pending visual and atmosphere selections
+## Implemented visual and atmosphere selections
 
-Kept on 25 October 2026. No batch assigned; implementation has not been requested. Numbers refer to the current visual-ideas discussion.
+Kept and approved on 25 October 2026. All four selections are implemented; see [the workspace experience guide](docs/WORKSPACE-EXPERIENCE.md). Numbers refer to the current visual-ideas discussion.
 
 | No. | Enhancement | Saved scope |
 | --- | --- | --- |
 | 241 | Observatory break scene | Add an observatory with a moving telescope/dome, subtle drifting stars, occasional shooting stars and a moon-shaped countdown. Preserve the repeating break-end alarm and explicit Resume work; reduce detail on phones. |
 | 244 | Ticket desk aesthetic | Style tickets as organised case folders with status tabs, clear identifiers/titles, prominent latest updates, ownership/priority/deadline labels and brief selection/opening motion. Preserve existing fields, filters and actions; completed cases use quieter colours. |
 | 247 | Soundscape visual identities | Give soundscapes matching artwork with restrained animation and clear playing, paused and muted states. Keep rest and focus identities distinct. Precise music-rhythm response is outside this selection. |
-| 249 | Companion arrival greetings | Add occasional peeking, waving, stretching or welcome-sign greetings on arrival/return. Avoid typing, focus and presentation interruptions. After Go home and nap, keep the companion asleep until clicked, then permit a greeting. Coordinate with the pending habitat and expressions. |
+| 249 | Companion arrival greetings | Add occasional peeking, waving, stretching or welcome-sign greetings on arrival/return. Avoid typing, focus and presentation interruptions. After Go home and nap, keep the companion asleep until clicked, then permit a greeting. Coordinate with the habitat and expressions. |
 
 246 · Floating-island scenery was explicitly excluded from this selection.
 

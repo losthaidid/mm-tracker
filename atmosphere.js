@@ -226,9 +226,11 @@
         '--ambient-moon-y',
         Math.round(13 - Math.sin(Math.min(1, night) * Math.PI) * 15) + 'px'
       );
-      const next = preferences.mode === 'auto' ? phaseAt(date) : preferences.mode;
+      const selectedMode =
+        a.lighting?.() && a.lighting() !== 'auto' ? a.lighting() : preferences.mode;
+      const next = selectedMode === 'auto' ? phaseAt(date) : selectedMode;
       document.body.dataset.atmospherePaused = String(document.hidden || !motion());
-      if (preferences.mode !== 'auto') {
+      if (selectedMode !== 'auto') {
         const fixed = {
           morning: [-65, 14],
           afternoon: [-15, -4],
