@@ -229,3 +229,60 @@ test('Presentation feedback: selected Process Hub screen is passed to native ful
  const select=h.document.getElementById('processPresentationScreen');select.value='0';select.dispatchEvent(new h.window.Event('change',{bubbles:true}));const calls=[];h.window.HTMLElement.prototype.requestFullscreen=function(options){calls.push({element:this,options});return Promise.resolve();};await h.click('present');
  assert.equal(calls.length,1);assert.equal(calls[0].options.screen,screen);assert.ok(calls[0].element.classList.contains('ph-fullscreen-stage'));assert.equal(h.writes.length,0);
 });
+
+function presenterPointer(h,target,type,x,y,id=41) {
+  const e=new h.window.MouseEvent(type,{bubbles:true,cancelable:true,button:0,clientX:x,clientY:y});
+  Object.defineProperty(e,'pointerId',{value:id});target.dispatchEvent(e);
+}
+test('Presenter canvas: placed arrows and text move, cancel, edit and delete without saving or losing shape',async t=>{
+ const h=hub(t);loadFlow(h,requestFlow(h));const {messages}=connectAudience(h),before=JSON.stringify(h.state()),host=h.document.querySelector('.presenter-preview');
+ host.getBoundingClientRect=()=>({left:0,top:0,width:1000,height:562.5});
+ const action=name=>h.document.querySelector('[data-presenter="'+name+'"]').click();
+ h.document.querySelector('[data-value="arrow"]').click();
+ presenterPointer(h,host,'pointerdown',100,100);presenterPointer(h,host,'pointermove',300,200);presenterPointer(h,host,'pointerup',300,200);
+ assert.equal(host.dataset.tool,'select');assert.ok(host.querySelector('.av-selection'));
+ presenterPointer(h,host,'pointerdown',200,150);presenterPointer(h,host,'pointermove',300,250);presenterPointer(h,host,'pointerup',300,250);
+ let mark=messages.findLast(x=>x.message.type==='workhub-audience-state').message.marks[0];
+ assert.ok(Math.abs(mark.points[0][0]-.2)<1e-8);assert.ok(Math.abs(mark.points[1][0]-.4)<1e-8);
+ const moved=copy(mark);
+ presenterPointer(h,host,'pointerdown',300,250);presenterPointer(h,host,'pointermove',400,300);presenterPointer(h,host,'pointercancel',400,300);
+ mark=messages.findLast(x=>x.message.type==='workhub-audience-state').message.marks[0];assert.deepEqual(mark,moved);
+ h.document.querySelector('[name="annotationText"]').value='Explain this clearly';
+ h.document.querySelector('[data-value="text"]').click();presenterPointer(h,host,'pointerdown',500,300);
+ presenterPointer(h,host,'pointerdown',550,330);presenterPointer(h,host,'pointermove',650,350);presenterPointer(h,host,'pointerup',650,350);
+ assert.equal(h.ui.presenter.snapshot().selectedMark,1);
+ h.document.querySelector('[name="annotationText"]').value='Updated explanation';action('update-text');await settle();assert.match(host.querySelector('.av-text-note').textContent,/Updated explanation/);
+ host.dispatchEvent(new h.window.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true}));assert.equal(h.ui.presenter.snapshot().marks,2);
+ host.dispatchEvent(new h.window.KeyboardEvent('keydown',{key:'Delete',bubbles:true,cancelable:true}));assert.equal(h.ui.presenter.snapshot().marks,1);
+ assert.equal(JSON.stringify(h.state()),before);assert.equal(h.writes.length,0);
+});
+test('Presenter canvas: pan and zoom are shared, fit restores the whole diagram, and clicking an off-route node starts a paused walkthrough there',async t=>{
+ const h=hub(t);loadFlow(h,requestFlow(h));const {messages}=connectAudience(h),before=JSON.stringify(h.state()),host=h.document.querySelector('.presenter-preview');
+ host.getBoundingClientRect=()=>({left:0,top:0,width:1000,height:562.5});
+ host.querySelector('.av-graph').getBoundingClientRect=()=>({left:20,top:70,width:950,height:400});
+ const graph=host.querySelector('.av-graph'),initial=graph.getAttribute('viewBox');
+ presenterPointer(h,graph,'pointerdown',500,200);presenterPointer(h,host,'pointermove',600,250);presenterPointer(h,host,'pointerup',600,250);
+ assert.notEqual(graph.getAttribute('viewBox'),initial);assert.ok(messages.findLast(x=>x.message.type==='workhub-audience-state').message.options.camera);
+ h.document.querySelector('[data-presenter="zoom-in"]').click();await settle();assert.ok(h.ui.presenter.snapshot().camera.width<Number(initial.split(' ')[2]));
+ h.document.querySelector('[data-presenter="fit"]').click();await settle();assert.equal(graph.getAttribute('viewBox'),initial);
+ const node=host.querySelector('[data-node="no"]');assert.ok(node);assert.equal(node.getAttribute('role'),'button');
+ presenterPointer(h,node,'pointerdown',450,240);presenterPointer(h,host,'pointerup',450,240);await settle();
+ const payload=messages.findLast(x=>x.message.type==='workhub-audience-state').message;
+ assert.equal(payload.snapshot.active,'no');assert.equal(payload.snapshot.playing,false);assert.equal(payload.snapshot.detail.title,h.ui.model().steps.find(s=>s.id==='no').title);
+ assert.equal(JSON.stringify(h.state()),before);assert.equal(h.writes.length,0);
+ h.document.querySelector('[data-presenter="expand"]').click();assert.equal(h.document.getElementById('processPresenter').dataset.expanded,'true');
+});
+test('Presenter fullscreen: a resized window or fulfilled request is not reported as true fullscreen; only verified audience status can confirm it',async t=>{
+ const h=hub(t);loadFlow(h,requestFlow(h));
+ let full=null,calls=0,url;const target=h.document.createElement('main'),doc={documentElement:target,get fullscreenElement(){return full;}};
+ target.requestFullscreen=async options=>{calls++;assert.equal(options.navigationUI,'hide');};
+ const sent=[],popup={closed:false,document:doc,focus(){},close(){this.closed=true;},postMessage:m=>sent.push(copy(m))};
+ h.window.open=href=>{url=new URL(href);return popup;};h.ui.presenter.open();
+ const receive=(type,fields={},source=popup)=>h.window.dispatchEvent(new h.window.MessageEvent('message',{origin:h.window.location.origin,source,data:{type,token:url.hash.slice(1),...fields}}));
+ receive('workhub-audience-ready');await settle();assert.equal(calls,1);assert.equal(h.ui.presenter.snapshot().audienceFull,false);assert.ok(sent.some(m=>m.type==='workhub-audience-fullscreen-needed'));
+ receive('workhub-audience-fullscreen',{fullscreen:true},{});assert.equal(h.ui.presenter.snapshot().audienceFull,false);
+ full=target;receive('workhub-audience-fullscreen',{fullscreen:true});assert.equal(h.ui.presenter.snapshot().audienceFull,true);
+ h.document.querySelector('[data-presenter="fullscreen"]').click();await settle();assert.equal(calls,1);
+ full=null;receive('workhub-audience-fullscreen',{fullscreen:false});assert.match(h.document.querySelector('[data-presenter-display-status]').textContent,/windowed/);
+ assert.equal(h.writes.length,0);
+});

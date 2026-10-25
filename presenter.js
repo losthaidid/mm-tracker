@@ -24,18 +24,23 @@
       marks = [],
       drawing = null,
       markFrame = 0,
-      lastMarkSent = 0,
       sceneKey = '',
       infoKey = '';
     let laser = null,
       laserFrame = 0,
       textDraft = '',
-      textSize = 24;
+      textSize = 24,
+      gesture = null,
+      selectedMark = -1,
+      camera = null,
+      mapOnly = true,
+      audienceFull = false,
+      fullscreenPending = false;
     let tool = 'move',
       color = '#eab956',
       width = 4,
       textScale = 1,
-      overview = false;
+      overview = true;
     const live = () =>
       !!(a.ready() && a.owner() && a.owner() === owner && (!a.active || a.active()));
     function connected() {
@@ -74,6 +79,101 @@
           if (connected()) send('workhub-audience-pointer', { pointer: laser });
         });
     }
+
+    function setTool(value) {
+      if (!['move', 'select', 'pen', 'arrow', 'text', 'laser'].includes(value)) return;
+      clearLaser();
+      tool = value;
+      if (value !== 'select') selectedMark = -1;
+      if (!panel) return;
+      panel.querySelector('.presenter-preview').dataset.tool = tool;
+      for (const b of panel.querySelectorAll('[data-presenter="tool"]'))
+        b.setAttribute('aria-pressed', String(b.dataset.value === tool));
+    }
+    function selectMark(index) {
+      selectedMark = index >= 0 && index < marks.length ? index : -1;
+      const m = marks[selectedMark];
+      if (m && panel) {
+        color = m.color;
+        width = m.width;
+        panel.querySelector('[name="color"]').value = color;
+        panel.querySelector('[name="width"]').value = width;
+      }
+      if (m?.type === 'text' && panel) {
+        textDraft = m.text;
+        textSize = m.fontSize;
+        panel.querySelector('[name="annotationText"]').value = textDraft;
+        panel.querySelector('[name="annotationSize"]').value = textSize;
+      }
+    }
+    function cancelGesture() {
+      if (gesture?.kind === 'mark' && marks[gesture.index]) marks[gesture.index] = gesture.original;
+      if (gesture?.kind === 'pan') camera = gesture.previousCamera;
+      gesture = null;
+      drawing = null;
+    }
+    function queuePublish() {
+      if (!markFrame)
+        markFrame = root.requestAnimationFrame(() => {
+          markFrame = 0;
+          if (!live() || !panel) return;
+          publish(true);
+        });
+    }
+    function zoomCanvas(factor, event) {
+      const host = panel?.querySelector('.presenter-preview'),
+        graph = host?.querySelector('.av-graph'),
+        c = preview?.camera();
+      if (!graph || !c || held || cover || breakSession || publicState().kind !== 'process') return;
+      const rect = graph.getBoundingClientRect(),
+        point = event
+          ? root.WorkHubAudienceView.graphPoint([event.clientX, event.clientY], rect, c)
+          : { x: c.x + c.width / 2, y: c.y + c.height / 2 };
+      factor = Math.max(
+        Math.max(200 / c.width, 100 / c.height),
+        Math.min(Math.min(20000 / c.width, 20000 / c.height), factor)
+      );
+      camera = {
+        x: point.x - (point.x - c.x) * factor,
+        y: point.y - (point.y - c.y) * factor,
+        width: c.width * factor,
+        height: c.height * factor,
+      };
+      publish(true);
+    }
+    async function fullscreenAudience() {
+      if (!live() || !popup || fullscreenPending) return;
+      const current = popup,
+        currentToken = token;
+      let target;
+      try {
+        target = current.document.documentElement;
+      } catch {}
+      if (!target) return;
+      fullscreenPending = true;
+      try {
+        if (!current.document.fullscreenElement) {
+          if (a.screens) await a.screens.fullscreen(target);
+          else await target.requestFullscreen?.({ navigationUI: 'hide' });
+        }
+      } catch {
+      } finally {
+        fullscreenPending = false;
+        if (!live() || current !== popup || token !== currentToken) return;
+        try {
+          audienceFull = !!current.document.fullscreenElement;
+        } catch {
+          audienceFull = false;
+        }
+        if (!audienceFull) {
+          send('workhub-audience-fullscreen-needed');
+          try {
+            current.focus();
+          } catch {}
+        }
+        updateControls();
+      }
+    }
     function closePanel() {
       clearLaser();
       tool = 'move';
@@ -84,7 +184,8 @@
         panel.remove();
         panel = null;
       }
-      drawing = null;
+      cancelGesture();
+      selectedMark = -1;
       if (markFrame) root.cancelAnimationFrame(markFrame);
       markFrame = 0;
     }
@@ -109,6 +210,11 @@
       infoKey = '';
       tool = 'move';
       lastSent = 0;
+      camera = null;
+      overview = true;
+      mapOnly = true;
+      audienceFull = false;
+      fullscreenPending = false;
     }
     function sync() {
       if (owner && !live()) {
@@ -163,16 +269,27 @@
       if (sceneKey && sceneKey !== key) {
         marks = [];
         drawing = null;
+        gesture = null;
+        selectedMark = -1;
         clearLaser();
       }
+      if (
+        sceneKey &&
+        sceneKey.split('|').slice(0, 2).join('|') !== key.split('|').slice(0, 2).join('|')
+      )
+        camera = null;
       sceneKey = key;
       const payload = {
         snapshot,
         marks: drawing ? [...marks, drawing] : marks,
-        options: { textScale, overview },
+        options: { textScale, overview, camera, mapOnly },
       };
       if (connected()) send('workhub-audience-state', payload);
-      preview?.update(payload.snapshot, payload.marks, payload.options);
+      preview?.update(payload.snapshot, payload.marks, {
+        ...payload.options,
+        selected: selectedMark,
+        interactive: true,
+      });
       updateControls();
     }
     function updateControls() {
@@ -205,7 +322,8 @@
       panel.querySelector('[data-presenter-step]').textContent =
         state.detail?.title || 'Route complete';
       panel.querySelector('[name="interactive"]').checked = info.interactive;
-      panel.querySelector('[data-presenter="play"]').textContent = info.paused ? 'Play' : 'Pause';
+      for (const button of panel.querySelectorAll('[data-presenter="play"]'))
+        button.textContent = info.paused ? 'Play' : 'Pause';
       for (const [action, on, label, off] of [
         ['hold', held, 'Release screen', 'Hold screen'],
         ['cover', cover, 'Show content', 'Hide content'],
@@ -241,6 +359,25 @@
         notice(
           connectionError || 'Audience connection interrupted. Reopen the window to reconnect.'
         );
+      const display = panel.querySelector('[data-presenter-display-status]');
+      if (display)
+        display.textContent = audienceFull
+          ? 'Audience is in true fullscreen · Esc exits'
+          : 'Audience is windowed · click Start full screen in the audience window if requested';
+      const markStatus = panel.querySelector('[data-presenter-mark-status]');
+      if (markStatus)
+        markStatus.textContent =
+          selectedMark >= 0
+            ? 'Selected ' +
+              marks[selectedMark]?.type +
+              ' · drag or use arrow keys; Delete removes it'
+            : 'Choose Select / move, then click a text note or arrow.';
+      const update = panel.querySelector('[data-presenter="update-text"]');
+      if (update)
+        update.textContent =
+          marks[selectedMark]?.type === 'text' ? 'Update selected text' : 'Update last text';
+      const remove = panel.querySelector('[data-presenter="delete-mark"]');
+      if (remove) remove.disabled = selectedMark < 0;
       const locked = !!(held || cover || breakSession);
       for (const b of panel.querySelectorAll('[data-playback-control]')) b.disabled = locked;
       for (const b of choices.querySelectorAll('button')) b.disabled = locked;
@@ -249,7 +386,7 @@
       if (!live()) return;
       try {
         if (popup && !popup.closed) {
-          a.screens?.place(popup);
+          if (!popup.document?.fullscreenElement) a.screens?.place(popup);
           popup.focus();
           return;
         }
@@ -262,6 +399,7 @@
       connectionError = '';
       const url = new URL('audience.html', base);
       url.hash = token;
+      url.searchParams.set('fullscreen', '1');
       popup = root.open(
         url.href,
         'workhub-audience-' + token,
@@ -283,7 +421,7 @@
         panel.id = 'processPresenter';
         panel.className = 'presenter-panel';
         panel.setAttribute('aria-labelledby', 'presenterTitle');
-        panel.innerHTML = `<header class="presenter-header"><div><span class="presenter-kicker">YOUR PRIVATE CONTROL ROOM</span><h2 id="presenterTitle">Present with confidence.</h2><p>Share the separate audience window. Your notes and controls stay here.</p></div><div class="actions"><button type="button" data-presenter="window">Open audience window ↗</button><button type="button" data-presenter="close-panel" aria-label="Close presenter controls">✕</button></div></header><div class="presenter-status" data-presenter-status role="status">Opening audience window…</div>${a.screens ? a.screens.markup('presenterScreen', 'data-presenter="screens"') : ''}<div class="presenter-display-actions"><button type="button" data-presenter="fullscreen">⛶ Full screen on selected screen</button><span data-presenter-display-status role="status"></span></div><div class="presenter-layout"><section class="presenter-screen"><div class="presenter-preview-label"><strong>AUDIENCE PREVIEW</strong><span>Choose your shared display below. Full screen presents the audience window there.</span></div><div class="presenter-preview" tabindex="0" aria-label="Audience preview. Select a drawing tool to annotate."></div><div class="presenter-ink" role="group" aria-label="Live annotations"><button type="button" data-presenter="tool" data-value="move" aria-pressed="true">View</button><button type="button" data-presenter="tool" data-value="pen" aria-pressed="false">✎ Pen</button><button type="button" data-presenter="tool" data-value="arrow" aria-pressed="false">↗ Arrow</button><button type="button" data-presenter="tool" data-value="text" aria-pressed="false">T Text</button><button type="button" data-presenter="tool" data-value="laser" aria-pressed="false">● Laser pointer</button><label>Colour<input type="color" name="color" value="${color}"></label><label>Width<input type="range" name="width" min="2" max="10" step="1" value="${width}"></label><button type="button" data-presenter="undo">Undo mark</button><button type="button" data-presenter="clear">Clear marks</button></div><div class="presenter-text-tools"><label>Live text<textarea name="annotationText" maxlength="240" rows="2" placeholder="Type a message, choose Text, then click the preview to place it.">${esc(textDraft)}</textarea></label><label>Text size<input name="annotationSize" type="number" min="16" max="40" step="2" value="${textSize}"></label><button type="button" data-presenter="update-text">Update last text</button></div><p class="presenter-hint">Use Text to place a message or Laser pointer to point without leaving a mark. Draw on this preview to highlight the audience screen. Marks clear when the step or scene changes; saved processes and exports stay unchanged. Up to 100 marks per scene.</p><div class="presenter-screen-options"><button type="button" data-presenter="hold" aria-pressed="false">Hold screen</button><button type="button" data-presenter="cover" aria-pressed="false">Hide content</button><label>Text size<input name="textScale" type="range" min="0.85" max="1.4" step="0.05" value="${textScale}"></label><label><input name="overview" type="checkbox"${overview ? ' checked' : ''}>Whole diagram</label></div><div class="presenter-notes"><span class="presenter-kicker">PRIVATE PRESENTER NOTES</span><h3 data-presenter-step></h3><p data-presenter-notes></p></div></section><aside class="presenter-controls"><section><h3>Your walkthrough</h3><label>Saved process<select name="process"></select></label><label>Scenario<select name="scenario"></select></label><div class="presenter-playback">${[
+        panel.innerHTML = `<header class="presenter-header"><div><span class="presenter-kicker">YOUR PRIVATE CONTROL ROOM</span><h2 id="presenterTitle">Present with confidence.</h2><p>Share the separate audience window. Your notes and controls stay here.</p></div><div class="actions"><button type="button" data-presenter="expand" aria-pressed="false">Expand canvas</button><button type="button" data-presenter="window">Open audience window ↗</button><button type="button" data-presenter="close-panel" aria-label="Close presenter controls">✕</button></div></header><div class="presenter-status" data-presenter-status role="status">Opening audience window…</div><div class="presenter-display-actions"><button type="button" data-presenter="fullscreen">⛶ Audience full screen</button><span data-presenter-display-status role="status"></span><details class="presenter-screen-setup"><summary>Choose display</summary>${a.screens ? a.screens.markup('presenterScreen', 'data-presenter="screens"') : ''}</details></div><div class="presenter-layout"><section class="presenter-screen"><div class="presenter-preview-label"><strong>AUDIENCE PREVIEW</strong><span>Drag the diagram to pan, scroll to zoom, or click a step to explain it.</span></div><div class="presenter-preview" tabindex="0" data-tool="move" aria-label="Interactive process canvas. Drag to pan, scroll to zoom, click a step, or choose Select / move for annotations."></div><div class="presenter-canvas-tools"><button type="button" data-presenter="back" data-playback-control aria-label="Previous process step">←</button><button type="button" data-presenter="play" data-playback-control>Pause</button><button type="button" data-presenter="next" data-playback-control aria-label="Next process step">→</button><button type="button" data-presenter="zoom-out" aria-label="Zoom diagram out">−</button><button type="button" data-presenter="zoom-in" aria-label="Zoom diagram in">＋</button><button type="button" data-presenter="fit">Fit diagram</button><button type="button" data-presenter="follow">Follow current step</button><label><input name="details" type="checkbox">Show step details</label><span data-presenter-mark-status role="status"></span></div><div class="presenter-ink" role="group" aria-label="Live annotations"><button type="button" data-presenter="tool" data-value="move" aria-pressed="true">Explore</button><button type="button" data-presenter="tool" data-value="select" aria-pressed="false">Select / move</button><button type="button" data-presenter="tool" data-value="pen" aria-pressed="false">✎ Pen</button><button type="button" data-presenter="tool" data-value="arrow" aria-pressed="false">↗ Arrow</button><button type="button" data-presenter="tool" data-value="text" aria-pressed="false">T Text</button><button type="button" data-presenter="tool" data-value="laser" aria-pressed="false">● Laser pointer</button><label>Colour<input type="color" name="color" value="${color}"></label><label>Width<input type="range" name="width" min="2" max="10" step="1" value="${width}"></label><button type="button" data-presenter="delete-mark" disabled>Delete selected</button><button type="button" data-presenter="undo">Undo mark</button><button type="button" data-presenter="clear">Clear marks</button></div><div class="presenter-text-tools"><label>Live text<textarea name="annotationText" maxlength="240" rows="2" placeholder="Type a message, choose Text, then click the preview to place it.">${esc(textDraft)}</textarea></label><label>Text size<input name="annotationSize" type="number" min="16" max="40" step="2" value="${textSize}"></label><button type="button" data-presenter="update-text">Update last text</button></div><p class="presenter-hint">Explore moves the diagram; Select / move repositions placed text, arrows and pen marks. Select a note to edit its text. Marks stay on the screen while you pan or zoom; Escape cancels a drag. Marks clear when the step or scene changes; saved processes and exports stay unchanged. Up to 100 marks per scene.</p><div class="presenter-screen-options"><button type="button" data-presenter="hold" aria-pressed="false">Hold screen</button><button type="button" data-presenter="cover" aria-pressed="false">Hide content</button><label>Text size<input name="textScale" type="range" min="0.85" max="1.4" step="0.05" value="${textScale}"></label><label><input name="overview" type="checkbox"${overview ? ' checked' : ''}>Whole diagram</label></div><div class="presenter-notes"><span class="presenter-kicker">PRIVATE PRESENTER NOTES</span><h3 data-presenter-step></h3><p data-presenter-notes></p></div></section><aside class="presenter-controls"><section><h3>Your walkthrough</h3><label>Saved process<select name="process"></select></label><label>Scenario<select name="scenario"></select></label><div class="presenter-playback">${[
           ['back', '← Previous'],
           ['play', 'Pause'],
           ['next', 'Next →'],
@@ -318,10 +456,17 @@
           if (el.name === 'annotationText') textDraft = el.value.slice(0, 240);
           else if (el.name === 'annotationSize')
             textSize = Math.max(16, Math.min(40, Number(el.value) || 24));
-          else if (el.name === 'color') color = el.value;
-          else if (el.name === 'width') width = Number(el.value);
-          else if (el.name === 'textScale') textScale = Number(el.value);
-          else if (el.name === 'overview') overview = el.checked;
+          else if (el.name === 'color') {
+            color = el.value;
+            if (tool === 'select' && marks[selectedMark]) marks[selectedMark].color = color;
+          } else if (el.name === 'width') {
+            width = Number(el.value);
+            if (tool === 'select' && marks[selectedMark]) marks[selectedMark].width = width;
+          } else if (el.name === 'textScale') textScale = Number(el.value);
+          else if (el.name === 'overview') {
+            overview = el.checked;
+            camera = null;
+          } else if (el.name === 'details') mapOnly = !el.checked;
           else if (el.name === 'interactive') a.command('interactive', el.checked);
           else if (['process', 'scenario'].includes(el.name)) {
             if (held || cover || breakSession) {
@@ -360,70 +505,243 @@
           marks = [];
           publish(true);
         });
+
         host.addEventListener('pointerdown', event => {
-          if (tool === 'move' || event.button !== 0 || !live()) return;
+          if (event.button !== 0 || !live() || gesture || drawing) return;
           if (tool === 'laser') {
             pointLaser(event, host);
             return;
           }
-          if (marks.length >= 100) return;
-          if (tool === 'text') {
-            const text = panel.querySelector('[name="annotationText"]').value.trim().slice(0, 240);
-            if (!text) {
-              a.tell?.('Type your live text first, then click the preview.');
+          const p = point(event, host),
+            V = root.WorkHubAudienceView;
+          if (tool === 'move') {
+            const graph = host.querySelector('.av-graph'),
+              c = preview.camera();
+            if (!event.target.closest('.av-map') || !graph || !c || held || cover || breakSession)
+              return;
+            gesture = {
+              kind: 'pan',
+              id: event.pointerId,
+              start: [event.clientX, event.clientY],
+              rect: graph.getBoundingClientRect(),
+              camera: c,
+              previousCamera: camera,
+              node: event.target.closest('[data-node]')?.dataset.node,
+              moved: false,
+            };
+          } else if (tool === 'select') {
+            selectMark(V.hitMark(marks, p));
+            if (selectedMark >= 0)
+              gesture = {
+                kind: 'mark',
+                id: event.pointerId,
+                index: selectedMark,
+                start: p,
+                original: marks[selectedMark],
+              };
+            publish(true);
+          } else {
+            if (marks.length >= 100) return;
+            if (!held && !cover && !breakSession && !a.privateInfo().paused) void a.command('play');
+            if (tool === 'text') {
+              const text = panel
+                .querySelector('[name="annotationText"]')
+                .value.trim()
+                .slice(0, 240);
+              if (!text) {
+                a.tell?.('Type your live text first, then click the preview.');
+                return;
+              }
+              const size = Math.max(
+                16,
+                Math.min(40, Number(panel.querySelector('[name="annotationSize"]').value) || 24)
+              );
+              const mark = { type: 'text', text, fontSize: size, color, width, points: [p] };
+              marks.push(V.moveMark(mark, 0, 0));
+              selectMark(marks.length - 1);
+              setTool('select');
+              publish(true);
               return;
             }
-            const size = Math.max(
-              16,
-              Math.min(40, Number(panel.querySelector('[name="annotationSize"]').value) || 24)
-            );
-            marks.push({
-              type: 'text',
-              text,
-              fontSize: size,
-              color,
-              width,
-              points: [point(event, host)],
-            });
+            drawing = { type: tool, color, width, points: [p], pointerId: event.pointerId };
             publish(true);
-            return;
           }
           event.preventDefault();
-          host.setPointerCapture?.(event.pointerId);
-          drawing = { type: tool, color, width, points: [point(event, host)] };
-          publish(true);
+          host.focus({ preventScroll: true });
+          try {
+            host.setPointerCapture?.(event.pointerId);
+          } catch {}
         });
         host.addEventListener('pointermove', event => {
-          if (tool === 'laser' && live()) {
+          if (!live()) return;
+          if (tool === 'laser') {
             pointLaser(event, host);
             return;
           }
-          if (!drawing) return;
+          if (gesture) {
+            if (event.pointerId !== gesture.id) return;
+            event.preventDefault();
+            if (gesture.kind === 'mark') {
+              const p = point(event, host);
+              marks[gesture.index] = root.WorkHubAudienceView.moveMark(
+                gesture.original,
+                p[0] - gesture.start[0],
+                p[1] - gesture.start[1]
+              );
+            } else {
+              if (
+                Math.hypot(event.clientX - gesture.start[0], event.clientY - gesture.start[1]) <
+                  4 &&
+                !gesture.moved
+              )
+                return;
+              gesture.moved = true;
+              const V = root.WorkHubAudienceView,
+                from = V.graphPoint(gesture.start, gesture.rect, gesture.camera),
+                to = V.graphPoint([event.clientX, event.clientY], gesture.rect, gesture.camera);
+              camera = {
+                ...gesture.camera,
+                x: gesture.camera.x + from.x - to.x,
+                y: gesture.camera.y + from.y - to.y,
+              };
+            }
+            queuePublish();
+            return;
+          }
+          if (!drawing || event.pointerId !== drawing.pointerId) return;
           event.preventDefault();
           const p = point(event, host);
           if (drawing.type === 'arrow') drawing.points = [drawing.points[0], p];
           else if (drawing.points.length < 300) drawing.points.push(p);
-          if (!markFrame)
-            markFrame = root.requestAnimationFrame(() => {
-              markFrame = 0;
-              if (root.performance.now() - lastMarkSent >= 40) {
-                lastMarkSent = root.performance.now();
-                publish(true);
-              }
-            });
+          queuePublish();
         });
-        const finish = () => {
-          if (!drawing) return;
-          if (drawing.points.length > 1) marks.push(drawing);
-          drawing = null;
-          publish(true);
+        const finish = event => {
+          if (gesture && event.pointerId === gesture.id) {
+            const completed = gesture;
+            gesture = null;
+            if (
+              completed.kind === 'pan' &&
+              !completed.moved &&
+              completed.node &&
+              !held &&
+              !cover &&
+              !breakSession
+            )
+              void Promise.resolve(a.command('step', completed.node)).catch(e =>
+                a.tell?.(e.message, true)
+              );
+            publish(true);
+          }
+          if (drawing && event.pointerId === drawing.pointerId) {
+            const mark = drawing;
+            drawing = null;
+            if (mark.points.length > 1) {
+              delete mark.pointerId;
+              marks.push(mark);
+              if (mark.type === 'arrow') {
+                selectMark(marks.length - 1);
+                setTool('select');
+              }
+            }
+            publish(true);
+          }
+          try {
+            if (host.hasPointerCapture?.(event.pointerId))
+              host.releasePointerCapture(event.pointerId);
+          } catch {}
         };
         host.addEventListener('pointerup', finish);
         host.addEventListener('pointerleave', clearLaser);
-        host.addEventListener('pointercancel', () => {
-          clearLaser();
-          drawing = null;
-          publish(true);
+        for (const name of ['pointercancel', 'lostpointercapture'])
+          host.addEventListener(name, event => {
+            if (
+              (gesture && gesture.id === event.pointerId) ||
+              (drawing && drawing.pointerId === event.pointerId)
+            ) {
+              cancelGesture();
+              publish(true);
+            }
+            clearLaser();
+          });
+        host.addEventListener(
+          'wheel',
+          event => {
+            if (
+              !live() ||
+              !event.target.closest('.av-map') ||
+              !['move', 'select'].includes(tool) ||
+              gesture ||
+              drawing
+            )
+              return;
+            event.preventDefault();
+            zoomCanvas(Math.exp(Math.max(-0.3, Math.min(0.3, event.deltaY * 0.0015))), event);
+          },
+          { passive: false }
+        );
+        host.addEventListener('keydown', event => {
+          if (!live()) return;
+          if (event.key === 'Escape' && (gesture || drawing)) {
+            event.preventDefault();
+            event.stopPropagation();
+            cancelGesture();
+            publish(true);
+            return;
+          }
+          if (tool === 'select' && marks[selectedMark]) {
+            if (['Delete', 'Backspace'].includes(event.key)) {
+              event.preventDefault();
+              marks.splice(selectedMark, 1);
+              selectedMark = -1;
+              publish(true);
+            }
+            const d = {
+              ArrowLeft: [-1, 0],
+              ArrowRight: [1, 0],
+              ArrowUp: [0, -1],
+              ArrowDown: [0, 1],
+            }[event.key];
+            if (d) {
+              event.preventDefault();
+              const n = event.shiftKey ? 10 : 2;
+              marks[selectedMark] = root.WorkHubAudienceView.moveMark(
+                marks[selectedMark],
+                (d[0] * n) / 1000,
+                (d[1] * n) / 562.5
+              );
+              publish(true);
+            }
+          } else if (
+            tool === 'move' &&
+            !held &&
+            !cover &&
+            !breakSession &&
+            event.key.startsWith('Arrow') &&
+            preview?.camera()
+          ) {
+            event.preventDefault();
+            const c = preview.camera(),
+              d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[
+                event.key
+              ];
+            if (d) {
+              camera = { ...c, x: c.x + d[0] * c.width * 0.08, y: c.y + d[1] * c.height * 0.08 };
+              publish(true);
+            }
+          } else if (['+', '=', '-'].includes(event.key)) {
+            event.preventDefault();
+            zoomCanvas(event.key === '-' ? 1.2 : 1 / 1.2);
+          } else if (
+            event.target.closest('[data-node]') &&
+            ['Enter', ' '].includes(event.key) &&
+            !held &&
+            !cover &&
+            !breakSession
+          ) {
+            event.preventDefault();
+            void a.command('step', event.target.closest('[data-node]').dataset.node);
+            publish(true);
+          }
         });
         infoKey = '';
       }
@@ -455,41 +773,36 @@
         }
       } else if (name === 'fullscreen') {
         openWindow();
-        const status = panel?.querySelector('[data-presenter-display-status]');
-        if (!connected()) {
-          if (status)
-            status.textContent =
-              'Audience window is opening. Press Full screen again when connected.';
-          return;
-        }
-        let target;
-        try {
-          target = popup.document.documentElement;
-        } catch {}
-        const ok = a.screens
-          ? await a.screens.fullscreen(target)
-          : await target
-              ?.requestFullscreen?.()
-              .then(() => true)
-              .catch(() => false);
-        if (status && status.isConnected)
-          status.textContent = ok
-            ? 'Audience fullscreen requested on your selected display.'
-            : 'Use Full screen in the audience window if the browser requires a click there.';
+        if (connected()) await fullscreenAudience();
       } else if (name === 'window') openWindow();
       else if (name === 'close-panel') closePanel();
       else if (name === 'end') {
         close();
         return;
       } else if (name === 'tool') {
-        clearLaser();
-        drawing = null;
-        tool = value;
-        panel.querySelector('.presenter-preview').dataset.tool = tool;
-        for (const b of panel.querySelectorAll('[data-presenter="tool"]'))
-          b.setAttribute('aria-pressed', String(b.dataset.value === tool));
+        cancelGesture();
+        setTool(value);
+      } else if (name === 'expand') {
+        const wide = panel.dataset.expanded !== 'true';
+        panel.dataset.expanded = String(wide);
+        const b = panel.querySelector('[data-presenter="expand"]');
+        b.textContent = wide ? 'Restore controls' : 'Expand canvas';
+        b.setAttribute('aria-pressed', String(wide));
+      } else if (name === 'fit' || name === 'follow') {
+        if (held || cover || breakSession) return;
+        camera = null;
+        overview = name === 'fit';
+        panel.querySelector('[name="overview"]').checked = overview;
+      } else if (name === 'zoom-in' || name === 'zoom-out')
+        zoomCanvas(name === 'zoom-in' ? 1 / 1.2 : 1.2);
+      else if (name === 'delete-mark') {
+        if (selectedMark >= 0) marks.splice(selectedMark, 1);
+        selectedMark = -1;
       } else if (name === 'update-text') {
-        const mark = [...marks].reverse().find(m => m.type === 'text');
+        const mark =
+          marks[selectedMark]?.type === 'text'
+            ? marks[selectedMark]
+            : [...marks].reverse().find(m => m.type === 'text');
         const text = panel.querySelector('[name="annotationText"]').value.trim().slice(0, 240);
         if (mark && text) {
           mark.text = text;
@@ -499,10 +812,13 @@
           a.tell?.(
             'Place a text note first, then type its replacement and choose Update last text.'
           );
-      } else if (name === 'undo') marks.pop();
-      else if (name === 'clear') {
+      } else if (name === 'undo') {
+        marks.pop();
+        selectedMark = -1;
+      } else if (name === 'clear') {
         marks = [];
         drawing = null;
+        selectedMark = -1;
       } else if (name === 'cover') {
         clearLaser();
         cover = !cover;
@@ -541,6 +857,10 @@
         ready = true;
         lastSeen = Date.now();
         publish(true);
+        if (event.data.type === 'workhub-audience-ready') void fullscreenAudience();
+      } else if (event.data.type === 'workhub-audience-fullscreen') {
+        audienceFull = event.data.fullscreen === true;
+        updateControls();
       } else if (event.data.type === 'workhub-audience-closed') {
         ready = false;
         notice('Audience window closed. Open it again when ready.');
@@ -564,6 +884,9 @@
         hidden: cover,
         breaking: !!breakSession,
         marks: marks.length,
+        selectedMark,
+        camera: camera ? { ...camera } : null,
+        audienceFull,
       }),
     };
   }

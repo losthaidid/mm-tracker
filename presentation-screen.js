@@ -47,7 +47,9 @@
       try {
         if (!available()) throw Error('screen disconnected');
         if (!element?.requestFullscreen) throw Error('fullscreen unavailable');
-        await element.requestFullscreen(selected ? { screen: selected } : undefined);
+        await element.requestFullscreen(
+          selected ? { screen: selected, navigationUI: 'hide' } : { navigationUI: 'hide' }
+        );
         if (epoch !== generation || !valid()) {
           const doc = element.ownerDocument;
           if (doc?.fullscreenElement === element) await doc.exitFullscreen?.().catch(() => {});
@@ -59,7 +61,7 @@
           report(
             !available()
               ? 'The selected screen disconnected. Choose an available screen and try again.'
-              : 'Fullscreen was not allowed. Use Full screen in the audience window, or maximise that window on your shared display.'
+              : 'Fullscreen needs a click in the presentation window. Choose Start full screen there.'
           );
         return false;
       }

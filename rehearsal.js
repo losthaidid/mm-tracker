@@ -2087,6 +2087,19 @@
           lastModel = '';
           paused = false;
           a.render();
+        } else if (action === 'step') {
+          const p = model();
+          if (!p.steps.some(s => s.id === value)) return;
+          route = E.plan({ ...p, startId: value }, scenario(p), overrides, routeChoices, {});
+          reverse = null;
+          visitChoices = {};
+          answered.clear();
+          index = 0;
+          elapsed = 0;
+          selected = value;
+          paused = true;
+          paintKey = '';
+          paint(false);
         } else if (action === 'interactive') {
           interactive = value;
           answered.clear();

@@ -20,6 +20,21 @@ Use **View** to switch between Normal, Full screen and Presentation. Saved proce
 
 Presentation shows the same animated graph and current-step explanation, responsibility, prerequisites, inputs, outputs, expected result and screenshot. An optional user-facing explanation replaces internal instructions. Configuration, internal failure details, testing, linked account records and private presenter notes stay in the reference view. Presentation still supports process/scenario selection, pause, restart, manual steps and sound. It does not identify or move to a monitor being shared by a meeting application.
 
+### Separate audience window and interactive presenter canvas
+
+Choose **Presenter controls** to open a private control room and a separate audience window. Share only the audience window in your meeting app. **Choose display** lets you select the shared monitor where supported; the website does not detect your meeting app's selection.
+
+The audience window requests native fullscreen instead of treating a resized window as fullscreen. If the browser requires a gesture inside that window, click its prominent **Start full screen** button once. The presenter reports **true fullscreen** only after the native fullscreen state is confirmed. Escape leaves fullscreen and offers the button again; **Stay windowed** dismisses the prompt. Audience controls fade in fullscreen and reappear on hover or keyboard focus.
+
+The presenter uses the full browser viewport. **Expand canvas** hides the side controls and compacts the header, leaving quick playback, zoom and annotation controls. **Restore controls** brings the sidebar back.
+
+- **Explore:** drag the diagram to pan, scroll or use **+ / −** to zoom, and choose **Fit diagram** or **Follow current step**. Arrow keys pan a focused canvas. Clicking a step, or focusing it and pressing Enter, starts a paused temporary walkthrough from that step; Play continues from there and Restart restores the process's normal start.
+- **Show step details:** toggles the audience's explanation panel. The default larger diagram uses the full map area. Camera movements appear in both the private preview and audience window.
+- **Select / move:** click and drag placed text, arrows or pen marks. Arrow keys nudge the selection; Shift uses larger nudges. Delete/Backspace or **Delete selected** removes it. Cancelled drags restore the original position. Arrows keep their shape when moved.
+- **Text:** type a message, choose Text and click the preview. Select an existing note, change its text/size/colour, then choose **Update selected text**. New arrows and text switch to Select / move automatically.
+
+Starting an annotation pauses an actively playing process so the scene does not advance while you place the mark. Marks remain attached to the presentation screen while the diagram pans/zooms, and clear when the step or scene changes. The laser leaves no permanent mark. These controls are temporary: they never change saved step positions, process records, private notes or exports, and are cleared when the presentation ends or the account changes.
+
 ## Animation, audio and scenarios
 
 Document tokens move between steps, active edges flow, approvals receive stamps, successful value updates flash, exceptions shake and rewind retraces a connector. These are the existing rehearsal effects. Choose Cosy desk, Blueprint or Control room, quiet/balanced/expressive effects, and 0.5x/1x/1.5x/2x speed. Large background effects pause while the full-screen canvas covers the workspace. Library adapters are cached between edits rather than copied every animation frame.
