@@ -2874,3 +2874,13 @@ test('Process Hub: old hub records play and edit without copying or losing their
  api.showTab('processhub');const old=api.state().workhub.processes[0];api.hub.rehearsal.open(old.id);api.showTab('processhub');const calls=db.calls.length;for(let n=1;n<100;n++)api.hub.rehearsal.tick(n*150);assert.equal(db.calls.length,calls);assert.equal(api.state().workhub.rehearsal.processes.length,0);
  document.querySelector('[data-rehearsal="edit-process"]').click();await settle();api.hub.rehearsal.stepEditor(old.steps[0].id);const f=document.getElementById('rehearsalStepForm');assert.equal(f.elements.namedItem('configuration').value,'Existing configuration');fill(f,{expected:'A maintained result'});document.querySelector('[data-rehearsal="save-draft"]').click();await settle();const updated=api.state().workhub.processes[0];assert.equal(updated.steps[0].testing,'Existing tests');assert.equal(updated.steps[0].expected,'A maintained result');assert.deepEqual(copy(updated.steps[0].next),old.steps[0].next);assert.equal(api.state().workhub.rehearsal.processes.length,0);api.validate(api.state());api.parseBackup(JSON.stringify(db.row.document));
 });
+
+test('Batch D: named decision answers save through the account document and reload without presentation-state writes',async t=>{
+ const {api,document,window,db}=await app(t);api.showTab('processhub');document.querySelector('[data-rehearsal="keep"]').click();await settle();
+ const rehearsal=api.hub.rehearsal;rehearsal.stepEditor('match');const form=document.getElementById('rehearsalStepForm');
+ fill(form,{decisionQuestion:'Is the request complete?','decisionLabel-0':'Continue to review','decisionNext-0':'invoice','decisionLabel-1':'Ask for details','decisionNext-1':'followup'});form.elements.namedItem('decisionEnabled').checked=true;
+ rehearsal.saveForm(form);await settle();assert.equal(rehearsal.model().steps.find(s=>s.id==='match').decision.question,'Is the request complete?');
+ const saved=api.parseBackup(JSON.stringify(db.row.document));assert.equal(saved.workhub.rehearsal.processes[0].steps.find(s=>s.id==='match').decision.answers[1].label,'Ask for details');
+ const before=db.calls.length;const mode=document.getElementById('rehearsalDecisionMode');mode.value='interactive';mode.dispatchEvent(new window.Event('change',{bubbles:true}));window.open=()=>null;rehearsal.presenter.open();await settle();assert.equal(db.calls.length,before);rehearsal.presenter.close();
+ const reloaded=await app(t,{remote:copy(db.row),login:false});await reloaded.api.loadCloud(sessionUser);reloaded.api.showTab('processhub');assert.equal(reloaded.api.hub.rehearsal.model().steps.find(s=>s.id==='match').decision.answers[0].next,'invoice');
+});

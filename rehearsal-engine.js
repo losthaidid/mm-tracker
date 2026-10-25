@@ -79,6 +79,31 @@
       };
     return d;
   }
+  // Explicit answers extend existing routes; old processes need no migration.
+  function answers(step) {
+    if (step.type !== 'decision') return [];
+    if (step.decision) return step.decision.answers.map(a => ({ ...a, outcome: 'success' }));
+    return [
+      ...[step.next, ...(step.alternatives || [])].filter(Boolean).map((next, i) => ({
+        label: i === 0 ? 'Continue' : 'Alternative ' + i,
+        next,
+        outcome: 'success',
+      })),
+      ...(step.failNext ? [{ label: 'Exception', next: step.failNext, outcome: 'failure' }] : []),
+    ];
+  }
+  function connections(step) {
+    return [
+      ...new Set(
+        [
+          step.next,
+          ...(step.alternatives || []),
+          step.failNext,
+          ...(step.decision?.answers || []).map(a => a.next),
+        ].filter(Boolean)
+      ),
+    ];
+  }
   function validateSaved(h, maxSteps = 80) {
     const p = h?.preferences;
     if (
@@ -166,6 +191,35 @@
               s.alternatives.some(id => !stepIds.has(id) || id === s.next)))
         )
           throw Error('Check step references and alternative routes.');
+        if (s.decision !== undefined) {
+          const q = s.decision;
+          if (
+            s.type !== 'decision' ||
+            !q ||
+            !text(q.question, 500) ||
+            !q.question.trim() ||
+            !Array.isArray(q.answers) ||
+            q.answers.length < 2 ||
+            q.answers.length > 6 ||
+            q.answers.some(
+              a =>
+                !a ||
+                !text(a.label, 120) ||
+                !a.label.trim() ||
+                !text(a.next, 100) ||
+                (a.next && !stepIds.has(a.next))
+            ) ||
+            new Set(q.answers.map(a => a.next)).size !== q.answers.length ||
+            new Set(q.answers.map(a => a.label.trim().toLowerCase())).size !== q.answers.length ||
+            (q.defaultNext !== undefined && q.defaultNext !== s.next) ||
+            !q.answers.some(a => a.next === s.next) ||
+            q.answers.some(a => a.next && ![s.next, ...(s.alternatives || [])].includes(a.next)) ||
+            [s.next, ...(s.alternatives || [])].some(id => !q.answers.some(a => a.next === id))
+          )
+            throw Error(
+              'Maintain a decision question and 2–6 uniquely labelled, connected answers with a default route.'
+            );
+        }
         imageBytes += s.image.length;
         for (const c of s.changes)
           if (
@@ -204,7 +258,14 @@
             Array.isArray(s.routes) ||
             Object.entries(s.routes).some(([id, next]) => {
               const step = process.steps.find(x => x.id === id);
-              return !step || ![step.next, ...(step.alternatives || [])].includes(next);
+              return (
+                !step ||
+                ![
+                  step.next,
+                  ...(step.alternatives || []),
+                  ...(step.decision?.answers || []).map(a => a.next),
+                ].includes(next)
+              );
             }))
         )
           throw Error('Choose a connected scenario route.');
@@ -268,8 +329,10 @@
         tcode: s.tcodes || '',
         instruction: s.notes || '',
         failure: s.errors || '',
-        next: s.next[0] || '',
-        alternatives: s.next.slice(1),
+        next: s.decision?.defaultNext ?? (s.next[0] || ''),
+        alternatives: s.decision
+          ? s.next.filter(id => id !== (s.decision.defaultNext ?? s.next[0]))
+          : s.next.slice(1),
         failNext: s.failNext || '',
         changes: s.changes || [],
       })),
@@ -313,6 +376,7 @@
         notes: s.instruction,
         errors: s.failure,
         next: [s.next, ...s.alternatives].filter(Boolean),
+        ...(s.decision ? { decision: { ...s.decision, defaultNext: s.next } } : {}),
       }));
     } else {
       const list = d.workhub.rehearsal.processes,
@@ -342,7 +406,7 @@
     checkValues(result);
     return { values: result, changes: diff };
   }
-  function plan(process, scenario, overrides = {}, routes = {}) {
+  function plan(process, scenario, overrides = {}, routes = {}, visitChoices = {}) {
     const map = new Map(process.steps.map(s => [s.id, s])),
       entries = [],
       visits = new Map();
@@ -361,13 +425,30 @@
         ending = 'loop-guard';
         break;
       }
-      const outcome = overrides[s.id] || scenario.choices[s.id] || 'success',
+      const chosen =
+          visitChoices[entries.length]?.id === s.id ? visitChoices[entries.length] : null,
+        outcome = chosen?.outcome || overrides[s.id] || scenario.choices[s.id] || 'success',
         before = copy(state),
         applied =
           outcome === 'failure' ? { values: before, changes: [] } : apply(before, s.changes),
-        nextId =
-          outcome === 'failure' ? s.failNext : routes[s.id] || scenario.routes?.[s.id] || s.next;
-      if (nextId && outcome !== 'failure' && ![s.next, ...(s.alternatives || [])].includes(nextId))
+        nextId = chosen
+          ? chosen.next
+          : outcome === 'failure'
+            ? s.failNext
+            : Object.hasOwn(routes, s.id)
+              ? routes[s.id]
+              : (scenario.routes?.[s.id] ?? s.next);
+      if (chosen && !answers(s).some(a => a.next === nextId && a.outcome === outcome))
+        throw Error('Choose a connected decision answer.');
+      if (
+        nextId &&
+        outcome !== 'failure' &&
+        ![
+          s.next,
+          ...(s.alternatives || []),
+          ...(s.decision?.answers || []).map(a => a.next),
+        ].includes(nextId)
+      )
         throw Error('Choose a connected next step.');
       state = applied.values;
       entries.push({
@@ -401,7 +482,7 @@
       const id = queue.shift(),
         s = nodes.get(id);
       if (!s) continue;
-      for (const next of [s.next, s.failNext, ...(s.alternatives || [])])
+      for (const next of connections(s))
         if (next && nodes.has(next) && !depth.has(next)) {
           depth.set(next, Math.min(14, depth.get(id) + 1));
           queue.push(next);
@@ -558,6 +639,8 @@
   root.WorkHubRehearsalEngine = {
     TYPES,
     THEMES,
+    answers,
+    connections,
     PROCESS_FIELDS,
     STEP_FIELDS,
     upgrade,

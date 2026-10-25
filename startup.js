@@ -13,7 +13,8 @@
   let finished = false,
     blocked = false,
     workspaceName = 'Your workspace',
-    message = 'Getting your workspace ready…';
+    message = 'Getting your workspace ready…',
+    stage = 'assets';
 
   function showName(value) {
     workspaceName =
@@ -49,6 +50,22 @@
     showName();
   }
 
+  function phase(value, label) {
+    if (finished || blocked || !['assets', 'account', 'records'].includes(value)) return;
+    stage = value;
+    const stages = ['assets', 'account', 'records'],
+      index = stages.indexOf(stage);
+    for (const el of document.querySelectorAll('[data-startup-stage]')) {
+      const i = stages.indexOf(el.dataset.startupStage);
+      el.dataset.state = i < index ? 'done' : i === index ? 'active' : 'waiting';
+      if (i === index) el.setAttribute('aria-current', 'step');
+      else el.removeAttribute('aria-current');
+    }
+    document
+      .getElementById('workhubStartupProgress')
+      ?.setAttribute('aria-valuetext', label || message);
+    if (label) showMessage(label);
+  }
   function showMessage(value) {
     message = value;
     const status = document.getElementById('workhubStartupStatus');
@@ -60,7 +77,7 @@
       return;
     blocked = true;
     page.dataset.workhubStartupState = 'error';
-    showMessage('WorkHub could not finish opening. Check your connection and reload.');
+    showMessage('Your workspace could not finish opening. Check your connection and reload.');
   }
   function rejected() {
     failed({ target: root });
@@ -79,6 +96,7 @@
       if (finished) return;
       showName(workspaceName);
       showMessage(message);
+      phase(stage);
       document.getElementById('workhubStartupReload')?.addEventListener('click', event => {
         event.preventDefault();
         root.location.reload();
@@ -87,8 +105,12 @@
     { once: true }
   );
 
+  document.addEventListener('visibilitychange', () => {
+    if (!finished) page.toggleAttribute('data-startup-hidden', document.hidden);
+  });
   root.WorkHubStartup = {
     account,
+    phase,
     name: showName,
     brand() {
       showName(workspaceName);
@@ -110,6 +132,7 @@
       screen.inert = true;
       // CSS fades the cover; reduced-motion users see the workspace immediately.
       screen.classList.add('is-leaving');
+      delete page.dataset.startupHidden;
       const remove = () => screen.remove();
       screen.addEventListener('transitionend', remove, { once: true });
       root.setTimeout(remove, 220);
