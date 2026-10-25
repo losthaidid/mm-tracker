@@ -662,3 +662,19 @@ body[data-atmosphere-paused='true'] .ambient-landscape * {
     transform: translateY(-3px) rotate(2deg);
   }
 }
+
+/* Keep the sky flowing while controls are used. Hide falling weather on a real pause;
+   freezing a raindrop halfway through its fall leaves a misleading hanging streak. */
+:is(#hubAtmosphereCard, #hubAtmospherePocket)[data-paused='true'] :is(.world-rain, .world-snow),
+body[data-atmosphere-paused='true'] .ambient-landscape :is(.world-rain, .world-snow),
+body[data-motion='off'] .ambient-landscape :is(.world-rain, .world-snow),
+body:is(.hub-focus, .hub-private, .hub-present, .rest-room-open)
+  .ambient-landscape
+  :is(.world-rain, .world-snow) {
+  display: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ambient-landscape :is(.world-rain, .world-snow) {
+    display: none !important;
+  }
+}

@@ -509,6 +509,7 @@
     const petPositionKey = 'mm-tracker.companion-position.v1';
     let petPosition = { x: 1, y: 0.42 },
       petDrag = null,
+      companionPinned = false,
       petSuppressClickUntil = 0,
       petWalk = null,
       petFrame = 0,
@@ -516,11 +517,13 @@
       petStation = 0;
     try {
       const saved = JSON.parse(localStorage.getItem(petPositionKey) || 'null');
-      if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y))
+      if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
+        companionPinned = saved.pinned === true;
         petPosition = {
           x: Math.min(1, Math.max(0, saved.x)),
           y: Math.min(1, Math.max(0, saved.y)),
         };
+      }
     } catch {}
     function companionBounds() {
       const v = root.visualViewport,
@@ -603,17 +606,33 @@
           top: top - b.top < 110 ? 'calc(100% + 10px)' : 'auto',
           bottom: top - b.top < 110 ? 'auto' : 'calc(100% + 10px)',
         });
+      pet.dataset.positionPinned = String(companionPinned);
       life?.layout();
       adventures?.moved(before, { x: left, y: top });
     }
     function rememberCompanion() {
       try {
-        localStorage.setItem(petPositionKey, JSON.stringify(petPosition));
+        localStorage.setItem(
+          petPositionKey,
+          JSON.stringify({ ...petPosition, pinned: companionPinned })
+        );
       } catch {}
+    }
+    function pinCompanion(value) {
+      stopCompanionWalk();
+      moments?.finish(false);
+      adventures?.finish(false);
+      life?.manualMove();
+      companionPinned = value;
+      rememberCompanion();
+      if ($('hubPet')) $('hubPet').dataset.positionPinned = String(value);
+      petNextWalk = Date.now() + 20000;
     }
     document.addEventListener('pointerdown', event => {
       const button = event.target.closest?.('#hubPet > button');
       if (!button || event.button > 0) return;
+      moments?.finish(false);
+      adventures?.finish(false);
       stopCompanionWalk();
       petNextWalk = Date.now() + 20000;
       const pet = $('hubPet');
@@ -649,7 +668,7 @@
       petDrag = null;
       if (drag.moved) {
         petSuppressClickUntil = Date.now() + 600;
-        rememberCompanion();
+        pinCompanion(true);
       }
       try {
         drag.button.releasePointerCapture?.(event.pointerId);
@@ -658,6 +677,7 @@
     }
     document.addEventListener('pointerup', endCompanionDrag);
     document.addEventListener('pointercancel', endCompanionDrag);
+    document.addEventListener('lostpointercapture', endCompanionDrag);
     document.addEventListener('keydown', event => {
       if (
         !event.target.closest?.('#hubPet > button') ||
@@ -665,7 +685,8 @@
       )
         return;
       event.preventDefault();
-      stopCompanionWalk();
+      if (life?.sleeping()) return;
+      pinCompanion(true);
       petNextWalk = Date.now() + 20000;
       const pet = $('hubPet'),
         step = event.shiftKey ? 32 : 12;
@@ -694,6 +715,7 @@
         a.cloud().ready &&
         p.mascot &&
         p.roaming &&
+        !companionPinned &&
         p.motion !== 'off' &&
         !root.matchMedia?.('(prefers-reduced-motion: reduce)').matches &&
         !document.hidden &&
@@ -769,7 +791,10 @@
     root.visualViewport?.addEventListener('resize', resizeFloaters);
     root.visualViewport?.addEventListener('scroll', resizeFloaters);
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden) stopCompanionWalk();
+      if (document.hidden) {
+        stopCompanionWalk();
+        if (petDrag) endCompanionDrag({ pointerId: petDrag.id });
+      }
     });
     document.addEventListener('focusin', () => {
       if (!canCompanionWalk()) stopCompanionWalk();
@@ -3758,6 +3783,8 @@
         !adventures?.snapshot().active &&
         !adventures?.snapshot().bookmark &&
         !moments?.snapshot().active,
+      pinned: () => companionPinned,
+      pin: pinCompanion,
       habitat: () => a.state().workhub.experience?.appearance.habitat || 'auto',
       pet: () => $('hubPet'),
       move: positionCompanion,
@@ -3870,6 +3897,7 @@
       life: () => life,
       workbench: () => workbench,
       move: positionCompanion,
+      canAutoMove: () => !companionPinned,
       react,
     });
     focusPanel = root.WorkHubFocusPanel?.install({
@@ -3898,6 +3926,7 @@
       workbench: () => workbench,
       move: positionCompanion,
       stop: stopCompanionWalk,
+      canAutoMove: () => !companionPinned,
       react,
     });
     claims = root.WorkHubClaims.install({

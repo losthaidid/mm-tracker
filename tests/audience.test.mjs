@@ -38,3 +38,9 @@ test('audience renderer escapes text, bounds annotations and renders a paused br
  h.receive({type:'workhub-audience-state',snapshot:{kind:'break',message:'Please wait',seconds:0,paused:true,completeMessage:'Ready when you are',scene:'stars'}});
  assert.equal(h.document.querySelector('.av-clock').textContent,'00:00');assert.match(h.document.body.textContent,/Ready when you are/);
 });
+test('audience text is escaped and bounded; authenticated laser updates are transient and clear on disconnect',t=>{
+ const h=audience(t),snapshot=processSnapshot();h.receive({type:'workhub-audience-state',snapshot,marks:[{type:'text',text:'Review <script>alert(1)</script> here',fontSize:24,color:'#ffe0aa',width:4,points:[[.9,.9]]},{type:'text',text:'x'.repeat(241),fontSize:24,color:'#ffe0aa',width:4,points:[[.1,.1]]}]});
+ assert.equal(h.document.querySelectorAll('.av-text-note').length,1);assert.match(h.document.querySelector('.av-text-note text').textContent,/<script>/);assert.equal(h.document.querySelectorAll('script:not([src])').length,0);
+ h.receive({type:'workhub-audience-pointer',pointer:[.3,.4]},{});assert.equal(h.document.querySelector('.av-laser'),null);h.receive({type:'workhub-audience-pointer',pointer:[.3,.4]});assert.equal(h.document.querySelector('.av-laser').hidden,false);
+ h.receive({type:'workhub-audience-pointer',pointer:[2,-1]});assert.equal(h.document.querySelector('.av-laser').hidden,true);h.advance(7000);assert.equal(h.document.querySelector('.av-laser'),null);
+});

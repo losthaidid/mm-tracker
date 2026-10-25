@@ -1048,3 +1048,22 @@ body[data-motion='off'] *::after {
     scroll-behavior: auto !important;
   }
 }
+
+/* Process Hub surfaces retain their solid fill, even if an entrance is interrupted. */
+body:not([data-motion='off']) .process-hub-workspace,
+body[data-spectacle='spectacle'] .fx-stage > header.rehearsal-hero {
+  animation: ph-surface-arrive 0.45s var(--hub-ease) backwards;
+}
+.process-hub-workspace > header.rehearsal-hero {
+  background-color: var(--hub-surface, #fffefa);
+  opacity: 1;
+  isolation: isolate;
+}
+@keyframes ph-surface-arrive {
+  from {
+    transform: translateY(10px);
+  }
+  to {
+    transform: none;
+  }
+}

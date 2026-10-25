@@ -101,7 +101,7 @@
           'input,textarea,select,[contenteditable]:not([contenteditable="false"])'
         ) &&
         !$('hubMomoMenu') &&
-        (!auto || !quiet())
+        (!auto || (a.canAutoMove?.() !== false && !quiet()))
       );
     }
     function finish(restore = true) {

@@ -216,11 +216,11 @@ body[data-experience-phase='evening'] #hubHeader {
 }
 .obs-stars {
   position: absolute;
-  inset: 0;
+  inset: -24px;
   background:
     radial-gradient(circle, #f4e7bc 1px, transparent 2px) 17px 21px/59px 67px,
     radial-gradient(circle, #d5e8f3 1px, transparent 2px) 35px 41px/103px 97px;
-  animation: obs-stars 7s ease-in-out infinite alternate;
+  animation: obs-stars 9s ease-in-out infinite alternate;
 }
 .obs-moon {
   position: absolute;
@@ -231,14 +231,15 @@ body[data-experience-phase='evening'] #hubHeader {
   top: 12%;
   left: 70%;
   box-shadow: inset -12px -3px #c9d1bc;
+  animation: obs-moon-float 6s ease-in-out infinite alternate;
 }
 .obs-telescope {
   transform-origin: 295px 322px;
-  animation: obs-turn 22s ease-in-out infinite alternate;
+  animation: obs-turn 7s ease-in-out infinite alternate;
 }
 .obs-dome {
   transform-origin: 300px 300px;
-  animation: obs-dome 28s ease-in-out infinite alternate;
+  animation: obs-dome 10s ease-in-out infinite alternate;
 }
 .obs-shooting {
   position: absolute;
@@ -374,18 +375,29 @@ body[data-experience-phase='evening'] #hubHeader {
   }
 }
 @keyframes obs-stars {
+  from {
+    opacity: 0.95;
+    transform: translate(-10px, 7px);
+  }
   to {
     opacity: 0.45;
+    transform: translate(12px, -7px);
   }
 }
 @keyframes obs-turn {
+  from {
+    transform: rotate(-12deg);
+  }
   to {
-    transform: rotate(-7deg);
+    transform: rotate(12deg);
   }
 }
 @keyframes obs-dome {
+  from {
+    transform: skewX(-4deg);
+  }
   to {
-    transform: scaleX(0.97);
+    transform: skewX(4deg);
   }
 }
 @keyframes obs-shoot {
@@ -486,8 +498,11 @@ body.hub-present .experience-celebration {
       95px 110px,
       150px 150px;
   }
+  .obs-stars.far {
+    display: none;
+  }
   .obs-dome {
-    animation: none;
+    animation-duration: 14s;
   }
   .rest-scenery-label {
     font-size: 0;
@@ -555,4 +570,71 @@ body[data-experience-paused='true'] #hubMomoHome * {
 .rest-room[data-scenery='observatory'] .rest-countdown small {
   color: #20383e;
   opacity: 1;
+}
+
+.obs-stars.far {
+  opacity: 0.4;
+  background-size:
+    139px 127px,
+    179px 159px;
+  animation-duration: 14s;
+  animation-direction: alternate-reverse;
+}
+.obs-cloud {
+  animation: obs-cloud-drift 12s ease-in-out infinite alternate;
+}
+.obs-ground-mist {
+  animation: obs-cloud-drift 9s ease-in-out infinite alternate-reverse;
+}
+.obs-grass {
+  transform-origin: 300px 480px;
+  animation: obs-grass-sway 3.5s ease-in-out infinite alternate;
+}
+.obs-window,
+.obs-lens {
+  animation: obs-window-glow 3s ease-in-out infinite alternate;
+}
+@keyframes obs-cloud-drift {
+  from {
+    transform: translateX(-18px);
+  }
+  to {
+    transform: translateX(30px);
+  }
+}
+@keyframes obs-moon-float {
+  from {
+    transform: translateY(-7px);
+  }
+  to {
+    transform: translateY(9px);
+  }
+}
+@keyframes obs-grass-sway {
+  from {
+    transform: skewX(-5deg);
+  }
+  to {
+    transform: skewX(5deg);
+  }
+}
+@keyframes obs-window-glow {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 1;
+  }
+}
+#restRoom[data-phase='paused'] .observatory-art * {
+  animation-play-state: paused;
+}
+
+#restRoom[data-motion='still'] .observatory-art * {
+  animation: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .observatory-art * {
+    animation: none !important;
+  }
 }

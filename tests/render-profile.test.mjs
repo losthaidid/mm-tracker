@@ -103,3 +103,6 @@ test('offscreen and covered workspace animation pauses without pausing the visib
   document.body.classList.remove('rest-room-open');card.classList.remove('mv-out-of-view');
   assert.notEqual(window.getComputedStyle(card.querySelector('button')).animationPlayState,'paused');
 });
+test('plain section headings never receive the animated rectangular card border while real cards retain it',async t=>{
+ const {document}=setup(t,{ua:'Desktop',platform:'Win32'}),view=document.getElementById('view');for(const text of ['Knowledge notebook','Waiting on','Studio']){const head=document.createElement('div');head.className='hub-head';head.textContent=text;view.firstElementChild.append(head);}await settle();for(const head of document.querySelectorAll('.hub-head'))assert.equal(head.querySelector('.fx-panel-aura'),null);assert.ok(document.querySelector('.hub-card .fx-panel-aura'));
+});

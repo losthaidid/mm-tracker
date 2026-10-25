@@ -8,7 +8,8 @@
     status = document.getElementById('audienceConnection');
   const view = root.WorkHubAudienceView.create(stage);
   let last = 0,
-    ended = false;
+    ended = false,
+    localLaser = false;
   const neutral = message =>
     view.update({
       kind: 'cover',
@@ -26,6 +27,10 @@
   root.addEventListener('message', event => {
     if (event.origin !== origin || event.source !== source || event.data?.token !== token || ended)
       return;
+    if (event.data.type === 'workhub-audience-pointer') {
+      if (last && !localLaser) view.pointer(event.data.pointer);
+      return;
+    }
     if (event.data.type === 'workhub-audience-end') {
       ended = true;
       last = 0;
@@ -59,6 +64,26 @@
     }
     send('workhub-audience-heartbeat');
   }, 1000);
+  const laserButton = document.getElementById('audienceLaser');
+  laserButton?.addEventListener('click', () => {
+    localLaser = !localLaser;
+    laserButton.setAttribute('aria-pressed', String(localLaser));
+    stage.dataset.laser = String(localLaser);
+    view.pointer(null);
+  });
+  stage.addEventListener('pointermove', event => {
+    if (!localLaser || ended || !last) return;
+    const r = stage.getBoundingClientRect();
+    view.pointer([
+      (event.clientX - r.left) / Math.max(1, r.width),
+      (event.clientY - r.top) / Math.max(1, r.height),
+    ]);
+  });
+  stage.addEventListener('pointerleave', () => view.pointer(null));
+  root.addEventListener('blur', () => view.pointer(null));
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) view.pointer(null);
+  });
   document.getElementById('audienceFullscreen').addEventListener('click', () => {
     if (!document.fullscreenElement && document.documentElement.requestFullscreen)
       void document.documentElement.requestFullscreen().catch(() => {

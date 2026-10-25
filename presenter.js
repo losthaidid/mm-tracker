@@ -27,6 +27,10 @@
       lastMarkSent = 0,
       sceneKey = '',
       infoKey = '';
+    let laser = null,
+      laserFrame = 0,
+      textDraft = '',
+      textSize = 24;
     let tool = 'move',
       color = '#eab956',
       width = 4,
@@ -53,7 +57,26 @@
         ready = false;
       }
     }
+    function clearLaser() {
+      laser = null;
+      if (laserFrame) root.cancelAnimationFrame(laserFrame);
+      laserFrame = 0;
+      preview?.pointer(null);
+      send('workhub-audience-pointer', { pointer: null });
+    }
+    function pointLaser(event, host) {
+      laser = point(event, host);
+      if (!laserFrame)
+        laserFrame = root.requestAnimationFrame(() => {
+          laserFrame = 0;
+          if (!live() || !panel || tool !== 'laser') return;
+          preview?.pointer(laser);
+          if (connected()) send('workhub-audience-pointer', { pointer: laser });
+        });
+    }
     function closePanel() {
+      clearLaser();
+      tool = 'move';
       preview?.destroy();
       preview = null;
       if (panel) {
@@ -140,6 +163,7 @@
       if (sceneKey && sceneKey !== key) {
         marks = [];
         drawing = null;
+        clearLaser();
       }
       sceneKey = key;
       const payload = {
@@ -225,6 +249,7 @@
       if (!live()) return;
       try {
         if (popup && !popup.closed) {
+          a.screens?.place(popup);
           popup.focus();
           return;
         }
@@ -237,7 +262,11 @@
       connectionError = '';
       const url = new URL('audience.html', base);
       url.hash = token;
-      popup = root.open(url.href, 'workhub-audience-' + token, 'popup,width=1280,height=800');
+      popup = root.open(
+        url.href,
+        'workhub-audience-' + token,
+        a.screens?.features() || 'popup,width=1280,height=800'
+      );
       if (!popup) {
         connectionError =
           'The audience window was blocked. Allow pop-ups for this site, then select Open audience window.';
@@ -254,7 +283,7 @@
         panel.id = 'processPresenter';
         panel.className = 'presenter-panel';
         panel.setAttribute('aria-labelledby', 'presenterTitle');
-        panel.innerHTML = `<header class="presenter-header"><div><span class="presenter-kicker">YOUR PRIVATE CONTROL ROOM</span><h2 id="presenterTitle">Present with confidence.</h2><p>Share the separate audience window. Your notes and controls stay here.</p></div><div class="actions"><button type="button" data-presenter="window">Open audience window ↗</button><button type="button" data-presenter="close-panel" aria-label="Close presenter controls">✕</button></div></header><div class="presenter-status" data-presenter-status role="status">Opening audience window…</div><div class="presenter-layout"><section class="presenter-screen"><div class="presenter-preview-label"><strong>AUDIENCE PREVIEW</strong><span>Move that window to your shared screen, then choose Full screen there.</span></div><div class="presenter-preview" tabindex="0" aria-label="Audience preview. Select a drawing tool to annotate."></div><div class="presenter-ink" role="group" aria-label="Live annotations"><button type="button" data-presenter="tool" data-value="move" aria-pressed="true">View</button><button type="button" data-presenter="tool" data-value="pen" aria-pressed="false">✎ Pen</button><button type="button" data-presenter="tool" data-value="arrow" aria-pressed="false">↗ Arrow</button><label>Colour<input type="color" name="color" value="${color}"></label><label>Width<input type="range" name="width" min="2" max="10" step="1" value="${width}"></label><button type="button" data-presenter="undo">Undo mark</button><button type="button" data-presenter="clear">Clear marks</button></div><p class="presenter-hint">Draw on this preview to highlight the audience screen. Marks clear when the step or scene changes; saved processes and exports stay unchanged. Up to 100 marks per scene.</p><div class="presenter-screen-options"><button type="button" data-presenter="hold" aria-pressed="false">Hold screen</button><button type="button" data-presenter="cover" aria-pressed="false">Hide content</button><label>Text size<input name="textScale" type="range" min="0.85" max="1.4" step="0.05" value="${textScale}"></label><label><input name="overview" type="checkbox"${overview ? ' checked' : ''}>Whole diagram</label></div><div class="presenter-notes"><span class="presenter-kicker">PRIVATE PRESENTER NOTES</span><h3 data-presenter-step></h3><p data-presenter-notes></p></div></section><aside class="presenter-controls"><section><h3>Your walkthrough</h3><label>Saved process<select name="process"></select></label><label>Scenario<select name="scenario"></select></label><div class="presenter-playback">${[
+        panel.innerHTML = `<header class="presenter-header"><div><span class="presenter-kicker">YOUR PRIVATE CONTROL ROOM</span><h2 id="presenterTitle">Present with confidence.</h2><p>Share the separate audience window. Your notes and controls stay here.</p></div><div class="actions"><button type="button" data-presenter="window">Open audience window ↗</button><button type="button" data-presenter="close-panel" aria-label="Close presenter controls">✕</button></div></header><div class="presenter-status" data-presenter-status role="status">Opening audience window…</div>${a.screens ? a.screens.markup('presenterScreen', 'data-presenter="screens"') : ''}<div class="presenter-display-actions"><button type="button" data-presenter="fullscreen">⛶ Full screen on selected screen</button><span data-presenter-display-status role="status"></span></div><div class="presenter-layout"><section class="presenter-screen"><div class="presenter-preview-label"><strong>AUDIENCE PREVIEW</strong><span>Choose your shared display below. Full screen presents the audience window there.</span></div><div class="presenter-preview" tabindex="0" aria-label="Audience preview. Select a drawing tool to annotate."></div><div class="presenter-ink" role="group" aria-label="Live annotations"><button type="button" data-presenter="tool" data-value="move" aria-pressed="true">View</button><button type="button" data-presenter="tool" data-value="pen" aria-pressed="false">✎ Pen</button><button type="button" data-presenter="tool" data-value="arrow" aria-pressed="false">↗ Arrow</button><button type="button" data-presenter="tool" data-value="text" aria-pressed="false">T Text</button><button type="button" data-presenter="tool" data-value="laser" aria-pressed="false">● Laser pointer</button><label>Colour<input type="color" name="color" value="${color}"></label><label>Width<input type="range" name="width" min="2" max="10" step="1" value="${width}"></label><button type="button" data-presenter="undo">Undo mark</button><button type="button" data-presenter="clear">Clear marks</button></div><div class="presenter-text-tools"><label>Live text<textarea name="annotationText" maxlength="240" rows="2" placeholder="Type a message, choose Text, then click the preview to place it.">${esc(textDraft)}</textarea></label><label>Text size<input name="annotationSize" type="number" min="16" max="40" step="2" value="${textSize}"></label><button type="button" data-presenter="update-text">Update last text</button></div><p class="presenter-hint">Use Text to place a message or Laser pointer to point without leaving a mark. Draw on this preview to highlight the audience screen. Marks clear when the step or scene changes; saved processes and exports stay unchanged. Up to 100 marks per scene.</p><div class="presenter-screen-options"><button type="button" data-presenter="hold" aria-pressed="false">Hold screen</button><button type="button" data-presenter="cover" aria-pressed="false">Hide content</button><label>Text size<input name="textScale" type="range" min="0.85" max="1.4" step="0.05" value="${textScale}"></label><label><input name="overview" type="checkbox"${overview ? ' checked' : ''}>Whole diagram</label></div><div class="presenter-notes"><span class="presenter-kicker">PRIVATE PRESENTER NOTES</span><h3 data-presenter-step></h3><p data-presenter-notes></p></div></section><aside class="presenter-controls"><section><h3>Your walkthrough</h3><label>Saved process<select name="process"></select></label><label>Scenario<select name="scenario"></select></label><div class="presenter-playback">${[
           ['back', '← Previous'],
           ['play', 'Pause'],
           ['next', 'Next →'],
@@ -282,7 +311,14 @@
         });
         panel.addEventListener('change', event => {
           const el = event.target;
-          if (el.name === 'color') color = el.value;
+          if (el.matches('[data-presentation-screen]')) {
+            a.screens?.choose(el.value);
+            return;
+          }
+          if (el.name === 'annotationText') textDraft = el.value.slice(0, 240);
+          else if (el.name === 'annotationSize')
+            textSize = Math.max(16, Math.min(40, Number(el.value) || 24));
+          else if (el.name === 'color') color = el.value;
           else if (el.name === 'width') width = Number(el.value);
           else if (el.name === 'textScale') textScale = Number(el.value);
           else if (el.name === 'overview') overview = el.checked;
@@ -295,7 +331,7 @@
           }
           publish(true);
         });
-        panel.querySelector('form').addEventListener('submit', event => {
+        panel.querySelector('#presenterBreakForm').addEventListener('submit', event => {
           event.preventDefault();
           if (!live()) return;
           const f = event.target,
@@ -311,6 +347,7 @@
             !['coast', 'mountains', 'stars'].includes(scene)
           )
             return;
+          clearLaser();
           breakSession = {
             message,
             scene,
@@ -324,13 +361,43 @@
           publish(true);
         });
         host.addEventListener('pointerdown', event => {
-          if (tool === 'move' || event.button !== 0 || !live() || marks.length >= 100) return;
+          if (tool === 'move' || event.button !== 0 || !live()) return;
+          if (tool === 'laser') {
+            pointLaser(event, host);
+            return;
+          }
+          if (marks.length >= 100) return;
+          if (tool === 'text') {
+            const text = panel.querySelector('[name="annotationText"]').value.trim().slice(0, 240);
+            if (!text) {
+              a.tell?.('Type your live text first, then click the preview.');
+              return;
+            }
+            const size = Math.max(
+              16,
+              Math.min(40, Number(panel.querySelector('[name="annotationSize"]').value) || 24)
+            );
+            marks.push({
+              type: 'text',
+              text,
+              fontSize: size,
+              color,
+              width,
+              points: [point(event, host)],
+            });
+            publish(true);
+            return;
+          }
           event.preventDefault();
           host.setPointerCapture?.(event.pointerId);
           drawing = { type: tool, color, width, points: [point(event, host)] };
           publish(true);
         });
         host.addEventListener('pointermove', event => {
+          if (tool === 'laser' && live()) {
+            pointLaser(event, host);
+            return;
+          }
           if (!drawing) return;
           event.preventDefault();
           const p = point(event, host);
@@ -352,7 +419,9 @@
           publish(true);
         };
         host.addEventListener('pointerup', finish);
+        host.addEventListener('pointerleave', clearLaser);
         host.addEventListener('pointercancel', () => {
+          clearLaser();
           drawing = null;
           publish(true);
         });
@@ -377,22 +446,67 @@
     }
     async function action(name, value) {
       if (!live()) return;
-      if (name === 'window') openWindow();
+      if (name === 'screens') {
+        const current = panel;
+        if ((await a.screens?.discover()) && panel === current && live()) {
+          const picker = panel.querySelector('.presentation-screen-picker');
+          if (picker)
+            picker.outerHTML = a.screens.markup('presenterScreen', 'data-presenter="screens"');
+        }
+      } else if (name === 'fullscreen') {
+        openWindow();
+        const status = panel?.querySelector('[data-presenter-display-status]');
+        if (!connected()) {
+          if (status)
+            status.textContent =
+              'Audience window is opening. Press Full screen again when connected.';
+          return;
+        }
+        let target;
+        try {
+          target = popup.document.documentElement;
+        } catch {}
+        const ok = a.screens
+          ? await a.screens.fullscreen(target)
+          : await target
+              ?.requestFullscreen?.()
+              .then(() => true)
+              .catch(() => false);
+        if (status && status.isConnected)
+          status.textContent = ok
+            ? 'Audience fullscreen requested on your selected display.'
+            : 'Use Full screen in the audience window if the browser requires a click there.';
+      } else if (name === 'window') openWindow();
       else if (name === 'close-panel') closePanel();
       else if (name === 'end') {
         close();
         return;
       } else if (name === 'tool') {
+        clearLaser();
+        drawing = null;
         tool = value;
         panel.querySelector('.presenter-preview').dataset.tool = tool;
         for (const b of panel.querySelectorAll('[data-presenter="tool"]'))
           b.setAttribute('aria-pressed', String(b.dataset.value === tool));
+      } else if (name === 'update-text') {
+        const mark = [...marks].reverse().find(m => m.type === 'text');
+        const text = panel.querySelector('[name="annotationText"]').value.trim().slice(0, 240);
+        if (mark && text) {
+          mark.text = text;
+          mark.fontSize = textSize;
+          mark.color = color;
+        } else
+          a.tell?.(
+            'Place a text note first, then type its replacement and choose Update last text.'
+          );
       } else if (name === 'undo') marks.pop();
       else if (name === 'clear') {
         marks = [];
         drawing = null;
-      } else if (name === 'cover') cover = !cover;
-      else if (name === 'hold') {
+      } else if (name === 'cover') {
+        clearLaser();
+        cover = !cover;
+      } else if (name === 'hold') {
         if (cover || breakSession) return;
         held = held ? null : { ...publicState(), playing: false };
         cover = false;
@@ -433,6 +547,10 @@
       }
     });
     root.addEventListener('pagehide', close);
+    root.addEventListener('blur', clearLaser);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) clearLaser();
+    });
     return {
       open,
       close,

@@ -31,6 +31,28 @@
 .audience-frame * {
   box-sizing: border-box;
 }
+.av-laser {
+  position: absolute;
+  width: 1.15cqw;
+  height: 1.15cqw;
+  min-width: 9px;
+  min-height: 9px;
+  border-radius: 50%;
+  background: #fff1db;
+  border: 2px solid #ff4033;
+  box-shadow:
+    0 0 0 0.55cqw #ff443833,
+    0 0 1.8cqw #ff4033;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 8;
+}
+.av-laser[hidden] {
+  display: none;
+}
+.audience-frame[data-laser='true'] {
+  cursor: none;
+}
 .av-content {
   height: 100%;
   display: flex;
