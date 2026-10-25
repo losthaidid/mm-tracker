@@ -86,6 +86,12 @@
       notes = panel.querySelector('.presenter-notes'),
       display = panel.querySelector('.presenter-display-actions'),
       status = panel.querySelector('[data-presenter-status]');
+    const retry = doc.createElement('button');
+    retry.type = 'button';
+    retry.dataset.presenter = 'window';
+    retry.setAttribute('data-presenter-retry', '');
+    retry.textContent = 'Retry audience';
+    if (display) display.append(retry);
     bubbles.append(
       menu('✦ Tools', [ink, text]),
       menu('＋ Steps', [types, quick]),

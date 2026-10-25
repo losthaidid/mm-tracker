@@ -81,8 +81,15 @@
         if (!stage.requestFullscreen) throw Error('Fullscreen is unavailable');
         if (chosenScreen && !screenDetails?.screens.includes(chosenScreen))
           throw Error('The chosen screen disconnected');
-        await stage.requestFullscreen(chosenScreen ? { screen: chosenScreen } : undefined);
-        if (current !== generation || !audience) return;
+        await stage.requestFullscreen(
+          chosenScreen ? { screen: chosenScreen, navigationUI: 'hide' } : { navigationUI: 'hide' }
+        );
+        if (current !== generation || !audience) {
+          if (document.fullscreenElement === stage)
+            void document.exitFullscreen?.().catch(() => {});
+          return;
+        }
+        if (document.fullscreenElement !== stage) throw Error('Fullscreen was not entered');
         text(audience.querySelector('[data-pb-notice]'), '');
       } catch {
         if (current !== generation || !audience) return;
@@ -114,6 +121,9 @@
         );
         return;
       }
+      const selection = form.elements.namedItem('screen').value;
+      chosenScreen =
+        selection === 'current' ? null : screenDetails?.screens[Number(selection)] || null;
       draft = { message, complete: completion, minutes, scene };
       closeSettings();
       session = {
@@ -143,6 +153,15 @@
     function open() {
       sync();
       if (!owner) return;
+      if (
+        !document.dispatchEvent(
+          new root.CustomEvent('workhub-presentation-launch', {
+            cancelable: true,
+            detail: { kind: 'presentation-break' },
+          })
+        )
+      )
+        return;
       if (audience) {
         audience.querySelector('[data-pb="end"]').focus();
         return;
@@ -243,6 +262,12 @@
           delete session.pausedAt;
         } else session.pausedAt = Date.now();
         sync();
+      }
+    });
+    document.addEventListener('workhub-presentation-launch', event => {
+      if (['process', 'rest'].includes(event.detail?.kind)) {
+        end(false);
+        closeSettings();
       }
     });
     document.addEventListener('visibilitychange', sync);

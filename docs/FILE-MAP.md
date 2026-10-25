@@ -155,8 +155,8 @@ Presentation breaks: [presentation-break.js](../presentation-break.js) owns cust
 
 ## Batch D presentation modules
 
-- `presenter.js` / `presenter.css`: Break-style current-document audience fullscreen launch, verified private-window handshake/adoption, transient laser, playback, hold/cover and presentation breaks.
-- `presenter-window.html` / `presenter-window.js`: account-client-free private control shell; exact origin/source/token checks, heartbeat and end cleanup.
+- `presenter.js` / `presenter.css`: main-window private canvas, selected-display audience pop-up, verified audience handshake and native fullscreen status, transient laser, playback, hold/cover and presentation breaks.
+- `presenter-window.html` / `presenter-window.js`: legacy private control shell retained for compatibility; new launches use the isolated audience page.
 - `process-canvas.js` / `process-canvas.css`: private in-canvas tool bubbles, staged step forms, dragging, ports, magnetic groups, annotation attachment and guarded saved edits.
 - `process-canvas-art.js`: shared graph-space annotation SVG, geometry, resize/attachment and canvas export drawing.
 - `presentation-screen.js`: explicitly selected display discovery/placement and fullscreen requests with current-account and disconnection guards.

@@ -22,9 +22,13 @@ Presentation shows the same animated graph and current-step explanation, respons
 
 ### Audience fullscreen and the private presenter canvas
 
-Choose **Presenter controls**. As with Presentation Break, the click requests native fullscreen on an audience-only stage in the current website window. The private canvas then opens in a separate presenter window. Share the **Audience** window in your meeting app and keep the private presenter window unshared. When screen selection is supported, choose your shared display before launching; the website cannot identify your meeting app's shared screen.
+Choose **Presenter controls**. The current website window keeps your private presenter canvas. A separate **Audience** window opens using the selected display's position and available size, and only that window requests native fullscreen. Share the Audience window in your meeting app and keep the main presenter window unshared. The website cannot identify your meeting app's shared screen.
 
-The audience contains the process, saved canvas annotations, optional explanations and the transient laser. It contains no toolbars, buttons, editing handles or private notes. There are no Full screen / Stay windowed prompts or extra audience-launch buttons. Native fullscreen is reported only when the document confirms it. A browser can refuse fullscreen or block the private pop-up: allow this site's pop-ups if needed and launch Presenter controls again. Without native fullscreen the audience fills its browser window. Escape or ending the private presentation closes the public stage. Physical multi-monitor placement depends on browser support and the selected display.
+Choose the shared monitor before launching, or use **View & notes → Choose display** during the session. Placement is applied when the window opens, after its verified ready message, and before fullscreen, so a refused fullscreen request does not switch the audience back into the private main browser. Native display placement still requires browser support and permission.
+
+The audience contains the process, saved canvas annotations, optional explanations and the transient laser. It contains no toolbars, buttons, editing handles or private notes. Fullscreen is attempted automatically. Some browsers require a direct gesture inside a newly opened window; **click anywhere in the audience** or press Enter there to retry, without an extra fullscreen button or prompt. The private display status distinguishes native fullscreen from a window sized to the monitor. If the browser blocks the audience pop-up, the private canvas stays usable and **Retry audience** appears under View & notes.
+
+**End presentation** or closing the audience ends that session. Escape leaves native fullscreen. Break Terrarium and the standalone Presentation Break retain their single-window fullscreen launch. Starting either break closes a Process Hub presenter session and its audience; an active terrarium keeps its break and alarm until **Resume work**, and cannot be replaced by another presentation.
 
 All private controls live in translucent bubbles **inside** the canvas:
 

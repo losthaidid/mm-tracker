@@ -15,10 +15,10 @@
       subtitle: 'Return to the private presenter controls to reconnect.',
     });
   neutral('Connecting to your presentation…');
-  function send(type) {
+  function send(type, fields = {}) {
     if (!ended && source && /^[a-zA-Z0-9-]{16,100}$/.test(token)) {
       try {
-        source.postMessage({ type, token }, origin);
+        source.postMessage({ type, token, ...fields }, origin);
       } catch {}
     }
   }
@@ -42,8 +42,42 @@
     )
       return;
     last = Date.now();
+    document.title = 'Audience · ' + (event.data.snapshot.title || 'Process Hub');
     view.update(event.data.snapshot, event.data.marks || [], event.data.options || {});
   });
+  let fullscreenPending = false;
+  function reportFullscreen() {
+    send('workhub-audience-fullscreen', { fullscreen: !!document.fullscreenElement });
+  }
+  async function enterFullscreen() {
+    if (
+      ended ||
+      !last ||
+      !source ||
+      source.closed ||
+      fullscreenPending ||
+      document.fullscreenElement
+    )
+      return;
+    fullscreenPending = true;
+    try {
+      await document.documentElement.requestFullscreen?.({ navigationUI: 'hide' });
+    } catch {
+    } finally {
+      fullscreenPending = false;
+      reportFullscreen();
+    }
+  }
+  // A direct audience gesture is the fallback where a new window cannot
+  // inherit the launch click. No buttons or presenter controls enter this page.
+  document.addEventListener('click', () => void enterFullscreen());
+  document.addEventListener('keydown', e => {
+    if (['Enter', ' '].includes(e.key)) {
+      e.preventDefault();
+      void enterFullscreen();
+    }
+  });
+  document.addEventListener('fullscreenchange', reportFullscreen);
   const timer = root.setInterval(() => {
     if (ended) {
       root.clearInterval(timer);

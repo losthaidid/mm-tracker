@@ -61,3 +61,11 @@ test('audience canvas geometry keeps annotations inside the stage and accounts f
  const stage=h.document.getElementById('audienceStage'),view=V.create(stage),snapshot=processSnapshot();
  view.update(snapshot,[],{overview:false});const node=stage.querySelector('.av-node');view.update(snapshot,[],{overview:true,camera:{x:50,y:70,width:600,height:300},mapOnly:true});assert.equal(stage.querySelector('.av-node'),node);assert.equal(stage.querySelector('.av-graph').getAttribute('viewBox'),'50 70 600 300');view.update(snapshot,[],{overview:true});assert.equal(stage.querySelector('.av-graph').getAttribute('viewBox'),'0 0 850 450');view.destroy();
 });
+test('audience fullscreen can be retried by a direct audience click without adding visible controls',async t=>{
+ const h=audience(t);let active=null,calls=0;Object.defineProperty(h.document,'fullscreenElement',{get:()=>active});
+ h.document.documentElement.requestFullscreen=async options=>{calls++;assert.equal(options.navigationUI,'hide');active=h.document.documentElement;h.document.dispatchEvent(new h.w.Event('fullscreenchange'));};
+ h.document.body.click();assert.equal(calls,0);h.receive({type:'workhub-audience-state',snapshot:processSnapshot()});h.document.body.click();
+ for(let i=0;i<12;i++)await Promise.resolve();
+ assert.equal(calls,1);assert.equal(h.document.querySelectorAll('button').length,0);assert.ok(h.out.some(({m})=>m.type==='workhub-audience-fullscreen'&&m.fullscreen));
+ h.receive({type:'workhub-audience-end'});active=null;h.document.body.click();assert.equal(calls,1);
+});

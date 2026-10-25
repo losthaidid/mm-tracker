@@ -289,28 +289,32 @@ test('Presenter fullscreen: a resized window or fulfilled request is not reporte
 
 async function richPresenter(t, fullscreenAccepted = true) {
  const h=hub(t,{},true);loadFlow(h,requestFlow(h));
- const dom=new JSDOM('<body class="pc-private-shell"></body>',{url:'http://preview.test/presenter-window.html',runScripts:'outside-only'});t.after(()=>dom.window.close());
- let full=null,url;const order=[];
- Object.defineProperty(h.document,'fullscreenElement',{configurable:true,get:()=>full});
- h.window.HTMLElement.prototype.requestFullscreen=async function(options){order.push('fullscreen');assert.equal(options.navigationUI,'hide');if(!fullscreenAccepted)throw Error('not granted');full=this;};
- h.document.exitFullscreen=async()=>{full=null;};
- const popup={closed:false,document:dom.window.document,focus(){},close(){this.closed=true;},postMessage(){}};
- h.window.open=href=>{order.push('window');url=new URL(href);return popup;};
+ const dom=new JSDOM('<body><main id="audienceStage"></main></body>',{url:'http://preview.test/audience.html',runScripts:'outside-only'});t.after(()=>dom.window.close());
+ const w=dom.window, audience=w.document;w.requestAnimationFrame=()=>1;w.cancelAnimationFrame=()=>{};
+ for(const f of ['process-canvas-art.js','audience-view.js'])w.eval(source(f));
+ const view=w.WorkHubAudienceView.create(audience.getElementById('audienceStage'));
+ let full=null,url;const order=[],messages=[];
+ Object.defineProperty(h.document,'fullscreenElement',{configurable:true,get:()=>null});
+ Object.defineProperty(audience,'fullscreenElement',{configurable:true,get:()=>full});
+ audience.documentElement.requestFullscreen=async function(options){order.push('fullscreen');assert.equal(options.navigationUI,'hide');if(!fullscreenAccepted)throw Error('not granted');full=this;};
+ h.window.HTMLElement.prototype.requestFullscreen=()=>{throw Error('The private main browser must not enter fullscreen');};
+ const popup={closed:false,document:audience,focus(){},close(){this.closed=true;full=null;},postMessage(m){messages.push(copy(m));if(m.type==='workhub-audience-state')view.update(m.snapshot,m.marks,m.options);if(m.type==='workhub-audience-pointer')view.pointer(m.pointer);}};
+ h.window.open=href=>{order.push('window');url=new URL(href);assert.equal(url.pathname,'/audience.html');return popup;};
  h.ui.presenter.open();await settle();
- h.window.dispatchEvent(new h.window.MessageEvent('message',{origin:h.window.location.origin,source:popup,data:{type:'workhub-presenter-ready',token:url.hash.slice(1)}}));await settle();
- const d=dom.window.document,panel=d.getElementById('processPresenter'),host=d.querySelector('.presenter-preview');
+ h.window.dispatchEvent(new h.window.MessageEvent('message',{origin:h.window.location.origin,source:popup,data:{type:'workhub-audience-ready',token:url.hash.slice(1)}}));await settle();
+ const d=h.document,panel=d.getElementById('processPresenter'),host=d.querySelector('.presenter-preview');
  const geometry=()=>{host.getBoundingClientRect=()=>({left:0,top:0,width:850,height:450,right:850,bottom:450});const svg=host.querySelector('.av-graph'),box=svg.getAttribute('viewBox').split(' ').map(Number);svg.getBoundingClientRect=()=>({left:0,top:0,width:box[2],height:box[3],right:box[2],bottom:box[3]});};
  geometry();
- return {...h,d,panel,host,popup,order,geometry,action(name){panel.querySelector('[data-pc="'+name+'"]').click();},tool(name){panel.querySelector('[data-presenter="tool"][data-value="'+name+'"]').click();}};
+ return {...h,d,panel,host,popup,audience,order,messages,geometry,action(name){panel.querySelector('[data-pc="'+name+'"]').click();},tool(name){panel.querySelector('[data-presenter="tool"][data-value="'+name+'"]').click();}};
 }
-test('Canvas studio: Presenter controls requests fullscreen before the private window, and the audience contains no private buttons or notes',async t=>{
+test('Canvas studio: Presenter controls stays in the main browser and only the separate audience enters fullscreen',async t=>{
  const h=await richPresenter(t);
- assert.deepEqual(h.order,['fullscreen','window']);assert.equal(h.document.fullscreenElement.id,'processAudienceStage');
- assert.equal(h.document.querySelectorAll('#processAudienceStage button,#processAudienceStage input,#processAudienceStage select').length,0);
- assert.doesNotMatch(h.document.querySelector('#processAudienceStage').textContent,/PRIVATE SPEAKER NOTES|PRIVATE CONFIG/);
+ assert.deepEqual(h.order,['window','fullscreen']);assert.equal(h.document.fullscreenElement,null);assert.equal(h.audience.fullscreenElement,h.audience.documentElement);assert.equal(h.panel.ownerDocument,h.document);
+ assert.equal(h.audience.querySelectorAll('button,input,select').length,0);
+ assert.doesNotMatch(h.audience.querySelector('#audienceStage').textContent,/PRIVATE SPEAKER NOTES|PRIVATE CONFIG/);
  assert.match(h.panel.textContent,/PRIVATE SPEAKER NOTES/);
  assert.ok([...h.panel.querySelectorAll('button')].every(b=>b.closest('.pc-stage')));
- assert.ok(h.panel.querySelector('.pc-stage .pc-bubbles'));assert.equal(h.panel.querySelector('[data-presenter="window"]'),null);assert.equal(h.panel.querySelector('[data-presenter="fullscreen"]'),null);
+ assert.ok(h.panel.querySelector('.pc-stage .pc-bubbles'));assert.equal(h.panel.querySelector('[data-presenter-retry]').hidden,true);assert.equal(h.panel.querySelector('[data-presenter="fullscreen"]'),null);
  h.panel.querySelector('[data-presenter="end"]').click();await settle();assert.equal(h.document.getElementById('processAudienceOverlay'),null);assert.equal(h.popup.closed,true);
 });
 test('Canvas studio: notes persist in graph coordinates, attach to steps and resize text and box dimensions in one saved edit',async t=>{
@@ -319,7 +323,7 @@ test('Canvas studio: notes persist in graph coordinates, attach to steps and res
  presenterPointer(h,step,'pointerdown',before.x+50,before.y+50);
  assert.equal(h.writes.length,1);
  let p=h.ui.model(),note=p.annotations[0];assert.equal(note.anchorId,'ask');assert.equal(note.text,'Attached explanation');
- assert.ok(h.host.querySelector('.pc-annotation'));assert.equal(h.document.querySelectorAll('#processAudienceStage .pc-handle').length,0);
+ assert.ok(h.host.querySelector('.pc-annotation'));assert.equal(h.audience.querySelectorAll('.pc-handle').length,0);
  h.geometry();const handle=h.host.querySelector('[data-pc-resize="se"]'),start={w:note.w,h:note.h,font:note.fontSize};
  presenterPointer(h,handle,'pointerdown',400,300);presenterPointer(h,h.host,'pointermove',500,400);presenterPointer(h,h.host,'pointerup',500,400);
  note=h.ui.model().annotations[0];assert.ok(note.w>start.w);assert.ok(note.h>start.h);assert.ok(note.fontSize>start.font);assert.equal(h.writes.length,2);
@@ -349,8 +353,8 @@ test('Canvas studio: stale editors and owner changes cannot overwrite a process 
 });
 test('Canvas studio: rejected native fullscreen retains a button-free audience and reports the verified windowed state',async t=>{
  const h=await richPresenter(t,false);assert.equal(h.document.fullscreenElement,null);
- assert.ok(h.document.querySelector('#processAudienceStage'));assert.equal(h.document.querySelectorAll('#processAudienceStage button').length,0);
- assert.equal(h.ui.presenter.snapshot().audienceFull,false);assert.match(h.panel.querySelector('[data-presenter-display-status]').textContent,/not granted/);
+ assert.ok(h.audience.querySelector('#audienceStage'));assert.equal(h.audience.querySelectorAll('button').length,0);
+ assert.equal(h.ui.presenter.snapshot().audienceFull,false);assert.match(h.panel.querySelector('[data-presenter-display-status]').textContent,/click anywhere/);
  h.panel.querySelector('[data-presenter="end"]').click();assert.equal(h.document.querySelector('#processAudienceStage'),null);
 });
 test('Canvas studio: blocked private pop-up returns usable private controls with no orphan audience or false audience title',async t=>{
@@ -358,13 +362,13 @@ test('Canvas studio: blocked private pop-up returns usable private controls with
  h.ui.presenter.open();await settle();
  assert.equal(h.document.getElementById('processAudienceOverlay'),null);assert.equal(h.document.title,title);
  assert.ok(h.document.getElementById('processPresenter'));assert.match(h.document.querySelector('[data-pc-notice]').textContent,/pop-ups/);
- assert.equal(h.document.querySelector('[data-presenter="window"]'),null);
+ assert.equal(h.document.querySelector('[data-presenter-retry]').hidden,false);
  h.document.querySelector('[data-presenter="end"]').click();assert.equal(h.document.querySelector('#processPresenter'),null);
 });
 test('Canvas studio: arrows persist and resize, attachments retain world position, camera moves do not change saved geometry and the audience laser stays transient',async t=>{
  const h=await richPresenter(t),before=h.ui.model();h.tool('arrow');
  presenterPointer(h,h.host,'pointerdown',160,150);presenterPointer(h,h.host,'pointermove',290,210);presenterPointer(h,h.host,'pointerup',290,210);
- let p=h.ui.model(),arrow=p.annotations[0];assert.equal(arrow.type,'arrow');assert.ok(h.document.querySelector('#processAudienceStage .pc-arrow'));
+ let p=h.ui.model(),arrow=p.annotations[0];assert.equal(arrow.type,'arrow');assert.ok(h.audience.querySelector('.pc-arrow'));
  h.geometry();const endpoint=h.host.querySelector('[data-pc-resize="end"]');assert.ok(endpoint);
  presenterPointer(h,endpoint,'pointerdown',290,210);presenterPointer(h,h.host,'pointermove',340,260);presenterPointer(h,h.host,'pointerup',340,260);
  arrow=h.ui.model().annotations[0];assert.deepEqual(copy(arrow.points.at(-1)),[180,110]);
@@ -373,7 +377,7 @@ test('Canvas studio: arrows persist and resize, attachments retain world positio
  p=h.ui.model();assert.equal(p.annotations[0].anchorId,'yes');assert.deepEqual(copy(Art.box(p.annotations[0],p.steps)),world);
  const saved=JSON.stringify(p),writes=h.writes.length;h.tool('move');h.panel.querySelector('[data-presenter="zoom-in"]').click();assert.equal(JSON.stringify(h.ui.model()),saved);assert.equal(h.writes.length,writes);
  h.window.requestAnimationFrame=fn=>{fn(1);return 1;};h.tool('laser');presenterPointer(h,h.host,'pointermove',200,100);
- const dot=h.document.querySelector('#processAudienceStage .av-laser');assert.ok(dot&&!dot.hidden);assert.equal(h.writes.length,writes);
+ const dot=h.audience.querySelector('.av-laser');assert.ok(dot&&!dot.hidden);assert.equal(h.writes.length,writes);
  h.tool('move');assert.equal(dot.hidden,true);assert.equal(before.annotations.length,0);
 });
 test('Canvas studio: named decisions edit inside the canvas and moving a magnetic parent carries its children',async t=>{
@@ -394,4 +398,52 @@ test('Canvas studio: idle presenter updates reuse the cached process instead of 
  h.E.copy=(...args)=>{if(args[0]?.steps && args[0]?.presenterNotes!==undefined)copies++;return original(...args);};
  for(let i=0;i<20;i++)h.ui.presenter.publish(true);
  assert.equal(copies,0);assert.equal(h.writes.length,0);
+});
+
+test('Display recovery: selected monitor coordinates position only the audience even when native fullscreen is refused',async t=>{
+ const h=hub(t,{},true);loadFlow(h,requestFlow(h));
+ const target={label:'Shared monitor',availLeft:-2560,availTop:120,availWidth:2560,availHeight:1440},moves=[],sizes=[];
+ h.window.getScreenDetails=async()=>({screens:[target]});h.render();await h.click('screens');
+ const select=h.document.querySelector('#processPresentationScreen');select.value='0';select.dispatchEvent(new h.window.Event('change',{bubbles:true}));
+ const child=new JSDOM('<main></main>',{url:'http://preview.test/audience.html'});t.after(()=>child.window.close());let href,features,calls=0;
+ child.window.document.documentElement.requestFullscreen=async options=>{calls++;assert.equal(options.screen,target);throw Error('needs audience click');};
+ h.window.HTMLElement.prototype.requestFullscreen=()=>{throw Error('Main browser must remain private');};
+ const popup={closed:false,document:child.window.document,moveTo:(...x)=>moves.push(x),resizeTo:(...x)=>sizes.push(x),focus(){},close(){this.closed=true;},postMessage(){}};
+ h.window.open=(url,name,opts)=>{href=new URL(url);features=opts;return popup;};
+ h.ui.presenter.open();assert.match(features,/left=-2560,top=120,width=2560,height=1440/);
+ h.window.dispatchEvent(new h.window.MessageEvent('message',{origin:h.window.location.origin,source:popup,data:{type:'workhub-audience-ready',token:href.hash.slice(1)}}));await settle();
+ assert.ok(moves.some(x=>x[0]===-2560&&x[1]===120));assert.ok(sizes.some(x=>x[0]===2560&&x[1]===1440));assert.equal(calls,1);
+ assert.equal(h.document.getElementById('processAudienceOverlay'),null);assert.equal(h.document.getElementById('processPresenter').ownerDocument,h.document);
+ assert.equal(h.ui.presenter.snapshot().audienceFull,false);assert.equal(h.writes.length,0);
+});
+
+function installBreaks(h) {
+ const audio={state:{music:true,playing:false,starting:false,paused:false,track:'garden',volume:45,error:''},snapshot(){return this.state;},start(){this.state.playing=true;return Promise.resolve();},stop(){this.state.playing=false;},pause(){},finish(){},tick(){}};
+ h.window.WorkHubRestAudio={TRACKS:{garden:{name:'Garden',detail:'Rest'}},install:()=>audio};
+ for(const f of ['rest-room.js','presentation-break.js'])h.window.eval(source(f));
+ const ctx={ready:()=>h.account.ready,owner:()=>h.account.id,tell(){}};
+ const room=h.window.WorkHubRestRoom.install({...ctx,motion:()=>true,pauseWork:()=>null,focus:()=>({active:false}),soundscape:()=>null,change(){}});
+ const pb=h.window.WorkHubPresentationBreak.install(ctx),button=h.document.createElement('button');button.dataset.pb='open';h.document.body.append(button);
+ let native=null;Object.defineProperty(h.document,'fullscreenElement',{configurable:true,get:()=>native});
+ h.document.exitFullscreen=async()=>{native=null;};
+ const targets=[];h.window.HTMLElement.prototype.requestFullscreen=async function(options){native=this;targets.push(this);assert.equal(options.navigationUI,'hide');};
+ return {room,pb,button,targets,get native(){return native;}};
+}
+test('Display recovery: starting either break closes presenter controls and its audience, leaving fullscreen in the main document',async t=>{
+ for(const kind of ['rest','presentation']){
+  const h=await richPresenter(t),b=installBreaks(h);
+  if(kind==='rest')b.room.start('Rest',60);
+  else {b.button.click();const f=h.document.querySelector('#presentationBreakSettings form');f.elements.message.value='Back shortly';f.dispatchEvent(new h.window.Event('submit',{bubbles:true,cancelable:true}));}
+  await settle();assert.equal(h.popup.closed,true);assert.equal(h.document.getElementById('processPresenter'),null);assert.equal(h.document.body.classList.contains('pc-presenting'),false);
+  assert.equal(b.targets.length,1);assert.equal(b.native.ownerDocument,h.document);assert.equal(b.native.matches(kind==='rest'?'.rest-room-shell':'.pb-stage'),true);
+  assert.equal(h.writes.length,0);assert.equal(h.document.querySelectorAll('#processAudienceOverlay').length,0);
+ }
+});
+test('Display recovery: an active terrarium cannot be replaced by a presenter or presentation break before Resume work',async t=>{
+ const h=await richPresenter(t),b=installBreaks(h);b.room.start('Rest',60);await settle();
+ h.ui.presenter.open();assert.equal(h.document.getElementById('processPresenter'),null);b.button.click();assert.equal(h.document.getElementById('presentationBreakSettings'),null);
+ assert.ok(h.document.getElementById('restRoom'));assert.equal(b.room.snapshot().complete,false);
+ b.room.finish(false);h.ui.presenter.open();assert.equal(h.document.getElementById('processPresenter'),null);
+ b.room.resume();assert.equal(h.document.getElementById('restRoom'),null);b.button.click();assert.ok(h.document.getElementById('presentationBreakSettings'));
+ assert.equal(h.writes.length,0);
 });
