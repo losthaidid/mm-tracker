@@ -31,6 +31,60 @@
 .audience-frame * {
   box-sizing: border-box;
 }
+.audience-frame[data-map-only='true'] .av-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+.audience-frame[data-map-only='true'] .av-detail {
+  display: none;
+}
+.audience-fullscreen-prompt {
+  position: fixed;
+  z-index: 20;
+  left: 50%;
+  bottom: 70px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  width: min(680px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 20px;
+  border: 1px solid #bed0b6;
+  border-radius: 16px;
+  background: #f6f6ed;
+  color: #244c42;
+  box-shadow: 0 14px 60px #102c2a50;
+}
+.audience-fullscreen-prompt[hidden] {
+  display: none;
+}
+.audience-fullscreen-prompt div {
+  flex: 1 1 230px;
+}
+.audience-fullscreen-prompt p {
+  margin: 6px 0 0;
+  font-size: 13px;
+}
+.audience-fullscreen-prompt button {
+  padding: 12px 16px;
+  border: 1px solid #a7be9d;
+  border-radius: 9px;
+  background: #e2ecd9;
+  color: #244c42;
+  font: 650 14px system-ui;
+  cursor: pointer;
+}
+.audience-fullscreen-prompt span {
+  font-size: 12px;
+  flex-basis: 100%;
+}
+.audience-window[data-fullscreen='true'] .audience-window-controls {
+  opacity: 0;
+}
+.audience-window[data-fullscreen='true'] .audience-window-controls:is(:hover, :focus-within) {
+  opacity: 1;
+}
 .av-laser {
   position: absolute;
   width: 1.15cqw;

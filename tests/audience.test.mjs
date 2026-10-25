@@ -44,3 +44,25 @@ test('audience text is escaped and bounded; authenticated laser updates are tran
  h.receive({type:'workhub-audience-pointer',pointer:[.3,.4]},{});assert.equal(h.document.querySelector('.av-laser'),null);h.receive({type:'workhub-audience-pointer',pointer:[.3,.4]});assert.equal(h.document.querySelector('.av-laser').hidden,false);
  h.receive({type:'workhub-audience-pointer',pointer:[2,-1]});assert.equal(h.document.querySelector('.av-laser').hidden,true);h.advance(7000);assert.equal(h.document.querySelector('.av-laser'),null);
 });
+
+test('audience fullscreen uses a direct local click, confirms the native state, and offers re-entry after Escape',async t=>{
+ const h=audience(t);h.receive({type:'workhub-audience-state',snapshot:processSnapshot()});h.receive({type:'workhub-audience-fullscreen-needed'});
+ let full=null,calls=0;Object.defineProperty(h.document,'fullscreenElement',{configurable:true,get:()=>full});
+ h.document.documentElement.requestFullscreen=async options=>{calls++;assert.equal(options.navigationUI,'hide');full=h.document.documentElement;h.document.dispatchEvent(new h.w.Event('fullscreenchange'));};
+ assert.equal(h.document.getElementById('audienceFullscreenPrompt').hidden,false);
+ h.document.getElementById('audienceStartFullscreen').click();await Promise.resolve();await Promise.resolve();
+ assert.equal(calls,1);assert.equal(h.document.getElementById('audienceFullscreenPrompt').hidden,true);assert.equal(h.document.body.dataset.fullscreen,'true');assert.ok(h.out.some(x=>x.m.type==='workhub-audience-fullscreen'&&x.m.fullscreen));
+ full=null;h.document.dispatchEvent(new h.w.Event('fullscreenchange'));assert.equal(h.document.getElementById('audienceFullscreenPrompt').hidden,false);
+ h.receive({type:'workhub-audience-end'});h.document.getElementById('audienceStartFullscreen').click();assert.equal(calls,1);
+});
+test('audience canvas geometry keeps annotations inside the stage and accounts for SVG letterboxing during zoom and pan',t=>{
+ const h=audience(t),V=h.w.WorkHubAudienceView;
+ const mark={type:'text',text:'A note near the edge',fontSize:24,color:'#ffffff',width:4,points:[[.98,.98]]},b=V.textBox(mark);
+ assert.equal(V.hitMark([mark],[(b.x+20)/1000,(b.y+20)/562.5]),0);
+ const moved=V.moveMark(mark,-.2,-.2),m=V.textBox(moved);assert.ok(Math.abs(m.x-(b.x-200))<1e-8);assert.ok(Math.abs(m.y-(b.y-112.5))<1e-8);
+ const arrow={type:'arrow',color:'#ffffff',width:4,points:[[.1,.2],[.4,.5]]},a=V.moveMark(arrow,3,-3);
+ assert.ok(Math.abs((a.points[1][0]-a.points[0][0])-.3)<1e-8);assert.ok(a.points.every(p=>p.every(n=>n>=0&&n<=1)));
+ const p=V.graphPoint([500,300],{left:0,top:0,width:1000,height:600},{x:100,y:200,width:1000,height:300});assert.equal(p.x,600);assert.equal(p.y,350);
+ const stage=h.document.getElementById('audienceStage'),view=V.create(stage),snapshot=processSnapshot();
+ view.update(snapshot,[],{overview:false});const node=stage.querySelector('.av-node');view.update(snapshot,[],{overview:true,camera:{x:50,y:70,width:600,height:300},mapOnly:true});assert.equal(stage.querySelector('.av-node'),node);assert.equal(stage.querySelector('.av-graph').getAttribute('viewBox'),'50 70 600 300');view.update(snapshot,[],{overview:true});assert.equal(stage.querySelector('.av-graph').getAttribute('viewBox'),'0 0 850 450');view.destroy();
+});

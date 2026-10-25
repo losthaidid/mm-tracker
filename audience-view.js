@@ -8,6 +8,104 @@
     );
   const clock = n =>
     `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`;
+  const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+  function textBox(mark) {
+    const size = clamp(mark.fontSize, 16, 40),
+      rows = [];
+    for (const paragraph of mark.text.split('\n')) {
+      let line = '';
+      for (const word of paragraph.match(/.{1,34}(?:\s|$)|\S{1,34}/g) || ['']) {
+        if ((line + word).length > 34 && line) {
+          rows.push(line.trim());
+          line = '';
+        }
+        line += word;
+      }
+      rows.push(line.trim());
+    }
+    const shown = rows.slice(0, 10),
+      width = Math.min(920, Math.max(100, ...shown.map(l => l.length * size * 0.62 + 24))),
+      height = shown.length * size * 1.25 + 20;
+    return {
+      rows: shown,
+      size,
+      width,
+      height,
+      x: clamp(mark.points[0][0] * 1000, 8, 992 - width),
+      y: clamp(mark.points[0][1] * 562.5, 8, 554.5 - height),
+    };
+  }
+  function moveMark(mark, dx, dy) {
+    const box = mark.type === 'text' ? textBox(mark) : null;
+    const points = box ? [[box.x / 1000, box.y / 562.5]] : mark.points;
+    const xs = points.map(p => p[0]),
+      ys = points.map(p => p[1]);
+    dx = clamp(
+      dx,
+      (box ? 0.008 : 0) - Math.min(...xs),
+      (box ? (992 - box.width) / 1000 : 1) - Math.max(...xs)
+    );
+    dy = clamp(
+      dy,
+      (box ? 8 / 562.5 : 0) - Math.min(...ys),
+      (box ? (554.5 - box.height) / 562.5 : 1) - Math.max(...ys)
+    );
+    return { ...mark, points: points.map(([x, y]) => [x + dx, y + dy]) };
+  }
+  function hitMark(marks, point) {
+    const [x, y] = [point[0] * 1000, point[1] * 562.5];
+    for (let i = marks.length - 1; i >= 0; i--) {
+      const m = marks[i];
+      if (m.type === 'text') {
+        const b = textBox(m);
+        if (x >= b.x - 5 && x <= b.x + b.width + 5 && y >= b.y - 5 && y <= b.y + b.height + 5)
+          return i;
+      } else
+        for (let j = 1; j < m.points.length; j++) {
+          const a = [m.points[j - 1][0] * 1000, m.points[j - 1][1] * 562.5],
+            b = [m.points[j][0] * 1000, m.points[j][1] * 562.5];
+          const vx = b[0] - a[0],
+            vy = b[1] - a[1],
+            t = clamp(((x - a[0]) * vx + (y - a[1]) * vy) / (vx * vx + vy * vy || 1), 0, 1);
+          if (Math.hypot(x - a[0] - t * vx, y - a[1] - t * vy) <= Math.max(10, m.width + 5))
+            return i;
+        }
+    }
+    return -1;
+  }
+  function cameraFor(data, options = {}) {
+    const width = Math.max(850, ...data.steps.map(s => s.x + 270)),
+      height = Math.max(450, ...data.steps.map(s => s.y + 160)),
+      c = options.camera;
+    if (
+      c &&
+      ['x', 'y', 'width', 'height'].every(k => Number.isFinite(c[k])) &&
+      c.width >= 200 &&
+      c.height >= 100 &&
+      c.width <= 20000 &&
+      c.height <= 20000
+    )
+      return {
+        x: clamp(c.x, -c.width * 0.9, width - c.width * 0.1),
+        y: clamp(c.y, -c.height * 0.9, height - c.height * 0.1),
+        width: c.width,
+        height: c.height,
+      };
+    const active = data.steps.find(s => s.id === data.active);
+    return !options.overview && active
+      ? { x: Math.max(0, active.x - 110), y: Math.max(0, active.y - 130), width: 850, height: 450 }
+      : { x: 0, y: 0, width, height };
+  }
+  function graphPoint(point, rect, camera) {
+    const scale = Math.max(
+      0.00001,
+      Math.min(rect.width / camera.width, rect.height / camera.height)
+    );
+    return {
+      x: camera.x + (point[0] - rect.left - (rect.width - camera.width * scale) / 2) / scale,
+      y: camera.y + (point[1] - rect.top - (rect.height - camera.height * scale) / 2) / scale,
+    };
+  }
   function lines(value) {
     const result = [];
     let line = '';
@@ -29,7 +127,8 @@
       markSignature = '',
       received = 0,
       frame = 0,
-      disposed = false;
+      disposed = false,
+      camera = null;
     host.classList.add('audience-frame');
     function stop() {
       if (frame) root.cancelAnimationFrame(frame);
@@ -96,6 +195,7 @@
       host.dataset.scene = data.scene || 'coast';
       host.dataset.reduced = String(!!data.reduced);
       host.dataset.playing = String(!!data.playing);
+      host.dataset.mapOnly = String(options.mapOnly === true);
       host.style.setProperty('--av-text', Math.max(0.85, Math.min(1.4, options.textScale || 1)));
       const key = JSON.stringify([
         data.kind,
@@ -106,7 +206,6 @@
         data.decision,
         data.message,
         data.scene,
-        options.overview,
       ]);
       if (key !== signature) {
         signature = key;
@@ -149,20 +248,25 @@
           : data.playing
             ? 'Following the process'
             : 'Playback paused';
-        for (const n of host.querySelectorAll('.av-node'))
+        for (const n of host.querySelectorAll('.av-node')) {
           n.dataset.active = String(n.dataset.node === data.active);
+          if (options.interactive && !n.hasAttribute('tabindex')) {
+            n.setAttribute('tabindex', '0');
+            n.setAttribute('role', 'button');
+            n.setAttribute(
+              'aria-label',
+              'Explain ' + (data.steps.find(s => s.id === n.dataset.node)?.title || 'step')
+            );
+          }
+        }
         for (const e of host.querySelectorAll('.av-edge'))
           e.dataset.active = String(
             e.dataset.from === data.active && e.dataset.to === data.next && !data.decision
           );
-        const active = data.steps.find(s => s.id === data.active);
-        if (!options.overview && active)
-          host
-            .querySelector('.av-graph')
-            .setAttribute(
-              'viewBox',
-              `${Math.max(0, active.x - 110)} ${Math.max(0, active.y - 130)} 850 450`
-            );
+        camera = cameraFor(data, options);
+        host
+          .querySelector('.av-graph')
+          .setAttribute('viewBox', [camera.x, camera.y, camera.width, camera.height].join(' '));
       } else if (data.kind === 'break') {
         host.querySelector('.av-clock').textContent = clock(data.seconds);
         host.querySelector('.av-break-status').textContent =
@@ -196,44 +300,53 @@
                 p.every(n => Number.isFinite(n) && n >= 0 && n <= 1)
             )
         );
-      const markKey = JSON.stringify(valid);
+      const markKey = JSON.stringify([valid, options.selected]);
       if (markKey !== markSignature) {
         markSignature = markKey;
         svg.innerHTML = valid
-          .map(m => {
+          .map((m, index) => {
             const points = m.points.map(([x, y]) => [x * 1000, y * 562.5]);
+            let selection = '';
+            if (options.selected === index) {
+              const b =
+                m.type === 'text'
+                  ? textBox(m)
+                  : {
+                      x: Math.min(...points.map(p => p[0])) - 8,
+                      y: Math.min(...points.map(p => p[1])) - 8,
+                      width:
+                        Math.max(...points.map(p => p[0])) -
+                        Math.min(...points.map(p => p[0])) +
+                        16,
+                      height:
+                        Math.max(...points.map(p => p[1])) -
+                        Math.min(...points.map(p => p[1])) +
+                        16,
+                    };
+              selection =
+                '<rect class="av-selection" x="' +
+                (b.x - 4) +
+                '" y="' +
+                (b.y - 4) +
+                '" width="' +
+                (b.width + 8) +
+                '" height="' +
+                (b.height + 8) +
+                '" rx="6" fill="none" stroke="#186fdb" stroke-width="2" stroke-dasharray="5 4"/>';
+            }
             if (m.type === 'text') {
-              const size = Math.max(16, Math.min(40, m.fontSize)),
-                rows = [];
-              for (const paragraph of m.text.split('\n')) {
-                let line = '';
-                for (const word of paragraph.match(/.{1,34}(?:\s|$)|\S{1,34}/g) || ['']) {
-                  if ((line + word).length > 34 && line) {
-                    rows.push(line.trim());
-                    line = '';
-                  }
-                  line += word;
-                }
-                rows.push(line.trim());
-              }
-              const shown = rows.slice(0, 10),
-                boxWidth = Math.min(
-                  920,
-                  Math.max(100, ...shown.map(l => l.length * size * 0.62 + 24))
-                ),
-                boxHeight = shown.length * size * 1.25 + 20;
-              const x = Math.max(8, Math.min(992 - boxWidth, points[0][0])),
-                y = Math.max(8, Math.min(554.5 - boxHeight, points[0][1]));
-              return `<g class="av-text-note"><title>${esc(m.text)}</title><rect x="${x}" y="${y}" width="${boxWidth}" height="${boxHeight}" rx="8" fill="#16382e" fill-opacity=".94"/><text x="${x + 12}" y="${y + size + 6}" fill="${m.color}" font-size="${size}" font-family="system-ui,sans-serif">${shown.map((line, i) => `<tspan x="${x + 12}" dy="${i ? size * 1.25 : 0}">${esc(line)}</tspan>`).join('')}</text></g>`;
+              const { x, y, width: boxWidth, height: boxHeight, size, rows: shown } = textBox(m);
+              return `<g class="av-text-note"><title>${esc(m.text)}</title><rect x="${x}" y="${y}" width="${boxWidth}" height="${boxHeight}" rx="8" fill="#16382e" fill-opacity=".94"/><text x="${x + 12}" y="${y + size + 6}" fill="${m.color}" font-size="${size}" font-family="system-ui,sans-serif">${shown.map((line, i) => `<tspan x="${x + 12}" dy="${i ? size * 1.25 : 0}">${esc(line)}</tspan>`).join('')}</text>${selection}</g>`;
             }
             if (points.length < 2) return '';
             const line = `<polyline points="${points.map(p => p.join(',')).join(' ')}" fill="none" stroke="${m.color}" stroke-width="${Math.max(1, Math.min(12, m.width))}" stroke-linecap="round" stroke-linejoin="round"/>`;
-            if (m.type !== 'arrow') return line;
+            if (m.type !== 'arrow') return line + selection;
             const [a, b] = [points[0], points.at(-1)],
               angle = Math.atan2(b[1] - a[1], b[0] - a[0]),
               size = 16;
             return (
               line +
+              selection +
               `<path d="M${b[0] - size * Math.cos(angle - 0.5)},${b[1] - size * Math.sin(angle - 0.5)} L${b.join(',')} L${b[0] - size * Math.cos(angle + 0.5)},${b[1] - size * Math.sin(angle + 0.5)}" fill="none" stroke="${m.color}" stroke-width="${Math.max(1, Math.min(12, m.width))}" stroke-linecap="round"/>`
             );
           })
@@ -246,6 +359,7 @@
     return {
       update,
       pointer,
+      camera: () => (camera ? { ...camera } : null),
       destroy() {
         disposed = true;
         stop();
@@ -254,5 +368,5 @@
       },
     };
   }
-  root.WorkHubAudienceView = { create };
+  root.WorkHubAudienceView = { create, textBox, moveMark, hitMark, cameraFor, graphPoint };
 })(window);
