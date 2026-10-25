@@ -70,6 +70,15 @@
       ['Outputs', s.outputs],
       ['System / tool', s.system],
       ['Typical working time', s.workingTime],
+      ['Decision question', s.decision?.question],
+      [
+        'Decision answers',
+        s.decision?.answers
+          .map(
+            a => a.label + ' → ' + title(a.next) + (a.next === s.next ? ' (automatic default)' : '')
+          )
+          .join('\n'),
+      ],
       ['Normal next step', s.next ? title(s.next) : 'End of route'],
       ['Alternative routes', (s.alternatives || []).map(title).join('\n')],
       ['Exception route', s.failNext ? title(s.failNext) : 'Stop at the exception'],
@@ -121,13 +130,39 @@
     c.font = font(38, true);
     const titles = wrap(c, p.name, 1488),
       header = Math.max(170, 100 + titles.length * 46);
+    const sequence = ordered(p),
+      keys = new Map(sequence.map((s, i) => [s.id, String(i + 1).padStart(2, '0')]));
+    const decisionRows = sequence.flatMap(s =>
+      (s.decision?.answers || []).map((a, i) => ({
+        key: keys.get(s.id) + String.fromCharCode(65 + i),
+        label: a.label,
+        target: p.steps.find(t => t.id === a.next)?.title || 'End route',
+      }))
+    );
+    c.font = font(17);
+    const legend = decisionRows
+      .slice(0, 24)
+      .flatMap(row =>
+        wrap(
+          c,
+          row.key +
+            ' · ' +
+            row.label +
+            ' → ' +
+            (row.target.length > 100 ? row.target.slice(0, 97) + '…' : row.target),
+          1488
+        )
+      );
+    const legendHeight = legend.length
+      ? 60 + legend.length * 25 + (decisionRows.length > 24 ? 30 : 0)
+      : 0;
     const minX = Math.min(0, ...p.steps.map(s => s.x - 90)),
       minY = Math.min(0, ...p.steps.map(s => s.y - 40));
     const w = Math.max(640, ...p.steps.map(s => s.x + 300)) - minX,
       h = Math.max(300, ...p.steps.map(s => s.y + 160)) - minY;
     const scale = Math.min(2, 1488 / w, 1950 / h),
       graphHeight = Math.ceil(h * scale);
-    canvas.height = header + graphHeight + 85;
+    canvas.height = header + graphHeight + 85 + legendHeight;
     c.fillStyle = '#f4f4ed';
     c.fillRect(0, 0, canvas.width, canvas.height);
     c.fillStyle = '#e1ece3';
@@ -168,6 +203,20 @@
         const offset = b.x <= x ? 150 : 0;
         c.bezierCurveTo(x + k, y + offset, b.x - k, b.y + 50 + offset, b.x, b.y + 50);
         c.stroke();
+        const answer = s.decision?.answers.findIndex(a => a.next === id);
+        if (answer !== undefined && answer >= 0) {
+          c.save();
+          c.font = font(12, true);
+          const text = keys.get(s.id) + String.fromCharCode(65 + answer),
+            tw = c.measureText(text).width;
+          const tx = (x + b.x) / 2 - tw / 2,
+            ty = (y + b.y + 50) / 2 + offset * 0.75 - 7;
+          c.fillStyle = '#f4f4ed';
+          c.fillRect(tx - 4, ty - 13, tw + 8, 19);
+          c.fillStyle = ink;
+          c.fillText(text, tx, ty);
+          c.restore();
+        }
         c.setLineDash([]);
         c.fillStyle = c.strokeStyle;
         c.beginPath();
@@ -205,6 +254,26 @@
         );
     }
     c.restore();
+    if (legend.length) {
+      let y = header + graphHeight + 35;
+      c.fillStyle = accent;
+      c.font = font(15, true);
+      c.fillText('DECISION ANSWERS', 56, y);
+      c.fillStyle = ink;
+      c.font = font(17);
+      for (const line of legend) {
+        y += 25;
+        c.fillText(line, 56, y);
+      }
+      if (decisionRows.length > 24) {
+        c.fillStyle = muted;
+        c.fillText(
+          `Showing 24 of ${decisionRows.length} answers. The PDF includes every decision and answer.`,
+          56,
+          y + 30
+        );
+      }
+    }
     c.fillStyle = muted;
     c.font = font(16);
     c.fillText(

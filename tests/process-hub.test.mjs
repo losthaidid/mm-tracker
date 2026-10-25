@@ -13,7 +13,7 @@ function hub(t, initial = {}) {
   window.URL.createObjectURL = () => 'blob:test-export'; window.URL.revokeObjectURL = () => {};
   window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
   window.HTMLDialogElement.prototype.close = function () { this.open = false; };
-  for (const f of ['rehearsal-engine.js', 'process-hub-files.js', 'rehearsal.js']) window.eval(source(f));
+  for (const f of ['rehearsal-engine.js', 'process-hub-files.js', 'audience-view.js', 'presenter.js', 'rehearsal.js']) window.eval(source(f));
   const E = window.WorkHubRehearsalEngine, F = window.WorkHubProcessFiles;
   let state = { projects: [], tickets: [], specs: [], workhub: { processes: [], notes: [], tcodes: { records: [] }, ...initial } };
   E.upgrade(state);
@@ -119,4 +119,97 @@ test('Process Hub can add the first animated step to an empty older process with
 
 test('Process Hub keeps both records selectable if the two older libraries contain overlapping IDs',t=>{
  const h=hub(t,{processes:[oldProcess()]});const p=h.E.seed('hub:existing','2026-10-24T00:00:00.000Z');h.state().workhub.rehearsal.processes.push(p);const rows=h.E.library(h.state());assert.equal(new Set(rows.map(x=>x.id)).size,2);assert.equal(rows.find(x=>x.hubId).hubId,'existing');
+});
+
+function requestFlow(h, loop = false) {
+  const p = h.E.normalize(h.E.seed('request-flow','2026-10-25T00:00:00.000Z',true));
+  const base = p.steps[0];
+  p.name='Request review';p.presenterNotes='PRIVATE SPEAKER NOTES';p.startId='ask';
+  p.scenarios=[{id:'normal',name:'Default route',notes:'PRIVATE SCENARIO',initial:{},choices:{},routes:{}}];
+  p.steps=[
+    {...copy(base),id:'ask',title:'Review request',type:'decision',next:'yes',alternatives:['no'],configuration:'PRIVATE CONFIG',instruction:'PUBLIC INSTRUCTION',audienceText:'PUBLIC EXPLANATION',decision:{question:'Is the information complete?',answers:[{label:'Complete',next:'yes'},{label:'Need more information',next:'no'}]}},
+    {...copy(base),id:'yes',title:'Proceed',next:'',x:310,y:40},
+    {...copy(base),id:'no',title:'Request details',next:loop?'ask':'',x:310,y:220},
+  ];return p;
+}
+function loadFlow(h,p) {h.change(d=>d.workhub.rehearsal.processes.push(p));h.ui.open(p.id);h.render();}
+function setInteractive(h) {const select=h.document.getElementById('rehearsalDecisionMode');select.value='interactive';select.dispatchEvent(new h.window.Event('change',{bubbles:true}));}
+function connectAudience(h) {
+  const messages=[],popup={closed:false,focus(){},close(){this.closed=true;},postMessage(message,origin){messages.push({message:copy(message),origin});}};
+  let url;h.window.open=href=>{url=new URL(href);return popup;};h.ui.presenter.open();
+  const ready=()=>h.window.dispatchEvent(new h.window.MessageEvent('message',{origin:h.window.location.origin,source:popup,data:{type:'workhub-audience-ready',token:url.hash.slice(1)}}));ready();
+  return {messages,popup,url,ready};
+}
+test('Batch D: interactive decisions wait, follow a named answer from the current step and never write records', async t=>{
+  const h=hub(t),p=requestFlow(h);loadFlow(h,p);setInteractive(h);
+  const before=copy(h.state());for(let n=1;n<150;n++)h.ui.tick(n*150);
+  assert.equal(h.ui.snapshot().index,0);assert.equal(h.ui.snapshot().waitingForDecision,true);assert.match(h.document.getElementById('rehearsalStatus').textContent,/Choose an answer/);
+  await h.click('next');assert.equal(h.ui.snapshot().index,0);
+  h.document.querySelector('[data-rehearsal="answer"][data-answer="1"]').click();await settle();
+  assert.equal(h.ui.snapshot().index,0);assert.equal(h.ui.snapshot().waitingForDecision,false);assert.equal(h.ui.plan().entries[1].id,'no');
+  await h.click('next');assert.equal(h.ui.snapshot().index,1);assert.match(h.document.getElementById('rehearsalInspector').textContent,/Request details/);
+  assert.deepEqual(copy(h.state()),before);assert.equal(h.writes.length,0);
+});
+test('Batch D: repeated decisions preserve earlier answers and bound loops while allowing a later different answer',t=>{
+  const h=hub(t),p=requestFlow(h,true),sc=p.scenarios[0];
+  const route=h.E.plan(p,sc,{}, {},{0:{id:'ask',next:'no',outcome:'success'},2:{id:'ask',next:'yes',outcome:'success'}});
+  assert.deepEqual(copy(route.entries.map(e=>e.id)),['ask','no','ask','yes']);
+  assert.throws(()=>h.E.plan(p,sc,{}, {},{0:{id:'ask',next:'foreign',outcome:'success'}}),/connected/);
+});
+test('Batch D: decision form saves named answers, automatic default and exports while rejecting invalid destinations', async t=>{
+  const h=hub(t);loadFlow(h,requestFlow(h));h.ui.stepEditor('ask');
+  const f=h.fill('rehearsalStepForm',{'decisionQuestion':'Choose the next action','decisionLabel-0':'Proceed now','decisionLabel-1':'Follow up','decisionDefault':'1'});
+  h.ui.saveForm(f);const p=h.ui.model();assert.equal(p.steps[0].next,'no');assert.equal(p.steps[0].decision.question,'Choose the next action');
+  assert.equal(h.E.plan(p,p.scenarios[0]).entries[1].id,'no');
+  const exported=h.F.stepSections(p,p.steps[0],'audience');assert.match(JSON.stringify(exported),/Choose the next action|Proceed now/);
+  assert.doesNotMatch(JSON.stringify(exported),/PRIVATE CONFIG|PRIVATE SPEAKER/);
+  const bad=copy(h.state());bad.workhub.rehearsal.processes[0].steps[0].decision.answers[1].next='foreign';assert.throws(()=>h.E.validate(bad),/decision/);
+  bad.workhub.rehearsal.processes[0]=copy(p);bad.workhub.rehearsal.processes[0].steps[0].decision.answers[1].label='Proceed now';assert.throws(()=>h.E.validate(bad),/decision/);
+});
+test('Batch D: default end-route answer survives validation and explicit scenario selection',t=>{
+  const h=hub(t),p=requestFlow(h);p.steps[0].next='';p.steps[0].alternatives=['no'];p.steps[0].decision.answers[0].next='';
+  loadFlow(h,p);h.E.validate(h.state());assert.equal(h.ui.plan().entries.length,1);
+  assert.equal(h.E.plan(p,p.scenarios[0],{}, {ask:'no'}).entries[1].id,'no');
+});
+test('Batch D: legacy Process Hub stores decision metadata in place and keeps its existing references',t=>{
+  const h=hub(t,{processes:[oldProcess()]});const p=h.ui.model(),s=p.steps[0];s.type='decision';s.decision={question:'Which path?',answers:[{label:'First',next:'s1'},{label:'Second',next:'s2'}]};h.E.store(h.state(),p);h.E.validate(h.state());
+  assert.equal(h.state().workhub.rehearsal.processes.length,0);assert.equal(h.E.library(h.state())[0].steps[0].decision.question,'Which path?');assert.equal(h.state().workhub.processes[0].steps[0].noteId,'note-old');
+});
+test('Batch D: audience handshake rejects foreign origin, source and token and sends only public content',t=>{
+  const h=hub(t);loadFlow(h,requestFlow(h));
+  const messages=[],popup={closed:false,focus(){},close(){this.closed=true;},postMessage(m,o){messages.push({message:copy(m),origin:o});}};let url;
+  h.window.open=href=>{url=new URL(href);return popup;};h.ui.presenter.open();
+  for(const options of [{origin:'https://foreign.test',source:popup,token:url.hash.slice(1)},{origin:h.window.location.origin,source:{},token:url.hash.slice(1)},{origin:h.window.location.origin,source:popup,token:'wrong'}]){
+    h.window.dispatchEvent(new h.window.MessageEvent('message',{origin:options.origin,source:options.source,data:{type:'workhub-audience-ready',token:options.token}}));
+    assert.equal(h.ui.presenter.connected(),false);
+  }
+  h.window.dispatchEvent(new h.window.MessageEvent('message',{origin:h.window.location.origin,source:popup,data:{type:'workhub-audience-ready',token:url.hash.slice(1)}}));
+  assert.equal(h.ui.presenter.connected(),true);assert.ok(messages.length);const payload=JSON.stringify(messages);
+  assert.match(payload,/PUBLIC EXPLANATION/);assert.doesNotMatch(payload,/PRIVATE SPEAKER NOTES|PRIVATE CONFIG|PRIVATE SCENARIO/);
+  assert.match(h.document.querySelector('[data-presenter-notes]').textContent,/PRIVATE SPEAKER NOTES/);
+  assert.ok(messages.every(m=>m.origin===h.window.location.origin));
+});
+test('Batch D: private annotations, hold, cover and audience breaks remain temporary and account changes clear both windows',async t=>{
+  const h=hub(t);loadFlow(h,requestFlow(h));const {messages,popup}=connectAudience(h);
+  const click=async name=>{h.document.querySelector(`[data-presenter="${name}"]`).click();await settle();};
+  await click('hold');assert.equal(h.ui.presenter.snapshot().holding,true);
+  await click('cover');assert.equal(messages.at(-1).message.snapshot.kind,'cover');assert.doesNotMatch(JSON.stringify(messages.at(-1)),/Review request|PUBLIC EXPLANATION/);
+  await click('cover');await click('hold');
+  const preview=h.document.querySelector('.presenter-preview');preview.getBoundingClientRect=()=>({left:0,top:0,width:1000,height:562.5});preview.setPointerCapture=()=>{};
+  h.document.querySelector('[data-presenter="tool"][data-value="arrow"]').click();
+  for(const [type,x,y]of [['pointerdown',100,100],['pointermove',300,200],['pointerup',300,200]])preview.dispatchEvent(new h.window.MouseEvent(type,{bubbles:true,clientX:x,clientY:y,button:0}));
+  assert.equal(h.ui.presenter.snapshot().marks,1);assert.equal(messages.at(-1).message.marks[0].type,'arrow');
+  await click('undo');assert.equal(h.ui.presenter.snapshot().marks,0);
+  const f=h.document.getElementById('presenterBreakForm');f.elements.namedItem('message').value='Please give us a moment';f.dispatchEvent(new h.window.Event('submit',{bubbles:true,cancelable:true}));
+  assert.equal(messages.at(-1).message.snapshot.kind,'break');assert.equal(messages.at(-1).message.snapshot.seconds,300);
+  await click('break-pause');assert.equal(messages.at(-1).message.snapshot.paused,true);await click('break-end');assert.equal(messages.at(-1).message.snapshot.kind,'process');
+  assert.equal(h.writes.length,0);h.account.id='other-owner';h.render();assert.equal(popup.closed,true);assert.equal(h.document.getElementById('processPresenter'),null);assert.equal(h.ui.presenter.connected(),false);
+});
+test('Batch D: blocked pop-ups retain usable private controls and allow a retry',t=>{
+  const h=hub(t);h.window.open=()=>null;h.ui.presenter.open();assert.ok(h.document.getElementById('processPresenter').open);assert.match(h.messages.join(' '),/pop-ups/);assert.equal(h.ui.presenter.connected(),false);
+});
+test('Batch D: legacy decisions preserve an end-route automatic default through store and reload',t=>{
+  const h=hub(t,{processes:[oldProcess()]}),p=h.ui.model(),s=p.steps[0];
+  s.type='decision';s.next='';s.alternatives=['s1'];s.decision={question:'Continue?',answers:[{label:'Finish now',next:''},{label:'Continue',next:'s1'}]};h.E.store(h.state(),p);h.E.validate(h.state());
+  const restored=h.E.library(h.state())[0];assert.equal(restored.steps[0].next,'');assert.equal(h.E.plan(restored,restored.scenarios[0]).entries.length,1);
 });

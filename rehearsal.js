@@ -48,7 +48,11 @@
       viewScroll = null,
       cachedState = null,
       cachedRows = [],
-      paletteDrag = null;
+      paletteDrag = null,
+      interactive = false,
+      answered = new Set(),
+      visitChoices = {},
+      presenter = null;
     const $ = id => document.getElementById(id),
       prefs = () => a.state().workhub.rehearsal.preferences;
     const guard = expected => {
@@ -98,6 +102,10 @@
     }
     function resetOwner() {
       if (owner === a.owner()) return;
+      presenter?.close();
+      interactive = false;
+      answered.clear();
+      visitChoices = {};
       closeOverlay();
       if ($('processHubExport')) a.closeModal();
       if (exportUrl) {
@@ -156,13 +164,15 @@
     function rebuild(keep = false) {
       reverse = null;
       const p = model();
+      if (!keep) visitChoices = {};
       try {
-        route = E.plan(p, scenario(p), overrides, routeChoices);
+        route = E.plan(p, scenario(p), overrides, routeChoices, visitChoices);
       } catch (err) {
         route = { entries: [], ending: 'invalid', error: err.message };
         paused = true;
       }
       if (!keep) {
+        answered.clear();
         index = 0;
         elapsed = 0;
       } else index = Math.min(index, Math.max(0, route.entries.length - 1));
@@ -175,14 +185,17 @@
       );
     }
     function otherDialog() {
-      return !!document.querySelector('dialog[open]:not(#processHubOverlay)');
+      return !!document.querySelector(
+        'dialog[open]:not(#processHubOverlay):not(#processPresenter)'
+      );
     }
     function blocked() {
       return (
-        document.hidden ||
+        (document.hidden && !presenter?.connected()) ||
         motionOff() ||
         editing ||
         !!draft ||
+        !!presenter?.blocked() ||
         otherDialog() ||
         document.body.matches('.hub-private,.hub-present,.hub-focus')
       );
@@ -365,7 +378,7 @@
             .filter(([, id]) => id && map.has(id))
             .map(
               ([kind, id]) =>
-                `<path class="rehearsal-edge" data-from="${esc(s.id)}" data-to="${esc(id)}" data-kind="${kind}" d="${E.path(s, map.get(id))}" marker-end="url(#rehearsalArrow)"></path>`
+                `<path class="rehearsal-edge" data-from="${esc(s.id)}" data-to="${esc(id)}" data-kind="${kind}" d="${E.path(s, map.get(id))}" marker-end="url(#rehearsalArrow)"><title>${esc(E.answers(s).find(a => a.next === id)?.label || kind)}</title></path>${s.decision ? `<text class="ph-route-label" x="${(s.x + 210 + map.get(id).x) / 2}" y="${(s.y + map.get(id).y) / 2 + 38}">${esc(s.decision.answers.find(a => a.next === id)?.label || kind)}</text>` : ''}`
             )
         )
         .join('');
@@ -428,7 +441,7 @@
             (isSaved
               ? button('edit-process', 'Edit process') + button('duplicate', 'Duplicate')
               : button('keep', 'Save this example'));
-      return `<section id="rehearsalRoot" class="hub rehearsal-workspace process-hub-workspace" data-owner="${esc(owner)}" data-theme="${prefs().theme}" data-effects="${prefs().effects}" data-mode="${mode}" data-draft="${!!draft}"><header class="rehearsal-hero"><div><span class="hub-kicker">${draft ? 'CREATE · CONNECT · EXPLAIN' : 'YOUR LIVING PROCESS LIBRARY'}</span><h2>${draft ? 'Process canvas' : 'Process Hub'}<span class="ph-title-mark" aria-hidden="true">↗</span></h2><p>${draft ? 'Arrange the flow and maintain every detail in one space. Save when you are ready.' : 'From your own reference to a clear walkthrough. Watch each handoff come to life.'}</p></div><div class="actions">${actions}${mode !== 'normal' ? button('normal', '↙ Normal view') : button('fullscreen', '⛶ Full screen')}${!draft && !isPresent ? button('present', '▷ Present') : ''}</div></header><div class="rehearsal-selection"><label>Saved process<select id="rehearsalProcess"${draft ? ' disabled' : ''}>${draft && !rows.some(x => x.id === p.id) ? `<option value="${esc(p.id)}" selected>Unsaved · ${esc(p.name)}</option>` : ''}${rows.map(x => `<option value="${esc(x.id)}"${x.id === p.id ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}<option value="__demo__"${p.id === '__demo__' ? ' selected' : ''}>Sample · Procure to pay</option></select></label><label>Scenario<select id="rehearsalScenario">${p.scenarios.map(s => `<option value="${esc(s.id)}"${s.id === scenarioId ? ' selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>${isSaved && !isPresent ? button('scenario', 'Edit scenario') + button('scenario-add', '＋ Scenario') : ''}<label>View<select id="processHubView"><option value="normal"${mode === 'normal' ? ' selected' : ''}>Normal</option><option value="full"${mode === 'full' ? ' selected' : ''}>Full screen</option><option value="present"${isPresent ? ' selected' : ''}>Presentation</option></select></label><span class="rehearsal-local-label">${draft ? 'Draft · saved only when you choose Save process' : `${p.steps.length} steps · ${p.scenarios.length} scenarios · ${p.revision ? esc(p.revision) + ' · ' : ''}Looping playback`}</span></div>${draft ? processFields(p) : `<div class="ph-library-bar"><div><strong>${esc(p.objective || p.notes || 'Build a process, then explore it at your own pace.')}</strong>${p.processOwner ? `<span>Owner · ${esc(p.processOwner)}</span>` : ''}</div><div class="actions">${!isPresent ? button('archive-view', archived ? 'Show active' : 'Archived processes') : ''}${isSaved && !isPresent ? button('archive', p.archived ? 'Restore process' : 'Archive') + button('export', '↓ Export PDF / Image') : ''}${isSaved && !isPresent ? button('settings', 'Process information') : ''}</div></div>`}<div class="ph-canvas-layout">${draft ? palette() : ''}<div class="rehearsal-layout"><div class="rehearsal-stage"><div class="rehearsal-stage-bar"><div><strong>${esc(p.name)}</strong><span id="rehearsalStatus" aria-live="polite"></span></div><div class="actions">${isSaved && !isPresent ? button('add-step', '＋ Step') + button('layout', 'Auto arrange') : ''}${button('fit', 'Fit')}${button('zoom-out', '−', 'aria-label="Zoom out"')}${button('zoom-in', '＋', 'aria-label="Zoom in"')}<span class="ph-zoom">${Math.round(zoom * 100)}%</span></div></div>${graph(p)}<div class="rehearsal-values"><div class="rehearsal-values-title"><strong>Sample values</strong><span>Changes follow your definitions</span></div><div id="rehearsalValues"></div></div><div class="rehearsal-playbar">${button('back', '↶', 'aria-label="Previous step / rewind"')}${button('play', draft ? 'Preview after saving' : 'Pause', 'id="rehearsalPlay"', 'primary small')}${button('next', '↷', 'aria-label="Next step"')}${button('restart', 'Restart')}<label>Speed<select id="rehearsalSpeed">${[0.5, 1, 1.5, 2].map(v => `<option value="${v}"${v === prefs().speed ? ' selected' : ''}>${v}×</option>`).join('')}</select></label>${button('sound', soundLabel(), 'id="rehearsalSound" aria-pressed="false" aria-describedby="rehearsalAudioStatus"')}<label>Volume<input id="rehearsalVolume" aria-label="Rehearsal volume" type="range" min="0" max="1" step="0.05" value="${prefs().volume}"></label></div><p id="rehearsalAudioStatus" class="hub-meta" role="status">${esc(audioMessage())}</p></div><aside id="rehearsalInspector" class="rehearsal-inspector"></aside></div></div><div class="rehearsal-options"><label>Scenery<select id="rehearsalTheme">${[
+      return `<section id="rehearsalRoot" class="hub rehearsal-workspace process-hub-workspace" data-owner="${esc(owner)}" data-theme="${prefs().theme}" data-effects="${prefs().effects}" data-mode="${mode}" data-draft="${!!draft}"><header class="rehearsal-hero"><div><span class="hub-kicker">${draft ? 'CREATE · CONNECT · EXPLAIN' : 'YOUR LIVING PROCESS LIBRARY'}</span><h2>${draft ? 'Process canvas' : 'Process Hub'}<span class="ph-title-mark" aria-hidden="true">↗</span></h2><p>${draft ? 'Arrange the flow and maintain every detail in one space. Save when you are ready.' : 'From your own reference to a clear walkthrough. Watch each handoff come to life.'}</p></div><div class="actions">${actions}${mode !== 'normal' ? button('normal', '↙ Normal view') : button('fullscreen', '⛶ Full screen')}${!draft && !isPresent ? button('present', '▷ Present') + button('presenter', '▣ Presenter controls') : ''}</div></header><div class="rehearsal-selection"><label>Saved process<select id="rehearsalProcess"${draft ? ' disabled' : ''}>${draft && !rows.some(x => x.id === p.id) ? `<option value="${esc(p.id)}" selected>Unsaved · ${esc(p.name)}</option>` : ''}${rows.map(x => `<option value="${esc(x.id)}"${x.id === p.id ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}<option value="__demo__"${p.id === '__demo__' ? ' selected' : ''}>Sample · Procure to pay</option></select></label><label>Scenario<select id="rehearsalScenario">${p.scenarios.map(s => `<option value="${esc(s.id)}"${s.id === scenarioId ? ' selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>${isSaved && !isPresent ? button('scenario', 'Edit scenario') + button('scenario-add', '＋ Scenario') : ''}<label>View<select id="processHubView"><option value="normal"${mode === 'normal' ? ' selected' : ''}>Normal</option><option value="full"${mode === 'full' ? ' selected' : ''}>Full screen</option><option value="present"${isPresent ? ' selected' : ''}>Presentation</option></select></label><span class="rehearsal-local-label">${draft ? 'Draft · saved only when you choose Save process' : `${p.steps.length} steps · ${p.scenarios.length} scenarios · ${p.revision ? esc(p.revision) + ' · ' : ''}Looping playback`}</span></div>${draft ? processFields(p) : `<div class="ph-library-bar"><div><strong>${esc(p.objective || p.notes || 'Build a process, then explore it at your own pace.')}</strong>${p.processOwner ? `<span>Owner · ${esc(p.processOwner)}</span>` : ''}</div><div class="actions">${!isPresent ? button('archive-view', archived ? 'Show active' : 'Archived processes') : ''}${isSaved && !isPresent ? button('archive', p.archived ? 'Restore process' : 'Archive') + button('export', '↓ Export PDF / Image') : ''}${isSaved && !isPresent ? button('settings', 'Process information') : ''}</div></div>`}<div class="ph-canvas-layout">${draft ? palette() : ''}<div class="rehearsal-layout"><div class="rehearsal-stage"><div class="rehearsal-stage-bar"><div><strong>${esc(p.name)}</strong><span id="rehearsalStatus" aria-live="polite"></span></div><div class="actions">${isSaved && !isPresent ? button('add-step', '＋ Step') + button('layout', 'Auto arrange') : ''}${button('fit', 'Fit')}${button('zoom-out', '−', 'aria-label="Zoom out"')}${button('zoom-in', '＋', 'aria-label="Zoom in"')}<span class="ph-zoom">${Math.round(zoom * 100)}%</span></div></div>${graph(p)}<div class="rehearsal-values"><div class="rehearsal-values-title"><strong>Sample values</strong><span>Changes follow your definitions</span></div><div id="rehearsalValues"></div></div><div class="rehearsal-playbar">${button('back', '↶', 'aria-label="Previous step / rewind"')}${button('play', draft ? 'Preview after saving' : 'Pause', 'id="rehearsalPlay"', 'primary small')}${button('next', '↷', 'aria-label="Next step"')}${button('restart', 'Restart')}<label>Decisions<select id="rehearsalDecisionMode"><option value="auto"${!interactive ? ' selected' : ''}>Automatic · default routes</option><option value="interactive"${interactive ? ' selected' : ''}>Interactive · ask me</option></select></label><label>Speed<select id="rehearsalSpeed">${[0.5, 1, 1.5, 2].map(v => `<option value="${v}"${v === prefs().speed ? ' selected' : ''}>${v}×</option>`).join('')}</select></label>${button('sound', soundLabel(), 'id="rehearsalSound" aria-pressed="false" aria-describedby="rehearsalAudioStatus"')}<label>Volume<input id="rehearsalVolume" aria-label="Rehearsal volume" type="range" min="0" max="1" step="0.05" value="${prefs().volume}"></label></div><p id="rehearsalAudioStatus" class="hub-meta" role="status">${esc(audioMessage())}</p></div><aside id="rehearsalInspector" class="rehearsal-inspector"></aside></div></div><div class="rehearsal-options"><label>Scenery<select id="rehearsalTheme">${[
         ['desk', 'Cosy desk'],
         ['blueprint', 'Blueprint'],
         ['control', 'Control room'],
@@ -447,7 +460,7 @@
         p = model(),
         row = (label, value) => (value ? `<dt>${label}</dt><dd>${esc(value)}</dd>` : '');
       const routes = [step.next, ...(step.alternatives || [])].filter(Boolean);
-      return `<span class="hub-kicker">${presenting ? 'FOLLOW THE PROCESS' : 'STEP DETAILS'}</span><div class="rehearsal-detail-title"><span>${ICONS[step.type]}</span><h3>${esc(step.title)}</h3></div>${step.tcode ? `<span class="rehearsal-tcode">${esc(step.tcode)}</span>` : ''}<dl>${row('Who handles it', step.owner)}${row('Before you start', step.prerequisites)}${row('What happens', presenting ? step.audienceText || step.instruction : step.instruction)}${row('Inputs', step.inputs)}${row('Expected result', step.expected)}${row('Outputs', step.outputs)}${row('System / tool', step.system)}${row('Typical working time', step.workingTime)}${!presenting ? row('If it fails / common errors', step.failure) + row('Configuration / setup', step.configuration) + row('Testing checklist', step.testing) : ''}</dl>${step.image ? `<a class="rehearsal-image-link" href="${esc(step.image)}" target="_blank" rel="noopener"><img src="${esc(step.image)}" alt="Reference screenshot for ${esc(step.title)}"></a>` : ''}${!presenting && step.link ? `<a href="${esc(step.link)}" target="_blank" rel="noopener noreferrer">Open reference ↗</a>` : ''}${!presenting ? a.recordLinks?.(step) || '' : ''}<div class="rehearsal-branches"><strong>Explore an outcome</strong>${button('success', 'Follow success', `data-id="${esc(step.id)}"`)}${button('failure', 'What if this fails?', `data-id="${esc(step.id)}"`)}${routes.length > 1 ? `<strong>Alternative routes</strong>${routes.map(id => button('route', esc(p.steps.find(s => s.id === id)?.title || id), `data-id="${esc(step.id)}" data-next="${esc(id)}"`)).join('')}` : ''}</div>${p.id !== '__demo__' && !presenting ? button('edit-step', 'Edit this step', `data-id="${esc(step.id)}"`, 'primary small') : ''}`;
+      return `<span class="hub-kicker">${presenting ? 'FOLLOW THE PROCESS' : 'STEP DETAILS'}</span><div class="rehearsal-detail-title"><span>${ICONS[step.type]}</span><h3>${esc(step.title)}</h3></div>${step.tcode ? `<span class="rehearsal-tcode">${esc(step.tcode)}</span>` : ''}<dl>${row('Who handles it', step.owner)}${row('Before you start', step.prerequisites)}${row('What happens', presenting ? step.audienceText || step.instruction : step.instruction)}${row('Inputs', step.inputs)}${row('Expected result', step.expected)}${row('Outputs', step.outputs)}${row('System / tool', step.system)}${row('Typical working time', step.workingTime)}${!presenting ? row('If it fails / common errors', step.failure) + row('Configuration / setup', step.configuration) + row('Testing checklist', step.testing) : ''}</dl>${step.image ? `<a class="rehearsal-image-link" href="${esc(step.image)}" target="_blank" rel="noopener"><img src="${esc(step.image)}" alt="Reference screenshot for ${esc(step.title)}"></a>` : ''}${!presenting && step.link ? `<a href="${esc(step.link)}" target="_blank" rel="noopener noreferrer">Open reference ↗</a>` : ''}${!presenting ? a.recordLinks?.(step) || '' : ''}${decisionHTML(step)}<div class="rehearsal-branches"><strong>Explore an outcome</strong>${button('success', 'Follow success', `data-id="${esc(step.id)}"`)}${button('failure', 'What if this fails?', `data-id="${esc(step.id)}"`)}${routes.length > 1 ? `<strong>Alternative routes</strong>${routes.map(id => button('route', esc(p.steps.find(s => s.id === id)?.title || id), `data-id="${esc(step.id)}" data-next="${esc(id)}"`)).join('')}` : ''}</div>${p.id !== '__demo__' && !presenting ? button('edit-step', 'Edit this step', `data-id="${esc(step.id)}"`, 'primary small') : ''}`;
     }
     function closeOverlay() {
       if (!overlay) return;
@@ -701,6 +714,47 @@
         }
       }
     }
+    function pendingDecision() {
+      const entry = route?.entries[index],
+        step = entry && model().steps.find(s => s.id === entry.id);
+      return !!(
+        interactive &&
+        !draft &&
+        !editing &&
+        step &&
+        E.answers(step).length > 1 &&
+        !answered.has(index)
+      );
+    }
+    function decisionHTML(step) {
+      const options = E.answers(step);
+      if (options.length < 2) return '';
+      const waiting = pendingDecision() && route.entries[index]?.id === step.id;
+      return `<section class="ph-decision" data-waiting="${waiting}"><span class="hub-kicker">${waiting ? 'YOUR CHOICE · PLAYBACK IS WAITING' : 'DECISION PATHS'}</span><h4>${esc(step.decision?.question || step.title)}</h4><div class="actions">${options.map((answer, i) => button('answer', `${esc(answer.label)}<small>${esc(model().steps.find(s => s.id === answer.next)?.title || 'End route')}</small>`, `data-id="${esc(step.id)}" data-answer="${i}"`, 'ph-answer')).join('')}</div></section>`;
+    }
+    function chooseAnswer(id, number) {
+      const at =
+        route?.entries[index]?.id === id ? index : route?.entries.findIndex(e => e.id === id);
+      const step = model().steps.find(s => s.id === id),
+        answer = step && E.answers(step)[number];
+      if (!answer || at < 0 || at === undefined)
+        throw Error('Choose an answer on the current route.');
+      visitChoices = Object.fromEntries(
+        Object.entries(visitChoices).filter(([i]) => Number(i) < at)
+      );
+      visitChoices[at] = { id, next: answer.next, outcome: answer.outcome };
+      index = at;
+      rebuild(true);
+      answered = new Set([...answered].filter(i => i < at));
+      answered.add(at);
+      index = at;
+      selected = '';
+      elapsed = (route.entries[index]?.duration || 3) * 550;
+      paused = false;
+      paintKey = '';
+      paint(false);
+      cue();
+    }
     function inspect(id) {
       reverse = null;
       const p = model();
@@ -742,8 +796,8 @@
         display = entry || route.entries.at(-1),
         duration = entry ? entry.duration * 1000 : 3200,
         phase = entry ? Math.min(1, elapsed / duration) : 1,
-        key = index + '|' + (entry ? phase >= 0.55 : 'end');
-      rootEl.dataset.playing = String((!paused || !!reverse) && !blocked());
+        key = index + '|' + (entry ? phase >= 0.55 : 'end') + '|' + pendingDecision();
+      rootEl.dataset.playing = String((!paused || !!reverse) && !pendingDecision() && !blocked());
       rootEl.dataset.direction = reverse ? 'reverse' : 'forward';
       rootEl.dataset.reduced = String(motionOff());
       const play = $('rehearsalPlay');
@@ -792,12 +846,15 @@
             .join('') || '<p>Add sample fields in your scenario.</p>';
         $('rehearsalStatus').textContent = draft
           ? 'Editing · Save process to start looping playback'
-          : motionOff()
-            ? 'Reduced motion · use Next to step through'
-            : route.error ||
-              (!entry
-                ? `${route.ending === 'loop-guard' ? 'Defined loop limit reached' : route.ending === 'failed' ? 'Exception route ended' : 'Route complete'} · restarting…`
-                : `${index + 1}/${route.entries.length} · ${entry.outcome === 'failure' ? 'Exception' : 'Running'} · ${scenario(p).name}`);
+          : pendingDecision()
+            ? 'Choose an answer to continue · ' +
+              (p.steps.find(s => s.id === entry?.id)?.decision?.question || entry?.title)
+            : motionOff()
+              ? 'Reduced motion · use Next to step through'
+              : route.error ||
+                (!entry
+                  ? `${route.ending === 'loop-guard' ? 'Defined loop limit reached' : route.ending === 'failed' ? 'Exception route ended' : 'Route complete'} · restarting…`
+                  : `${index + 1}/${route.entries.length} · ${entry.outcome === 'failure' ? 'Exception' : 'Running'} · ${scenario(p).name}`);
         const reached = route.entries.slice(0, Math.min(index + 1, route.entries.length));
         $('rehearsalJournal').innerHTML = reached
           .map(
@@ -840,7 +897,7 @@
         from = entry && p.steps.find(s => s.id === entry.id),
         to = entry && p.steps.find(s => s.id === entry.nextId);
       if (token) {
-        token.hidden = !entry || !from || !to || phase < 0.5 || motionOff();
+        token.hidden = !entry || !from || !to || phase < 0.5 || motionOff() || pendingDecision();
         if (!token.hidden) {
           const point = E.point(from, to, Math.min(1, (phase - 0.5) * 2));
           token.style.left = point.x + 'px';
@@ -857,7 +914,7 @@
         return;
       }
       if (!last) last = t;
-      const dt = Math.min(150, Math.max(0, t - last));
+      const dt = Math.min(presenter?.connected() ? 600 : 150, Math.max(0, t - last));
       last = t;
       if (reverse && !blocked()) {
         reverse.elapsed += dt * prefs().speed;
@@ -869,7 +926,7 @@
           paintKey = '';
           cue();
         }
-      } else if (!paused && !blocked() && route?.entries.length) {
+      } else if (!paused && !blocked() && !pendingDecision() && route?.entries.length) {
         elapsed += dt * prefs().speed;
         const entry = route.entries[index],
           duration = entry ? entry.duration * 1000 : 3200;
@@ -890,10 +947,12 @@
         }
       }
       paint();
+      presenter?.publish();
       raf = root.requestAnimationFrame(tick);
     }
     function mount() {
       resetOwner();
+      presenter?.sync();
       if (a.active && !a.active()) {
         closeOverlay();
         wasVisible = false;
@@ -1023,15 +1082,16 @@
           .map(
             step =>
               `<label>${esc(step.title)}<select name="outcome-${esc(step.id)}"><option value="success">Success / normal path</option><option value="failure"${s.choices[step.id] === 'failure' ? ' selected' : ''}>Failure / exception path</option></select></label>${
-                step.alternatives?.length
+                step.alternatives?.length || step.decision
                   ? `<label>Normal route from ${esc(step.title)}<select name="route-${esc(step.id)}">${[
                       step.next,
                       ...step.alternatives,
+                      ...(step.decision?.answers || []).map(a => a.next),
                     ]
-                      .filter(Boolean)
+                      .filter((id, i, list) => list.indexOf(id) === i)
                       .map(
                         id =>
-                          `<option value="${esc(id)}"${(s.routes?.[step.id] || step.next) === id ? ' selected' : ''}>${esc(p.steps.find(x => x.id === id)?.title)}</option>`
+                          `<option value="${esc(id)}"${(s.routes?.[step.id] ?? step.next) === id ? ' selected' : ''}>${esc((step.decision?.answers.find(a => a.next === id)?.label || 'Route') + ' → ' + (p.steps.find(x => x.id === id)?.title || 'End route'))}</option>`
                       )
                       .join('')}</select></label>`
                   : ''
@@ -1052,6 +1112,13 @@
         throw Error('This process changed. Reopen the editor before saving.');
       return p;
     }
+    function decisionFields(step, p) {
+      const choices = step.decision?.answers || [
+        { label: 'Yes', next: step.next },
+        { label: 'No', next: step.alternatives?.[0] || step.failNext || '' },
+      ];
+      return `<fieldset class="ph-decision-editor"${step.type !== 'decision' ? ' hidden' : ''}><legend>Decision question &amp; answers</legend><label class="check-label"><input name="decisionEnabled" type="checkbox"${step.decision ? ' checked' : ''}>Enable named answers</label><p>Maintain 2–6 answers with different destinations. The default is used in automatic playback; interactive playback waits for your choice. An empty destination ends the route.</p><label>Question<input name="decisionQuestion" maxlength="500" value="${esc(step.decision?.question || step.title)}"></label>${Array.from({ length: 6 }, (_, i) => `<div class="ph-answer-editor"><label>Answer ${i + 1}<input name="decisionLabel-${i}" maxlength="120" value="${esc(choices[i]?.label || '')}" placeholder="${i < 2 ? 'Answer label' : 'Optional answer'}"></label><label>Go to<select name="decisionNext-${i}"><option value="">End route</option>${p.steps.map(s => `<option value="${esc(s.id)}"${s.id === choices[i]?.next ? ' selected' : ''}>${esc(s.title)}</option>`).join('')}</select></label><label class="check-label"><input type="radio" name="decisionDefault" value="${i}"${(step.decision ? !!choices[i] && choices[i].next === step.next : i === 0) ? ' checked' : ''}>Default</label></div>`).join('')}<p>Normal routes below are maintained from these answers when this is a decision step. Exception routing remains available separately.</p></fieldset>`;
+    }
     function stepEditor(id) {
       const p = model(),
         step = p.steps.find(s => s.id === id);
@@ -1070,7 +1137,7 @@
           .map(r => `<option value="${esc(r.code)}">${esc(r.title)}</option>`)
           .join(
             ''
-          )}</datalist>${field('owner', 'Who handles it', 'text', 200)}${field('prerequisites', 'Before you start', 'textarea')}${field('instruction', 'Instructions', 'textarea')}${field('expected', 'Expected result', 'textarea')}${field('failure', 'If it fails / common errors & solutions', 'textarea')}${field('inputs', 'Inputs / required information', 'textarea')}${field('outputs', 'Outputs / deliverables', 'textarea')}${field('system', 'System / tool', 'text', 300)}${field('workingTime', 'Typical working time (separate from playback)', 'text', 300)}${field('audienceText', 'Explanation to show users (optional)', 'textarea')}${field('configuration', 'Configuration / setup notes', 'textarea')}${field('testing', 'Testing / verification checklist', 'textarea')}<label>Normal next step<select name="next"><option value="">End route</option>${p.steps.map(s => `<option value="${esc(s.id)}"${s.id === step.next ? ' selected' : ''}>${esc(s.title)}</option>`).join('')}</select></label><fieldset><legend>Additional normal routes</legend>${p.steps
+          )}</datalist>${field('owner', 'Who handles it', 'text', 200)}${field('prerequisites', 'Before you start', 'textarea')}${field('instruction', 'Instructions', 'textarea')}${field('expected', 'Expected result', 'textarea')}${field('failure', 'If it fails / common errors & solutions', 'textarea')}${decisionFields(step, p)}${field('inputs', 'Inputs / required information', 'textarea')}${field('outputs', 'Outputs / deliverables', 'textarea')}${field('system', 'System / tool', 'text', 300)}${field('workingTime', 'Typical working time (separate from playback)', 'text', 300)}${field('audienceText', 'Explanation to show users (optional)', 'textarea')}${field('configuration', 'Configuration / setup notes', 'textarea')}${field('testing', 'Testing / verification checklist', 'textarea')}<label>Normal next step<select name="next"><option value="">End route</option>${p.steps.map(s => `<option value="${esc(s.id)}"${s.id === step.next ? ' selected' : ''}>${esc(s.title)}</option>`).join('')}</select></label><fieldset><legend>Additional normal routes</legend>${p.steps
           .filter(s => s.id !== id)
           .map(
             s =>
@@ -1121,7 +1188,8 @@
         for (const step of p.steps)
           if (value('outcome-' + step.id) === 'failure') choices[step.id] = 'failure';
         for (const step of p.steps)
-          if (step.alternatives?.length) routes[step.id] = value('route-' + step.id);
+          if (step.alternatives?.length || step.decision)
+            routes[step.id] = value('route-' + step.id);
         const changed = {
           id: form.dataset.id,
           name,
@@ -1164,6 +1232,21 @@
             .filter(id => id !== value('next')),
           ...Object.fromEntries(E.STEP_FIELDS.map(k => [k, value(k)])),
         };
+        if (step.type === 'decision' && form.elements.namedItem('decisionEnabled').checked) {
+          const answers = Array.from({ length: 6 }, (_, i) => ({
+            label: value('decisionLabel-' + i).trim(),
+            next: value('decisionNext-' + i),
+            i,
+          })).filter(a => a.label);
+          const normal = answers.find(a => String(a.i) === value('decisionDefault'));
+          if (!normal) throw Error('Choose a default among the maintained decision answers.');
+          step.decision = {
+            question: value('decisionQuestion').trim(),
+            answers: answers.map(({ label, next }) => ({ label, next })),
+          };
+          step.next = normal.next;
+          step.alternatives = answers.map(a => a.next).filter(id => id && id !== normal.next);
+        } else delete step.decision;
         editing = false;
         editorSnapshot = null;
         paused = false;
@@ -1174,7 +1257,11 @@
             for (const scenario of row.scenarios)
               if (
                 scenario.routes?.[id] &&
-                ![step.next, ...step.alternatives].includes(scenario.routes[id])
+                ![
+                  step.next,
+                  ...step.alternatives,
+                  ...(step.decision?.answers || []).map(a => a.next),
+                ].includes(scenario.routes[id])
               )
                 delete scenario.routes[id];
           });
@@ -1249,6 +1336,16 @@
       const action = el.dataset.rehearsal,
         id = el.dataset.id,
         p = model();
+      if (action === 'presenter') {
+        if (draft || editing) throw Error('Save or cancel your changes before presenting.');
+        presenter?.open();
+        return;
+      }
+      if (action === 'answer') {
+        if (editing) throw Error('Save or cancel the step editor first.');
+        chooseAnswer(id, Number(el.dataset.answer));
+        return;
+      }
       if (action === 'sound') {
         if (prefs().sound && (audioPending || (audioReady && audio?.state === 'running'))) {
           setPreference('sound', false);
@@ -1399,6 +1496,16 @@
               if (s.next === id) s.next = '';
               if (s.failNext === id) s.failNext = '';
               s.alternatives = s.alternatives.filter(x => x !== id);
+              if (s.decision) {
+                s.decision.answers = s.decision.answers.filter(a => a.next !== id);
+                if (s.decision.answers.length < 2) delete s.decision;
+                else if (!s.decision.answers.some(a => a.next === s.next))
+                  s.next = s.decision.answers[0].next;
+                if (s.decision)
+                  s.alternatives = s.decision.answers
+                    .map(a => a.next)
+                    .filter(to => to && to !== s.next);
+              }
             }
             for (const scenario of row.scenarios) {
               delete scenario.choices[id];
@@ -1513,6 +1620,10 @@
         reverse = { source: index, target: index - 1, elapsed: 0 };
         paintKey = '';
         paint();
+        return;
+      }
+      if (action === 'next' && pendingDecision()) {
+        a.tell('Choose an answer before continuing.');
         return;
       }
       if (action === 'back' || action === 'next') {
@@ -1758,6 +1869,17 @@
       const el = event.target,
         id = el.id;
       try {
+        if (el.name === 'type' && el.closest('#rehearsalStepForm')) {
+          el.closest('form').querySelector('.ph-decision-editor').hidden = el.value !== 'decision';
+          return;
+        }
+        if (id === 'rehearsalDecisionMode') {
+          interactive = el.value === 'interactive';
+          answered.clear();
+          paintKey = '';
+          paint(false);
+          return;
+        }
         if (id === 'rehearsalImageInput') {
           void upload(el.files?.[0], el.closest('form')).catch(err => a.tell(err.message, true));
           return;
@@ -1853,12 +1975,115 @@
         URL.revokeObjectURL(exportUrl);
         exportUrl = '';
       }
+      presenter?.close();
       stopFrame();
       closeOverlay();
       draft = null;
       editorSnapshot = null;
       paletteDrag?.ghost?.remove();
       paletteDrag = null;
+    });
+    function audienceSnapshot() {
+      const p = model(),
+        entry = route?.entries[index],
+        step = p.steps.find(s => s.id === entry?.id);
+      return {
+        kind: 'process',
+        title: p.name,
+        objective: p.objective,
+        theme: prefs().theme,
+        reduced: motionOff() || prefs().effects === 'quiet',
+        speed: prefs().speed,
+        playing:
+          !paused &&
+          !pendingDecision() &&
+          !editing &&
+          !draft &&
+          !motionOff() &&
+          !presenter?.blocked(),
+        phase: entry ? Math.min(1, elapsed / (entry.duration * 1000)) : 1,
+        duration: entry?.duration || 3,
+        active: entry?.id || '',
+        next: entry?.nextId || '',
+        outcome: entry?.outcome || 'success',
+        count: index + 1,
+        total: route?.entries.length || 0,
+        steps: p.steps.map(s => ({ id: s.id, title: s.title, type: s.type, x: s.x, y: s.y })),
+        edges: p.steps.flatMap(s =>
+          E.connections(s).map(next => ({
+            from: s.id,
+            to: next,
+            label: E.answers(s).find(a => a.next === next)?.label || '',
+            failure: next === s.failNext,
+          }))
+        ),
+        detail: step
+          ? {
+              title: step.title,
+              explanation: step.audienceText || step.instruction,
+              expected: step.expected,
+              owner: step.owner,
+            }
+          : { title: 'Route complete', explanation: 'The walkthrough will restart shortly.' },
+        decision:
+          pendingDecision() && step
+            ? {
+                question: step.decision?.question || step.title,
+                answers: E.answers(step).map(a => ({ label: a.label })),
+              }
+            : null,
+      };
+    }
+    presenter = root.WorkHubPresenter?.install({
+      ready: () => a.ready() && !draft && !editing,
+      owner: a.owner,
+      active: () => !a.active || a.active(),
+      snapshot: audienceSnapshot,
+      privateInfo: () => {
+        const p = model();
+        return {
+          processId,
+          scenarioId,
+          interactive,
+          notes: p.presenterNotes,
+          paused,
+          processes: library()
+            .filter(p => !p.archived)
+            .map(p => ({ id: p.id, name: p.name })),
+          scenarios: p.scenarios.map(s => ({ id: s.id, name: s.name })),
+        };
+      },
+      command(action, value) {
+        guard(owner);
+        if (draft || editing) throw Error('Save or cancel your changes before presenting.');
+        if (action === 'process' || action === 'scenario') {
+          if (action === 'process') {
+            processId = value;
+            scenarioId = '';
+          } else scenarioId = value;
+          overrides = {};
+          routeChoices = {};
+          route = null;
+          lastModel = '';
+          paused = false;
+          a.render();
+        } else if (action === 'interactive') {
+          interactive = value;
+          answered.clear();
+          paintKey = '';
+          paint(false);
+          const select = $('rehearsalDecisionMode');
+          if (select) select.value = value ? 'interactive' : 'auto';
+        } else if (action === 'answer') chooseAnswer(route.entries[index]?.id, Number(value));
+        else if (['play', 'next', 'back', 'restart'].includes(action))
+          return handle({ dataset: { rehearsal: action } });
+      },
+      backgroundPulse() {
+        if (!document.hidden || !$('rehearsalRoot')) return;
+        if (raf) root.cancelAnimationFrame(raf);
+        tick(root.performance.now());
+      },
+      tell: a.tell,
     });
     return {
       render,
@@ -1885,6 +2110,8 @@
         editing = false;
         return true;
       },
+      presenter,
+      audienceSnapshot,
       plan: () => route,
       snapshot: () => ({
         index,
@@ -1896,6 +2123,8 @@
         loops,
         mode,
         drafting: !!draft,
+        interactive,
+        waitingForDecision: pendingDecision(),
         archived,
         sound: audioReady && audio?.state === 'running' && prefs().sound,
         audioPending: !!audioPending,

@@ -1455,3 +1455,61 @@ body.process-hub-full-open #view *::after {
   font-size: 0.85rem;
   font-weight: 600;
 }
+
+/* Named decision paths and interaction mode. */
+.ph-decision {
+  padding: 16px;
+  margin: 18px 0;
+  border: 1px solid #bfd0ac;
+  border-radius: 13px;
+  background: #edf1e1;
+}
+.ph-decision[data-waiting='true'] {
+  border-color: #8ba369;
+  box-shadow: 0 0 0 3px #b7c89425;
+}
+.ph-decision h4 {
+  margin: 8px 0 14px;
+  font-size: 17px;
+}
+.ph-decision .ph-answer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  text-align: left;
+  flex: 1 1 130px;
+}
+.ph-answer small {
+  font-weight: 400;
+  color: #64795d;
+  font-size: 11px;
+}
+.ph-decision-editor {
+  margin: 18px 0;
+  border: 1px solid #c1d0b2;
+  border-radius: 10px;
+  padding: 13px;
+}
+.ph-decision-editor[hidden] {
+  display: none;
+}
+.ph-answer-editor {
+  border-top: 1px solid #dce2d2;
+  margin-top: 10px;
+  padding-top: 6px;
+}
+.ph-decision-editor p {
+  font-size: 12px;
+  color: #6a7c60;
+}
+.ph-route-label {
+  fill: #47654e;
+  font:
+    12px system-ui,
+    sans-serif;
+  paint-order: stroke;
+  stroke: #f5f5ec;
+  stroke-width: 5px;
+  stroke-linejoin: round;
+}

@@ -6,7 +6,7 @@ The two prioritised items are implemented: **TNG PDF extraction and cropped evid
 
 The Momo behaviour enhancements in [Batch B](BATCH-B.md) are implemented, including the later weather consequences, visitor friendships and click-reaction selections. [Batch C](BATCH-C.md) is implemented: 25 · Ticket twin finder, 26 · Sensitive screenshot brush, and 30 · Screenshot guide builder. See its usage and local-file notes before sharing an editable guide.
 
-[Batch D](BATCH-D.md) was kept on 25 October 2026: **4 · Interactive process decisions**, **7 · Personal reminder rules**, **10 · Sync health centre**, **42 · Presentation control panel**, **97 · Private presentation annotations**, **193 · Day-to-night atmosphere**, **196 · Companion habitat**, **198 · Expressive completion moments**, **204 · Companion expressions**, and **209 · Elegant loading scenes**. These are wishlist selections; implementation has not been requested.
+[Batch D](BATCH-D.md) is partially implemented: **4 · Interactive process decisions**, **42 · Presentation control panel**, **97 · Private presentation annotations**, and **209 · Elegant loading scenes** are complete. **7, 10, 193, 196, 198 and 204** remain pending. See [the usage guide](docs/BATCH-D-PRESENTING.md).
 
 [Batch E](BATCH-E.md) was kept on 25 October 2026: **51 · Work handover mode**. These are wishlist selections; implementation has not been requested.
 
@@ -77,4 +77,4 @@ The [example workspace](https://losthaidid.github.io/mm-tracker/tests/wishlist-p
 
 ## Verification
 
-Run `npm test` for the application, engine, Excel and database tests. The command gives the Node test process a 6 GiB maximum heap for the full JSDOM suite; this is a test-runner setting and does not change browser memory limits.
+Run `npm test` for the application, engine, Excel and database tests. The command runs module/database checks, then the large JSDOM application suite in four disjoint name groups with a 4 GiB maximum heap per process. All test names are covered, including names outside A–S. This bounds test-runner memory without changing browser memory limits.

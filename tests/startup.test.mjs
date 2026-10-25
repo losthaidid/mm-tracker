@@ -134,3 +134,13 @@ test('failed startup files or runtime errors keep recovery visible without revea
     assert.ok(document.getElementById('workhubStartupReload'));
   }
 });
+
+test('startup shows real opening stages without a fabricated percentage or minimum delay', t => {
+  const {window,document,timers}=startup(t);
+  window.WorkHubStartup.phase('account','Connecting your account…');
+  assert.equal(document.querySelector('[data-startup-stage="assets"]').dataset.state,'done');
+  assert.equal(document.querySelector('[aria-current="step"]').dataset.startupStage,'account');
+  const progress=document.getElementById('workhubStartupProgress');assert.equal(progress.hasAttribute('aria-valuenow'),false);assert.match(progress.getAttribute('aria-valuetext'),/Connecting/);
+  window.WorkHubStartup.phase('records','Opening your records…');assert.equal(document.querySelector('[aria-current="step"]').dataset.startupStage,'records');
+  window.WorkHubStartup.finish();assert.equal(document.documentElement.hasAttribute('data-workhub-startup'),false);assert.equal([...timers.values()].filter(t=>t.delay!==220).length,0);
+});

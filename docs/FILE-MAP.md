@@ -150,3 +150,12 @@ Project people: [project-people-engine.js](../project-people-engine.js) validate
 - `solution-valuation-ui.js` / `solution-valuation.css`: valuation controls, class context, stock ledgers and worked-example entry points.
 
 Presentation breaks: [presentation-break.js](../presentation-break.js) owns custom audience messages, timestamp countdowns, screen selection and fullscreen fallback; [presentation-break.css](../presentation-break.css) supplies three lightweight landscape scenes. The shared Focus toolbar creates the launch button and supplies its existing tick and owner guard. No database writes or personal timer actions.
+
+## Batch D presentation modules
+
+- `presenter.js` / `presenter.css`: private controls, audience connection, temporary annotations and presentation breaks.
+- `audience-view.js` / `audience.css`: shared 16:9 public scene and preview renderer.
+- `audience.html` / `audience.js`: isolated audience window; no account client or record storage.
+- `rehearsal-engine.js` / `rehearsal.js`: named decision definitions, automatic defaults and interactive playback.
+- `startup.js` and critical `index.html` styles: maintained branding, lightweight loading illustration and actual startup stages.
+- `docs/BATCH-D-PRESENTING.md`: usage and verification notes for selections 4, 42, 97 and 209.

@@ -1,7 +1,7 @@
 {
   "private": true,
   "scripts": {
-    "test": "node --max-old-space-size=6144 --test tests/*.test.mjs",
+    "test": "node scripts/test.mjs",
     "format": "prettier --write \"*.js\" \"*.css\" index.html",
     "format:check": "prettier --check \"*.js\" \"*.css\" index.html",
     "build:client": "esbuild cloud-entry.js --bundle --minify --format=iife --legal-comments=inline --outfile=supabase-client.js"

@@ -27,3 +27,11 @@ test('production and development previews share the supplied ZIP reader',()=>{
  assert.ok(!existsSync(new URL('tests/validator-zip.js',root)));
  for(const file of ['tests/validator-preview.html','tests/wishlist-preview.html'])assert.match(readFileSync(new URL(file,root),'utf8'),/\.\.\/vendor\/jszip\.min\.js/);
 });
+test('audience window loads only its isolated renderer and controller, with no account client',t=>{
+ const dom=new JSDOM(readFileSync(new URL('audience.html',root),'utf8'));t.after(()=>dom.window.close());
+ const scripts=[...dom.window.document.querySelectorAll('script[src]')].map(s=>s.getAttribute('src').split('?')[0]);
+ assert.deepEqual(scripts,['./audience-view.js','./audience.js']);
+ assert.match(dom.window.document.querySelector('meta[http-equiv="Content-Security-Policy"]').content,/connect-src 'none'/);
+ const main=new JSDOM(html);t.after(()=>main.window.close());const order=[...main.window.document.querySelectorAll('script[src]')].map(s=>s.getAttribute('src').split('?')[0]);
+ assert.ok(order.indexOf('./audience-view.js')<order.indexOf('./presenter.js'));assert.ok(order.indexOf('./presenter.js')<order.indexOf('./rehearsal.js'));
+});

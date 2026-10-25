@@ -9028,7 +9028,7 @@ async function loadCloud(session) {
   cloud.conflict = false;
   cloud.key = 'mm-tracker.cloud.v1:' + cloudConfig.project + ':' + cloud.user.id;
   cloud.status = 'Opening cloud records…';
-  window.WorkHubStartup?.message('Opening your records…');
+  window.WorkHubStartup?.phase('records', 'Opening your records…');
   notice();
   render();
   let cache = null;
@@ -9778,8 +9778,10 @@ $('modal').addEventListener('close', () => {
 month = state.calendarMonth;
 notice();
 render();
-if (CLOUD_MODE) startCloud();
-else window.WorkHubStartup?.finish();
+if (CLOUD_MODE) {
+  window.WorkHubStartup?.phase('account', 'Connecting your account…');
+  startCloud();
+} else window.WorkHubStartup?.finish();
 if (document.modelContext?.registerTool) {
   try {
     Promise.resolve(
