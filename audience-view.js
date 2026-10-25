@@ -74,8 +74,16 @@
     return -1;
   }
   function cameraFor(data, options = {}) {
-    const width = Math.max(850, ...data.steps.map(s => s.x + 270)),
-      height = Math.max(450, ...data.steps.map(s => s.y + 160)),
+    const width = Math.max(
+        850,
+        root.WorkHubProcessCanvasArt?.dimensions(data).width || 0,
+        ...data.steps.map(s => s.x + 270)
+      ),
+      height = Math.max(
+        450,
+        root.WorkHubProcessCanvasArt?.dimensions(data).height || 0,
+        ...data.steps.map(s => s.y + 160)
+      ),
       c = options.camera;
     if (
       c &&
@@ -128,7 +136,8 @@
       received = 0,
       frame = 0,
       disposed = false,
-      camera = null;
+      camera = null,
+      annotationKey = '';
     host.classList.add('audience-frame');
     function stop() {
       if (frame) root.cancelAnimationFrame(frame);
@@ -200,7 +209,13 @@
       const key = JSON.stringify([
         data.kind,
         data.title,
-        data.steps,
+        data.steps?.map(s => ({
+          id: s.id,
+          title: s.title,
+          type: s.type,
+          entity: s.entity,
+          stackParent: s.stackParent,
+        })),
         data.edges,
         data.detail,
         data.decision,
@@ -210,6 +225,7 @@
       if (key !== signature) {
         signature = key;
         markSignature = '';
+        annotationKey = '';
         if (data.kind === 'process') {
           const w = Math.max(850, ...data.steps.map(s => s.x + 270)),
             h = Math.max(400, ...data.steps.map(s => s.y + 160));
@@ -230,10 +246,12 @@
                   s.title
                 )
                   .map((l, i) => `<tspan x="15" y="${45 + i * 19}">${esc(l)}</tspan>`)
-                  .join('')}</text></g>`
+                  .join(
+                    ''
+                  )}</text>${s.entity && Object.values(s.entity).some(Boolean) ? '<text class="pc-entity-label" x="15" y="94">' + esc(Object.values(s.entity).filter(Boolean).slice(0, 3).join(' · ').slice(0, 38)) + '</text>' : ''}</g>`
             )
             .join('');
-          host.innerHTML = `<div class="av-content"><header class="av-header"><div><span class="av-kicker">PROCESS WALKTHROUGH</span><h1>${esc(data.title)}</h1></div><span class="av-counter"></span></header><div class="av-layout"><div class="av-map"><svg class="av-graph" viewBox="0 0 ${w} ${h}" aria-label="Process diagram">${edges}${nodes}<g class="av-token"><circle r="12"/><path d="M-4-5H4V5H-4Z"/></g></svg></div><aside class="av-detail"><span class="av-kicker">CURRENT STEP</span><h2>${esc(data.detail?.title || '')}</h2>${data.detail?.owner ? `<p class="av-owner">${esc(data.detail.owner)}</p>` : ''}<p>${esc(data.detail?.explanation || '')}</p>${data.detail?.expected ? `<div class="av-result"><span>EXPECTED RESULT</span><p>${esc(data.detail.expected)}</p></div>` : ''}${data.decision ? `<section class="av-question"><strong>${esc(data.decision.question)}</strong><ol>${data.decision.answers.map(a => `<li>${esc(a.label)}</li>`).join('')}</ol><small>Waiting for the presenter’s choice</small></section>` : ''}</aside></div><footer class="av-footer"><span class="av-state"></span><span>PROCESS HUB</span></footer></div><svg class="av-annotations" viewBox="0 0 1000 562.5" aria-hidden="true"></svg>`;
+          host.innerHTML = `<div class="av-content"><header class="av-header"><div><span class="av-kicker">PROCESS WALKTHROUGH</span><h1>${esc(data.title)}</h1></div><span class="av-counter"></span></header><div class="av-layout"><div class="av-map"><svg class="av-graph" viewBox="0 0 ${w} ${h}" aria-label="Process diagram">${edges}${nodes}<g class="pc-graph-annotations"></g><path class="pc-wire-preview" hidden/><g class="av-token"><circle r="12"/><path d="M-4-5H4V5H-4Z"/></g></svg></div><aside class="av-detail"><span class="av-kicker">CURRENT STEP</span><h2>${esc(data.detail?.title || '')}</h2>${data.detail?.owner ? `<p class="av-owner">${esc(data.detail.owner)}</p>` : ''}<p>${esc(data.detail?.explanation || '')}</p>${data.detail?.expected ? `<div class="av-result"><span>EXPECTED RESULT</span><p>${esc(data.detail.expected)}</p></div>` : ''}${data.decision ? `<section class="av-question"><strong>${esc(data.decision.question)}</strong><ol>${data.decision.answers.map(a => `<li>${esc(a.label)}</li>`).join('')}</ol><small>Waiting for the presenter’s choice</small></section>` : ''}</aside></div><footer class="av-footer"><span class="av-state"></span><span>PROCESS HUB</span></footer></div><svg class="av-annotations" viewBox="0 0 1000 562.5" aria-hidden="true"></svg>`;
         } else if (data.kind === 'break') {
           host.innerHTML = `<div class="av-break-scenery" aria-hidden="true"><i class="av-sun"></i><i class="av-cloud"></i><i class="av-hill back"></i><i class="av-hill front"></i><i class="av-water"></i><i class="av-stars"></i></div><div class="av-break-copy"><span class="av-kicker">A MOMENT TO RESET</span><h1>${esc(data.message)}</h1><output class="av-clock" role="timer" aria-live="off"></output><p class="av-break-status"></p></div><svg class="av-annotations" viewBox="0 0 1000 562.5" aria-hidden="true"></svg>`;
         } else {
@@ -248,16 +266,75 @@
           : data.playing
             ? 'Following the process'
             : 'Playback paused';
+        const positions = new Map(data.steps.map(s => [s.id, s]));
         for (const n of host.querySelectorAll('.av-node')) {
+          const step = positions.get(n.dataset.node);
+          if (step) n.setAttribute('transform', 'translate(' + step.x + ',' + step.y + ')');
           n.dataset.active = String(n.dataset.node === data.active);
+          n.dataset.selected = String(n.dataset.node === options.selectedNode);
+          n.dataset.type = step?.type || '';
+          n.dataset.stacked = String(!!step?.stackParent);
           if (options.interactive && !n.hasAttribute('tabindex')) {
             n.setAttribute('tabindex', '0');
             n.setAttribute('role', 'button');
-            n.setAttribute(
-              'aria-label',
-              'Explain ' + (data.steps.find(s => s.id === n.dataset.node)?.title || 'step')
-            );
+            n.setAttribute('aria-label', 'Explain ' + (step?.title || 'step'));
           }
+          if (options.interactive && !n.querySelector('.pc-ports')) {
+            const ports = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            ports.setAttribute('class', 'pc-ports');
+            ports.innerHTML =
+              '<circle data-pc-port="in" data-pc-step="' +
+              esc(n.dataset.node) +
+              '" cx="0" cy="50" r="9"/><circle data-pc-port="out" data-pc-step="' +
+              esc(n.dataset.node) +
+              '" cx="210" cy="50" r="9"/>';
+            n.append(ports);
+          }
+        }
+        for (const edge of host.querySelectorAll('.av-edge')) {
+          const a = positions.get(edge.dataset.from),
+            b = positions.get(edge.dataset.to);
+          if (!a || !b) continue;
+          const k = Math.max(70, Math.abs(b.x - a.x - 210) * 0.45);
+          edge
+            .querySelector('path')
+            .setAttribute(
+              'd',
+              'M' +
+                (a.x + 210) +
+                ',' +
+                (a.y + 50) +
+                'C' +
+                (a.x + 210 + k) +
+                ',' +
+                (a.y + 50) +
+                ' ' +
+                (b.x - k) +
+                ',' +
+                (b.y + 50) +
+                ' ' +
+                b.x +
+                ',' +
+                (b.y + 50)
+            );
+          const label = edge.querySelector('text');
+          if (label) {
+            label.setAttribute('x', (a.x + 210 + b.x) / 2);
+            label.setAttribute('y', (a.y + b.y) / 2 + 35);
+          }
+        }
+        const noteLayer = host.querySelector('.pc-graph-annotations');
+        const key = JSON.stringify([
+          data.annotations,
+          data.steps.map(s => [s.id, s.x, s.y]),
+          options.canvasSelection,
+          options.interactive,
+        ]);
+        if (noteLayer && key !== annotationKey) {
+          annotationKey = key;
+          noteLayer.innerHTML =
+            root.WorkHubProcessCanvasArt?.svg(data, options.canvasSelection, options.interactive) ||
+            '';
         }
         for (const e of host.querySelectorAll('.av-edge'))
           e.dataset.active = String(

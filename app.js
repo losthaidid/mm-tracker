@@ -455,7 +455,9 @@ function field(k, label, type = 'text', required = false, value = '', group = 't
     const values =
       group === 'specs' && k === 'itemType'
         ? state.lists.projectItemTypes || ['RICEFW ID', 'Blueprint', 'Data Migration']
-        : OPTIONS[group === 'specs' ? (k === 'status' ? 'specStatus' : 'specPriority') : k];
+        : group === 'tickets' && k === 'object'
+          ? state.lists.ticketObjects
+          : OPTIONS[group === 'specs' ? (k === 'status' ? 'specStatus' : 'specPriority') : k];
     input = `<select id="field-${k}" name="${k}"${req}>${selectOptions(values, value, '—')}</select>`;
   } else
     input = `<input id="field-${k}" name="${k}" type="${type}"${type === 'number' ? ' min="0" step="any"' : type === 'date' ? ' min="1900-01-01" max="9999-12-31"' : type === 'time' ? ' step="1"' : ' maxlength="32767"'} value="${esc(value)}"${req}>`;
@@ -654,7 +656,10 @@ document.addEventListener('change', e => {
     if (progressFormChange(el) || enhancementChange(el) || projectChange(el)) return;
     if (id === 'statusFilter') {
       filterState.status = el.value;
+      if (el.value !== 'Pending') filterState.object = '';
       render();
+    } else if (el.closest('#editForm[data-group="tickets"]') && el.name === 'status') {
+      window.WorkHubTicketWorkspace?.syncPending(el.form);
     } else if (id === 'objectFilter') {
       filterState.object = el.value;
       render();
@@ -1052,8 +1057,8 @@ function rangeDates(start, end = start) {
 
 function pendingObjectCounts() {
   const pending = state.tickets.filter(t => t.status === 'Pending'),
-    objects = [...new Set([...OPTIONS.object, ...pending.map(t => t.object)])];
-  return `<section class="pending-objects" aria-label="Pending tickets by object"><span>Pending by object</span>${objects.map(o => `<button class="small${filterState.status === 'Pending' && filterState.object === o ? ' selected' : ''}" data-action="pending-object" data-object="${esc(o || '__unassigned')}">${esc(o) || 'Unassigned'} <strong>${pending.filter(t => t.object === o).length}</strong></button>`).join('')}</section>`;
+    objects = [...new Set([...state.lists.ticketObjects, ...pending.map(t => t.object)])];
+  return `<section class="pending-objects" aria-label="Pending tickets by object"><span>Object bookmarks · Pending</span>${objects.map(o => `<button class="small${filterState.status === 'Pending' && filterState.object === o ? ' selected' : ''}" data-action="pending-object" data-object="${esc(o || '__unassigned')}">${esc(o) || 'Unassigned'} <strong>${pending.filter(t => t.object === o).length}</strong></button>`).join('')}</section>`;
 }
 
 // Version 5: configurable milestones, linked tasks, secured actions, TOIL, and project governance.
@@ -2715,6 +2720,8 @@ function upgradeFeaturesV6(d) {
     'Completed',
   ];
   d.lists = d.lists && typeof d.lists === 'object' ? d.lists : {};
+  if (!Array.isArray(d.lists.ticketObjects) || !d.lists.ticketObjects.length)
+    d.lists.ticketObjects = OPTIONS.object.slice();
   if (!Array.isArray(d.lists.codes)) d.lists.codes = [];
   d.lists.ticketActivities = [];
   if (!Array.isArray(d.lists.projectActivities) || !d.lists.projectActivities.length)
@@ -2917,6 +2924,7 @@ function validateFeaturesV6(d) {
     throw Error('Keep exactly 12 named milestones.');
   for (const key of [
     'projectActivities',
+    'ticketObjects',
     'workLocations',
     'projectPhases',
     'departments',
@@ -3148,7 +3156,10 @@ function editLists() {
 function saveLists(form) {
   if (form.dataset.owner !== (cloud.user?.id || ''))
     throw Error('Reopen the built-in lists for the current account.');
-  const milestones = listValues(form, 'milestones'),
+  const ticketObjects = form.elements.namedItem('ticketObjects')
+      ? listValues(form, 'ticketObjects')
+      : state.lists.ticketObjects,
+    milestones = listValues(form, 'milestones'),
     projectActivities = listValues(form, 'projectActivities'),
     workLocations = listValues(form, 'workLocations'),
     projectPhases = listValues(form, 'projectPhases'),
@@ -3162,6 +3173,7 @@ function saveLists(form) {
   if (milestones.length !== 12) throw Error('Enter exactly 12 milestone names.');
   if (
     !projectActivities.length ||
+    !ticketObjects.length ||
     !workLocations.length ||
     projectPhases.length < 2 ||
     !projectItemTypes.length ||
@@ -3243,6 +3255,7 @@ function saveLists(form) {
       d.lists = {
         ...d.lists,
         milestones,
+        ticketObjects,
         projectActivities,
         workLocations,
         projectPhases,
@@ -7306,7 +7319,7 @@ function renderTasksV3() {
 /** Tickets use the card workspace; status, details and editors share the existing handlers. */
 function renderTickets() {
   const rows = filteredTickets(),
-    tools = `<input id="ticketSearch" type="search" value="${esc(filterState.query)}" placeholder="Search ticket, description, PIC or history" aria-label="Search tickets"><select id="statusFilter" aria-label="Filter ticket status">${selectOptions(OPTIONS.status, filterState.status, 'All statuses')}</select><select id="objectFilter" aria-label="Filter ticket object">${selectOptions(OPTIONS.object, filterState.object, 'All objects')}</select><select id="priorityFilter" aria-label="Filter ticket priority">${selectOptions(OPTIONS.priority, filterState.priority, 'All priorities')}</select>`;
+    tools = `<input id="ticketSearch" type="search" value="${esc(filterState.query)}" placeholder="Search ticket, description, PIC or history" aria-label="Search tickets"><select id="statusFilter" aria-label="Filter ticket status">${selectOptions(OPTIONS.status, filterState.status, 'All statuses')}</select><select id="objectFilter" aria-label="Filter ticket object"${filterState.status === 'Pending' ? '' : ' hidden'}>${selectOptions(state.lists.ticketObjects, filterState.object, 'All objects')}</select><select id="priorityFilter" aria-label="Filter ticket priority">${selectOptions(OPTIONS.priority, filterState.priority, 'All priorities')}</select>`;
   const heading = `<div class="workspace-heading"><div><span class="eyebrow">Ticket workspace</span><h2>A clearer view of your support queue</h2><p>Track priorities, ownership and the latest update in one place.</p></div><button class="primary" data-action="new" data-group="tickets">+ Add ticket</button></div>`;
   return `<div class="workspace-v10 tickets-workspace">${heading}${stats()}${pendingObjectCounts()}<section class="panel"><div class="workspace-toolbar">${tools}</div><div class="workspace-results">${rows.length} of ${state.tickets.length} tickets</div><div class="ticket-board">${
     rows

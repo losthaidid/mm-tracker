@@ -2918,3 +2918,41 @@ test('Companion hobbies: manual previews work after opening his menu, stay at th
 test('Companion umbrella: gripping hand shares the body mirror and only one original arm is hidden in both directions',async t=>{
  const {api,document,window}=await app(t,{styles:true}),pet=document.getElementById('hubPet');document.activeElement?.blur();assert.equal(api.hub.life.umbrella(),true);const prop=document.getElementById('hubMomoUmbrella');assert.equal(prop.namespaceURI,'http://www.w3.org/2000/svg');assert.equal(prop.parentElement.classList.contains('pet-body'),true);assert.equal(prop.querySelectorAll('.momo-umbrella-hand').length,1);for(const side of ['left','right']){pet.dataset.facing=side;assert.equal(window.getComputedStyle(pet.querySelector('.momo-arm-right')).visibility,'hidden');assert.equal(window.getComputedStyle(pet.querySelector('.momo-arm-left')).visibility,'visible');assert.equal(prop.querySelectorAll('svg').length,0);}api.hub.life.endUmbrella();assert.equal(document.getElementById('hubMomoUmbrella'),null);assert.equal(window.getComputedStyle(pet.querySelector('.momo-arm-right')).visibility,'visible');
 });
+
+test('Ticket objects: Pending-only editor and filters preserve saved classifications while status changes',async t=>{
+ const {api,document,window,db}=await app(t);
+ api.editLists();let settings=document.getElementById('listsForm');settings.elements.ticketObjects.value+='\nSecurity Team';api.saveLists(settings);await settle();
+ assert.ok(api.state().lists.ticketObjects.includes('Security Team'));
+ const id=addWishlistTicket(api,document);await settle();
+ api.editRecord('tickets',id);let f=document.getElementById('editForm');
+ const object=f.elements.namedItem('object'),wrapper=object.closest('.ticket-editor-fields > div');
+ f.elements.status.value='Pending';f.elements.status.dispatchEvent(new window.Event('change',{bubbles:true}));
+ assert.equal(wrapper.hidden,false);object.value='Security Team';api.saveEdit(f);await settle();
+ api.showTab('tickets');assert.equal(document.getElementById('objectFilter').hidden,false);
+ assert.ok([...document.getElementById('objectFilter').options].some(o=>o.value==='Security Team'));
+ document.getElementById('objectFilter').value='Security Team';document.getElementById('objectFilter').dispatchEvent(new window.Event('change',{bubbles:true}));
+ assert.equal(document.querySelectorAll('.ticket-queue-card').length,1);
+ document.getElementById('statusFilter').value='Closed';document.getElementById('statusFilter').dispatchEvent(new window.Event('change',{bubbles:true}));
+ assert.equal(document.getElementById('objectFilter').hidden,true);assert.equal(document.getElementById('objectFilter').value,'');
+ api.editRecord('tickets',id);f=document.getElementById('editForm');f.elements.status.value='Closed';f.elements.status.dispatchEvent(new window.Event('change',{bubbles:true}));
+ assert.equal(f.elements.object.closest('.ticket-editor-fields > div').hidden,true);
+ api.saveEdit(f);await settle();assert.equal(api.state().tickets[0].object,'Security Team');assert.equal(db.row.document.data.tickets[0].object,'Security Team');
+ api.editRecord('tickets',id);f=document.getElementById('editForm');f.elements.status.value='Pending';f.elements.status.dispatchEvent(new window.Event('change',{bubbles:true}));
+ assert.equal(f.elements.object.closest('.ticket-editor-fields > div').hidden,false);assert.equal(f.elements.object.value,'Security Team');
+});
+
+test('Ticket objects: maintained bookmark choices save one field and reject stale status or account actions',async t=>{
+ const {api,document,db}=await app(t),id=addWishlistTicket(api,document);await settle();
+ api.mutate(d=>{d.lists.ticketObjects.push('Security Team');d.tickets[0].status='Pending';});await settle();api.showTab('tickets');
+ const before=copy(api.state().tickets[0]);document.querySelector('[data-bench="object"]').click();
+ let choice=document.querySelector('[data-bench="object-pick"][data-value="Security Team"]');assert.ok(choice);
+ const writes=db.calls.length;choice.click();await settle();assert.equal(db.calls.length,writes+1);
+ const expected={...before,object:'Security Team'};assert.deepEqual(copy(api.state().tickets[0]),expected);
+ assert.match(document.querySelector('[data-bench="object"]').textContent,/Security Team/);
+ document.querySelector('[data-bench="object"]').click();choice=document.querySelector('[data-bench="object-pick"]');const stale=choice.cloneNode(true);document.body.append(stale);
+ api.closeModal();api.mutate(d=>d.tickets[0].status='Closed');await settle();const afterStatus=JSON.stringify(api.state().tickets[0]),statusWrites=db.calls.length;
+ stale.click();await settle();assert.equal(db.calls.length,statusWrites);assert.equal(JSON.stringify(api.state().tickets[0]),afterStatus);stale.remove();
+ api.mutate(d=>d.tickets[0].status='Pending');api.showTab('tickets');document.querySelector('[data-bench="object"]').click();choice=document.querySelector('[data-bench="object-pick"]');const previous=choice.cloneNode(true);document.body.append(previous);
+ api.closeModal();api.cloud.user={id:'22222222-2222-4222-8222-222222222222',email:'second@example.com'};api.showTab('tickets');const previousWrites=db.calls.length;
+ previous.click();await settle();assert.equal(db.calls.length,previousWrites);
+});

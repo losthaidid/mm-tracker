@@ -5,7 +5,7 @@ import { JSDOM } from 'jsdom';
 const source = f => readFileSync(new URL('../' + f, import.meta.url), 'utf8');
 const copy = x => JSON.parse(JSON.stringify(x));
 const settle = async () => { for (let i = 0; i < 24; i++) await Promise.resolve(); };
-function hub(t, initial = {}) {
+function hub(t, initial = {}, rich = false) {
   const dom = new JSDOM('<body><main id="view"></main><dialog id="modal"><div id="modalBody"></div></dialog></body>', { url: 'http://preview.test/', runScripts: 'outside-only', pretendToBeVisual: true });
   t.after(() => dom.window.close());
   const { window } = dom, { document } = window;
@@ -13,7 +13,7 @@ function hub(t, initial = {}) {
   window.URL.createObjectURL = () => 'blob:test-export'; window.URL.revokeObjectURL = () => {};
   window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
   window.HTMLDialogElement.prototype.close = function () { this.open = false; };
-  for (const f of ['rehearsal-engine.js', 'process-hub-files.js', 'audience-view.js', 'presentation-screen.js', 'presenter.js', 'rehearsal.js']) window.eval(source(f));
+  for (const f of ['rehearsal-engine.js', 'process-hub-files.js', ...(rich?['process-canvas-art.js','process-canvas.js']:[]), 'audience-view.js', 'presentation-screen.js', 'presenter.js', 'rehearsal.js']) window.eval(source(f));
   const E = window.WorkHubRehearsalEngine, F = window.WorkHubProcessFiles;
   let state = { projects: [], tickets: [], specs: [], workhub: { processes: [], notes: [], tcodes: { records: [] }, ...initial } };
   E.upgrade(state);
@@ -285,4 +285,113 @@ test('Presenter fullscreen: a resized window or fulfilled request is not reporte
  h.document.querySelector('[data-presenter="fullscreen"]').click();await settle();assert.equal(calls,1);
  full=null;receive('workhub-audience-fullscreen',{fullscreen:false});assert.match(h.document.querySelector('[data-presenter-display-status]').textContent,/windowed/);
  assert.equal(h.writes.length,0);
+});
+
+async function richPresenter(t, fullscreenAccepted = true) {
+ const h=hub(t,{},true);loadFlow(h,requestFlow(h));
+ const dom=new JSDOM('<body class="pc-private-shell"></body>',{url:'http://preview.test/presenter-window.html',runScripts:'outside-only'});t.after(()=>dom.window.close());
+ let full=null,url;const order=[];
+ Object.defineProperty(h.document,'fullscreenElement',{configurable:true,get:()=>full});
+ h.window.HTMLElement.prototype.requestFullscreen=async function(options){order.push('fullscreen');assert.equal(options.navigationUI,'hide');if(!fullscreenAccepted)throw Error('not granted');full=this;};
+ h.document.exitFullscreen=async()=>{full=null;};
+ const popup={closed:false,document:dom.window.document,focus(){},close(){this.closed=true;},postMessage(){}};
+ h.window.open=href=>{order.push('window');url=new URL(href);return popup;};
+ h.ui.presenter.open();await settle();
+ h.window.dispatchEvent(new h.window.MessageEvent('message',{origin:h.window.location.origin,source:popup,data:{type:'workhub-presenter-ready',token:url.hash.slice(1)}}));await settle();
+ const d=dom.window.document,panel=d.getElementById('processPresenter'),host=d.querySelector('.presenter-preview');
+ const geometry=()=>{host.getBoundingClientRect=()=>({left:0,top:0,width:850,height:450,right:850,bottom:450});const svg=host.querySelector('.av-graph'),box=svg.getAttribute('viewBox').split(' ').map(Number);svg.getBoundingClientRect=()=>({left:0,top:0,width:box[2],height:box[3],right:box[2],bottom:box[3]});};
+ geometry();
+ return {...h,d,panel,host,popup,order,geometry,action(name){panel.querySelector('[data-pc="'+name+'"]').click();},tool(name){panel.querySelector('[data-presenter="tool"][data-value="'+name+'"]').click();}};
+}
+test('Canvas studio: Presenter controls requests fullscreen before the private window, and the audience contains no private buttons or notes',async t=>{
+ const h=await richPresenter(t);
+ assert.deepEqual(h.order,['fullscreen','window']);assert.equal(h.document.fullscreenElement.id,'processAudienceStage');
+ assert.equal(h.document.querySelectorAll('#processAudienceStage button,#processAudienceStage input,#processAudienceStage select').length,0);
+ assert.doesNotMatch(h.document.querySelector('#processAudienceStage').textContent,/PRIVATE SPEAKER NOTES|PRIVATE CONFIG/);
+ assert.match(h.panel.textContent,/PRIVATE SPEAKER NOTES/);
+ assert.ok([...h.panel.querySelectorAll('button')].every(b=>b.closest('.pc-stage')));
+ assert.ok(h.panel.querySelector('.pc-stage .pc-bubbles'));assert.equal(h.panel.querySelector('[data-presenter="window"]'),null);assert.equal(h.panel.querySelector('[data-presenter="fullscreen"]'),null);
+ h.panel.querySelector('[data-presenter="end"]').click();await settle();assert.equal(h.document.getElementById('processAudienceOverlay'),null);assert.equal(h.popup.closed,true);
+});
+test('Canvas studio: notes persist in graph coordinates, attach to steps and resize text and box dimensions in one saved edit',async t=>{
+ const h=await richPresenter(t);h.panel.querySelector('[name="annotationText"]').value='Attached explanation';h.tool('text');
+ const step=h.host.querySelector('[data-node="ask"]'),before=h.ui.model().steps.find(s=>s.id==='ask');
+ presenterPointer(h,step,'pointerdown',before.x+50,before.y+50);
+ assert.equal(h.writes.length,1);
+ let p=h.ui.model(),note=p.annotations[0];assert.equal(note.anchorId,'ask');assert.equal(note.text,'Attached explanation');
+ assert.ok(h.host.querySelector('.pc-annotation'));assert.equal(h.document.querySelectorAll('#processAudienceStage .pc-handle').length,0);
+ h.geometry();const handle=h.host.querySelector('[data-pc-resize="se"]'),start={w:note.w,h:note.h,font:note.fontSize};
+ presenterPointer(h,handle,'pointerdown',400,300);presenterPointer(h,h.host,'pointermove',500,400);presenterPointer(h,h.host,'pointerup',500,400);
+ note=h.ui.model().annotations[0];assert.ok(note.w>start.w);assert.ok(note.h>start.h);assert.ok(note.fontSize>start.font);assert.equal(h.writes.length,2);
+ h.tool('move');h.host.dispatchEvent(new h.window.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true}));assert.equal(h.ui.model().annotations[0].x,note.x);
+ const saved=copy(h.state()),again=hub(t,saved.workhub,true);assert.equal(again.ui.model().annotations[0].text,'Attached explanation');
+});
+test('Canvas studio: new material steps maintain codes and valuation fields, magnetic parents persist and ports connect without changing existing routes',async t=>{
+ const h=await richPresenter(t);const type=h.panel.querySelector('[data-pc-type="material"]');
+ const parent=h.ui.model().steps.find(s=>s.id==='ask'),view=h.host.querySelector('.av-graph').getAttribute('viewBox').split(' ').map(Number);
+ presenterPointer(h,type,'pointerdown',20,20);presenterPointer(h,h.host,'pointerup',parent.x-view[0]+60,parent.y-view[1]+60);
+ let f=h.panel.querySelector('[data-pc-form="step"]');assert.ok(f);
+ f.elements.title.value='Material master';f.elements.namedItem('entity-materialCode').value='MAT-001';f.elements.namedItem('entity-materialType').value='ROH';f.elements.namedItem('entity-valuationClass').value='3000';f.elements.namedItem('entity-batch').value='BATCH-A';
+ f.dispatchEvent(new h.window.Event('submit',{bubbles:true,cancelable:true}));
+ let p=h.ui.model(),material=p.steps.find(s=>s.title==='Material master');assert.ok(material);assert.equal(material.entity.valuationClass,'3000');assert.equal(material.stackParent,'ask');assert.equal(h.writes.length,1);
+ h.geometry();const from=h.host.querySelector('[data-pc-port="out"][data-pc-step="ask"]'),to=h.host.querySelector('[data-pc-port="in"][data-pc-step="'+material.id+'"]');
+ h.d.elementFromPoint=()=>to;presenterPointer(h,from,'pointerdown',100,100);presenterPointer(h,h.host,'pointerup',300,200);
+ p=h.ui.model();assert.ok(h.E.connections(p.steps.find(s=>s.id==='ask')).includes(material.id));assert.equal(p.steps.find(s=>s.id==='ask').next,'yes');assert.equal(h.writes.length,2);
+ h.action('links');f=h.panel.querySelector('[data-pc-form="links"]');assert.ok(f);f.dispatchEvent(new h.window.Event('submit',{bubbles:true,cancelable:true}));assert.equal(h.writes.length,3);
+});
+test('Canvas studio: stale editors and owner changes cannot overwrite a process or keep an audience alive',async t=>{
+ const h=await richPresenter(t);h.tool('select');const card=h.host.querySelector('[data-node="ask"]');presenterPointer(h,card,'pointerdown',50,50);presenterPointer(h,h.host,'pointercancel',50,50);
+ h.action('edit-step');const form=h.panel.querySelector('[data-pc-form="step"]');assert.ok(form);
+ h.change(d=>{d.workhub.rehearsal.processes[0].notes='Changed elsewhere';});form.elements.title.value='Stale title';form.dispatchEvent(new h.window.Event('submit',{bubbles:true,cancelable:true}));
+ assert.match(form.querySelector('[role="alert"]').textContent,/changed/);assert.equal(h.writes.length,0);
+ h.account.id='another';h.render();assert.equal(h.popup.closed,true);assert.equal(h.document.getElementById('processAudienceOverlay'),null);
+ form.dispatchEvent(new h.window.Event('submit',{bubbles:true,cancelable:true}));assert.equal(h.writes.length,0);
+});
+test('Canvas studio: rejected native fullscreen retains a button-free audience and reports the verified windowed state',async t=>{
+ const h=await richPresenter(t,false);assert.equal(h.document.fullscreenElement,null);
+ assert.ok(h.document.querySelector('#processAudienceStage'));assert.equal(h.document.querySelectorAll('#processAudienceStage button').length,0);
+ assert.equal(h.ui.presenter.snapshot().audienceFull,false);assert.match(h.panel.querySelector('[data-presenter-display-status]').textContent,/not granted/);
+ h.panel.querySelector('[data-presenter="end"]').click();assert.equal(h.document.querySelector('#processAudienceStage'),null);
+});
+test('Canvas studio: blocked private pop-up returns usable private controls with no orphan audience or false audience title',async t=>{
+ const h=hub(t,{},true);loadFlow(h,requestFlow(h));const title=h.document.title;h.window.open=()=>null;
+ h.ui.presenter.open();await settle();
+ assert.equal(h.document.getElementById('processAudienceOverlay'),null);assert.equal(h.document.title,title);
+ assert.ok(h.document.getElementById('processPresenter'));assert.match(h.document.querySelector('[data-pc-notice]').textContent,/pop-ups/);
+ assert.equal(h.document.querySelector('[data-presenter="window"]'),null);
+ h.document.querySelector('[data-presenter="end"]').click();assert.equal(h.document.querySelector('#processPresenter'),null);
+});
+test('Canvas studio: arrows persist and resize, attachments retain world position, camera moves do not change saved geometry and the audience laser stays transient',async t=>{
+ const h=await richPresenter(t),before=h.ui.model();h.tool('arrow');
+ presenterPointer(h,h.host,'pointerdown',160,150);presenterPointer(h,h.host,'pointermove',290,210);presenterPointer(h,h.host,'pointerup',290,210);
+ let p=h.ui.model(),arrow=p.annotations[0];assert.equal(arrow.type,'arrow');assert.ok(h.document.querySelector('#processAudienceStage .pc-arrow'));
+ h.geometry();const endpoint=h.host.querySelector('[data-pc-resize="end"]');assert.ok(endpoint);
+ presenterPointer(h,endpoint,'pointerdown',290,210);presenterPointer(h,h.host,'pointermove',340,260);presenterPointer(h,h.host,'pointerup',340,260);
+ arrow=h.ui.model().annotations[0];assert.deepEqual(copy(arrow.points.at(-1)),[180,110]);
+ const Art=h.window.WorkHubProcessCanvasArt,world=copy(Art.box(arrow,h.ui.model().steps));
+ h.action('attach');let form=h.panel.querySelector('[data-pc-form="attach"]');form.elements.anchorId.value='yes';form.dispatchEvent(new h.window.Event('submit',{bubbles:true,cancelable:true}));
+ p=h.ui.model();assert.equal(p.annotations[0].anchorId,'yes');assert.deepEqual(copy(Art.box(p.annotations[0],p.steps)),world);
+ const saved=JSON.stringify(p),writes=h.writes.length;h.tool('move');h.panel.querySelector('[data-presenter="zoom-in"]').click();assert.equal(JSON.stringify(h.ui.model()),saved);assert.equal(h.writes.length,writes);
+ h.window.requestAnimationFrame=fn=>{fn(1);return 1;};h.tool('laser');presenterPointer(h,h.host,'pointermove',200,100);
+ const dot=h.document.querySelector('#processAudienceStage .av-laser');assert.ok(dot&&!dot.hidden);assert.equal(h.writes.length,writes);
+ h.tool('move');assert.equal(dot.hidden,true);assert.equal(before.annotations.length,0);
+});
+test('Canvas studio: named decisions edit inside the canvas and moving a magnetic parent carries its children',async t=>{
+ const h=await richPresenter(t);h.tool('select');let card=h.host.querySelector('[data-node="ask"]');
+ presenterPointer(h,card,'pointerdown',80,80);presenterPointer(h,h.host,'pointercancel',80,80);h.action('edit-step');
+ let f=h.panel.querySelector('[data-pc-form="step"]');f.elements.decisionQuestion.value='Can we continue?';f.elements.defaultAnswer.value='1';f.dispatchEvent(new h.window.Event('submit',{bubbles:true,cancelable:true}));
+ assert.equal(h.ui.model().steps.find(s=>s.id==='ask').next,'no');assert.equal(h.ui.model().steps.find(s=>s.id==='ask').decision.question,'Can we continue?');
+ h.geometry();const base=h.ui.model().steps.find(s=>s.id==='ask'),camera=h.host.querySelector('.av-graph').getAttribute('viewBox').split(' ').map(Number),type=h.panel.querySelector('[data-pc-type="plant"]');
+ presenterPointer(h,type,'pointerdown',20,20);presenterPointer(h,h.host,'pointerup',base.x-camera[0]+50,base.y-camera[1]+50);
+ f=h.panel.querySelector('[data-pc-form="step"]');f.elements.title.value='Magnetic plant';f.dispatchEvent(new h.window.Event('submit',{bubbles:true,cancelable:true}));
+ let p=h.ui.model(),child=p.steps.find(s=>s.title==='Magnetic plant');assert.equal(child.stackParent,'ask');const x=child.x,y=child.y;
+ h.geometry();h.tool('select');card=h.host.querySelector('[data-node="ask"]');
+ presenterPointer(h,card,'pointerdown',80,80);presenterPointer(h,h.host,'pointermove',110,110);presenterPointer(h,h.host,'pointerup',110,110);
+ p=h.ui.model();child=p.steps.find(s=>s.id===child.id);assert.equal(child.x,x+30);assert.equal(child.y,y+30);
+});
+test('Canvas studio: idle presenter updates reuse the cached process instead of copying its private fields and screenshots',async t=>{
+ const h=await richPresenter(t),original=h.E.copy;let copies=0;
+ h.E.copy=(...args)=>{if(args[0]?.steps && args[0]?.presenterNotes!==undefined)copies++;return original(...args);};
+ for(let i=0;i<20;i++)h.ui.presenter.publish(true);
+ assert.equal(copies,0);assert.equal(h.writes.length,0);
 });

@@ -38,7 +38,7 @@ CSS (`.css`) controls appearance; HTML supplies the initial page structure.
 
 | Files | What they control |
 | --- | --- |
-| [ticket-workspace.js](../ticket-workspace.js), [ticket-workspace.css](../ticket-workspace.css) | Ticket cards, Latest update, details, milestones/history and grouped editor sections including Work Context. Uses the existing core save handlers. |
+| [ticket-workspace.js](../ticket-workspace.js), [ticket-workspace.css](../ticket-workspace.css) | Ticket cards, Latest update, details, milestones/history, Object bookmarks and grouped editor sections including Work Context. Object fields/filters appear for Pending; maintained values come from Settings → Built-in lists → Ticket objects. Uses existing core save handlers. |
 | [task-workspace.css](../task-workspace.css) | Task action/status toolbar and main-task/sub-task styling. Task editors and saved fields are in `app.js`; board and timer interactions also use `studio.js`. |
 | [batch-a-engine.js](../batch-a-engine.js) | Rules/calculations for dependencies, labels, environments, outcomes, glossary, stale-work review and resume context. |
 | [batch-a.js](../batch-a.js), [batch-a.css](../batch-a.css) | Interfaces for those workflow tools: Work Context, splitting, wrap-ups, glossary and reading mode. |
@@ -155,7 +155,10 @@ Presentation breaks: [presentation-break.js](../presentation-break.js) owns cust
 
 ## Batch D presentation modules
 
-- `presenter.js` / `presenter.css`: private controls, audience connection, live text/ink, transient laser and presentation breaks.
+- `presenter.js` / `presenter.css`: Break-style current-document audience fullscreen launch, verified private-window handshake/adoption, transient laser, playback, hold/cover and presentation breaks.
+- `presenter-window.html` / `presenter-window.js`: account-client-free private control shell; exact origin/source/token checks, heartbeat and end cleanup.
+- `process-canvas.js` / `process-canvas.css`: private in-canvas tool bubbles, staged step forms, dragging, ports, magnetic groups, annotation attachment and guarded saved edits.
+- `process-canvas-art.js`: shared graph-space annotation SVG, geometry, resize/attachment and canvas export drawing.
 - `presentation-screen.js`: explicitly selected display discovery/placement and fullscreen requests with current-account and disconnection guards.
 - `audience-view.js` / `audience.css`: shared 16:9 public scene and preview renderer.
 - `audience.html` / `audience.js`: isolated audience window; no account client or record storage.

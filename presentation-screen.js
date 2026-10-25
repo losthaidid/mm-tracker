@@ -61,7 +61,7 @@
           report(
             !available()
               ? 'The selected screen disconnected. Choose an available screen and try again.'
-              : 'Fullscreen needs a click in the presentation window. Choose Start full screen there.'
+              : 'The browser did not allow fullscreen. The presentation will fill its window.'
           );
         return false;
       }

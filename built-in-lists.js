@@ -15,6 +15,13 @@
       'Keep exactly 12 names, in the order you want to see them.',
     ],
     [
+      'ticketObjects',
+      'Ticket objects',
+      'Tickets',
+      'Objects available in Pending ticket editors, filters and object bookmarks.',
+      'One object per line. Existing ticket classifications are preserved when you change this list.',
+    ],
+    [
       'workLocations',
       'Work locations',
       'Workday',
@@ -86,7 +93,7 @@
       group,
       description,
       hint,
-      text: lists[key].join('\n'),
+      text: (lists[key] || []).join('\n'),
     }));
     lists.projectPhases.forEach((phase, index) =>
       entries.push({

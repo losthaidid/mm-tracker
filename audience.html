@@ -9,29 +9,12 @@
     />
     <title>Audience · Process Hub</title>
     <link rel="stylesheet" href="./audience.css?v=20261025-presenter-3" />
-    <script defer src="./audience-view.js?v=20261025-presenter-3"></script>
-    <script defer src="./audience.js?v=20261025-presenter-3"></script>
+    <link rel="stylesheet" href="./process-canvas.css?v=20261025-canvas-4" />
+    <script defer src="./process-canvas-art.js?v=20261025-canvas-4"></script>
+    <script defer src="./audience-view.js?v=20261025-canvas-4"></script>
+    <script defer src="./audience.js?v=20261025-canvas-4"></script>
   </head>
   <body class="audience-window">
     <main id="audienceStage" aria-label="Audience presentation"></main>
-    <section
-      id="audienceFullscreenPrompt"
-      class="audience-fullscreen-prompt"
-      aria-label="Start audience fullscreen"
-      hidden
-    >
-      <div>
-        <strong>Ready for your shared screen</strong>
-        <p>Click once to remove the browser frame and fill this display.</p>
-      </div>
-      <button id="audienceStartFullscreen" type="button">⛶ Start full screen</button>
-      <button id="audienceStayWindowed" type="button">Stay windowed</button>
-      <span id="audienceFullscreenStatus" role="status"></span>
-    </section>
-    <nav class="audience-window-controls" aria-label="Window controls">
-      <button id="audienceFullscreen" type="button">⛶ Full screen</button
-      ><button id="audienceLaser" type="button" aria-pressed="false">● Laser pointer</button
-      ><span id="audienceConnection" role="status">Waiting for presenter</span>
-    </nav>
   </body>
 </html>

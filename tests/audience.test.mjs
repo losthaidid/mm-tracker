@@ -10,7 +10,7 @@ function audience(t){
  w.opener=opener;w.Date.now=()=>now;w.requestAnimationFrame=()=>1;w.cancelAnimationFrame=()=>{};
  w.setInterval=fn=>{timers.set(1,fn);return 1;};w.clearInterval=id=>timers.delete(id);
  Object.defineProperty(w,'localStorage',{get(){throw Error('Audience must not access account storage');}});
- w.eval(source('audience-view.js'));w.eval(source('audience.js'));
+ w.eval(source('process-canvas-art.js'));w.eval(source('audience-view.js'));w.eval(source('audience.js'));
  const receive=(data,from=opener,site=origin)=>w.dispatchEvent(new w.MessageEvent('message',{origin:site,source:from,data:{token,...data}}));
  return {w,document:w.document,opener,timers,out,receive,advance(ms){now+=ms;for(const fn of timers.values())fn();}};
 }
@@ -27,7 +27,7 @@ test('audience accepts only its opener, exact origin and current token; ending c
 });
 test('audience covers stale or closed presenter content and heartbeat requests never send content back',t=>{
  const h=audience(t);h.receive({type:'workhub-audience-state',snapshot:processSnapshot()});h.advance(6500);
- assert.doesNotMatch(h.document.body.textContent,/Public information|Public request flow/);assert.match(h.document.body.textContent,/disconnected/);
+ assert.doesNotMatch(h.document.body.textContent,/Public information|Public request flow/);assert.match(h.document.body.textContent,/paused|disconnected/);
  assert.ok(h.out.every(({m,o})=>o===origin && Object.keys(m).sort().join(',')==='token,type'));
  h.receive({type:'workhub-audience-state',snapshot:processSnapshot()});h.opener.closed=true;h.advance(1000);assert.doesNotMatch(h.document.body.textContent,/Public information/);
 });
@@ -45,15 +45,10 @@ test('audience text is escaped and bounded; authenticated laser updates are tran
  h.receive({type:'workhub-audience-pointer',pointer:[2,-1]});assert.equal(h.document.querySelector('.av-laser').hidden,true);h.advance(7000);assert.equal(h.document.querySelector('.av-laser'),null);
 });
 
-test('audience fullscreen uses a direct local click, confirms the native state, and offers re-entry after Escape',async t=>{
- const h=audience(t);h.receive({type:'workhub-audience-state',snapshot:processSnapshot()});h.receive({type:'workhub-audience-fullscreen-needed'});
- let full=null,calls=0;Object.defineProperty(h.document,'fullscreenElement',{configurable:true,get:()=>full});
- h.document.documentElement.requestFullscreen=async options=>{calls++;assert.equal(options.navigationUI,'hide');full=h.document.documentElement;h.document.dispatchEvent(new h.w.Event('fullscreenchange'));};
- assert.equal(h.document.getElementById('audienceFullscreenPrompt').hidden,false);
- h.document.getElementById('audienceStartFullscreen').click();await Promise.resolve();await Promise.resolve();
- assert.equal(calls,1);assert.equal(h.document.getElementById('audienceFullscreenPrompt').hidden,true);assert.equal(h.document.body.dataset.fullscreen,'true');assert.ok(h.out.some(x=>x.m.type==='workhub-audience-fullscreen'&&x.m.fullscreen));
- full=null;h.document.dispatchEvent(new h.w.Event('fullscreenchange'));assert.equal(h.document.getElementById('audienceFullscreenPrompt').hidden,false);
- h.receive({type:'workhub-audience-end'});h.document.getElementById('audienceStartFullscreen').click();assert.equal(calls,1);
+test('audience content has no fullscreen, stay-windowed, laser or other controls',t=>{
+ const h=audience(t);h.receive({type:'workhub-audience-state',snapshot:processSnapshot()});
+ assert.equal(h.document.querySelectorAll('button,input,select,textarea').length,0);
+ assert.equal(h.document.querySelector('#audienceStage').getAttribute('data-kind'),'process');
 });
 test('audience canvas geometry keeps annotations inside the stage and accounts for SVG letterboxing during zoom and pan',t=>{
  const h=audience(t),V=h.w.WorkHubAudienceView;

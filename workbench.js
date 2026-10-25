@@ -256,6 +256,38 @@
         `<div class="bench-status"><p class="hub-kicker">${esc(kind === 'tasks' ? 'MAIN TASK' : kind === 'taskSub' ? 'SUBTASK' : 'RECORD STATUS')}</p><h3>${esc(found.title)}</h3>${kind === 'tasks' ? '<p class="hub-meta">Completing this main task also completes its subtasks.</p>' : ''}${['specs', 'specSub'].includes(kind) ? '<label for="benchStatusDate">Status date</label><input id="benchStatusDate" type="date" min="1900-01-01" max="9999-12-31" value="' + esc(a.today()) + '"><p class="hub-meta">Today is captured automatically. Choose another date if needed.</p>' : ''}<div class="bench-status-options">${choices.map(([value, label]) => btn('status-pick', esc(label), attrs(kind, id, parent) + ` data-value="${esc(value)}" aria-pressed="${value === found.status}"`, value === found.status ? 'selected' : '')).join('')}</div><div class="modal-actions">${btn('status-cancel', 'Cancel')}</div></div>`
       );
     }
+    function objectMenu(id) {
+      const t = state().tickets.find(t => t.id === id);
+      if (!t || t.status !== 'Pending') return;
+      const choices = state().lists?.ticketObjects || [];
+      a.openModal(
+        'Update ticket object',
+        '<div class="bench-status"><p class="hub-kicker">PENDING TICKET · OBJECT</p><h3>' +
+          esc(t.ticket) +
+          '</h3><div class="bench-status-options">' +
+          choices
+            .map(value =>
+              btn(
+                'object-pick',
+                esc(value),
+                'data-id="' +
+                  esc(id) +
+                  '" data-value="' +
+                  esc(value) +
+                  '" data-owner="' +
+                  esc(owner) +
+                  '" aria-pressed="' +
+                  (value === t.object) +
+                  '"',
+                value === t.object ? 'selected' : ''
+              )
+            )
+            .join('') +
+          '</div><div class="modal-actions">' +
+          btn('cancel', 'Cancel') +
+          '</div></div>'
+      );
+    }
     function setPreview(el, kind, id, parent = '') {
       if (!el || el.dataset.peekKind) return;
       el.dataset.peekKind = kind;
@@ -756,7 +788,23 @@
           action = x.bench;
         if (action === 'peek-close') closePeek(true);
         else if (action === 'open') openRecord(x.kind, x.id, x.parent);
-        else if (action === 'status') statusMenu(x.kind, x.id, x.parent, !!b.closest('#modal'));
+        else if (action === 'object') objectMenu(x.id);
+        else if (action === 'object-pick') {
+          if (!a.ready() || x.owner !== owner || owner !== a.owner())
+            throw Error('Reopen this ticket for your current account.');
+          const choices = state().lists?.ticketObjects || [];
+          if (!choices.includes(x.value)) throw Error('Choose a maintained ticket object.');
+          const ok = a.mutate(d => {
+            const t = d.tickets.find(t => t.id === x.id);
+            if (!t || t.status !== 'Pending')
+              throw Error('This ticket is no longer Pending. Reopen it.');
+            t.object = x.value;
+          });
+          if (ok) {
+            a.closeModal();
+            a.tell('Ticket object updated.');
+          }
+        } else if (action === 'status') statusMenu(x.kind, x.id, x.parent, !!b.closest('#modal'));
         else if (action === 'status-pick') {
           if (changeStatus(x.kind, x.id, x.parent, x.value, $('benchStatusDate')?.value)) {
             const back = statusReturn;

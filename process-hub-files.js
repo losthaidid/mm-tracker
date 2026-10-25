@@ -70,6 +70,7 @@
       ['Outputs', s.outputs],
       ['System / tool', s.system],
       ['Typical working time', s.workingTime],
+      ...E.ENTITY_FIELDS.map(([k, label]) => [label, s.entity?.[k]]),
       ['Decision question', s.decision?.question],
       [
         'Decision answers',
@@ -156,10 +157,14 @@
     const legendHeight = legend.length
       ? 60 + legend.length * 25 + (decisionRows.length > 24 ? 30 : 0)
       : 0;
-    const minX = Math.min(0, ...p.steps.map(s => s.x - 90)),
-      minY = Math.min(0, ...p.steps.map(s => s.y - 40));
-    const w = Math.max(640, ...p.steps.map(s => s.x + 300)) - minX,
-      h = Math.max(300, ...p.steps.map(s => s.y + 160)) - minY;
+    const boxes = (p.annotations || [])
+      .map(m => root.WorkHubProcessCanvasArt?.box(m, p.steps))
+      .filter(Boolean);
+    const minX = Math.min(0, ...boxes.map(b => b.x - 20), ...p.steps.map(s => s.x - 90)),
+      minY = Math.min(0, ...boxes.map(b => b.y - 20), ...p.steps.map(s => s.y - 40));
+    const w =
+        Math.max(640, ...boxes.map(b => b.x + b.w + 30), ...p.steps.map(s => s.x + 300)) - minX,
+      h = Math.max(300, ...boxes.map(b => b.y + b.h + 30), ...p.steps.map(s => s.y + 160)) - minY;
     const scale = Math.min(2, 1488 / w, 1950 / h),
       graphHeight = Math.ceil(h * scale);
     canvas.height = header + graphHeight + 85 + legendHeight;
@@ -253,6 +258,7 @@
           )
         );
     }
+    root.WorkHubProcessCanvasArt?.draw(c, p);
     c.restore();
     if (legend.length) {
       let y = header + graphHeight + 35;
