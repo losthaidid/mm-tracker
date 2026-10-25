@@ -18,7 +18,7 @@
     }
     function markup(id, actionAttribute) {
       const screens = details?.screens || [];
-      return `<div class="presentation-screen-picker"><label>Presentation screen<select id="${esc(id)}" data-presentation-screen><option value="current"${!selected ? ' selected' : ''}>Current screen</option>${screens.map((s, i) => `<option value="${i}"${s === selected ? ' selected' : ''}>${esc(s.label || 'Screen ' + (i + 1))}${s.isPrimary ? ' · primary' : ''}</option>`).join('')}</select></label>${root.getScreenDetails ? `<button type="button" ${actionAttribute}>Choose screen…</button>` : ''}<p>${root.getScreenDetails ? 'Choose the same display you share in your meeting app.' : 'Screen selection is unavailable here. Move the presentation window to your shared display, then choose Full screen.'}</p></div>`;
+      return `<div class="presentation-screen-picker"><label>Presentation screen<select id="${esc(id)}" data-presentation-screen><option value="current"${!selected ? ' selected' : ''}>Current screen</option>${screens.map((s, i) => `<option value="${i}"${s === selected ? ' selected' : ''}>${esc(s.label || 'Screen ' + (i + 1))}${s.isPrimary ? ' · primary' : ''}</option>`).join('')}</select></label>${root.getScreenDetails ? `<button type="button" ${actionAttribute}>Choose screen…</button>` : ''}<p>${root.getScreenDetails ? 'Choose the same display you share in your meeting app.' : 'Screen selection is unavailable here. Move the window you plan to share onto your monitor.'}</p></div>`;
     }
     async function discover() {
       if (!valid() || !root.getScreenDetails) return false;
@@ -71,7 +71,7 @@
       return `popup,left=${selected.availLeft},top=${selected.availTop},width=${selected.availWidth},height=${selected.availHeight}`;
     }
     function place(window) {
-      if (!valid() || !selected || !available()) return;
+      if (!valid() || !window || !selected || !available()) return;
       try {
         window.moveTo?.(selected.availLeft, selected.availTop);
         window.resizeTo?.(selected.availWidth, selected.availHeight);

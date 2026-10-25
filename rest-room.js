@@ -86,7 +86,9 @@
         // A dialog itself cannot enter fullscreen. Its complete content can.
         // Keep this call inside the click gesture; do not await audio first.
         if (!stage.requestFullscreen) throw Error('Fullscreen unavailable');
-        await stage.requestFullscreen();
+        await stage.requestFullscreen({ navigationUI: 'hide' });
+        if (dialog === room && session === current && document.fullscreenElement !== stage)
+          throw Error('Fullscreen was not entered');
         if (dialog !== room || session !== current || !a.ready() || current.owner !== a.owner()) {
           if (document.fullscreenElement === stage)
             void document.exitFullscreen?.().catch(() => {});
@@ -309,6 +311,15 @@
         open();
         return;
       }
+      if (
+        !document.dispatchEvent(
+          new root.CustomEvent('workhub-presentation-launch', {
+            cancelable: true,
+            detail: { kind: 'rest' },
+          })
+        )
+      )
+        return;
       trigger = document.activeElement;
       const work = a.pauseWork(),
         f = a.focus(),
@@ -397,6 +408,12 @@
       audio.tick();
       paint();
     }
+    document.addEventListener('workhub-presentation-launch', event => {
+      if (session && event.detail?.kind !== 'rest') {
+        event.preventDefault();
+        open(false);
+      }
+    });
     document.addEventListener('visibilitychange', tick);
     document.addEventListener('fullscreenchange', () => {
       if (dialog) paintFullscreen();

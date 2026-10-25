@@ -9,7 +9,10 @@ function setup(t) {
   window.Date.now=()=>now;
   window.HTMLDialogElement.prototype.showModal=function(){this.open=true;};
   window.HTMLDialogElement.prototype.close=function(){this.open=false;};
-  window.HTMLElement.prototype.requestFullscreen=function(options){fullscreen.push({element:this,options});return Promise.resolve();};
+  let nativeFullscreen=null;
+  Object.defineProperty(document,'fullscreenElement',{configurable:true,get:()=>nativeFullscreen});
+  document.exitFullscreen=async()=>{nativeFullscreen=null;};
+  window.HTMLElement.prototype.requestFullscreen=function(options){fullscreen.push({element:this,options});nativeFullscreen=this;return Promise.resolve();};
   window.eval(readFileSync(new URL('../presentation-break.js',import.meta.url),'utf8'));
   const ui=window.WorkHubPresentationBreak.install({ready:()=>ready,owner:()=>owner});
   const open=()=>{document.querySelector('[data-pb="open"]').focus();document.querySelector('[data-pb="open"]').click();return document.querySelector('.pb-settings form');};
@@ -35,3 +38,12 @@ test('the countdown reconciles elapsed time when the page becomes visible and pa
 });
 
  test('leaving fullscreen keeps the audience cover until explicit return',t=>{const c=setup(t);c.start();Object.defineProperty(c.document,'fullscreenElement',{value:c.document.querySelector('.pb-stage'),configurable:true});c.document.dispatchEvent(new c.window.Event('fullscreenchange'));Object.defineProperty(c.document,'fullscreenElement',{value:null,configurable:true});c.document.dispatchEvent(new c.window.Event('fullscreenchange'));assert.equal(c.document.querySelector('.pb-audience').open,true);assert.equal(c.document.body.classList.contains('presentation-break-open'),true);c.document.querySelector('[data-pb="end"]').click();assert.equal(c.document.querySelector('.pb-audience'),null);});
+test('presentation break verifies native fullscreen and releases a late request after the account changes',async t=>{
+ const c=setup(t);c.window.HTMLElement.prototype.requestFullscreen=()=>Promise.resolve();c.start();for(let i=0;i<12;i++)await Promise.resolve();
+ assert.match(c.document.querySelector('[data-pb-notice]').textContent,/unavailable/);assert.equal(c.document.querySelector('.pb-audience').open,true);
+ c.document.querySelector('[data-pb="end"]').click();
+ let finish,active=null,exits=0;Object.defineProperty(c.document,'fullscreenElement',{configurable:true,get:()=>active});c.document.exitFullscreen=async()=>{active=null;exits++;};
+ c.window.HTMLElement.prototype.requestFullscreen=function(){const target=this;return new Promise(resolve=>finish=()=>{active=target;resolve();});};
+ c.start();c.account('other');finish();for(let i=0;i<12;i++)await Promise.resolve();
+ assert.equal(active,null);assert.equal(exits,1);assert.equal(c.document.querySelector('.pb-audience'),null);
+});
