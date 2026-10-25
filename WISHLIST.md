@@ -6,17 +6,13 @@ The two prioritised items are implemented: **TNG PDF extraction and cropped evid
 
 The Momo behaviour enhancements in [Batch B](BATCH-B.md) are implemented, including the later weather consequences, visitor friendships and click-reaction selections. [Batch C](BATCH-C.md) is implemented: 25 · Ticket twin finder, 26 · Sensitive screenshot brush, and 30 · Screenshot guide builder. See its usage and local-file notes before sharing an editable guide.
 
-[Batch D](BATCH-D.md) was kept on 25 October 2026: **4 · Interactive process decisions**, **7 · Personal reminder rules**, **10 · Sync health centre**, and **42 · Presentation control panel**. These are wishlist selections; implementation has not been requested.
+[Batch D](BATCH-D.md) was kept on 25 October 2026: **4 · Interactive process decisions**, **7 · Personal reminder rules**, **10 · Sync health centre**, **42 · Presentation control panel**, **97 · Private presentation annotations**, **193 · Day-to-night atmosphere**, **196 · Companion habitat**, and **198 · Expressive completion moments**. These are wishlist selections; implementation has not been requested.
 
 [Batch E](BATCH-E.md) was kept on 25 October 2026: **51 · Work handover mode**. These are wishlist selections; implementation has not been requested.
 
 [Batch X](BATCH-X.md) remains saved for later: each user connects their own Supabase project, and QR downloads for Process Hub PDF / image exports. QR downloads were kept on 25 October 2026; implementation has not been requested.
 
 On 20 October 2026, Request inbox, End-of-day ritual, Personal learning roadmap and Show-me-how walkthroughs were removed from the wishlist at the user's request.
-
-## Pending presentation enhancement
-
-Kept on 25 October 2026: **97 · Private presentation annotations** — draw temporary highlights or arrows over the audience view from private presenter controls, then clear them without editing the saved process. This is a wishlist selection only; implementation has not been requested. No batch assigned. The number refers to the current functional-ideas discussion.
 
 ## Pending stand-up enhancement
 
