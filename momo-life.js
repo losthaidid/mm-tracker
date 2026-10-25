@@ -574,11 +574,15 @@
         ($('hubMomoBall') ? 'Put ball away' : 'Play ball') +
         '</button><button data-momo="come">Come here…</button><button data-momo="perch">Find a perch</button><button data-momo="gesture">Show me a little move</button><button data-momo="sit">Unfold a chair & whistle</button><button data-momo="sleep">A tiny sleep break</button><button data-momo="home">' +
         'Go home & nap' +
+        '</button><button data-momo="pin" aria-pressed="' +
+        !!a.pinned?.() +
+        '">' +
+        (a.pinned?.() ? 'Allow automatic movement' : 'Stay here') +
         '</button><button data-momo="place-home">Put my home here</button><button data-momo="rain">Umbrella moment</button><button data-momo="quip">Tell me something silly</button><button data-momo="theatre">Momo’s tiny theatre</button><button data-momo="discover">Desk discoveries</button><button data-momo="moments-settings">Little moment settings</button><button data-momo="quiet" aria-pressed="' +
         quiet +
         '">' +
         (quiet ? 'Turn on little chats' : 'Quiet time · pause little chats') +
-        '</button></div><small>I sometimes nod off, tidy my hair, daydream or lose my balance. Little chats appear about every 1–2 minutes while you’re not typing or focusing. Quiet time pauses speech; reduced motion pauses my animations.</small>';
+        '</button></div><small>I sometimes nod off, tidy my hair, daydream or lose my balance. Little chats appear about every 1–2 minutes while you’re not typing or focusing. Dragging or arrow-key placement keeps me where you put me. Choose Allow automatic movement to let me move again. Quiet time pauses speech; reduced motion pauses my animations.</small>';
       document.body.append(el);
       layout();
       root.dispatchEvent(new CustomEvent('workhub:momo-menu'));
@@ -908,6 +912,10 @@
           if (action === 'home' && Date.now() < homeSuppress) return;
           $('hubMomoMenu')?.remove();
           if (action === 'close') return;
+          if (action === 'pin') {
+            a.pin?.(!a.pinned?.());
+            return;
+          }
           if (nap) return;
           if (['theatre', 'discover', 'moments-settings'].includes(action)) {
             root.dispatchEvent(new CustomEvent('workhub:momo-extra', { detail: { action } }));
@@ -1163,6 +1171,18 @@
         restUntil = Date.now() + 12000;
         pose('idle');
         return true;
+      },
+      manualMove() {
+        cancelTravel();
+        ballResumeUntil = 0;
+        armed = false;
+        perch = null;
+        sceneState = null;
+        endGesture();
+        endUmbrella();
+        reaction = null;
+        restUntil = Date.now() + 6000;
+        if (!nap) pose('idle');
       },
       homePosition: () => ({ ...home }),
       sceneAvailable: () =>

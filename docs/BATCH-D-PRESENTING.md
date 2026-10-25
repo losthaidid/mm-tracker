@@ -1,6 +1,6 @@
 # Process Hub decisions, presenter controls and loading scenes
 
-Batch D selections **4, 42, 97 and 209** are implemented. The other Batch D selections remain pending.
+This guide covers Batch D selections **4, 42, 97 and 209**. All Batch D selections are implemented; see [Workspace experience](WORKSPACE-EXPERIENCE.md) for the remaining six.
 
 ## Maintain decision paths
 
@@ -12,7 +12,7 @@ PDF guides include the question, answer labels, destinations and automatic defau
 
 ## Present in a separate audience window
 
-Open **Process Hub → Presenter controls**. Allow the audience pop-up if the browser blocks it. Move the separate audience window to the screen you are sharing and select **Full screen** in that window. Share only that audience window in your meeting app. The website cannot determine which monitor the meeting app is sharing.
+Open **Process Hub → Presenter controls**. Allow the audience pop-up if the browser blocks it. Use **Choose screen…**, allow the browser’s display-selection permission, then select the display shared in your meeting app. **Full screen on selected screen** requests audience fullscreen there. If the browser requires a click in that window, use its **Full screen** button. Browsers without screen selection retain manual window placement. Share only that audience window in your meeting app. The website cannot determine which monitor the meeting app is sharing.
 
 Your private control panel contains saved process/scenario selectors, playback controls, an interactive-decision switch and answer buttons, process-level presenter notes, a live audience preview, text-size and whole-diagram controls. The audience sees process titles, step titles, connections and labels, current-step audience explanation (or instructions), expected result and responsible role. Private presenter notes, technical setup, linked records, account data and editing controls are not sent. Audience text is displayed literally, never executed as markup.
 
@@ -24,7 +24,7 @@ Closing the controls keeps the audience session open; reopen Presenter controls 
 
 ## Live annotations
 
-Choose **Pen** or **Arrow** below the private preview, select colour/width and drag on the preview. The audience sees the same mark. **View** returns to normal preview interaction; **Undo mark** removes the last annotation and **Clear marks** removes all. Touch drawing is supported.
+Choose **Pen** or **Arrow** below the private preview, select colour/width and drag on the preview. To add text, enter **Live text**, choose **Text**, then click the preview to place it. **Update last text** changes the most recent text annotation using the current text, size and colour. Text is limited to 240 characters and rendered literally in a readable note. Choose **Laser pointer** and move over the preview to point on the audience screen without adding a mark; moving outside, changing tools or closing the controls clears the laser. The audience window also has a local laser toggle. The audience sees the same mark. **View** returns to normal preview interaction; **Undo mark** removes the last annotation and **Clear marks** removes all. Touch drawing is supported.
 
 Marks are temporary, limited to 100 per scene and 300 points per mark. They clear when the active step or scene changes. They are never saved to the process, account document, PDF or image export. The preview and audience share a 16:9 stage, letterboxed on other screen proportions to keep marks aligned.
 
@@ -36,8 +36,10 @@ Startup uses the maintained account workspace name when its matching device reco
 
 ## Source and verification
 
-`rehearsal-engine.js` validates decision definitions and builds bounded routes. `rehearsal.js` maintains them and publishes an explicit audience-only snapshot. `presenter.js` owns private controls, the audience connection, breaks and temporary annotations. `audience-view.js` / `audience.css` render the same scene in both windows; `audience.html` / `audience.js` are the isolated audience page. Startup remains in critical `index.html` styles and `startup.js`.
+`rehearsal-engine.js` validates decision definitions and builds bounded routes. `rehearsal.js` maintains them and publishes an explicit audience-only snapshot. `presentation-screen.js` handles explicitly selected displays, permission failure, disconnected screens and late owner changes. `presenter.js` owns private controls, the audience connection, breaks and temporary annotations. `audience-view.js` / `audience.css` render the same scene in both windows; `audience.html` / `audience.js` are the isolated audience page. Startup remains in critical `index.html` styles and `startup.js`.
 
 Tests cover default/interactive routes, repeat visits, legacy save/reload, account-document round trips, export scope, message-origin/source/token checks, stale-window covers, annotation bounds, temporary state, pop-up failure and startup phases/recovery. Browser QA uses fictional local records, including a phone-width simulation; no physical iPhone or multi-monitor meeting app is available in this environment.
 
 `npm test` runs the application suite in five disjoint name groups to avoid accumulating all JSDOM fixtures in one process. Module/database tests run first. This test-runner change does not change browser memory limits.
+
+The 25 October feedback fixes, including observatory motion, opaque Process Hub panels, heading outlines, rain pause behavior and companion placement, are described in [FEEDBACK-FIXES.md](FEEDBACK-FIXES.md).

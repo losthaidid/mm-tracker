@@ -13,7 +13,7 @@ function hub(t, initial = {}) {
   window.URL.createObjectURL = () => 'blob:test-export'; window.URL.revokeObjectURL = () => {};
   window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
   window.HTMLDialogElement.prototype.close = function () { this.open = false; };
-  for (const f of ['rehearsal-engine.js', 'process-hub-files.js', 'audience-view.js', 'presenter.js', 'rehearsal.js']) window.eval(source(f));
+  for (const f of ['rehearsal-engine.js', 'process-hub-files.js', 'audience-view.js', 'presentation-screen.js', 'presenter.js', 'rehearsal.js']) window.eval(source(f));
   const E = window.WorkHubRehearsalEngine, F = window.WorkHubProcessFiles;
   let state = { projects: [], tickets: [], specs: [], workhub: { processes: [], notes: [], tcodes: { records: [] }, ...initial } };
   E.upgrade(state);
@@ -212,4 +212,20 @@ test('Batch D: legacy decisions preserve an end-route automatic default through 
   const h=hub(t,{processes:[oldProcess()]}),p=h.ui.model(),s=p.steps[0];
   s.type='decision';s.next='';s.alternatives=['s1'];s.decision={question:'Continue?',answers:[{label:'Finish now',next:''},{label:'Continue',next:'s1'}]};h.E.store(h.state(),p);h.E.validate(h.state());
   const restored=h.E.library(h.state())[0];assert.equal(restored.steps[0].next,'');assert.equal(h.E.plan(restored,restored.scenarios[0]).entries.length,1);
+});
+test('Presentation feedback: live text and laser stay temporary, clear on scene change and leave saved processes untouched',async t=>{
+ const h=hub(t);loadFlow(h,requestFlow(h));const {messages}=connectAudience(h),before=JSON.stringify(h.state());
+ const host=h.document.querySelector('.presenter-preview');host.getBoundingClientRect=()=>({left:0,top:0,width:1000,height:562.5});
+ const field=h.document.querySelector('[name="annotationText"]');field.value='Please check this handoff <b>together</b>';
+ h.document.querySelector('[data-presenter="tool"][data-value="text"]').click();host.dispatchEvent(new h.window.MouseEvent('pointerdown',{bubbles:true,button:0,clientX:200,clientY:300}));
+ assert.equal(h.ui.presenter.snapshot().marks,1);assert.equal(messages.at(-1).message.marks[0].type,'text');assert.match(h.document.querySelector('.av-text-note').textContent,/<b>together<\/b>/);assert.equal(host.querySelector('b'),null);
+ const frames=[];h.window.requestAnimationFrame=fn=>{frames.push(fn);return frames.length;};h.document.querySelector('[data-presenter="tool"][data-value="laser"]').click();host.dispatchEvent(new h.window.MouseEvent('pointermove',{bubbles:true,clientX:600,clientY:200}));for(const f of frames.splice(0))f(100);
+ const packet=messages.findLast(x=>x.message.type==='workhub-audience-pointer'&&x.message.pointer);assert.deepEqual(packet.message.pointer,[.6,200/562.5]);assert.equal(h.ui.presenter.snapshot().marks,1);assert.equal(host.querySelector('.av-laser').hidden,false);
+ host.dispatchEvent(new h.window.MouseEvent('pointerleave'));assert.equal(host.querySelector('.av-laser').hidden,true);
+ h.document.querySelector('[data-presenter="next"]').click();await settle();assert.equal(h.ui.presenter.snapshot().marks,0);assert.equal(JSON.stringify(h.state()),before);assert.equal(h.writes.length,0);
+});
+test('Presentation feedback: selected Process Hub screen is passed to native fullscreen without saving records',async t=>{
+ const h=hub(t),screen={label:'Shared display',availLeft:1440,availTop:0,availWidth:1920,availHeight:1080};h.window.getScreenDetails=async()=>({screens:[screen]});h.render();await h.click('screens');
+ const select=h.document.getElementById('processPresentationScreen');select.value='0';select.dispatchEvent(new h.window.Event('change',{bubbles:true}));const calls=[];h.window.HTMLElement.prototype.requestFullscreen=function(options){calls.push({element:this,options});return Promise.resolve();};await h.click('present');
+ assert.equal(calls.length,1);assert.equal(calls[0].options.screen,screen);assert.ok(calls[0].element.classList.contains('ph-fullscreen-stage'));assert.equal(h.writes.length,0);
 });

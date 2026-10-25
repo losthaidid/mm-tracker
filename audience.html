@@ -1,12 +1,23 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'none'; connect-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
-<title>Audience · Process Hub</title>
-<link rel="stylesheet" href="./audience.css?v=20261025-batch-d-1">
-<script defer src="./audience-view.js?v=20261025-batch-d-1"></script>
-<script defer src="./audience.js?v=20261025-batch-d-1"></script>
-</head>
-<body class="audience-window"><main id="audienceStage" aria-label="Audience presentation"></main><nav class="audience-window-controls" aria-label="Window controls"><button id="audienceFullscreen" type="button">⛶ Full screen</button><span id="audienceConnection" role="status">Waiting for presenter</span></nav></body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'none'; connect-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <title>Audience · Process Hub</title>
+    <link rel="stylesheet" href="./audience.css?v=20261025-feedback-1" />
+    <script defer src="./audience-view.js?v=20261025-feedback-1"></script>
+    <script defer src="./audience.js?v=20261025-feedback-1"></script>
+  </head>
+  <body class="audience-window">
+    <main id="audienceStage" aria-label="Audience presentation"></main>
+    <nav class="audience-window-controls" aria-label="Window controls">
+      <button id="audienceFullscreen" type="button">⛶ Full screen</button
+      ><button id="audienceLaser" type="button" aria-pressed="false">● Laser pointer</button
+      ><span id="audienceConnection" role="status">Waiting for presenter</span>
+    </nav>
+  </body>
 </html>

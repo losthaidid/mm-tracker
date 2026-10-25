@@ -1,0 +1,19 @@
+# Presentation, scenery and companion feedback
+
+Addresses the seven requests supplied on 25 October 2026. No database migration, authentication, audio-volume or exported process changes.
+
+## Check the changes
+
+1. **Live presentation text and laser:** Process Hub → Presenter controls. Pause the process for a stationary example. Type in Live text, choose Text and click the audience preview. The note appears on the separate audience window. Change the wording and choose Update last text. Select Laser pointer and move over the preview: the audience sees a glowing point, without permanent trails or saved marks. Leaving the preview clears it. Undo/Clear and step changes remove text as they remove pen/arrow marks. The audience window also has its own laser toggle.
+2. **Selected-screen fullscreen:** choose a Presentation screen before Present or Full screen in Process Hub. Choose screen… requests browser permission only on your click, then lists actual connected displays. Choose the same display your meeting app shares. Presenter controls use that selection for audience-window placement and its fullscreen request. Browser restrictions can require clicking Full screen inside the audience window; unsupported browsers retain manual placement/maximising. There is no meeting-app integration, display capture or automatic identification of the shared display. Screen choice is temporary and cleared on account change.
+3. **Moving observatory:** Break Terrarium → Moonlit observatory. The telescope sweeps, dome turns, moon floats, stars drift, clouds/mist pass, grass sways and windows brighten. Pause break freezes them; resuming continues them. Motion Off, reduced motion, hidden-page and privacy/presentation safeguards remain. Phones retain fewer stars and no shooting star. The repeating alarm and explicit Resume work lifecycle are unchanged.
+4. **Plain heading outlines:** Knowledge, Waiting on and Studio headings no longer receive the rectangular animated card-border layer. Card effects remain on actual cards.
+5. **Manual companion placement:** drag the companion or use his arrow keys. This cancels old journeys and story restoration, remembers the position and gives it priority over automatic roaming/scenes/work-area relocation. Expressions and small in-place gestures remain. Choose Allow automatic movement in his menu to release that priority; Stay here reapplies it. Existing explicit games, Come here, home relocation and requested naps remain available. Nap still ends only when the companion is activated. Lost pointer capture and hiding the page also end an active drag, avoiding later pointer jumps. Placement is a device preference, not a cloud record.
+6. **Opaque Process Hub heading:** the heading retains a solid backing colour. Its workspace/header entrance only moves, so a paused entrance cannot leave it faded halfway through.
+7. **Rain pause:** using controls, typing or the visitor cooldown no longer freezes the window's falling rain. A real motion pause hides falling rain/snow instead of suspending visible droplets in midair. The regular sky returns when that pause ends. Visitor interruption rules remain separate.
+
+## Validation boundaries
+
+Automated checks exercise public text escaping/bounds, laser message authentication/cleanup, selected fullscreen targets, denied/disconnected displays and late account changes, interrupted companion movement, remembered placement, stale pointer capture, and weather pause/resume. Existing process exports, saving, presentation isolation and rest alarm tests remain in the regression suite.
+
+Browser QA uses fictional local records on a desktop browser and a phone-width simulation. This environment has no physical iPhone, multiple physical displays or meeting-app screen-sharing session. On a supported browser, screen placement remains subject to its permission and fullscreen rules.

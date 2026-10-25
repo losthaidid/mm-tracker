@@ -153,7 +153,8 @@ Presentation breaks: [presentation-break.js](../presentation-break.js) owns cust
 
 ## Batch D presentation modules
 
-- `presenter.js` / `presenter.css`: private controls, audience connection, temporary annotations and presentation breaks.
+- `presenter.js` / `presenter.css`: private controls, audience connection, live text/ink, transient laser and presentation breaks.
+- `presentation-screen.js`: explicitly selected display discovery/placement and fullscreen requests with current-account and disconnection guards.
 - `audience-view.js` / `audience.css`: shared 16:9 public scene and preview renderer.
 - `audience.html` / `audience.js`: isolated audience window; no account client or record storage.
 - `rehearsal-engine.js` / `rehearsal.js`: named decision definitions, automatic defaults and interactive playback.

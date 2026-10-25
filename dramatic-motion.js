@@ -15,7 +15,7 @@
     },
     reduced = root.matchMedia?.('(prefers-reduced-motion: reduce)'),
     surfaces =
-      '.hub-card,.mv-widget-shell,.ticket-folio,.task-main-card,.wl-snippet,.panel.box,.val-summary,.claim-summary,.project-banner,.hub-head,.workspace-v10 > header,.bl-library-mark',
+      '.hub-card,.mv-widget-shell,.ticket-folio,.task-main-card,.wl-snippet,.panel.box,.val-summary,.claim-summary,.project-banner,.hub-head.hero-home,.workspace-v10 > header,.bl-library-mark',
     layer = document.createElement('div');
   const observedSurfaces = new Set(),
     visibleSurfaces = new Set(),

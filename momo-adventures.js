@@ -114,7 +114,7 @@
         ) &&
         !editing() &&
         !$('hubMomoMenu') &&
-        (!auto || !quiet())
+        (!auto || (a.canAutoMove?.() !== false && !quiet()))
       );
     }
     function position() {
@@ -976,6 +976,7 @@
     function yieldTo(el, extend = true) {
       if (
         !preferences.awareness ||
+        a.canAutoMove?.() === false ||
         !a.ready() ||
         document.hidden ||
         !a.prefs().mascot ||

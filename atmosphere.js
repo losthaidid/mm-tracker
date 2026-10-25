@@ -247,7 +247,14 @@
       if (document.body.dataset.atmosphere !== phase) document.body.dataset.atmosphere = phase;
       const ready = a.ready(),
         present = document.body.classList.contains('hub-present'),
-        paused = quiet();
+        paused = quiet(),
+        weatherPaused =
+          !ready ||
+          document.hidden ||
+          !motion() ||
+          document.body.matches(
+            '.hub-present,.hub-private,.hub-focus,.hub-sorting,.rest-room-open'
+          );
       const layer = $('hubAtmosphere');
       if (layer) {
         layer.hidden = !ready || present || phase === 'off';
@@ -269,14 +276,14 @@
       if (card) {
         card.hidden = !ready || present || phase === 'off';
         card.dataset.phase = phase;
-        card.dataset.paused = String(paused);
+        card.dataset.paused = String(weatherPaused);
         card.setAttribute('aria-label', PHASES[phase] + '. Change atmosphere and visitors.');
       }
       const pocket = $('hubAtmospherePocket');
       if (pocket) {
         pocket.hidden = !ready || present || phase === 'off';
         pocket.dataset.phase = phase;
-        pocket.dataset.paused = String(paused);
+        pocket.dataset.paused = String(weatherPaused);
         pocket.setAttribute('aria-label', PHASES[phase] + '. Open atmosphere settings.');
       }
       const badge = $('hubAtmosphereBadge');

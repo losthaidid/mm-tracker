@@ -113,10 +113,83 @@
   box-shadow: 0 8px 24px #224b3210;
 }
 .presenter-preview[data-tool='pen'],
-.presenter-preview[data-tool='arrow'] {
+.presenter-preview[data-tool='arrow'],
+.presenter-preview[data-tool='text'],
+.presenter-preview[data-tool='laser'] {
   cursor: crosshair;
   touch-action: none;
   user-select: none;
+}
+.presenter-text-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px;
+  margin-top: 14px;
+}
+.presenter-text-tools label {
+  display: grid;
+  gap: 5px;
+  font-size: 12px;
+}
+.presenter-text-tools label:first-child {
+  flex: 1 1 220px;
+}
+.presenter-text-tools textarea {
+  width: 100%;
+  min-height: 64px;
+  resize: vertical;
+  font: 14px system-ui;
+  padding: 9px;
+  border: 1px solid #bdcbb5;
+  border-radius: 8px;
+  background: #fffef8;
+  color: #294b40;
+}
+.presenter-text-tools input {
+  width: 70px;
+  padding: 9px;
+  border: 1px solid #bdcbb5;
+  border-radius: 8px;
+}
+.presentation-screen-picker {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 0;
+}
+.presentation-screen-picker label {
+  display: grid;
+  gap: 5px;
+  font: 600 12px system-ui;
+}
+.presentation-screen-picker select {
+  min-width: 180px;
+  max-width: 100%;
+  padding: 9px;
+  border: 1px solid #bdcbb5;
+  border-radius: 8px;
+  background: var(--hub-surface, #fffef8);
+  color: var(--hub-text, #294b40);
+  font: 13px system-ui;
+}
+.presentation-screen-picker p {
+  flex-basis: 100%;
+  margin: 0;
+  font: 12px/1.5 system-ui;
+  color: var(--hub-muted, #647c6e);
+}
+.presenter-display-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0 0 20px;
+  font: 12px system-ui;
+}
+.process-hub-workspace[data-mode='present'] > .presentation-screen-picker {
+  display: none;
 }
 .presenter-ink,
 .presenter-screen-options {

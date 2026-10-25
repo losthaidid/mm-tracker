@@ -67,6 +67,27 @@
           frame = root.requestAnimationFrame(draw);
       }
     }
+    function pointer(point) {
+      let dot = host.querySelector('.av-laser');
+      if (
+        !point ||
+        !Array.isArray(point) ||
+        point.length !== 2 ||
+        !point.every(n => Number.isFinite(n) && n >= 0 && n <= 1)
+      ) {
+        if (dot) dot.hidden = true;
+        return;
+      }
+      if (!dot) {
+        dot = document.createElement('i');
+        dot.className = 'av-laser';
+        dot.setAttribute('aria-hidden', 'true');
+        host.append(dot);
+      }
+      dot.hidden = false;
+      dot.style.left = point[0] * 100 + '%';
+      dot.style.top = point[1] * 100 + '%';
+    }
     function update(snapshot, marks = [], options = {}) {
       if (disposed) return;
       data = snapshot;
@@ -157,10 +178,17 @@
         .slice(0, 100)
         .filter(
           m =>
-            ['pen', 'arrow'].includes(m.type) &&
+            ['pen', 'arrow', 'text'].includes(m.type) &&
             /^#[0-9a-f]{6}$/i.test(m.color) &&
             Number.isFinite(m.width) &&
-            m.points?.length <= 300 &&
+            (m.type !== 'text' ||
+              (typeof m.text === 'string' &&
+                m.text.trim().length > 0 &&
+                m.text.length <= 240 &&
+                Number.isFinite(m.fontSize))) &&
+            Array.isArray(m.points) &&
+            m.points.length > 0 &&
+            m.points.length <= 300 &&
             m.points.every(
               p =>
                 Array.isArray(p) &&
@@ -174,6 +202,30 @@
         svg.innerHTML = valid
           .map(m => {
             const points = m.points.map(([x, y]) => [x * 1000, y * 562.5]);
+            if (m.type === 'text') {
+              const size = Math.max(16, Math.min(40, m.fontSize)),
+                rows = [];
+              for (const paragraph of m.text.split('\n')) {
+                let line = '';
+                for (const word of paragraph.match(/.{1,34}(?:\s|$)|\S{1,34}/g) || ['']) {
+                  if ((line + word).length > 34 && line) {
+                    rows.push(line.trim());
+                    line = '';
+                  }
+                  line += word;
+                }
+                rows.push(line.trim());
+              }
+              const shown = rows.slice(0, 10),
+                boxWidth = Math.min(
+                  920,
+                  Math.max(100, ...shown.map(l => l.length * size * 0.62 + 24))
+                ),
+                boxHeight = shown.length * size * 1.25 + 20;
+              const x = Math.max(8, Math.min(992 - boxWidth, points[0][0])),
+                y = Math.max(8, Math.min(554.5 - boxHeight, points[0][1]));
+              return `<g class="av-text-note"><title>${esc(m.text)}</title><rect x="${x}" y="${y}" width="${boxWidth}" height="${boxHeight}" rx="8" fill="#16382e" fill-opacity=".94"/><text x="${x + 12}" y="${y + size + 6}" fill="${m.color}" font-size="${size}" font-family="system-ui,sans-serif">${shown.map((line, i) => `<tspan x="${x + 12}" dy="${i ? size * 1.25 : 0}">${esc(line)}</tspan>`).join('')}</text></g>`;
+            }
             if (points.length < 2) return '';
             const line = `<polyline points="${points.map(p => p.join(',')).join(' ')}" fill="none" stroke="${m.color}" stroke-width="${Math.max(1, Math.min(12, m.width))}" stroke-linecap="round" stroke-linejoin="round"/>`;
             if (m.type !== 'arrow') return line;
@@ -193,6 +245,7 @@
     document.addEventListener('visibilitychange', stop);
     return {
       update,
+      pointer,
       destroy() {
         disposed = true;
         stop();
