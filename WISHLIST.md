@@ -6,6 +6,8 @@ The two prioritised items are implemented: **TNG PDF extraction and cropped evid
 
 The Momo behaviour enhancements in [Batch B](BATCH-B.md) are implemented, including the later weather consequences, visitor friendships and click-reaction selections. [Batch C](BATCH-C.md) is implemented: 25 · Ticket twin finder, 26 · Sensitive screenshot brush, and 30 · Screenshot guide builder. See its usage and local-file notes before sharing an editable guide.
 
+[Batch D](BATCH-D.md) was kept on 25 October 2026: **4 · Interactive process decisions**, **7 · Personal reminder rules**, and **10 · Sync health centre**. These are wishlist selections; implementation has not been requested.
+
 [Batch X](BATCH-X.md) remains saved for later: each user connects their own Supabase project, and QR downloads for Process Hub PDF / image exports. QR downloads were kept on 25 October 2026; implementation has not been requested.
 
 On 20 October 2026, Request inbox, End-of-day ritual, Personal learning roadmap and Show-me-how walkthroughs were removed from the wishlist at the user's request.
