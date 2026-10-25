@@ -1,0 +1,297 @@
+/* All movement stays inside a small header identity; no full-page filters or particles. */
+.hub-header-brand .hub-brand-mark {
+  position: relative;
+  isolation: isolate;
+  overflow: visible;
+  padding: 3px;
+  cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--hub-accent) 65%, #fff);
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--hub-accent) 88%, #fff),
+    color-mix(in srgb, var(--hub-accent) 65%, #102841)
+  );
+  box-shadow:
+    0 0 18px color-mix(in srgb, var(--hub-accent) 30%, transparent),
+    inset 0 0 13px #ffffff35;
+  animation: brand-float 6s ease-in-out infinite;
+}
+.hub-brand-mark::before {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border: 1px solid color-mix(in srgb, var(--hub-accent) 55%, transparent);
+  border-radius: 19px;
+  animation: brand-halo-breathe 3s ease-in-out infinite;
+  pointer-events: none;
+}
+.hub-brand-mark .brand-cosmos {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  stroke-width: 1.1;
+  stroke: color-mix(in srgb, var(--hub-on-accent) 78%, #fff);
+}
+.brand-halo {
+  stroke-dasharray: 2 9;
+  opacity: 0.5;
+  transform-origin: 32px 32px;
+  animation: brand-orbit 24s linear infinite;
+}
+.brand-orbit {
+  transform-origin: 32px 32px;
+  animation: brand-orbit 12s linear infinite;
+}
+.brand-orbit ellipse {
+  opacity: 0.42;
+}
+.brand-orbit-two {
+  animation-duration: 19s;
+  animation-direction: reverse;
+}
+.brand-satellite {
+  fill: #f1fcff;
+  stroke: none;
+}
+.brand-satellite-gold {
+  fill: #ffdf87;
+}
+.brand-star-core {
+  transform-origin: 32px 32px;
+  animation: brand-star-turn 9s ease-in-out infinite;
+}
+.brand-star-core > path:first-child {
+  fill: color-mix(in srgb, var(--hub-on-accent) 65%, #fff);
+  stroke: var(--hub-on-accent);
+}
+.brand-star-heart {
+  fill: #ffedb7;
+  stroke: none;
+}
+.brand-twinkles {
+  stroke: #fff4ce;
+  animation: brand-twinkle 2.4s ease-in-out infinite;
+}
+.hub-header-brand [data-brand-home] {
+  display: block;
+  position: relative;
+  border: 0;
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0;
+  color: inherit !important;
+  font: inherit !important;
+  letter-spacing: inherit;
+  text-align: left;
+  cursor: pointer;
+  max-width: 100%;
+}
+.brand-title-letters {
+  display: inline;
+}
+.brand-title-letters > span {
+  display: inline-block;
+  white-space: pre;
+  position: relative;
+  color: var(--hub-text);
+  text-shadow: 0 0 12px color-mix(in srgb, var(--hub-accent) 30%, transparent);
+  animation: brand-letter-wave 4.8s ease-in-out infinite;
+  animation-delay: calc(var(--brand-letter) * -0.13s);
+}
+.hub-header-brand:hover .brand-star-core {
+  animation-duration: 2.4s;
+}
+.hub-header-brand:hover .brand-orbit-one {
+  animation-duration: 4s;
+}
+.hub-header-brand:hover .brand-title-letters > span {
+  color: color-mix(in srgb, var(--hub-text) 75%, var(--hub-accent));
+}
+.hub-header-brand :is([data-brand-home], [data-epic-brand]):focus-visible {
+  outline: 2px solid var(--hub-accent);
+  outline-offset: 6px;
+  border-radius: 8px;
+}
+.brand-click-ring {
+  position: absolute;
+  inset: -4px;
+  border: 2px solid var(--hub-accent);
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+}
+.brand-energised .brand-click-ring {
+  animation: brand-click-burst 1s ease-out;
+}
+.brand-energised .brand-title-letters > span {
+  animation: brand-title-launch 0.8s ease-in-out;
+  animation-delay: calc(var(--brand-letter) * 0.025s);
+}
+@keyframes brand-float {
+  0%,
+  100% {
+    transform: translateY(1px) rotate(-6deg);
+  }
+  50% {
+    transform: translateY(-3px) rotate(5deg);
+  }
+}
+@keyframes brand-halo-breathe {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.98) rotate(-5deg);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.07) rotate(7deg);
+  }
+}
+@keyframes brand-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes brand-star-turn {
+  0%,
+  100% {
+    transform: rotate(0) scale(0.9);
+  }
+  45% {
+    transform: rotate(180deg) scale(1.05);
+  }
+  80% {
+    transform: rotate(360deg) scale(0.9);
+  }
+}
+@keyframes brand-twinkle {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes brand-letter-wave {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  35% {
+    transform: translateY(-1.6px);
+  }
+  65% {
+    transform: translateY(0.6px);
+  }
+}
+@keyframes brand-click-burst {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.7);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2);
+  }
+}
+@keyframes brand-title-launch {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  45% {
+    transform: translateY(-6px);
+    color: var(--hub-accent);
+  }
+}
+.brand-page-hidden .hub-header-brand *,
+body[data-motion='off'] .hub-header-brand *,
+body.pc-presenting .hub-header-brand *,
+body.rest-room-open .hub-header-brand *,
+body.presentation-break-open .hub-header-brand * {
+  animation-play-state: paused !important;
+}
+body[data-motion='off'] .hub-header-brand .hub-brand-mark::before {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hub-header-brand *,
+  .hub-header-brand *::before {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+@media (max-width: 600px) {
+  .hub-header-brand .hub-brand-mark {
+    flex-basis: 40px;
+    width: 40px;
+    height: 40px;
+  }
+  .brand-title-letters > span {
+    animation-duration: 6s;
+  }
+}
+
+.hub-header-brand [data-brand-home]::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 25%;
+  height: 2px;
+  border-radius: 50%;
+  background: linear-gradient(90deg, transparent, var(--hub-accent), #ffeab1, transparent);
+  opacity: 0.8;
+  pointer-events: none;
+  animation: brand-title-comet 4.8s ease-in-out infinite;
+}
+@keyframes brand-title-comet {
+  0%,
+  100% {
+    transform: translateX(0);
+    opacity: 0.25;
+  }
+  50% {
+    transform: translateX(300%);
+    opacity: 1;
+  }
+}
+.brand-page-hidden .hub-header-brand *::before,
+.brand-page-hidden .hub-header-brand *::after,
+body[data-motion='off'] .hub-header-brand *::after {
+  animation-play-state: paused !important;
+}
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+  .brand-title-letters > span {
+    background: linear-gradient(
+      110deg,
+      var(--hub-text) 12%,
+      var(--hub-accent) 44%,
+      color-mix(in srgb, var(--hub-text) 70%, #e7ba68) 56%,
+      var(--hub-text) 85%
+    );
+    background-size: 300% 100%;
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+    animation:
+      brand-letter-wave 4.8s ease-in-out infinite,
+      brand-title-shine 7s linear infinite;
+    animation-delay: calc(var(--brand-letter) * -0.13s), calc(var(--brand-letter) * -0.18s);
+  }
+  .hub-header-brand:hover .brand-title-letters > span {
+    color: transparent;
+  }
+  .brand-energised .brand-title-letters > span {
+    animation:
+      brand-title-launch 0.8s ease-in-out,
+      brand-title-shine 2s linear infinite;
+    animation-delay: calc(var(--brand-letter) * 0.025s), 0s;
+  }
+}
+@keyframes brand-title-shine {
+  to {
+    background-position: 300% 0;
+  }
+}

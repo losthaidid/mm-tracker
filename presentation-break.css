@@ -163,28 +163,43 @@
 .pb-controls {
   position: absolute;
   z-index: 2;
-  bottom: 45px;
-  left: 14px;
-  right: 14px;
+  bottom: max(14px, env(safe-area-inset-bottom));
+  left: max(14px, env(safe-area-inset-left));
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  justify-content: center;
+  gap: 8px;
+  justify-content: flex-start;
 }
 .pb-controls button {
-  font: 500 13px system-ui;
+  display: grid;
+  place-items: center;
+  font: 500 19px system-ui;
   color: #fff;
-  background: #12394dd9;
-  border: 1px solid #ffffff50;
-  border-radius: 30px;
-  padding: 12px 18px;
-  min-height: 44px;
+  background: #12394d38;
+  border: 1px solid #ffffff45;
+  border-radius: 50%;
+  padding: 0;
+  width: 38px;
+  height: 38px;
+  min-height: 38px;
+  opacity: 0.38;
+  cursor: pointer;
+  transition:
+    opacity 0.18s ease,
+    background 0.18s ease;
+}
+.pb-controls button:hover,
+.pb-controls button:focus-visible {
+  opacity: 1;
+  background: #12394dbb;
+  outline: 2px solid #ffffffb3;
+  outline-offset: 3px;
 }
 .pb-notice {
   position: absolute;
   z-index: 2;
   bottom: 4px;
-  left: 16px;
+  left: 160px;
   right: 16px;
   text-align: center;
   font: 11px system-ui;
@@ -325,11 +340,12 @@ body.presentation-break-open #view *::after {
     grid-template-columns: 1fr;
   }
   .pb-controls {
-    bottom: 52px;
     gap: 6px;
   }
   .pb-controls button {
-    padding: 10px 13px;
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

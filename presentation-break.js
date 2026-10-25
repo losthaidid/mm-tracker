@@ -71,7 +71,10 @@
       );
       const pause = audience.querySelector('[data-pb="pause"]');
       pause.hidden = session.complete;
-      text(pause, session.pausedAt != null ? 'Resume countdown' : 'Pause countdown');
+      const pauseLabel = session.pausedAt != null ? 'Resume countdown' : 'Pause countdown';
+      pause.setAttribute('aria-label', pauseLabel);
+      pause.title = pauseLabel;
+      text(pause, session.pausedAt != null ? '▶' : 'Ⅱ');
     }
     async function fullscreen() {
       if (!audience) return;
@@ -137,7 +140,7 @@
       audience.dataset.scene = scene;
       audience.dataset.messageSize = message.length > 120 ? 'long' : 'short';
       audience.setAttribute('aria-labelledby', 'pbMessage');
-      audience.innerHTML = `<section class="pb-stage">${scenery()}<div class="pb-copy"><p class="pb-eyebrow">A MOMENT TO RESET</p><h1 id="pbMessage"></h1><output data-pb-clock role="timer" aria-label="Presentation countdown" aria-live="off"></output><p data-pb-status role="status"></p></div><div class="pb-controls"><button type="button" data-pb="pause">Pause countdown</button><button type="button" data-pb="fullscreen">Full screen</button><button type="button" data-pb="end">Back to presentation</button></div><p class="pb-notice" data-pb-notice role="status"></p></section>`;
+      audience.innerHTML = `<section class="pb-stage">${scenery()}<div class="pb-copy"><p class="pb-eyebrow">A MOMENT TO RESET</p><h1 id="pbMessage"></h1><output data-pb-clock role="timer" aria-label="Presentation countdown" aria-live="off"></output><p data-pb-status role="status"></p></div><div class="pb-controls" role="group" aria-label="Presentation break controls"><button type="button" data-pb="pause" aria-label="Pause countdown" title="Pause countdown">Ⅱ</button><button type="button" data-pb="fullscreen" aria-label="Full screen" title="Full screen">⛶</button><button type="button" data-pb="end" aria-label="Back to presentation" title="Back to presentation">↩</button></div><p class="pb-notice" data-pb-notice role="status"></p></section>`;
       text(audience.querySelector('#pbMessage'), message);
       audience.addEventListener('cancel', event => {
         event.preventDefault();

@@ -9,6 +9,10 @@
       );
   const ICONS = E.TYPE_ICONS;
   function install(a) {
+    let selection = new Set(),
+      selectionMode = false,
+      selectionProcess = '',
+      marquee = null;
     let owner = '',
       processId = '',
       scenarioId = '',
@@ -148,6 +152,10 @@
       audioError = '';
       editorSnapshot = null;
       drag = null;
+      marquee?.element.remove();
+      marquee = null;
+      selection.clear();
+      selectionMode = false;
       demo = E.seed('__demo__', now());
     }
     function model() {
@@ -368,7 +376,14 @@
     }
     function positions() {
       return new Map(
-        model().steps.map(s => [s.id, drag?.id === s.id ? { ...s, x: drag.x, y: drag.y } : s])
+        model().steps.map(s => [
+          s.id,
+          drag?.group?.[s.id]
+            ? { ...s, x: drag.group[s.id].x, y: drag.group[s.id].y }
+            : drag?.id === s.id
+              ? { ...s, x: drag.x, y: drag.y }
+              : s,
+        ])
       );
     }
     function edges(p) {
@@ -389,10 +404,16 @@
         .join('');
     }
     function graph(p) {
+      if (selectionProcess !== p.id) {
+        selectionProcess = p.id;
+        selection.clear();
+        selectionMode = false;
+      }
+
       const size = root.WorkHubProcessCanvasArt?.dimensions(p),
         width = size?.width || Math.max(850, ...p.steps.map(s => s.x + 270)),
         height = size?.height || Math.max(440, ...p.steps.map(s => s.y + 180));
-      return `<div id="rehearsalViewport" class="rehearsal-viewport" tabindex="0" aria-label="Process canvas. Scroll to explore."><div class="rehearsal-extent" style="width:${width * zoom}px;height:${height * zoom}px"><div id="rehearsalBoard" class="rehearsal-board" style="width:${width}px;height:${height}px;transform:scale(${zoom})"><svg class="rehearsal-wires" width="${width}" height="${height}" aria-hidden="true"><defs><marker id="rehearsalArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z"></path></marker></defs>${edges(p)}<g class="pc-saved-annotations">${root.WorkHubProcessCanvasArt?.svg(p) || ''}</g></svg>${p.steps.map(s => `<article class="rehearsal-node" data-node="${esc(s.id)}" data-type="${s.type}" style="left:${s.x}px;top:${s.y}px">${p.id !== '__demo__' ? `<button type="button" class="rehearsal-drag" data-rehearsal-drag="${esc(s.id)}" aria-label="Move ${esc(s.title)}. Drag or use arrow keys.">⠿</button>` : ''}<button type="button" class="rehearsal-node-main" data-rehearsal="inspect" data-id="${esc(s.id)}"><span class="rehearsal-node-icon">${ICONS[s.type]}</span><span><small>${esc(s.type)}${s.tcode ? ' · ' + esc(s.tcode) : ''}</small><strong>${esc(s.title)}</strong></span></button><span class="rehearsal-node-state" aria-hidden="true"></span><div class="rehearsal-particles" aria-hidden="true">${Array.from({ length: 6 }, (_, i) => `<i style="--particle:${i}"></i>`).join('')}</div></article>`).join('')}<div id="rehearsalToken" class="rehearsal-token" aria-hidden="true"><span>▤</span></div><div class="rehearsal-scene-specks" aria-hidden="true"></div></div></div></div>`;
+      return `<div id="rehearsalViewport" class="rehearsal-viewport" data-select-mode="${selectionMode}" tabindex="0" aria-label="Process canvas. Scroll to explore."><div class="rehearsal-extent" style="width:${width * zoom}px;height:${height * zoom}px"><div id="rehearsalBoard" class="rehearsal-board" style="width:${width}px;height:${height}px;transform:scale(${zoom})"><svg class="rehearsal-wires" width="${width}" height="${height}" aria-hidden="true"><defs><marker id="rehearsalArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z"></path></marker></defs>${edges(p)}<g class="pc-saved-annotations">${root.WorkHubProcessCanvasArt?.svg(p) || ''}</g></svg>${p.steps.map(s => `<article class="rehearsal-node" data-node="${esc(s.id)}" data-selected="${selection.has(s.id)}" data-type="${s.type}" style="left:${s.x}px;top:${s.y}px">${p.id !== '__demo__' ? `<button type="button" class="rehearsal-drag" data-rehearsal-drag="${esc(s.id)}" aria-label="Move ${esc(s.title)}. Drag or use arrow keys.">⠿</button>` : ''}<button type="button" class="rehearsal-node-main" data-rehearsal="inspect" data-id="${esc(s.id)}"><span class="rehearsal-node-icon">${ICONS[s.type]}</span><span><small>${esc(s.type)}${s.tcode ? ' · ' + esc(s.tcode) : ''}</small><strong>${esc(s.title)}</strong></span></button><span class="rehearsal-node-state" aria-hidden="true"></span><div class="rehearsal-particles" aria-hidden="true">${Array.from({ length: 6 }, (_, i) => `<i style="--particle:${i}"></i>`).join('')}</div></article>`).join('')}<div id="rehearsalToken" class="rehearsal-token" aria-hidden="true"><span>▤</span></div><div class="rehearsal-scene-specks" aria-hidden="true"></div></div></div></div>`;
     }
     function captureDraftFields() {
       const form = $('processHubDetails');
@@ -487,6 +508,11 @@
         editorSnapshot = clone;
       }
       const p = model();
+      if (selectionProcess !== p.id) {
+        selectionProcess = p.id;
+        selection.clear();
+        selectionMode = false;
+      }
       if (!route) rebuild();
       const rows = library().filter(x => x.archived === archived),
         isPresent = mode === 'present',
@@ -500,7 +526,7 @@
             (isSaved
               ? button('edit-process', 'Edit process') + button('duplicate', 'Duplicate')
               : button('keep', 'Save this example'));
-      return `<section id="rehearsalRoot" class="hub rehearsal-workspace process-hub-workspace" data-owner="${esc(owner)}" data-theme="${prefs().theme}" data-effects="${prefs().effects}" data-mode="${mode}" data-draft="${!!draft}"><header class="rehearsal-hero"><div><span class="hub-kicker">${draft ? 'CREATE · CONNECT · EXPLAIN' : 'YOUR LIVING PROCESS LIBRARY'}</span><h2>${draft ? 'Process canvas' : 'Process Hub'}<span class="ph-title-mark" aria-hidden="true">↗</span></h2><p>${draft ? 'Arrange the flow and maintain every detail in one space. Save when you are ready.' : 'From your own reference to a clear walkthrough. Watch each handoff come to life.'}</p></div><div class="actions">${actions}${mode !== 'normal' ? button('normal', '↙ Normal view') : button('fullscreen', '⛶ Full screen')}${!draft ? (!isPresent ? button('present', '▷ Present') : '') + button('presenter', '▣ Presenter controls') : ''}</div></header>${screens ? screens.markup('processPresentationScreen', 'data-rehearsal="screens"') : ''}<div class="rehearsal-selection"><label>Saved process<select id="rehearsalProcess"${draft ? ' disabled' : ''}>${draft && !rows.some(x => x.id === p.id) ? `<option value="${esc(p.id)}" selected>Unsaved · ${esc(p.name)}</option>` : ''}${rows.map(x => `<option value="${esc(x.id)}"${x.id === p.id ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}<option value="__demo__"${p.id === '__demo__' ? ' selected' : ''}>Sample · Procure to pay</option></select></label><label>Scenario<select id="rehearsalScenario">${p.scenarios.map(s => `<option value="${esc(s.id)}"${s.id === scenarioId ? ' selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>${isSaved && !isPresent ? button('scenario', 'Edit scenario') + button('scenario-add', '＋ Scenario') : ''}<label>View<select id="processHubView"><option value="normal"${mode === 'normal' ? ' selected' : ''}>Normal</option><option value="full"${mode === 'full' ? ' selected' : ''}>Full screen</option><option value="present"${isPresent ? ' selected' : ''}>Presentation</option></select></label><span class="rehearsal-local-label">${draft ? 'Draft · saved only when you choose Save process' : `${p.steps.length} steps · ${p.scenarios.length} scenarios · ${p.revision ? esc(p.revision) + ' · ' : ''}Looping playback`}</span></div>${draft ? processFields(p) : `<div class="ph-library-bar"><div><strong>${esc(p.objective || p.notes || 'Build a process, then explore it at your own pace.')}</strong>${p.processOwner ? `<span>Owner · ${esc(p.processOwner)}</span>` : ''}</div><div class="actions">${!isPresent ? button('archive-view', archived ? 'Show active' : 'Archived processes') : ''}${isSaved && !isPresent ? button('archive', p.archived ? 'Restore process' : 'Archive') + button('export', '↓ Export PDF / Image') : ''}${isSaved && !isPresent ? button('settings', 'Process information') : ''}</div></div>`}<div class="ph-canvas-layout">${draft ? palette() : ''}<div class="rehearsal-layout"><div class="rehearsal-stage"><div class="rehearsal-stage-bar"><div><strong>${esc(p.name)}</strong><span id="rehearsalStatus" aria-live="polite"></span></div><div class="actions">${isSaved && !isPresent ? button('add-step', '＋ Step') + button('layout', 'Auto arrange') : ''}${button('fit', 'Fit')}${button('zoom-out', '−', 'aria-label="Zoom out"')}${button('zoom-in', '＋', 'aria-label="Zoom in"')}<span class="ph-zoom">${Math.round(zoom * 100)}%</span></div></div>${graph(p)}<div class="rehearsal-values"><div class="rehearsal-values-title"><strong>Sample values</strong><span>Changes follow your definitions</span></div><div id="rehearsalValues"></div></div><div class="rehearsal-playbar">${button('back', '↶', 'aria-label="Previous step / rewind"')}${button('play', draft ? 'Preview after saving' : 'Pause', 'id="rehearsalPlay"', 'primary small')}${button('next', '↷', 'aria-label="Next step"')}${button('restart', 'Restart')}<label>Decisions<select id="rehearsalDecisionMode"><option value="auto"${!interactive ? ' selected' : ''}>Automatic · default routes</option><option value="interactive"${interactive ? ' selected' : ''}>Interactive · ask me</option></select></label><label>Speed<select id="rehearsalSpeed">${[0.5, 1, 1.5, 2].map(v => `<option value="${v}"${v === prefs().speed ? ' selected' : ''}>${v}×</option>`).join('')}</select></label>${button('sound', soundLabel(), 'id="rehearsalSound" aria-pressed="false" aria-describedby="rehearsalAudioStatus"')}<label>Volume<input id="rehearsalVolume" aria-label="Rehearsal volume" type="range" min="0" max="1" step="0.05" value="${prefs().volume}"></label></div><p id="rehearsalAudioStatus" class="hub-meta" role="status">${esc(audioMessage())}</p></div><aside id="rehearsalInspector" class="rehearsal-inspector"></aside></div></div><div class="rehearsal-options"><label>Scenery<select id="rehearsalTheme">${[
+      return `<section id="rehearsalRoot" class="hub rehearsal-workspace process-hub-workspace" data-owner="${esc(owner)}" data-theme="${prefs().theme}" data-effects="${prefs().effects}" data-mode="${mode}" data-draft="${!!draft}"><header class="rehearsal-hero"><div><span class="hub-kicker">${draft ? 'CREATE · CONNECT · EXPLAIN' : 'YOUR LIVING PROCESS LIBRARY'}</span><h2>${draft ? 'Process canvas' : 'Process Hub'}<span class="ph-title-mark" aria-hidden="true">↗</span></h2><p>${draft ? 'Arrange the flow and maintain every detail in one space. Save when you are ready.' : 'From your own reference to a clear walkthrough. Watch each handoff come to life.'}</p></div><div class="actions">${actions}${mode !== 'normal' ? button('normal', '↙ Normal view') : button('fullscreen', '⛶ Full screen')}${!draft ? (!isPresent ? button('present', '▷ Present') : '') + button('presenter', '▣ Presenter controls') : ''}</div></header>${screens ? screens.markup('processPresentationScreen', 'data-rehearsal="screens"') : ''}<div class="rehearsal-selection"><label>Saved process<select id="rehearsalProcess"${draft ? ' disabled' : ''}>${draft && !rows.some(x => x.id === p.id) ? `<option value="${esc(p.id)}" selected>Unsaved · ${esc(p.name)}</option>` : ''}${rows.map(x => `<option value="${esc(x.id)}"${x.id === p.id ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}<option value="__demo__"${p.id === '__demo__' ? ' selected' : ''}>Sample · Procure to pay</option></select></label><label>Scenario<select id="rehearsalScenario">${p.scenarios.map(s => `<option value="${esc(s.id)}"${s.id === scenarioId ? ' selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>${isSaved && !isPresent ? button('scenario', 'Edit scenario') + button('scenario-add', '＋ Scenario') : ''}<label>View<select id="processHubView"><option value="normal"${mode === 'normal' ? ' selected' : ''}>Normal</option><option value="full"${mode === 'full' ? ' selected' : ''}>Full screen</option><option value="present"${isPresent ? ' selected' : ''}>Presentation</option></select></label><span class="rehearsal-local-label">${draft ? 'Draft · saved only when you choose Save process' : `${p.steps.length} steps · ${p.scenarios.length} scenarios · ${p.revision ? esc(p.revision) + ' · ' : ''}Looping playback`}</span></div>${draft ? processFields(p) : `<div class="ph-library-bar"><div><strong>${esc(p.objective || p.notes || 'Build a process, then explore it at your own pace.')}</strong>${p.processOwner ? `<span>Owner · ${esc(p.processOwner)}</span>` : ''}</div><div class="actions">${!isPresent ? button('archive-view', archived ? 'Show active' : 'Archived processes') : ''}${isSaved && !isPresent ? button('archive', p.archived ? 'Restore process' : 'Archive') + button('export', '↓ Export PDF / Image') : ''}${isSaved && !isPresent ? button('settings', 'Process information') : ''}</div></div>`}<div class="ph-canvas-layout">${draft ? palette() : ''}<div class="rehearsal-layout"><div class="rehearsal-stage"><div class="rehearsal-stage-bar"><div><strong>${esc(p.name)}</strong><span id="rehearsalStatus" aria-live="polite"></span></div><div class="actions">${isSaved && !isPresent ? button('add-step', '＋ Step') + button('layout', 'Auto arrange') : ''}${!isPresent ? button('select-mode', selectionMode ? '✓ Select steps' : '▧ Select steps', `aria-pressed="${selectionMode}"`) + button('select-all', 'Select all') + `<span class="ph-selection-count" role="status">${selection.size ? selection.size + ' selected' : ''}</span>` : ''}${button('fit', 'Fit')}${button('zoom-out', '−', 'aria-label="Zoom out"')}${button('zoom-in', '＋', 'aria-label="Zoom in"')}<span class="ph-zoom">${Math.round(zoom * 100)}%</span></div></div>${graph(p)}<div class="rehearsal-values"><div class="rehearsal-values-title"><strong>Sample values</strong><span>Changes follow your definitions</span></div><div id="rehearsalValues"></div></div><div class="rehearsal-playbar">${button('back', '↶', 'aria-label="Previous step / rewind"')}${button('play', draft ? 'Preview after saving' : 'Pause', 'id="rehearsalPlay"', 'primary small')}${button('next', '↷', 'aria-label="Next step"')}${button('restart', 'Restart')}<label>Decisions<select id="rehearsalDecisionMode"><option value="auto"${!interactive ? ' selected' : ''}>Automatic · default routes</option><option value="interactive"${interactive ? ' selected' : ''}>Interactive · ask me</option></select></label><label>Speed<select id="rehearsalSpeed">${[0.5, 1, 1.5, 2].map(v => `<option value="${v}"${v === prefs().speed ? ' selected' : ''}>${v}×</option>`).join('')}</select></label>${button('sound', soundLabel(), 'id="rehearsalSound" aria-pressed="false" aria-describedby="rehearsalAudioStatus"')}<label>Volume<input id="rehearsalVolume" aria-label="Rehearsal volume" type="range" min="0" max="1" step="0.05" value="${prefs().volume}"></label></div><p id="rehearsalAudioStatus" class="hub-meta" role="status">${esc(audioMessage())}</p></div><aside id="rehearsalInspector" class="rehearsal-inspector"></aside></div></div><div class="rehearsal-options"><label>Scenery<select id="rehearsalTheme">${[
         ['desk', 'Cosy desk'],
         ['blueprint', 'Blueprint'],
         ['control', 'Control room'],
@@ -1396,17 +1422,56 @@
     function moveStep(id, x, y) {
       paused = true;
       saveMutation(p => {
-        const s = p.steps.find(s => s.id === id);
-        if (!s) throw Error('Step no longer exists.');
-        s.x = Math.max(0, Math.min(4000, x));
-        s.y = Math.max(0, Math.min(4000, y));
+        const step = p.steps.find(s => s.id === id);
+        if (!step) throw Error('Step no longer exists.');
+        const moving = selection.has(id) ? new Set(selection) : new Set([id]);
+        let more = true;
+        while (more) {
+          more = false;
+          for (const s of p.steps)
+            if (s.stackParent && moving.has(s.stackParent) && !moving.has(s.id)) {
+              moving.add(s.id);
+              more = true;
+            }
+        }
+        const rows = p.steps.filter(s => moving.has(s.id));
+        const dx = Math.max(
+          -Math.min(...rows.map(s => s.x)),
+          Math.min(4000 - Math.max(...rows.map(s => s.x)), x - step.x)
+        );
+        const dy = Math.max(
+          -Math.min(...rows.map(s => s.y)),
+          Math.min(4000 - Math.max(...rows.map(s => s.y)), y - step.y)
+        );
+        for (const s of rows) {
+          s.x += dx;
+          s.y += dy;
+          if (s.stackParent && !moving.has(s.stackParent)) delete s.stackParent;
+        }
       });
+    }
+    function paintSelection() {
+      for (const n of document.querySelectorAll('#rehearsalBoard [data-node]'))
+        n.dataset.selected = String(selection.has(n.dataset.node));
+      const status = document.querySelector('.ph-selection-count');
+      if (status) status.textContent = selection.size ? selection.size + ' selected' : '';
+    }
+    function boardPoint(e) {
+      const r = $('rehearsalBoard')?.getBoundingClientRect();
+      return r ? { x: (e.clientX - r.left) / zoom, y: (e.clientY - r.top) / zoom } : null;
     }
     async function handle(el) {
       guard(owner);
       const action = el.dataset.rehearsal,
         id = el.dataset.id,
         p = model();
+      if (action === 'select-mode' || action === 'select-all') {
+        selectionMode = action === 'select-all' ? true : !selectionMode;
+        selection = action === 'select-all' ? new Set(p.steps.map(s => s.id)) : new Set();
+        paused = true;
+        a.render();
+        return;
+      }
       if (action === 'screens') {
         captureDraftFields();
         if (await screens?.discover()) a.render();
@@ -1737,6 +1802,43 @@
       }
     });
     document.addEventListener('pointerdown', event => {
+      const view = event.target.closest?.('#rehearsalViewport'),
+        card = event.target.closest?.('[data-node]');
+      if (selectionMode && view && event.button === 0 && !editing && mode !== 'present') {
+        if (!card) {
+          const point = boardPoint(event);
+          if (!point) return;
+          event.preventDefault();
+          paused = true;
+          suppressClick = Date.now() + 400;
+          const element = document.createElement('div');
+          element.className = 'ph-marquee';
+          element.setAttribute('aria-hidden', 'true');
+          $('rehearsalBoard').append(element);
+          const base = event.shiftKey || event.ctrlKey || event.metaKey ? [...selection] : [];
+          selection = new Set(base);
+          marquee = {
+            start: point,
+            element,
+            base,
+            owner,
+            process: model().id,
+            id: event.pointerId,
+          };
+          view.setPointerCapture?.(event.pointerId);
+          view.focus({ preventScroll: true });
+          paintSelection();
+          return;
+        }
+        if (event.shiftKey || event.ctrlKey || event.metaKey) {
+          event.preventDefault();
+          suppressClick = Date.now() + 400;
+          if (selection.has(card.dataset.node)) selection.delete(card.dataset.node);
+          else selection.add(card.dataset.node);
+          paintSelection();
+          return;
+        }
+      }
       const type = event.target.closest?.('[data-step-type]');
       if (type && draft && ['touch', 'pen'].includes(event.pointerType)) {
         paletteDrag = {
@@ -1750,7 +1852,9 @@
         type.setPointerCapture?.(event.pointerId);
         return;
       }
-      const handle = event.target.closest?.('[data-rehearsal-drag]');
+      const handle =
+        event.target.closest?.('[data-rehearsal-drag]') ||
+        (selectionMode && card ? card.querySelector('[data-rehearsal-drag]') : null);
       if (!handle || event.button > 0) return;
       if (editing) {
         a.tell('Save or cancel the step editor before moving cards.');
@@ -1761,6 +1865,8 @@
         const s = model().steps.find(s => s.id === handle.dataset.rehearsalDrag);
         if (!s) return;
         paused = true;
+        if (!selection.has(s.id)) selection = new Set([s.id]);
+        paintSelection();
         event.preventDefault();
         drag = {
           id: s.id,
@@ -1773,6 +1879,11 @@
           owner,
           process: model().id,
           moved: false,
+          group: Object.fromEntries(
+            model()
+              .steps.filter(s => selection.has(s.id))
+              .map(s => [s.id, { x: s.x, y: s.y, baseX: s.x, baseY: s.y }])
+          ),
         };
         handle.setPointerCapture?.(event.pointerId);
       } catch (err) {
@@ -1780,6 +1891,35 @@
       }
     });
     document.addEventListener('pointermove', event => {
+      if (marquee) {
+        if (marquee.id !== event.pointerId) return;
+        if (marquee.owner !== a.owner() || marquee.process !== model().id) {
+          marquee.element.remove();
+          marquee = null;
+          selection.clear();
+          return;
+        }
+        const pt = boardPoint(event);
+        if (!pt) return;
+        event.preventDefault();
+        const x = Math.min(pt.x, marquee.start.x),
+          y = Math.min(pt.y, marquee.start.y),
+          w = Math.abs(pt.x - marquee.start.x),
+          h = Math.abs(pt.y - marquee.start.y);
+        Object.assign(marquee.element.style, {
+          left: x + 'px',
+          top: y + 'px',
+          width: w + 'px',
+          height: h + 'px',
+        });
+        selection = new Set(marquee.base);
+        if (w + h > 4)
+          for (const s of model().steps)
+            if (s.x <= x + w && s.x + 210 >= x && s.y <= y + h && s.y + 100 >= y)
+              selection.add(s.id);
+        paintSelection();
+        return;
+      }
       if (paletteDrag) {
         const d = paletteDrag;
         if (Math.abs(event.clientX - d.startX) + Math.abs(event.clientY - d.startY) > 8)
@@ -1799,15 +1939,28 @@
       if (!drag) return;
       const dx = (event.clientX - drag.startX) / zoom,
         dy = (event.clientY - drag.startY) / zoom;
-      drag.x = Math.max(0, Math.min(4000, drag.baseX + dx));
-      drag.y = Math.max(0, Math.min(4000, drag.baseY + dy));
-      drag.moved = drag.moved || Math.abs(dx) + Math.abs(dy) > 4;
-      const node = [...document.querySelectorAll('[data-node]')].find(
-        n => n.dataset.node === drag.id
+      const rows = Object.values(drag.group);
+      const mx = Math.max(
+        -Math.min(...rows.map(s => s.baseX)),
+        Math.min(4000 - Math.max(...rows.map(s => s.baseX)), dx)
       );
-      if (node) {
-        node.style.left = drag.x + 'px';
-        node.style.top = drag.y + 'px';
+      const my = Math.max(
+        -Math.min(...rows.map(s => s.baseY)),
+        Math.min(4000 - Math.max(...rows.map(s => s.baseY)), dy)
+      );
+      drag.x = drag.baseX + mx;
+      drag.y = drag.baseY + my;
+      drag.moved = drag.moved || Math.abs(dx) + Math.abs(dy) > 4;
+      for (const [id, pos] of Object.entries(drag.group)) {
+        pos.x = pos.baseX + mx;
+        pos.y = pos.baseY + my;
+        const node = [...document.querySelectorAll('#rehearsalBoard [data-node]')].find(
+          n => n.dataset.node === id
+        );
+        if (node) {
+          node.style.left = pos.x + 'px';
+          node.style.top = pos.y + 'px';
+        }
       }
       const map = positions();
       for (const edge of document.querySelectorAll('.rehearsal-edge')) {
@@ -1817,6 +1970,14 @@
       }
     });
     document.addEventListener('pointerup', event => {
+      if (marquee) {
+        if (marquee.id !== event.pointerId) return;
+        marquee.element.remove();
+        marquee = null;
+        suppressClick = Date.now() + 400;
+        paintSelection();
+        return;
+      }
       if (paletteDrag) {
         const d = paletteDrag;
         paletteDrag = null;
@@ -1854,6 +2015,12 @@
       }
     });
     document.addEventListener('pointercancel', () => {
+      if (marquee) {
+        selection = new Set(marquee.base);
+        marquee.element.remove();
+        marquee = null;
+        paintSelection();
+      }
       paletteDrag?.ghost?.remove();
       paletteDrag = null;
       if (!drag) return;
@@ -1863,6 +2030,32 @@
     document.addEventListener(
       'keydown',
       event => {
+        if (
+          event.target.closest?.('#rehearsalViewport') &&
+          !event.target.matches('input,textarea,select,[contenteditable="true"]')
+        ) {
+          if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
+            event.preventDefault();
+            event.stopPropagation();
+            selectionMode = true;
+            selection = new Set(model().steps.map(s => s.id));
+            paused = true;
+            a.render();
+            $('rehearsalViewport')?.focus();
+            return;
+          }
+          if (event.key === 'Escape' && selection.size) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            selection.clear();
+            if (marquee) {
+              marquee.element.remove();
+              marquee = null;
+            }
+            paintSelection();
+            return;
+          }
+        }
         const el = event.target.closest?.('[data-rehearsal-drag]');
         if (!el || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
         event.preventDefault();
@@ -2221,6 +2414,8 @@
       audienceSnapshot,
       plan: () => route,
       snapshot: () => ({
+        selection: [...selection],
+        selectionMode,
         index,
         elapsed,
         paused,

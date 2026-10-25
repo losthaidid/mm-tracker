@@ -1,4 +1,4 @@
-/** Daily, account-seeded outfits and finite, in-place hobbies. No movement or network. */
+/** Morning, afternoon and night, account-seeded outfits and finite, in-place hobbies. No movement or network. */
 (function (root) {
   'use strict';
   const OUTFITS = [
@@ -26,6 +26,13 @@
     ['festival', 'Patchwork jacket'],
     ['highcollar', 'High-collar knit'],
     ['pyjamas', 'Starry pyjamas'],
+    ['pyjamas-moon', 'Crescent moon pyjamas'],
+    ['pyjamas-cloud', 'Sleepy cloud pyjamas'],
+    ['pyjamas-stripe', 'Bedtime stripe pyjamas'],
+    ['pyjamas-check', 'Cosy check pyjamas'],
+    ['pyjamas-dot', 'Polka-dot pyjamas'],
+    ['pyjamas-comet', 'Dream comet pyjamas'],
+    ['pyjamas-leaf', 'Soft fern pyjamas'],
   ];
   const PALETTES = [
     ['mint', 'Mint tide', '#85b5a5', '#e8edce'],
@@ -109,23 +116,41 @@
     return Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86400000);
   }
   function look(p, owner, date = new Date()) {
-    const n = day(date),
-      combo = (((n + hash(owner)) % 288) * 137) % 288;
-    const outfit = p.outfit === 'daily' ? OUTFITS[Math.floor(combo / 12)][0] : p.outfit || 'hoodie';
+    const hour = date.getHours(),
+      period = hour >= 6 && hour < 12 ? 'morning' : hour >= 12 && hour < 19 ? 'afternoon' : 'night';
+    // A night belongs to the date on which it started, including after midnight.
+    const n = day(date) - (hour < 6 ? 1 : 0),
+      night = period === 'night';
+    const daytime = OUTFITS.filter(x => !x[0].startsWith('pyjamas'));
+    const sleepwear = OUTFITS.filter(x => x[0].startsWith('pyjamas'));
+    const slot = n * 2 + (period === 'afternoon' ? 1 : 0);
+    const nightCombo = ((n + hash(owner + 'night')) * 37) % (sleepwear.length * PALETTES.length);
+    const outfit =
+      p.outfit === 'daily'
+        ? night
+          ? sleepwear[Math.floor(nightCombo / PALETTES.length)][0]
+          : daytime[((slot + hash(owner)) * 7) % daytime.length][0]
+        : p.outfit || 'hoodie';
+    const paletteIndex = night
+      ? nightCombo % PALETTES.length
+      : ((slot + hash(owner + 'palette')) * 5) % PALETTES.length;
     const palette =
       PALETTES.find(
-        x => x[0] === (p.outfitPalette === 'daily' ? PALETTES[combo % 12][0] : p.outfitPalette)
+        x => x[0] === (p.outfitPalette === 'daily' ? PALETTES[paletteIndex][0] : p.outfitPalette)
       ) || PALETTES[0];
     const choices = ACCESSORIES.filter(x => !['daily', 'none'].includes(x[0]));
     const accessory =
       p.accessory === 'daily'
-        ? choices[((n + hash(owner + 'accessory')) * 17) % choices.length][0]
+        ? night
+          ? 'none'
+          : choices[((slot + hash(owner + 'accessory')) * 17) % choices.length][0]
         : p.accessory;
     return {
       outfit,
       palette,
       accessory,
-      key: [n, outfit, palette[0], accessory].join('|'),
+      period,
+      key: [n, period, outfit, palette[0], accessory].join('|'),
       label: (OUTFITS.find(x => x[0] === outfit)?.[1] || 'Cloud hoodie') + ' · ' + palette[1],
     };
   }
@@ -175,6 +200,41 @@
         )
         .join('')}<path d="M70 82v31" ${line}/>`,
     };
+    const dots = [
+      [56, 91],
+      [80, 96],
+      [65, 108],
+    ];
+    const sleepMotifs = {
+      'pyjamas-moon': dots
+        .map(
+          ([x, y]) =>
+            `<path d="M${x + 3} ${y - 4}a5 5 0 1 0 0 8 4 4 0 0 1 0-8" fill="var(--momo-trim)"/>`
+        )
+        .join(''),
+      'pyjamas-cloud': dots
+        .map(
+          ([x, y]) => `<path d="M${x - 5} ${y}q-2-5 2-5 4-5 6 0 5 0 3 5Z" fill="var(--momo-trim)"/>`
+        )
+        .join(''),
+      'pyjamas-stripe': [86, 94, 102, 110].map(y => `<path d="M49 ${y}h42" ${line}/>`).join(''),
+      'pyjamas-check': `<path d="M57 84v29m13-29v29m13-29v29m-34-22h42m-42 9h42m-42 9h42" ${line}/>`,
+      'pyjamas-dot': dots
+        .map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3" fill="var(--momo-trim)"/>`)
+        .join(''),
+      'pyjamas-comet': dots
+        .map(
+          ([x, y]) =>
+            `<path d="m${x - 4} ${y - 4} 6 6m-3-9 6 6" ${line}/><circle cx="${x + 3}" cy="${y + 3}" r="2.5" fill="var(--momo-trim)"/>`
+        )
+        .join(''),
+      'pyjamas-leaf': dots
+        .map(
+          ([x, y]) => `<path d="M${x - 4} ${y + 4}q-3-10 8-8 2 10-8 8" fill="var(--momo-trim)"/>`
+        )
+        .join(''),
+    };
+    if (sleepMotifs[kind]) motifs[kind] = sleepMotifs[kind] + `<path d="M70 82v31" ${line}/>`;
     return `<path d="M51 77q19 8 38 0l6 9-3 27H48l-3-27Z" fill="url(#momo-fabric)" stroke="var(--momo-cloth-edge)" stroke-width=".7"/>${motifs[kind] || motifs.hoodie}`;
   }
   function sleeve(side) {
@@ -240,7 +300,7 @@
       select(
         'outfit',
         'Wardrobe',
-        [['daily', 'Daily surprise · a different combination each day'], ...OUTFITS],
+        [['daily', 'Automatic · morning, afternoon & night'], ...OUTFITS],
         p.outfit
       ) +
       select(
@@ -341,7 +401,7 @@
       const current = look(a.prefs(), owner);
       a.openModal(
         'Wardrobe & hobbies',
-        `<section class="momo-wardrobe-gallery"><span class="hub-kicker">A LITTLE LIFE OF HIS OWN</span><h3>${esc(current.label)}</h3><p>24 outfits × 12 colour palettes: 288 daily combinations, stable for the whole local day. Choose Daily surprise in Appearance to rotate clothes or accessories. Headphones are optional.</p><button type="button" data-momo-style="appearance">Choose outfit & accessories</button><h3>His hobby shelf</h3><p>Try a quiet, in-place activity. Automatic hobbies wait while you work, type, focus or present, and never wake a requested nap.</p><div class="momo-hobby-grid">${HOBBIES.map(([id, label, icon]) => `<button type="button" data-momo-style="hobby" data-kind="${id}"><span aria-hidden="true">${icon}</span>${esc(label)}</button>`).join('')}</div></section>`
+        `<section class="momo-wardrobe-gallery"><span class="hub-kicker">A LITTLE LIFE OF HIS OWN</span><h3>${esc(current.label)}</h3><p>Automatic wardrobe changes at 6 am, noon and 7 pm using your device’s local time. Morning and afternoon have different outfits; night brings one of 8 pajama designs in 12 colours, with a different design each night. The night outfit stays through midnight until 6 am. Choose Automatic in Appearance, or keep a fixed outfit. Headphones are optional.</p><button type="button" data-momo-style="appearance">Choose outfit & accessories</button><h3>His hobby shelf</h3><p>Try a quiet, in-place activity. Automatic hobbies wait while you work, type, focus or present, and never wake a requested nap.</p><div class="momo-hobby-grid">${HOBBIES.map(([id, label, icon]) => `<button type="button" data-momo-style="hobby" data-kind="${id}"><span aria-hidden="true">${icon}</span>${esc(label)}</button>`).join('')}</div></section>`
       );
     }
     document.addEventListener('click', event => {

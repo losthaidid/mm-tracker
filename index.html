@@ -147,17 +147,17 @@
     <link rel="stylesheet" href="./solution-experience.css?v=20261021-materials-1" />
     <link rel="stylesheet" href="./solution-guide.css?v=20261022-learning-1" />
     <link rel="stylesheet" href="./solution-valuation.css?v=20261022-stock-1" />
-    <link rel="stylesheet" href="./rehearsal.css?v=20261025-batch-d-1" />
+    <link rel="stylesheet" href="./rehearsal.css?v=20261026-workspace-6" />
     <link rel="stylesheet" href="./audience.css?v=20261025-presenter-3" />
-    <link rel="stylesheet" href="./process-canvas.css?v=20261025-canvas-4" />
+    <link rel="stylesheet" href="./process-canvas.css?v=20261026-workspace-6" />
     <link rel="stylesheet" href="./presenter.css?v=20261025-presenter-3" />
     <link rel="stylesheet" href="./momo-world.css?v=20261024-no-aurora-1" />
     <link rel="stylesheet" href="./claims.css?v=20261023-corrections-claims-holidays-1" />
     <link rel="stylesheet" href="./tng.css?v=20261020-claim-packs-1" />
     <link rel="stylesheet" href="./recipients.css?v=20261019-source-1" />
     <link rel="stylesheet" href="./focus-panel.css?v=20261024-break-shortcut-1" />
-    <link rel="stylesheet" href="./presentation-break.css?v=20261024-presentation-1" />
-    <link rel="stylesheet" href="./settings-panel.css?v=20261019-source-1" />
+    <link rel="stylesheet" href="./presentation-break.css?v=20261026-workspace-6" />
+    <link rel="stylesheet" href="./settings-panel.css?v=20261026-workspace-6" />
     <link rel="stylesheet" href="./built-in-lists.css?v=20261020-workspace-refresh-1" />
     <link rel="stylesheet" href="./dramatic-motion.css?v=20261025-feedback-1" />
     <link rel="stylesheet" href="./momo-behaviour.css?v=20261021-umbrella-hand-1" />
@@ -165,6 +165,7 @@
     <link rel="stylesheet" href="./momo-wardrobe.css?v=20261025-companion-2" />
     <link rel="stylesheet" href="./large-display.css?v=20261025-companion-2" />
     <link rel="stylesheet" href="./experience.css?v=20261025-feedback-1" />
+    <link rel="stylesheet" href="./brand-motion.css?v=20261026-workspace-6" />
     <link rel="stylesheet" href="./custom.css?v=20261019-source-1" />
   </head>
   <body>
@@ -263,6 +264,8 @@
             ><button type="button" data-action="edit-lists">Built-in lists</button
             ><button type="button" data-action="tab-visibility">Screen visibility</button
             ><button id="backupButton">Backup</button><button id="restoreButton">Restore</button
+            ><button type="button" class="danger" id="workspaceResetButton">
+              Back up &amp; clear all records</button
             ><button id="cloudRetry" data-action="cloud-retry" hidden>Retry / refresh</button
             ><button id="cloudReload" data-action="cloud-reload" hidden>Reload cloud records</button
             ><button class="danger" id="cloudSignOut" data-action="cloud-signout" hidden>
@@ -380,7 +383,7 @@
     <script src="./supabase-client.js"></script>
     <!-- Cloud merge, reminders, reports and visual feature modules. Preserve this load order. -->
     <script src="./sync-merge.js"></script>
-    <script src="./momo-wardrobe.js?v=20261025-companion-2"></script>
+    <script src="./momo-wardrobe.js?v=20261026-workspace-6"></script>
     <script src="./photo-background.js?v=20261025-companion-2"></script>
     <script src="./momo-art.js?v=20261025-companion-2"></script>
     <script src="./momo-behaviour-engine.js?v=20261020-momo-batch-b-1"></script>
@@ -414,11 +417,11 @@
     <script src="./rehearsal-engine.js?v=20261025-canvas-4"></script>
     <script src="./process-hub-files.js?v=20261025-canvas-4"></script>
     <script src="./process-canvas-art.js?v=20261025-canvas-4"></script>
-    <script src="./process-canvas.js?v=20261025-display-fix-5"></script>
-    <script src="./audience-view.js?v=20261025-canvas-4"></script>
+    <script src="./process-canvas.js?v=20261026-workspace-6"></script>
+    <script src="./audience-view.js?v=20261026-workspace-6"></script>
     <script src="./presentation-screen.js?v=20261025-display-fix-5"></script>
     <script src="./presenter.js?v=20261025-display-fix-5"></script>
-    <script src="./rehearsal.js?v=20261025-canvas-4"></script>
+    <script src="./rehearsal.js?v=20261026-workspace-6"></script>
     <script src="./project-standup-engine.js?v=20261022-standup-search-2"></script>
     <script src="./project-standup.js?v=20261022-standup-search-1"></script>
     <script src="./project-people-engine.js?v=20261021-people-1"></script>
@@ -438,7 +441,7 @@
     <script src="./batch-c-engine.js?v=20261025-batch-c-1"></script>
     <script src="./batch-c-files.js?v=20261025-batch-c-1"></script>
     <script src="./batch-c.js?v=20261025-batch-c-1"></script>
-    <script src="./presentation-break.js?v=20261025-display-fix-5"></script>
+    <script src="./presentation-break.js?v=20261026-workspace-6"></script>
     <script src="./focus-panel.js?v=20261024-presentation-1"></script>
     <script src="./momo-adventures.js?v=20261025-feedback-1"></script>
     <!-- Expenses, company recipients and Settings. Engines load before their interfaces. -->
@@ -450,7 +453,7 @@
     <script src="./claims.js?v=20261023-corrections-claims-holidays-1"></script>
     <script src="./recipients-engine.js?v=20261019-source-1"></script>
     <script src="./recipients.js?v=20261019-source-1"></script>
-    <script src="./settings-panel.js?v=20261025-companion-2"></script>
+    <script src="./settings-panel.js?v=20261026-workspace-6"></script>
     <script src="./built-in-lists.js?v=20261025-canvas-4"></script>
     <script src="./dramatic-motion.js?v=20261025-companion-2"></script>
     <script src="./my-day-engine.js?v=20261024-terrarium-1"></script>
@@ -461,7 +464,9 @@
     <script src="./experience.js?v=20261025-experience-1"></script>
     <script src="./rest-room.js?v=20261025-display-fix-5"></script>
     <script src="./my-day.js?v=20261024-performance-1"></script>
-    <script src="./studio.js?v=20261025-companion-2"></script>
+    <script src="./brand-motion.js?v=20261026-workspace-6"></script>
+    <script src="./workspace-reset.js?v=20261026-workspace-6"></script>
+    <script src="./studio.js?v=20261026-workspace-6"></script>
     <!-- Empty starter records and default lists; this is not your saved account data. -->
     <script id="seedData" type="application/json">
       {
@@ -656,6 +661,6 @@
       }
     </script>
     <!-- Start the application after all feature modules and the empty seed defaults are ready. -->
-    <script src="./app.js?v=20261025-canvas-4"></script>
+    <script src="./app.js?v=20261026-workspace-6"></script>
   </body>
 </html>

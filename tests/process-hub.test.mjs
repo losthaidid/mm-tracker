@@ -447,3 +447,36 @@ test('Display recovery: an active terrarium cannot be replaced by a presenter or
  b.room.resume();assert.equal(h.document.getElementById('restRoom'),null);b.button.click();assert.ok(h.document.getElementById('presentationBreakSettings'));
  assert.equal(h.writes.length,0);
 });
+
+test('Canvas selection: normal and full editor canvases select steps with a marquee without writes and move selected steps together',async t=>{
+ const h=hub(t);loadFlow(h,requestFlow(h));await h.click('select-mode');
+ const board=h.document.getElementById('rehearsalBoard');board.getBoundingClientRect=()=>({left:0,top:0});
+ const before=copy(h.ui.model()),writes=h.writes.length;
+ presenterPointer(h,board,'pointerdown',0,0);presenterPointer(h,board,'pointermove',4500,4500);
+ assert.ok(h.document.querySelector('.ph-marquee'));assert.equal(h.ui.snapshot().selection.length,before.steps.length);
+ presenterPointer(h,board,'pointerup',4500,4500);assert.equal(h.document.querySelector('.ph-marquee'),null);assert.equal(h.writes.length,writes);
+ const first=before.steps[0],handle=h.document.querySelector('[data-rehearsal-drag="'+first.id+'"]');
+ presenterPointer(h,handle,'pointerdown',first.x,first.y);presenterPointer(h,board,'pointermove',first.x+30,first.y+20);presenterPointer(h,board,'pointerup',first.x+30,first.y+20);
+ assert.equal(h.writes.length,writes+1);for(const old of before.steps){const s=h.ui.model().steps.find(s=>s.id===old.id);assert.equal(s.x,old.x+30);assert.equal(s.y,old.y+20);}
+ await h.click('edit-process');assert.equal(h.ui.snapshot().mode,'full');await h.click('select-all');assert.equal(h.ui.snapshot().selection.length,h.ui.model().steps.length);
+ h.document.getElementById('rehearsalViewport').dispatchEvent(new h.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));assert.equal(h.ui.snapshot().selection.length,0);
+});
+test('Canvas selection: presenter marquee stays private, selects in both drag directions and group moves save once with undo',async t=>{
+ const h=await richPresenter(t);h.tool('select');h.geometry();const before=copy(h.ui.model()),writes=h.writes.length;
+ presenterPointer(h,h.host,'pointerdown',0,0);presenterPointer(h,h.host,'pointermove',4500,4500);
+ assert.equal(h.panel.querySelector('.pc-marquee').hidden,false);assert.equal(h.ui.presenter.snapshot().canvas.nodes.length,before.steps.length);
+ presenterPointer(h,h.host,'pointerup',4500,4500);assert.equal(h.panel.querySelector('.pc-marquee').hidden,true);assert.equal(h.writes.length,writes);
+ assert.equal(h.audience.querySelectorAll('[data-selected="true"]').length,0);assert.equal(h.audience.querySelector('.pc-marquee'),null);
+ h.geometry();const first=before.steps[0],node=h.host.querySelector('[data-node="'+first.id+'"]');
+ presenterPointer(h,node,'pointerdown',first.x+20,first.y+20);presenterPointer(h,h.host,'pointermove',first.x+50,first.y+45);presenterPointer(h,h.host,'pointerup',first.x+50,first.y+45);
+ assert.equal(h.writes.length,writes+1);for(const old of before.steps){const step=h.ui.model().steps.find(s=>s.id===old.id);assert.equal(step.x,old.x+30);assert.equal(step.y,old.y+25);}
+ h.action('undo');assert.deepEqual(copy(h.ui.model().steps),before.steps);
+ h.geometry();h.action('clear-selection');presenterPointer(h,h.host,'pointerdown',4500,4500);presenterPointer(h,h.host,'pointermove',0,0);presenterPointer(h,h.host,'pointerup',0,0);assert.equal(h.ui.presenter.snapshot().canvas.nodes.length,before.steps.length);
+});
+test('Canvas selection: Ctrl A affects only the canvas, cancellation and owner changes discard the selection without record changes',async t=>{
+ const h=await richPresenter(t),before=JSON.stringify(h.state());
+ h.host.dispatchEvent(new h.window.KeyboardEvent('keydown',{key:'a',ctrlKey:true,bubbles:true,cancelable:true}));assert.equal(h.ui.presenter.snapshot().canvas.nodes.length,h.ui.model().steps.length);
+ const input=h.panel.querySelector('[name="annotationText"]'),event=new h.window.KeyboardEvent('keydown',{key:'a',ctrlKey:true,bubbles:true,cancelable:true});input.dispatchEvent(event);assert.equal(event.defaultPrevented,false);
+ h.action('clear-selection');h.geometry();presenterPointer(h,h.host,'pointerdown',0,0);presenterPointer(h,h.host,'pointermove',4500,4500);presenterPointer(h,h.host,'pointercancel',4500,4500);assert.equal(h.ui.presenter.snapshot().canvas.nodes.length,0);assert.equal(JSON.stringify(h.state()),before);
+ h.action('select-all');h.account.id='next-owner';h.render();assert.equal(h.document.getElementById('processPresenter'),null);assert.equal(h.popup.closed,true);assert.equal(JSON.stringify(h.state()),before);
+});

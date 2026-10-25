@@ -46,7 +46,7 @@ async function app(t,{storage={},rpcError=null,remote=null,login=true,styles=fal
  // Use production's script order, replacing only the network client with the stub above.
  for(const script of window.document.querySelectorAll('script[src]')){const file=new URL(script.src).pathname.split('/mm-tracker/')[1];if(!['supabase-client.js','app.js'].includes(file))window.eval(readFileSync(new URL('../'+file,import.meta.url),'utf8'));}
  window.eval(readFileSync(new URL('../app.js',import.meta.url),'utf8')+`\nwindow.api={
-  hub,queueCloudReview,state:()=>state,steps:()=>STEPS,cloud,KEY,payload,parseBackup,emptyState,validate,mutate,loadCloud,flushCloud,refreshCloud,retryCloud,closeModal,
+  hub,workspaceReset,scheduleTimeStatus,queueCloudReview,state:()=>state,steps:()=>STEPS,cloud,KEY,payload,parseBackup,emptyState,validate,mutate,loadCloud,flushCloud,refreshCloud,retryCloud,closeModal,
   openMMAreaManager,saveMMAreas,editLists,saveLists,editMMAreaDraft,canonicalArea,summarizeGovernanceRows,
   renderProjectCompanies,editCompany,saveCompany,editProcess,saveProcess,editProject,saveProject,
   browserMigrationAction,notice,action,projectMMAreas,editRecord,saveEdit,editSubItem,saveSubItem,openSubItems,editTaskSub,saveTaskSub,openRangeEditor,saveRange,scheduleEntries,viewBooking,workhubAction,workhubChange,rangeSegments,rangeTimes,editPlan,savePlan,reportModel,reportDashboard,exportReport,scheduleMonthMetrics,formatDuration,
@@ -871,7 +871,7 @@ test('the document simulator computes quantity and price differences locally',as
 });
 
 test('stopping a project stopwatch creates synchronized schedule and project records once',async t=>{
- const {api,db}=await app(t);api.hub.startTimer({kind:'project',linkId:api.state().activeProjectId,title:'Project testing',notes:'Verified quantity',chargeCode:'MM-TEST'});const draft=api.hub.timer();draft.started='2026-10-16T09:15:00+08:00';draft.runningSince=null;draft.segments=[{start:'2026-10-16T09:15:00+08:00',end:'2026-10-16T10:05:00+08:00'},{start:'2026-10-16T10:15:00+08:00',end:'2026-10-16T10:45:00+08:00'}];api.hub.finishTimer();await settle();assert.equal(api.hub.timer(),null);assert.equal(api.state().workhub.sessions.length,1);assert.equal(api.state().workhub.sessions[0].seconds,4800);assert.equal(api.state().projectPlans.length,2);assert.equal(api.state().schedule.reduce((n,r)=>n+(+r.endTime.slice(0,2)*60 + +r.endTime.slice(3))-(+r.time.slice(0,2)*60 + +r.time.slice(3)),0),80);assert.ok(api.state().schedule.every(r=>r.planId&&r.sessionId));api.validate(api.state());api.hub.finishTimer();assert.equal(api.state().workhub.sessions.length,1);assert.equal(db.row.document.data.workhub.sessions[0].scheduled,true);
+ const {api,db}=await app(t);api.mutate(d=>d.projects[0].code='MM-TEST');await settle();api.hub.startTimer({kind:'project',linkId:api.state().activeProjectId,title:'Project testing',notes:'Verified quantity',chargeCode:'MM-TEST'});const draft=api.hub.timer();draft.started='2026-10-16T09:15:00+08:00';draft.runningSince=null;draft.segments=[{start:'2026-10-16T09:15:00+08:00',end:'2026-10-16T10:05:00+08:00'},{start:'2026-10-16T10:15:00+08:00',end:'2026-10-16T10:45:00+08:00'}];api.hub.finishTimer();await settle();assert.equal(api.hub.timer(),null);assert.equal(api.state().workhub.sessions.length,1);assert.equal(api.state().workhub.sessions[0].seconds,4800);assert.equal(api.state().projectPlans.length,2);assert.equal(api.state().schedule.reduce((n,r)=>n+(+r.endTime.slice(0,2)*60 + +r.endTime.slice(3))-(+r.time.slice(0,2)*60 + +r.time.slice(3)),0),80);assert.ok(api.state().schedule.every(r=>r.planId&&r.sessionId));api.validate(api.state());api.hub.finishTimer();assert.equal(api.state().workhub.sessions.length,1);assert.equal(db.row.document.data.workhub.sessions[0].scheduled,true);
 });
 
 test('a stopwatch overlapping a booking preserves both the booking and timer for review',async t=>{
@@ -1929,8 +1929,8 @@ test('recipients: account saves, reopened records and JSON backups retain compan
 
 test('grouped Settings: five sections keep all existing actions and section changes stay open',async t=>{
  const {api,document,window,db}=await app(t),ui=api.hub.settingsPanel,menu=document.getElementById('settingsMenu');api.hub.chromeUX.open();await settle();
- assert.equal(document.querySelectorAll('#settingsCategories [role="tab"]').length,5);assert.deepEqual(copy(ui.snapshot().groups.map(g=>[g.id,g.count])),[['workspace',4],['work',8],['companion',4],['data',4],['account',2]]);assert.equal(document.querySelectorAll('.settings-group:not([hidden])').length,1);assert.equal(document.querySelector('.settings-group:not([hidden])').id,'settingsGroup-workspace');assert.equal(document.querySelectorAll('.settings-option').length,22);assert.equal(document.querySelector('#hubSettingsAppearance button'),null);
- for(const [id,group]of [['hubSettingsHeader','workspace'],['claimSettingsButton','work'],['recipientSettingsButton','work'],['momoAdventureSettings','companion'],['soundscapeSettings','companion'],['backupButton','data'],['cloudSignOut','account']])assert.equal(document.getElementById(id).closest('.settings-group').id,'settingsGroup-'+group);
+ assert.equal(document.querySelectorAll('#settingsCategories [role="tab"]').length,5);assert.deepEqual(copy(ui.snapshot().groups.map(g=>[g.id,g.count])),[['workspace',4],['work',8],['companion',4],['data',5],['account',2]]);assert.equal(document.querySelectorAll('.settings-group:not([hidden])').length,1);assert.equal(document.querySelector('.settings-group:not([hidden])').id,'settingsGroup-workspace');assert.equal(document.querySelectorAll('.settings-option').length,23);assert.equal(document.querySelector('#hubSettingsAppearance button'),null);
+ for(const [id,group]of [['hubSettingsHeader','workspace'],['claimSettingsButton','work'],['recipientSettingsButton','work'],['momoAdventureSettings','companion'],['soundscapeSettings','companion'],['backupButton','data'],['workspaceResetButton','data'],['cloudSignOut','account']])assert.equal(document.getElementById(id).closest('.settings-group').id,'settingsGroup-'+group);
  document.querySelector('[data-settings-group="work"]').click();assert.equal(menu.open,true);assert.equal(ui.snapshot().active,'work');document.getElementById('recipientSettingsButton').click();await settle();assert.equal(menu.open,false);assert.ok(document.getElementById('recipientDirectory'));api.closeModal();api.hub.chromeUX.open();document.querySelector('[data-settings-group="companion"]').click();document.getElementById('soundscapeSettings').click();await settle();assert.equal(menu.open,false);assert.ok(document.querySelector('#modalBody .soundscape-room'));assert.equal(db.calls.length,0);
 });
 
@@ -1950,7 +1950,7 @@ test('grouped Settings: keyboard section navigation, narrow-screen orientation a
 test('grouped Settings: later launchers and sync visibility update without cloning controls or writing records',async t=>{
  const {api,document,window,db}=await app(t),ui=api.hub.settingsPanel,button=document.createElement('button');button.id='customWorkspaceSetting';button.textContent='Custom workspace option';let clicked=0;button.addEventListener('click',()=>clicked++);document.getElementById('hubSettingsAppearance').append(button);await settle();assert.equal(document.querySelector('#settingsItems-workspace #customWorkspaceSetting'),button);assert.equal(ui.snapshot().groups.find(g=>g.id==='workspace').count,5);for(let i=0;i<3;i++)ui.mount();assert.equal(document.querySelectorAll('#customWorkspaceSetting').length,1);
  api.hub.chromeUX.open();button.click();assert.equal(clicked,1);assert.equal(document.getElementById('settingsMenu').open,false);button.hidden=true;await settle();assert.equal(button.closest('.settings-entry').hidden,true);assert.equal(ui.snapshot().groups.find(g=>g.id==='workspace').count,4);
- api.cloud.conflict=true;api.cloud.status='Newer records need review';api.notice();await settle();assert.equal(document.getElementById('cloudRetry').closest('.settings-entry').hidden,true);assert.equal(document.getElementById('cloudReload').closest('.settings-entry').hidden,false);assert.equal(document.getElementById('restoreButton').disabled,true);assert.equal(ui.snapshot().groups.find(g=>g.id==='data').count,3);assert.match(document.getElementById('settingsSaveStatus').textContent,/review/);assert.equal(db.calls.length,0);
+ api.cloud.conflict=true;api.cloud.status='Newer records need review';api.notice();await settle();assert.equal(document.getElementById('cloudRetry').closest('.settings-entry').hidden,true);assert.equal(document.getElementById('cloudReload').closest('.settings-entry').hidden,false);assert.equal(document.getElementById('restoreButton').disabled,true);assert.equal(ui.snapshot().groups.find(g=>g.id==='data').count,4);assert.match(document.getElementById('settingsSaveStatus').textContent,/review/);assert.equal(db.calls.length,0);
 });
 
 test('grouped Settings: sign-out clears the search and hides account-owned options while sign-in remains available',async t=>{
@@ -2955,4 +2955,37 @@ test('Ticket objects: maintained bookmark choices save one field and reject stal
  api.mutate(d=>d.tickets[0].status='Pending');api.showTab('tickets');document.querySelector('[data-bench="object"]').click();choice=document.querySelector('[data-bench="object-pick"]');const previous=choice.cloneNode(true);document.body.append(previous);
  api.closeModal();api.cloud.user={id:'22222222-2222-4222-8222-222222222222',email:'second@example.com'};api.showTab('tickets');const previousWrites=db.calls.length;
  previous.click();await settle();assert.equal(db.calls.length,previousWrites);
+});
+
+test('Work sessions hide completed tasks, subtasks and tickets and use maintained project charge codes only',async t=>{
+ const {api,document,window}=await app(t);
+ const active=addMainTask(api,document,'Active timer work'),done=addMainTask(api,document,'Finished timer work');
+ const closedSub=addTaskSub(api,document,active,'Finished subtask','','','Completed');
+ const ticket=addWishlistTicket(api,document);await settle();
+ api.mutate(d=>{const task=d.tasks.find(x=>x.id===done);task.done=true;task.doneDate='2026-10-26';d.projects[0].code='PROJ-100';const old=copy(d.tickets.find(x=>x.id===ticket));old.id='closed-timer-ticket';old.ticket='CLOSED-100';old.status='Closed';d.tickets.push(old);});await settle();api.closeModal();
+ await hubAction(api,'timer-new',{kind:'task'});let f=document.getElementById('hubTimerStart');
+ assert.ok([...f.elements.linkId.options].some(o=>o.value===active));assert.ok(![...f.elements.linkId.options].some(o=>o.value===done));assert.equal(f.elements.namedItem('chargeCode'),null);
+ f.elements.linkId.value=active;f.elements.linkId.dispatchEvent(new window.Event('change',{bubbles:true}));f=document.getElementById('hubTimerStart');assert.ok(![...f.elements.subTaskId.options].some(o=>o.value===closedSub));
+ f.elements.kind.value='ticket';f.elements.kind.dispatchEvent(new window.Event('change',{bubbles:true}));assert.ok([...f.elements.linkId.options].some(o=>o.value===ticket));assert.ok(![...f.elements.linkId.options].some(o=>o.value==='closed-timer-ticket'));assert.equal(f.elements.namedItem('chargeCode'),null);
+ f.elements.kind.value='project';f.elements.kind.dispatchEvent(new window.Event('change',{bubbles:true}));f.elements.linkId.value=api.state().activeProjectId;f.elements.linkId.dispatchEvent(new window.Event('change',{bubbles:true}));assert.equal(f.elements.chargeCode.tagName,'SELECT');assert.equal(f.elements.chargeCode.value,'PROJ-100');
+ f.elements.kind.value='custom';f.elements.kind.dispatchEvent(new window.Event('change',{bubbles:true}));assert.equal(f.elements.namedItem('chargeCode'),null);
+ assert.throws(()=>api.hub.startTimer({kind:'task',linkId:done}),/unfinished/);assert.throws(()=>api.hub.startTimer({kind:'ticket',linkId:'closed-timer-ticket'}),/unfinished/);assert.throws(()=>api.hub.startTimer({kind:'project',linkId:api.state().activeProjectId,chargeCode:'FOREIGN'}),/maintained projects/);
+});
+test('Work sessions show Completed in Schedule for custom, task and ticket recordings even after the session is deleted',async t=>{
+ const {api,document}=await app(t),taskId=addMainTask(api,document,'Unfinished parent'),ticketId=addWishlistTicket(api,document);await settle();
+ for(const [i,kind]of ['custom','task','ticket'].entries()){
+  api.mutate(d=>{const hour=String(9+i*2).padStart(2,'0'),end=String(10+i*2).padStart(2,'0');const session={id:'recorded-'+kind,title:'Recorded '+kind,kind,linkId:kind==='task'?taskId:kind==='ticket'?ticketId:'',projectId:'',subTaskId:'',chargeCode:'',notes:'',start:'2026-10-16T'+hour+':00:00+08:00',end:'2026-10-16T'+end+':00:00+08:00',intervals:[{start:'2026-10-16T'+hour+':00:00+08:00',end:'2026-10-16T'+end+':00:00+08:00'}],seconds:3600,scheduled:false};d.workhub.sessions.push(session);api.hub.scheduleSession(session,d);});await settle();
+ }
+ for(const slot of api.state().schedule)assert.equal(api.scheduleTimeStatus(slot,api.state(),'2026-10-26','12:00'),'Completed');
+ api.mutate(d=>d.workhub.sessions=[]);await settle();for(const slot of api.state().schedule)assert.equal(api.scheduleTimeStatus(slot),'Completed');
+ const plain={date:'2026-10-16',time:'18:00',endTime:'19:00',kind:'custom'};assert.equal(api.scheduleTimeStatus(plain,api.state(),'2026-10-26','12:00'),'Elapsed');
+});
+test('Workspace reset clears every cloud collection using the actual account adapter and keeps a restorable backup',async t=>{
+ const {api,document,window,db}=await app(t);addMainTask(api,document,'Saved before clear');addWishlistTicket(api,document);await settle();api.closeModal();
+ const downloaded=[];window.URL.createObjectURL=blob=>{downloaded.push(blob);return'blob:backup-test';};window.URL.revokeObjectURL=()=>{};window.HTMLAnchorElement.prototype.click=()=>{};
+ api.cloud.client.auth.signInWithPassword=async()=>({data:{user:copy(api.cloud.user)},error:null});api.cloud.client.auth.signOut=async()=>({error:null});
+ api.workspaceReset.open();api.workspaceReset.backup();const f=document.getElementById('workspaceResetForm');f.elements.backupSaved.checked=true;f.elements.unfinishedConfirmed.checked=true;f.elements.confirmation.value='CLEAR';f.elements.password.value='test-password';
+ await api.workspaceReset.submit(f);await settle();assert.equal(api.state().tickets.length,0);assert.equal(api.state().tasks.length,0);assert.equal(api.state().workhub.sessions.length,0);assert.equal(api.state().workhub.notes.length,0);assert.equal(api.state().projects.length,1);api.validate(api.state());assert.equal(api.cloud.conflict,false);
+ const backup=api.parseBackup(await downloaded[0].text());assert.equal(backup.tickets.length,1);assert.equal(backup.tasks.length,1);assert.equal(db.row.document.data.tickets.length,0);assert.equal(db.row.document.data.tasks.length,0);assert.equal(document.getElementById('modal').open,false);
+ const reopened=await app(t,{remote:copy(db.row),login:false});await reopened.api.loadCloud(sessionUser);assert.equal(reopened.api.state().tasks.length,0);assert.equal(reopened.api.state().tickets.length,0);
 });

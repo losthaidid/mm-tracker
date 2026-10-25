@@ -121,6 +121,11 @@
       'Download a copy of your records.',
       'backup download export json save data',
     ],
+    workspaceResetButton: [
+      'data',
+      'Download every cloud record, check unfinished work and verify your password before clearing this account.',
+      'backup reset clear all wipe delete password fresh workspace',
+    ],
     restoreButton: [
       'data',
       'Restore records from a saved backup.',

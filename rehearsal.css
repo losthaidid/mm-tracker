@@ -1513,3 +1513,24 @@ body.process-hub-full-open #view *::after {
   stroke-width: 5px;
   stroke-linejoin: round;
 }
+
+.ph-marquee {
+  position: absolute;
+  z-index: 12;
+  border: 1px solid #298aff;
+  background: #298aff30;
+  pointer-events: none;
+  border-radius: 2px;
+}
+.rehearsal-node[data-selected='true'] {
+  outline: 3px solid #298aff;
+  outline-offset: 3px;
+}
+.rehearsal-viewport[data-select-mode='true'] {
+  cursor: crosshair;
+  touch-action: none;
+}
+.ph-selection-count {
+  font-size: 12px;
+  color: var(--hub-muted);
+}

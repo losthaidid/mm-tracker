@@ -456,3 +456,25 @@ body #hubHeader #settingsSearchClear {
     }
   }
 }
+
+.workspace-reset-warning {
+  margin: 18px 0;
+  padding: 16px;
+  border: 1px solid #c67559;
+  border-radius: 12px;
+  background: #bd704912;
+}
+.workspace-reset-warning li {
+  margin: 6px 0;
+}
+#workspaceResetForm > label {
+  display: grid;
+  gap: 7px;
+  margin-top: 16px;
+}
+#workspaceResetForm > label.check-label {
+  display: flex;
+}
+#workspaceResetForm [data-reset-error] {
+  color: #ad3544;
+}

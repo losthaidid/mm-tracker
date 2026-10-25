@@ -851,7 +851,12 @@
             icon('studio') +
             '</span><div class="hub-header-copy"><h1 id="hubSiteTitle"></h1><p id="hubSiteSubtitle"></p></div>';
         }
-        $('hubSiteTitle').textContent = prefs().workspace;
+        const title = $('hubSiteTitle');
+        if (title.dataset.brandTitle !== prefs().workspace) {
+          title.dataset.brandTitle = prefs().workspace;
+          title.textContent = prefs().workspace;
+        }
+        root.WorkHubBrandMotion?.mount(brand, title, () => a.navigate('home'));
         if (a.cloud().ready) root.WorkHubStartup?.name(prefs().workspace);
         $('hubSiteSubtitle').textContent = data().headerSubtitle || '';
         if (a.cloud().ready || !document.documentElement.hasAttribute('data-workhub-startup'))
@@ -2028,6 +2033,44 @@
       rememberTimerPosition();
     });
 
+    const timerTicketOpen = t =>
+      !['completed', 'closed'].includes(String(t.status).trim().toLowerCase());
+    function timerRows(kind) {
+      return kind === 'project'
+        ? projects()
+        : kind === 'task'
+          ? a
+              .state()
+              .tasks.filter(t => !t.archived && !t.done)
+              .map(t => [t.id, t.task])
+          : kind === 'ticket'
+            ? a
+                .state()
+                .tickets.filter(timerTicketOpen)
+                .map(t => [t.id, t.ticket + ' · ' + t.description])
+            : [];
+    }
+    function timerChargeFields(kind, projectId, current = '') {
+      if (kind !== 'project') return '';
+      const codes = [
+        ...new Set(
+          a
+            .state()
+            .projects.map(p => p.code)
+            .filter(Boolean)
+        ),
+      ];
+      const value = codes.includes(current)
+        ? current
+        : a.state().projects.find(p => p.id === projectId)?.code || '';
+      return select(
+        'chargeCode',
+        'Charge code',
+        codes.map(code => [code, code]),
+        value,
+        'No charge code'
+      );
+    }
     function projectTimerFields(projectId, itemId = '', subItemId = '') {
       const items = a.state().specs.filter(p => p.projectId === projectId),
         item = items.find(p => p.id === itemId);
@@ -2060,15 +2103,9 @@
         renderTimerBar();
         return;
       }
-      const tasks = a.state().tasks.filter(t => !t.archived),
-        rows =
-          kind === 'project'
-            ? projects()
-            : kind === 'task'
-              ? tasks.map(t => [t.id, t.task])
-              : kind === 'ticket'
-                ? a.state().tickets.map(t => [t.id, t.ticket + ' · ' + t.description])
-                : [];
+      const tasks = a.state().tasks.filter(t => !t.archived && !t.done),
+        rows = timerRows(kind);
+      if (!rows.some(r => r[0] === linkId)) linkId = '';
       form(
         'Start a work session',
         'hubTimerStart',
@@ -2089,13 +2126,17 @@
               ? select(
                   'subTaskId',
                   'Optional subtask',
-                  (tasks.find(t => t.id === linkId)?.subTasks || []).map(s => [s.id, s.title]),
+                  (tasks.find(t => t.id === linkId)?.subTasks || [])
+                    .filter(s => !s.done && s.status !== 'Completed')
+                    .map(s => [s.id, s.title]),
                   subTaskId
                 )
               : ''
           }${kind === 'project' ? '<div id="hubTimerProjectItems">' + projectTimerFields(linkId, itemId, subItemId) + '</div>' : ''}</div>` +
           field('title', 'Session title (optional for linked work)', '') +
-          field('chargeCode', 'Charge code', '') +
+          '<div id="hubTimerCharge">' +
+          timerChargeFields(kind, linkId) +
+          '</div>' +
           field('notes', 'Session remarks', '', 'textarea'),
         '',
         '<p class="hint">Sub-item sessions keep their main item and project link. Stop & save adds the active time to Schedule and the project calendar. Pauses are excluded.</p>'
@@ -2116,6 +2157,14 @@
         (kind === 'ticket' && !ticket)
       )
         throw Error('Choose a valid activity and linked record.');
+      if (task && (task.done || task.archived)) throw Error('Choose an active, unfinished task.');
+      if (ticket && !timerTicketOpen(ticket)) throw Error('Choose an open, unfinished ticket.');
+      if (
+        kind === 'project' &&
+        values.chargeCode &&
+        !s.projects.some(p => p.code === values.chargeCode)
+      )
+        throw Error('Choose a charge code from your maintained projects.');
       const sub = kind === 'task' ? task.subTasks.find(s => s.id === values.subTaskId) : null,
         item =
           kind === 'project' && values.itemId
@@ -2126,6 +2175,7 @@
         throw Error('Choose an item and sub-item belonging to this project.');
       if (kind === 'task' && values.subTaskId && !sub)
         throw Error('Choose a subtask belonging to this task.');
+      if (sub?.done || sub?.status === 'Completed') throw Error('Choose an unfinished subtask.');
       const title =
         values.title?.trim() ||
         subItem?.title ||
@@ -2160,7 +2210,7 @@
         runningSince: started,
         segments: [],
         notes: values.notes || '',
-        chargeCode: values.chargeCode || '',
+        chargeCode: kind === 'project' ? values.chargeCode || '' : '',
       };
       batchA?.timerStarted(timerDraft);
       persistTimer();
@@ -3629,17 +3679,7 @@
           const form = el.form,
             kind = form.elements.namedItem('kind').value,
             id = el.name === 'kind' ? '' : form.elements.namedItem('linkId')?.value || '',
-            rows =
-              kind === 'project'
-                ? projects()
-                : kind === 'task'
-                  ? a
-                      .state()
-                      .tasks.filter(t => !t.archived)
-                      .map(t => [t.id, t.task])
-                  : kind === 'ticket'
-                    ? a.state().tickets.map(t => [t.id, t.ticket + ' · ' + t.description])
-                    : [];
+            rows = timerRows(kind);
           if (el.name === 'itemId')
             $('hubTimerProjectItems').innerHTML = projectTimerFields(id, el.value);
           else
@@ -3651,16 +3691,16 @@
                 ? select(
                     'subTaskId',
                     'Optional subtask',
-                    (a.state().tasks.find(t => t.id === id)?.subTasks || []).map(s => [
-                      s.id,
-                      s.title,
-                    ]),
+                    (a.state().tasks.find(t => t.id === id)?.subTasks || [])
+                      .filter(s => !s.done && s.status !== 'Completed')
+                      .map(s => [s.id, s.title]),
                     ''
                   )
                 : '') +
               (kind === 'project'
                 ? '<div id="hubTimerProjectItems">' + projectTimerFields(id) + '</div>'
                 : '');
+          if (el.name !== 'itemId') $('hubTimerCharge').innerHTML = timerChargeFields(kind, id);
         }
 
         if (el.id === 'hubThemeFile')
