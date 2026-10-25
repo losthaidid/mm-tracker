@@ -77,4 +77,4 @@ The [example workspace](https://losthaidid.github.io/mm-tracker/tests/wishlist-p
 
 ## Verification
 
-Run `npm test` for the application, engine, Excel and database tests. The command runs module/database checks, then the large JSDOM application suite in four disjoint name groups with a 4 GiB maximum heap per process. All test names are covered, including names outside A–S. This bounds test-runner memory without changing browser memory limits.
+Run `npm test` for the application, engine, Excel and database tests. The command runs module/database checks, then the large JSDOM application suite in five disjoint name groups with a 4 GiB maximum heap per process. All test names are covered, including names outside A–V. This bounds test-runner memory without changing browser memory limits.
