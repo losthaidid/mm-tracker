@@ -127,8 +127,10 @@
         if (!match) continue;
         const x = index(match[1]),
           y = +match[2] - 1;
-        if (x >= 80 || y > 5000) throw Error('Use up to 80 columns and 5,000 data rows.');
-        if (++cells > 200080) throw Error('Use up to 200,000 data cells.');
+        if (x >= E().LIMITS.columns || y > 5000)
+          throw Error('Use up to 200 columns and 5,000 data rows.');
+        if (++cells > E().LIMITS.cells + E().LIMITS.columns)
+          throw Error('Use up to 200,000 data cells.');
         if (first(c, 'f'))
           throw Error(
             sheet.getAttribute('name') +
@@ -351,27 +353,40 @@
             'Allowed values',
             'Format',
             'Notes',
+            'Template type',
+            'SAP length',
+            'SAP decimals',
+            'Currency/unit field',
           ],
           ...t.columns.map(c => [
             c.label,
             c.key,
-            c.type,
+            t.mode === 'sap' ? E().sapSettings(c).type : c.type,
             c.required ? 'Yes' : 'No',
             c.unique ? 'Yes' : 'No',
-            [
-              c.minLength !== '' ? 'Min length ' + c.minLength : '',
-              c.maxLength !== '' ? 'Max length ' + c.maxLength : '',
-              c.min !== '' ? 'Min ' + c.min : '',
-              c.max !== '' ? 'Max ' + c.max : '',
-            ]
-              .filter(Boolean)
-              .join('; '),
+            t.mode === 'sap'
+              ? 'DDIC length ' +
+                E().sapSettings(c).length +
+                '; decimals ' +
+                E().sapSettings(c).decimals
+              : [
+                  c.minLength !== '' ? 'Min length ' + c.minLength : '',
+                  c.maxLength !== '' ? 'Max length ' + c.maxLength : '',
+                  c.min !== '' ? 'Min ' + c.min : '',
+                  c.max !== '' ? 'Max ' + c.max : '',
+                ]
+                  .filter(Boolean)
+                  .join('; '),
             c.values,
-            c.format,
+            t.mode === 'sap' ? E().sapSettings(c).spec.format : c.format,
             c.description,
+            t.mode || 'general',
+            t.mode === 'sap' ? E().sapSettings(c).length : '',
+            t.mode === 'sap' ? E().sapSettings(c).decimals : '',
+            t.mode === 'sap' ? c.sapReference || '' : '',
           ]),
         ],
-        widths: [28, 24, 16, 12, 12, 35, 35, 20, 55],
+        widths: [28, 24, 16, 12, 12, 35, 35, 20, 55, 18, 16, 16, 24],
       },
       {
         name: 'Conditions',

@@ -249,6 +249,7 @@
         for (const pair of r.assertion.pairs || []) if (pair.field === oldKey) pair.field = newKey;
       }
       draft.uniqueGroups = draft.uniqueGroups.map(g => g.map(k => (k === oldKey ? newKey : k)));
+      for (const c of draft.columns) if (c.sapReference === oldKey) c.sapReference = newKey;
     }
     function readClause(el) {
       if (!el) return null;
@@ -287,6 +288,7 @@
       if (meta) {
         draft.name = meta.elements.namedItem('name').value.trim();
         draft.description = meta.elements.namedItem('description').value;
+        draft.mode = meta.elements.namedItem('mode')?.value || draft.mode || 'general';
       }
       const cf = $('valColumnForm');
       if (cf) {
@@ -304,8 +306,12 @@
           'aliases',
           'description',
           'format',
+          'sapType',
+          'sapLength',
+          'sapDecimals',
+          'sapReference',
         ])
-          c[k] = cf.elements.namedItem(k).value;
+          if (cf.elements.namedItem(k)) c[k] = cf.elements.namedItem(k).value;
         for (const k of ['required', 'unique', 'trim', 'caseSensitive'])
           c[k] = cf.elements.namedItem(k).checked;
         if (old !== c.key) rewire(old, c.key);
@@ -388,6 +394,7 @@
                 '</strong><small>' +
                 t.columns.length +
                 ' columns · ' +
+                (t.mode === 'sap' ? 'SAP · ' : 'General · ') +
                 (t.releases.length ? 'v' + t.releases.at(-1).version : 'Draft') +
                 '</small></span>',
               'data-id="' + esc(t.id) + '"',
@@ -399,7 +406,9 @@
         '</div>' +
         btn('new', '＋ New template', '', 'val-wide') +
         btn('import-setup', 'Import Excel setup', '', 'val-wide val-secondary') +
-        '<a class="val-btn val-wide val-quiet val-setup-download" href="./validation-setup-template.xlsx" download>Download setup template</a><p class="val-setup-help">Create columns, conditions and references together in Excel. Import as a new draft.</p>' +
+        '<a class="val-btn val-wide val-secondary val-setup-download" href="./validation-setup-simple.xlsx" download>Download simple General setup</a><a class="val-btn val-wide val-quiet val-setup-download" href="./validation-setup-sap.xlsx" download>Download simple SAP setup</a>' +
+        btn('setup-help', 'How to fill the setup', '', 'val-wide val-quiet') +
+        '<p class="val-setup-help">One sheet. Choose the template type, replace the example field rows, then import. Up to 200 fields.</p><details class="val-setup-advanced"><summary>Advanced setup: conditions &amp; references</summary><p>Optional. Use this when you want to maintain conditions and reference lists in Excel.</p><a class="val-btn val-wide val-quiet" href="./validation-setup-template.xlsx?v=20261026-sap-200-simple-1" download>Download advanced setup template</a></details>' +
         btn('import-definition', 'Import definition', '', 'val-wide val-quiet') +
         '<div class="val-library-note">' +
         icon('leaf', 24) +
@@ -464,6 +473,58 @@
         '</nav>'
       );
     }
+    function sapColumnFields(c) {
+      const settings = E.sapSettings(c),
+        spec = settings.spec || E.SAP_TYPES.CHAR;
+      const referenceType =
+        settings.type === 'CURR' ? 'CUKY' : settings.type === 'QUAN' ? 'UNIT' : '';
+      return (
+        select(
+          'sapType',
+          'SAP data type (DDIC)',
+          Object.entries(E.SAP_TYPES).map(([id, s]) => [id, id + ' · ' + s.label]),
+          settings.type
+        ) +
+        input(
+          'sapLength',
+          settings.type === 'RAW' ? 'SAP length (bytes)' : 'SAP length (digits / characters)',
+          settings.length,
+          'number',
+          'min="' +
+            (spec.min || spec.length) +
+            '" max="' +
+            (spec.max || spec.length) +
+            '"' +
+            (spec.min ? '' : ' readonly')
+        ) +
+        input(
+          'sapDecimals',
+          'SAP decimal places',
+          settings.decimals,
+          'number',
+          'min="' +
+            (settings.type === 'CURR' ? 1 : 0) +
+            '" max="14"' +
+            (spec.decimals === undefined ? ' readonly' : '')
+        ) +
+        (referenceType
+          ? select(
+              'sapReference',
+              referenceType === 'CUKY' ? 'Currency field (optional)' : 'Unit field (optional)',
+              [
+                ['', 'Format only · no reference field'],
+                ...draft.columns
+                  .filter(f => f.id !== c.id && E.sapSettings(f).type === referenceType)
+                  .map(f => [f.key, f.label + ' (' + f.key + ')']),
+              ],
+              settings.reference
+            )
+          : '') +
+        '<div class="val-sap-format"><strong>SAP format check · automatic</strong><p>' +
+        esc(spec.format) +
+        '</p><small>Use your actual SE11/DDIC length and scale. Domain values, conversion exits and system-specific currency rules need your own Conditions or References. No values are padded, rounded or converted.</small></div>'
+      );
+    }
     function columnEditor() {
       const c = draft.columns.find(c => c.id === columnId) || draft.columns[0];
       if (c) columnId = c.id;
@@ -476,7 +537,9 @@
         '</div>' +
         '</div><div class="val-designer"><div class="val-outline"><div class="val-outline-title">UPLOAD COLUMNS <span>' +
         draft.columns.length +
-        '/80</span></div>' +
+        '/' +
+        E.LIMITS.columns +
+        '</span></div>' +
         draft.columns
           .map(
             (f, i) =>
@@ -528,6 +591,15 @@
           : '') +
         '</div><div class="val-inspector"><form id="valMetaForm" class="val-meta">' +
         input('name', 'Template name', draft.name, 'text', 'maxlength="120" required') +
+        select(
+          'mode',
+          'Template type',
+          [
+            ['general', 'General · existing checks'],
+            ['sap', 'SAP · DDIC field formats'],
+          ],
+          draft.mode || 'general'
+        ) +
         area(
           'description',
           'A little context',
@@ -554,29 +626,31 @@
               'text',
               'maxlength="64" spellcheck="false" autocapitalize="off" required'
             ) +
-            select(
-              'type',
-              'Data type',
-              E.TYPES.map(x => [
-                x,
-                x === 'integer'
-                  ? 'Whole number'
-                  : x === 'decimal'
-                    ? 'Decimal number'
-                    : x[0].toUpperCase() + x.slice(1),
-              ]),
-              c.type
-            ) +
-            select(
-              'format',
-              'Format check',
-              [['', 'Any format'], ...Object.keys(E.FORMATS).map(x => [x, x])],
-              c.format
-            ) +
-            input('minLength', 'Minimum length', c.minLength, 'number', 'min="0" max="32000"') +
-            input('maxLength', 'Maximum length', c.maxLength, 'number', 'min="0" max="32000"') +
-            input('min', 'Minimum number', c.min, 'number', 'step="any"') +
-            input('max', 'Maximum number', c.max, 'number', 'step="any"') +
+            (draft.mode === 'sap'
+              ? sapColumnFields(c)
+              : select(
+                  'type',
+                  'Data type',
+                  E.TYPES.map(x => [
+                    x,
+                    x === 'integer'
+                      ? 'Whole number'
+                      : x === 'decimal'
+                        ? 'Decimal number'
+                        : x[0].toUpperCase() + x.slice(1),
+                  ]),
+                  c.type
+                ) +
+                select(
+                  'format',
+                  'Format check',
+                  [['', 'Any format'], ...Object.keys(E.FORMATS).map(x => [x, x])],
+                  c.format
+                ) +
+                input('minLength', 'Minimum length', c.minLength, 'number', 'min="0" max="32000"') +
+                input('maxLength', 'Maximum length', c.maxLength, 'number', 'min="0" max="32000"') +
+                input('min', 'Minimum number', c.min, 'number', 'step="any"') +
+                input('max', 'Maximum number', c.max, 'number', 'step="any"')) +
             '</div><div class="val-toggle-grid">' +
             toggle('required', 'Required', c.required) +
             toggle('unique', 'Unique values', c.unique) +
@@ -602,7 +676,11 @@
               c.description,
               'rows="2" maxlength="8000"'
             ) +
-            '<p class="val-help">Dates use YYYY-MM-DD. Keep identifiers as Text to preserve leading zeros and every digit. Number limits apply to whole-number and decimal columns.</p><button class="val-btn val-secondary" type="submit">Apply column changes</button></form>'
+            '<p class="val-help">' +
+            (draft.mode === 'sap'
+              ? 'SAP uses internal field formats. DATS uses YYYYMMDD (00000000 is an initial value), TIMS uses HHMMSS. Keep codes and long numbers as Excel Text. General settings are preserved but inactive.'
+              : 'Dates use YYYY-MM-DD. Keep identifiers as Text to preserve leading zeros and every digit. Number limits apply to whole-number and decimal columns.') +
+            '</p><button class="val-btn val-secondary" type="submit">Apply column changes</button></form>'
           : '<p class="val-muted">Your column settings will appear here.</p>') +
         '</div></div><section class="val-card val-combinations"><div><h3>Unique combinations</h3><p>For example: the same ID may appear in different plants, but each ID + plant pair must be unique.</p></div>' +
         draft.uniqueGroups
@@ -1009,20 +1087,39 @@
         }
       }
     }
+    function sapSample(c) {
+      if (E.tokens(c.values).length) return E.tokens(c.values)[0];
+      const s = E.sapSettings(c);
+      if (s.type === 'DATS') return '20261026';
+      if (s.type === 'TIMS') return '093000';
+      if (s.type === 'NUMC' || s.type === 'CLNT') return '1'.padStart(s.length, '0');
+      if (s.type === 'LANG') return 'E';
+      if (s.type === 'CUKY') return 'MYR';
+      if (s.type === 'UNIT') return 'KG';
+      if (s.type === 'RAW') return '00'.repeat(s.length);
+      if (s.spec.range) return '1';
+      if (s.spec.decimals !== undefined)
+        return (
+          (s.length > s.decimals ? '1' : '0') + (s.decimals ? '.' + '0'.repeat(s.decimals) : '')
+        );
+      return 'Example'.slice(0, s.length);
+    }
     function loadSample() {
       commitCurrent();
       const t = activeSchema();
       E.checkSchema(t);
       const sample = t.columns.map(c =>
-        c.type === 'date'
-          ? '2026-10-20'
-          : c.type === 'integer'
-            ? '1'
-            : c.type === 'decimal'
-              ? '25.50'
-              : c.type === 'boolean'
-                ? 'true'
-                : E.tokens(c.values)[0] || 'Example'
+        t.mode === 'sap'
+          ? sapSample(c)
+          : c.type === 'date'
+            ? '2026-10-20'
+            : c.type === 'integer'
+              ? '1'
+              : c.type === 'decimal'
+                ? '25.50'
+                : c.type === 'boolean'
+                  ? 'true'
+                  : E.tokens(c.values)[0] || 'Example'
       );
       book = {
         sheets: [
@@ -1037,6 +1134,7 @@
         ],
       };
       if (
+        t.mode !== 'sap' &&
         t.columns.map(c => c.key).join(',') === 'REQUEST_ID,TYPE,OWNER,AMOUNT,START_DATE,END_DATE'
       )
         book.sheets[0].rows = [
@@ -1377,7 +1475,7 @@
         icon('upload', 30) +
         '</span><h3>' +
         esc(fileName || 'Drop a file. Find your clarity.') +
-        '</h3><p>XLSX, CSV or TSV · Up to 5,000 rows and 200,000 cells</p><div class="val-actions">' +
+        '</h3><p>XLSX, CSV or TSV · Up to 200 columns, 5,000 rows and 200,000 cells total (1,000 rows at 200 columns)</p><div class="val-actions">' +
         btn('browse', fileName ? 'Choose another file' : 'Browse files', '', 'val-primary') +
         btn('download-template', 'Download Excel template', '', 'val-secondary') +
         '</div><div class="val-upload-foot">' +
@@ -1485,6 +1583,13 @@
       const action = el.dataset.val,
         id = el.dataset.id;
       message = '';
+      if (action === 'setup-help') {
+        a.openModal(
+          'Fill your setup in 3 steps',
+          `<section class="val-setup-guide"><p>Use <strong>simple General setup</strong> for everyday files, or <strong>simple SAP setup</strong> for DDIC field formats. Each file has just one <strong>Setup</strong> sheet.</p><ol><li><strong>Name it.</strong> Fill the name in B2 and choose General or SAP in B3.</li><li><strong>Replace the examples from row 9.</strong> One row creates one upload column. Keep the row 8 headers. Delete example rows you do not need. You can define up to 200 fields.</li><li><strong>Import and review.</strong> Choose Import Excel setup → your file → Create new draft → Save draft. Then use Validate to upload the records you want to check.</li></ol><div class="val-setup-table"><table><thead><tr><th>Fill this</th><th>What to enter</th></tr></thead><tbody><tr><td>Field</td><td>A unique key, e.g. VENDOR_CODE. Use letters and underscores; no spaces.</td></tr><tr><td>Label</td><td>Your data upload header, e.g. Vendor code. Optional: defaults to Field.</td></tr><tr><td>Data type</td><td>Choose from the dropdown. General: text, integer, decimal, date or boolean. SAP: choose the actual DDIC type.</td></tr><tr><td>Length / Decimals</td><td>General: Length is an optional maximum character count; leave Decimals blank. SAP: use SE11/DDIC length and decimal places, or leave blank for the displayed type defaults.</td></tr><tr><td>Required / Allowed values</td><td>Required defaults to No. Use X in Allowed values and Required = No to allow X or blank. A trailing comma is unnecessary.</td></tr><tr><td>Format / Reference field</td><td>Optional. General formats: digits, alphanumeric, email, url or identifier. SAP format is automatic; CURR can point to a CUKY field and QUAN to a UNIT field using its Field key.</td></tr><tr><td>Notes</td><td>Optional instructions for the person uploading data.</td></tr></tbody></table></div><p>Keep codes and long numbers as Excel <strong>Text</strong>. Enter values, not formulas. You can add Conditions and References inside Studio after import; the advanced workbook is only needed to maintain them in Excel.</p><p class="hint">Data uploads support 5,000 rows and 200,000 cells: at 200 columns, upload up to 1,000 rows per file. SAP mode checks the supported DDIC field formats; maintain your system's domain values and conversion rules separately.</p></section>`
+        );
+        return;
+      }
       if (action === 'new' || action === 'example') {
         create(action === 'example');
         return;
@@ -1597,7 +1702,7 @@
         }
       }
       if (action === 'add-column') {
-        if (draft.columns.length >= 80) throw Error('Use up to 80 columns.');
+        if (draft.columns.length >= E.LIMITS.columns) throw Error('Use up to 200 columns.');
         let n = draft.columns.length,
           c = E.column(n);
         while (draft.columns.some(f => f.key === c.key)) c = E.column(++n);
@@ -1620,10 +1725,11 @@
         const c = draft.columns.find(c => c.id === id),
           used =
             draft.rules.some(r => JSON.stringify(r).includes('"' + c.key + '"')) ||
-            draft.uniqueGroups.some(g => g.includes(c.key));
+            draft.uniqueGroups.some(g => g.includes(c.key)) ||
+            draft.columns.some(f => f.sapReference === c.key);
         if (used)
           throw Error(
-            'This field is used in a condition or unique combination. Update those first.'
+            'This field is used in a condition, unique combination or SAP currency/unit reference. Update those first.'
           );
         draft.columns = draft.columns.filter(c => c.id !== id);
         columnId = draft.columns[0]?.id || '';
@@ -1778,7 +1884,7 @@
     function addLibraryField(definition) {
       ensure();
       if (!draft) throw Error('Create a template first.');
-      if (draft.columns.length >= 80) throw Error('Use up to 80 columns.');
+      if (draft.columns.length >= E.LIMITS.columns) throw Error('Use up to 200 columns.');
       const c = E.copy(definition);
       c.id = E.uid();
       let n = 1,
@@ -1942,6 +2048,7 @@
           'Review Excel setup',
           `<section id="valSetupReview" class="val-setup-review"><span class="eyebrow">NEW TEMPLATE DRAFT</span><h3>${esc(t.name)}</h3><p>${esc(t.description || 'Columns, conditions and reference lists from your workbook.')}</p><div class="val-setup-counts">${[
             [t.columns.length, 'Columns'],
+            [t.mode === 'sap' ? 'SAP' : 'General', 'Template type'],
             [t.rules.length, 'Conditions'],
             [t.lookups.length, 'Reference lists'],
             [t.uniqueGroups.length, 'Unique combinations'],
@@ -1953,7 +2060,7 @@
             .slice(0, 8)
             .map(
               c =>
-                `<tr><td>${esc(c.key)}</td><td>${esc(c.label)}</td><td>${esc(c.type)}</td><td>${c.required ? 'Yes' : 'No'}</td></tr>`
+                `<tr><td>${esc(c.key)}</td><td>${esc(c.label)}</td><td>${esc(t.mode === 'sap' ? E.sapSettings(c).type + ' (' + E.sapSettings(c).length + ')' : c.type)}</td><td>${c.required ? 'Yes' : 'No'}</td></tr>`
             )
             .join(
               ''
@@ -2057,6 +2164,24 @@
       if (!el.closest?.('.validation-studio')) return;
       void (async () => {
         ensure();
+        if (el.name === 'mode' && el.form?.id === 'valMetaForm') {
+          commitCurrent();
+          mark();
+          paint();
+          return;
+        }
+        if (el.name === 'sapType' && el.form?.id === 'valColumnForm') {
+          const spec = E.SAP_TYPES[el.value];
+          if (!spec) return;
+          el.form.elements.namedItem('sapLength').value = spec.length;
+          el.form.elements.namedItem('sapDecimals').value = spec.decimals || 0;
+          if (el.form.elements.namedItem('sapReference'))
+            el.form.elements.namedItem('sapReference').value = '';
+          commitCurrent();
+          mark();
+          paint();
+          return;
+        }
         if (el.id === 'valFile') {
           if (el.files[0]) await loadFile(el.files[0]);
           return;

@@ -40,7 +40,7 @@
   };
   const LIMITS = {
     templates: 60,
-    columns: 80,
+    columns: 200,
     rules: 100,
     rows: 5000,
     cells: 200000,
@@ -62,6 +62,226 @@
       .split(/[\n,]/)
       .map(s => s.trim())
       .filter(Boolean);
+  // SAP DDIC field formats, using ABAP 7.54's documented technical limits.
+  // Domain values/conversion exits and TCURX scaling are deliberately configured separately.
+  const SAP_TYPES = Object.freeze({
+    CHAR: {
+      label: 'Character',
+      min: 1,
+      max: 30000,
+      length: 255,
+      format: 'Text up to the configured length',
+    },
+    NUMC: {
+      label: 'Numeric text',
+      min: 1,
+      max: 255,
+      length: 10,
+      format: 'Digits only, exactly the configured length; preserve leading zeros',
+    },
+    DATS: {
+      label: 'Date',
+      length: 8,
+      format: 'YYYYMMDD; real calendar date or SAP initial 00000000',
+    },
+    TIMS: { label: 'Time', length: 6, format: 'HHMMSS, 000000–235959' },
+    CLNT: { label: 'Client', length: 3, format: 'Three-digit internal client key, e.g. 100' },
+    LANG: {
+      label: 'Language key',
+      length: 1,
+      format: 'One-character internal SAP key, e.g. E; use References for valid keys',
+    },
+    CUKY: {
+      label: 'Currency key',
+      length: 5,
+      format: 'Internal currency key up to 5 characters; use References for valid keys',
+    },
+    UNIT: {
+      label: 'Unit key',
+      min: 2,
+      max: 3,
+      length: 3,
+      format: 'Internal unit key up to the configured length; use References for valid keys',
+    },
+    DEC: {
+      label: 'Packed decimal',
+      min: 1,
+      max: 31,
+      length: 15,
+      decimals: 2,
+      format:
+        'Signed decimal with a dot; configured total digits and scale, no grouping or exponent',
+    },
+    CURR: {
+      label: 'Currency amount',
+      min: 1,
+      max: 31,
+      length: 15,
+      decimals: 2,
+      format:
+        'DDIC amount digits/scale; currency display scaling depends on your SAP configuration',
+    },
+    QUAN: {
+      label: 'Quantity',
+      min: 1,
+      max: 31,
+      length: 13,
+      decimals: 3,
+      format: 'DDIC quantity digits/scale, decimal point is a dot',
+    },
+    INT1: {
+      label: '1-byte integer',
+      length: 3,
+      range: ['0', '255'],
+      format: 'Whole number from 0 to 255',
+    },
+    INT2: {
+      label: '2-byte integer',
+      length: 5,
+      range: ['-32768', '32767'],
+      format: 'Whole number from -32768 to 32767',
+    },
+    INT4: {
+      label: '4-byte integer',
+      length: 10,
+      range: ['-2147483648', '2147483647'],
+      format: 'Whole number from -2147483648 to 2147483647',
+    },
+    INT8: {
+      label: '8-byte integer',
+      length: 19,
+      range: ['-9223372036854775808', '9223372036854775807'],
+      format: '64-bit whole number; keep Excel cells as Text to preserve every digit',
+    },
+    SSTRING: {
+      label: 'Short string',
+      min: 1,
+      max: 1333,
+      length: 255,
+      format: 'Text up to the configured maximum length',
+    },
+    STRING: {
+      label: 'Variable string',
+      min: 1,
+      max: 32000,
+      length: 32000,
+      format: 'Variable text; this workspace supports up to 32000 characters per cell',
+    },
+    RAW: {
+      label: 'Byte field',
+      min: 1,
+      max: 255,
+      length: 16,
+      format: 'Hexadecimal bytes: exactly two hex characters per configured byte',
+    },
+  });
+  const sapMode = t => t?.mode === 'sap';
+  function sapSettings(c) {
+    const type = c.sapType || { integer: 'INT4', decimal: 'DEC', date: 'DATS' }[c.type] || 'CHAR';
+    const spec = SAP_TYPES[type];
+    return {
+      type,
+      spec,
+      length: c.sapLength === '' || c.sapLength === undefined ? spec?.length : Number(c.sapLength),
+      decimals:
+        c.sapDecimals === '' || c.sapDecimals === undefined
+          ? spec?.decimals || 0
+          : Number(c.sapDecimals),
+      reference: c.sapReference || '',
+    };
+  }
+  function checkSAPColumn(c, t) {
+    const { type, spec, length, decimals, reference } = sapSettings(c);
+    if (
+      (c.sapType !== undefined && !text(c.sapType, 20)) ||
+      ['sapLength', 'sapDecimals'].some(
+        k =>
+          c[k] !== undefined &&
+          c[k] !== '' &&
+          !(
+            (typeof c[k] === 'number' && Number.isFinite(c[k])) ||
+            (typeof c[k] === 'string' && /^\d+$/.test(c[k]))
+          )
+      ) ||
+      !Object.hasOwn(SAP_TYPES, type) ||
+      !Number.isInteger(length) ||
+      (spec.min ? length < spec.min || length > spec.max : length !== spec.length)
+    )
+      throw Error(c.label + ': choose a supported SAP type and valid DDIC length.');
+    if (
+      !Number.isInteger(decimals) ||
+      decimals < (type === 'CURR' ? 1 : 0) ||
+      decimals > (spec.decimals !== undefined ? Math.min(length, 14) : 0)
+    )
+      throw Error(
+        c.label +
+          ': check SAP decimal places (maximum 14, within the field length; CURR needs at least 1).'
+      );
+    if (
+      !text(reference, 64) ||
+      (reference &&
+        (!['CURR', 'QUAN'].includes(type) ||
+          !t.columns.some(
+            f => f.key === reference && sapSettings(f).type === (type === 'CURR' ? 'CUKY' : 'UNIT')
+          )))
+    )
+      throw Error(c.label + ': choose a CUKY field for CURR or a UNIT field for QUAN.');
+  }
+  function sapCheck(value, c) {
+    const v = normalized(value, c),
+      { type, spec, length, decimals } = sapSettings(c);
+    if (!Object.hasOwn(SAP_TYPES, type)) return 'Choose a supported SAP type.';
+    if (spec.range) {
+      if (!/^[+-]?\d+$/.test(v)) return type + ' requires a whole number.';
+      const n = BigInt(v);
+      return n < BigInt(spec.range[0]) || n > BigInt(spec.range[1]) ? spec.format + '.' : '';
+    }
+    if (spec.decimals !== undefined) {
+      if (!/^[+-]?\d+(?:\.\d+)?$/.test(v))
+        return type + ' requires a plain decimal using a dot, without grouping or exponents.';
+      const [whole, fraction = ''] = v.replace(/^[+-]/, '').split('.');
+      if (fraction.length > decimals || whole.replace(/^0+/, '').length > length - decimals)
+        return type + ' allows ' + length + ' total digits with ' + decimals + ' decimal places.';
+      return '';
+    }
+    if (type === 'DATS') {
+      if (v === '00000000') return '';
+      return /^\d{8}$/.test(v) &&
+        v.slice(0, 4) !== '0000' &&
+        date(v.slice(0, 4) + '-' + v.slice(4, 6) + '-' + v.slice(6))
+        ? ''
+        : 'DATS requires a real YYYYMMDD date, or SAP initial 00000000.';
+    }
+    if (type === 'TIMS')
+      return /^(?:[01]\d|2[0-3])[0-5]\d[0-5]\d$/.test(v)
+        ? ''
+        : 'TIMS requires HHMMSS from 000000 to 235959.';
+    if (type === 'NUMC' || type === 'CLNT')
+      return /^\d+$/.test(v) && v.length === length
+        ? ''
+        : type + ' requires exactly ' + length + ' digits; keep leading zeros.';
+    if (type === 'RAW')
+      return /^[0-9a-f]+$/i.test(v) && v.length === length * 2
+        ? ''
+        : 'RAW requires exactly ' + length * 2 + ' hexadecimal characters (' + length + ' bytes).';
+    return v.length <= length && (type !== 'LANG' || v.length === 1)
+      ? ''
+      : type + ' allows ' + length + ' character' + (length === 1 ? '' : 's') + '.';
+  }
+  function sapComparable(v, c) {
+    const s = normalized(v, c),
+      { type, spec } = sapSettings(c);
+    if (sapCheck(s, c)) return null;
+    if (spec.range || spec.decimals !== undefined) {
+      const negative = s.startsWith('-'),
+        [a, b = ''] = s.replace(/^[+-]/, '').split('.');
+      const n = BigInt(a + b.padEnd(14, '0'));
+      return negative ? -n : n;
+    }
+    return c.caseSensitive ? s : s.toLowerCase();
+  }
+  const valueKey = v =>
+    JSON.stringify(v, (_, x) => (typeof x === 'bigint' ? 'SAP#' + x.toString() : x));
   function column(index = 0) {
     return {
       id: uid(),
@@ -80,6 +300,10 @@
       caseSensitive: false,
       format: '',
       description: '',
+      sapType: '',
+      sapLength: '',
+      sapDecimals: '',
+      sapReference: '',
     };
   }
   function create(name = 'Untitled template') {
@@ -87,6 +311,7 @@
       id: uid(),
       name,
       description: '',
+      mode: 'general',
       columns: [],
       rules: [],
       lookups: [],
@@ -117,6 +342,7 @@
     return copy({
       name: t.name,
       description: t.description,
+      mode: t.mode || 'general',
       columns: t.columns,
       rules: t.rules,
       lookups: t.lookups,
@@ -131,7 +357,9 @@
       t.columns.length > LIMITS.columns ||
       (!allowEmpty && !t.columns.length)
     )
-      throw Error('Add between 1 and 80 columns.');
+      throw Error('Add between 1 and 200 columns.');
+    if (t.mode !== undefined && !['general', 'sap'].includes(t.mode))
+      throw Error('Choose General or SAP validation.');
     const keys = new Set(),
       ids = new Set(),
       labels = new Set();
@@ -176,6 +404,7 @@
       labels.add(headerKey(c.label));
       keys.add(c.key.toLowerCase());
       ids.add(c.id);
+      if (sapMode(t)) checkSAPColumn(c, t);
     }
     const has = k => t.columns.some(c => c.key === k),
       references = new Map();
@@ -266,12 +495,17 @@
       if (
         ['eq', 'neq', 'gt', 'gte', 'lt', 'lte'].includes(c.operator) &&
         !blank(c.value) &&
-        comparable(c.value, field) === null
+        comparable(c.value, field, t.mode) === null
       )
-        throw Error('Use a valid ' + field.type + ' value in the condition.');
+        throw Error(
+          'Use a valid ' +
+            (sapMode(t) ? sapSettings(field).type : field.type) +
+            ' value in the condition.'
+        );
       if (
         ['in', 'notIn'].includes(c.operator) &&
-        (!tokens(c.value).length || tokens(c.value).some(v => comparable(v, field) === null))
+        (!tokens(c.value).length ||
+          tokens(c.value).some(v => comparable(v, field, t.mode) === null))
       )
         throw Error('Provide valid values for the condition list.');
     }
@@ -406,9 +640,10 @@
     if (c?.trim !== false) s = s.trim();
     return s;
   }
-  function comparable(v, c) {
+  function comparable(v, c, mode = 'general') {
     const s = normalized(v, c);
     if (blank(s)) return null;
+    if (mode === 'sap') return sapComparable(s, c);
     if (['integer', 'decimal'].includes(c?.type)) return numeric(s);
     if (c?.type === 'date') return date(s);
     if (c?.type === 'boolean') {
@@ -421,11 +656,11 @@
   function testCondition(c, row, t, cache) {
     const field = t.columns.find(f => f.key === c.field),
       raw = own(row, c.field),
-      a = comparable(raw, field),
+      a = comparable(raw, field, t.mode),
       other = t.columns.find(f => f.key === c.otherField),
       b = c.operator.startsWith('field')
-        ? comparable(own(row, c.otherField), other)
-        : comparable(c.value, field);
+        ? comparable(own(row, c.otherField), other, t.mode)
+        : comparable(c.value, field, t.mode);
     switch (c.operator) {
       case 'empty':
         return blank(raw);
@@ -444,15 +679,21 @@
       case 'lte':
         return a !== null && b !== null && a <= b;
       case 'contains':
-        return a !== null && b !== null && String(a).includes(String(b));
+        return sapMode(t)
+          ? stringMatch('includes')
+          : a !== null && b !== null && String(a).includes(String(b));
       case 'starts':
-        return a !== null && b !== null && String(a).startsWith(String(b));
+        return sapMode(t)
+          ? stringMatch('startsWith')
+          : a !== null && b !== null && String(a).startsWith(String(b));
       case 'ends':
-        return a !== null && b !== null && String(a).endsWith(String(b));
+        return sapMode(t)
+          ? stringMatch('endsWith')
+          : a !== null && b !== null && String(a).endsWith(String(b));
       case 'in':
-        return tokens(c.value).some(x => comparable(x, field) === a);
+        return tokens(c.value).some(x => comparable(x, field, t.mode) === a);
       case 'notIn':
-        return !tokens(c.value).some(x => comparable(x, field) === a);
+        return !tokens(c.value).some(x => comparable(x, field, t.mode) === a);
       case 'fieldEq':
         return a === b;
       case 'fieldNeq':
@@ -467,16 +708,23 @@
         const l = t.lookups.find(x => x.id === c.lookupId),
           i = l?.headers.indexOf(c.lookupColumn);
         if (!l || i < 0) return false;
-        if (!cache) return l.rows.some(r => comparable(r[i], field) === a);
+        if (!cache) return l.rows.some(r => comparable(r[i], field, t.mode) === a);
         const key = JSON.stringify([l.id, i, field.key]);
         if (!cache.has(key))
-          cache.set(key, new Set(l.rows.map(r => JSON.stringify(comparable(r[i], field)))));
-        return cache.get(key).has(JSON.stringify(a));
+          cache.set(key, new Set(l.rows.map(r => valueKey(comparable(r[i], field, t.mode)))));
+        return cache.get(key).has(valueKey(a));
       }
       case 'lookupTuple':
         return referenceRows(c, row, t, cache).count > 0;
       default:
         return false;
+    }
+    function stringMatch(method) {
+      const strings = [raw, c.value].map(v => {
+        const s = normalized(v, field);
+        return field.caseSensitive ? s : s.toLowerCase();
+      });
+      return !blank(raw) && !blank(c.value) && strings[0][method](strings[1]);
     }
   }
 
@@ -497,9 +745,9 @@
     if (!cache.has(key)) {
       const index = new Map();
       l.rows.forEach((r, i) => {
-        const values = mapping.map(m => comparable(r[m.index], m.field));
+        const values = mapping.map(m => comparable(r[m.index], m.field, t.mode));
         if (values.some(v => v === null)) return;
-        const key = JSON.stringify(values);
+        const key = valueKey(values);
         if (!index.has(key)) index.set(key, { rows: [], count: 0 });
         const match = index.get(key);
         match.count++;
@@ -507,9 +755,9 @@
       });
       cache.set(key, index);
     }
-    const values = mapping.map(m => comparable(own(row, m.field.key), m.field));
+    const values = mapping.map(m => comparable(own(row, m.field.key), m.field, t.mode));
     if (values.some(v => v === null)) return { rows: [], count: 0 };
-    return cache.get(key).get(JSON.stringify(values)) || { rows: [], count: 0 };
+    return cache.get(key).get(valueKey(values)) || { rows: [], count: 0 };
   }
   /** Offer maintained values for one field; tuple lookups retain the other mapped values. */
   function suggestions(t, row, fieldKey, query = '') {
@@ -519,9 +767,12 @@
     const candidates = new Map(),
       cache = new Map();
     const add = (value, source, detail = '') => {
-      if (blank(value) || comparable(value, field) === comparable(own(row, fieldKey), field))
+      if (
+        blank(value) ||
+        comparable(value, field, t.mode) === comparable(own(row, fieldKey), field, t.mode)
+      )
         return;
-      const key = JSON.stringify(comparable(value, field));
+      const key = valueKey(comparable(value, field, t.mode));
       if (!candidates.has(key)) candidates.set(key, { value: String(value), source, detail });
     };
     for (const value of tokens(field.values)) add(value, 'Allowed values');
@@ -551,10 +802,10 @@
             .filter(p => p.field !== fieldKey)
             .every(p => {
               const f = t.columns.find(f => f.key === p.field),
-                value = comparable(own(row, p.field), f);
+                value = comparable(own(row, p.field), f, t.mode);
               return (
                 value !== null &&
-                value === comparable(reference[list.headers.indexOf(p.referenceColumn)], f)
+                value === comparable(reference[list.headers.indexOf(p.referenceColumn)], f, t.mode)
               );
             })
         )
@@ -571,26 +822,33 @@
       current = String(own(row, fieldKey)).trim().toLocaleLowerCase();
     const valid = value => {
       const v = normalized(value, field),
-        n = comparable(value, field),
+        n = comparable(value, field, t.mode),
         trial = { ...row, [fieldKey]: value };
+      if (sapMode(t)) {
+        if (sapCheck(v, field)) return false;
+      }
       if (
         n === null ||
-        (field.type === 'integer' && !Number.isInteger(n)) ||
-        (field.type === 'date' && !date(v))
+        (!sapMode(t) &&
+          ((field.type === 'integer' && !Number.isInteger(n)) ||
+            (field.type === 'date' && !date(v))))
       )
         return false;
       if (
-        (field.minLength !== '' && v.length < Number(field.minLength)) ||
-        (field.maxLength !== '' && v.length > Number(field.maxLength))
+        !sapMode(t) &&
+        ((field.minLength !== '' && v.length < Number(field.minLength)) ||
+          (field.maxLength !== '' && v.length > Number(field.maxLength)))
       )
         return false;
       if (
+        !sapMode(t) &&
         ['integer', 'decimal'].includes(field.type) &&
         ((field.min !== '' && n < Number(field.min)) || (field.max !== '' && n > Number(field.max)))
       )
         return false;
-      if (field.values && !tokens(field.values).some(x => comparable(x, field) === n)) return false;
-      if (field.format && !FORMATS[field.format].test(v)) return false;
+      if (field.values && !tokens(field.values).some(x => comparable(x, field, t.mode) === n))
+        return false;
+      if (!sapMode(t) && field.format && !FORMATS[field.format].test(v)) return false;
       return t.rules.every(
         r =>
           !r.enabled ||
@@ -731,27 +989,35 @@
           if (c.required) add(i, c.key, c.label + ' is required.');
           continue;
         }
-        const n = comparable(v, c);
-        if (c.type === 'integer' && (n === null || !Number.isSafeInteger(n)))
-          add(i, c.key, 'Enter a whole number within the safe integer range.');
-        if (c.type === 'decimal' && n === null)
-          add(i, c.key, 'Enter a number using a dot as the decimal separator.');
-        if (c.type === 'date' && n === null)
-          add(i, c.key, 'Enter a real date in YYYY-MM-DD format.');
-        if (c.type === 'boolean' && n === null) add(i, c.key, 'Use true/false, yes/no or 1/0.');
-        if (c.minLength !== '' && v.length < Number(c.minLength))
-          add(i, c.key, 'Use at least ' + c.minLength + ' characters.');
-        if (c.maxLength !== '' && v.length > Number(c.maxLength))
-          add(i, c.key, 'Use at most ' + c.maxLength + ' characters.');
-        if (['integer', 'decimal'].includes(c.type) && n !== null) {
-          if (c.min !== '' && n < Number(c.min))
-            add(i, c.key, 'Value must be at least ' + c.min + '.');
-          if (c.max !== '' && n > Number(c.max))
-            add(i, c.key, 'Value must be at most ' + c.max + '.');
+        const n = comparable(v, c, t.mode);
+        if (sapMode(t)) {
+          const issue = sapCheck(v, c);
+          if (issue) add(i, c.key, issue);
+          const ref = sapSettings(c).reference;
+          if (ref && blank(own(row, ref)))
+            add(i, c.key, 'Fill the linked currency/unit field ' + ref + '.');
+        } else {
+          if (c.type === 'integer' && (n === null || !Number.isSafeInteger(n)))
+            add(i, c.key, 'Enter a whole number within the safe integer range.');
+          if (c.type === 'decimal' && n === null)
+            add(i, c.key, 'Enter a number using a dot as the decimal separator.');
+          if (c.type === 'date' && n === null)
+            add(i, c.key, 'Enter a real date in YYYY-MM-DD format.');
+          if (c.type === 'boolean' && n === null) add(i, c.key, 'Use true/false, yes/no or 1/0.');
+          if (c.minLength !== '' && v.length < Number(c.minLength))
+            add(i, c.key, 'Use at least ' + c.minLength + ' characters.');
+          if (c.maxLength !== '' && v.length > Number(c.maxLength))
+            add(i, c.key, 'Use at most ' + c.maxLength + ' characters.');
+          if (['integer', 'decimal'].includes(c.type) && n !== null) {
+            if (c.min !== '' && n < Number(c.min))
+              add(i, c.key, 'Value must be at least ' + c.min + '.');
+            if (c.max !== '' && n > Number(c.max))
+              add(i, c.key, 'Value must be at most ' + c.max + '.');
+          }
         }
-        if (c.values && !tokens(c.values).some(x => comparable(x, c) === n))
+        if (c.values && !tokens(c.values).some(x => comparable(x, c, t.mode) === n))
           add(i, c.key, 'Choose a value from the allowed list.');
-        if (c.format && !FORMATS[c.format].test(v))
+        if (!sapMode(t) && c.format && !FORMATS[c.format].test(v))
           add(i, c.key, 'Use the ' + c.format + ' format.');
       }
       for (const r of t.rules)
@@ -774,11 +1040,12 @@
       const seen = new Map();
       rows.forEach((row, i) => {
         if (keys.some(k => blank(own(row, k)))) return;
-        const value = JSON.stringify(
+        const value = valueKey(
           keys.map(k =>
             comparable(
               own(row, k),
-              t.columns.find(c => c.key === k)
+              t.columns.find(c => c.key === k),
+              t.mode
             )
           )
         );
@@ -883,13 +1150,16 @@
     const rows = [];
     let row = [],
       cell = '',
+      cells = 0,
       quoted = false,
       closed = false;
     const endCell = () => {
       row.push(cell);
       cell = '';
       closed = false;
-      if (row.length > LIMITS.columns) throw Error('Use up to 80 upload columns.');
+      if (row.length > LIMITS.columns) throw Error('Use up to 200 upload columns.');
+      if (++cells > LIMITS.cells + LIMITS.columns)
+        throw Error('Use up to 200,000 data cells (1,000 rows at 200 columns).');
     };
     const endRow = () => {
       endCell();
@@ -996,6 +1266,9 @@
   }
   root.WorkHubValidatorEngine = Object.freeze({
     TYPES,
+    SAP_TYPES,
+    sapSettings,
+    sapCheck,
     OPS,
     FORMATS,
     LIMITS,

@@ -2,7 +2,7 @@
 (function (root) {
   'use strict';
   const HEADERS = {
-    Template: ['Name', 'Description', 'Format version'],
+    Template: ['Name', 'Description', 'Format version', 'Template type'],
     Columns: [
       'Field',
       'Label',
@@ -19,6 +19,10 @@
       'Case sensitive',
       'Format',
       'Description',
+      'SAP type',
+      'SAP length',
+      'SAP decimals',
+      'SAP reference field',
     ],
     Conditions: [
       'Rule ID',
@@ -51,6 +55,80 @@
     String(s ?? '')
       .trim()
       .toLowerCase();
+  const SIMPLE_HEADERS = [
+    'Field',
+    'Label',
+    'Data type',
+    'Length',
+    'Decimals',
+    'Required',
+    'Allowed values',
+    'Format',
+    'Reference field',
+    'Notes',
+  ];
+  function parseSimple(sheet) {
+    const E = root.WorkHubValidatorEngine,
+      rows = sheet.rows || [],
+      t = E.create(String(rows[1]?.[1] || '').trim());
+    t.mode = key(rows[2]?.[1]) || 'general';
+    t.description = String(rows[3]?.[1] || '').trim();
+    if (!['general', 'sap'].includes(t.mode)) throw Error('Setup B3: choose General or SAP.');
+    const headers = (rows[7] || []).map(key);
+    while (headers.length && !headers.at(-1)) headers.pop();
+    if (
+      !headers.length ||
+      new Set(headers).size !== headers.length ||
+      headers.some(h => !SIMPLE_HEADERS.map(key).includes(h)) ||
+      !headers.includes('field') ||
+      !headers.includes('data type')
+    )
+      throw Error('Setup row 8: keep the supplied field headers, including Field and Data type.');
+    for (const [i, row] of rows.slice(8).entries()) {
+      if (row.every(E.blank)) continue;
+      const at = 'Setup row ' + (i + 9),
+        get = h => String(row[headers.indexOf(key(h))] ?? '').trim();
+      if (row.slice(headers.length).some(v => !E.blank(v)))
+        throw Error(at + ': a value has no column header.');
+      const required = key(get('Required'));
+      if (required && !['yes', 'no', 'true', 'false', '1', '0'].includes(required))
+        throw Error(at + ': Required must be Yes or No.');
+      const number = h => {
+        const v = get(h);
+        if (v && !/^\d+$/.test(v)) throw Error(at + ': ' + h + ' must be a whole number.');
+        return v === '' ? '' : Number(v);
+      };
+      const c = {
+        ...E.column(i),
+        key: get('Field'),
+        label: get('Label') || get('Field'),
+        required: ['yes', 'true', '1'].includes(required),
+        values: get('Allowed values'),
+        description: get('Notes'),
+      };
+      if (t.mode === 'sap') {
+        c.sapType = get('Data type').toUpperCase();
+        c.sapLength = number('Length');
+        c.sapDecimals = number('Decimals');
+        c.sapReference = get('Reference field');
+        if (!Object.hasOwn(E.SAP_TYPES, c.sapType))
+          throw Error(at + ': choose a supported SAP DDIC Data type, e.g. CHAR or NUMC.');
+        if (get('Format') && key(get('Format')) !== 'standard')
+          throw Error(at + ': SAP format follows Data type. Leave Format blank or use standard.');
+      } else {
+        c.type = key(get('Data type')) || 'text';
+        c.maxLength = number('Length');
+        c.format = key(get('Format'));
+        if (get('Decimals') || get('Reference field'))
+          throw Error(
+            at + ': Decimals and Reference field are SAP-only. Leave them blank in General mode.'
+          );
+      }
+      t.columns.push(c);
+    }
+    E.checkSchema(t);
+    return t;
+  }
   function parse(book) {
     const E = root.WorkHubValidatorEngine;
     if (!Array.isArray(book?.sheets)) throw Error('Choose an Excel setup workbook.');
@@ -58,6 +136,13 @@
     for (const s of book.sheets) {
       if (sheets.has(key(s.name))) throw Error('Worksheet names must be unique.');
       sheets.set(key(s.name), s);
+    }
+    if (sheets.has('setup')) {
+      if (Object.keys(HEADERS).some(name => sheets.has(key(name))))
+        throw Error(
+          'Upload either the single-sheet Setup template or the advanced multi-sheet template.'
+        );
+      return parseSimple(sheets.get('setup'));
     }
     function table(name, required = []) {
       const sheet = sheets.get(key(name));
@@ -105,6 +190,7 @@
       throw Error('Template: provide one name row with format version 1.');
     const t = E.create(metadata[0].get('Name'));
     t.description = metadata[0].get('Description');
+    t.mode = key(metadata[0].get('Template type')) || 'general';
     t.columns = table('Columns', ['Field', 'Label']).map((r, i) => ({
       ...E.column(i),
       key: r.get('Field'),
@@ -122,6 +208,10 @@
       caseSensitive: bool(r, 'Case sensitive', false),
       format: key(r.get('Format')),
       description: r.get('Description'),
+      sapType: r.get('SAP type').toUpperCase(),
+      sapLength: number(r, 'SAP length'),
+      sapDecimals: number(r, 'SAP decimals'),
+      sapReference: r.get('SAP reference field'),
     }));
     // Validate columns before resolving rule and reference links.
     E.checkSchema(t);
@@ -275,5 +365,5 @@
     E.checkSchema(t);
     return t;
   }
-  root.WorkHubValidatorSetup = { HEADERS, parse };
+  root.WorkHubValidatorSetup = { HEADERS, SIMPLE_HEADERS, parse };
 })(window);
