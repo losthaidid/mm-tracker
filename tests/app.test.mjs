@@ -3180,3 +3180,17 @@ test('Validation issues: attention links jump across pages, show the exact value
  const cell=document.querySelector('[data-cell="30"][data-field="AMOUNT"]');assert.equal(document.activeElement,cell);assert.equal(cell.selectionEnd,cell.value.length);assert.match(document.getElementById('valSelectedIssue').textContent,/Row 32 · Amount/);assert.equal(document.querySelector('#valSelectedIssue pre').textContent,'wrong <img src=x>');assert.equal(document.querySelector('#valSelectedIssue img'),null);assert.ok(cell.closest('td').classList.contains('val-target-cell'));
  cell.value='25';cell.dispatchEvent(new window.Event('change',{bubbles:true}));await settle();assert.equal(document.getElementById('valSelectedIssue'),null);await ui.run();assert.equal(ui.snapshot().result.errors,0);
 });
+
+test('startup theme: reload uses the saved Studio palette rather than an unsaved preview and updates from verified remote preferences',async t=>{
+ const h=await app(t),{api,document,window,db}=h;api.hub.setTool('theme');api.showTab('studio');
+ let form=document.getElementById('hubTheme');fill(form,{theme:'forest',font:'serif',radius:'24',background:'petals'});api.hub.submit(form);await settle();
+ document.querySelector('[data-theme-choice="rose"]').click();await settle();assert.equal(document.body.dataset.hubTheme,'rose');assert.equal(api.state().workhub.preferences.theme,'forest');
+ const storage=Object.fromEntries(Array.from({length:window.localStorage.length},(_,i)=>{const key=window.localStorage.key(i);return[key,window.localStorage.getItem(key)];}));
+ storage['mm-tracker.auth.v1:aaotojqkiewbhtnrlcur']=JSON.stringify({user:{id:api.cloud.user.id}});
+ let resolveSession,resolveRow;const pendingSession=new Promise(resolve=>resolveSession=resolve),pendingRow=new Promise(resolve=>resolveRow=resolve);
+ const reloaded=await app(t,{login:false,storage,sessionLookup:()=>pendingSession,read:()=>pendingRow}),root=reloaded.document.documentElement;
+ assert.equal(root.dataset.startupTheme,'forest');assert.equal(root.style.getPropertyValue('--startup-page'),'#f2f6ef');assert.equal(root.style.getPropertyValue('--startup-font'),'Georgia,serif');
+ resolveSession({data:{session:{user:{id:api.cloud.user.id}}},error:null});await settle();assert.equal(root.dataset.startupTheme,'forest');
+ const row=copy(db.row);row.document.data.workhub.preferences.theme='lagoon';resolveRow({data:row,error:null});await settle();
+ assert.equal(reloaded.document.body.dataset.hubTheme,'lagoon');assert.equal(root.dataset.startupTheme,'lagoon');assert.equal(root.style.getPropertyValue('--startup-page'),'#eef8f7');assert.equal(root.hasAttribute('data-workhub-startup'),false);assert.equal(reloaded.db.calls.length,0);
+});
