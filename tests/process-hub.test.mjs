@@ -480,3 +480,103 @@ test('Canvas selection: Ctrl A affects only the canvas, cancellation and owner c
  h.action('clear-selection');h.geometry();presenterPointer(h,h.host,'pointerdown',0,0);presenterPointer(h,h.host,'pointermove',4500,4500);presenterPointer(h,h.host,'pointercancel',4500,4500);assert.equal(h.ui.presenter.snapshot().canvas.nodes.length,0);assert.equal(JSON.stringify(h.state()),before);
  h.action('select-all');h.account.id='next-owner';h.render();assert.equal(h.document.getElementById('processPresenter'),null);assert.equal(h.popup.closed,true);assert.equal(JSON.stringify(h.state()),before);
 });
+
+function liveFlow(h) {
+  const p = h.E.normalize(h.E.seed('live-edit', '2026-10-26T00:00:00.000Z', true));
+  p.steps.forEach(step => step.duration = 3);
+  p.steps[0].changes = [{ field: 'Count', operator: 'add', value: 1 }];
+  p.scenarios[0].initial = { Count: 0 };
+  p.steps.push(...['branch-a', 'branch-b'].map((id, i) => ({ ...copy(p.steps[1]), id, title: id, x: 600, y: 220 + i * 160 })));
+  return p;
+}
+function liveClock(h) {
+  let time = 1000;
+  return (frames = 1) => { for (let i = 0; i < frames; i++) h.ui.tick(time += 150); };
+}
+test('Live process editing: open fields keep animating, saved edits retain the current step and phase without applying past values twice', async t => {
+  const h = hub(t); loadFlow(h, liveFlow(h)); const advance = liveClock(h);
+  advance(25); assert.equal(h.ui.audienceSnapshot().active, 'finish');
+  h.ui.stepEditor('finish'); const form = h.document.getElementById('rehearsalStepForm');
+  form.elements.title.value = 'Edited while playing'; advance(4);
+  assert.equal(h.ui.snapshot().paused, false); assert.equal(h.ui.audienceSnapshot().playing, true);
+  assert.equal(h.document.getElementById('rehearsalStepForm'), form); assert.equal(form.elements.title.value, 'Edited while playing');
+  const before = h.ui.snapshot(); form.elements.duration.value = '6'; h.ui.saveForm(form);
+  assert.equal(h.ui.audienceSnapshot().active, 'finish'); assert.equal(h.ui.snapshot().index, before.index);
+  assert.equal(h.ui.snapshot().elapsed, before.elapsed * 2); assert.equal(h.ui.plan().values.Count, 1);
+  assert.equal(h.ui.plan().entries[0].values.Count, 1); assert.equal(h.ui.snapshot().paused, false); assert.equal(h.writes.length, 1);
+});
+test('Live process linking: one source links to several existing and new steps, every branch joins playback and animation never writes records', async t => {
+  const h = hub(t); loadFlow(h, liveFlow(h)); const advance = liveClock(h); advance(5);
+  h.document.querySelector('[data-pc-port="out"][data-pc-step="po"]').click(); await settle();
+  for (const to of ['branch-a', 'branch-b']) {
+    const before = h.ui.snapshot(); h.document.getElementById('processLinkTo').value = to; await h.click('connect-selected');
+    assert.equal(h.ui.snapshot().index, before.index); assert.equal(h.ui.snapshot().elapsed, before.elapsed); assert.equal(h.ui.snapshot().paused, false);
+  }
+  h.document.getElementById('processLinkType').value = 'material'; await h.click('add-linked');
+  const added = h.ui.model().steps.at(-1), form = h.document.getElementById('rehearsalStepForm');
+  form.elements.title.value = 'New linked material'; form.elements.namedItem('entity-materialCode').value = 'MAT-LIVE'; h.ui.saveForm(form);
+  const first = h.ui.model().steps[0]; assert.equal(first.next, 'finish');
+  assert.deepEqual(copy(first.alternatives), ['branch-a', 'branch-b', added.id]);
+  assert.equal(h.ui.model().steps.at(-1).entity.materialCode, 'MAT-LIVE'); assert.ok(h.ui.audienceSnapshot().linkEffects.length >= 3);
+  assert.ok(h.document.querySelector('.rehearsal-edge[data-link-effect]')); assert.equal(h.ui.audienceSnapshot().playing, true);
+  const writes = h.writes.length, visited = new Set();
+  for (let i = 0; i < 500; i++) { advance(); visited.add(h.ui.audienceSnapshot().active); }
+  assert.ok(['finish', 'branch-a', 'branch-b', added.id].every(id => visited.has(id)));
+  assert.equal(h.writes.length, writes); assert.equal(h.ui.snapshot().paused, false);
+  const again = hub(t, copy(h.state().workhub)); assert.ok(again.E.connections(again.ui.model().steps[0]).includes(added.id));
+});
+test('Live process drafts: new and existing full-screen drafts play during editing, stage linked steps locally and save once', async t => {
+  const h = hub(t); const advance = liveClock(h); await h.click('new'); advance(4);
+  assert.equal(h.ui.snapshot().paused, false); assert.equal(h.ui.audienceSnapshot().playing, true);
+  h.document.querySelector('[data-pc-port="out"][data-pc-step="finish"]').click(); await settle(); await h.click('add-linked');
+  const form = h.document.getElementById('rehearsalStepForm'); form.elements.title.value = 'Live draft continuation'; advance(4);
+  assert.equal(h.document.getElementById('rehearsalStepForm'), form); assert.equal(h.writes.length, 0);
+  await h.click('save-draft'); assert.equal(h.writes.length, 1); assert.equal(h.ui.snapshot().paused, false);
+  const before = h.ui.snapshot(); await h.click('edit-process');
+  assert.equal(h.ui.snapshot().elapsed, before.elapsed); assert.equal(h.ui.snapshot().index, before.index); assert.equal(h.ui.snapshot().paused, false);
+  advance(4); assert.ok(h.ui.snapshot().elapsed > before.elapsed); assert.equal(h.writes.length, 1);
+});
+test('Live process ports: dragging onto a card links steps, cancel and stale graphs cannot save connections', async t => {
+  const h = hub(t); loadFlow(h, liveFlow(h));
+  const geometry = () => { h.document.getElementById('rehearsalBoard').getBoundingClientRect = () => ({ left: 0, top: 0 }); };
+  geometry(); let port = h.document.querySelector('[data-pc-port="out"][data-pc-step="po"]');
+  let target = h.document.querySelector('[data-node="branch-a"]'); h.document.elementFromPoint = () => target;
+  presenterPointer(h, port, 'pointerdown', 100, 100); presenterPointer(h, port, 'pointermove', 700, 280);
+  assert.ok(!h.document.querySelector('.ph-wire-preview').hasAttribute('hidden')); presenterPointer(h, port, 'pointerup', 700, 280);
+  assert.ok(h.E.connections(h.ui.model().steps[0]).includes('branch-a')); assert.equal(h.ui.snapshot().paused, false); assert.equal(h.writes.length, 1);
+  geometry(); port = h.document.querySelector('[data-pc-port="out"][data-pc-step="po"]');
+  presenterPointer(h, port, 'pointerdown', 100, 100); presenterPointer(h, port, 'pointercancel', 700, 400); assert.equal(h.writes.length, 1);
+  presenterPointer(h, port, 'pointerdown', 100, 100); presenterPointer(h, port, 'pointermove', 700, 440);
+  h.change(d => { d.workhub.rehearsal.processes[0].notes = 'Newer content'; });
+  target = h.document.querySelector('[data-node="branch-b"]'); presenterPointer(h, h.document.getElementById('rehearsalViewport'), 'pointerup', 700, 440);
+  assert.match(h.messages.at(-1), /changed/); assert.equal(h.writes.length, 1); assert.equal(h.ui.model().notes, 'Newer content');
+});
+test('Live presenter edits: port branches and new linked steps update the playing audience, keep its controls private and preserve the clock', async t => {
+  const h = await richPresenter(t), advance = liveClock(h); advance(5);
+  const before = h.ui.snapshot(); h.action('connect'); h.geometry();
+  const from = h.host.querySelector('[data-pc-port="out"][data-pc-step="yes"]');
+  from.dispatchEvent(new h.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+  const to = h.host.querySelector('[data-pc-port="in"][data-pc-step="no"]');
+  to.dispatchEvent(new h.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+  assert.equal(h.ui.snapshot().paused, false); assert.equal(h.ui.snapshot().elapsed, before.elapsed); assert.equal(h.ui.snapshot().index, before.index);
+  assert.ok(h.audience.querySelector('.av-edge[data-from="yes"][data-to="no"]')); assert.ok(h.audience.querySelector('[data-link-effect]'));
+  assert.equal(h.audience.querySelectorAll('button,input,select,[data-pc-port]').length, 0);
+  const type = h.panel.querySelector('[data-pc-type="task"]'); type.click(); await settle();
+  let form = h.panel.querySelector('[data-pc-form="step"]'); assert.ok(form); advance(4);
+  assert.equal(h.ui.audienceSnapshot().playing, true); form.elements.title.value = 'Live presenter insertion';
+  form.dispatchEvent(new h.window.Event('submit', { bubbles: true, cancelable: true }));
+  const added = h.ui.model().steps.find(s => s.title === 'Live presenter insertion'); assert.ok(added); assert.ok(h.E.connections(h.ui.model().steps.find(s => s.id === 'yes')).includes(added.id));
+  assert.equal(h.ui.snapshot().paused, false); assert.ok(h.audience.querySelector('[data-node="' + added.id + '"]'));
+  h.geometry(); h.tool('select'); const card = h.host.querySelector('[data-node="ask"]');
+  presenterPointer(h, card, 'pointerdown', 80, 80); presenterPointer(h, h.host, 'pointercancel', 80, 80); h.action('edit-step');
+  form = h.panel.querySelector('[data-pc-form="step"]'); assert.ok(form); const elapsed = h.ui.snapshot().elapsed; advance(3);
+  assert.equal(h.panel.querySelector('[data-pc-form="step"]'), form); assert.ok(h.ui.snapshot().elapsed > elapsed); assert.equal(h.ui.snapshot().paused, false);
+});
+test('Live process editing respects an explicit Pause and reduced motion while inspection and positioning do not pause running playback', async t => {
+  const h = hub(t); loadFlow(h, liveFlow(h)); const advance = liveClock(h); advance(4);
+  h.document.querySelector('[data-rehearsal="inspect"][data-id="po"]').click(); await settle(); assert.equal(h.ui.snapshot().paused, false);
+  h.ui.stepEditor('po'); await h.click('play'); assert.equal(h.ui.snapshot().paused, true); const elapsed = h.ui.snapshot().elapsed; advance(5); assert.equal(h.ui.snapshot().elapsed, elapsed);
+  h.ui.saveForm(h.document.getElementById('rehearsalStepForm')); assert.equal(h.ui.snapshot().paused, true);
+  await h.click('play'); assert.equal(h.ui.snapshot().paused, false); h.window.matchMedia = () => ({ matches: true });
+  h.ui.stepEditor('po'); const at = h.ui.snapshot().elapsed; advance(6); assert.equal(h.ui.snapshot().elapsed, at); assert.equal(h.ui.audienceSnapshot().playing, false);
+});

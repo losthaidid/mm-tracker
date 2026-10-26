@@ -675,6 +675,61 @@
     }
     return { entries, ending, values: copy(state) };
   }
+  // Re-plan only the unfinished part of a live edit. Past sample changes must not run twice.
+  function resumePlan(
+    process,
+    scenario,
+    previous,
+    index,
+    elapsed,
+    overrides = {},
+    routes = {},
+    visitChoices = {}
+  ) {
+    const entry = previous?.entries[index];
+    if (!entry)
+      return {
+        route: plan(process, scenario, overrides, routes, visitChoices),
+        index: 0,
+        elapsed: 0,
+      };
+    const current = process.steps.find(s => s.id === entry.id),
+      startId =
+        current?.id ||
+        (process.steps.some(s => s.id === entry.nextId) ? entry.nextId : process.startId),
+      prefix = previous.entries.slice(0, index),
+      choices = Object.fromEntries(
+        Object.entries(visitChoices)
+          .filter(([at]) => Number(at) >= index)
+          .map(([at, choice]) => [Number(at) - index, choice])
+      ),
+      tail = plan(
+        { ...process, startId },
+        { ...scenario, initial: current ? entry.before : entry.values },
+        overrides,
+        routes,
+        choices
+      ),
+      entries = [],
+      visits = new Map();
+    let ending = tail.ending;
+    for (const row of [...prefix, ...tail.entries]) {
+      const count = (visits.get(row.id) || 0) + 1;
+      if (entries.length >= 160 || count > 4) {
+        ending = 'loop-guard';
+        break;
+      }
+      visits.set(row.id, count);
+      entries.push(row);
+    }
+    const at = Math.min(prefix.length, entries.length),
+      duration = entries[at]?.duration || entry.duration;
+    return {
+      route: { entries, ending, values: copy(entries.at(-1)?.values || scenario.initial) },
+      index: at,
+      elapsed: current ? Math.min(elapsed, entry.duration * 1000) * (duration / entry.duration) : 0,
+    };
+  }
   function layout(process) {
     const nodes = new Map(process.steps.map(s => [s.id, s])),
       depth = new Map([[process.startId, 0]]),
@@ -857,6 +912,7 @@
     changes,
     apply,
     plan,
+    resumePlan,
     layout,
     seed,
     point,

@@ -14,6 +14,18 @@ Set the starting step, normal successor, additional normal routes and optional e
 
 Move cards using their dotted handles, or focus a handle and use arrow keys (Shift moves farther). **Auto arrange**, **Fit**, zoom and canvas scrolling help with larger flows. Deleting a step removes its incoming routes and scenario references and updates the starting step if necessary. Archive/restore and duplicate are available for saved processes. Process information also contains permanent deletion, with confirmation.
 
+## Link and edit a playing process
+
+Choose **Link steps**, or click the **＋ connection point on the right of a step**. Click the left point or body of a destination, or choose it in **Existing destination → Link selected step**. The source stays selected so you can connect it to several steps. Existing normal, alternative and exception definitions are retained; duplicate destinations are not added.
+
+You can also **drag a connection point onto another card**. Drag to empty canvas to choose a new step type at that position, then use **Add linked step**. This also works directly from the linking panel. Save its details in the usual step editor. **Done linking** (or Escape on the canvas) leaves connection mode. All points and the linking panel support keyboard use.
+
+New links receive a short flowing glow and an arrival pulse on their destination, including in the audience view. They join the route at the next available visit to their source; a source already passed is picked up on the following loop. Ordinary branches are explored in turn. Scenario-specific routes and named decision defaults remain available; a newly linked route receives one live preview before those defaults resume. Interactive decision answers still control their chosen routes outside editing.
+
+Playback continues while creating a full-screen draft, filling step details, moving cards, connecting branches or editing in the presenter canvas. Saved changes rebuild the unfinished route while preserving the active step and its progress; completed sample changes are not applied again. The camera stays steady while building. Opening step details no longer pauses the animation. Manual **Pause**, system reduced motion, privacy, hidden-page handling, presentation hold and audience breaks retain their controls.
+
+Full-screen draft changes remain local until **Save process**. Normal and presenter canvas edits use the existing guarded saved-process update. Animation, connection previews, branch traversal and selection do not create record writes.
+
 ## Reference and presentation views
 
 Use **View** to switch between Normal, Full screen and Presentation. Saved processes automatically play and loop in all three views. Full-screen creation uses the browser's fullscreen API when permitted, with a full-viewport dialog fallback. Choose Normal view to return to the workspace. Escape follows the browser’s fullscreen/dialog behaviour.
@@ -45,7 +57,7 @@ All private controls live in translucent bubbles **inside** the canvas:
 
 Drag a step type onto the diagram to open its in-canvas editor. Tap a type to place it without dragging. Maintain its instructions, user-facing explanation, responsibilities, sample changes, normal/alternative/exception routes, named decision answers, project/knowledge links and organization/material fields: company code, plant, storage location, material code/type, batch, valuation class/type and unit. **Save step** commits one saved edit; Cancel discards that insertion or edit. Choose **Save editable copy** before modifying the demonstration process.
 
-Drop a new or existing step onto another card to stack it magnetically; it snaps below its parent and adds a connection without replacing an existing normal route. Moving the parent carries its magnetic descendants. **Detach selected** detaches a selected child. To create another route, drag a step's outgoing dot to another step's incoming dot. Existing defaults remain intact and duplicate connections are ignored; additional named decision routes remain bounded to six. Arrival and flowing-connector effects show the change.
+Drop a new or existing step onto another card to stack it magnetically; it snaps below its parent and adds a connection without replacing an existing normal route. Moving the parent carries its magnetic descendants. **Detach selected** detaches a selected child. To create another route, drag a step's outgoing dot to another step's incoming dot. Existing defaults remain intact and duplicate connections are ignored; additional named decision routes remain bounded to six. Click an outgoing point, then several destinations to build branches, or choose a new step type to insert a linked step. **Done linking** returns to Explore. Arrival and flowing-connector effects show the change without pausing playback.
 
 Presenter canvas edits use the existing account document and backup/restore path. Guarded Undo refuses to overwrite a later external edit, and stale open editors cannot overwrite a changed saved process. Changing accounts closes both views. Hold, hide-content and audience breaks temporarily lock canvas editing; playback, the laser, camera and presentation state do not create record writes.
 
@@ -55,9 +67,9 @@ Document tokens move between steps, active edges flow, approvals receive stamps,
 
 Sound waits for a browser gesture. **Enable sound** plays a preview; **Mute sound** and Volume control the locally generated step tones. Sound status explains zero volume, browser blocking and unavailable audio. Pending activation cannot block playback or reactivate muted sound. Leaving, hiding the page or changing accounts stops tones.
 
-Global Animations Off and system reduced-motion settings stop automatic advancement and special effects; manual steps and explicitly requested sound still work. Editing, other open dialogs, hidden pages, Focus, privacy and the global presentation switch pause playback. The Process Hub's own full-screen dialog permits playback.
+Global Animations Off and system reduced-motion settings stop automatic advancement and special effects; manual steps and explicitly requested sound still work. Unrelated open dialogs, hidden pages, Focus, privacy and the global presentation switch pause playback. Process editing dialogs, step forms and drafts allow playback to continue. The Process Hub's own full-screen dialog permits playback.
 
-Scenarios define initial sample values, success/exception outcomes and choices among additional normal routes. Explore scenarios automatically cycles through scenarios after a route finishes. **Follow success**, **What if this fails?** and alternative-route buttons change the current playback only. Clicking a graph card pauses for inspection; the journal revisits a reached step. Previous/Next/Restart and temporary outcomes do not write records. Cycles stop after four visits per step or 160 trace entries, show a loop-limit result, then restart the presentation.
+Scenarios define initial sample values, success/exception outcomes and choices among additional normal routes. Explore scenarios automatically cycles through scenarios after a route finishes. **Follow success**, **What if this fails?** and alternative-route buttons change the current playback only. Clicking a graph card opens its details while playback continues; the journal revisits a reached step. Previous/Next/Restart and temporary outcomes do not write records. Cycles stop after four visits per step or 160 trace entries, show a loop-limit result, then restart the presentation.
 
 Initial sample values use one `Field = value` per line. Step changes use `Field = value` or `Field += number`; `@Other field` reads a sample value. Invalid additions or missing values pause the scenario with an explanation. At most 30 sample fields and 30 changes per step are allowed. These operations do not execute code or post to SAP.
 

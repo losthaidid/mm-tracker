@@ -4,7 +4,7 @@ This is the source map for **SAP MM WorkHub** in `losthaidid/mm-tracker`.
 The website is published by GitHub Pages. Supabase stores private account records and handles login.
 There is no build step for ordinary website changes.
 
-Unified Process Hub: `rehearsal-engine.js` validates saved graphs, adapts both existing process collections in place, and plans scenarios/sample-value changes; `rehearsal.js` supplies full-screen draft editing, drag/drop types, animated playback, audience/reference views, audio and journal; `process-hub-files.js` creates local PDF/PNG exports; `rehearsal.css` styles the hub and T-code desk. `sap-tcodes-data.js` contains the SAP-sourced starter references, `sap-tcodes-engine.js` validates and filters the private library, and `sap-tcodes.js` handles maintenance. See [PROCESS-REHEARSAL.md](PROCESS-REHEARSAL.md).
+Unified Process Hub: `rehearsal-engine.js` validates saved graphs, adapts both existing process collections in place, plans scenarios/sample-value changes and resumes live edits without replaying completed changes; `rehearsal.js` supplies full-screen draft editing, drag/drop types, animated playback, audience/reference views, audio and journal; `process-hub-files.js` creates local PDF/PNG exports; `rehearsal.css` styles the hub and T-code desk. `sap-tcodes-data.js` contains the SAP-sourced starter references, `sap-tcodes-engine.js` validates and filters the private library, and `sap-tcodes.js` handles maintenance. See [PROCESS-REHEARSAL.md](PROCESS-REHEARSAL.md).
 
 Project reporting: [project-standup-engine.js](../project-standup-engine.js) handles progress totals, recorded update times and Action/task links; [project-standup.js](../project-standup.js) supplies the Overview card, expanded report and Actions forms; [project-standup.css](../project-standup.css) controls its responsive layout. See [PROJECT-STANDUP.md](PROJECT-STANDUP.md) for usage and storage notes.
 
@@ -160,7 +160,7 @@ Presentation breaks: [presentation-break.js](../presentation-break.js) owns cust
 
 - `presenter.js` / `presenter.css`: main-window private canvas, selected-display audience pop-up, verified audience handshake and native fullscreen status, transient laser, playback, hold/cover and presentation breaks.
 - `presenter-window.html` / `presenter-window.js`: legacy private control shell retained for compatibility; new launches use the isolated audience page.
-- `process-canvas.js` / `process-canvas.css`: private in-canvas tool bubbles, staged step forms, dragging, ports, magnetic groups, annotation attachment and guarded saved edits.
+- `process-canvas.js` / `process-canvas.css`: private in-canvas tool bubbles, staged step forms, live multi-destination ports, magnetic groups, annotation attachment and guarded saved edits while playback continues.
 - `process-canvas-art.js`: shared graph-space annotation SVG, geometry, resize/attachment and canvas export drawing.
 - `presentation-screen.js`: explicitly selected display discovery/placement and fullscreen requests with current-account and disconnection guards.
 - `audience-view.js` / `audience.css`: shared 16:9 public scene and preview renderer.
