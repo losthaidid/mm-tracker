@@ -215,6 +215,11 @@
           date(t.dueDate),
           related,
           date(reminder('tasks', t.id)),
+          t.taskType === 'Project'
+            ? d.projectCompanies.find(c => c.id === t.companyId && c.projectId === t.linkId)
+                ?.name || ''
+            : '',
+          (t.references || []).map(ref => (ref.label ? ref.label + ': ' : '') + ref.url).join('\n'),
         ],
         record: 1,
         parent: true,
@@ -226,7 +231,17 @@
         });
       for (const sub of t.subTasks || []) {
         taskRows.push({
-          values: [sub.title, 'Subtask', sub.status, '', date(sub.dueDate || ''), t.task, ''],
+          values: [
+            sub.title,
+            'Subtask',
+            sub.status,
+            '',
+            date(sub.dueDate || ''),
+            t.task,
+            '',
+            '',
+            '',
+          ],
           record: 0,
           level: 1,
         });
@@ -249,6 +264,8 @@
         C('Due date', 16, 'date'),
         C('Related work / main task', 40),
         C('Revisit on', 16, 'date'),
+        C('Company', 30),
+        C('Website references', 65),
       ],
       taskRows,
       {

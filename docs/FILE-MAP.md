@@ -27,6 +27,7 @@ Current work-session filters, completed Schedule recordings, password-verified c
 | [app.js](../app.js) | Core records, Tickets/Tasks editors, Projects/governance, Schedule, workbook utilities, login and autosave. Extracted from the old inline script. | `FIELDS`, `render`, `mutate`, `saveEdit`, `saveCloud`. Numbered section comments explain the major areas. |
 | [base.css](../base.css) | Original shared styles for pages, forms, dialogs, tables, Projects and Schedule. Extracted from the old inline style. | Shared selectors; later feature sheets can override these rules. |
 | [custom.css](../custom.css) | Your own style overrides, loaded last. Contains commented examples. | Start here for simple appearance changes. |
+| [theme-surfaces.css](../theme-surfaces.css) | Shared theme colours for feature surfaces, controls, text and semantic states. Loaded before personal overrides. | Feature palette aliases; no layout or scene-art changes. |
 | [studio.js](../studio.js) | Workspace shell; My day, Knowledge, Process Hub, Waiting on, Studio, theme preferences, focus/work timers; installs the feature modules. | `DEFAULTS`, `WIDGETS`, `install`, `prepare`, `afterRender`. |
 | [studio.css](../studio.css) | Sidebar, dashboard, workspace screens, theme controls and work timer. | Shared WorkHub layouts and theme variables. |
 | [settings-panel.js](../settings-panel.js), [settings-panel.css](../settings-panel.css) | Searchable Settings categories and action descriptions. | `GROUPS` for category labels; `ITEMS` for descriptions/search words. |

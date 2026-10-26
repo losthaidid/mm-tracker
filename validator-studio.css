@@ -731,13 +731,13 @@
 .val-help {
   font-size: 10px !important;
   line-height: 1.7 !important;
-  color: #969f8b !important;
+  color: var(--val-muted, var(--hub-muted)) !important;
   margin: 12px 0 17px !important;
 }
 .val-muted {
   font-size: 12px !important;
   line-height: 1.7 !important;
-  color: #8b9681 !important;
+  color: var(--val-muted, var(--hub-muted)) !important;
 }
 .val-empty-small {
   text-align: center;
@@ -1527,11 +1527,11 @@
 .val-card > p,
 .val-muted,
 .val-work-head p {
-  color: #6f7d69 !important;
+  color: var(--val-muted, var(--hub-muted)) !important;
 }
 .val-help,
 .val-welcome > p {
-  color: #7c8873 !important;
+  color: var(--val-muted, var(--hub-muted)) !important;
 }
 .validation-studio .val-eyebrow,
 .val-library-heading,
@@ -1564,13 +1564,13 @@
 .val-release p,
 .val-run-history p,
 .val-run-history small {
-  color: #65735e !important;
+  color: var(--val-muted, var(--hub-muted)) !important;
 }
 .val-grid thead th,
 .val-grid th code,
 .val-grid tbody th,
 .val-chip {
-  color: #5f7054 !important;
+  color: var(--val-ink, var(--hub-text)) !important;
 }
 .val-metric > span,
 .val-metric strong small {
