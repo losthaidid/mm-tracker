@@ -144,3 +144,29 @@ test('startup shows real opening stages without a fabricated percentage or minim
   window.WorkHubStartup.phase('records','Opening your records…');assert.equal(document.querySelector('[aria-current="step"]').dataset.startupStage,'records');
   window.WorkHubStartup.finish();assert.equal(document.documentElement.hasAttribute('data-workhub-startup'),false);assert.equal([...timers.values()].filter(t=>t.delay!==220).length,0);
 });
+
+
+test('startup star interaction replays a finite burst, cleans up on completion, and never adds a readiness delay', t => {
+  const { window, document, timers } = startup(t), button = document.querySelector('.startup-spark-button'), scene = button.closest('.startup-scene');
+  const before = timers.size;
+  button.click(); assert.equal(scene.classList.contains('is-sparked'), true); assert.equal(timers.size, before);
+  const ended = new window.Event('animationend', { bubbles: true }); Object.defineProperty(ended, 'animationName', { value: 'startup-tap-wave' });
+  document.querySelector('.startup-tap-wave').dispatchEvent(ended); assert.equal(scene.classList.contains('is-sparked'), false);
+  button.click(); assert.equal(scene.classList.contains('is-sparked'), true); window.WorkHubStartup.finish();
+  scene.classList.remove('is-sparked'); button.click(); assert.equal(scene.classList.contains('is-sparked'), false);
+  assert.equal(document.documentElement.hasAttribute('data-workhub-startup'), false);
+  assert.deepEqual([...timers.values()].map(timer => timer.delay), [220]);
+  window.WorkHubStartup.account(project, 'owner'); assert.equal(document.documentElement.hasAttribute('data-startup-motion'), false); assert.equal(document.documentElement.hasAttribute('data-startup-phase'), false);
+});
+
+test('startup uses only the matching account motion setting, respects reduced motion for interactions and stops recovery-screen bursts', t => {
+  const stored = workspace => JSON.stringify({ document: { data: { workhub: { preferences: { workspace, motion: 'off' } } } } });
+  const h = startup(t, true, { [authKey]: JSON.stringify({ user: { id: 'owner' } }), [cacheKey('owner')]: stored('Quiet workspace'), [cacheKey('other')]: stored('Other workspace') });
+  const { window, document } = h, scene = document.querySelector('.startup-scene'), button = document.querySelector('.startup-spark-button');
+  assert.equal(document.documentElement.dataset.startupMotion, 'off'); button.click(); assert.equal(scene.classList.contains('is-sparked'), false);
+  window.WorkHubStartup.account(project, 'new-owner'); assert.equal(document.documentElement.hasAttribute('data-startup-motion'), false);
+  window.matchMedia = () => ({ matches: true }); button.click(); assert.equal(scene.classList.contains('is-sparked'), false);
+  window.matchMedia = () => ({ matches: false }); window.WorkHubStartup.phase('records', 'Opening your records…');
+  assert.equal(document.documentElement.dataset.startupPhase, 'records'); window.WorkHubStartup.phase('made-up'); assert.equal(document.documentElement.dataset.startupPhase, 'records');
+  document.querySelector('script[src]').dispatchEvent(new window.Event('error')); button.click(); assert.equal(scene.classList.contains('is-sparked'), false); assert.equal(document.documentElement.dataset.workhubStartupState, 'error');
+});
