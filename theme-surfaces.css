@@ -782,6 +782,7 @@ body[data-hub-theme]
     .batch-muted,
     .batch-eyebrow,
     .batch-field,
+    .batch-label-choices legend,
     .batch-section-label small,
     .calendar-weekdays span,
     .booking-context,
