@@ -3106,3 +3106,77 @@ test('Task companies: older backups gain active companies and empty optional tas
  const ctx=await app(t),{api}=ctx,pid=taskCompanyFixture(api);api.saveEdit(chooseTaskProject(ctx,pid,'task-company-a'));const legacy=copy(api.state());delete legacy.tasks[0].companyId;delete legacy.tasks[0].references;delete legacy.projectCompanies[0].active;const restored=api.parseBackup(api.payload(legacy));assert.equal(restored.projectCompanies[0].active,true);assert.equal(restored.tasks[0].companyId,'');assert.deepEqual(copy(restored.tasks[0].references),[]);
  restored.tasks[0].companyId='task-company-other';assert.throws(()=>api.validate(restored),/linked project/);restored.tasks[0].companyId='';restored.projectCompanies[0].active='No';assert.throws(()=>api.validate(restored),/company details/);
 });
+
+async function companyValidationWorkspace(ctx) {
+
+ const {api,document,window}=ctx,pid=taskCompanyFixture(api),ui=api.hub.validator;
+ api.showTab('validator');await ui.handle({dataset:{val:'example'}});
+ let f=document.getElementById('valMetaForm');f.elements.namedItem('projectId').value=pid;f.elements.namedItem('projectId').dispatchEvent(new window.Event('change',{bubbles:true}));await settle();
+ await ui.handle({dataset:{val:'mode',mode:'rules'}});
+ f=document.getElementById('valRuleForm');f.elements.namedItem('companyScope').value='selected';f.elements.namedItem('companyScope').dispatchEvent(new window.Event('change',{bubbles:true}));await settle();
+ f=document.getElementById('valRuleForm');f.querySelector('[name="ruleCompany"][value="task-company-a"]').checked=true;
+ assert.equal(ui.saveDraft(),true);await settle();return {ui,pid};
+}
+function validationCompany(ctx,id) {
+ const el=ctx.document.querySelector('[name="validationCompany"]');el.value=id;el.dispatchEvent(new ctx.window.Event('change',{bubbles:true}));
+}
+test('Validation company: conditions, corrections and run summaries use the selected company without saving upload rows',async t=>{
+ const ctx=await app(t),{api,document,window,db}=ctx,{ui,pid}=await companyValidationWorkspace(ctx);
+ const choices=[...document.querySelectorAll('[name="ruleCompany"]')].map(el=>el.value);assert.deepEqual(choices,['task-company-a','task-company-b']);
+ ui.loadSample();await assert.rejects(ui.run(),/Choose an active company/);
+ assert.deepEqual([...document.querySelector('[name="validationCompany"]').options].map(o=>o.value),['','task-company-a','task-company-b']);
+ validationCompany(ctx,'task-company-a');window.setTimeout=(callback,delay)=>{if(delay===50)queueMicrotask(callback);return 0;};await ui.run();await settle();
+ assert.equal(ui.snapshot().result.errors,3);assert.equal(ui.snapshot().result.context.companyName,'Company Alpha');assert.match(document.querySelector('.val-run-scope').textContent,/Results for Company Alpha/);
+ validationCompany(ctx,'task-company-b');await settle();assert.equal(ui.snapshot().result,null);assert.equal(document.querySelector('[data-val="report"]').disabled,true);
+ await ui.run();await settle();assert.equal(ui.snapshot().result.errors,2);assert.equal(ui.snapshot().result.context.projectId,pid);assert.equal(api.state().workhub.validator.runs[0].context.companyName,'Company Beta');
+ assert.equal(JSON.stringify(db.row).includes('REQ-002'),false);assert.equal(api.parseBackup(api.payload(api.state())).workhub.validator.templates[0].rules[0].companies[0].id,'task-company-a');
+});
+test('Validation company: saved project links and frozen condition scopes reopen on another device',async t=>{
+ const ctx=await app(t),{api,db}=ctx,{ui,pid}=await companyValidationWorkspace(ctx);ui.publish();await settle();
+ const frozen=copy(api.state().workhub.validator.templates[0].releases[0]);assert.equal(frozen.schema.projectId,pid);assert.equal(frozen.schema.rules[0].companies[0].name,'Company Alpha');
+ const next=await app(t,{remote:copy(db.row),login:false});await next.api.loadCloud(sessionUser);next.api.showTab('validator');await next.api.hub.validator.handle({dataset:{val:'mode',mode:'check'}});
+ assert.equal(next.document.querySelectorAll('[name="validationCompany"] option').length,3);assert.equal(next.api.hub.validator.snapshot().draft.projectId,pid);
+ api.validate(api.state());assert.deepEqual(copy(api.state().workhub.validator.templates[0].releases[0]),frozen);
+});
+test('Validation company: changing projects pauses company conditions, preserves shared rules and respects cancellation',async t=>{
+ const ctx=await app(t),{document,window}=ctx,{ui,pid}=await companyValidationWorkspace(ctx);
+ await ui.handle({dataset:{val:'mode',mode:'columns'}});window.confirm=()=>false;
+ let el=document.querySelector('#valMetaForm [name="projectId"]');el.value='task-other-project';el.dispatchEvent(new window.Event('change',{bubbles:true}));await settle();assert.equal(el.value,pid);assert.equal(ui.snapshot().draft.rules[0].enabled,true);
+ window.confirm=()=>true;el.value='task-other-project';el.dispatchEvent(new window.Event('change',{bubbles:true}));await settle();
+ const draft=ui.snapshot().draft;assert.equal(draft.projectId,'task-other-project');assert.equal(draft.rules[0].enabled,false);assert.deepEqual(copy(draft.rules[0].companies),[]);assert.equal(draft.rules[1].enabled,true);assert.equal(ui.saveDraft(),true);
+});
+test('Validation company: changing company cancels a pending run and account changes clear company context',async t=>{
+ const ctx=await app(t),{api,document,window}=ctx,{ui}=await companyValidationWorkspace(ctx);ui.loadSample();validationCompany(ctx,'task-company-a');await settle();
+ let finish;window.setTimeout=(callback,delay)=>{if(delay===50)finish=callback;return 0;};const pending=ui.run();validationCompany(ctx,'task-company-b');await settle();finish();await pending;
+ assert.equal(ui.snapshot().result,null);assert.equal(api.state().workhub.validator.runs.length,0);
+ api.cloud.user=null;api.cloud.ready=false;api.showTab('home');assert.equal(ui.snapshot().runCompanyId,'');assert.equal(ui.snapshot().draft,null);
+});
+test('Validation company: inactive companies cannot be used for a new run while saved condition assignments remain intact',async t=>{
+ const ctx=await app(t),{api}=ctx,{ui}=await companyValidationWorkspace(ctx);ui.loadSample();validationCompany(ctx,'task-company-a');
+ api.mutate(d=>{d.projectCompanies.find(c=>c.id==='task-company-a').active=false;});await settle();
+ await assert.rejects(ui.run(),/active company/);assert.equal(api.state().workhub.validator.templates[0].rules[0].companies[0].id,'task-company-a');api.validate(api.state());
+});
+
+test('Validation copying: whole templates copy across projects with new company assignments and independent saved definitions',async t=>{
+ const ctx=await app(t),{api,document,window}=ctx,{ui}=await companyValidationWorkspace(ctx);ui.publish();await settle();
+ const source=copy(api.state().workhub.validator.templates[0]);await ui.handle({dataset:{val:'copy-template'}});
+ let f=document.getElementById('valCopyForm');f.elements.namedItem('copyName').value='Other project checks';f.elements.namedItem('copyProject').value='task-other-project';f.elements.namedItem('copyProject').dispatchEvent(new window.Event('change',{bubbles:true}));await settle();
+ f=document.getElementById('valCopyForm');assert.equal(f.elements.namedItem('copyName').value,'Other project checks');assert.deepEqual([...f.querySelectorAll('[name="copyCompany"]')].map(el=>el.value),['task-company-other']);f.querySelector('[name="copyCompany"]').checked=true;f.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));await settle();
+ const next=ui.snapshot().draft;assert.equal(next.projectId,'task-other-project');assert.notEqual(next.id,source.id);assert.equal(next.releases.length,0);assert.ok(next.rules.every(r=>r.companies[0].id==='task-company-other'));assert.equal(ui.saveDraft(),true);await settle();
+ assert.equal(api.state().workhub.validator.templates.length,2);assert.deepEqual(copy(api.state().workhub.validator.templates[0]),source);
+});
+test('Validation copying: source company filter and selected conditions copy independently to a destination company',async t=>{
+ const ctx=await app(t),{api,document,window}=ctx,{ui}=await companyValidationWorkspace(ctx),source=copy(api.state().workhub.validator.templates[0]);
+ await ui.handle({dataset:{val:'copy-conditions'}});let f=document.getElementById('valCopyForm');f.elements.namedItem('copySourceCompany').value='task-company-a';f.elements.namedItem('copySourceCompany').dispatchEvent(new window.Event('change',{bubbles:true}));await settle();
+ f=document.getElementById('valCopyForm');const rules=[...f.querySelectorAll('[name="copyRule"]')];for(const el of rules)el.checked=el.value===source.rules[0].id;
+ f.querySelector('[name="copyCompany"][value="task-company-b"]').checked=true;f.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));await settle();
+ const next=ui.snapshot().draft;assert.equal(next.rules.length,4);assert.notEqual(next.rules[3].id,source.rules[0].id);assert.equal(next.rules[3].companies[0].id,'task-company-b');assert.equal(next.rules[0].companies[0].id,'task-company-a');assert.equal(ui.saveDraft(),true);
+});
+test('Validation issues: attention links jump across pages, show the exact value and focus the editable error cell',async t=>{
+ const {api,document,window}=await app(t),ui=api.hub.validator;api.showTab('validator');await ui.handle({dataset:{val:'example'}});ui.saveDraft();
+ const data=['Request ID,Request type,Owner,Amount,Start date,End date',...Array.from({length:31},(_,i)=>['REQ-'+i,'Standard','Aisha',i===30?'wrong <img src=x>':'25','2026-10-20','2026-10-21'].join(','))].join('\n');
+ await ui.loadFile({name:'issues.csv',size:data.length,text:async()=>data});window.setTimeout=(callback,delay)=>{if(delay===50)queueMicrotask(callback);return 0;};await ui.run();await settle();
+ assert.equal(ui.snapshot().result.errors,1);await ui.handle({dataset:{val:'filter',filter:'passed'}});const issue=document.querySelector('[data-val="issue"][data-index="30"]');assert.match(issue.textContent,/wrong <img src=x>/);await ui.handle(issue);
+ const cell=document.querySelector('[data-cell="30"][data-field="AMOUNT"]');assert.equal(document.activeElement,cell);assert.equal(cell.selectionEnd,cell.value.length);assert.match(document.getElementById('valSelectedIssue').textContent,/Row 32 · Amount/);assert.equal(document.querySelector('#valSelectedIssue pre').textContent,'wrong <img src=x>');assert.equal(document.querySelector('#valSelectedIssue img'),null);assert.ok(cell.closest('td').classList.contains('val-target-cell'));
+ cell.value='25';cell.dispatchEvent(new window.Event('change',{bubbles:true}));await settle();assert.equal(document.getElementById('valSelectedIssue'),null);await ui.run();assert.equal(ui.snapshot().result.errors,0);
+});

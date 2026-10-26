@@ -312,6 +312,8 @@
       name,
       description: '',
       mode: 'general',
+      projectId: '',
+      projectName: '',
       columns: [],
       rules: [],
       lookups: [],
@@ -333,6 +335,8 @@
       name: 'New condition',
       severity: 'error',
       enabled: true,
+      companyScope: 'all',
+      companies: [],
       when: group(),
       assertion: { ...condition(field), operator: 'notEmpty' },
       message: '',
@@ -343,6 +347,8 @@
       name: t.name,
       description: t.description,
       mode: t.mode || 'general',
+      projectId: t.projectId || '',
+      projectName: t.projectName || '',
       columns: t.columns,
       rules: t.rules,
       lookups: t.lookups,
@@ -360,6 +366,8 @@
       throw Error('Add between 1 and 200 columns.');
     if (t.mode !== undefined && !['general', 'sap'].includes(t.mode))
       throw Error('Choose General or SAP validation.');
+    if (!text(t.projectId || '', 100) || !text(t.projectName || '', 200))
+      throw Error('Check the linked project.');
     const keys = new Set(),
       ids = new Set(),
       labels = new Set();
@@ -543,6 +551,19 @@
       )
         throw Error('Check rule names, severity and messages.');
       ruleIds.add(r.id);
+      if (
+        !['all', 'selected'].includes(r.companyScope || 'all') ||
+        (r.companies !== undefined && !Array.isArray(r.companies)) ||
+        (r.companies || []).length > 200 ||
+        (r.companies || []).some(
+          c => !c || !text(c.id, 100) || !c.id.trim() || !text(c.name, 200) || !c.name.trim()
+        ) ||
+        new Set((r.companies || []).map(c => c.id)).size !== (r.companies || []).length ||
+        (r.companyScope === 'selected'
+          ? !t.projectId || !r.companies?.length
+          : !!r.companies?.length)
+      )
+        throw Error('Company conditions need a linked project and at least one selected company.');
       checkGroup(r.when);
       checkCondition(r.assertion);
     }
@@ -588,6 +609,12 @@
         throw Error('Check template identifiers.');
       ids.add(t.id);
       checkSchema(t, true);
+      for (const rule of t.rules)
+        for (const assigned of rule.companies || []) {
+          const company = d.projectCompanies?.find(c => c.id === assigned.id);
+          if (company && company.projectId !== t.projectId)
+            throw Error('Condition companies must belong to the linked project.');
+        }
       if (!Array.isArray(t.releases) || t.releases.length > LIMITS.versions)
         throw Error('Keep up to 15 published versions per template.');
       let last = 0;
@@ -617,6 +644,7 @@
       )
         throw Error('Check validation run summaries.');
       runIds.add(r.id);
+      if (r.context !== undefined) checkContext({ projectId: r.context?.projectId }, r.context);
     }
     if (JSON.stringify(v).length > 6000000)
       throw Error(
@@ -760,8 +788,9 @@
     return cache.get(key).get(valueKey(values)) || { rows: [], count: 0 };
   }
   /** Offer maintained values for one field; tuple lookups retain the other mapped values. */
-  function suggestions(t, row, fieldKey, query = '') {
+  function suggestions(t, row, fieldKey, query = '', context = {}) {
     checkSchema(t);
+    checkContext(t, context);
     const field = t.columns.find(c => c.key === fieldKey);
     if (!field) throw Error('Choose an existing field.');
     const candidates = new Map(),
@@ -779,7 +808,7 @@
     for (const rule of t.rules) {
       const c = rule.assertion;
       if (
-        !rule.enabled ||
+        !ruleApplies(rule, context) ||
         c.field !== fieldKey ||
         !testGroup(rule.when, row, t, cache) ||
         !['lookup', 'lookupTuple', 'in'].includes(c.operator)
@@ -851,7 +880,7 @@
       if (!sapMode(t) && field.format && !FORMATS[field.format].test(v)) return false;
       return t.rules.every(
         r =>
-          !r.enabled ||
+          !ruleApplies(r, context) ||
           r.assertion.field !== fieldKey ||
           !testGroup(r.when, trial, t, cache) ||
           testCondition(r.assertion, trial, t, cache)
@@ -869,7 +898,8 @@
     );
     return { total: choices.length, choices: choices.slice(0, 30) };
   }
-  function referenceDetails(t, row, cache = new Map()) {
+  function referenceDetails(t, row, cache = new Map(), context = {}) {
+    checkContext(t, context);
     const conditions = [],
       seen = new Set(),
       out = [];
@@ -878,7 +908,7 @@
       g.groups.forEach(walk);
     };
     for (const r of t.rules)
-      if (r.enabled) {
+      if (ruleApplies(r, context)) {
         walk(r.when);
         conditions.push(r.assertion);
       }
@@ -942,8 +972,121 @@
             : ' ' + (c.value || '…'))
     );
   }
-  function validateRows(t, rows) {
+  /** A run is for one maintained company; scope is separate from uploaded cell values. */
+  function checkContext(t, context = {}) {
+    if (
+      !context ||
+      typeof context !== 'object' ||
+      Array.isArray(context) ||
+      ['projectId', 'companyId'].some(k => !text(context[k] || '', 100)) ||
+      ['projectName', 'companyName'].some(k => !text(context[k] || '', 200)) ||
+      (t.projectId
+        ? context.projectId !== t.projectId || !context.companyId?.trim()
+        : !!context.projectId || !!context.companyId)
+    )
+      throw Error('Choose a company from the template’s linked project before validation.');
+    return context;
+  }
+  function runContext(d, t, companyId = '') {
+    if (!t.projectId) return {};
+    const project = (d.projects || []).find(p => p.id === t.projectId),
+      company = (d.projectCompanies || []).find(
+        c => c.id === companyId && c.projectId === t.projectId && c.active !== false
+      );
+    if (!project)
+      throw Error('The linked project is unavailable. Relink the draft or choose another version.');
+    if (!company)
+      throw Error('Choose an active company from the template’s linked project before validation.');
+    return {
+      projectId: project.id,
+      projectName: project.name,
+      companyId: company.id,
+      companyName: company.name,
+    };
+  }
+  function ruleApplies(r, context = {}) {
+    return (
+      r.enabled &&
+      (r.companyScope !== 'selected' || r.companies.some(c => c.id === context.companyId))
+    );
+  }
+  function assignCompanies(r, destination) {
+    r.companyScope = destination.companyScope || 'all';
+    r.companies = r.companyScope === 'selected' ? copy(destination.companies || []) : [];
+    return r;
+  }
+  function copyTemplate(source, name, destination, ruleIds = source.rules.map(r => r.id)) {
+    if (
+      !Array.isArray(ruleIds) ||
+      new Set(ruleIds).size !== ruleIds.length ||
+      ruleIds.some(id => !source.rules.some(r => r.id === id))
+    )
+      throw Error('Choose existing source conditions to copy.');
+    const next = { ...create(name), ...schema(source), name };
+    next.projectId = destination.projectId || '';
+    next.projectName = destination.projectName || '';
+    next.columns.forEach(c => (c.id = uid()));
+    next.rules = next.rules.filter(r => ruleIds.includes(r.id));
+    next.rules.forEach(r => {
+      r.id = uid();
+      assignCompanies(r, destination);
+    });
+    checkSchema(next, true);
+    return next;
+  }
+  /** Copies are independent. Exact field keys must exist; referenced lists travel with the rules. */
+  function copyConditions(source, target, ruleIds, destination) {
+    checkSchema(source, true);
+    if (
+      !Array.isArray(ruleIds) ||
+      !ruleIds.length ||
+      new Set(ruleIds).size !== ruleIds.length ||
+      ruleIds.some(id => !source.rules.some(r => r.id === id))
+    )
+      throw Error('Choose at least one source condition to copy.');
+    const next = copy(target),
+      lookups = new Map(),
+      rules = source.rules.filter(r => ruleIds.includes(r.id)).map(copy);
+    const clause = c => {
+      for (const key of [
+        c.field,
+        ...(c.otherField && c.operator.startsWith('field') ? [c.otherField] : []),
+        ...(c.pairs || []).map(p => p.field),
+      ])
+        if (!next.columns.some(f => f.key === key))
+          throw Error(
+            'Add the technical field ' +
+              key +
+              ' to the destination template before copying this condition.'
+          );
+      if (['lookup', 'lookupTuple'].includes(c.operator)) {
+        if (!lookups.has(c.lookupId)) {
+          const list = copy(source.lookups.find(l => l.id === c.lookupId)),
+            id = uid();
+          lookups.set(c.lookupId, id);
+          list.id = id;
+          next.lookups.push(list);
+        }
+        c.lookupId = lookups.get(c.lookupId);
+      }
+    };
+    const walk = g => {
+      g.conditions.forEach(clause);
+      g.groups.forEach(walk);
+    };
+    for (const r of rules) {
+      r.id = uid();
+      assignCompanies(r, destination);
+      walk(r.when);
+      clause(r.assertion);
+    }
+    next.rules.push(...rules);
+    checkSchema(next, true);
+    return next;
+  }
+  function validateRows(t, rows, context = {}) {
     checkSchema(t);
+    checkContext(t, context);
     if (
       !Array.isArray(rows) ||
       rows.length > LIMITS.rows ||
@@ -1022,7 +1165,7 @@
       }
       for (const r of t.rules)
         if (
-          r.enabled &&
+          ruleApplies(r, context) &&
           testGroup(r.when, row, t, cache) &&
           !testCondition(r.assertion, row, t, cache)
         )
@@ -1072,6 +1215,8 @@
     const errors = status.reduce((n, r) => n + r.errors, 0),
       warnings = status.reduce((n, r) => n + r.warnings, 0);
     return {
+      context: copy(context),
+      appliedRules: t.rules.filter(r => ruleApplies(r, context)).length,
       rows: rows.length,
       passed: status.filter(r => !r.errors).length,
       clean: status.filter(r => !r.errors && !r.warnings).length,
@@ -1254,6 +1399,30 @@
     if (restoring) return;
     for (const t of next.workhub?.validator?.templates || []) {
       const old = previous?.workhub?.validator?.templates.find(p => p.id === t.id);
+      if (
+        t.projectId &&
+        t.projectId !== old?.projectId &&
+        !next.projects?.some(p => p.id === t.projectId)
+      )
+        throw Error('Choose a maintained project for this validation template.');
+      for (const r of t.rules) {
+        const before = old?.rules.find(rule => rule.id === r.id);
+        for (const c of r.companies || [])
+          if (
+            t.projectId !== old?.projectId ||
+            !before?.companies?.some(saved => saved.id === c.id)
+          ) {
+            if (
+              !next.projectCompanies?.some(
+                company =>
+                  company.id === c.id &&
+                  company.projectId === t.projectId &&
+                  company.active !== false
+              )
+            )
+              throw Error('Choose active condition companies from the template’s linked project.');
+          }
+      }
       if (!old) continue;
       for (const release of old.releases) {
         const retained = t.releases.find(r => r.version === release.version);
@@ -1281,6 +1450,11 @@
     rule,
     schema,
     checkSchema,
+    checkContext,
+    runContext,
+    ruleApplies,
+    copyTemplate,
+    copyConditions,
     upgrade,
     validateState,
     prepare,

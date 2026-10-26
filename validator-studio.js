@@ -131,13 +131,16 @@
       result = null,
       resultSchema = null,
       version = 'draft',
+      runCompanyId = '',
       fileName = '',
       filter = 'all',
       page = 0,
       busy = false,
       refEditing = '',
       targetRow = -1,
+      selectedIssue = null,
       setupPreview = null,
+      copyPreview = null,
       correction = null;
     function sync() {
       const next = a.owner?.() || '';
@@ -154,11 +157,15 @@
         rows = [];
         result = null;
         resultSchema = null;
+        selectedIssue = null;
         fileName = '';
         busy = false;
         mode = 'columns';
+        runCompanyId = '';
         setupPreview = null;
         correction = null;
+        copyPreview = null;
+        if ($('valCopyReview')) a.closeModal?.();
         if ($('valCorrectionReview')) a.closeModal?.();
         if ($('valSetupReview')) a.closeModal?.();
       }
@@ -181,6 +188,7 @@
       dirty = true;
       result = null;
       resultSchema = null;
+      selectedIssue = null;
       const el = $('valDraftStatus');
       if (el) el.textContent = 'Unsaved draft';
     }
@@ -206,7 +214,11 @@
     }
     function clearFile() {
       generation++;
+      runCompanyId = '';
+      selectedIssue = null;
+      targetRow = -1;
       setupPreview = null;
+      copyPreview = null;
       correction = null;
       book = null;
       headers = [];
@@ -289,6 +301,16 @@
         draft.name = meta.elements.namedItem('name').value.trim();
         draft.description = meta.elements.namedItem('description').value;
         draft.mode = meta.elements.namedItem('mode')?.value || draft.mode || 'general';
+        const projectId = meta.elements.namedItem('projectId')?.value || '';
+        if (
+          projectId !== (draft.projectId || '') &&
+          draft.rules.some(r => r.companyScope === 'selected')
+        )
+          throw Error('Reassign company conditions before changing the linked project.');
+        draft.projectId = projectId;
+        draft.projectName =
+          a.state().projects.find(p => p.id === projectId)?.name || draft.projectName || '';
+        if (!projectId) draft.projectName = '';
       }
       const cf = $('valColumnForm');
       if (cf) {
@@ -323,6 +345,20 @@
         r.severity = rf.elements.namedItem('severity').value;
         r.message = rf.elements.namedItem('message').value;
         r.enabled = rf.elements.namedItem('enabled').checked;
+        r.companyScope = rf.elements.namedItem('companyScope')?.value || 'all';
+        r.companies =
+          r.companyScope === 'selected'
+            ? Array.from(rf.querySelectorAll('[name="ruleCompany"]:checked')).map(el => {
+                const current = a
+                  .state()
+                  .projectCompanies.find(c => c.id === el.value && c.projectId === draft.projectId);
+                return {
+                  id: el.value,
+                  name:
+                    current?.name || r.companies?.find(c => c.id === el.value)?.name || el.value,
+                };
+              })
+            : [];
         r.when = readGroup(rf.querySelector('[data-group-root]'));
         r.assertion = readClause(rf.querySelector('[data-assertion]'));
       }
@@ -396,6 +432,7 @@
                 ' columns · ' +
                 (t.mode === 'sap' ? 'SAP · ' : 'General · ') +
                 (t.releases.length ? 'v' + t.releases.at(-1).version : 'Draft') +
+                (t.projectId ? ' · ' + esc(projectName(t)) : '') +
                 '</small></span>',
               'data-id="' + esc(t.id) + '"',
               t.id === selected ? 'is-active' : ''
@@ -444,7 +481,11 @@
         esc(draft.name || 'Untitled template') +
         '</h2><p>' +
         esc(draft.description || 'A flexible home for columns, conditions and clean data.') +
-        '</p><span id="valDraftStatus" class="val-save-state">' +
+        '</p>' +
+        (draft.projectId
+          ? '<span class="val-scope-badge">Project · ' + esc(projectName(draft)) + '</span>'
+          : '') +
+        '<span id="valDraftStatus" class="val-save-state">' +
         (dirty ? 'Unsaved draft' : 'Draft saved') +
         '</span></div><div class="val-actions">' +
         btn('save', 'Save draft', '', 'val-secondary') +
@@ -452,6 +493,7 @@
         '<details class="val-more"><summary aria-label="Template options">•••</summary><div>' +
         btn('export-definition', 'Export definition') +
         btn('duplicate', 'Duplicate template') +
+        btn('copy-template', 'Copy to project / companies…') +
         btn('delete-template', 'Delete template', '', 'val-danger') +
         '</div></details></div></div><nav class="val-tabs" aria-label="Validation workspace">' +
         [
@@ -471,6 +513,67 @@
           )
           .join('') +
         '</nav>'
+      );
+    }
+    function projectName(t) {
+      return (
+        a.state().projects.find(p => p.id === t.projectId)?.name ||
+        t.projectName ||
+        'Unavailable project'
+      );
+    }
+    function projectOptions() {
+      const projects = a.state().projects;
+      return [
+        ['', 'Standalone · no project link'],
+        ...projects.map(p => [p.id, p.name]),
+        ...(draft.projectId && !projects.some(p => p.id === draft.projectId)
+          ? [[draft.projectId, (draft.projectName || 'Saved project') + ' (unavailable)']]
+          : []),
+      ];
+    }
+    function companyScopeEditor(r) {
+      const companies = a
+          .state()
+          .projectCompanies.filter(c => c.projectId === draft.projectId && c.active !== false),
+        retained = (r.companies || []).filter(saved => !companies.some(c => c.id === saved.id));
+      return (
+        '<fieldset class="val-company-scope"><legend>Company scope</legend>' +
+        select(
+          'companyScope',
+          'Apply this condition to',
+          [
+            ['all', draft.projectId ? 'All companies in this project' : 'All validation runs'],
+            ...(draft.projectId ? [['selected', 'Selected companies only']] : []),
+          ],
+          r.companyScope || 'all'
+        ) +
+        (!draft.projectId
+          ? '<p class="val-help">Link this template to a project in Columns to maintain company-specific conditions.</p>'
+          : '<div class="val-company-choices"' +
+            (r.companyScope !== 'selected' ? ' hidden' : '') +
+            '><p class="val-help">Choose one or more companies from ' +
+            esc(projectName(draft)) +
+            '. This condition runs only for those companies.</p><div class="val-check-list">' +
+            [...companies, ...retained]
+              .map(
+                c =>
+                  '<label class="val-toggle"><input type="checkbox" name="ruleCompany" value="' +
+                  esc(c.id) +
+                  '"' +
+                  ((r.companies || []).some(saved => saved.id === c.id) ? ' checked' : '') +
+                  '><span>' +
+                  esc(c.name) +
+                  (retained.includes(c) ? ' (inactive or unavailable)' : '') +
+                  '</span></label>'
+              )
+              .join('') +
+            '</div>' +
+            (!companies.length
+              ? '<p class="val-help">Add or activate companies in Projects → Companies &amp; processes.</p>'
+              : '') +
+            '</div>') +
+        '<p class="val-help">Column checks and conditions for all companies still apply alongside company-specific conditions.</p></fieldset>'
       );
     }
     function sapColumnFields(c) {
@@ -606,6 +709,8 @@
           draft.description,
           'maxlength="2000" rows="2" placeholder="What will this template help you check?"'
         ) +
+        select('projectId', 'Linked project', projectOptions(), draft.projectId || '') +
+        '<p class="val-help">Optional. Use one template for multiple companies, then assign each condition in Conditions. Companies are maintained in Projects → Companies &amp; processes.</p>' +
         '</form>' +
         (c
           ? '<form id="valColumnForm" data-id="' +
@@ -874,13 +979,15 @@
       if (r) ruleId = r.id;
       return (
         '<div class="val-section-heading"><div><h3>Small conditions. Clear answers.</h3><p>Combine AND/OR groups, compare fields and choose what an issue should say.</p></div>' +
+        '<div class="val-actions">' +
+        btn('copy-conditions', 'Copy conditions…', '', 'val-secondary') +
         btn(
           'add-rule',
           '＋ Add condition',
           !draft.columns.length ? 'disabled' : '',
           'val-secondary'
         ) +
-        '</div><div class="val-designer"><div class="val-outline"><div class="val-outline-title">YOUR CONDITIONS <span>' +
+        '</div></div><div class="val-designer"><div class="val-outline"><div class="val-outline-title">YOUR CONDITIONS <span>' +
         draft.rules.length +
         '</span></div>' +
         draft.rules
@@ -893,6 +1000,12 @@
                 esc(r.name) +
                 '</strong><small>' +
                 (r.enabled ? (r.severity === 'warning' ? 'Warning' : 'Error') : 'Paused') +
+                ' · ' +
+                esc(
+                  r.companyScope === 'selected'
+                    ? (r.companies || []).map(c => c.name).join(', ') || 'Choose companies'
+                    : 'All companies'
+                ) +
                 '</small></span>',
               'data-id="' + esc(r.id) + '"',
               r.id === ruleId ? 'is-active' : ''
@@ -923,6 +1036,7 @@
             ) +
             '</div>' +
             toggle('enabled', 'Enable this condition', r.enabled) +
+            companyScopeEditor(r) +
             groupView(r.when, 'when') +
             '<div class="val-then"><span class="val-eyebrow">THEN REQUIRE</span>' +
             clause(r.assertion, 'assertion', true) +
@@ -1155,6 +1269,7 @@
       commitCurrent();
       const t = activeSchema();
       E.checkSchema(t);
+      const context = E.runContext(a.state(), t, runCompanyId);
       const mapped = E.mapRows(headers, sourceRows, t, mapping);
       if (!mapped.length) throw Error('Upload or paste at least one data row.');
       if (version === 'draft' && !saveDraft(true)) return;
@@ -1163,12 +1278,15 @@
       busy = true;
       result = null;
       rows = mapped;
+      selectedIssue = null;
+      targetRow = -1;
       say('Checking columns, conditions and references…');
       paint();
       await new Promise(resolve => root.setTimeout(resolve, 50));
       if (token !== generation || account !== a.owner?.() || !a.ready()) return;
       try {
-        const checked = E.validateRows(t, rows);
+        E.runContext(a.state(), t, context.companyId);
+        const checked = E.validateRows(t, rows, context);
         if (token !== generation || account !== a.owner?.()) return;
         result = checked;
         resultSchema = E.copy(t);
@@ -1185,6 +1303,7 @@
           passed: checked.passed,
           errors: checked.errors,
           warnings: checked.warnings,
+          context: E.copy(context),
         };
         a.mutate(d => {
           const history = d.workhub.validator.runs;
@@ -1310,7 +1429,19 @@
         (page * 25 + shown.length) +
         ' of ' +
         indices.length +
-        '</span></div><div class="val-table-scroll"><table class="val-grid"><thead><tr><th>Excel row</th><th>Check</th>' +
+        '</span></div>' +
+        (result && selectedIssue
+          ? '<section id="valSelectedIssue" class="val-selected-issue" aria-label="Selected validation issue" aria-live="polite"><strong>Row ' +
+            (headerRow + selectedIssue.index + 1) +
+            ' · ' +
+            esc(selectedIssue.column) +
+            '</strong><p>' +
+            esc(selectedIssue.message) +
+            '</p><span class="val-eyebrow">CURRENT VALUE</span><pre>' +
+            esc(rows[selectedIssue.index]?.[selectedIssue.field] || '(blank)') +
+            '</pre><small>The exact cell is selected below. Edit it, then Run validation again.</small></section>'
+          : '') +
+        '<div class="val-table-scroll"><table class="val-grid"><thead><tr><th>Excel row</th><th>Check</th>' +
         t.columns
           .map(c => '<th>' + esc(c.label) + '<code>' + esc(c.key) + '</code></th>')
           .join('') +
@@ -1359,6 +1490,9 @@
                   return (
                     '<td class="' +
                     severity +
+                    (selectedIssue?.index === i && selectedIssue.field === c.key
+                      ? ' val-target-cell'
+                      : '') +
                     '"><input data-cell="' +
                     i +
                     '" data-field="' +
@@ -1424,7 +1558,7 @@
             '</span></div><div class="val-issue-list">' +
             issues
               .slice(0, 100)
-              .map(issue =>
+              .map((issue, issueIndex) =>
                 btn(
                   'issue',
                   '<span class="val-issue-marker ' +
@@ -1439,8 +1573,10 @@
                     esc(issue.column) +
                     ' · ' +
                     esc(issue.rule) +
+                    '</small><small class="val-issue-value">Value: ' +
+                    esc(issue.value || '(blank)') +
                     '</small></span><span>↗</span>',
-                  'data-index="' + issue.index + '"'
+                  'data-index="' + issue.index + '" data-issue="' + issueIndex + '"'
                 )
               )
               .join('') +
@@ -1464,6 +1600,7 @@
         '<div class="val-section-heading"><div><h3>Let’s give your file a check.</h3><p>Choose a version, connect your columns, then correct issues in place.</p></div><div class="val-version-picker">' +
         select('version', 'Validate against', versions, version) +
         '</div></div>' +
+        validationScopeView() +
         (busy
           ? '<div class="val-scanning" role="status"><span class="val-scanner-orb">' +
             icon('spark', 28) +
@@ -1491,6 +1628,44 @@
         '<button type="submit" class="val-btn val-secondary">Use pasted data</button></form><p class="val-help">Values only. Excel formulas must be pasted as values before upload.</p></details></div>' +
         (book ? mappingView() : '') +
         resultsView()
+      );
+    }
+    function validationScopeView() {
+      const t = activeSchema();
+      if (!t.projectId)
+        return '<p class="val-help">Standalone template · all enabled conditions apply.</p>';
+      const companies = a
+          .state()
+          .projectCompanies.filter(c => c.projectId === t.projectId && c.active !== false),
+        applicable = t.rules.filter(r => E.ruleApplies(r, { companyId: runCompanyId })).length,
+        scoped = t.rules.filter(r => r.enabled && r.companyScope === 'selected').length;
+      return (
+        '<section class="val-card val-run-scope"><div><span class="val-eyebrow">PROJECT &amp; COMPANY</span><h3>' +
+        esc(projectName(t)) +
+        '</h3><p class="val-help">One company per file. Shared column checks and conditions always apply; company-specific conditions use your choice below.</p></div>' +
+        select(
+          'validationCompany',
+          'Company for this validation',
+          [['', 'Choose a company…'], ...companies.map(c => [c.id, c.name])],
+          runCompanyId
+        ) +
+        '<p class="val-help">' +
+        (runCompanyId && companies.some(c => c.id === runCompanyId)
+          ? applicable + ' enabled condition(s) apply to this company.'
+          : 'Choose an active company before running validation.') +
+        (scoped ? ' ' + scoped + ' company-specific condition(s) maintained.' : '') +
+        (!companies.length
+          ? ' Add or activate companies in Projects → Companies &amp; processes.'
+          : '') +
+        '</p>' +
+        (result?.context?.companyId
+          ? '<p class="val-scope-badge">Results for ' +
+            esc(result.context.companyName) +
+            ' · ' +
+            result.appliedRules +
+            ' condition(s) applied</p>'
+          : '') +
+        '</section>'
       );
     }
     function history() {
@@ -1538,6 +1713,9 @@
               stamp(r.at) +
               ' · ' +
               (r.version ? 'v' + r.version : 'Draft') +
+              (r.context?.companyId
+                ? ' · ' + esc(r.context.projectName) + ' / ' + esc(r.context.companyName)
+                : '') +
               '</p><small>' +
               r.rows +
               ' rows · ' +
@@ -1654,6 +1832,16 @@
       }
       if (!draft) throw Error('Create or choose a template first.');
       commitCurrent();
+      if (action === 'copy-template' || action === 'copy-conditions') {
+        copyPreview = {
+          owner,
+          token: generation,
+          templateId: draft.id,
+          kind: action === 'copy-template' ? 'template' : 'conditions',
+        };
+        copyDialog();
+        return;
+      }
       if (action === 'save') {
         saveDraft();
         paint();
@@ -1801,7 +1989,10 @@
       }
       if (action === 'page') page += Number(el.dataset.delta);
       if (action === 'issue') {
-        targetRow = Number(el.dataset.index);
+        const issue = result?.issues[Number(el.dataset.issue)];
+        if (!issue) throw Error('Run validation again before opening this issue.');
+        selectedIssue = E.copy(issue);
+        targetRow = issue.index;
         filter = 'all';
         page = Math.floor(targetRow / 25);
       }
@@ -1820,7 +2011,10 @@
         outcome.issues.forEach(i => (i.row = headerRow + i.index + 1));
         a.download(
           await F.report(resultSchema, rows, outcome, action === 'accepted'),
-          safeName(resultSchema.name) + (action === 'accepted' ? '-accepted.xlsx' : '-issues.xlsx'),
+          safeName(
+            resultSchema.name +
+              (result.context?.companyName ? '-' + result.context.companyName : '')
+          ) + (action === 'accepted' ? '-accepted.xlsx' : '-issues.xlsx'),
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         );
         return;
@@ -1872,7 +2066,8 @@
         if (dirty && !root.confirm('Replace the current draft with this published version?'))
           return;
         const r = draft.releases.find(r => String(r.version) === el.dataset.version);
-        Object.assign(draft, E.copy(r.schema));
+        Object.assign(draft, { projectId: '', projectName: '' }, E.copy(r.schema));
+        runCompanyId = '';
         columnId = draft.columns[0]?.id || '';
         ruleId = draft.rules[0]?.id || '';
         version = 'draft';
@@ -1880,6 +2075,17 @@
         mode = 'columns';
       }
       paint();
+      if (action === 'issue') {
+        const cell = Array.from(document.querySelectorAll('.val-grid input[data-cell]')).find(
+          el =>
+            Number(el.dataset.cell) === selectedIssue.index &&
+            el.dataset.field === selectedIssue.field
+        );
+        $('valSelectedIssue')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+        cell?.scrollIntoView?.({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+        cell?.focus({ preventScroll: true });
+        cell?.select();
+      }
     }
     function addLibraryField(definition) {
       ensure();
@@ -1915,7 +2121,7 @@
     function referenceDetails(index) {
       if (!result || !resultSchema || !rows[index])
         throw Error('Run validation to inspect the current row.');
-      const matches = E.referenceDetails(resultSchema, rows[index]);
+      const matches = E.referenceDetails(resultSchema, rows[index], new Map(), result.context);
       const body =
         '<div class="wl-intro"><span class="val-eyebrow">READ THE CODE IN CONTEXT</span><h3>Reference details · row ' +
         (headerRow + index + 1) +
@@ -1962,6 +2168,246 @@
           .slice(0, 80) || 'validation'
       );
     }
+    function copyDialog(form = null) {
+      const p = copyPreview;
+      if (!p || p.owner !== a.owner?.() || p.token !== generation || p.templateId !== draft?.id)
+        throw Error('Reopen the copy dialog for the current template.');
+      const get = key => form?.elements.namedItem(key)?.value,
+        projectId =
+          p.kind === 'template'
+            ? (get('copyProject') ?? draft.projectId ?? '')
+            : draft.projectId || '',
+        sourceId = get('copySource') || draft.id,
+        source = sourceId === draft.id ? draft : store().templates.find(t => t.id === sourceId);
+      if (!source) throw Error('Choose an available source template.');
+      const companies = a
+          .state()
+          .projectCompanies.filter(c => c.projectId === projectId && c.active !== false),
+        scope = projectId ? get('copyScope') || 'selected' : 'all',
+        sourceCompanies = [
+          ...new Map(source.rules.flatMap(r => r.companies || []).map(c => [c.id, c])).values(),
+        ],
+        requestedCompany =
+          get('copySourceCompany') ||
+          (p.kind === 'template' && sourceCompanies.length ? sourceCompanies[0].id : '*'),
+        sourceCompany = ['*', 'shared', ...sourceCompanies.map(c => c.id)].includes(
+          requestedCompany
+        )
+          ? requestedCompany
+          : '*',
+        sourceRules = source.rules.filter(
+          r =>
+            sourceCompany === '*' ||
+            (sourceCompany === 'shared'
+              ? r.companyScope !== 'selected'
+              : r.companyScope !== 'selected' || r.companies.some(c => c.id === sourceCompany))
+        );
+      const sources = [draft, ...store().templates.filter(t => t.id !== draft.id)],
+        selectedRules =
+          form && p.sourceId === sourceId && p.sourceCompany === sourceCompany
+            ? new Set(
+                Array.from(form.querySelectorAll('[name="copyRule"]:checked')).map(el => el.value)
+              )
+            : null,
+        selectedCompanies =
+          form && p.projectId === projectId
+            ? new Set(
+                Array.from(form.querySelectorAll('[name="copyCompany"]:checked')).map(
+                  el => el.value
+                )
+              )
+            : new Set();
+      Object.assign(p, {
+        sourceId,
+        sourceCompany,
+        projectId,
+        sourceSchema: JSON.stringify(E.schema(source)),
+      });
+      const body =
+        '<form id="valCopyForm"><section id="valCopyReview" class="val-copy-review"><p>' +
+        (p.kind === 'template'
+          ? 'Create an independent template draft with its columns, conditions and references. Published versions and run history are not copied.'
+          : 'Add selected conditions to this draft. Referenced lists are copied too. Matching technical field names must exist in the destination; existing conditions are kept.') +
+        '</p>' +
+        (p.kind === 'template'
+          ? input(
+              'copyName',
+              'New template name',
+              get('copyName') ?? (draft.name + ' copy').slice(0, 120),
+              'text',
+              'maxlength="120" required'
+            ) +
+            select(
+              'copyProject',
+              'Destination project',
+              [
+                ['', 'Standalone · no project link'],
+                ...a.state().projects.map(project => [project.id, project.name]),
+              ],
+              projectId
+            )
+          : '<p><strong>Destination:</strong> ' +
+            esc(draft.name) +
+            (draft.projectId ? ' · ' + esc(projectName(draft)) : ' · Standalone') +
+            '</p>' +
+            select(
+              'copySource',
+              'Source template',
+              sources.map(t => [
+                t.id,
+                t.name + (t.projectId ? ' · ' + projectName(t) : ' · Standalone'),
+              ]),
+              sourceId
+            )) +
+        select(
+          'copySourceCompany',
+          'Source company conditions',
+          [
+            ['*', 'All conditions'],
+            ['shared', 'Shared conditions only'],
+            ...sourceCompanies.map(c => [c.id, 'Shared + ' + c.name]),
+          ],
+          sourceCompany
+        ) +
+        '<fieldset class="val-company-scope"><legend>Conditions to copy</legend><div class="val-check-list">' +
+        sourceRules
+          .map(
+            r =>
+              '<label class="val-toggle"><input type="checkbox" name="copyRule" value="' +
+              esc(r.id) +
+              '"' +
+              (!selectedRules || selectedRules.has(r.id) ? ' checked' : '') +
+              '><span>' +
+              esc(r.name) +
+              '<small> · ' +
+              esc(
+                r.companyScope === 'selected'
+                  ? r.companies.map(c => c.name).join(', ')
+                  : 'All companies'
+              ) +
+              (r.enabled ? '' : ' · Paused') +
+              '</small></span></label>'
+          )
+          .join('') +
+        '</div>' +
+        (!sourceRules.length ? '<p>No conditions in this selection.</p>' : '') +
+        '</fieldset>' +
+        select(
+          'copyScope',
+          'Apply copied conditions to',
+          [
+            ['all', projectId ? 'All companies in destination project' : 'All validation runs'],
+            ...(projectId ? [['selected', 'Selected destination companies only']] : []),
+          ],
+          scope
+        ) +
+        (scope === 'selected'
+          ? '<fieldset class="val-company-scope"><legend>Destination companies</legend><div class="val-check-list">' +
+            companies
+              .map(
+                c =>
+                  '<label class="val-toggle"><input type="checkbox" name="copyCompany" value="' +
+                  esc(c.id) +
+                  '"' +
+                  (selectedCompanies.has(c.id) ? ' checked' : '') +
+                  '><span>' +
+                  esc(c.name) +
+                  '</span></label>'
+              )
+              .join('') +
+            '</div>' +
+            (!companies.length
+              ? '<p>Add or activate companies in the destination project first.</p>'
+              : '') +
+            '</fieldset>'
+          : '') +
+        '<p class="val-help">Every copied condition uses the destination scope above. Source conditions stay unchanged. Paused conditions remain paused. Review the new draft, then Save draft.</p><div class="modal-actions"><button type="submit" class="primary">' +
+        (p.kind === 'template' ? 'Create template copy' : 'Copy selected conditions') +
+        '</button></div></section></form>';
+      a.openModal(
+        p.kind === 'template'
+          ? 'Copy template to another project or company'
+          : 'Copy conditions from a project or company',
+        body
+      );
+    }
+    function applyCopy(form) {
+      const p = copyPreview;
+      if (
+        !p ||
+        p.owner !== a.owner?.() ||
+        p.token !== generation ||
+        p.templateId !== draft?.id ||
+        form !== $('valCopyForm') ||
+        !form.closest('dialog[open]')
+      )
+        throw Error('Reopen the copy dialog for the current template.');
+      const get = key => form.elements.namedItem(key)?.value || '',
+        projectId = p.kind === 'template' ? get('copyProject') : draft.projectId || '',
+        project = a.state().projects.find(project => project.id === projectId),
+        companies = Array.from(form.querySelectorAll('[name="copyCompany"]:checked')).map(el => {
+          const c = a
+            .state()
+            .projectCompanies.find(
+              c => c.id === el.value && c.projectId === projectId && c.active !== false
+            );
+          if (!c) throw Error('Choose active destination companies from this project.');
+          return { id: c.id, name: c.name };
+        }),
+        destination = {
+          projectId,
+          projectName: project?.name || '',
+          companyScope: get('copyScope'),
+          companies,
+        };
+      if (projectId && !project) throw Error('Choose a maintained destination project.');
+      if (destination.companyScope === 'selected' && !companies.length)
+        throw Error('Select at least one destination company.');
+      let next;
+      if (p.kind === 'template') {
+        if (p.sourceSchema !== JSON.stringify(E.schema(draft)))
+          throw Error('The source template changed. Reopen the copy dialog.');
+        next = E.copyTemplate(
+          draft,
+          get('copyName').trim(),
+          destination,
+          Array.from(form.querySelectorAll('[name="copyRule"]:checked')).map(el => el.value)
+        );
+        if (dirty && !saveDraft(true)) return;
+        draft = next;
+        selected = next.id;
+        baseStamp = '';
+        columnId = next.columns[0]?.id || '';
+        ruleId = next.rules[0]?.id || '';
+        version = 'draft';
+        mode = 'columns';
+        clearFile();
+      } else {
+        const sourceId = get('copySource'),
+          source = sourceId === draft.id ? draft : store().templates.find(t => t.id === sourceId);
+        if (!source) throw Error('Choose an available source template.');
+        if (p.sourceSchema !== JSON.stringify(E.schema(source)))
+          throw Error('The source template changed. Reopen the copy dialog.');
+        next = E.copyConditions(
+          source,
+          draft,
+          Array.from(form.querySelectorAll('[name="copyRule"]:checked')).map(el => el.value),
+          destination
+        );
+        ruleId = next.rules[draft.rules.length]?.id || '';
+        draft = next;
+        mode = 'rules';
+      }
+      copyPreview = null;
+      mark();
+      a.closeModal();
+      say(
+        p.kind === 'template'
+          ? 'Independent template copy created. Review its company conditions, then Save draft.'
+          : 'Conditions and their references copied. Review the destination scopes, then Save draft.'
+      );
+      paint();
+    }
     function openCorrections(index, field) {
       if (!result || !rows[index] || !resultSchema)
         throw Error('Run validation before choosing a correction.');
@@ -1976,6 +2422,7 @@
         field,
         row: JSON.stringify(rows[index]),
         schema: JSON.stringify(activeSchema()),
+        context: E.copy(result.context),
         choices: [],
       };
       a.openModal(
@@ -1991,7 +2438,8 @@
         activeSchema(),
         rows[correction.index],
         correction.field,
-        $('valSuggestionSearch')?.value || ''
+        $('valSuggestionSearch')?.value || '',
+        correction.context
       );
       correction.choices = result.choices;
       $('valSuggestionChoices').innerHTML =
@@ -2072,6 +2520,10 @@
     }
     function formSubmit(form) {
       ensure();
+      if (form.id === 'valCopyForm') {
+        applyCopy(form);
+        return;
+      }
       if (form.id === 'valPasteForm') {
         commitCurrent();
         book = {
@@ -2161,9 +2613,66 @@
     });
     document.addEventListener('change', event => {
       const el = event.target;
+      if (
+        el.form?.id === 'valCopyForm' &&
+        ['copyProject', 'copySource', 'copySourceCompany', 'copyScope'].includes(el.name)
+      ) {
+        try {
+          ensure();
+          copyDialog(el.form);
+        } catch (error) {
+          say(error.message, true);
+        }
+        return;
+      }
       if (!el.closest?.('.validation-studio')) return;
       void (async () => {
         ensure();
+        if (el.name === 'projectId' && el.form?.id === 'valMetaForm') {
+          if (
+            el.value !== (draft.projectId || '') &&
+            draft.rules.some(r => r.companyScope === 'selected')
+          ) {
+            if (
+              !root.confirm(
+                'Changing project will clear company assignments and pause company-specific conditions. Reassign their companies and enable them again in Conditions. Continue?'
+              )
+            ) {
+              el.value = draft.projectId || '';
+              return;
+            }
+            for (const r of draft.rules)
+              if (r.companyScope === 'selected') {
+                r.companyScope = 'all';
+                r.companies = [];
+                r.enabled = false;
+              }
+          }
+          commitCurrent();
+          runCompanyId = '';
+          mark();
+          paint();
+          return;
+        }
+        if (el.name === 'companyScope' && el.form?.id === 'valRuleForm') {
+          commitCurrent();
+          mark();
+          paint();
+          return;
+        }
+        if (el.name === 'validationCompany') {
+          runCompanyId = el.value;
+          generation++;
+          busy = false;
+          result = null;
+          resultSchema = null;
+          correction = null;
+          if ($('valCorrectionReview')) a.closeModal?.();
+          filter = 'all';
+          page = 0;
+          paint();
+          return;
+        }
         if (el.name === 'mode' && el.form?.id === 'valMetaForm') {
           commitCurrent();
           mark();
@@ -2233,6 +2742,7 @@
           generation++;
           busy = false;
           version = el.value;
+          runCompanyId = '';
           if (book) getDataFromSheet();
           result = null;
           rows = [];
@@ -2352,6 +2862,7 @@
         rows: E.copy(rows),
         result: E.copy(result),
         mapping: { ...mapping },
+        runCompanyId,
         owner,
       }),
       loadSample,

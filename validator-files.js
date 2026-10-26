@@ -391,7 +391,7 @@
       {
         name: 'Conditions',
         rows: [
-          ['Rule', 'Severity', 'When', 'Requirement', 'Message'],
+          ['Rule', 'Severity', 'When', 'Requirement', 'Message', 'Company scope'],
           ...t.rules
             .filter(r => r.enabled)
             .map(r => [
@@ -400,11 +400,31 @@
               describeGroup(r.when, t),
               E().describe(r.assertion, t),
               r.message,
+              r.companyScope === 'selected'
+                ? r.companies.map(c => c.name).join(', ')
+                : 'All companies',
             ]),
         ],
-        widths: [30, 14, 60, 60, 65],
+        widths: [30, 14, 60, 60, 65, 40],
       },
     ];
+    if (t.projectId)
+      sheets.push({
+        name: 'Project scope',
+        rows: [
+          ['Item', 'Value'],
+          ['Project', t.projectName || t.projectId],
+          [
+            'Validation company',
+            'Choose one active company in Studio before validating. Each file is checked for one company.',
+          ],
+          [
+            'Shared checks',
+            'Column checks and all-company conditions apply alongside selected-company conditions.',
+          ],
+        ],
+        widths: [25, 100],
+      });
     for (const l of t.lookups) sheets.push({ name: 'Ref ' + l.name, rows: [l.headers, ...l.rows] });
     return workbook(sheets);
   }
@@ -467,6 +487,15 @@
       rows: [
         ['Item', 'Value'],
         ['Template', t.name],
+        ...(result.context?.projectId
+          ? [
+              ['Project', result.context.projectName],
+              ['Project ID', result.context.projectId],
+              ['Company', result.context.companyName],
+              ['Company ID', result.context.companyId],
+              ['Conditions applied', result.appliedRules],
+            ]
+          : []),
         ['Rows checked', result.rows],
         ['Rows without errors', result.passed],
         ['Errors', result.errors],
@@ -493,7 +522,7 @@
       let truncated = false;
       for (let i = 0; i < rows.length; i++) {
         if (acceptedOnly && result.status[i].errors) continue;
-        for (const m of E().referenceDetails(t, rows[i], cache)) {
+        for (const m of E().referenceDetails(t, rows[i], cache, result.context)) {
           if (matches.length > 10000) {
             truncated = true;
             break;

@@ -1,6 +1,88 @@
 /* validator-studio.css — Validation Studio template editor, column/rule cards and result tables.
    See docs/FILE-MAP.md. Keep rule order: later selectors can override earlier ones. */
 /* Warm paper, sage glass and small, purposeful movements. */
+.val-company-scope {
+  margin: 18px 0;
+  padding: 16px;
+  border: 1px solid var(--hub-border);
+  border-radius: 16px;
+  background: var(--hub-surface-soft);
+  color: var(--hub-text);
+  min-width: 0;
+}
+.val-company-scope legend {
+  padding: 0 6px;
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+.val-company-scope .val-check-list {
+  display: grid;
+  gap: 10px;
+  max-height: 230px;
+  overflow: auto;
+}
+.val-company-choices[hidden] {
+  display: none;
+}
+.val-copy-review > p {
+  line-height: 1.65;
+}
+.val-copy-review .val-label {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+}
+.val-selected-issue {
+  margin: 16px 0;
+  padding: 16px;
+  border: 2px solid var(--hub-accent);
+  border-radius: 14px;
+  background: var(--hub-surface-soft);
+  color: var(--hub-text);
+  scroll-margin-top: 20px;
+}
+.val-selected-issue p {
+  margin: 8px 0;
+}
+.val-selected-issue pre {
+  margin: 8px 0 12px;
+  padding: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 150px;
+  overflow: auto;
+  border-radius: 8px;
+  background: var(--hub-surface);
+  color: var(--hub-text);
+}
+.validation-studio .val-grid td.val-target-cell {
+  outline: 2px solid var(--hub-accent);
+  outline-offset: -2px;
+}
+.val-issue-value {
+  display: block;
+  max-width: 600px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.val-run-scope {
+  margin-bottom: 20px;
+}
+.val-run-scope > .val-label {
+  max-width: 480px;
+}
+.val-scope-badge {
+  display: inline-block;
+  margin: 4px 12px 8px 0;
+  padding: 6px 10px;
+  border: 1px solid var(--hub-border);
+  border-radius: 10px;
+  background: var(--hub-accent-soft);
+  color: var(--hub-text);
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
 .validation-studio .val-suggest-button {
   display: block;
   margin-top: 7px;
