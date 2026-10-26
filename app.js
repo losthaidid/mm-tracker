@@ -7688,12 +7688,28 @@ reportModel = function (d, asof) {
     'Sub-task',
     'Sub-task status',
     'Sub-task remarks',
-    'Sub-task feedback'
+    'Sub-task feedback',
+    'Company ID',
+    'Company',
+    'Website references'
   );
-  tasks.widths.push(20, 24, 65, 24, 65, 22, 70, 70);
-  tasks.rows.forEach((row, index) =>
-    row.push('Main task', d.tasks[index].id, d.tasks[index].task, '', '', '', '', '')
-  );
+  tasks.widths.push(20, 24, 65, 24, 65, 22, 70, 70, 24, 35, 65);
+  tasks.rows.forEach((row, index) => {
+    const task = d.tasks[index];
+    row.push(
+      'Main task',
+      task.id,
+      task.task,
+      '',
+      '',
+      '',
+      '',
+      '',
+      task.companyId || '',
+      taskCompanyLabel(task, d),
+      (task.references || []).map(ref => (ref.label ? ref.label + ': ' : '') + ref.url).join('\n')
+    );
+  });
   for (const task of d.tasks)
     for (const sub of task.subTasks || [])
       tasks.rows.push([
@@ -7706,6 +7722,9 @@ reportModel = function (d, asof) {
         sub.status,
         sub.remarks,
         sub.feedback,
+        task.companyId || '',
+        taskCompanyLabel(task, d),
+        '',
       ]);
   items.headers.push(
     'Record type',
@@ -8205,9 +8224,6 @@ function reportModel(d, asof) {
       'Task type',
       'Linked ID',
       'Linked to',
-      'Company ID',
-      'Company',
-      'Website references',
     ],
     d.tasks.map((t, i) => {
       const r = i + 5,
@@ -8243,12 +8259,9 @@ function reportModel(d, asof) {
         t.taskType,
         t.linkId,
         linked,
-        t.companyId || '',
-        taskCompanyLabel(t, d),
-        (t.references || []).map(ref => (ref.label ? ref.label + ': ' : '') + ref.url).join('\n'),
       ];
     }),
-    [22, 10, 75, 14, 16, 12, 16, 14, 16, 65, 65, 18, 16, 24, 45, 24, 35, 65],
+    [22, 10, 75, 14, 16, 12, 16, 14, 16, 65, 65, 18, 16, 24, 45],
     { 4: 'date', 6: 'date', 8: 'date' }
   );
   const weekend = date => [0, 6].includes(new Date(date + 'T12:00:00').getDay()),
