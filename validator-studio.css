@@ -39,6 +39,42 @@
   line-height: 1.6;
   color: var(--hub-muted);
 }
+.val-setup-advanced {
+  margin: 12px 0;
+  padding: 10px;
+  border: 1px solid var(--hub-border);
+  border-radius: 12px;
+  font-size: 0.75rem;
+  color: var(--hub-muted);
+}
+.val-setup-advanced summary {
+  cursor: pointer;
+  line-height: 1.5;
+  color: var(--hub-text);
+}
+.val-setup-guide {
+  line-height: 1.7;
+  color: var(--hub-text);
+}
+.val-setup-guide li {
+  margin-bottom: 12px;
+}
+.val-sap-format {
+  grid-column: 1 / -1;
+  padding: 14px;
+  border: 1px solid var(--hub-border);
+  border-radius: 12px;
+  background: var(--hub-surface-soft);
+  color: var(--hub-text);
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+.val-sap-format p {
+  margin: 6px 0;
+}
+.val-sap-format small {
+  color: var(--hub-muted);
+}
 .validation-studio .val-setup-download {
   display: flex;
   justify-content: center;

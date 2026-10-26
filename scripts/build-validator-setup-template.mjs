@@ -7,10 +7,11 @@ import { SpreadsheetFile, Workbook } from '@oai/artifact-tool';
 const repo = process.argv[2];
 if (!repo) throw Error('Pass the mm-tracker source directory.');
 const scope = { window: {} };
+vm.runInNewContext(await fs.readFile(path.join(repo, 'validator-engine.js'), 'utf8'), scope);
 vm.runInNewContext(await fs.readFile(path.join(repo, 'validator-setup.js'), 'utf8'), scope);
 const headers = scope.window.WorkHubValidatorSetup.HEADERS;
 const workbook = Workbook.create();
-const outputDir = path.resolve('outputs/validation-setup-20261023');
+const outputDir = path.resolve('outputs/validation-setup-20261026');
 await fs.mkdir(outputDir, { recursive: true });
 function add(name, values, widths) {
   const sheet = workbook.worksheets.add(name);
@@ -46,11 +47,12 @@ const template = add(
       Description:
         'Example configuration. Replace the fields, conditions and fictional reference codes with your own definitions.',
       'Format version': 1,
+      'Template type': 'General',
     },
   ]),
-  [35, 75, 18]
+  [35, 75, 18, 20]
 );
-template.getRange('A2:C2').format.rowHeight = 58;
+template.getRange('A2:D2').format.rowHeight = 58;
 const columns = add(
   'Columns',
   rows('Columns', [
@@ -76,16 +78,16 @@ const columns = add(
     },
     { Field: 'COST_CENTER', Label: 'Cost center', Type: 'text', 'Max length': 10 },
   ]),
-  [25, 23, 14, 13, 13, 14, 14, 13, 13, 24, 24, 13, 17, 19, 45]
+  [25, 23, 14, 13, 13, 14, 14, 13, 13, 24, 24, 13, 17, 19, 45, 18, 14, 14, 24]
 );
-columns.getRange('C2:C100').dataValidation = {
+columns.getRange('C2:C201').dataValidation = {
   rule: { type: 'list', values: ['text', 'integer', 'decimal', 'date', 'boolean'] },
 };
 for (const c of ['D', 'E', 'L', 'M'])
-  columns.getRange(c + '2:' + c + '100').dataValidation = {
+  columns.getRange(c + '2:' + c + '201').dataValidation = {
     rule: { type: 'list', values: ['Yes', 'No'] },
   };
-columns.getRange('N2:N100').dataValidation = {
+columns.getRange('N2:N201').dataValidation = {
   rule: { type: 'list', values: ['digits', 'alphanumeric', 'email', 'url', 'identifier'] },
 };
 const conditions = add(
@@ -132,7 +134,7 @@ const conditions = add(
   ]),
   [22, 36, 14, 14, 14, 14, 12, 24, 19, 23, 24, 22, 25, 58, 40]
 );
-conditions.getRange('C2:C100').dataValidation = {
+conditions.getRange('C2:C201').dataValidation = {
   rule: { type: 'list', values: ['error', 'warning'] },
 };
 conditions.getRange('D2:D100').dataValidation = { rule: { type: 'list', values: ['Yes', 'No'] } };
@@ -190,7 +192,7 @@ const guideRows = [
   [
     'Start here',
     'Edit Template, then Columns. Each field uses one row. Header rows must stay in row 1. Delete example rows you do not need.',
-    'Template: one name row. Columns: 1–80 fields.',
+    'Template: one name row. Columns: 1–200 fields.',
   ],
   [
     'Import',
@@ -269,7 +271,7 @@ const guideRows = [
   ],
   [
     'Limits',
-    'Up to 80 columns, 100 rules, 400 when clauses, 20 reference lists and 20 unique combinations. Keep the workbook below 10 MB.',
+    'Up to 200 columns, 100 rules, 400 when clauses, 20 reference lists and 20 unique combinations. Keep the workbook below 10 MB.',
     'Remove a sheet only when you do not use that section. Template and Columns are required.',
   ],
   [
@@ -278,9 +280,36 @@ const guideRows = [
     'This file configures validation rules. Use the Validate tab for data files to check.',
   ],
 ];
+guideRows.push(
+  [
+    'Template type',
+    'General preserves the existing checks. For SAP choose SAP in Template, and fill SAP type, SAP length, SAP decimals and optional SAP reference field on Columns. General Type stays text if unused.',
+    'SAP date DATS / 8; currency CURR / 15 / 2 → CUKY field.',
+  ],
+  [
+    'SAP formats',
+    'Use internal formats: DATS YYYYMMDD (initial 00000000), TIMS HHMMSS, NUMC fixed digits, signed plain decimals with a dot. No zero padding, rounding or conversion exits are applied.',
+    'Keep technical codes and long numbers as Text in Excel.',
+  ],
+  [
+    'SAP scope',
+    '18 supported DDIC formats. Use actual SE11 definitions. Domain values, conversion exits and currency display scaling need your system-specific Conditions/References.',
+    'Source: https://help.sap.com/doc/abapdocu_754_index_htm/7.54/en-US/abenddic_builtin_types.htm',
+  ],
+  [
+    'Simpler option',
+    'For column setup without Excel conditions/references, use the one-sheet simple General or SAP setup download instead. You can maintain Conditions and References later inside Studio.',
+    'A single Setup sheet: name in B2, type in B3, fields from row 9.',
+  ],
+  [
+    'Upload size',
+    'Data validation stays within 5,000 rows and 200,000 cells. At 200 columns, upload up to 1,000 data rows per file.',
+    'Setup rows define fields; data rows are uploaded separately on Validate.',
+  ]
+);
 const guide = add('Guide', guideRows, [25, 100, 65]);
-guide.getRange('A2:C20').format.rowHeight = 64;
-guide.getRange('A2:C20').format.fill = '#F4F6F8';
+guide.getRange('A2:D20').format.rowHeight = 64;
+guide.getRange('A2:D20').format.fill = '#F4F6F8';
 workbook.recalculate();
 console.log((await workbook.inspect({ kind: 'sheet', include: 'id,name', maxChars: 1600 })).ndjson);
 console.log(
@@ -294,14 +323,14 @@ console.log(
   ).ndjson
 );
 for (const [sheetName, range] of [
-  ['Template', 'A1:C2'],
-  ['Columns', 'A1:O7'],
+  ['Template', 'A1:D2'],
+  ['Columns', 'A1:S7'],
   ['Conditions', 'A1:O6'],
   ['References', 'A1:F3'],
   ['Unique combinations', 'A1:A2'],
   ['Plants', 'A1:C3'],
   ['Storage locations', 'A1:C3'],
-  ['Guide', 'A1:C20'],
+  ['Guide', 'A1:C' + guideRows.length],
 ]) {
   const preview = await workbook.render({ sheetName, range, scale: 1, format: 'png' });
   await fs.writeFile(
@@ -316,3 +345,240 @@ await fs.copyFile(
   path.join(repo, 'validation-setup-template.xlsx')
 );
 console.log('Saved validation-setup-template.xlsx');
+
+// The default setup downloads need only one worksheet. Blank field rows are deliberate inputs.
+const E = scope.window.WorkHubValidatorEngine;
+const simpleHeaders = scope.window.WorkHubValidatorSetup.SIMPLE_HEADERS;
+const examples = {
+  general: [
+    [
+      'RECORD_ID',
+      'Record ID',
+      'text',
+      20,
+      '',
+      'Yes',
+      '',
+      'identifier',
+      '',
+      'Keep codes as Text, e.g. 000012.',
+    ],
+    [
+      'APPROVED',
+      'Approved',
+      'text',
+      1,
+      '',
+      'No',
+      'X',
+      '',
+      '',
+      'X or blank is allowed because Required is No.',
+    ],
+    ['AMOUNT', 'Amount', 'decimal', '', '', 'Yes', '', '', '', 'Use a decimal point, e.g. 125.50.'],
+    ['DUE_DATE', 'Due date', 'date', '', '', 'No', '', '', '', 'General dates use YYYY-MM-DD.'],
+  ],
+  sap: [
+    ['CLIENT', 'Client', 'CLNT', 3, 0, 'Yes', '', '', '', 'Internal key: 100.'],
+    [
+      'MATERIAL',
+      'Material',
+      'CHAR',
+      18,
+      0,
+      'Yes',
+      '',
+      '',
+      '',
+      'Example length only: use your actual SE11/DDIC definition.',
+    ],
+    [
+      'BATCH',
+      'Batch',
+      'NUMC',
+      10,
+      0,
+      'No',
+      '',
+      '',
+      '',
+      'Illustrative numeric code: 0000000001. Choose CHAR if your batch allows letters.',
+    ],
+    [
+      'POSTING_DATE',
+      'Posting date',
+      'DATS',
+      8,
+      0,
+      'Yes',
+      '',
+      '',
+      '',
+      'YYYYMMDD, e.g. 20261026; initial 00000000 is valid.',
+    ],
+    [
+      'AMOUNT',
+      'Amount',
+      'CURR',
+      15,
+      2,
+      'Yes',
+      '',
+      '',
+      'CURRENCY',
+      'Plain decimal, e.g. 125.50; reference uses the Field key.',
+    ],
+    [
+      'CURRENCY',
+      'Currency',
+      'CUKY',
+      5,
+      0,
+      'Yes',
+      '',
+      '',
+      '',
+      'Internal code, e.g. MYR. Maintain valid codes in References.',
+    ],
+    ['QUANTITY', 'Quantity', 'QUAN', 13, 3, 'No', '', '', 'UNIT', 'Plain decimal, e.g. 12.500.'],
+    ['UNIT', 'Unit', 'UNIT', 3, 0, 'No', '', '', '', 'Internal code, e.g. KG.'],
+    [
+      'APPROVED',
+      'Approved',
+      'CHAR',
+      1,
+      0,
+      'No',
+      'X',
+      '',
+      '',
+      'X or blank: no trailing comma needed.',
+    ],
+  ],
+};
+for (const mode of ['general', 'sap']) {
+  const wb = Workbook.create(),
+    sheet = wb.worksheets.add('Setup');
+  const sap = mode === 'sap',
+    label = sap ? 'SAP' : 'General';
+  sheet.showGridLines = false;
+  const all = sheet.getRange('A1:J208');
+  all.format.font = { name: 'Arial', size: 10, color: '#243449' };
+  all.format.verticalAlignment = 'center';
+  all.format.wrapText = true;
+  all.format.rowHeight = 36;
+  all.setNumberFormat('@');
+  [22, 20, 16, 10, 10, 11, 22, 16, 21, 48].forEach((width, i) => {
+    sheet.getRangeByIndexes(0, i, 208, 1).format.columnWidth = width;
+  });
+  for (const range of [
+    'A1:J1',
+    'B2:E2',
+    'F2:J2',
+    'B3:C3',
+    'D3:J3',
+    'B4:J4',
+    'A5:J5',
+    'A6:J6',
+    'A7:J7',
+  ])
+    sheet.getRange(range).merge();
+  sheet.getRange('A1').values = [
+    ['VALIDATION STUDIO  /  SIMPLE ' + label.toUpperCase() + ' SETUP'],
+  ];
+  sheet.getRange('A1:J1').format.fill = '#31596A';
+  sheet.getRange('A1:J1').format.font = { name: 'Arial', size: 15, bold: true, color: '#FFFFFF' };
+  sheet.getRange('A1:J1').format.rowHeight = 45;
+  sheet.getRange('A2:A4').values = [['Template name'], ['Template type'], ['Description']];
+  sheet.getRange('A2:A4').format.font = { name: 'Arial', size: 10, bold: true, color: '#31596A' };
+  sheet.getRange('B2').values = [[sap ? 'SAP field format checks' : 'Everyday file checks']];
+  sheet.getRange('F2').values = [
+    ['1  Name it  →  2  Replace examples below  →  3  Import Excel setup in Studio'],
+  ];
+  sheet.getRange('B3').values = [[label]];
+  sheet.getRange('D3').values = [
+    [
+      sap
+        ? 'SAP: internal field formats. Use the actual DDIC type, length and decimal places.'
+        : 'General: existing text, number, date, boolean and format checks.',
+    ],
+  ];
+  sheet.getRange('B4').values = [
+    [
+      'Replace these fictional example fields with your own. Each row below creates one data upload column.',
+    ],
+  ];
+  for (const range of ['B2:E2', 'B3:C3', 'B4:J4']) sheet.getRange(range).format.fill = '#FFF2C9';
+  sheet.getRange('A5').values = [
+    [
+      'Keep the row 8 headers. Replace or delete examples from row 9; one field per row, up to 200. Label is optional. Required defaults to No. Allowed values X + Required No means X or blank.',
+    ],
+  ];
+  sheet.getRange('A6').values = [
+    [
+      sap
+        ? 'SAP: CHAR / NUMC / DATS / TIMS / CLNT / LANG / CUKY / UNIT / DEC / CURR / QUAN / INT1 / INT2 / INT4 / INT8 / SSTRING / STRING / RAW. Format is automatic; leave Format blank. CURR can reference a CUKY Field; QUAN a UNIT Field. Domain values and conversion exits need your own Conditions or References.'
+        : 'General: Data type = text, integer, decimal, date or boolean. Length = optional maximum characters. Format = optional digits, alphanumeric, email, url or identifier. Leave Decimals and Reference field blank. Dates use YYYY-MM-DD.',
+    ],
+  ];
+  sheet.getRange('A5:J6').format.fill = '#EFF5F7';
+  sheet.getRange('A5:J6').format.rowHeight = 54;
+  sheet.getRange('A7').values = [
+    [
+      'Yellow cells are yours to edit. Keep codes and long numbers as Excel Text. Use values, not formulas. Import this file → review → Create new draft → Save draft. Upload records separately on Validate.',
+    ],
+  ];
+  sheet.getRange('A7:J7').format.font = { name: 'Arial', size: 10, italic: true, color: '#526276' };
+  sheet.getRange('A8:J8').values = [simpleHeaders];
+  sheet.getRange('A8:J8').format.fill = '#31596A';
+  sheet.getRange('A8:J8').format.font = { name: 'Arial', size: 10, bold: true, color: '#FFFFFF' };
+  sheet.getRange('A9:J208').format.fill = '#FFFBEE';
+  sheet.getRange('D9:E208').setNumberFormat('0');
+  sheet.getRangeByIndexes(8, 0, examples[mode].length, 10).values = examples[mode];
+  sheet.getRangeByIndexes(8, 0, examples[mode].length, 10).format.rowHeight = 49;
+  sheet.getRange('B3').dataValidation = { rule: { type: 'list', values: ['General', 'SAP'] } };
+  sheet.getRange('C9:C208').dataValidation = {
+    rule: { type: 'list', values: sap ? Object.keys(E.SAP_TYPES) : [...E.TYPES] },
+  };
+  sheet.getRange('F9:F208').dataValidation = { rule: { type: 'list', values: ['Yes', 'No'] } };
+  sheet.getRange('H9:H208').dataValidation = {
+    rule: { type: 'list', values: sap ? ['standard'] : Object.keys(E.FORMATS) },
+  };
+  sheet.freezePanes.freezeRows(8);
+  sheet.freezePanes.freezeColumns(2);
+  wb.recalculate();
+  console.log(
+    (
+      await wb.inspect({
+        kind: 'table',
+        range: 'Setup!A1:J17',
+        include: 'values,formulas',
+        maxChars: 1800,
+      })
+    ).ndjson
+  );
+  console.log(
+    (
+      await wb.inspect({
+        kind: 'match',
+        searchTerm: '#REF!|#DIV/0!|#VALUE!|#NAME\\?|#NUM!',
+        options: { useRegex: true, maxResults: 10 },
+        summary: label + ' formula error scan',
+      })
+    ).ndjson
+  );
+  const preview = await wb.render({
+    sheetName: 'Setup',
+    range: sap ? 'A1:J17' : 'A1:J12',
+    scale: 1.25,
+    format: 'png',
+  });
+  await fs.writeFile(
+    path.join(outputDir, 'simple-' + mode + '.png'),
+    new Uint8Array(await preview.arrayBuffer())
+  );
+  const filename = sap ? 'validation-setup-sap.xlsx' : 'validation-setup-simple.xlsx';
+  await (await SpreadsheetFile.exportXlsx(wb)).save(path.join(outputDir, filename));
+  await fs.copyFile(path.join(outputDir, filename), path.join(repo, filename));
+  console.log('Saved ' + filename);
+}

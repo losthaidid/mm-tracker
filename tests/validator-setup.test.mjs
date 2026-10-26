@@ -44,6 +44,16 @@ test('Excel setup: shipped workbook creates working columns, conditional rules, 
   E.validateState({ workhub: { validator: { templates: [t], runs: [] } } });
 });
 
+test('Excel setup: older multi-sheet headers remain General and keep their existing checks', () => {
+  const b=copy(sample);
+  const metadata=sheet(b,'Template');metadata.rows=metadata.rows.map(row=>row.slice(0,3));
+  const columns=sheet(b,'Columns');columns.rows=columns.rows.map(row=>row.slice(0,15));
+  const t=S.parse(b);assert.equal(t.mode,'general');assert.equal(t.columns.length,6);
+  assert.equal(E.validateRows(t,[data()]).errors,0);
+  assert.equal(E.validateRows(t,[data({MOVEMENT_TYPE:'201'})]).errors,1);
+  assert.equal(t.rules.length,3);assert.equal(t.lookups.length,2);
+});
+
 test('Excel setup: missing or misspelled sections and invalid column options fail without partial results', () => {
   for (const [name, change, error] of [
     ['missing sheet', b => b.sheets.splice(b.sheets.findIndex(s => s.name === 'Columns'), 1), /Missing Columns/],
@@ -100,8 +110,10 @@ test('Excel setup: optional sections can be omitted and limits still use the exi
   b.sheets = b.sheets.filter(s => ['Template', 'Columns'].includes(s.name));
   assert.equal(S.parse(b).rules.length, 0);
   const cols = sheet(b, 'Columns');
-  for (let i = 6; i < 81; i++) {
+  for (let i = 6; i < 200; i++) {
     const row = copy(cols.rows[1]); row[0] = 'FIELD_' + i; row[1] = 'Field ' + i; cols.rows.push(row);
   }
-  assert.throws(() => S.parse(b), /80 columns/);
+  assert.equal(S.parse(b).columns.length, 200);
+  const row = copy(cols.rows[1]); row[0] = 'FIELD_200'; row[1] = 'Field 200'; cols.rows.push(row);
+  assert.throws(() => S.parse(b), /200 columns/);
 });

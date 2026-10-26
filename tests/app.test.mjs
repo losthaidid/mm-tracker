@@ -2527,6 +2527,56 @@ test('maintained leave types: card setup focuses the matching allowance and chan
  const ctx=await app(t),{api,document,db}=ctx,id=await addLeaveType(ctx);api.closeModal();api.setMonth('2026-10');api.showTab('schedule');document.querySelector('.leave-balance-card[data-leave-kind="'+id+'"] [data-leave-balance="settings"]').click();let f=document.getElementById('leaveBalanceForm');assert.equal(document.activeElement,f.elements.namedItem(id+'-allowance'));const writes=db.calls.length;api.mutate(d=>d.workhub.leaveTypes.push({id:'leave-study',name:'Study Leave',code:'SL',archived:false}));await settle();assert.throws(()=>api.hub.leaveBalances.saveSettings(f),/Leave types changed/);assert.equal(db.calls.length,writes+1);api.closeModal();api.hub.leaveBalances.settings('2026');assert.ok(document.getElementById('leaveBalanceForm').elements.namedItem('leave-study-allowance'));
 });
 
+test('SAP setup UI: simple workbook previews, saves and freezes mode and DDIC fields across cloud and backup', async t => {
+  const {api,document,db}=await app(t),ui=api.hub.validator;
+  api.showTab('validator');
+  assert.ok(document.querySelector('a[href="./validation-setup-simple.xlsx"]'));
+  assert.ok(document.querySelector('a[href="./validation-setup-sap.xlsx"]'));
+  await ui.handle({dataset:{val:'setup-help'}});
+  assert.match(document.querySelector('dialog[open]').textContent,/Fill your setup in 3 steps/);
+  assert.match(document.querySelector('dialog[open]').textContent,/X or blank/);api.closeModal();
+  const bytes=readFileSync(new URL('../validation-setup-sap.xlsx',import.meta.url)),writes=db.calls.length;
+  await ui.loadSetupFile({name:'simple-sap.xlsx',size:bytes.length,arrayBuffer:async()=>bytes});
+  assert.match(document.getElementById('valSetupReview').textContent,/SAPTemplate type/);
+  assert.equal(db.calls.length,writes);
+  await ui.handle(document.querySelector('[data-val="apply-setup"]'));
+  assert.equal(document.querySelector('#valMetaForm [name="mode"]').value,'sap');
+  assert.ok(document.querySelector('#valColumnForm [name="sapType"]'));
+  assert.equal(document.querySelector('#valColumnForm [name="type"]'),null);
+  assert.equal(ui.saveDraft(),true);await settle();ui.publish();await settle();
+  const saved=copy(api.state().workhub.validator.templates[0]);assert.equal(saved.releases[0].schema.mode,'sap');
+  assert.equal(saved.releases[0].schema.columns.find(c=>c.key==='AMOUNT').sapReference,'CURRENCY');
+  const backup=api.parseBackup(api.payload(api.state()));assert.equal(backup.workhub.validator.templates[0].mode,'sap');
+  const reopened=await app(t,{remote:copy(db.row),login:false});await reopened.api.loadCloud(sessionUser);await settle();
+  assert.deepEqual(copy(reopened.api.state().workhub.validator.templates[0]),saved);
+});
+test('SAP setup UI: mode switches preserve General checks, suggest SAP defaults and rewire currency fields', async t => {
+  const {api,document,window}=await app(t),ui=api.hub.validator;
+  api.showTab('validator');await ui.handle({dataset:{val:'new'}});await ui.handle({dataset:{val:'add-column'}});
+  let f=document.getElementById('valColumnForm');fill(f,{type:'text',maxLength:18,format:'identifier'});
+  let mode=document.querySelector('#valMetaForm [name="mode"]');mode.value='sap';mode.dispatchEvent(new window.Event('change',{bubbles:true}));await settle();
+  f=document.getElementById('valColumnForm');let type=f.elements.namedItem('sapType');type.value='NUMC';type.dispatchEvent(new window.Event('change',{bubbles:true}));await settle();
+  f=document.getElementById('valColumnForm');assert.equal(f.elements.namedItem('sapLength').value,'10');assert.equal(f.elements.namedItem('sapDecimals').readOnly,true);
+  f.elements.namedItem('sapLength').value='8';assert.equal(ui.saveDraft(),true);await settle();
+  mode=document.querySelector('#valMetaForm [name="mode"]');mode.value='general';mode.dispatchEvent(new window.Event('change',{bubbles:true}));await settle();
+  f=document.getElementById('valColumnForm');assert.equal(f.elements.namedItem('maxLength').value,'18');assert.equal(f.elements.namedItem('format').value,'identifier');
+  mode=document.querySelector('#valMetaForm [name="mode"]');mode.value='sap';mode.dispatchEvent(new window.Event('change',{bubbles:true}));await settle();
+  assert.equal(document.querySelector('#valColumnForm [name="sapLength"]').value,'8');
+  const bytes=readFileSync(new URL('../validation-setup-sap.xlsx',import.meta.url));await ui.loadSetupFile({name:'sap.xlsx',size:bytes.length,arrayBuffer:async()=>bytes});await ui.handle(document.querySelector('[data-val="apply-setup"]'));
+  let currency=ui.snapshot().draft.columns.find(c=>c.key==='CURRENCY');await ui.handle({dataset:{val:'select-column',id:currency.id}});
+  document.querySelector('#valColumnForm [name="key"]').value='WAERS';assert.equal(ui.saveDraft(),true);await settle();
+  assert.equal(ui.snapshot().draft.columns.find(c=>c.key==='AMOUNT').sapReference,'WAERS');
+  await assert.rejects(ui.handle({dataset:{val:'remove-column',id:currency.id}}),/SAP currency\/unit reference/);
+});
+test('SAP setup UI: 200 fields display their count and reject additions without changing the draft', async t => {
+  const {api,document,window}=await app(t),ui=api.hub.validator,E=window.WorkHubValidatorEngine;
+  const definition=E.create('Wide setup');definition.columns=Array.from({length:200},(_,i)=>({...E.column(i),key:'FIELD_'+i,label:'Field '+i}));
+  api.mutate(d=>d.workhub.validator.templates.push(definition));await settle();api.showTab('validator');await ui.handle({dataset:{val:'open',id:definition.id}});
+  assert.match(document.querySelector('.val-outline-title').textContent,/200\/200/);
+  await assert.rejects(ui.handle({dataset:{val:'add-column'}}),/200 columns/);
+  assert.equal(ui.snapshot().draft.columns.length,200);
+});
+
 test('Excel setup UI: preview creates a new draft, retains existing releases, and saves through cloud and backup', async t => {
   const { api, document, db } = await app(t), ui = api.hub.validator;
   api.showTab('validator');
