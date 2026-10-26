@@ -818,6 +818,9 @@
             info: a.privateInfo,
             command: a.command,
             camera: () => preview?.camera(),
+            freezeCamera: () => {
+              if (!camera) camera = preview?.camera() || null;
+            },
             setTool,
             publish: () => publish(true),
           });
@@ -965,6 +968,10 @@
       publish,
       connected,
       blocked: () => !!(held || cover || breakSession),
+      editing: () => {
+        const state = canvasUI?.state();
+        return !!(state?.editing || state?.dragging || state?.linking);
+      },
       snapshot: () => ({
         connected: connected(),
         holding: !!held,

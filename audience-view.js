@@ -279,6 +279,14 @@
           );
           n.dataset.type = step?.type || '';
           n.dataset.stacked = String(!!step?.stackParent);
+          n.dataset.linkSource = String(
+            !!options.interactive && n.dataset.node === options.connectFrom
+          );
+          const arrival = (data.linkEffects || []).find(
+            effect => effect.to === n.dataset.node && effect.until > Date.now()
+          );
+          if (arrival) n.dataset.linkArrival = arrival.id;
+          else delete n.dataset.linkArrival;
           if (options.interactive && !n.hasAttribute('tabindex')) {
             n.setAttribute('tabindex', '0');
             n.setAttribute('role', 'button');
@@ -293,6 +301,15 @@
               '" cx="0" cy="50" r="9"/><circle data-pc-port="out" data-pc-step="' +
               esc(n.dataset.node) +
               '" cx="210" cy="50" r="9"/>';
+            for (const port of ports.querySelectorAll('circle')) {
+              port.setAttribute('role', 'button');
+              port.setAttribute('tabindex', '0');
+              port.setAttribute(
+                'aria-label',
+                (port.dataset.pcPort === 'out' ? 'Start links from ' : 'Link to ') +
+                  (step?.title || 'step')
+              );
+            }
             n.append(ports);
           }
         }
@@ -341,10 +358,19 @@
             root.WorkHubProcessCanvasArt?.svg(data, options.canvasSelection, options.interactive) ||
             '';
         }
-        for (const e of host.querySelectorAll('.av-edge'))
+        for (const e of host.querySelectorAll('.av-edge')) {
           e.dataset.active = String(
             e.dataset.from === data.active && e.dataset.to === data.next && !data.decision
           );
+          const effect = (data.linkEffects || []).find(
+            effect =>
+              effect.from === e.dataset.from &&
+              effect.to === e.dataset.to &&
+              effect.until > Date.now()
+          );
+          if (effect) e.dataset.linkEffect = effect.id;
+          else delete e.dataset.linkEffect;
+        }
         camera = cameraFor(data, options);
         host
           .querySelector('.av-graph')

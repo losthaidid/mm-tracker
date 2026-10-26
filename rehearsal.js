@@ -57,6 +57,15 @@
       answered = new Set(),
       visitChoices = {},
       presenter = null;
+    let routeContext = '',
+      routeModel = null,
+      branchVisits = Object.create(null),
+      routePreview = Object.create(null),
+      linkFrom = '',
+      linkDrop = null,
+      wire = null,
+      linkMessage = '',
+      linkEffects = [];
     const $ = id => document.getElementById(id),
       prefs = () => a.state().workhub.rehearsal.preferences;
     const screens = root.WorkHubPresentationScreen?.create({
@@ -139,6 +148,14 @@
       mode = 'normal';
       archived = false;
       routeChoices = {};
+      routeContext = '';
+      routeModel = null;
+      branchVisits = Object.create(null);
+      routePreview = Object.create(null);
+      linkFrom = '';
+      linkDrop = wire = null;
+      linkMessage = '';
+      linkEffects = [];
       editorSnapshot = null;
       viewScroll = null;
       cachedState = null;
@@ -174,17 +191,99 @@
     function scenario(p = model()) {
       return p.scenarios.find(s => s.id === scenarioId) || p.scenarios[0];
     }
-    function rebuild(keep = false) {
+    function normalPaths(step) {
+      return [
+        ...new Set(
+          [
+            step.next,
+            ...(step.alternatives || []),
+            ...(step.decision?.answers || []).map(a => a.next),
+          ].filter(Boolean)
+        ),
+      ];
+    }
+    function observeGraph(p) {
+      if (routeModel && routeModel.id === p.id) {
+        const old = new Map(routeModel.steps.map(s => [s.id, E.connections(s)]));
+        for (const step of p.steps)
+          for (const to of E.connections(step)) {
+            if (old.get(step.id)?.includes(to)) continue;
+            linkEffects.push({ id: uid(), from: step.id, to, until: Date.now() + 2800 });
+            if (normalPaths(step).includes(to)) {
+              const queue = (routePreview[step.id] ||= []);
+              if (!queue.includes(to)) queue.push(to);
+              delete routeChoices[step.id];
+            }
+          }
+        linkEffects = linkEffects.slice(-24);
+      }
+      routeModel = p;
+    }
+    function playbackRoutes(p) {
+      const routes = Object.create(null);
+      for (const step of p.steps) {
+        const paths = normalPaths(step),
+          queue = (routePreview[step.id] || []).filter(to => paths.includes(to));
+        routePreview[step.id] = queue;
+        if (queue.length) routes[step.id] = queue[0];
+        else if (
+          !interactive &&
+          !step.decision &&
+          paths.length > 1 &&
+          !Object.hasOwn(scenario(p).routes || {}, step.id)
+        )
+          routes[step.id] = paths.reduce((best, to) =>
+            (branchVisits[step.id]?.[to] || 0) < (branchVisits[step.id]?.[best] || 0) ? to : best
+          );
+      }
+      return { ...routes, ...routeChoices };
+    }
+    function rebuild(keep = false, liveEdit = false) {
       reverse = null;
-      const p = model();
+      const p = model(),
+        context = owner + '|' + p.id + '|' + scenario(p).id;
+      if (routeContext !== context) {
+        routeContext = context;
+        routeModel = null;
+        branchVisits = Object.create(null);
+        routePreview = Object.create(null);
+        linkEffects = [];
+        linkFrom = '';
+        linkDrop = wire = null;
+        linkMessage = '';
+        liveEdit = false;
+        keep = false;
+      }
+      observeGraph(p);
       if (!keep) visitChoices = {};
       try {
-        route = E.plan(p, scenario(p), overrides, routeChoices, visitChoices);
+        if (liveEdit && route) {
+          visitChoices = Object.fromEntries(
+            Object.entries(visitChoices).filter(([, choice]) =>
+              E.answers(p.steps.find(s => s.id === choice.id) || {}).some(
+                a => a.next === choice.next && a.outcome === choice.outcome
+              )
+            )
+          );
+          const continued = E.resumePlan(
+            p,
+            scenario(p),
+            route,
+            index,
+            elapsed,
+            overrides,
+            playbackRoutes(p),
+            visitChoices
+          );
+          route = continued.route;
+          index = continued.index;
+          elapsed = continued.elapsed;
+        } else route = E.plan(p, scenario(p), overrides, playbackRoutes(p), visitChoices);
       } catch (err) {
         route = { entries: [], ending: 'invalid', error: err.message };
         paused = true;
       }
-      if (!keep) {
+      if (!keep && !liveEdit) {
         answered.clear();
         index = 0;
         elapsed = 0;
@@ -198,16 +297,19 @@
       );
     }
     function otherDialog() {
-      return !!document.querySelector(
-        'dialog[open]:not(#processHubOverlay):not(#processPresenter):not(#processAudienceOverlay)'
+      return [
+        ...document.querySelectorAll(
+          'dialog[open]:not(#processHubOverlay):not(#processPresenter):not(#processAudienceOverlay)'
+        ),
+      ].some(
+        dialog =>
+          !dialog.querySelector('#rehearsalProcessForm,#rehearsalScenarioForm,#rehearsalNewForm')
       );
     }
     function blocked() {
       return (
         (document.hidden && !presenter?.connected()) ||
         motionOff() ||
-        editing ||
-        !!draft ||
         !!presenter?.blocked() ||
         otherDialog() ||
         document.body.matches('.hub-private,.hub-present,.hub-focus')
@@ -226,8 +328,6 @@
         owner !== a.owner() ||
         !$('rehearsalRoot') ||
         document.hidden ||
-        editing ||
-        !!draft ||
         otherDialog() ||
         document.body.matches('.hub-private,.hub-present,.hub-focus')
       );
@@ -403,6 +503,70 @@
         )
         .join('');
     }
+    function linkTools(p = model()) {
+      const from = p.steps.find(s => s.id === linkFrom);
+      if (!from) return '<section id="processLinkTools" class="ph-link-tools" hidden></section>';
+      const destinations = p.steps.filter(
+        s => s.id !== from.id && !E.connections(from).includes(s.id)
+      );
+      return `<section id="processLinkTools" class="ph-link-tools" aria-label="Link process steps"><div><strong>Link from ${esc(from.title)}</strong><p>Drag a right-hand point to another card, or click its left-hand point. Keep linking to add several branches.</p></div><div class="ph-link-fields"><label>Starting step<select id="processLinkFrom">${p.steps.map(s => `<option value="${esc(s.id)}"${s.id === from.id ? ' selected' : ''}>${esc(s.title)}</option>`).join('')}</select></label><label>Existing destination<select id="processLinkTo">${destinations.length ? destinations.map(s => `<option value="${esc(s.id)}">${esc(s.title)}</option>`).join('') : '<option value="">All other steps are already linked</option>'}</select></label>${button('connect-selected', 'Link selected step', destinations.length ? '' : 'disabled', 'primary small')}<label>New step type<select id="processLinkType">${E.TYPES.map(type => `<option value="${type}">${esc(E.TYPE_LABELS[type])}</option>`).join('')}</select></label>${button('add-linked', '＋ Add linked step')}${button('finish-linking', 'Done linking')}</div><p role="status">${esc(linkMessage || 'Playback stays live. New branches join automatically on the next available pass.')}</p></section>`;
+    }
+    function syncLinkTools() {
+      const panel = $('processLinkTools');
+      if (panel) panel.outerHTML = linkTools();
+      const board = $('rehearsalBoard');
+      if (board) board.dataset.linking = String(!!linkFrom);
+      for (const node of document.querySelectorAll('#rehearsalBoard [data-node]')) {
+        node.dataset.linkSource = String(node.dataset.node === linkFrom);
+        const port = node.querySelector('[data-pc-port="out"]');
+        port?.setAttribute('aria-pressed', String(node.dataset.node === linkFrom));
+      }
+      document
+        .querySelector('[data-rehearsal="link-mode"]')
+        ?.setAttribute('aria-pressed', String(!!linkFrom));
+    }
+    function startLink(id, point = null) {
+      if (!model().steps.some(s => s.id === id)) return;
+      linkFrom = id;
+      linkDrop = point;
+      linkMessage = '';
+      syncLinkTools();
+    }
+    function connectSteps(from, to, expected = null) {
+      guard(owner);
+      if (expected && JSON.stringify(model()) !== JSON.stringify(expected))
+        throw Error('The process changed. Start the connection again.');
+      if (!from || !to || from === to) throw Error('Choose two different steps to link.');
+      if (editing && $('rehearsalStepForm')) saveForm($('rehearsalStepForm'));
+      const p = model(),
+        source = p.steps.find(s => s.id === from),
+        target = p.steps.find(s => s.id === to);
+      if (!source || !target) throw Error('Choose two existing steps in this process.');
+      linkFrom = from;
+      if (E.connections(source).includes(to)) {
+        linkMessage = 'These steps are already linked. Choose another destination.';
+        syncLinkTools();
+        return;
+      }
+      const ok = saveMutation(row => E.connect(row, from, to));
+      if (ok !== false) {
+        linkMessage =
+          'Connected ' +
+          source.title +
+          ' → ' +
+          target.title +
+          '. Keep choosing destinations to add more branches.';
+        syncLinkTools();
+      }
+    }
+    function linkPorts(step) {
+      return ['in', 'out']
+        .map(
+          direction =>
+            `<button type="button" class="ph-link-port ph-link-port-${direction}" data-rehearsal="link-port" data-pc-port="${direction}" data-pc-step="${esc(step.id)}" aria-label="${direction === 'out' ? 'Start links from ' : 'Link to '}${esc(step.title)}"${direction === 'out' ? ` aria-pressed="${linkFrom === step.id}"` : ''}><span aria-hidden="true">${direction === 'out' ? '＋' : '●'}</span></button>`
+        )
+        .join('');
+    }
     function graph(p) {
       if (selectionProcess !== p.id) {
         selectionProcess = p.id;
@@ -413,7 +577,7 @@
       const size = root.WorkHubProcessCanvasArt?.dimensions(p),
         width = size?.width || Math.max(850, ...p.steps.map(s => s.x + 270)),
         height = size?.height || Math.max(440, ...p.steps.map(s => s.y + 180));
-      return `<div id="rehearsalViewport" class="rehearsal-viewport" data-select-mode="${selectionMode}" tabindex="0" aria-label="Process canvas. Scroll to explore."><div class="rehearsal-extent" style="width:${width * zoom}px;height:${height * zoom}px"><div id="rehearsalBoard" class="rehearsal-board" style="width:${width}px;height:${height}px;transform:scale(${zoom})"><svg class="rehearsal-wires" width="${width}" height="${height}" aria-hidden="true"><defs><marker id="rehearsalArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z"></path></marker></defs>${edges(p)}<g class="pc-saved-annotations">${root.WorkHubProcessCanvasArt?.svg(p) || ''}</g></svg>${p.steps.map(s => `<article class="rehearsal-node" data-node="${esc(s.id)}" data-selected="${selection.has(s.id)}" data-type="${s.type}" style="left:${s.x}px;top:${s.y}px">${p.id !== '__demo__' ? `<button type="button" class="rehearsal-drag" data-rehearsal-drag="${esc(s.id)}" aria-label="Move ${esc(s.title)}. Drag or use arrow keys.">⠿</button>` : ''}<button type="button" class="rehearsal-node-main" data-rehearsal="inspect" data-id="${esc(s.id)}"><span class="rehearsal-node-icon">${ICONS[s.type]}</span><span><small>${esc(s.type)}${s.tcode ? ' · ' + esc(s.tcode) : ''}</small><strong>${esc(s.title)}</strong></span></button><span class="rehearsal-node-state" aria-hidden="true"></span><div class="rehearsal-particles" aria-hidden="true">${Array.from({ length: 6 }, (_, i) => `<i style="--particle:${i}"></i>`).join('')}</div></article>`).join('')}<div id="rehearsalToken" class="rehearsal-token" aria-hidden="true"><span>▤</span></div><div class="rehearsal-scene-specks" aria-hidden="true"></div></div></div></div>`;
+      return `<div id="rehearsalViewport" class="rehearsal-viewport" data-select-mode="${selectionMode}" tabindex="0" aria-label="Process canvas. Scroll to explore."><div class="rehearsal-extent" style="width:${width * zoom}px;height:${height * zoom}px"><div id="rehearsalBoard" class="rehearsal-board" data-linking="${!!linkFrom}" style="width:${width}px;height:${height}px;transform:scale(${zoom})"><svg class="rehearsal-wires" width="${width}" height="${height}" aria-hidden="true"><defs><marker id="rehearsalArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z"></path></marker></defs>${edges(p)}<path class="ph-wire-preview" hidden/><g class="pc-saved-annotations">${root.WorkHubProcessCanvasArt?.svg(p) || ''}</g></svg>${p.steps.map(s => `<article class="rehearsal-node" data-node="${esc(s.id)}" data-selected="${selection.has(s.id)}" data-link-source="${linkFrom === s.id}" data-type="${s.type}" style="left:${s.x}px;top:${s.y}px">${p.id !== '__demo__' ? `<button type="button" class="rehearsal-drag" data-rehearsal-drag="${esc(s.id)}" aria-label="Move ${esc(s.title)}. Drag or use arrow keys.">⠿</button>` + (mode !== 'present' ? linkPorts(s) : '') : ''}<button type="button" class="rehearsal-node-main" data-rehearsal="inspect" data-id="${esc(s.id)}"><span class="rehearsal-node-icon">${ICONS[s.type]}</span><span><small>${esc(s.type)}${s.tcode ? ' · ' + esc(s.tcode) : ''}</small><strong>${esc(s.title)}</strong></span></button><span class="rehearsal-node-state" aria-hidden="true"></span><div class="rehearsal-particles" aria-hidden="true">${Array.from({ length: 6 }, (_, i) => `<i style="--particle:${i}"></i>`).join('')}</div></article>`).join('')}<div id="rehearsalToken" class="rehearsal-token" aria-hidden="true"><span>▤</span></div><div class="rehearsal-scene-specks" aria-hidden="true"></div></div></div></div>`;
     }
     function captureDraftFields() {
       const form = $('processHubDetails');
@@ -425,7 +589,7 @@
         draft.links[key] = form.elements.namedItem('pc-' + key)?.value ?? draft.links[key] ?? '';
     }
     function palette() {
-      return `<aside class="ph-palette" aria-label="Step types"><span class="hub-kicker">BUILD YOUR FLOW</span><h3>Step types</h3><p>Drag onto the canvas, or tap to add.</p>${E.TYPES.map(type => button('palette', `<b>${ICONS[type]}</b><span>${type[0].toUpperCase() + type.slice(1)}<small>${{ task: 'An action to perform', document: 'Create or check a record', decision: 'Choose a route', approval: 'Review and authorise', result: 'An outcome or finish' }[type] || E.TYPE_LABELS[type]}</small></span>`, `data-type="${type}" draggable="true" data-step-type="${type}"`, 'ph-step-type')).join('')}<div class="ph-palette-tip"><strong>Make the connection</strong><p>Open a step to set its normal, alternative and exception routes. Move cards by their dotted handles.</p></div></aside>`;
+      return `<aside class="ph-palette" aria-label="Step types"><span class="hub-kicker">BUILD YOUR FLOW</span><h3>Step types</h3><p>Drag onto the canvas, or tap to add.</p>${E.TYPES.map(type => button('palette', `<b>${ICONS[type]}</b><span>${type[0].toUpperCase() + type.slice(1)}<small>${{ task: 'An action to perform', document: 'Create or check a record', decision: 'Choose a route', approval: 'Review and authorise', result: 'An outcome or finish' }[type] || E.TYPE_LABELS[type]}</small></span>`, `data-type="${type}" draggable="true" data-step-type="${type}"`, 'ph-step-type')).join('')}<div class="ph-palette-tip"><strong>Make the connection</strong><p>Drag a right-hand connection point to another step. Keep one source selected to create several branches. Playback stays live while you build.</p></div></aside>`;
     }
     function canvasLinks(p, prefix = 'pc-') {
       return [
@@ -501,9 +665,12 @@
       if (view) viewScroll = { left: view.scrollLeft, top: view.scrollTop };
       if (editing && oldForm && oldForm.dataset.owner === a.owner()) {
         const clone = oldForm.cloneNode(true);
-        for (const field of oldForm.elements) {
-          const target = clone.elements.namedItem(field.name);
-          if (target && 'value' in target) target.value = field.value;
+        for (const [i, field] of [...oldForm.elements].entries()) {
+          const target = clone.elements[i];
+          if (target && 'value' in target) {
+            target.value = field.value;
+            if ('checked' in field) target.checked = field.checked;
+          }
         }
         editorSnapshot = clone;
       }
@@ -526,7 +693,7 @@
             (isSaved
               ? button('edit-process', 'Edit process') + button('duplicate', 'Duplicate')
               : button('keep', 'Save this example'));
-      return `<section id="rehearsalRoot" class="hub rehearsal-workspace process-hub-workspace" data-owner="${esc(owner)}" data-theme="${prefs().theme}" data-effects="${prefs().effects}" data-mode="${mode}" data-draft="${!!draft}"><header class="rehearsal-hero"><div><span class="hub-kicker">${draft ? 'CREATE · CONNECT · EXPLAIN' : 'YOUR LIVING PROCESS LIBRARY'}</span><h2>${draft ? 'Process canvas' : 'Process Hub'}<span class="ph-title-mark" aria-hidden="true">↗</span></h2><p>${draft ? 'Arrange the flow and maintain every detail in one space. Save when you are ready.' : 'From your own reference to a clear walkthrough. Watch each handoff come to life.'}</p></div><div class="actions">${actions}${mode !== 'normal' ? button('normal', '↙ Normal view') : button('fullscreen', '⛶ Full screen')}${!draft ? (!isPresent ? button('present', '▷ Present') : '') + button('presenter', '▣ Presenter controls') : ''}</div></header>${screens ? screens.markup('processPresentationScreen', 'data-rehearsal="screens"') : ''}<div class="rehearsal-selection"><label>Saved process<select id="rehearsalProcess"${draft ? ' disabled' : ''}>${draft && !rows.some(x => x.id === p.id) ? `<option value="${esc(p.id)}" selected>Unsaved · ${esc(p.name)}</option>` : ''}${rows.map(x => `<option value="${esc(x.id)}"${x.id === p.id ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}<option value="__demo__"${p.id === '__demo__' ? ' selected' : ''}>Sample · Procure to pay</option></select></label><label>Scenario<select id="rehearsalScenario">${p.scenarios.map(s => `<option value="${esc(s.id)}"${s.id === scenarioId ? ' selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>${isSaved && !isPresent ? button('scenario', 'Edit scenario') + button('scenario-add', '＋ Scenario') : ''}<label>View<select id="processHubView"><option value="normal"${mode === 'normal' ? ' selected' : ''}>Normal</option><option value="full"${mode === 'full' ? ' selected' : ''}>Full screen</option><option value="present"${isPresent ? ' selected' : ''}>Presentation</option></select></label><span class="rehearsal-local-label">${draft ? 'Draft · saved only when you choose Save process' : `${p.steps.length} steps · ${p.scenarios.length} scenarios · ${p.revision ? esc(p.revision) + ' · ' : ''}Looping playback`}</span></div>${draft ? processFields(p) : `<div class="ph-library-bar"><div><strong>${esc(p.objective || p.notes || 'Build a process, then explore it at your own pace.')}</strong>${p.processOwner ? `<span>Owner · ${esc(p.processOwner)}</span>` : ''}</div><div class="actions">${!isPresent ? button('archive-view', archived ? 'Show active' : 'Archived processes') : ''}${isSaved && !isPresent ? button('archive', p.archived ? 'Restore process' : 'Archive') + button('export', '↓ Export PDF / Image') : ''}${isSaved && !isPresent ? button('settings', 'Process information') : ''}</div></div>`}<div class="ph-canvas-layout">${draft ? palette() : ''}<div class="rehearsal-layout"><div class="rehearsal-stage"><div class="rehearsal-stage-bar"><div><strong>${esc(p.name)}</strong><span id="rehearsalStatus" aria-live="polite"></span></div><div class="actions">${isSaved && !isPresent ? button('add-step', '＋ Step') + button('layout', 'Auto arrange') : ''}${!isPresent ? button('select-mode', selectionMode ? '✓ Select steps' : '▧ Select steps', `aria-pressed="${selectionMode}"`) + button('select-all', 'Select all') + `<span class="ph-selection-count" role="status">${selection.size ? selection.size + ' selected' : ''}</span>` : ''}${button('fit', 'Fit')}${button('zoom-out', '−', 'aria-label="Zoom out"')}${button('zoom-in', '＋', 'aria-label="Zoom in"')}<span class="ph-zoom">${Math.round(zoom * 100)}%</span></div></div>${graph(p)}<div class="rehearsal-values"><div class="rehearsal-values-title"><strong>Sample values</strong><span>Changes follow your definitions</span></div><div id="rehearsalValues"></div></div><div class="rehearsal-playbar">${button('back', '↶', 'aria-label="Previous step / rewind"')}${button('play', draft ? 'Preview after saving' : 'Pause', 'id="rehearsalPlay"', 'primary small')}${button('next', '↷', 'aria-label="Next step"')}${button('restart', 'Restart')}<label>Decisions<select id="rehearsalDecisionMode"><option value="auto"${!interactive ? ' selected' : ''}>Automatic · default routes</option><option value="interactive"${interactive ? ' selected' : ''}>Interactive · ask me</option></select></label><label>Speed<select id="rehearsalSpeed">${[0.5, 1, 1.5, 2].map(v => `<option value="${v}"${v === prefs().speed ? ' selected' : ''}>${v}×</option>`).join('')}</select></label>${button('sound', soundLabel(), 'id="rehearsalSound" aria-pressed="false" aria-describedby="rehearsalAudioStatus"')}<label>Volume<input id="rehearsalVolume" aria-label="Rehearsal volume" type="range" min="0" max="1" step="0.05" value="${prefs().volume}"></label></div><p id="rehearsalAudioStatus" class="hub-meta" role="status">${esc(audioMessage())}</p></div><aside id="rehearsalInspector" class="rehearsal-inspector"></aside></div></div><div class="rehearsal-options"><label>Scenery<select id="rehearsalTheme">${[
+      return `<section id="rehearsalRoot" class="hub rehearsal-workspace process-hub-workspace" data-owner="${esc(owner)}" data-theme="${prefs().theme}" data-effects="${prefs().effects}" data-mode="${mode}" data-draft="${!!draft}"><header class="rehearsal-hero"><div><span class="hub-kicker">${draft ? 'CREATE · CONNECT · EXPLAIN' : 'YOUR LIVING PROCESS LIBRARY'}</span><h2>${draft ? 'Process canvas' : 'Process Hub'}<span class="ph-title-mark" aria-hidden="true">↗</span></h2><p>${draft ? 'Arrange the flow and maintain every detail in one space. Save when you are ready.' : 'From your own reference to a clear walkthrough. Watch each handoff come to life.'}</p></div><div class="actions">${actions}${mode !== 'normal' ? button('normal', '↙ Normal view') : button('fullscreen', '⛶ Full screen')}${!draft ? (!isPresent ? button('present', '▷ Present') : '') + button('presenter', '▣ Presenter controls') : ''}</div></header>${screens ? screens.markup('processPresentationScreen', 'data-rehearsal="screens"') : ''}<div class="rehearsal-selection"><label>Saved process<select id="rehearsalProcess"${draft ? ' disabled' : ''}>${draft && !rows.some(x => x.id === p.id) ? `<option value="${esc(p.id)}" selected>Unsaved · ${esc(p.name)}</option>` : ''}${rows.map(x => `<option value="${esc(x.id)}"${x.id === p.id ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}<option value="__demo__"${p.id === '__demo__' ? ' selected' : ''}>Sample · Procure to pay</option></select></label><label>Scenario<select id="rehearsalScenario">${p.scenarios.map(s => `<option value="${esc(s.id)}"${s.id === scenarioId ? ' selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>${isSaved && !isPresent ? button('scenario', 'Edit scenario') + button('scenario-add', '＋ Scenario') : ''}<label>View<select id="processHubView"><option value="normal"${mode === 'normal' ? ' selected' : ''}>Normal</option><option value="full"${mode === 'full' ? ' selected' : ''}>Full screen</option><option value="present"${isPresent ? ' selected' : ''}>Presentation</option></select></label><span class="rehearsal-local-label">${draft ? 'Draft · saved only when you choose Save process' : `${p.steps.length} steps · ${p.scenarios.length} scenarios · ${p.revision ? esc(p.revision) + ' · ' : ''}Looping playback`}</span></div>${draft ? processFields(p) : `<div class="ph-library-bar"><div><strong>${esc(p.objective || p.notes || 'Build a process, then explore it at your own pace.')}</strong>${p.processOwner ? `<span>Owner · ${esc(p.processOwner)}</span>` : ''}</div><div class="actions">${!isPresent ? button('archive-view', archived ? 'Show active' : 'Archived processes') : ''}${isSaved && !isPresent ? button('archive', p.archived ? 'Restore process' : 'Archive') + button('export', '↓ Export PDF / Image') : ''}${isSaved && !isPresent ? button('settings', 'Process information') : ''}</div></div>`}<div class="ph-canvas-layout">${draft ? palette() : ''}<div class="rehearsal-layout"><div class="rehearsal-stage"><div class="rehearsal-stage-bar"><div><strong>${esc(p.name)}</strong><span id="rehearsalStatus" aria-live="polite"></span></div><div class="actions">${isSaved && !isPresent ? button('add-step', '＋ Step') + button('link-mode', '↗ Link steps', `aria-pressed="${!!linkFrom}"`) + button('layout', 'Auto arrange') : ''}${!isPresent ? button('select-mode', selectionMode ? '✓ Select steps' : '▧ Select steps', `aria-pressed="${selectionMode}"`) + button('select-all', 'Select all') + `<span class="ph-selection-count" role="status">${selection.size ? selection.size + ' selected' : ''}</span>` : ''}${button('fit', 'Fit')}${button('zoom-out', '−', 'aria-label="Zoom out"')}${button('zoom-in', '＋', 'aria-label="Zoom in"')}<span class="ph-zoom">${Math.round(zoom * 100)}%</span></div></div>${!isPresent ? linkTools(p) : ''}${graph(p)}<div class="rehearsal-values"><div class="rehearsal-values-title"><strong>Sample values</strong><span>Changes follow your definitions</span></div><div id="rehearsalValues"></div></div><div class="rehearsal-playbar">${button('back', '↶', 'aria-label="Previous step / rewind"')}${button('play', 'Pause', 'id="rehearsalPlay"', 'primary small')}${button('next', '↷', 'aria-label="Next step"')}${button('restart', 'Restart')}<label>Decisions<select id="rehearsalDecisionMode"><option value="auto"${!interactive ? ' selected' : ''}>Automatic · explore connected paths</option><option value="interactive"${interactive ? ' selected' : ''}>Interactive · ask me</option></select></label><label>Speed<select id="rehearsalSpeed">${[0.5, 1, 1.5, 2].map(v => `<option value="${v}"${v === prefs().speed ? ' selected' : ''}>${v}×</option>`).join('')}</select></label>${button('sound', soundLabel(), 'id="rehearsalSound" aria-pressed="false" aria-describedby="rehearsalAudioStatus"')}<label>Volume<input id="rehearsalVolume" aria-label="Rehearsal volume" type="range" min="0" max="1" step="0.05" value="${prefs().volume}"></label></div><p id="rehearsalAudioStatus" class="hub-meta" role="status">${esc(audioMessage())}</p></div><aside id="rehearsalInspector" class="rehearsal-inspector"></aside></div></div><div class="rehearsal-options"><label>Scenery<select id="rehearsalTheme">${[
         ['desk', 'Cosy desk'],
         ['blueprint', 'Blueprint'],
         ['control', 'Control room'],
@@ -536,7 +703,7 @@
         )
         .join(
           ''
-        )}</select></label><label>Effects<select id="rehearsalEffects">${['quiet', 'balanced', 'expressive'].map(v => `<option${prefs().effects === v ? ' selected' : ''}>${v}</option>`).join('')}</select></label><label class="check-label"><input id="rehearsalExplore" type="checkbox"${prefs().explore ? ' checked' : ''}>Explore scenarios automatically</label><span>Animated playback loops. Editing pauses the scene.</span></div><section class="rehearsal-journal"><div><h3>Playback journal</h3><span id="rehearsalJournalHeading">Current route</span></div><ol id="rehearsalJournal" aria-live="off"></ol></section></section>`;
+        )}</select></label><label>Effects<select id="rehearsalEffects">${['quiet', 'balanced', 'expressive'].map(v => `<option${prefs().effects === v ? ' selected' : ''}>${v}</option>`).join('')}</select></label><label class="check-label"><input id="rehearsalExplore" type="checkbox"${prefs().explore ? ' checked' : ''}>Explore scenarios automatically</label><span>Live playback continues while you create, link and edit. Connected branches are explored automatically; named decisions keep their defaults.</span></div><section class="rehearsal-journal"><div><h3>Playback journal</h3><span id="rehearsalJournalHeading">Current route</span></div><ol id="rehearsalJournal" aria-live="off"></ol></section></section>`;
     }
     function detailHTML(step) {
       if (!step)
@@ -545,7 +712,7 @@
         p = model(),
         row = (label, value) => (value ? `<dt>${label}</dt><dd>${esc(value)}</dd>` : '');
       const routes = [step.next, ...(step.alternatives || [])].filter(Boolean);
-      return `<span class="hub-kicker">${presenting ? 'FOLLOW THE PROCESS' : 'STEP DETAILS'}</span><div class="rehearsal-detail-title"><span>${ICONS[step.type]}</span><h3>${esc(step.title)}</h3></div>${step.tcode ? `<span class="rehearsal-tcode">${esc(step.tcode)}</span>` : ''}<dl>${row('Who handles it', step.owner)}${row('Before you start', step.prerequisites)}${row('What happens', presenting ? step.audienceText || step.instruction : step.instruction)}${row('Inputs', step.inputs)}${row('Expected result', step.expected)}${row('Outputs', step.outputs)}${row('System / tool', step.system)}${row('Typical working time', step.workingTime)}${!presenting ? row('If it fails / common errors', step.failure) + row('Configuration / setup', step.configuration) + row('Testing checklist', step.testing) : ''}</dl>${step.image ? `<a class="rehearsal-image-link" href="${esc(step.image)}" target="_blank" rel="noopener"><img src="${esc(step.image)}" alt="Reference screenshot for ${esc(step.title)}"></a>` : ''}${!presenting && step.link ? `<a href="${esc(step.link)}" target="_blank" rel="noopener noreferrer">Open reference ↗</a>` : ''}${!presenting ? a.recordLinks?.(step) || '' : ''}${decisionHTML(step)}<div class="rehearsal-branches"><strong>Explore an outcome</strong>${button('success', 'Follow success', `data-id="${esc(step.id)}"`)}${button('failure', 'What if this fails?', `data-id="${esc(step.id)}"`)}${routes.length > 1 ? `<strong>Alternative routes</strong>${routes.map(id => button('route', esc(p.steps.find(s => s.id === id)?.title || id), `data-id="${esc(step.id)}" data-next="${esc(id)}"`)).join('')}` : ''}</div>${p.id !== '__demo__' && !presenting ? button('edit-step', 'Edit this step', `data-id="${esc(step.id)}"`, 'primary small') : ''}`;
+      return `<span class="hub-kicker">${presenting ? 'FOLLOW THE PROCESS' : 'STEP DETAILS'}</span><div class="rehearsal-detail-title"><span>${ICONS[step.type]}</span><h3>${esc(step.title)}</h3></div>${step.tcode ? `<span class="rehearsal-tcode">${esc(step.tcode)}</span>` : ''}<dl>${row('Who handles it', step.owner)}${row('Before you start', step.prerequisites)}${row('What happens', presenting ? step.audienceText || step.instruction : step.instruction)}${row('Inputs', step.inputs)}${row('Expected result', step.expected)}${row('Outputs', step.outputs)}${row('System / tool', step.system)}${row('Typical working time', step.workingTime)}${!presenting ? row('If it fails / common errors', step.failure) + row('Configuration / setup', step.configuration) + row('Testing checklist', step.testing) : ''}</dl>${step.image ? `<a class="rehearsal-image-link" href="${esc(step.image)}" target="_blank" rel="noopener"><img src="${esc(step.image)}" alt="Reference screenshot for ${esc(step.title)}"></a>` : ''}${!presenting && step.link ? `<a href="${esc(step.link)}" target="_blank" rel="noopener noreferrer">Open reference ↗</a>` : ''}${!presenting ? a.recordLinks?.(step) || '' : ''}${decisionHTML(step)}<div class="rehearsal-branches"><strong>Explore an outcome</strong>${button('success', 'Follow success', `data-id="${esc(step.id)}"`)}${button('failure', 'What if this fails?', `data-id="${esc(step.id)}"`)}${routes.length > 1 ? `<strong>Alternative routes</strong>${routes.map(id => button('route', esc(p.steps.find(s => s.id === id)?.title || id), `data-id="${esc(step.id)}" data-next="${esc(id)}"`)).join('')}` : ''}</div>${p.id !== '__demo__' && !presenting ? button('edit-step', 'Edit this step', `data-id="${esc(step.id)}"`, 'primary small') + button('link-from', '↗ Link from this step', `data-id="${esc(step.id)}"`) : ''}`;
     }
     function closeOverlay() {
       if (!overlay) return;
@@ -616,14 +783,16 @@
         : '';
       draft = p;
       processId = p.id;
-      scenarioId = p.scenarios[0].id;
-      routeChoices = {};
-      overrides = {};
-      route = null;
+      if (!source || !p.scenarios.some(s => s.id === scenarioId)) scenarioId = p.scenarios[0].id;
+      if (!source) {
+        routeChoices = {};
+        overrides = {};
+      }
+      if (!source) route = null;
       editing = false;
       selected = '';
       editorSnapshot = null;
-      paused = true;
+      if (!source) paused = false;
       if (!source) {
         p.name = 'My new process';
         p.notes = '';
@@ -654,19 +823,15 @@
       draft = null;
       editing = false;
       editorSnapshot = null;
-      route = null;
       lastModel = '';
-      paused = false;
       try {
         if (!a.mutate(d => E.store(d, candidate))) {
           draft = held;
-          paused = true;
           a.render();
           return;
         }
       } catch (err) {
         draft = held;
-        paused = true;
         a.render();
         throw err;
       }
@@ -685,11 +850,12 @@
       paused = false;
       setMode('normal', false);
     }
-    function addStep(type = 'task', position = null) {
+    function addStep(type = 'task', position = null, from = '') {
       if (editing && $('rehearsalStepForm')) saveForm($('rehearsalStepForm'));
       const p = model();
       if (!saved(p)) throw Error('Save the example or create a process before adding steps.');
-      const base = E.seed('temporary', now(), true).steps[0],
+      const source = p.steps.find(s => s.id === from),
+        base = E.seed('temporary', now(), true).steps[0],
         s = {
           ...base,
           ...Object.fromEntries(E.STEP_FIELDS.map(k => [k, ''])),
@@ -698,8 +864,12 @@
           title: 'New ' + type,
           next: '',
           alternatives: [],
-          x: position?.x ?? 60,
-          y: position?.y ?? Math.min(4000, 80 + p.steps.length * 120),
+          x: position?.x ?? (source ? Math.min(4000, source.x + 300) : 60),
+          y:
+            position?.y ??
+            (source
+              ? Math.min(4000, source.y + normalPaths(source).length * 140)
+              : Math.min(4000, 80 + p.steps.length * 120)),
         };
       if (p.steps.length >= (p.hubId ? 200 : 80))
         throw Error('This process has reached its step limit.');
@@ -707,6 +877,7 @@
       editorSnapshot = null;
       saveMutation(row => {
         row.steps.push(s);
+        if (source) E.connect(row, source.id, s.id);
         if (!row.startId) row.startId = s.id;
       });
       stepEditor(s.id);
@@ -811,6 +982,9 @@
         interactive &&
         !draft &&
         !editing &&
+        !linkFrom &&
+        !wire &&
+        !presenter?.editing() &&
         step &&
         E.answers(step).length > 1 &&
         !answered.has(index)
@@ -849,10 +1023,6 @@
       reverse = null;
       const p = model();
       selected = id;
-      paused = true;
-      elapsed = 0;
-      const at = route.entries.findIndex(e => e.id === id);
-      if (at >= 0) index = at;
       if (!editing) $('rehearsalInspector').innerHTML = detailHTML(p.steps.find(s => s.id === id));
       paintKey = '';
       paint();
@@ -887,6 +1057,22 @@
         duration = entry ? entry.duration * 1000 : 3200,
         phase = entry ? Math.min(1, elapsed / duration) : 1,
         key = index + '|' + (entry ? phase >= 0.55 : 'end') + '|' + pendingDecision();
+      if (linkEffects.length) {
+        const effects = linkEffects.filter(effect => effect.until > Date.now());
+        for (const edge of rootEl.querySelectorAll('.rehearsal-edge')) {
+          const effect = effects.find(
+            effect => effect.from === edge.dataset.from && effect.to === edge.dataset.to
+          );
+          if (effect) edge.dataset.linkEffect = effect.id;
+          else delete edge.dataset.linkEffect;
+        }
+        for (const node of rootEl.querySelectorAll('[data-node]')) {
+          const effect = effects.find(effect => effect.to === node.dataset.node);
+          if (effect) node.dataset.linkArrival = effect.id;
+          else delete node.dataset.linkArrival;
+        }
+        linkEffects = effects;
+      }
       rootEl.dataset.playing = String((!paused || !!reverse) && !pendingDecision() && !blocked());
       rootEl.dataset.direction = reverse ? 'reverse' : 'forward';
       rootEl.dataset.reduced = String(motionOff());
@@ -935,7 +1121,7 @@
             )
             .join('') || '<p>Add sample fields in your scenario.</p>';
         $('rehearsalStatus').textContent = draft
-          ? 'Editing · Save process to start looping playback'
+          ? 'Live draft · changes join playback as you build · Save process to keep them'
           : pendingDecision()
             ? 'Choose an answer to continue · ' +
               (p.steps.find(s => s.id === entry?.id)?.decision?.question || entry?.title)
@@ -954,13 +1140,13 @@
           .join('');
         $('rehearsalJournalHeading').textContent = scenario(p).name + ' · loop ' + (loops + 1);
         if (!editing && display) {
-          const detailId = paused && selected ? selected : display.id;
-          selected = detailId;
+          const detailId = selected || display.id;
           $('rehearsalInspector').innerHTML = detailHTML(p.steps.find(s => s.id === detailId));
         }
         if (moved && entry) {
           const step = p.steps.find(s => s.id === entry.id);
-          if (step && !paused && !blocked()) camera(step);
+          if (step && !paused && !blocked() && !draft && !editing && !linkFrom && !wire && !drag)
+            camera(step);
           if (!paused && playSound) tone(entry);
         }
       }
@@ -1021,6 +1207,13 @@
         const entry = route.entries[index],
           duration = entry ? entry.duration * 1000 : 3200;
         if (elapsed >= duration) {
+          if (entry?.nextId) {
+            const visits = (branchVisits[entry.id] ||= Object.create(null));
+            visits[entry.nextId] = (visits[entry.nextId] || 0) + 1;
+            routePreview[entry.id] = (routePreview[entry.id] || []).filter(
+              to => to !== entry.nextId
+            );
+          }
           elapsed = 0;
           index++;
           if (index > route.entries.length) {
@@ -1076,14 +1269,15 @@
       const p = model(),
         key = owner + '|' + JSON.stringify(p) + '|' + scenarioId;
       if (!wasVisible) {
-        paused = !!draft;
+        paused = false;
         elapsed = 0;
         index = 0;
       }
       if (key !== lastModel || !wasVisible) {
         lastModel = key;
-        rebuild();
+        rebuild(true, wasVisible && routeContext === owner + '|' + p.id + '|' + scenario(p).id);
       }
+      syncLinkTools();
       wasVisible = true;
       if (editing && editorSnapshot && editorSnapshot.dataset.owner === owner) {
         $('rehearsalInspector').replaceChildren(editorSnapshot);
@@ -1114,7 +1308,6 @@
         E.store(probe, { ...next, name: next.name.trim() || 'Untitled process' });
         E.validate(probe);
         draft = next;
-        route = null;
         a.render();
         return true;
       }
@@ -1215,13 +1408,12 @@
       guard(owner);
       if (!saved(p) || !step) throw Error('Step no longer exists.');
       reverse = null;
-      paused = true;
       editing = true;
       selected = id;
       const field = (k, label, type = 'text', max = 32767) =>
         `<label>${label}${type === 'textarea' ? `<textarea name="${k}" maxlength="${max}">${esc(step[k])}</textarea>` : `<input name="${k}" maxlength="${max}" value="${esc(step[k])}"${k === 'title' ? ' required' : ''}${k === 'tcode' ? ' list="rehearsalTcodes"' : ''}>`}</label>`;
       $('rehearsalInspector').innerHTML =
-        `<form id="rehearsalStepForm" data-owner="${esc(owner)}" data-process="${esc(p.id)}" data-id="${esc(id)}" data-updated="${esc(p.updatedAt)}"><span class="hub-kicker">EDIT STEP · PLAYBACK PAUSED</span>${field('title', 'Step title', 'text', 500)}<label>Step type<select name="type">${E.TYPES.map(t => `<option${t === step.type ? ' selected' : ''}>${t}</option>`).join('')}</select></label>${field('tcode', 'Transaction / reference codes', 'text', 32767)}<datalist id="rehearsalTcodes">${a
+        `<form id="rehearsalStepForm" data-owner="${esc(owner)}" data-process="${esc(p.id)}" data-id="${esc(id)}" data-updated="${esc(p.updatedAt)}"><span class="hub-kicker">EDIT STEP · LIVE PLAYBACK</span>${field('title', 'Step title', 'text', 500)}<label>Step type<select name="type">${E.TYPES.map(t => `<option${t === step.type ? ' selected' : ''}>${t}</option>`).join('')}</select></label>${field('tcode', 'Transaction / reference codes', 'text', 32767)}<datalist id="rehearsalTcodes">${a
           .state()
           .workhub.tcodes.records.filter(r => !r.archived)
           .map(r => `<option value="${esc(r.code)}">${esc(r.title)}</option>`)
@@ -1249,7 +1441,6 @@
             ''
           )}<label>Sample value changes<textarea name="changes" placeholder="Received quantity += @Delivery quantity">${esc(step.changes.map(c => c.field + (c.operator === 'add' ? ' += ' : ' = ') + c.value).join('\n'))}</textarea></label><p class="hub-meta">Use = to set a value; += to add a number. @Field reads another sample field. No code is executed.</p><label>Seconds on this step (0 = automatic)<input name="duration" type="number" min="0" max="30" step="0.5" value="${step.duration}"></label>${field('link', 'Reference URL', 'text', 2000)}<label>Reference screenshot<input id="rehearsalImageInput" type="file" accept="image/png,image/jpeg,image/webp"></label><p class="hub-meta">Optimized screenshot saved with the process. Up to 2 MB of screenshots across your rehearsals.</p><input name="image" type="hidden" value="${esc(step.image)}"><div id="rehearsalImagePreview">${step.image ? `<img src="${esc(step.image)}" alt="Step screenshot">` : ''}</div>${button('remove-image', 'Remove screenshot')}<div class="actions"><button type="submit" class="primary">Save step</button>${button('cancel-edit', 'Cancel')}</div>${p.steps.length > 1 ? button('delete-step', 'Delete step', `data-id="${esc(id)}"`, 'danger small') : ''}</form>`;
       $('rehearsalInspector').querySelector('[name="title"]').focus();
-      clearAudio();
     }
     function saveForm(form) {
       const value = k => form.elements.namedItem(k).value;
@@ -1346,7 +1537,6 @@
         } else delete step.decision;
         editing = false;
         editorSnapshot = null;
-        paused = false;
         try {
           saveMutation(row => {
             row.steps[row.steps.findIndex(s => s.id === id)] = step;
@@ -1364,7 +1554,6 @@
           });
         } catch (err) {
           editing = true;
-          paused = true;
           throw err;
         }
       }
@@ -1420,7 +1609,6 @@
       if (key === 'sound' && !value) clearAudio();
     }
     function moveStep(id, x, y) {
-      paused = true;
       saveMutation(p => {
         const step = p.steps.find(s => s.id === id);
         if (!step) throw Error('Step no longer exists.');
@@ -1465,10 +1653,41 @@
       const action = el.dataset.rehearsal,
         id = el.dataset.id,
         p = model();
+      if (action === 'link-mode' || action === 'link-from') {
+        if (!saved(p)) throw Error('Save an editable copy before linking steps.');
+        if (action === 'link-mode' && linkFrom) {
+          linkFrom = '';
+          linkDrop = null;
+          syncLinkTools();
+        } else startLink(id || selected || p.steps[0]?.id);
+        return;
+      }
+      if (action === 'finish-linking') {
+        linkFrom = '';
+        linkDrop = null;
+        syncLinkTools();
+        return;
+      }
+      if (action === 'link-port') {
+        if (Date.now() < suppressClick) return;
+        if (el.dataset.pcPort === 'out') startLink(el.dataset.pcStep);
+        else if (linkFrom) connectSteps(linkFrom, el.dataset.pcStep);
+        else a.tell('Choose a right-hand connection point first.');
+        return;
+      }
+      if (action === 'connect-selected') {
+        connectSteps(linkFrom, $('processLinkTo')?.value);
+        return;
+      }
+      if (action === 'add-linked') {
+        const type = $('processLinkType')?.value || 'task';
+        addStep(type, linkDrop, linkFrom);
+        linkDrop = null;
+        return;
+      }
       if (action === 'select-mode' || action === 'select-all') {
         selectionMode = action === 'select-all' ? true : !selectionMode;
         selection = action === 'select-all' ? new Set(p.steps.map(s => s.id)) : new Set();
-        paused = true;
         a.render();
         return;
       }
@@ -1642,13 +1861,15 @@
       if (action === 'cancel-edit') {
         editing = false;
         editorSnapshot = null;
-        paused = true;
+        paintKey = '';
+        paint(false);
         $('rehearsalInspector').innerHTML = detailHTML(p.steps.find(s => s.id === selected));
         return;
       }
       if (action === 'inspect') {
         if (Date.now() < suppressClick) return;
-        inspect(id);
+        if (linkFrom && id !== linkFrom) connectSteps(linkFrom, id);
+        else inspect(id);
         return;
       }
       if (action === 'route') {
@@ -1693,19 +1914,11 @@
         return;
       }
       if (action === 'play') {
-        if (draft) {
-          a.tell('Save your process to start looping playback.');
-          return;
-        }
         if (reverse) {
           reverse = null;
           paused = true;
           paintKey = '';
           paint();
-          return;
-        }
-        if (editing) {
-          a.tell('Save or cancel the step editor first.');
           return;
         }
         paused = !paused;
@@ -1804,12 +2017,28 @@
     document.addEventListener('pointerdown', event => {
       const view = event.target.closest?.('#rehearsalViewport'),
         card = event.target.closest?.('[data-node]');
+      const port = event.target.closest?.('#rehearsalBoard [data-pc-port]');
+      if (view && port && event.button === 0 && mode !== 'present') {
+        event.preventDefault();
+        wire = {
+          from: port.dataset.pcStep,
+          direction: port.dataset.pcPort,
+          owner,
+          process: model().id,
+          expected: E.copy(model()),
+          id: event.pointerId,
+          x: event.clientX,
+          y: event.clientY,
+          moved: false,
+        };
+        view.setPointerCapture?.(event.pointerId);
+        return;
+      }
       if (selectionMode && view && event.button === 0 && !editing && mode !== 'present') {
         if (!card) {
           const point = boardPoint(event);
           if (!point) return;
           event.preventDefault();
-          paused = true;
           suppressClick = Date.now() + 400;
           const element = document.createElement('div');
           element.className = 'ph-marquee';
@@ -1864,7 +2093,6 @@
         guard(owner);
         const s = model().steps.find(s => s.id === handle.dataset.rehearsalDrag);
         if (!s) return;
-        paused = true;
         if (!selection.has(s.id)) selection = new Set([s.id]);
         paintSelection();
         event.preventDefault();
@@ -1891,6 +2119,29 @@
       }
     });
     document.addEventListener('pointermove', event => {
+      if (wire) {
+        if (wire.id !== event.pointerId) return;
+        if (wire.owner !== a.owner() || wire.process !== model().id) {
+          wire = null;
+          return;
+        }
+        const point = boardPoint(event),
+          source = model().steps.find(s => s.id === wire.from),
+          path = document.querySelector('#rehearsalBoard .ph-wire-preview');
+        if (!point || !source || !path) return;
+        event.preventDefault();
+        wire.moved ||= Math.hypot(event.clientX - wire.x, event.clientY - wire.y) > 5;
+        if (wire.moved) {
+          path.removeAttribute('hidden');
+          const x = source.x + (wire.direction === 'out' ? 210 : 0),
+            y = source.y + 50;
+          path.setAttribute(
+            'd',
+            `M${x},${y} C${x + (wire.direction === 'out' ? 90 : -90)},${y} ${point.x},${point.y} ${point.x},${point.y}`
+          );
+        }
+        return;
+      }
       if (marquee) {
         if (marquee.id !== event.pointerId) return;
         if (marquee.owner !== a.owner() || marquee.process !== model().id) {
@@ -1970,6 +2221,40 @@
       }
     });
     document.addEventListener('pointerup', event => {
+      if (wire) {
+        if (wire.id !== event.pointerId) return;
+        const done = wire;
+        wire = null;
+        suppressClick = Date.now() + 400;
+        document.querySelector('#rehearsalBoard .ph-wire-preview')?.setAttribute('hidden', '');
+        if (done.owner !== a.owner() || done.process !== model().id) return;
+        try {
+          if (!done.moved) {
+            if (done.direction === 'out') startLink(done.from);
+            else if (linkFrom) connectSteps(linkFrom, done.from, done.expected);
+          } else {
+            const element =
+                document.elementFromPoint?.(event.clientX, event.clientY) || event.target,
+              destination =
+                element?.closest('[data-pc-step]')?.dataset.pcStep ||
+                element?.closest('[data-node]')?.dataset.node;
+            if (destination && destination !== done.from)
+              connectSteps(
+                done.direction === 'out' ? done.from : destination,
+                done.direction === 'out' ? destination : done.from,
+                done.expected
+              );
+            else if (done.direction === 'out') {
+              startLink(done.from, boardPoint(event));
+              linkMessage = 'Choose a new step type, then Add linked step to place it here.';
+              syncLinkTools();
+            }
+          }
+        } catch (err) {
+          a.tell(err.message, true);
+        }
+        return;
+      }
       if (marquee) {
         if (marquee.id !== event.pointerId) return;
         marquee.element.remove();
@@ -2015,6 +2300,8 @@
       }
     });
     document.addEventListener('pointercancel', () => {
+      wire = null;
+      document.querySelector('#rehearsalBoard .ph-wire-preview')?.setAttribute('hidden', '');
       if (marquee) {
         selection = new Set(marquee.base);
         marquee.element.remove();
@@ -2031,6 +2318,21 @@
       'keydown',
       event => {
         if (
+          event.key === 'Escape' &&
+          (wire || linkFrom) &&
+          event.target.closest?.('#rehearsalRoot') &&
+          !event.target.matches('input,textarea,select')
+        ) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          wire = null;
+          linkFrom = '';
+          linkDrop = null;
+          document.querySelector('#rehearsalBoard .ph-wire-preview')?.setAttribute('hidden', '');
+          syncLinkTools();
+          return;
+        }
+        if (
           event.target.closest?.('#rehearsalViewport') &&
           !event.target.matches('input,textarea,select,[contenteditable="true"]')
         ) {
@@ -2039,7 +2341,6 @@
             event.stopPropagation();
             selectionMode = true;
             selection = new Set(model().steps.map(s => s.id));
-            paused = true;
             a.render();
             $('rehearsalViewport')?.focus();
             return;
@@ -2115,6 +2416,10 @@
       const el = event.target,
         id = el.id;
       try {
+        if (id === 'processLinkFrom') {
+          startLink(el.value);
+          return;
+        }
         if (el.name === 'type' && el.closest('#rehearsalStepForm')) {
           el.closest('form').querySelector('.ph-decision-editor').hidden = el.value !== 'decision';
           return;
@@ -2245,18 +2550,13 @@
         theme: prefs().theme,
         reduced: motionOff() || prefs().effects === 'quiet',
         speed: prefs().speed,
-        playing:
-          !paused &&
-          !pendingDecision() &&
-          !editing &&
-          !draft &&
-          !motionOff() &&
-          !presenter?.blocked(),
+        playing: !paused && !pendingDecision() && !motionOff() && !presenter?.blocked(),
         phase: entry ? Math.min(1, elapsed / (entry.duration * 1000)) : 1,
         duration: entry?.duration || 3,
         active: entry?.id || '',
         next: entry?.nextId || '',
         outcome: entry?.outcome || 'success',
+        linkEffects: linkEffects.filter(effect => effect.until > Date.now()),
         count: index + 1,
         total: route?.entries.length || 0,
         steps: p.steps.map(s => ({
@@ -2312,12 +2612,7 @@
           const ok = saveMutation(row => {
             Object.assign(row, E.copy(next));
           });
-          if (ok !== false) {
-            route = null;
-            rebuild();
-            paused = true;
-            paint(false);
-          }
+          if (ok !== false) paint(false);
           return ok;
         },
         copy: () => saveCopy(false),

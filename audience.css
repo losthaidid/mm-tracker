@@ -474,6 +474,31 @@
 .audience-frame[data-playing='false'] .av-edge path {
   animation-play-state: paused;
 }
+.audience-frame .av-edge[data-link-effect] path {
+  stroke: #258369;
+  stroke-width: 5;
+  stroke-dasharray: 16 7;
+  filter: drop-shadow(0 0 4px #6ecaa4);
+  animation: av-flow 0.65s linear infinite;
+}
+.audience-frame .av-node[data-link-arrival] > rect {
+  stroke: #258369;
+  stroke-width: 4;
+  animation: av-link-arrival 0.8s ease-in-out infinite alternate;
+}
+.presenter-preview .av-node[data-link-source='true'] > rect {
+  stroke: #258369;
+  stroke-width: 5;
+}
+.presenter-preview .pc-ports [role='button']:focus-visible {
+  outline: 3px solid #258369;
+  outline-offset: 4px;
+}
+@keyframes av-link-arrival {
+  to {
+    filter: drop-shadow(0 0 12px #76d5b3);
+  }
+}
 .audience-frame[data-reduced='true'] * {
   animation: none !important;
 }

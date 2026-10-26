@@ -51,3 +51,15 @@ test('T-codes: archived and edited entries survive upgrades without reseeding',(
  const bad=copy(d);bad.workhub.tcodes.records[0].sourceUrl='javascript:alert(1)';assert.throws(()=>T.validate(bad),/details/);
  bad.workhub.tcodes.records[0].sourceUrl='';bad.workhub.tcodes.records[0].systems=[];assert.throws(()=>T.validate(bad),/details/);
 });
+
+test('live resume: graph edits preserve the active phase and completed sample values while including a new destination',()=>{
+ const p=E.seed('p',stamp,true);p.steps.forEach(s=>s.duration=3);p.scenarios[0].initial={Count:0};p.steps[0].changes=[{field:'Count',operator:'add',value:1}];
+ const before=E.plan(p,p.scenarios[0]),extra={...copy(p.steps[1]),id:'extra',title:'New destination',next:'',duration:6};p.steps.push(extra);E.connect(p,'finish','extra');p.steps[1].duration=6;
+ const resumed=E.resumePlan(p,p.scenarios[0],before,1,1500);
+ assert.equal(resumed.index,1);assert.equal(resumed.elapsed,3000);assert.deepEqual(copy(resumed.route.entries.map(s=>s.id)),['po','finish','extra']);assert.equal(resumed.route.values.Count,1);assert.equal(resumed.route.entries[1].before.Count,1);
+});
+test('live resume: deleting the current step follows a surviving successor and repeated edits retain global loop bounds',()=>{
+ const p=E.seed('p',stamp,true);p.steps[1].next='po';let route=E.plan(p,p.scenarios[0]);
+ for(let i=0;i<30;i++){const result=E.resumePlan(p,p.scenarios[0],route,Math.min(2,route.entries.length-1),700);route=result.route;assert.ok(route.entries.length<=160);assert.ok(['po','finish'].every(id=>route.entries.filter(e=>e.id===id).length<=4));}
+ const previous=E.plan(p,p.scenarios[0]);E.removeStep(p,'po');const resumed=E.resumePlan(p,p.scenarios[0],previous,0,700);assert.equal(resumed.route.entries[resumed.index].id,'finish');assert.equal(resumed.elapsed,0);
+});

@@ -25,22 +25,22 @@
       process = '',
       history = [],
       editor = null,
-      tool = 'move';
+      tool = 'move',
+      linkFrom = '';
     const live = () => a.live() && !!panel.isConnected;
     const model = () => draft || a.canvas.model();
     const notify = s => {
       const n = stage.querySelector('[data-pc-notice]');
       if (n) n.textContent = s;
     };
-    const pause = () => {
-      if (!a.info().paused) void a.command('play');
-    };
     function collapse() {
       for (const d of stage.querySelectorAll('.pc-bubbles > details')) d.open = false;
     }
     function setTool(value) {
+      a.freezeCamera?.();
       a.setTool(value === 'connect' ? 'move' : value);
       tool = value;
+      if (value !== 'connect') linkFrom = '';
       host.dataset.tool = value;
       for (const b of panel.querySelectorAll('[data-presenter="tool"]'))
         b.setAttribute('aria-pressed', String(b.dataset.value === value));
@@ -80,7 +80,7 @@
     const quick = doc.createElement('div');
     quick.className = 'pc-quick';
     quick.innerHTML =
-      '<button type="button" data-pc="select-all">Select all steps</button><button type="button" data-pc="clear-selection">Clear selection</button><button type="button" data-pc="edit-step">Edit selected step</button><button type="button" data-pc="connect">Connect ports</button><button type="button" data-pc="attach">Attach note / arrow to step</button><button type="button" data-pc="detach">Detach selected</button><button type="button" data-pc="links">Project / knowledge links</button><button type="button" data-pc="undo">Undo canvas edit</button><button type="button" data-pc="copy">Save editable copy</button><button type="button" data-presenter="end">End presentation</button>';
+      '<button type="button" data-pc="select-all">Select all steps</button><button type="button" data-pc="clear-selection">Clear selection</button><button type="button" data-pc="edit-step">Edit selected step</button><button type="button" data-pc="connect">Connect ports</button><button type="button" data-pc="finish-links">Done linking</button><button type="button" data-pc="attach">Attach note / arrow to step</button><button type="button" data-pc="detach">Detach selected</button><button type="button" data-pc="links">Project / knowledge links</button><button type="button" data-pc="undo">Undo canvas edit</button><button type="button" data-pc="copy">Save editable copy</button><button type="button" data-presenter="end">End presentation</button>';
     const canvasTools = panel.querySelector('.presenter-canvas-tools'),
       opts = panel.querySelector('.presenter-screen-options'),
       walk = panel.querySelector('.presenter-controls'),
@@ -270,7 +270,7 @@
         notify('Choose Save editable copy in Steps before editing the example.');
         return;
       }
-      pause();
+      a.freezeCamera?.();
       draft = copy(source);
       const s = draft.steps.find(s => s.id === stepId);
       if (!s) return;
@@ -432,7 +432,8 @@
         throw Error('This process has reached its step limit.');
       const next = copy(before),
         base = E.seed('base', new Date().toISOString(), true).steps[0],
-        parent = near(next, point);
+        parent = near(next, point),
+        source = next.steps.find(s => s.id === linkFrom) || parent;
       const s = {
         ...base,
         id: id(),
@@ -450,10 +451,9 @@
         s.stackParent = parent.id;
       } // destination is inserted before validating below
       next.steps.push(s);
-      if (parent) {
+      if (source) {
         // connect now that both endpoints exist
-        const parentRow = next.steps.find(x => x.id === parent.id);
-        if (!E.connections(parentRow).includes(s.id)) E.connect(next, parent.id, s.id);
+        if (!E.connections(source).includes(s.id)) E.connect(next, source.id, s.id);
       }
       selected = '';
       node = s.id;
@@ -513,9 +513,16 @@
         else notify('Click a step first, then choose Edit selected step.');
       }
       if (name === 'connect') {
-        pause();
         setTool('connect');
-        notify('Drag an outgoing dot onto another step’s incoming dot.');
+        linkFrom = node;
+        notify(
+          'Click an outgoing point, then click several destinations. Or drag a point to another card. Choose a step type to add a linked step. Playback stays live.'
+        );
+        a.publish();
+      }
+      if (name === 'finish-links') {
+        setTool('move');
+        notify('Connections saved. Playback continues.');
       }
       if (name === 'attach') {
         if (!m) throw Error('Select a note or arrow first.');
@@ -729,7 +736,7 @@
         if (tool === 'laser') return;
         e.preventDefault();
         e.stopImmediatePropagation();
-        pause();
+        a.freezeCamera?.();
         const before = a.canvas.model();
         if (tool === 'select' && !stepId && !markId && !port) {
           const base = e.shiftKey || e.ctrlKey || e.metaKey ? [...nodes] : [];
@@ -760,12 +767,14 @@
           before: copy(before),
           original: copy(before),
         };
-        if (port) {
+        if (port || (tool === 'connect' && stepId)) {
           gesture = {
             ...state,
             kind: 'wire',
-            from: port.dataset.pcStep,
-            direction: port.dataset.pcPort,
+            from: port?.dataset.pcStep || linkFrom || stepId,
+            direction: port?.dataset.pcPort || 'out',
+            startNode: stepId,
+            moved: false,
           };
         } else if (tool === 'select' && markId) {
           selected = markId;
@@ -890,6 +899,7 @@
           return;
         }
         if (gesture.kind === 'wire') {
+          gesture.moved ||= Math.hypot(dx, dy) > 5;
           const path = host.querySelector('.pc-wire-preview'),
             from = gesture.before.steps.find(s => s.id === gesture.from);
           if (path && from) {
@@ -956,6 +966,7 @@
       true
     );
     function cancel() {
+      host.querySelector('.pc-wire-preview')?.setAttribute('hidden', '');
       dropPreview?.remove();
       dropPreview = null;
       if (gesture?.kind === 'marquee') nodes = new Set(gesture.base);
@@ -1000,18 +1011,40 @@
           if (done.kind === 'wire') {
             const element = stage.ownerDocument.elementFromPoint?.(e.clientX, e.clientY),
               port = element?.closest('[data-pc-port]'),
-              target = port?.dataset.pcStep;
-            if (target && port.dataset.pcPort !== done.direction) {
+              target =
+                port?.dataset.pcStep ||
+                element?.closest('[data-node]')?.dataset.node ||
+                (!done.moved ? done.startNode : '');
+            const source = !done.moved && done.direction === 'in' ? linkFrom : done.from;
+            if (
+              target &&
+              target !== source &&
+              (!port || port.dataset.pcPort !== done.direction || !done.moved)
+            ) {
               const next = copy(done.before);
               E.connect(
                 next,
-                done.direction === 'out' ? done.from : target,
-                done.direction === 'out' ? target : done.from
+                done.direction === 'out' || !done.moved ? source : target,
+                done.direction === 'out' || !done.moved ? target : done.from
               );
+              if (!source) throw Error('Choose an outgoing point first.');
               commit(next, done.before);
-              notify('Connected · follow the animated handoff.');
-            }
+              linkFrom = done.direction === 'out' || !done.moved ? source : target;
+              tool = 'connect';
+              host.dataset.tool = 'connect';
+              notify(
+                'Connected · playback continues. Choose another destination, or a step type to add a linked step.'
+              );
+            } else if (done.direction === 'out') {
+              linkFrom = done.from;
+              tool = 'connect';
+              host.dataset.tool = 'connect';
+              notify(
+                'Starting point selected · click more destinations, or choose a step type to add a linked step.'
+              );
+            } else notify('Choose an outgoing point first, then this destination.');
             host.querySelector('.pc-wire-preview')?.setAttribute('hidden', '');
+            a.publish();
             return;
           }
           if (done.kind === 'draw') {
@@ -1056,6 +1089,7 @@
           notify(err.message);
           a.publish();
         } finally {
+          host.querySelector('.pc-wire-preview')?.setAttribute('hidden', '');
           dropPreview?.remove();
           dropPreview = null;
           try {
@@ -1090,6 +1124,30 @@
       'keydown',
       e => {
         if (!live()) return;
+        const port = e.target.closest('[data-pc-port]');
+        if (port && ['Enter', ' '].includes(e.key)) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          try {
+            a.freezeCamera?.();
+            if (port.dataset.pcPort === 'out') {
+              linkFrom = port.dataset.pcStep;
+              tool = 'connect';
+              host.dataset.tool = 'connect';
+              notify('Starting point selected · choose one or more destinations.');
+            } else if (linkFrom) {
+              const before = a.canvas.model(),
+                next = copy(before);
+              E.connect(next, linkFrom, port.dataset.pcStep);
+              commit(next, before);
+              notify('Connected · choose another destination to add a branch.');
+            } else notify('Choose an outgoing point first.');
+            a.publish();
+          } catch (err) {
+            notify(err.message);
+          }
+          return;
+        }
         if (e.key === 'Escape' && (gesture || editor)) {
           e.preventDefault();
           e.stopImmediatePropagation();
@@ -1114,6 +1172,7 @@
           e.stopImmediatePropagation();
           nodes.clear();
           node = '';
+          linkFrom = '';
           a.publish();
           return;
         }
@@ -1159,6 +1218,7 @@
           draft = null;
           selected = '';
           node = '';
+          linkFrom = '';
           nodes.clear();
           marquee.hidden = true;
           editor?.remove();
@@ -1180,9 +1240,22 @@
             stackParent: s.stackParent || '',
           })),
           annotations: copy(p.annotations || []),
+          edges: p.steps.flatMap(s =>
+            E.connections(s).map(to => ({
+              from: s.id,
+              to,
+              failure: to === s.failNext,
+              label: E.answers(s).find(a => a.next === to)?.label || '',
+            }))
+          ),
         };
       },
-      options: () => ({ canvasSelection: selected, selectedNode: node, selectedNodes: [...nodes] }),
+      options: () => ({
+        canvasSelection: selected,
+        selectedNode: node,
+        selectedNodes: [...nodes],
+        connectFrom: linkFrom,
+      }),
       destroy() {
         marquee.remove();
         dropPreview?.remove();
@@ -1193,7 +1266,14 @@
         editor?.remove();
         editor = null;
       },
-      state: () => ({ selected, node, nodes: [...nodes], editing: !!editor, dragging: !!gesture }),
+      state: () => ({
+        selected,
+        node,
+        nodes: [...nodes],
+        editing: !!editor,
+        dragging: !!gesture,
+        linking: !!linkFrom,
+      }),
     };
   }
   root.WorkHubProcessCanvas = { install };
