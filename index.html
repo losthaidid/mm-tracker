@@ -41,6 +41,7 @@
       }
       #workhubStartup.is-leaving { opacity: 0; pointer-events: none; }
       #workhubStartup .startup-card {
+        position: relative;
         box-sizing: border-box;
         width: min(100%, 510px);
         padding: 34px 32px 26px;
@@ -50,6 +51,12 @@
         box-shadow: 0 14px 60px #38564a0d;
         text-align: center;
         overflow-wrap: anywhere;
+        animation: startup-arrive 650ms cubic-bezier(.16,1,.3,1) both;
+      }
+      #workhubStartup .startup-card::before {
+        content: ''; position: absolute; top: -1px; left: 18%; right: 18%; height: 2px;
+        background: linear-gradient(90deg, transparent, #90b59a, #c2a5d0, transparent);
+        transform-origin: center; animation: startup-horizon 3.5s ease-in-out infinite;
       }
       #workhubStartup .startup-brand {
         margin: 0 0 10px;
@@ -57,7 +64,30 @@
         font-size: 16px;
         font-weight: 700;
         letter-spacing: 0.025em;
+        animation: startup-title 4s ease-in-out infinite;
       }
+      #workhubStartup .startup-sun { transform-origin: 224px 59px; animation: startup-sun 5s ease-in-out infinite; }
+      #workhubStartup .startup-rays { transform-origin: 224px 59px; animation: startup-orbit 24s linear infinite; }
+      #workhubStartup .startup-cloud { animation: startup-cloud 7s ease-in-out infinite alternate; }
+      #workhubStartup .startup-cloud.second { animation-delay: -4s; animation-duration: 9s; }
+      #workhubStartup .startup-note { transform-box: fill-box; transform-origin: center; animation: startup-note 5s ease-in-out infinite; }
+      #workhubStartup .startup-note.second { animation-delay: -2.5s; animation-duration: 6s; }
+      #workhubStartup .startup-page { transform-origin: 153px 145px; animation: startup-page 4s ease-in-out infinite; }
+      #workhubStartup .startup-spark { transform-box: fill-box; transform-origin: center; animation: startup-spark 3.5s ease-in-out infinite; }
+      #workhubStartup .startup-spark.second { animation-delay: -1.8s; }
+      #workhubStartup .startup-spark.third { animation-delay: -2.6s; }
+      #workhubStartup .startup-bird { animation: startup-bird 6s ease-in-out infinite alternate; }
+      #workhubStartup .startup-stages li[data-state='active']::before { animation: startup-breathe 1.6s ease-in-out infinite; }
+      @keyframes startup-arrive { from { opacity: 0; transform: translateY(14px) scale(.98); } to { opacity: 1; transform: none; } }
+      @keyframes startup-horizon { 0%,100% { opacity: .35; transform: scaleX(.55); } 50% { opacity: 1; transform: scaleX(1); } }
+      @keyframes startup-title { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+      @keyframes startup-sun { 0%,100% { transform: scale(.94); opacity: .8; } 50% { transform: scale(1.06); opacity: 1; } }
+      @keyframes startup-orbit { to { transform: rotate(360deg); } }
+      @keyframes startup-cloud { to { transform: translateX(14px); } }
+      @keyframes startup-note { 0%,100% { transform: translateY(0) rotate(-5deg); } 50% { transform: translateY(-9px) rotate(4deg); } }
+      @keyframes startup-page { 0%,20%,100% { transform: scaleX(.04); opacity: 0; } 35% { opacity: .85; } 55% { transform: scaleX(1); opacity: .85; } 80% { transform: scaleX(.04); opacity: 0; } }
+      @keyframes startup-spark { 0%,100% { transform: scale(.6) rotate(-12deg); opacity: .3; } 50% { transform: scale(1.15) rotate(12deg); opacity: 1; } }
+      @keyframes startup-bird { to { transform: translate(10px,-4px); } }
       #workhubStartup .startup-art { display:block; width:min(100%,310px); height:auto; margin:8px auto 20px; }
       #workhubStartup .startup-eyebrow { margin:0; font-size:10px; letter-spacing:.19em; color:#82927d; }
       #workhubStartup .startup-leaf { transform-origin:245px 133px; animation:startup-leaf 4s ease-in-out infinite alternate; }
@@ -107,7 +137,11 @@
       @media (prefers-reduced-motion: reduce) {
         #workhubStartup { transition: none; }
         #workhubStartup .startup-dots span { animation: none; }
+        #workhubStartup *, #workhubStartup *::before, #workhubStartup *::after { animation: none !important; }
       }
+      html[data-workhub-startup-state] #workhubStartup *, html[data-workhub-startup-state] #workhubStartup *::before,
+      #workhubStartup.is-leaving *, #workhubStartup.is-leaving *::before { animation: none !important; }
+      html[data-startup-hidden] #workhubStartup *::before { animation-play-state: paused !important; }
     </style>
     <!-- Public connection settings only. Private records are loaded after sign-in. -->
     <script id="cloudConfig" type="application/json">
@@ -132,7 +166,7 @@
     <link rel="stylesheet" href="./workspace-features.css?v=20261019-source-1" />
     <link rel="stylesheet" href="./leave-balances.css?v=20261023-corrections-claims-holidays-1" />
     <link rel="stylesheet" href="./momo-anime.css?v=20261020-workspace-refresh-1" />
-    <link rel="stylesheet" href="./validator-studio.css?v=20261026-validator-company-1" />
+    <link rel="stylesheet" href="./validator-studio.css?v=20261026-live-corrections-1" />
     <link rel="stylesheet" href="./batch-a.css?v=20261019-source-1" />
     <link rel="stylesheet" href="./my-day.css?v=20261023-my-day-1" />
     <link rel="stylesheet" href="./my-day-visuals.css?v=20261024-performance-1" />
@@ -177,7 +211,29 @@
         <p class="startup-eyebrow">A LITTLE SPACE FOR YOUR DAY</p>
         <svg class="startup-art" viewBox="0 0 320 205" fill="none" aria-hidden="true">
           <path d="M55 171V94a105 105 0 0 1 210 0v77" fill="#e8eddf" />
-          <circle cx="224" cy="59" r="25" fill="#eddaaf" />
+          <g class="startup-sun"><circle cx="224" cy="59" r="25" fill="#eddaaf" /></g>
+          <g class="startup-rays" stroke="#d7bf8f" stroke-width="2" stroke-linecap="round">
+            <path d="M224 24v-4m0 78v-4m35-35h4m-78 0h4m60-25 3-3m-53 53 3-3m47 0 3 3m-53-53 3 3" />
+          </g>
+          <path
+            class="startup-cloud"
+            d="M75 64h41a9 9 0 0 0-15-7 12 12 0 0 0-23 2 4 4 0 0 0-3 5Z"
+            fill="#fffdf5"
+            opacity=".85"
+          />
+          <path
+            class="startup-cloud second"
+            d="M167 42h25a6 6 0 0 0-9-4 8 8 0 0 0-15 1Z"
+            fill="#fffdf5"
+            opacity=".75"
+          />
+          <path
+            class="startup-bird"
+            d="m113 80 5-3 5 3m6-7 4-2 4 2"
+            stroke="#91a48a"
+            stroke-width="1.5"
+            stroke-linecap="round"
+          />
           <path d="M56 138c40-37 73-33 111-8 40-30 74-29 98-8v49H55Z" fill="#c6d7c0" />
           <path d="M56 156c55-27 92 9 133-6 36-13 54-6 76 5v16H55Z" fill="#9db99f" />
           <path d="M160 19v149M56 99h208" stroke="#fffdf5" stroke-width="4" />
@@ -195,6 +251,39 @@
             stroke-width="2"
             stroke-linecap="round"
           />
+          <path
+            class="startup-page"
+            d="M153 119q-21-18-43-12v48q23-3 43 8Z"
+            fill="#e1ead7"
+            stroke="#a4b895"
+            stroke-width="1.4"
+          />
+          <g class="startup-note">
+            <rect x="33" y="75" width="27" height="33" rx="5" fill="#f1e8f5" stroke="#c3b0cd" />
+            <path
+              d="m39 87 4 4 9-9m-13 17h13"
+              stroke="#ad93bc"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </g>
+          <g class="startup-note second">
+            <rect x="272" y="94" width="27" height="33" rx="5" fill="#edf2e2" stroke="#b3c49b" />
+            <path
+              d="M279 103h13m-13 7h10m-10 7h6"
+              stroke="#8da47c"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+          </g>
+          <path class="startup-spark" d="m74 38 2 6 6 2-6 2-2 6-2-6-6-2 6-2Z" fill="#b7a0c8" />
+          <path
+            class="startup-spark second"
+            d="m283 54 2 5 5 2-5 2-2 5-2-5-5-2 5-2Z"
+            fill="#d9bb7b"
+          />
+          <circle class="startup-spark third" cx="25" cy="134" r="3" fill="#9aba9e" />
           <path d="M226 151h22l-3 18h-16Z" fill="#c3997d" />
           <g class="startup-leaf">
             <path
@@ -406,7 +495,7 @@
     <script src="./validator-engine.js?v=20261026-validator-company-1"></script>
     <script src="./validator-files.js?v=20261026-validator-company-1"></script>
     <script src="./validator-setup.js?v=20261026-sap-200-simple-1"></script>
-    <script src="./validator-studio.js?v=20261026-validator-company-1"></script>
+    <script src="./validator-studio.js?v=20261026-live-corrections-1"></script>
     <!-- Workflow tools and reusable work library. -->
     <script src="./batch-a-engine.js?v=20261023-leave-types-1"></script>
     <script src="./batch-a.js?v=20261023-schedule-claims-1"></script>

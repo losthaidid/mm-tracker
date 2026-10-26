@@ -141,10 +141,22 @@
       selectedIssue = null,
       setupPreview = null,
       copyPreview = null,
-      correction = null;
+      correction = null,
+      liveTimer = null,
+      livePending = false,
+      liveCheck = null,
+      pinnedRows = new Set();
+    function cancelLive() {
+      root.clearTimeout(liveTimer);
+      liveTimer = null;
+      livePending = false;
+      liveCheck = null;
+    }
     function sync() {
       const next = a.owner?.() || '';
       if (next !== owner) {
+        cancelLive();
+        pinnedRows.clear();
         owner = next;
         generation++;
         draft = null;
@@ -183,6 +195,8 @@
       if (!a.ready()) throw Error('Sign in to open Validation Studio.');
     }
     function mark() {
+      cancelLive();
+      pinnedRows.clear();
       generation++;
       busy = false;
       dirty = true;
@@ -213,6 +227,8 @@
       message = '';
     }
     function clearFile() {
+      cancelLive();
+      pinnedRows.clear();
       generation++;
       runCompanyId = '';
       selectedIssue = null;
@@ -1266,6 +1282,8 @@
     }
     async function run() {
       ensure();
+      cancelLive();
+      pinnedRows.clear();
       commitCurrent();
       const t = activeSchema();
       E.checkSchema(t);
@@ -1324,6 +1342,136 @@
         }
       }
     }
+    // Reconcile only result nodes. Keep keyed cells/buttons in place so blur does not
+    // swallow the next click, and editing never rebuilds the surrounding workspace.
+    function patchResults() {
+      const current = $('valResultsArea');
+      if (!current) return;
+      const template = document.createElement('template');
+      template.innerHTML = resultsView();
+      const next = template.content.firstElementChild;
+      if (!next) return;
+      const active = document.activeElement,
+        selection = active?.matches?.('input[data-cell]')
+          ? [active.selectionStart, active.selectionEnd, active.selectionDirection]
+          : null,
+        scroll = $('valResultsScroll'),
+        position = scroll ? [scroll.scrollLeft, scroll.scrollTop] : null;
+      const key = node => {
+        if (node.nodeType !== 1) return '';
+        if (node.id) return 'id:' + node.id;
+        const d = node.dataset;
+        if (d.cell !== undefined) return 'cell:' + d.cell + ':' + d.field;
+        if (d.rowIndex !== undefined) return 'row:' + d.rowIndex;
+        if (d.val === 'issue') return 'issue:' + d.issueKey;
+        if (d.val) return [d.val, d.index, d.field, d.filter, d.delta].join(':');
+        return '';
+      };
+      const same = (a, b) => a.nodeType === b.nodeType && a.nodeName === b.nodeName;
+      function patch(current, next) {
+        if (current.nodeType !== 1) {
+          if (current.nodeValue !== next.nodeValue) current.nodeValue = next.nodeValue;
+          return;
+        }
+        for (const attr of Array.from(current.attributes))
+          if (!next.hasAttribute(attr.name)) current.removeAttribute(attr.name);
+        for (const attr of Array.from(next.attributes))
+          if (current.getAttribute(attr.name) !== attr.value)
+            current.setAttribute(attr.name, attr.value);
+        if (current.matches('input[data-cell]') && current.value !== next.value)
+          current.value = next.value;
+        const old = Array.from(current.childNodes),
+          used = new Set(),
+          keyed = new Map(old.filter(n => key(n)).map(n => [key(n), n]));
+        let cursor = current.firstChild;
+        for (const child of Array.from(next.childNodes)) {
+          const id = key(child);
+          let match = id ? keyed.get(id) : old.find(n => !used.has(n) && !key(n) && same(n, child));
+          if (!match || !same(match, child)) match = child.cloneNode(true);
+          else patch(match, child);
+          used.add(match);
+          if (cursor !== match) current.insertBefore(match, cursor);
+          cursor = match.nextSibling;
+        }
+        for (const child of old) if (!used.has(child)) child.remove();
+      }
+      patch(current, next);
+      if (position && scroll?.isConnected) {
+        scroll.scrollLeft = position[0];
+        scroll.scrollTop = position[1];
+      }
+      if (selection && active.isConnected) {
+        if (document.activeElement !== active) active.focus({ preventScroll: true });
+        active.setSelectionRange(...selection);
+      }
+      const status = document.querySelector('.validation-studio .val-message');
+      if (status) status.textContent = message;
+    }
+    function checkEdit() {
+      const check = liveCheck;
+      if (!check) return;
+      root.clearTimeout(liveTimer);
+      liveTimer = null;
+      if (
+        check.token !== generation ||
+        check.owner !== a.owner?.() ||
+        !a.ready() ||
+        resultSchema !== check.schema
+      ) {
+        cancelLive();
+        return;
+      }
+      try {
+        const context = E.runContext(a.state(), check.schema, runCompanyId);
+        result = E.validateRows(check.schema, rows, context);
+        if (selectedIssue)
+          selectedIssue =
+            result.issues.find(
+              i => i.index === selectedIssue.index && i.field === selectedIssue.field
+            ) || null;
+        message =
+          'Edit checked automatically · ' +
+          result.errors +
+          ' errors · ' +
+          result.warnings +
+          ' warnings.';
+      } catch (error) {
+        result = null;
+        resultSchema = null;
+        selectedIssue = null;
+        message = 'Automatic check could not finish. ' + error.message;
+        a.tell?.(message, true);
+      }
+      cancelLive();
+      patchResults();
+    }
+    function editCell(index, field, value, immediate = false) {
+      if (!rows[index] || !activeSchema().columns.some(c => c.key === field)) return;
+      const source = Number(mapping[field]);
+      if (!Number.isInteger(source) || source < 0)
+        throw Error('Map this field before editing its value.');
+      if (rows[index][field] === value && !livePending) return;
+      rows[index][field] = value;
+      sourceRows[index][source] = value;
+      root.clearTimeout(liveTimer);
+      generation++;
+      busy = false;
+      if (!resultSchema || !result) {
+        cancelLive();
+        return;
+      }
+      pinnedRows.add(index);
+      const focused = document.activeElement;
+      if (focused?.dataset.cell !== undefined) pinnedRows.add(Number(focused.dataset.cell));
+      livePending = true;
+      liveCheck = { token: generation, owner, schema: resultSchema };
+      for (const el of document.querySelectorAll('[data-val="report"],[data-val="accepted"]'))
+        el.disabled = true;
+      const status = $('valLiveStatus');
+      if (status) status.textContent = 'Checking your edit…';
+      if (immediate) checkEdit();
+      else liveTimer = root.setTimeout(checkEdit, 250);
+    }
     function mappingView() {
       const t = activeSchema(),
         unmapped = t.columns.filter(c => Number(mapping[c.key]) < 0).length;
@@ -1377,6 +1525,7 @@
           i =>
             !result ||
             filter === 'all' ||
+            pinnedRows.has(i) ||
             (filter === 'errors' && result.status[i].errors) ||
             (filter === 'warnings' && result.status[i].warnings) ||
             (filter === 'passed' && !result.status[i].errors)
@@ -1384,8 +1533,24 @@
       page = Math.max(0, Math.min(page, Math.ceil(indices.length / 25) - 1));
       const shown = indices.slice(page * 25, page * 25 + 25),
         t = resultSchema || activeSchema(),
-        issues = result?.issues || [];
+        issues = result?.issues || [],
+        byCell = new Map();
+      for (const issue of issues) {
+        const key = issue.index + ':' + issue.field;
+        if (!byCell.has(key)) byCell.set(key, []);
+        byCell.get(key).push(issue);
+      }
       return (
+        '<div id="valResultsArea"><p id="valLiveStatus" class="val-live-status" role="status" aria-live="polite">' +
+        (livePending
+          ? 'Checking your edit…'
+          : result
+            ? 'Live checks on · Edits and suggested corrections recheck automatically.'
+            : 'Run validation to check this upload.') +
+        '</p>' +
+        (filter !== 'all' && pinnedRows.size
+          ? '<p class="val-help">Edited rows stay visible while you work. Change the filter to refresh the list.</p>'
+          : '') +
         (result
           ? '<div class="val-metrics"><div class="val-metric passed"><span>Rows without errors</span><strong>' +
             result.passed +
@@ -1399,12 +1564,17 @@
             (version === 'draft' ? 'Saved draft' : 'Version ' + version) +
             '</strong></div></div>'
           : '<div class="val-inline-note">Your data changed. Run validation again to refresh the results and exports.</div>') +
-        '<section class="val-card val-results"><div class="val-panel-title"><div><span class="val-eyebrow">LOOK CLOSER</span><h3>Your data, with the answers beside it</h3></div><div class="val-actions">' +
-        btn('report', 'Export issue workbook', !result ? 'disabled' : '', 'val-secondary') +
+        '<section id="valResultsCard" class="val-card val-results"><div class="val-panel-title"><div><span class="val-eyebrow">LOOK CLOSER</span><h3>Your data, with the answers beside it</h3></div><div class="val-actions">' +
+        btn(
+          'report',
+          'Export issue workbook',
+          !result || livePending ? 'disabled' : '',
+          'val-secondary'
+        ) +
         btn(
           'accepted',
           'Export accepted rows',
-          !result || !result.passed ? 'disabled' : '',
+          !result || livePending || !result.passed ? 'disabled' : '',
           'val-primary'
         ) +
         '</div></div><p class="val-help">Accepted exports exclude rows with errors. Rows with warnings remain included for your review.</p><div class="val-result-toolbar"><div class="val-segments">' +
@@ -1441,7 +1611,7 @@
             esc(rows[selectedIssue.index]?.[selectedIssue.field] || '(blank)') +
             '</pre><small>The exact cell is selected below. Edit it, then Run validation again.</small></section>'
           : '') +
-        '<div class="val-table-scroll"><table class="val-grid"><thead><tr><th>Excel row</th><th>Check</th>' +
+        '<div id="valResultsScroll" class="val-table-scroll"><table class="val-grid"><thead><tr><th>Excel row</th><th>Check</th>' +
         t.columns
           .map(c => '<th>' + esc(c.label) + '<code>' + esc(c.key) + '</code></th>')
           .join('') +
@@ -1449,7 +1619,9 @@
         shown
           .map(
             i =>
-              '<tr' +
+              '<tr data-row-index="' +
+              i +
+              '"' +
               (targetRow === i ? ' class="val-target-row"' : '') +
               '><th>' +
               (headerRow + i + 1) +
@@ -1481,7 +1653,7 @@
               '</td>' +
               t.columns
                 .map(c => {
-                  const found = issues.filter(x => x.index === i && x.field === c.key),
+                  const found = byCell.get(i + ':' + c.key) || [],
                     severity = found.some(x => x.severity === 'error')
                       ? 'error'
                       : found.length
@@ -1551,7 +1723,7 @@
         ) +
         '</div></section>' +
         (result && issues.length
-          ? '<section class="val-card"><div class="val-panel-title"><h3>What needs attention</h3><span class="val-chip">' +
+          ? '<section id="valAttention" class="val-card"><div class="val-panel-title"><h3>What needs attention</h3><span class="val-chip">' +
             issues.length +
             ' listed' +
             (result.truncated ? ' · capped at 15,000' : '') +
@@ -1576,7 +1748,13 @@
                     '</small><small class="val-issue-value">Value: ' +
                     esc(issue.value || '(blank)') +
                     '</small></span><span>↗</span>',
-                  'data-index="' + issue.index + '" data-issue="' + issueIndex + '"'
+                  'data-index="' +
+                    issue.index +
+                    '" data-issue="' +
+                    issueIndex +
+                    '" data-issue-key="' +
+                    esc(JSON.stringify([issue.index, issue.field, issue.ruleId, issue.message])) +
+                    '"'
                 )
               )
               .join('') +
@@ -1585,7 +1763,8 @@
               ? '<p class="val-help">Showing the first 100 issues here. Export the workbook for all listed issues.</p>'
               : '') +
             '</section>'
-          : '')
+          : '') +
+        '</div>'
       );
     }
     function checkView() {
@@ -1984,10 +2163,14 @@
         return;
       }
       if (action === 'filter') {
+        pinnedRows.clear();
         filter = el.dataset.filter;
         page = 0;
       }
-      if (action === 'page') page += Number(el.dataset.delta);
+      if (action === 'page') {
+        pinnedRows.clear();
+        page += Number(el.dataset.delta);
+      }
       if (action === 'issue') {
         const issue = result?.issues[Number(el.dataset.issue)];
         if (!issue) throw Error('Run validation again before opening this issue.');
@@ -2006,7 +2189,8 @@
         return;
       }
       if (action === 'report' || action === 'accepted') {
-        if (!result || !resultSchema) throw Error('Run validation again before exporting.');
+        if (!result || !resultSchema || livePending)
+          throw Error('Wait for validation to finish before exporting.');
         const outcome = E.copy(result);
         outcome.issues.forEach(i => (i.row = headerRow + i.index + 1));
         a.download(
@@ -2409,6 +2593,7 @@
       paint();
     }
     function openCorrections(index, field) {
+      if (livePending) checkEdit();
       if (!result || !rows[index] || !resultSchema)
         throw Error('Run validation before choosing a correction.');
       if (!Number.isInteger(Number(mapping[field])) || Number(mapping[field]) < 0)
@@ -2427,7 +2612,7 @@
       };
       a.openModal(
         'Suggested corrections',
-        `<section id="valCorrectionReview"><span class="eyebrow">ROW ${headerRow + index + 1} · ${esc(column.label)}</span><h3>Choose a maintained value</h3><p>Current value: <strong>${esc(rows[index][field] || '(blank)')}</strong></p><p class="hint">Reference combinations keep the other mapped values in this row. Review your choice, then rerun validation to check the whole row. The original file on your device is unchanged.</p><label for="valSuggestionSearch">Search reference choices</label><input id="valSuggestionSearch" type="search" maxlength="120" placeholder="Search code, name or description"><div id="valSuggestionChoices" class="val-suggestion-choices" aria-live="polite"></div></section>`
+        `<section id="valCorrectionReview"><span class="eyebrow">ROW ${headerRow + index + 1} · ${esc(column.label)}</span><h3>Choose a maintained value</h3><p>Current value: <strong>${esc(rows[index][field] || '(blank)')}</strong></p><p class="hint">Reference combinations keep the other mapped values in this row. Choosing a value automatically rechecks the whole upload. The original file on your device is unchanged.</p><label for="valSuggestionSearch">Search reference choices</label><input id="valSuggestionSearch" type="search" maxlength="120" placeholder="Search code, name or description"><div id="valSuggestionChoices" class="val-suggestion-choices" aria-live="polite"></div></section>`
       );
       paintCorrections();
     }
@@ -2464,18 +2649,10 @@
         source = Number(mapping[field]);
       if (!Number.isInteger(source) || source < 0)
         throw Error('Map the field before applying a correction.');
-      rows[index][field] = value;
-      sourceRows[index][source] = value;
-      generation++;
       correction = null;
-      result = null;
-      resultSchema = null;
-      filter = 'all';
-      page = Math.floor(index / 25);
       targetRow = index;
       a.closeModal();
-      say('Correction applied to this upload. Run validation again to check the updated rows.');
-      paint();
+      editCell(index, field, value, true);
     }
     async function loadSetupFile(file) {
       ensure();
@@ -2609,6 +2786,18 @@
     });
     document.addEventListener('input', event => {
       if (event.target.id === 'valSuggestionSearch') paintCorrections();
+      if (event.target.matches?.('.val-grid input[data-cell]')) {
+        try {
+          ensure();
+          editCell(
+            Number(event.target.dataset.cell),
+            event.target.dataset.field,
+            event.target.value
+          );
+        } catch (error) {
+          say(error.message, true);
+        }
+      }
       if (event.target.closest?.('#valColumnForm,#valRuleForm,#valMetaForm')) mark();
     });
     document.addEventListener('change', event => {
@@ -2661,6 +2850,8 @@
           return;
         }
         if (el.name === 'validationCompany') {
+          cancelLive();
+          pinnedRows.clear();
           runCompanyId = el.value;
           generation++;
           busy = false;
@@ -2739,6 +2930,8 @@
           return;
         }
         if (el.name === 'version') {
+          cancelLive();
+          pinnedRows.clear();
           generation++;
           busy = false;
           version = el.value;
@@ -2750,6 +2943,8 @@
           return;
         }
         if (el.name === 'sheet' || el.name === 'headerRow') {
+          cancelLive();
+          pinnedRows.clear();
           generation++;
           busy = false;
           if (el.name === 'sheet') sheetIndex = Number(el.value);
@@ -2761,6 +2956,8 @@
           return;
         }
         if (el.dataset.map) {
+          cancelLive();
+          pinnedRows.clear();
           generation++;
           busy = false;
           mapping[el.dataset.map] = Number(el.value);
@@ -2770,18 +2967,7 @@
           return;
         }
         if (el.dataset.cell !== undefined) {
-          generation++;
-          busy = false;
-          const i = Number(el.dataset.cell),
-            field = el.dataset.field;
-          if (!rows[i] || !activeSchema().columns.some(c => c.key === field)) return;
-          rows[i][field] = el.value;
-          const source = Number(mapping[field]);
-          if (source >= 0) sourceRows[i][source] = el.value;
-          result = null;
-          resultSchema = null;
-          filter = 'all';
-          paint();
+          editCell(Number(el.dataset.cell), el.dataset.field, el.value, true);
           return;
         }
         if (el.dataset.clause === 'operator' || el.dataset.clause === 'lookupId') {
@@ -2863,6 +3049,7 @@
         result: E.copy(result),
         mapping: { ...mapping },
         runCompanyId,
+        livePending,
         owner,
       }),
       loadSample,

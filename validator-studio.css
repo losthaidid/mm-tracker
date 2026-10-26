@@ -1,6 +1,22 @@
 /* validator-studio.css — Validation Studio template editor, column/rule cards and result tables.
    See docs/FILE-MAP.md. Keep rule order: later selectors can override earlier ones. */
 /* Warm paper, sage glass and small, purposeful movements. */
+.val-live-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 18px 0 12px;
+  color: var(--hub-text);
+  font-size: 0.78rem;
+}
+.val-live-status::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--hub-accent);
+  flex-shrink: 0;
+}
 .val-company-scope {
   margin: 18px 0;
   padding: 16px;

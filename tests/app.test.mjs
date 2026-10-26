@@ -1057,7 +1057,7 @@ test('validator mapping, correction and revalidation keep uploaded data out of c
  assert.equal(ui.snapshot().result.errors,3);assert.equal(ui.snapshot().result.warnings,1);assert.equal(api.state().workhub.validator.runs.length,1);
  assert.equal(api.payload(api.state()).includes('REQ-002'),false);assert.equal(JSON.stringify(db.row).includes('REQ-002'),false);
  const cell=document.querySelector('[data-cell="1"][data-field="OWNER"]');cell.value='Mira';cell.dispatchEvent(new window.Event('change',{bubbles:true}));await settle();
- assert.equal(ui.snapshot().result,null);assert.equal(document.querySelector('[data-val="report"]').disabled,true);
+ assert.equal(ui.snapshot().result.errors,2);assert.equal(document.querySelector('[data-val="report"]').disabled,false);
  await ui.run();await settle();assert.equal(ui.snapshot().result.errors,2);assert.equal(ui.snapshot().rows[1].OWNER,'Mira');
  api.cloud.user=null;api.cloud.ready=false;api.showTab('home');assert.equal(ui.snapshot().draft,null);assert.deepEqual(copy(ui.snapshot().rows),[]);assert.equal(ui.snapshot().result,null);
 });
@@ -2723,7 +2723,7 @@ test('suggested corrections update only the chosen uploaded value, survive remap
  await ui.loadFile({name:'data.csv',size:text.length,text:async()=>text});window.setTimeout=callback=>{queueMicrotask(callback);return 0;};await ui.run();await settle();
  const before=copy(ui.snapshot().rows),writes=db.calls.length;assert.equal(ui.snapshot().result.errors,1);assert.ok(document.querySelector('[data-val="suggest"][data-field="TYPE"]'));
  ui.openCorrections(0,'TYPE');const choice=[...document.querySelectorAll('[data-val="apply-correction"]')].find(b=>b.querySelector('strong').textContent==='Standard');assert.ok(choice);ui.applyCorrection(Number(choice.dataset.choice));
- assert.equal(ui.snapshot().rows[0].TYPE,'Standard');assert.deepEqual(copy(ui.snapshot().rows[1]),before[1]);assert.equal(ui.snapshot().result,null);assert.equal(db.calls.length,writes);
+ assert.equal(ui.snapshot().rows[0].TYPE,'Standard');assert.deepEqual(copy(ui.snapshot().rows[1]),before[1]);assert.equal(ui.snapshot().result.errors,0);assert.equal(db.calls.length,writes);
  await ui.run();await settle();assert.equal(ui.snapshot().result.errors,0);assert.equal(ui.snapshot().rows[0].TYPE,'Standard');assert.equal(api.payload(api.state()).includes('PRIVATE-001'),false);assert.equal(JSON.stringify(db.row).includes('PRIVATE-001'),false);
  ui.openCorrections(0,'TYPE');window.setTimeout=()=>0;api.cloud.user=null;api.cloud.ready=false;api.showTab('home');assert.equal(document.querySelector('dialog[open]'),null);assert.throws(()=>ui.applyCorrection(0),/preview changed/);
 });
