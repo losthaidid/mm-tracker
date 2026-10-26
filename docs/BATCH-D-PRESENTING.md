@@ -28,7 +28,7 @@ Use the in-canvas Tools bubble for Pen, Arrow, Text and the transient laser. Tex
 
 ## Loading scene
 
-Startup uses the maintained account workspace name when its matching device recovery copy is available, otherwise **Your workspace** until the account name is verified. The illustrated desk has lightweight leaf/steam motion and an indeterminate progress bar. Workspace, Account and Records indicators follow actual startup stages; no percentage or artificial minimum delay is added. The existing immediate reveal, reduced-motion support, slow-connection recovery and failed-file recovery remain in place. Aurora stays removed.
+Startup uses the maintained account workspace name when its matching device recovery copy is available, otherwise **Your workspace** until the account name is verified. The loading scene now has a luminous WorkHub star, orbiting light trails, floating task/document/calendar cards, drawing checkmarks, turning pages, a pulsing floor and a flowing indeterminate progress line. Tapping the central star replays a finite sparkle wave. The saved workspace name remains the main title. Workspace, Account and Records indicators follow actual startup stages; no percentage or artificial minimum delay is added. The existing immediate reveal, reduced-motion support, slow-connection recovery and failed-file recovery remain in place. The matching account’s saved Animations Off setting also stops startup motion. Hidden tabs pause the effects; recovery and error states stop them. The iPhone profile reduces secondary animation layers. The scene uses inline SVG/CSS, with no animation frame loop, added image/font requests, audio, 3D scene, blur or aurora. It introduces no minimum loading time.
 
 ## Source and verification
 

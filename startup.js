@@ -31,15 +31,20 @@
   // Reuse only the matching account's existing recovery copy for its display name.
   // The stored session is a branding hint; app.js still verifies the actual session.
   function account(project, userId) {
-    let name;
+    let name, motion;
     try {
       if (project && userId) {
         const cache = JSON.parse(
           localStorage.getItem('mm-tracker.cloud.v1:' + project + ':' + userId)
         );
         name = cache?.document?.data?.workhub?.preferences?.workspace;
+        motion = cache?.document?.data?.workhub?.preferences?.motion;
       }
     } catch {}
+    if (!finished) {
+      page.toggleAttribute('data-startup-motion', motion === 'off');
+      if (motion === 'off') page.dataset.startupMotion = 'off';
+    }
     showName(name);
   }
   try {
@@ -53,6 +58,7 @@
   function phase(value, label) {
     if (finished || blocked || !['assets', 'account', 'records'].includes(value)) return;
     stage = value;
+    page.dataset.startupPhase = stage;
     const stages = ['assets', 'account', 'records'],
       index = stages.indexOf(stage);
     for (const el of document.querySelectorAll('[data-startup-stage]')) {
@@ -108,6 +114,29 @@
   document.addEventListener('visibilitychange', () => {
     if (!finished) page.toggleAttribute('data-startup-hidden', document.hidden);
   });
+  function spark(event) {
+    const button = event.target.closest?.('#workhubStartup .startup-spark-button');
+    if (
+      !button ||
+      finished ||
+      blocked ||
+      page.hasAttribute('data-workhub-startup-state') ||
+      page.dataset.startupMotion === 'off' ||
+      root.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    )
+      return;
+    const scene = button.closest('.startup-scene');
+    // A finite burst can be replayed without timers, particles or a render loop.
+    scene.classList.remove('is-sparked');
+    void scene.getBoundingClientRect();
+    scene.classList.add('is-sparked');
+  }
+  function endSpark(event) {
+    if (event.animationName === 'startup-tap-wave')
+      event.target.closest('.startup-scene')?.classList.remove('is-sparked');
+  }
+  document.addEventListener('click', spark);
+  document.addEventListener('animationend', endSpark);
   root.WorkHubStartup = {
     account,
     phase,
@@ -124,15 +153,19 @@
       root.clearTimeout(watchdog);
       root.removeEventListener('error', failed, true);
       root.removeEventListener('unhandledrejection', rejected);
+      document.removeEventListener('click', spark);
+      document.removeEventListener('animationend', endSpark);
       delete page.dataset.workhubStartup;
       delete page.dataset.workhubStartupState;
+      delete page.dataset.startupHidden;
+      delete page.dataset.startupPhase;
+      delete page.dataset.startupMotion;
       const screen = document.getElementById('workhubStartup');
       if (!screen) return;
       screen.setAttribute('aria-hidden', 'true');
       screen.inert = true;
       // CSS fades the cover; reduced-motion users see the workspace immediately.
       screen.classList.add('is-leaving');
-      delete page.dataset.startupHidden;
       const remove = () => screen.remove();
       screen.addEventListener('transitionend', remove, { once: true });
       root.setTimeout(remove, 220);
