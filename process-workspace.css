@@ -766,3 +766,15 @@
 #rehearsalRoot .rehearsal-hero h2 {
   -webkit-text-fill-color: currentColor;
 }
+
+#rehearsalRoot .ph-connected-list {
+  max-height: 175px;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+#rehearsalRoot .ph-add-connection > summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: #d4e9f2;
+  padding: 8px 0;
+}
