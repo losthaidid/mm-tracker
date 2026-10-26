@@ -73,7 +73,10 @@
       restoreView = null,
       editHistory = [],
       restoring = false,
-      spacePan = false;
+      spacePan = false,
+      linkSelection = new Map(),
+      activeLink = null,
+      linkGesture = null;
     const $ = id => document.getElementById(id),
       prefs = () => a.state().workhub.rehearsal.preferences;
     const screens = root.WorkHubPresentationScreen?.create({
@@ -161,6 +164,8 @@
       branchVisits = Object.create(null);
       routePreview = Object.create(null);
       linkFrom = '';
+      linkSelection.clear();
+      activeLink = linkGesture = null;
       linkDrop = wire = null;
       linkMessage = '';
       linkEffects = [];
@@ -509,7 +514,7 @@
             .filter(([, id]) => id && map.has(id))
             .map(
               ([kind, id]) =>
-                `<path class="rehearsal-edge" data-from="${esc(s.id)}" data-to="${esc(id)}" data-kind="${kind}" data-rehearsal="manage-edge" d="${E.path(s, map.get(id))}" marker-end="url(#rehearsalArrow)"><title>${esc(E.answers(s).find(a => a.next === id)?.label || kind)}</title></path>${s.decision ? `<text class="ph-route-label" x="${(s.x + 210 + map.get(id).x) / 2}" y="${(s.y + map.get(id).y) / 2 + 38}">${esc(s.decision.answers.find(a => a.next === id)?.label || kind)}</text>` : ''}`
+                `<path class="ph-edge-hit" data-from="${esc(s.id)}" data-to="${esc(id)}" data-rehearsal="manage-edge" d="${E.path(s, map.get(id), E.connector(p, s.id, id))}"/><path class="rehearsal-edge" data-from="${esc(s.id)}" data-to="${esc(id)}" data-kind="${kind}" data-rehearsal="manage-edge" data-selected="${linkSelection.has(JSON.stringify([s.id, id]))}" d="${E.path(s, map.get(id), E.connector(p, s.id, id))}" marker-end="url(#rehearsalArrow)"><title>${esc(E.answers(s).find(a => a.next === id)?.label || kind)}</title></path>${s.decision ? `<text class="ph-route-label" x="${(s.x + 210 + map.get(id).x) / 2}" y="${(s.y + map.get(id).y) / 2 + 38}">${esc(s.decision.answers.find(a => a.next === id)?.label || kind)}</text>` : ''}`
             )
         )
         .join('');
@@ -525,7 +530,7 @@
         connected
           .map(to => {
             const target = p.steps.find(s => s.id === to);
-            return `<div><span><b>${esc(target?.title || to)}</b><small>${to === from.next ? 'Default route' : to === from.failNext ? 'Exception route' : 'Alternative route'}</small></span>${button('unlink', 'Unlink', `data-from="${esc(from.id)}" data-to="${esc(to)}" aria-label="Unlink ${esc(from.title)} from ${esc(target?.title || to)}"`)}</div>`;
+            return `<div><span><b>${esc(target?.title || to)}</b><small>${to === from.next ? 'Default route' : to === from.failNext ? 'Exception route' : 'Alternative route'}</small></span>${button('arrange-link', 'Arrange', `data-from="${esc(from.id)}" data-to="${esc(to)}"`)}${button('unlink', 'Unlink', `data-from="${esc(from.id)}" data-to="${esc(to)}" aria-label="Unlink ${esc(from.title)} from ${esc(target?.title || to)}"`)}</div>`;
           })
           .join('') || '<p>No outgoing links. Choose a destination to begin.</p>'
       }</div><details class="ph-add-connection" open><summary>Add a destination</summary><div class="ph-link-fields"><label>Existing destination<select id="processLinkTo">${destinations.length ? destinations.map(s => `<option value="${esc(s.id)}">${esc(s.title)}</option>`).join('') : '<option value="">All other steps are already linked</option>'}</select></label>${button('connect-selected', 'Link selected step', destinations.length ? '' : 'disabled', 'primary small')}<label>New step type<select id="processLinkType">${E.TYPES.map(type => `<option value="${type}">${esc(E.TYPE_LABELS[type])}</option>`).join('')}</select></label>${button('add-linked', '＋ Add linked step')}</div></details>${button('finish-linking', 'Done linking')}<p role="status">${esc(linkMessage || 'Playback stays live. New branches join automatically on the next available pass.')}</p></section>`;
@@ -569,6 +574,13 @@
     }
     function syncPanels() {
       const inspector = document.querySelector('.ph-inspector-drawer');
+      const heading = inspector?.querySelector('header strong');
+      if (heading)
+        heading.textContent = activeLink
+          ? 'Edit connection'
+          : editing
+            ? 'Edit step'
+            : 'Step details';
       if (inspector) inspector.hidden = !panelOpen;
       const links = $('processLinkTools');
       if (links) links.hidden = !linkFrom || panelOpen || paletteOpen;
@@ -675,6 +687,184 @@
         syncLinkTools();
       }
     }
+    function renderLinkHandles(preview = null) {
+      const layer = document.querySelector('#rehearsalBoard .ph-link-overlay');
+      if (layer)
+        layer.innerHTML =
+          mode !== 'present' && activeLink
+            ? root.WorkHubProcessCanvasArt?.linkHandles(
+                preview?.model || model(),
+                preview?.edge || E.connector(model(), activeLink.from, activeLink.to)
+              ) || ''
+            : '';
+      for (const edge of document.querySelectorAll(
+        '#rehearsalBoard :is(.rehearsal-edge,.ph-edge-hit)'
+      ))
+        edge.dataset.selected = String(
+          linkSelection.has(JSON.stringify([edge.dataset.from, edge.dataset.to]))
+        );
+    }
+    function connectorInspector() {
+      if (!activeLink) return '';
+      const p = model(),
+        edge = E.connector(p, activeLink.from, activeLink.to),
+        steps = (key, value) =>
+          `<label>${key === 'from' ? 'Starting step' : 'Destination step'}<select name="${key}">${p.steps.map(s => `<option value="${esc(s.id)}"${s.id === value ? ' selected' : ''}>${esc(s.title)}</option>`).join('')}</select></label>`,
+        anchor = (key, value) =>
+          `<fieldset class="ph-anchor-fields"><legend>${key === 'start' ? 'Starting point' : 'Endpoint'}</legend><label>Edge<select name="${key}Side">${['top', 'right', 'bottom', 'left'].map(side => `<option${side === value.side ? ' selected' : ''}>${side}</option>`).join('')}</select></label><label>Position %<input type="number" name="${key}Offset" value="${Math.round(value.offset * 100)}" min="0" max="100" step="1"></label></fieldset>`;
+      return `<form id="processConnectorForm" data-owner="${esc(owner)}" data-process="${esc(p.id)}" data-updated="${esc(p.updatedAt)}" data-from="${esc(edge.from)}" data-to="${esc(edge.to)}"><span class="hub-kicker">CONNECTION / LIVE EDIT</span><p class="ph-link-help">Drag either end to any edge of a step. Drag the diamond to shape the route. Hold Shift for a 10 px grid.</p>${steps('from', edge.from)}${steps('to', edge.to)}<label>Route style<select name="style">${[
+        ['curve', 'Smooth curve'],
+        ['elbow', 'Right-angle / Visio'],
+        ['straight', 'Straight line'],
+      ]
+        .map(([v, l]) => `<option value="${v}"${edge.style === v ? ' selected' : ''}>${l}</option>`)
+        .join(
+          ''
+        )}</select></label><details class="ph-exact-anchors"><summary>Exact attachment positions</summary>${anchor('start', edge.start)}${anchor('end', edge.end)}</details><div class="ph-route-actions">${button('connector-bend', '＋ Route bend')}${button('connector-reset', 'Reset attachment & bends')}</div><div class="ph-inspector-footer"><button class="primary" type="submit">Apply connection</button>${button('connector-delete', linkSelection.size > 1 ? 'Delete selected links' : 'Delete link', '', 'danger small')}</div><p class="hub-meta">${linkSelection.size} link${linkSelection.size === 1 ? '' : 's'} selected · Delete selection removes links only. Undo restores them.</p></form>`;
+    }
+    function selectConnection(from, to, add = false) {
+      const p = model();
+      if (mode === 'present' || !saved(p)) return;
+      if (editing) {
+        a.tell('Save or cancel step details before editing a connection.');
+        return;
+      }
+      const key = JSON.stringify([from, to]);
+      if (!add) {
+        selection.clear();
+        linkSelection.clear();
+        selected = '';
+      }
+      if (add && linkSelection.has(key)) linkSelection.delete(key);
+      else linkSelection.set(key, { from, to });
+      activeLink = [...linkSelection.values()].at(-1) || null;
+      followCamera = false;
+      panelOpen = !!activeLink;
+      paletteOpen = false;
+      linkFrom = '';
+      paintSelection();
+      renderLinkHandles();
+      syncPanels();
+      $('rehearsalInspector').innerHTML = connectorInspector();
+      $('rehearsalViewport')?.focus({ preventScroll: true });
+    }
+    function deleteSelection() {
+      const p = model();
+      if (editing) {
+        a.tell('Save or cancel step details before deleting steps or links.');
+        return;
+      }
+      const edges = [...linkSelection.values()].filter(e =>
+          p.steps.some(s => s.id === e.from && E.connections(s).includes(e.to))
+        ),
+        ids = [...selection].filter(id => p.steps.some(s => s.id === id));
+      if (!ids.length && !edges.length && selected && p.steps.some(s => s.id === selected))
+        ids.push(selected);
+      if (!ids.length && !edges.length) {
+        selectionMode = true;
+        syncCanvasModes();
+        a.tell('Select steps or click a link, then choose Delete selection.');
+        return;
+      }
+      if (ids.length >= p.steps.length) throw Error('Keep at least one process step.');
+      if (
+        !root.confirm(
+          'Delete ' +
+            (ids.length
+              ? ids.length + ' step' + (ids.length === 1 ? '' : 's') + ' and their connections'
+              : '') +
+            (ids.length && edges.length ? ' plus ' : '') +
+            (edges.length
+              ? edges.length + ' selected link' + (edges.length === 1 ? '' : 's')
+              : '') +
+            '?' +
+            (edges.length && !ids.length ? ' Both steps will be kept.' : '') +
+            '\nYou can undo this canvas edit.'
+        )
+      )
+        return;
+      followCamera = false;
+      selected = '';
+      panelOpen = false;
+      selection.clear();
+      linkSelection.clear();
+      activeLink = null;
+      if (ids.includes(linkFrom)) linkFrom = '';
+      saveMutation(row => {
+        for (const e of edges) E.disconnect(row, e.from, e.to);
+        if (ids.length) E.removeSteps(row, ids);
+      });
+      renderLinkHandles();
+      syncPanels();
+      a.tell(
+        ids.length
+          ? 'Steps deleted. Undo can restore them.'
+          : 'Links deleted. Both steps are kept. Undo can restore them.'
+      );
+    }
+    function connectionTarget(point, p, other) {
+      return p.steps
+        .filter(
+          s =>
+            s.id !== other &&
+            point.x >= s.x - 24 &&
+            point.x <= s.x + 234 &&
+            point.y >= s.y - 24 &&
+            point.y <= s.y + 124
+        )
+        .sort(
+          (a, b) =>
+            Math.hypot(point.x - a.x - 105, point.y - a.y - 50) -
+            Math.hypot(point.x - b.x - 105, point.y - b.y - 50)
+        )[0];
+    }
+    function drawConnectionGesture(event) {
+      const g = linkGesture,
+        point = boardPoint(event),
+        A = root.WorkHubProcessCanvasArt;
+      if (!g || !point) return;
+      g.moved ||= Math.hypot(event.clientX - g.client.x, event.clientY - g.client.y) > 4;
+      const edge = E.copy(g.edge),
+        p = E.copy(g.before),
+        key = g.handle;
+      if (event.shiftKey) {
+        point.x = Math.round(point.x / 10) * 10;
+        point.y = Math.round(point.y / 10) * 10;
+      }
+      point.x = A.clamp(point.x, 0, 8000);
+      point.y = A.clamp(point.y, 0, 8000);
+      let valid = true;
+      if (key === 'start' || key === 'end') {
+        const target = connectionTarget(point, p, key === 'start' ? edge.to : edge.from);
+        g.target = target?.id || '';
+        if (target) {
+          edge[key] = A.nearestAnchor(target, point);
+          edge[key === 'start' ? 'from' : 'to'] = target.id;
+        } else {
+          valid = false;
+          const fake = { id: '__pointer__', x: point.x, y: point.y };
+          p.steps.push(fake);
+          edge[key === 'start' ? 'from' : 'to'] = fake.id;
+          edge[key] = { side: 'left', offset: 0 };
+        }
+      } else {
+        const index = key === 'bend-new' ? 0 : Number(key.slice(5));
+        edge.via[index] = point;
+      }
+      g.next = valid ? edge : null;
+
+      for (const node of document.querySelectorAll('#rehearsalBoard [data-node]'))
+        node.dataset.linkTarget = String(node.dataset.node === g.target);
+      const source = p.steps.find(s => s.id === edge.from),
+        target = p.steps.find(s => s.id === edge.to);
+      g.visual = { source, target, edge };
+      for (const path of document.querySelectorAll(
+        '#rehearsalBoard :is(.rehearsal-edge,.ph-edge-hit)'
+      ))
+        if (path.dataset.from === g.edge.from && path.dataset.to === g.edge.to)
+          path.setAttribute('d', A.linkGeometry(source, target, edge).path);
+      renderLinkHandles({ model: p, edge });
+    }
     function linkPorts(step) {
       return ['in', 'out']
         .map(
@@ -687,6 +877,8 @@
       if (selectionProcess !== p.id) {
         selectionProcess = p.id;
         selection.clear();
+        linkSelection.clear();
+        activeLink = linkGesture = null;
         selectionMode = false;
         editHistory = [];
         panelOpen = paletteOpen = false;
@@ -695,7 +887,7 @@
       const size = root.WorkHubProcessCanvasArt?.dimensions(p),
         width = Math.max(3200, (size?.width || 850) + 600),
         height = Math.max(2000, (size?.height || 450) + 500);
-      return `<div id="rehearsalViewport" class="rehearsal-viewport" data-select-mode="${selectionMode}" tabindex="0" aria-label="Process canvas. Drag empty space to explore, or choose Select steps. Press 0 to fit."><div class="rehearsal-extent" style="width:${width * zoom}px;height:${height * zoom}px"><div id="rehearsalBoard" class="rehearsal-board" data-linking="${!!linkFrom}" style="width:${width}px;height:${height}px;transform:scale(${zoom})"><svg class="rehearsal-wires" width="${width}" height="${height}" aria-hidden="true"><defs><marker id="rehearsalArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z"></path></marker></defs>${edges(p)}<path class="ph-wire-preview" hidden/><g class="pc-saved-annotations">${root.WorkHubProcessCanvasArt?.svg(p) || ''}</g></svg>${p.steps.map(s => `<article class="rehearsal-node" data-node="${esc(s.id)}" data-selected="${selection.has(s.id)}" data-link-source="${linkFrom === s.id}" data-type="${s.type}" style="left:${s.x}px;top:${s.y}px">${p.id !== '__demo__' ? `<button type="button" class="rehearsal-drag" data-rehearsal-drag="${esc(s.id)}" aria-label="Move ${esc(s.title)}. Drag or use arrow keys.">⠿</button>` + (mode !== 'present' ? linkPorts(s) : '') : ''}<button type="button" class="rehearsal-node-main" data-rehearsal="inspect" data-id="${esc(s.id)}"><span class="rehearsal-node-icon">${ICONS[s.type]}</span><span><small>${esc(s.type)}${s.tcode ? ' · ' + esc(s.tcode) : ''}</small><strong>${esc(s.title)}</strong></span></button><span class="rehearsal-node-state" aria-hidden="true"></span><div class="rehearsal-particles" aria-hidden="true">${Array.from({ length: 6 }, (_, i) => `<i style="--particle:${i}"></i>`).join('')}</div></article>`).join('')}<div id="rehearsalToken" class="rehearsal-token" aria-hidden="true"><span>▤</span></div><div class="rehearsal-scene-specks" aria-hidden="true"></div></div></div></div>`;
+      return `<div id="rehearsalViewport" class="rehearsal-viewport" data-select-mode="${selectionMode}" tabindex="0" aria-label="Process canvas. Drag empty space to explore, or choose Select steps. Press 0 to fit."><div class="rehearsal-extent" style="width:${width * zoom}px;height:${height * zoom}px"><div id="rehearsalBoard" class="rehearsal-board" data-linking="${!!linkFrom}" style="width:${width}px;height:${height}px;transform:scale(${zoom})"><svg class="rehearsal-wires" width="${width}" height="${height}" aria-hidden="true"><defs><marker id="rehearsalArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z"></path></marker></defs>${edges(p)}<path class="ph-wire-preview" hidden/><g class="pc-saved-annotations">${root.WorkHubProcessCanvasArt?.svg(p) || ''}</g></svg>${p.steps.map(s => `<article class="rehearsal-node" data-node="${esc(s.id)}" data-selected="${selection.has(s.id)}" data-link-source="${linkFrom === s.id}" data-type="${s.type}" style="left:${s.x}px;top:${s.y}px">${p.id !== '__demo__' ? `<button type="button" class="rehearsal-drag" data-rehearsal-drag="${esc(s.id)}" aria-label="Move ${esc(s.title)}. Drag or use arrow keys.">⠿</button>` + (mode !== 'present' ? linkPorts(s) : '') : ''}<button type="button" class="rehearsal-node-main" data-rehearsal="inspect" data-id="${esc(s.id)}"><span class="rehearsal-node-icon">${ICONS[s.type]}</span><span><small>${esc(s.type)}${s.tcode ? ' · ' + esc(s.tcode) : ''}</small><strong>${esc(s.title)}</strong></span></button><span class="rehearsal-node-state" aria-hidden="true"></span><div class="rehearsal-particles" aria-hidden="true">${Array.from({ length: 6 }, (_, i) => `<i style="--particle:${i}"></i>`).join('')}</div></article>`).join('')}<svg class="ph-link-overlay" width="${width}" height="${height}" aria-label="Selected connection handles"></svg><div id="rehearsalToken" class="rehearsal-token" aria-hidden="true"><span>▤</span></div><div class="rehearsal-scene-specks" aria-hidden="true"></div></div></div></div>`;
     }
     function captureDraftFields() {
       const form = $('processHubDetails');
@@ -777,7 +969,7 @@
         )}</select></label>${field('objective', 'Purpose / intended outcome', true)}${field('notes', 'Description & context', true)}${field('presenterNotes', 'Private presenter notes (hidden in presentation)', true)}${canvasLinks(p)}</form></details>`;
     }
     function canvasToolbar(p, isSaved, isPresent) {
-      return `<div class="rehearsal-stage-bar"><div class="ph-flow-identity"><span class="ph-signal" aria-hidden="true"></span><div><strong>${esc(p.name)}</strong><span id="rehearsalStatus" aria-live="polite"></span></div></div><div class="actions ph-edit-tools">${isSaved && !isPresent ? button('add-step', '＋ Step', `aria-pressed="${paletteOpen}"`) + button('link-mode', '↗ Link steps', `aria-pressed="${!!linkFrom}"`) + button('manage-links', 'Unlink') + button('delete-steps', 'Delete steps') + button('undo-canvas', '↶ Undo', editHistory.length ? '' : 'disabled') + button('layout', 'Auto arrange') : ''}${!isPresent ? button('pan-mode', '✥ Explore', `aria-pressed="${!selectionMode}"`) + button('select-mode', '▧ Select steps', `aria-pressed="${selectionMode}"`) + button('select-all', 'Select all') : ''}${button('details', '▤ Details', `aria-pressed="${panelOpen}"`)}</div></div>`;
+      return `<div class="rehearsal-stage-bar"><div class="ph-flow-identity"><span class="ph-signal" aria-hidden="true"></span><div><strong>${esc(p.name)}</strong><span id="rehearsalStatus" aria-live="polite"></span></div></div><div class="actions ph-edit-tools">${isSaved && !isPresent ? button('add-step', '＋ Step', `aria-pressed="${paletteOpen}"`) + button('link-mode', '↗ Link steps', `aria-pressed="${!!linkFrom}"`) + button('manage-links', 'Unlink') + button('delete-steps', 'Delete selection', 'title="Delete selected steps or links"') + button('undo-canvas', '↶ Undo', editHistory.length ? '' : 'disabled') + button('layout', 'Auto arrange') : ''}${!isPresent ? button('pan-mode', '✥ Explore', `aria-pressed="${!selectionMode}"`) + button('select-mode', '▧ Select steps', `aria-pressed="${selectionMode}"`) + button('select-all', 'Select all') : ''}${button('details', '▤ Details', `aria-pressed="${panelOpen}"`)}</div></div>`;
     }
     function playbackDock() {
       return `<div class="ph-playback-dock" role="group" aria-label="Canvas playback controls"><div class="ph-dock-live"><i aria-hidden="true"></i><span id="phPlaybackState">LIVE FLOW</span><span class="ph-selection-count" role="status">${selection.size ? selection.size + ' selected' : ''}</span></div><div class="rehearsal-playbar">${button('back', '↶', 'aria-label="Previous step / rewind"')}${button('play', paused ? 'Play' : 'Pause', 'id="rehearsalPlay"', 'primary small')}${button('next', '↷', 'aria-label="Next step"')}${button('restart', '↺', 'aria-label="Restart"')}${button('sound', soundLabel(), 'id="rehearsalSound" aria-pressed="false" aria-describedby="rehearsalAudioStatus"')}${button('zoom-out', '−', 'aria-label="Zoom out"')}<span class="ph-zoom">${Math.round(zoom * 100)}%</span>${button('zoom-in', '＋', 'aria-label="Zoom in"')}${button('fit', 'Fit')}${button('follow', '◎ Follow', `aria-pressed="${followCamera}"`)}<details class="ph-dock-options" data-ph-panel="playback"><summary aria-label="Playback settings" title="Playback settings">⚙</summary><div><label>Decisions<select id="rehearsalDecisionMode"><option value="auto"${!interactive ? ' selected' : ''}>Automatic · explore connected paths</option><option value="interactive"${interactive ? ' selected' : ''}>Interactive · ask me</option></select></label><label>Speed<select id="rehearsalSpeed">${[0.5, 1, 1.5, 2].map(v => `<option value="${v}"${v === prefs().speed ? ' selected' : ''}>${v}×</option>`).join('')}</select></label><label>Volume<input id="rehearsalVolume" aria-label="Rehearsal volume" type="range" min="0" max="1" step="0.05" value="${prefs().volume}"></label><p id="rehearsalAudioStatus" class="hub-meta" role="status">${esc(audioMessage())}</p></div></details></div></div>`;
@@ -807,6 +999,8 @@
       if (selectionProcess !== p.id) {
         selectionProcess = p.id;
         selection.clear();
+        linkSelection.clear();
+        activeLink = linkGesture = null;
         selectionMode = false;
         editHistory = [];
         panelOpen = paletteOpen = false;
@@ -1198,6 +1392,9 @@
       const p = model();
       selected = id;
       selection = new Set([id]);
+      linkSelection.clear();
+      activeLink = null;
+      renderLinkHandles();
       panelOpen = true;
       followCamera = false;
       syncPanels();
@@ -1330,7 +1527,11 @@
         $('rehearsalJournalHeading').textContent = scenario(p).name + ' · loop ' + (loops + 1);
         if (!editing && display) {
           const detailId = selected || display.id;
-          $('rehearsalInspector').innerHTML = detailHTML(p.steps.find(s => s.id === detailId));
+          if (activeLink) {
+            if (!$('processConnectorForm'))
+              $('rehearsalInspector').innerHTML = connectorInspector();
+          } else
+            $('rehearsalInspector').innerHTML = detailHTML(p.steps.find(s => s.id === detailId));
         }
         if (moved && entry) {
           const step = p.steps.find(s => s.id === entry.id);
@@ -1344,7 +1545,12 @@
           current = p.steps.find(s => s.id === route.entries[reverse.source]?.id),
           token = $('rehearsalToken');
         if (prev && current && token) {
-          const point = E.point(prev, current, 1 - Math.min(1, reverse.elapsed / 850));
+          const point = E.point(
+            prev,
+            current,
+            1 - Math.min(1, reverse.elapsed / 850),
+            E.connector(p, prev.id, current.id)
+          );
           token.hidden = false;
           token.style.left = point.x + 'px';
           token.style.top = point.y + 'px';
@@ -1364,7 +1570,17 @@
       if (token) {
         token.hidden = !entry || !from || !to || phase < 0.5 || motionOff() || pendingDecision();
         if (!token.hidden) {
-          const point = E.point(from, to, Math.min(1, (phase - 0.5) * 2));
+          const preview =
+            linkGesture?.edge.from === from.id && linkGesture?.edge.to === to.id
+              ? linkGesture.visual
+              : null;
+          const point = preview
+            ? root.WorkHubProcessCanvasArt.linkGeometry(
+                preview.source,
+                preview.target,
+                preview.edge
+              ).point(Math.min(1, (phase - 0.5) * 2))
+            : E.point(from, to, Math.min(1, (phase - 0.5) * 2), E.connector(p, from.id, to.id));
           token.style.left = point.x + 'px';
           token.style.top = point.y + 'px';
           token.dataset.type = entry.type;
@@ -1428,7 +1644,10 @@
       if (a.active && !a.active()) {
         closeOverlay();
         pan = null;
-        spacePan = false;
+        ((spacePan = false),
+          (linkSelection = new Map()),
+          (activeLink = null),
+          (linkGesture = null));
         wasVisible = false;
         stopFrame();
         return;
@@ -1469,10 +1688,19 @@
         rebuild(true, wasVisible && routeContext === owner + '|' + p.id + '|' + scenario(p).id);
       }
       syncLinkTools();
+      for (const [key, edge] of linkSelection)
+        if (!p.steps.some(s => s.id === edge.from && E.connections(s).includes(edge.to)))
+          linkSelection.delete(key);
+      activeLink =
+        activeLink && linkSelection.has(JSON.stringify([activeLink.from, activeLink.to]))
+          ? activeLink
+          : [...linkSelection.values()].at(-1) || null;
+      renderLinkHandles();
       wasVisible = true;
       if (editing && editorSnapshot && editorSnapshot.dataset.owner === owner) {
         $('rehearsalInspector').replaceChildren(editorSnapshot);
         editorSnapshot = null;
+        root.WorkHubProcessInspector?.enhance($('rehearsalStepForm'));
       }
       paintKey = '';
       paint();
@@ -1538,10 +1766,19 @@
         throw Error('The process changed after that edit. Undo will not overwrite newer changes.');
       restoring = true;
       try {
-        if (saveMutation(row => Object.assign(row, E.copy(lastEdit.before)), false) !== false) {
+        if (
+          saveMutation(row => {
+            for (const key of Object.keys(row))
+              if (!Object.hasOwn(lastEdit.before, key)) delete row[key];
+            Object.assign(row, E.copy(lastEdit.before));
+          }, false) !== false
+        ) {
           editHistory.pop();
           if (editHistory.length) editHistory.at(-1).after = JSON.stringify(model());
           selection.clear();
+          linkSelection.clear();
+          activeLink = null;
+          renderLinkHandles();
           selected = '';
           panelOpen = false;
           syncPanels();
@@ -1645,10 +1882,13 @@
       reverse = null;
       editing = true;
       selected = id;
+      linkSelection.clear();
+      activeLink = null;
+      renderLinkHandles();
       const field = (k, label, type = 'text', max = 32767) =>
         `<label>${label}${type === 'textarea' ? `<textarea name="${k}" maxlength="${max}">${esc(step[k])}</textarea>` : `<input name="${k}" maxlength="${max}" value="${esc(step[k])}"${k === 'title' ? ' required' : ''}${k === 'tcode' ? ' list="rehearsalTcodes"' : ''}>`}</label>`;
       $('rehearsalInspector').innerHTML =
-        `<form id="rehearsalStepForm" data-owner="${esc(owner)}" data-process="${esc(p.id)}" data-id="${esc(id)}" data-updated="${esc(p.updatedAt)}"><span class="hub-kicker">EDIT STEP · LIVE PLAYBACK</span>${field('title', 'Step title', 'text', 500)}<label>Step type<select name="type">${E.TYPES.map(t => `<option${t === step.type ? ' selected' : ''}>${t}</option>`).join('')}</select></label>${field('tcode', 'Transaction / reference codes', 'text', 32767)}<datalist id="rehearsalTcodes">${a
+        `<form id="rehearsalStepForm" data-owner="${esc(owner)}" data-process="${esc(p.id)}" data-id="${esc(id)}" data-updated="${esc(p.updatedAt)}"><span class="hub-kicker">EDIT STEP · LIVE PLAYBACK</span>${field('title', 'Step title', 'text', 500)}<label>Step type<select name="type">${E.TYPES.map(t => `<option value="${t}"${t === step.type ? ' selected' : ''}>${esc(E.TYPE_LABELS[t])}</option>`).join('')}</select></label>${field('tcode', 'Transaction / reference codes', 'text', 32767)}<datalist id="rehearsalTcodes">${a
           .state()
           .workhub.tcodes.records.filter(r => !r.archived)
           .map(r => `<option value="${esc(r.code)}">${esc(r.title)}</option>`)
@@ -1679,6 +1919,7 @@
       paletteOpen = false;
       followCamera = false;
       syncPanels();
+      root.WorkHubProcessInspector?.enhance($('rehearsalStepForm'));
       $('rehearsalInspector').querySelector('[name="title"]').focus({ preventScroll: true });
     }
     function saveForm(form) {
@@ -1779,6 +2020,7 @@
         try {
           saveMutation(row => {
             row.steps[row.steps.findIndex(s => s.id === id)] = step;
+            E.pruneConnectors(row);
             if (form.elements.namedItem('isStart').checked) row.startId = id;
             for (const scenario of row.scenarios)
               if (
@@ -1909,6 +2151,9 @@
         return;
       }
       if (action === 'pan-mode') {
+        linkSelection.clear();
+        activeLink = null;
+        renderLinkHandles();
         selectionMode = false;
         selection.clear();
         followCamera = false;
@@ -1926,8 +2171,13 @@
         syncPanels();
         return;
       }
+      if (action === 'arrange-link') {
+        selectConnection(el.dataset.from, el.dataset.to);
+        return;
+      }
       if (action === 'manage-edge') {
-        startLink(el.dataset.from);
+        if (Date.now() < suppressClick) return;
+        selectConnection(el.dataset.from, el.dataset.to);
         return;
       }
       if (action === 'manage-links') {
@@ -1947,41 +2197,33 @@
         return;
       }
       if (action === 'delete-steps') {
-        if (editing) {
-          a.tell('Save or cancel step details before deleting steps.');
+        deleteSelection();
+        return;
+      }
+      if (
+        action === 'connector-bend' ||
+        action === 'connector-reset' ||
+        action === 'connector-delete'
+      ) {
+        if (!activeLink) return;
+        if (action === 'connector-delete') {
+          deleteSelection();
           return;
         }
-        const ids = [...selection].filter(id => p.steps.some(s => s.id === id));
-        if (!ids.length && selected && p.steps.some(s => s.id === selected)) ids.push(selected);
-        if (!ids.length) {
-          selectionMode = true;
-          syncCanvasModes();
-          a.tell('Click a step, or drag a selection rectangle, then choose Delete steps.');
-          return;
+        const edge = E.copy(E.connector(p, activeLink.from, activeLink.to));
+        if (action === 'connector-reset') {
+          edge.via = [];
+          edge.start = { side: 'right', offset: 0.5 };
+          edge.end = { side: 'left', offset: 0.5 };
+        } else {
+          if (edge.via.length >= 8) throw Error('Use up to eight route bends.');
+          const source = p.steps.find(s => s.id === edge.from),
+            target = p.steps.find(s => s.id === edge.to),
+            pt = root.WorkHubProcessCanvasArt.linkGeometry(source, target, edge).point(0.5);
+          edge.via.push({ x: Math.max(0, pt.x + 40), y: Math.max(0, pt.y + 60) });
         }
-        if (ids.length >= p.steps.length) throw Error('Keep at least one process step.');
-        const names = ids.map(id => p.steps.find(s => s.id === id).title);
-        if (
-          !root.confirm(
-            'Delete ' +
-              ids.length +
-              ' step' +
-              (ids.length === 1 ? '' : 's') +
-              ' and their connections?\n' +
-              names.slice(0, 5).join('\n') +
-              (ids.length > 5 ? '\n…' : '') +
-              '\nYou can undo this canvas edit.'
-          )
-        )
-          return;
-        followCamera = false;
-        selected = '';
-        panelOpen = false;
-        selection.clear();
-        if (ids.includes(linkFrom)) linkFrom = '';
-        saveMutation(row => E.removeSteps(row, ids));
-        syncPanels();
-        a.tell('Steps deleted. Undo can restore them.');
+        saveMutation(row => E.setConnector(row, edge));
+        $('rehearsalInspector').innerHTML = connectorInspector();
         return;
       }
       if (action === 'link-mode' || action === 'link-from') {
@@ -2017,6 +2259,8 @@
         return;
       }
       if (action === 'select-mode' || action === 'select-all') {
+        linkSelection.clear();
+        activeLink = null;
         selectionMode = action === 'select-all' ? true : !selectionMode;
         selection = action === 'select-all' ? new Set(p.steps.map(s => s.id)) : new Set();
         a.render();
@@ -2200,6 +2444,7 @@
         paintKey = '';
         paint(false);
         $('rehearsalInspector').innerHTML = detailHTML(p.steps.find(s => s.id === selected));
+        syncPanels();
         return;
       }
       if (action === 'inspect') {
@@ -2358,11 +2603,39 @@
         event.preventDefault();
         control.focus({ preventScroll: true });
       }
+      const connectionHandle = event.target.closest?.('#rehearsalBoard [data-link-handle]'),
+        edge = event.target.closest?.('#rehearsalBoard :is(.rehearsal-edge,.ph-edge-hit)');
+      if (view && event.button === 0 && (connectionHandle || edge) && mode !== 'present') {
+        event.preventDefault();
+        followCamera = false;
+        if (connectionHandle && activeLink && !editing) {
+          linkGesture = {
+            handle: connectionHandle.dataset.linkHandle,
+            id: event.pointerId,
+            owner,
+            process: model().id,
+            before: E.copy(model()),
+            edge: E.copy(E.connector(model(), activeLink.from, activeLink.to)),
+            client: { x: event.clientX, y: event.clientY },
+            moved: false,
+            next: null,
+          };
+          view.setPointerCapture?.(event.pointerId);
+        } else if (edge) {
+          selectConnection(
+            edge.dataset.from,
+            edge.dataset.to,
+            event.ctrlKey || event.metaKey || event.shiftKey
+          );
+          suppressClick = Date.now() + 400;
+        }
+        return;
+      }
       const port = event.target.closest?.('#rehearsalBoard [data-pc-port]');
       if (
         view &&
         !port &&
-        !event.target.closest('.rehearsal-edge') &&
+        !event.target.closest('.rehearsal-edge,.ph-edge-hit') &&
         event.isPrimary !== false &&
         (event.button === 1 || (event.button === 0 && (spacePan || (!selectionMode && !card))))
       ) {
@@ -2412,6 +2685,11 @@
           $('rehearsalBoard').append(element);
           const base = event.shiftKey || event.ctrlKey || event.metaKey ? [...selection] : [];
           selection = new Set(base);
+          if (!event.shiftKey && !event.ctrlKey && !event.metaKey) {
+            linkSelection.clear();
+            activeLink = null;
+            renderLinkHandles();
+          }
           marquee = {
             start: point,
             element,
@@ -2497,6 +2775,21 @@
         pan.moved ||= Math.hypot(dx, dy) > 4;
         pan.view.scrollLeft = pan.left - dx;
         pan.view.scrollTop = pan.top - dy;
+        return;
+      }
+      if (linkGesture) {
+        if (linkGesture.id !== event.pointerId) return;
+        if (
+          !$('rehearsalRoot') ||
+          (a.active && !a.active()) ||
+          linkGesture.owner !== a.owner() ||
+          linkGesture.process !== model().id
+        ) {
+          linkGesture = null;
+          return;
+        }
+        event.preventDefault();
+        drawConnectionGesture(event);
         return;
       }
       if (wire) {
@@ -2594,11 +2887,12 @@
         }
       }
       const map = positions();
-      for (const edge of document.querySelectorAll('.rehearsal-edge')) {
+      for (const edge of document.querySelectorAll('.rehearsal-edge,.ph-edge-hit')) {
         const a = map.get(edge.dataset.from),
           b = map.get(edge.dataset.to);
-        if (a && b) edge.setAttribute('d', E.path(a, b));
+        if (a && b) edge.setAttribute('d', E.path(a, b, E.connector(model(), a.id, b.id)));
       }
+      renderLinkHandles();
     });
     document.addEventListener('pointerup', event => {
       if (pan && pan.id === event.pointerId) {
@@ -2608,6 +2902,57 @@
           pan.view.releasePointerCapture?.(event.pointerId);
         } catch {}
         pan = null;
+        return;
+      }
+      if (linkGesture) {
+        if (linkGesture.id !== event.pointerId) return;
+        const done = linkGesture;
+        linkGesture = null;
+        suppressClick = Date.now() + 400;
+        try {
+          if (
+            !$('rehearsalRoot') ||
+            (a.active && !a.active()) ||
+            done.owner !== a.owner() ||
+            done.process !== model().id
+          )
+            return;
+          if (done.moved) {
+            if (!done.next)
+              throw Error('Drop the endpoint on an edge of a step. The original link is kept.');
+            if (JSON.stringify(model()) !== JSON.stringify(done.before))
+              throw Error('The process changed. Start this connection edit again.');
+            const edge = done.next;
+            linkSelection.clear();
+            activeLink = { from: edge.from, to: edge.to };
+            linkSelection.set(JSON.stringify([edge.from, edge.to]), activeLink);
+            saveMutation(row =>
+              E.reconnect(row, done.edge.from, done.edge.to, edge.from, edge.to, edge)
+            );
+            $('rehearsalInspector').innerHTML = connectorInspector();
+            a.tell('Connection updated. Playback continues. Undo can restore it.');
+          }
+        } catch (err) {
+          linkSelection.clear();
+          activeLink = { from: done.edge.from, to: done.edge.to };
+          linkSelection.set(JSON.stringify([activeLink.from, activeLink.to]), activeLink);
+          a.tell(err.message, true);
+        } finally {
+          for (const n of document.querySelectorAll('[data-link-target]'))
+            delete n.dataset.linkTarget;
+          const map = positions();
+          for (const e of document.querySelectorAll(
+            '#rehearsalBoard :is(.rehearsal-edge,.ph-edge-hit)'
+          )) {
+            const a = map.get(e.dataset.from),
+              b = map.get(e.dataset.to);
+            if (a && b) e.setAttribute('d', E.path(a, b, E.connector(model(), a.id, b.id)));
+          }
+          renderLinkHandles();
+          try {
+            $('rehearsalViewport')?.releasePointerCapture?.(event.pointerId);
+          } catch {}
+        }
         return;
       }
       if (wire) {
@@ -2689,6 +3034,10 @@
       }
     });
     document.addEventListener('pointercancel', () => {
+      if (linkGesture) {
+        linkGesture = null;
+        a.render();
+      }
       if (pan) {
         pan.view.scrollLeft = pan.left;
         pan.view.scrollTop = pan.top;
@@ -2712,6 +3061,89 @@
     document.addEventListener(
       'keydown',
       event => {
+        if (
+          event.target.closest?.('#rehearsalViewport') &&
+          !event.target.closest('input,textarea,select,[contenteditable="true"]') &&
+          mode !== 'present'
+        ) {
+          const handle = event.target.closest('[data-link-handle]')?.dataset.linkHandle;
+          if (event.key === 'Escape' && (linkGesture || activeLink)) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            linkGesture = null;
+            activeLink = null;
+            linkSelection.clear();
+            panelOpen = false;
+            a.render();
+            return;
+          }
+          if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            try {
+              undoCanvas();
+            } catch (err) {
+              a.tell(err.message, true);
+            }
+            return;
+          }
+          if (['Delete', 'Backspace'].includes(event.key) && (activeLink || selection.size)) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            try {
+              if (handle?.startsWith('bend-') && handle !== 'bend-new' && activeLink) {
+                const edge = E.copy(E.connector(model(), activeLink.from, activeLink.to));
+                edge.via.splice(Number(handle.slice(5)), 1);
+                saveMutation(row => E.setConnector(row, edge));
+              } else deleteSelection();
+            } catch (err) {
+              a.tell(err.message, true);
+            }
+            return;
+          }
+          if (
+            handle &&
+            activeLink &&
+            ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)
+          ) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            const edge = E.copy(E.connector(model(), activeLink.from, activeLink.to)),
+              n = event.shiftKey ? 10 : 2,
+              dx = event.key === 'ArrowLeft' ? -n : event.key === 'ArrowRight' ? n : 0,
+              dy = event.key === 'ArrowUp' ? -n : event.key === 'ArrowDown' ? n : 0;
+            if (handle === 'start' || handle === 'end')
+              edge[handle].offset = Math.max(
+                0,
+                Math.min(1, edge[handle].offset + (dx || dy) / 100)
+              );
+            else {
+              const i = handle === 'bend-new' ? 0 : Number(handle.slice(5)),
+                pt =
+                  edge.via[i] ||
+                  root.WorkHubProcessCanvasArt.linkGeometry(
+                    model().steps.find(s => s.id === edge.from),
+                    model().steps.find(s => s.id === edge.to),
+                    edge
+                  ).point(0.5);
+              edge.via[i] = {
+                x: Math.max(0, Math.min(8000, pt.x + dx)),
+                y: Math.max(0, Math.min(8000, pt.y + dy)),
+              };
+            }
+            try {
+              saveMutation(row => E.setConnector(row, edge));
+              document
+                .querySelector(
+                  '[data-link-handle="' + (handle === 'bend-new' ? 'bend-0' : handle) + '"]'
+                )
+                ?.focus({ preventScroll: true });
+            } catch (err) {
+              a.tell(err.message, true);
+            }
+            return;
+          }
+        }
         if (
           event.target.closest?.('#rehearsalViewport') &&
           !event.target.closest('input,textarea,select,[contenteditable="true"]')
@@ -2820,16 +3252,39 @@
     );
     document.addEventListener('keyup', event => {
       if (event.key === ' ') {
-        spacePan = false;
+        ((spacePan = false),
+          (linkSelection = new Map()),
+          (activeLink = null),
+          (linkGesture = null));
         if ($('rehearsalViewport')) $('rehearsalViewport').dataset.spacePan = 'false';
       }
     });
     root.addEventListener('blur', () => {
-      spacePan = false;
+      ((spacePan = false), (linkSelection = new Map()), (activeLink = null), (linkGesture = null));
       if (pan) pan.view.dataset.panning = 'false';
       pan = null;
     });
     document.addEventListener('submit', event => {
+      if (event.target.id === 'processConnectorForm') {
+        event.preventDefault();
+        try {
+          const f = event.target,
+            p = checkForm(f),
+            value = k => f.elements.namedItem(k).value,
+            edge = E.copy(E.connector(p, f.dataset.from, f.dataset.to));
+          edge.style = value('style');
+          for (const key of ['start', 'end'])
+            edge[key] = { side: value(key + 'Side'), offset: Number(value(key + 'Offset')) / 100 };
+          const from = value('from'),
+            to = value('to');
+          saveMutation(row => E.reconnect(row, edge.from, edge.to, from, to, edge));
+          selectConnection(from, to);
+          a.tell('Connection updated. Playback continues.');
+        } catch (err) {
+          a.tell(err.message, true);
+        }
+        return;
+      }
       if (event.target.id === 'processHubDetails') {
         event.preventDefault();
         return;
@@ -3019,6 +3474,7 @@
             to: next,
             label: E.answers(s).find(a => a.next === next)?.label || '',
             failure: next === s.failNext,
+            ...E.copy(E.connector(p, s.id, next)),
           }))
         ),
         detail: step
@@ -3060,6 +3516,7 @@
           if (current.id !== expected.id || JSON.stringify(current) !== JSON.stringify(expected))
             throw Error('The process changed. Reopen the canvas item before saving.');
           const ok = saveMutation(row => {
+            for (const key of Object.keys(row)) if (!Object.hasOwn(next, key)) delete row[key];
             Object.assign(row, E.copy(next));
           });
           if (ok !== false) paint(false);
@@ -3160,6 +3617,7 @@
       plan: () => route,
       snapshot: () => ({
         selection: [...selection],
+        selectedLinks: [...linkSelection.values()],
         selectionMode,
         index,
         elapsed,

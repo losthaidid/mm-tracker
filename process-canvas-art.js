@@ -23,8 +23,204 @@
       h: Math.max(...ys) - Math.min(...ys),
     };
   }
+  function anchor(step, value = { side: 'right', offset: 0.5 }) {
+    const t = clamp(value.offset, 0, 1);
+    return value.side === 'left'
+      ? { x: step.x, y: step.y + t * 100, nx: -1, ny: 0 }
+      : value.side === 'top'
+        ? { x: step.x + t * 210, y: step.y, nx: 0, ny: -1 }
+        : value.side === 'bottom'
+          ? { x: step.x + t * 210, y: step.y + 100, nx: 0, ny: 1 }
+          : { x: step.x + 210, y: step.y + t * 100, nx: 1, ny: 0 };
+  }
+  function nearestAnchor(step, point) {
+    const x = clamp((point.x - step.x) / 210, 0, 1),
+      y = clamp((point.y - step.y) / 100, 0, 1);
+    return [
+      { side: 'top', offset: x },
+      { side: 'right', offset: y },
+      { side: 'bottom', offset: x },
+      { side: 'left', offset: y },
+    ].sort((a, b) => {
+      const pa = anchor(step, a),
+        pb = anchor(step, b);
+      return (
+        Math.hypot(pa.x - point.x, pa.y - point.y) - Math.hypot(pb.x - point.x, pb.y - point.y)
+      );
+    })[0];
+  }
+  function linkGeometry(a, b, edge = {}) {
+    const start = anchor(a, edge.start),
+      end = anchor(b, edge.end || { side: 'left', offset: 0.5 }),
+      via = edge.via || [],
+      segments = [],
+      points = [start, ...via, end];
+    const line = (a, b) => segments.push([a, a, b, b]);
+    if (edge.style === 'straight')
+      for (let i = 1; i < points.length; i++) line(points[i - 1], points[i]);
+    else if (edge.style === 'elbow') {
+      const route = [
+        start,
+        { x: clamp(start.x + start.nx * 32, 0, 8000), y: clamp(start.y + start.ny * 32, 0, 8000) },
+        ...via,
+        { x: clamp(end.x + end.nx * 32, 0, 8000), y: clamp(end.y + end.ny * 32, 0, 8000) },
+        end,
+      ];
+      for (let i = 1; i < route.length; i++) {
+        const prev = route[i - 1],
+          next = route[i];
+        if (i === 1 || i === route.length - 1 || prev.x === next.x || prev.y === next.y) {
+          line(prev, next);
+          continue;
+        }
+        // A dogleg leaves each bend without retracing the incoming leg.
+        const horizontal = i === route.length - 2 ? !end.nx : !!start.nx,
+          mid = horizontal ? (prev.x + next.x) / 2 : (prev.y + next.y) / 2,
+          first = horizontal ? { x: mid, y: prev.y } : { x: prev.x, y: mid },
+          second = horizontal ? { x: mid, y: next.y } : { x: next.x, y: mid };
+        line(prev, first);
+        line(first, second);
+        line(second, next);
+      }
+    } else
+      for (let i = 1; i < points.length; i++) {
+        const prev = points[i - 1],
+          next = points[i],
+          k = Math.max(70, Math.abs(next.x - prev.x) * 0.45),
+          before = points[i - 2] || prev,
+          after = points[i + 1] || next;
+        segments.push([
+          prev,
+          i === 1
+            ? { x: prev.x + start.nx * k, y: prev.y + start.ny * k }
+            : { x: prev.x + (next.x - before.x) * 0.2, y: prev.y + (next.y - before.y) * 0.2 },
+          i === points.length - 1
+            ? { x: next.x + end.nx * k, y: next.y + end.ny * k }
+            : { x: next.x - (after.x - prev.x) * 0.2, y: next.y - (after.y - prev.y) * 0.2 },
+          next,
+        ]);
+      }
+    for (const segment of segments)
+      for (const i of [1, 2])
+        segment[i] = { x: clamp(segment[i].x, 0, 8000), y: clamp(segment[i].y, 0, 8000) };
+    const at = (s, t) => {
+      const u = 1 - t;
+      return {
+        x:
+          u * u * u * s[0].x + 3 * u * u * t * s[1].x + 3 * u * t * t * s[2].x + t * t * t * s[3].x,
+        y:
+          u * u * u * s[0].y + 3 * u * u * t * s[1].y + 3 * u * t * t * s[2].y + t * t * t * s[3].y,
+      };
+    };
+    const lengths = segments.map(s => {
+        let total = 0,
+          prev = s[0];
+        for (let i = 1; i <= 12; i++) {
+          const pt = at(s, i / 12);
+          total += Math.hypot(pt.x - prev.x, pt.y - prev.y);
+          prev = pt;
+        }
+        return total;
+      }),
+      length = lengths.reduce((a, b) => a + b, 0);
+    return {
+      start,
+      end,
+      segments,
+      path:
+        'M ' +
+        start.x +
+        ' ' +
+        start.y +
+        segments
+          .map(
+            s =>
+              ' C ' +
+              s[1].x +
+              ' ' +
+              s[1].y +
+              ', ' +
+              s[2].x +
+              ' ' +
+              s[2].y +
+              ', ' +
+              s[3].x +
+              ' ' +
+              s[3].y
+          )
+          .join(''),
+      point(t) {
+        let distance = clamp(t, 0, 1) * length;
+        for (let i = 0; i < segments.length; i++) {
+          if (distance <= lengths[i] || i === segments.length - 1)
+            return at(segments[i], lengths[i] ? distance / lengths[i] : 0);
+          distance -= lengths[i];
+        }
+        return start;
+      },
+    };
+  }
+  function linkHandles(p, edge) {
+    if (!edge) return '';
+    const a = p.steps.find(s => s.id === edge.from),
+      b = p.steps.find(s => s.id === edge.to);
+    if (!a || !b) return '';
+    const route = linkGeometry(a, b, edge),
+      handles = [
+        ['start', route.start],
+        ['end', route.end],
+        ...(edge.via?.length
+          ? edge.via.map((pt, i) => ['bend-' + i, pt])
+          : [['bend-new', route.point(0.5)]]),
+      ];
+    return handles
+      .map(([key, pt]) => {
+        const attributes =
+          ' class="pc-connection-handle" data-link-handle="' +
+          key +
+          '" role="button" tabindex="0" aria-label="' +
+          (key === 'start'
+            ? 'Move link starting point'
+            : key === 'end'
+              ? 'Move link endpoint'
+              : 'Move route bend') +
+          '"';
+        const title =
+          '<title>' +
+          (key.startsWith('bend')
+            ? 'Drag to shape route; Delete removes a bend'
+            : 'Drag to any edge of a step') +
+          '</title>';
+        return key.startsWith('bend')
+          ? '<rect' +
+              attributes +
+              ' x="' +
+              (pt.x - 6) +
+              '" y="' +
+              (pt.y - 6) +
+              '" width="12" height="12" rx="1" transform="rotate(45 ' +
+              pt.x +
+              ' ' +
+              pt.y +
+              ')">' +
+              title +
+              '</rect>'
+          : '<circle' +
+              attributes +
+              ' cx="' +
+              pt.x +
+              '" cy="' +
+              pt.y +
+              '" r="9">' +
+              title +
+              '</circle>';
+      })
+      .join('');
+  }
   function dimensions(p) {
     const boxes = (p.annotations || []).map(m => box(m, p.steps));
+    for (const edge of p.connectors || p.edges || [])
+      for (const pt of edge.via || []) boxes.push({ x: pt.x, y: pt.y, w: 50, h: 50 });
     return {
       width: Math.max(850, ...p.steps.map(s => s.x + 270), ...boxes.map(b => b.x + b.w + 60)),
       height: Math.max(450, ...p.steps.map(s => s.y + 180), ...boxes.map(b => b.y + b.h + 60)),
@@ -268,6 +464,10 @@
     }
   }
   root.WorkHubProcessCanvasArt = {
+    anchor,
+    nearestAnchor,
+    linkGeometry,
+    linkHandles,
     resolved,
     box,
     dimensions,

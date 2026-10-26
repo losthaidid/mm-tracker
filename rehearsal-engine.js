@@ -112,6 +112,45 @@
         parent = p.steps.find(s => s.id === parent)?.stackParent;
       }
     }
+    if (p.connectors !== undefined) {
+      if (!Array.isArray(p.connectors) || p.connectors.length > 4000)
+        throw Error('Keep up to 4,000 customized connections.');
+      const seen = new Set();
+      for (const edge of p.connectors) {
+        const key = JSON.stringify([edge?.from, edge?.to]);
+        if (
+          !edge ||
+          !ids.has(edge.from) ||
+          !ids.has(edge.to) ||
+          edge.from === edge.to ||
+          !connections(p.steps.find(s => s.id === edge.from)).includes(edge.to) ||
+          seen.has(key) ||
+          !['curve', 'elbow', 'straight'].includes(edge.style) ||
+          [edge.start, edge.end].some(
+            anchor =>
+              !anchor ||
+              !['top', 'right', 'bottom', 'left'].includes(anchor.side) ||
+              !Number.isFinite(anchor.offset) ||
+              anchor.offset < 0 ||
+              anchor.offset > 1
+          ) ||
+          !Array.isArray(edge.via) ||
+          edge.via.length > 8 ||
+          edge.via.some(
+            pt =>
+              !pt ||
+              !Number.isFinite(pt.x) ||
+              !Number.isFinite(pt.y) ||
+              pt.x < 0 ||
+              pt.y < 0 ||
+              pt.x > 8000 ||
+              pt.y > 8000
+          )
+        )
+          throw Error('Check the connection attachment points and route bends.');
+        seen.add(key);
+      }
+    }
     if (p.annotations === undefined) return;
     if (!Array.isArray(p.annotations) || p.annotations.length > 100)
       throw Error('Keep up to 100 process annotations.');
@@ -190,6 +229,7 @@
       return next;
     });
     p.steps = p.steps.filter(s => s.id !== id);
+    if (p.connectors) p.connectors = p.connectors.filter(e => e.from !== id && e.to !== id);
     if (p.startId === id) p.startId = p.steps[0].id;
     for (const step of p.steps) {
       if (step.next === id) step.next = '';
@@ -246,6 +286,7 @@
           .filter(id => id && id !== step.next);
       }
     }
+    if (p.connectors) p.connectors = p.connectors.filter(e => e.from !== from || e.to !== to);
     const child = p.steps.find(s => s.id === to);
     if (child.stackParent === from) delete child.stackParent;
     for (const scenario of p.scenarios)
@@ -256,6 +297,87 @@
       )
         delete scenario.routes[from];
     return true;
+  }
+  function connector(p, from, to) {
+    return (
+      p.connectors?.find(e => e.from === from && e.to === to) || {
+        from,
+        to,
+        style: 'curve',
+        start: { side: 'right', offset: 0.5 },
+        end: { side: 'left', offset: 0.5 },
+        via: [],
+      }
+    );
+  }
+  function pruneConnectors(p) {
+    if (p.connectors)
+      p.connectors = p.connectors.filter(
+        e =>
+          p.steps.some(s => s.id === e.from && connections(s).includes(e.to)) &&
+          p.steps.some(s => s.id === e.to)
+      );
+  }
+  function setConnector(p, edge) {
+    const next = copy(edge),
+      probe = {
+        ...p,
+        connectors: (p.connectors || [])
+          .filter(e => e.from !== edge.from || e.to !== edge.to)
+          .concat(next),
+      };
+    validateCanvas(probe);
+    p.connectors = probe.connectors;
+  }
+  // Reattach one logical link atomically; unchanged-source decision labels and scenario choices survive.
+  function reconnect(p, from, to, nextFrom, nextTo, layout = connector(p, from, to)) {
+    const source = p.steps.find(s => s.id === from),
+      target = p.steps.find(s => s.id === nextFrom);
+    if (
+      !source ||
+      !connections(source).includes(to) ||
+      !target ||
+      !p.steps.some(s => s.id === nextTo) ||
+      nextFrom === nextTo
+    )
+      throw Error('Attach both ends to two different existing steps.');
+    if ((nextFrom !== from || nextTo !== to) && connections(target).includes(nextTo))
+      throw Error('Those steps are already linked. Choose a different endpoint.');
+    const next = copy(p),
+      step = next.steps.find(s => s.id === from);
+    if (nextFrom === from && nextTo !== to) {
+      if (step.next === to) step.next = nextTo;
+      if (step.failNext === to) step.failNext = nextTo;
+      step.alternatives = (step.alternatives || []).map(id => (id === to ? nextTo : id));
+      if (step.decision) {
+        step.decision.answers = step.decision.answers.map(a => ({
+          ...a,
+          next: a.next === to ? nextTo : a.next,
+        }));
+        if (step.decision.defaultNext === to) step.decision.defaultNext = nextTo;
+      }
+      for (const scenario of next.scenarios)
+        if (scenario.routes?.[from] === to) scenario.routes[from] = nextTo;
+      const child = next.steps.find(s => s.id === to);
+      if (child?.stackParent === from) delete child.stackParent;
+    } else if (nextFrom !== from) {
+      const exception = source.failNext === to,
+        normal = [
+          source.next,
+          ...(source.alternatives || []),
+          ...(source.decision?.answers || []).map(a => a.next),
+        ].includes(to);
+      disconnect(next, from, to);
+      const row = next.steps.find(s => s.id === nextFrom);
+      if (exception && row.failNext)
+        throw Error('The new source already has an exception link. Choose another source.');
+      if (normal) connect(next, nextFrom, nextTo);
+      if (exception) row.failNext = nextTo;
+    }
+    if (next.connectors)
+      next.connectors = next.connectors.filter(e => e.from !== from || e.to !== to);
+    setConnector(next, { ...copy(layout), from: nextFrom, to: nextTo });
+    Object.assign(p, next);
   }
   function removeSteps(p, ids) {
     const targets = [...new Set(ids)].filter(id => p.steps.some(s => s.id === id));
@@ -610,6 +732,7 @@
       old.canvas = {
         version: 1,
         annotations: value.annotations,
+        ...(value.connectors ? { connectors: value.connectors } : {}),
         links: value.links,
         startId: value.startId,
         scenarios: value.scenarios,
@@ -922,7 +1045,9 @@
     };
     return layout(p);
   }
-  function point(a, b, t) {
+  function point(a, b, t, edge) {
+    if (root.WorkHubProcessCanvasArt?.linkGeometry)
+      return root.WorkHubProcessCanvasArt.linkGeometry(a, b, edge).point(t);
     const x1 = a.x + 210,
       y1 = a.y + 50,
       x2 = b.x,
@@ -934,7 +1059,9 @@
       y: u * u * u * y1 + 3 * u * u * t * y1 + 3 * u * t * t * y2 + t * t * t * y2,
     };
   }
-  function path(a, b) {
+  function path(a, b, edge) {
+    if (root.WorkHubProcessCanvasArt?.linkGeometry)
+      return root.WorkHubProcessCanvasArt.linkGeometry(a, b, edge).path;
     const k = Math.max(70, Math.abs(b.x - a.x - 210) * 0.45);
     return `M ${a.x + 210} ${a.y + 50} C ${a.x + 210 + k} ${a.y + 50}, ${b.x - k} ${b.y + 50}, ${b.x} ${b.y + 50}`;
   }
@@ -951,6 +1078,10 @@
     validateCanvas,
     connect,
     disconnect,
+    connector,
+    setConnector,
+    pruneConnectors,
+    reconnect,
     removeStep,
     removeSteps,
     upgrade,

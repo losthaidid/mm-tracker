@@ -778,3 +778,87 @@
   color: #d4e9f2;
   padding: 8px 0;
 }
+
+#rehearsalRoot .rehearsal-edge[data-selected='true'] {
+  stroke: #a1efff;
+  stroke-width: 5;
+  stroke-dasharray: 9 5;
+  filter: drop-shadow(0 0 4px #45ccf088);
+}
+#rehearsalRoot .ph-edge-hit {
+  stroke: transparent;
+  stroke-width: 20;
+  fill: none;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+#rehearsalRoot .rehearsal-node[data-link-target='true'] {
+  outline: 3px solid #8df4db;
+  outline-offset: 6px;
+  box-shadow: 0 0 24px #6ce6cb66;
+}
+#rehearsalRoot .ph-anchor-fields {
+  display: grid;
+  grid-template-columns: 1fr 90px;
+  gap: 9px;
+  margin: 14px 0;
+  padding: 10px;
+  border: 1px solid #41616f;
+  border-radius: 10px;
+}
+#rehearsalRoot .ph-anchor-fields legend {
+  color: #bbecf6;
+  padding: 0 5px;
+  font-size: 11px;
+}
+#rehearsalRoot :is(.ph-link-help, .ph-inspector-summary) {
+  font-size: 11px;
+  line-height: 1.6;
+  color: #bed4de;
+}
+#rehearsalRoot .ph-route-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+#rehearsalRoot .ph-inspector-tabs > button[aria-selected='true'] {
+  color: #102936;
+  background: #b3f0ff;
+}
+#rehearsalRoot .ph-inspector-pages .check-label {
+  display: flex;
+  align-items: center;
+}
+#rehearsalRoot .ph-inspector-pages details {
+  margin: 0;
+}
+#rehearsalRoot .ph-inspector-footer {
+  background: #102936;
+}
+#rehearsalRoot #processConnectorForm {
+  gap: 8px;
+}
+#rehearsalRoot #processConnectorForm > label {
+  font-size: 12px;
+  margin-bottom: 0;
+  gap: 5px;
+}
+#rehearsalRoot #processConnectorForm :is(input, select) {
+  min-height: 36px;
+  padding: 8px 10px;
+}
+#rehearsalRoot #processConnectorForm > :is(p, .hub-kicker) {
+  margin: 0;
+}
+#rehearsalRoot .ph-exact-anchors summary {
+  padding: 9px 0;
+  cursor: pointer;
+  font-size: 12px;
+}
+#rehearsalRoot .ph-connected-list > div {
+  gap: 7px;
+}
+#rehearsalRoot .ph-connected-list > div > span {
+  min-width: 0;
+  flex: 1;
+}
