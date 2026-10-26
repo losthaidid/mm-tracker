@@ -620,6 +620,9 @@
   background: #fafbf5;
   align-self: start;
   min-width: 0;
+  max-height: min(66vh, 680px);
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 .val-outline-title {
   display: flex;
