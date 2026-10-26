@@ -81,6 +81,16 @@
     quick.className = 'pc-quick';
     quick.innerHTML =
       '<button type="button" data-pc="select-all">Select all steps</button><button type="button" data-pc="clear-selection">Clear selection</button><button type="button" data-pc="edit-step">Edit selected step</button><button type="button" data-pc="connect">Connect ports</button><button type="button" data-pc="finish-links">Done linking</button><button type="button" data-pc="attach">Attach note / arrow to step</button><button type="button" data-pc="detach">Detach selected</button><button type="button" data-pc="links">Project / knowledge links</button><button type="button" data-pc="undo">Undo canvas edit</button><button type="button" data-pc="copy">Save editable copy</button><button type="button" data-presenter="end">End presentation</button>';
+    for (const [action, label] of [
+      ['manage-connections', 'Unlink / manage connections'],
+      ['delete-steps', 'Delete selected steps'],
+    ]) {
+      const button = doc.createElement('button');
+      button.type = 'button';
+      button.dataset.pc = action;
+      button.textContent = label;
+      quick.prepend(button);
+    }
     const canvasTools = panel.querySelector('.presenter-canvas-tools'),
       opts = panel.querySelector('.presenter-screen-options'),
       walk = panel.querySelector('.presenter-controls'),
@@ -96,7 +106,7 @@
     bubbles.append(
       menu('✦ Tools', [ink, text]),
       menu('＋ Steps', [types, quick]),
-      menu('▷ Playback', [canvasTools, walk]),
+      menu('▷ Playback', [walk]),
       menu('◉ View & notes', [opts, notes, display, status])
     );
     const notice = doc.createElement('p');
@@ -104,6 +114,19 @@
     notice.setAttribute('data-pc-notice', '');
     notice.setAttribute('role', 'status');
     stage.append(bubbles, notice);
+    const dock = doc.createElement('div');
+    dock.className = 'pc-playback-dock';
+    dock.setAttribute('aria-label', 'Canvas playback controls');
+    dock.setAttribute('role', 'group');
+    if (canvasTools) dock.append(canvasTools);
+    if (a.canvas.sound) {
+      const sound = doc.createElement('button');
+      sound.type = 'button';
+      sound.dataset.pc = 'sound';
+      sound.textContent = 'Enable sound';
+      dock.append(sound);
+    }
+    stage.append(dock);
     const marquee = doc.createElement('div');
     marquee.className = 'pc-marquee';
     marquee.hidden = true;
@@ -486,10 +509,86 @@
       }
       a.publish();
     }
-    function action(name) {
+    function connectionEditor(source = linkFrom || node || model().steps[0]?.id) {
+      const p = a.canvas.model(),
+        row = p.steps.find(s => s.id === source);
+      if (!row) return;
+      openEditor(
+        'Connections',
+        '<form data-pc-form="connections">' +
+          reference(
+            'from',
+            'Starting step',
+            p.steps.map(s => ({ id: s.id, title: s.title })),
+            source
+          ) +
+          '<div class="pc-connected-list">' +
+          E.connections(row)
+            .map(
+              to =>
+                '<div><span>' +
+                esc(p.steps.find(s => s.id === to)?.title || to) +
+                '</span><button type="button" data-pc="unlink-edge" data-from="' +
+                esc(source) +
+                '" data-to="' +
+                esc(to) +
+                '">Unlink</button></div>'
+            )
+            .join('') +
+          '</div><p>Removing a link keeps both steps. Undo can restore the connection.</p></form>'
+      );
+      editor._before = copy(p);
+      editor
+        .querySelector('[name="from"]')
+        .addEventListener('change', e => connectionEditor(e.target.value));
+    }
+    function action(name, button = null) {
       const p = a.canvas.model(),
         next = copy(p),
         m = next.annotations.find(m => m.id === selected);
+      if (name === 'sound') {
+        void a.canvas.sound()?.catch(err => notify(err.message));
+        return;
+      }
+      if (name === 'manage-connections') {
+        connectionEditor();
+        return;
+      }
+      if (name === 'unlink-edge') {
+        const from = button.dataset.from;
+        E.disconnect(next, from, button.dataset.to);
+        if (commit(next, editor._before)) {
+          connectionEditor(from);
+          notify('Connection removed · playback continues. Undo can restore it.');
+        }
+        return;
+      }
+      if (name === 'delete-steps') {
+        if (editor) throw Error('Save or cancel step details before deleting selected steps.');
+        const ids = nodes.size ? [...nodes] : node ? [node] : [];
+        if (!ids.length) throw Error('Select one or more steps first.');
+        if (ids.length >= p.steps.length) throw Error('Keep at least one process step.');
+        if (
+          !root.confirm(
+            'Delete ' +
+              ids.length +
+              ' selected step' +
+              (ids.length === 1 ? '' : 's') +
+              ' and their connections? You can undo this canvas edit.'
+          )
+        )
+          return;
+        E.removeSteps(next, ids);
+        if (commit(next, p)) {
+          nodes.clear();
+          node = '';
+          selected = '';
+          linkFrom = '';
+          a.publish();
+          notify('Steps deleted. Undo can restore them.');
+        }
+        return;
+      }
       if (name === 'select-all' || name === 'clear-selection') {
         setTool('select');
         selected = '';
@@ -627,7 +726,7 @@
           if (name) {
             e.preventDefault();
             e.stopImmediatePropagation();
-            action(name);
+            action(name, b);
             if (!['links', 'edit-step', 'cancel'].includes(name)) collapse();
             return;
           }
@@ -1212,6 +1311,12 @@
     return {
       sync() {
         const p = a.canvas.model();
+        const sound = dock.querySelector('[data-pc="sound"]');
+        if (sound && a.canvas.audio) {
+          const audio = a.canvas.audio();
+          sound.textContent = audio.label;
+          sound.setAttribute('aria-pressed', String(audio.enabled));
+        }
         if (process !== p.id) {
           process = p.id;
           history = [];

@@ -580,3 +580,63 @@ test('Live process editing respects an explicit Pause and reduced motion while i
   await h.click('play'); assert.equal(h.ui.snapshot().paused, false); h.window.matchMedia = () => ({ matches: true });
   h.ui.stepEditor('po'); const at = h.ui.snapshot().elapsed; advance(6); assert.equal(h.ui.snapshot().elapsed, at); assert.equal(h.ui.audienceSnapshot().playing, false);
 });
+
+test('Canvas workspace: page, canvas, inspector and open input focus survive a document render without jumping',async t=>{
+ const h=hub(t);loadFlow(h,liveFlow(h));let pageX=7,pageY=530;
+ Object.defineProperty(h.window,'scrollX',{configurable:true,get:()=>pageX});Object.defineProperty(h.window,'scrollY',{configurable:true,get:()=>pageY});
+ h.window.scrollTo=({left,top})=>{pageX=left;pageY=top;};
+ const view=h.document.getElementById('view'),html=Object.getOwnPropertyDescriptor(h.window.Element.prototype,'innerHTML');
+ Object.defineProperty(view,'innerHTML',{configurable:true,get(){return html.get.call(this);},set(value){html.set.call(this,value);pageX=0;pageY=0;}});
+ h.ui.stepEditor('po');let form=h.document.getElementById('rehearsalStepForm');form.elements.title.value='Keep my cursor here';form.elements.title.focus();form.elements.title.setSelectionRange(5,8);
+ h.document.getElementById('rehearsalViewport').scrollLeft=280;h.document.getElementById('rehearsalViewport').scrollTop=410;h.document.getElementById('rehearsalInspector').scrollTop=130;
+ h.document.querySelector('[data-ph-panel="playback"]').open=true;
+ h.change(d=>{d.workhub.rehearsal.preferences.volume=.35;});
+ form=h.document.getElementById('rehearsalStepForm');assert.equal(pageX,7);assert.equal(pageY,530);assert.equal(h.document.getElementById('rehearsalViewport').scrollLeft,280);assert.equal(h.document.getElementById('rehearsalViewport').scrollTop,410);assert.equal(h.document.getElementById('rehearsalInspector').scrollTop,130);
+ assert.equal(h.document.activeElement,form.elements.title);assert.equal(form.elements.title.value,'Keep my cursor here');assert.equal(form.elements.title.selectionStart,5);assert.equal(form.elements.title.selectionEnd,8);assert.equal(h.document.querySelector('[data-ph-panel="playback"]').open,true);assert.equal(h.ui.snapshot().paused,false);
+ h.ui.saveForm(form);assert.equal(pageY,530);assert.equal(h.document.getElementById('rehearsalViewport').scrollTop,410);assert.equal(h.writes.length,1);
+});
+test('Canvas workspace: full-screen draft scroll stays in place during linking and unlinking without saving records',async t=>{
+ const h=hub(t);loadFlow(h,liveFlow(h));await h.click('edit-process');
+ h.document.querySelector('.ph-fullscreen-stage').scrollTop=160;h.document.getElementById('rehearsalViewport').scrollLeft=210;h.document.getElementById('rehearsalViewport').scrollTop=260;
+ await h.click('link-mode');h.document.getElementById('processLinkTo').value='branch-a';await h.click('connect-selected');
+ assert.equal(h.document.querySelector('.ph-fullscreen-stage').scrollTop,160);assert.equal(h.document.getElementById('rehearsalViewport').scrollTop,260);assert.equal(h.writes.length,0);
+ h.document.querySelector('[data-rehearsal="unlink"][data-to="branch-a"]').click();await settle();
+ assert.ok(!h.E.connections(h.ui.model().steps[0]).includes('branch-a'));assert.equal(h.document.querySelector('.ph-fullscreen-stage').scrollTop,160);assert.equal(h.document.getElementById('rehearsalViewport').scrollLeft,210);assert.equal(h.writes.length,0);assert.equal(h.ui.snapshot().paused,false);
+ await h.click('save-draft');assert.equal(h.writes.length,1);
+});
+test('Canvas workspace: unlink, delete a selection and guarded undo keep playback and saved references intact',async t=>{
+ const h=hub(t);loadFlow(h,liveFlow(h));await h.click('manage-links');
+ h.document.querySelector('[data-rehearsal="unlink"][data-to="finish"]').click();await settle();assert.equal(h.ui.model().steps.length,4);assert.equal(h.ui.model().steps[0].next,'');assert.equal(h.writes.length,1);
+ await h.click('undo-canvas');assert.equal(h.ui.model().steps[0].next,'finish');assert.equal(h.writes.length,2);
+ await h.click('finish-linking');h.document.querySelector('[data-rehearsal="inspect"][data-id="branch-a"]').click();await settle();
+ h.window.confirm=()=>false;await h.click('delete-steps');assert.equal(h.ui.model().steps.length,4);assert.equal(h.writes.length,2);
+ h.window.confirm=()=>true;await h.click('delete-steps');assert.equal(h.ui.model().steps.length,3);assert.equal(h.writes.length,3);assert.equal(h.ui.snapshot().paused,false);
+ await h.click('undo-canvas');assert.equal(h.ui.model().steps.length,4);assert.equal(h.writes.length,4);
+ await h.click('manage-links');h.document.querySelector('[data-rehearsal="unlink"][data-to="finish"]').click();await settle();h.change(d=>d.workhub.rehearsal.processes[0].notes='Newer remote content');await h.click('undo-canvas');
+ assert.equal(h.ui.model().notes,'Newer remote content');assert.equal(h.writes.length,5);assert.match(h.messages.at(-1),/newer changes/);
+});
+test('Canvas workspace: background dragging pans without writes, selection still draws a marquee, and keyboard panning and fit work',async t=>{
+ const h=hub(t);loadFlow(h,liveFlow(h));let view=h.document.getElementById('rehearsalViewport'),board=h.document.getElementById('rehearsalBoard');board.getBoundingClientRect=()=>({left:0,top:0});
+ view.scrollLeft=500;view.scrollTop=400;presenterPointer(h,board,'pointerdown',300,300);presenterPointer(h,view,'pointermove',220,250);presenterPointer(h,view,'pointerup',220,250);
+ assert.equal(view.scrollLeft,580);assert.equal(view.scrollTop,450);assert.equal(h.writes.length,0);assert.equal(h.ui.snapshot().paused,false);
+ presenterPointer(h,board,'pointerdown',300,300);presenterPointer(h,view,'pointermove',200,200);presenterPointer(h,view,'pointercancel',200,200);assert.equal(view.scrollLeft,580);assert.equal(view.scrollTop,450);
+ view.dispatchEvent(new h.window.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true}));assert.equal(view.scrollLeft,640);
+ await h.click('select-mode');view=h.document.getElementById('rehearsalViewport');board=h.document.getElementById('rehearsalBoard');board.getBoundingClientRect=()=>({left:0,top:0});
+ presenterPointer(h,board,'pointerdown',0,0);presenterPointer(h,view,'pointermove',4500,4500);presenterPointer(h,view,'pointerup',4500,4500);assert.equal(h.ui.snapshot().selection.length,4);assert.equal(h.writes.length,0);
+ await h.click('pan-mode');view=h.document.getElementById('rehearsalViewport');view.dispatchEvent(new h.window.KeyboardEvent('keydown',{key:'0',bubbles:true,cancelable:true}));assert.equal(h.document.getElementById('rehearsalViewport').scrollLeft,0);assert.equal(h.writes.length,0);
+});
+test('Canvas workspace: controls live inside the canvas, palette insertion uses the explored area and all-step deletion is rejected',async t=>{
+ const h=hub(t);loadFlow(h,liveFlow(h));const view=h.document.getElementById('rehearsalViewport');view.scrollLeft=700;view.scrollTop=500;
+ assert.ok(h.document.getElementById('rehearsalPlay').closest('.ph-canvas-shell'));assert.ok(h.document.getElementById('rehearsalSound').closest('.ph-playback-dock'));assert.ok(h.document.getElementById('rehearsalVolume').closest('.ph-playback-dock'));
+ await h.click('add-step');assert.equal(h.document.querySelector('.ph-palette').hidden,false);assert.equal(h.writes.length,0);h.document.querySelector('[data-step-type="task"]').click();await settle();
+ const added=h.ui.model().steps.at(-1);assert.ok(added.x>=700);assert.ok(added.y>=500);assert.equal(h.document.querySelector('.ph-inspector-drawer').hidden,false);assert.equal(h.ui.snapshot().paused,false);
+ await h.click('cancel-edit');await h.click('select-all');const calls=h.writes.length;await h.click('delete-steps');assert.equal(h.ui.model().steps.length,5);assert.equal(h.writes.length,calls);assert.match(h.messages.at(-1),/at least one/);
+});
+test('Canvas workspace: presenter connection removal, deletion and dock preserve the separate button-free playing audience',async t=>{
+ const h=await richPresenter(t);assert.ok(h.panel.querySelector('.pc-playback-dock [data-presenter="play"]'));assert.ok(h.panel.querySelector('.pc-playback-dock [data-pc="sound"]'));
+ h.action('manage-connections');let form=h.panel.querySelector('[data-pc-form="connections"]');form.querySelector('[data-to="yes"]').click();await settle();
+ assert.ok(!h.E.connections(h.ui.model().steps[0]).includes('yes'));assert.equal(h.ui.snapshot().paused,false);assert.equal(h.audience.querySelectorAll('button,input,select').length,0);assert.equal(h.audience.querySelector('.av-edge[data-from="ask"][data-to="yes"]'),null);
+ h.action('cancel');h.action('undo');h.geometry();h.tool('select');const card=h.host.querySelector('[data-node="no"]');presenterPointer(h,card,'pointerdown',350,250);presenterPointer(h,h.host,'pointercancel',350,250);h.action('delete-steps');
+ assert.equal(h.ui.model().steps.length,2);assert.equal(h.ui.snapshot().paused,false);assert.equal(h.audience.querySelectorAll('.av-node').length,2);h.action('undo');assert.equal(h.ui.model().steps.length,3);
+ assert.deepEqual(h.order,['window','fullscreen']);assert.equal(h.document.fullscreenElement,null);assert.equal(h.audience.fullscreenElement,h.audience.documentElement);
+});

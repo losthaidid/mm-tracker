@@ -64,3 +64,28 @@ test('Process canvas rendering escapes saved text, hides editing handles from au
   A.draw(ctx,p);assert.ok(drawn.some(x=>x[0]==='fillText'&&String(x[1]).includes('Receiving')));
   assert.ok(drawn.some(x=>x[0]==='lineTo'));assert.ok(A.dimensions(p).width>=850);
 });
+
+test('Connection removal preserves both steps, repairs normal and scenario routes, and detaches only the matching magnetic group',()=>{
+ const {d,p}=sample(),first=p.steps[0],second=p.steps[1];
+ p.steps.push({...copy(second),id:'third',title:'Alternative',next:'',alternatives:[],x:600,y:300});
+ first.alternatives=['third'];first.failNext=second.id;second.stackParent=first.id;p.scenarios[0].routes={[first.id]:second.id};
+ const notes=JSON.stringify(p.annotations),entity=JSON.stringify(first.entity);
+ assert.equal(E.disconnect(p,first.id,second.id),true);E.validate(d);
+ assert.equal(p.steps.length,3);assert.equal(first.next,'third');assert.equal(first.failNext,'');assert.deepEqual(copy(first.alternatives),[]);
+ assert.equal(p.scenarios[0].routes[first.id],undefined);assert.equal(second.stackParent,undefined);assert.equal(JSON.stringify(p.annotations),notes);assert.equal(JSON.stringify(first.entity),entity);
+ const before=JSON.stringify(p);assert.equal(E.disconnect(p,first.id,second.id),false);assert.equal(JSON.stringify(p),before);
+ assert.throws(()=>E.disconnect(p,'foreign',second.id),/existing/);
+});
+test('Connection removal repairs named decision defaults and keeps remaining answers valid',()=>{
+ const {d,p}=sample(),first=p.steps[0],second=p.steps[1];
+ p.steps.push({...copy(second),id:'third',title:'Alternative',next:'',alternatives:[],x:600,y:300});
+ first.type='decision';first.decision={question:'Choose a path',defaultNext:second.id,answers:[{label:'A',next:second.id},{label:'B',next:'third'},{label:'End',next:''}]};first.alternatives=['third'];
+ E.disconnect(p,first.id,second.id);E.validate(d);assert.equal(first.next,'third');assert.equal(first.decision.defaultNext,'third');assert.equal(first.decision.answers.length,2);
+ E.disconnect(p,first.id,'third');E.validate(d);assert.equal(first.next,'');assert.equal(first.decision,undefined);
+});
+test('Bulk step deletion validates the whole selection before changing records and repairs references in one graph mutation',()=>{
+ const {d,p}=sample(),first=p.steps[0];
+ p.steps.push({...copy(p.steps[1]),id:'third',title:'Keep me',next:'',alternatives:[],x:600,y:300});first.alternatives=['third'];
+ const before=JSON.stringify(p);assert.throws(()=>E.removeSteps(p,p.steps.map(s=>s.id)),/at least one/);assert.equal(JSON.stringify(p),before);
+ E.removeSteps(p,[first.id,p.steps[1].id,first.id]);E.validate(d);assert.equal(p.steps.length,1);assert.equal(p.startId,'third');assert.equal(p.annotations[0].anchorId,undefined);assert.deepEqual(copy(E.connections(p.steps[0])),[]);
+});

@@ -2,11 +2,25 @@
 
 Open **Process Hub** in the main navigation. Process Rehearsal is now part of this workspace and no longer appears in Studio. Existing rehearsal and Process Hub libraries appear together in the Saved process dropdown. Opening them does not copy or rewrite saved records.
 
+## Canvas workspace
+
+The Process Hub uses a full-width, futuristic canvas with a dark grid, luminous active routes and a larger area to explore. Step details, insertion tools and connections open as floating drawers. The document, canvas and editor scroll positions stay in place during saved edits; input focus and unsaved step fields survive preference updates.
+
+- **Explore:** drag empty canvas to pan. Hold Space or use the middle mouse button to pan over cards. Arrow keys pan a focused canvas; Shift moves farther. **0** or **Fit** frames the process. Zoom keeps the current viewing area centred. **Follow** explicitly follows the playing step; manual exploration and editing turn following off.
+- **＋ Step:** open the type tray, then drag a type into place or tap it to insert in the area you are viewing. Click a card for its details; **Details** opens or closes the drawer.
+- **Link steps / Unlink:** choose the source and maintain its connected destinations. Each destination has an **Unlink** button. Clicking a connector also opens its source connections. Removing a default route promotes a surviving normal destination; named decisions and scenario routes are repaired. Both endpoint steps remain.
+- **Delete steps:** click a step or use **Select steps** to draw a selection rectangle, then choose **Delete steps** beside the other canvas tools. Confirm the named selection. At least one step must remain. Incoming links, decisions, scenarios and anchored notes are repaired together.
+- **Undo:** restore the previous canvas edit, including removed links or steps. Undo is private to this tab and refuses to overwrite a later external change. History is bounded to limit memory use.
+
+Playback, previous/next, restart, sound, zoom and Fit are inside the translucent dock at the canvas's bottom left. Its settings button opens decisions, speed and volume. Sample values, scene settings and the playback journal can be expanded below the canvas. **Process brief & library actions** contains archive, export and process settings. **Presentation display** holds the existing screen selector; the selected-display, fullscreen, audience window and break behaviour are unchanged.
+
+In the private presenter canvas, playback controls now sit in a translucent bottom-left dock. The Steps bubble includes connection removal and deletion of selected steps. The audience continues to receive a button-free process view.
+
 ## Create a process
 
 Choose **New process** to open a blank, full-screen canvas. Expand **Process information** to maintain its name, intended outcome, owner, revision, audience, description and private presenter notes. The draft starts with a first task and a result; rename, replace or extend them.
 
-Drag a **Task**, **Document**, **Decision**, **Approval**, **Result**, **Organization level**, **Company code**, **Plant**, **Storage location**, **Material**, **Batch**, **Valuation** or **Step group** from the step-type tray onto the canvas. On a touch screen, drag a type or tap it to add. Its detail editor opens alongside the canvas. Maintain the title, owner, instructions, prerequisites, inputs, outputs, expected result, system/tool, typical working time, user-facing explanation, configuration, common errors and testing checklist. Reference codes, URLs, optimized screenshots and links to projects, tickets, project items and knowledge notes are retained.
+Choose **＋ Step** to open the type tray. Drag a **Task**, **Document**, **Decision**, **Approval**, **Result**, **Organization level**, **Company code**, **Plant**, **Storage location**, **Material**, **Batch**, **Valuation** or **Step group** from the step-type tray onto the canvas. On a touch screen, drag a type or tap it to add. Its detail editor opens alongside the canvas. Maintain the title, owner, instructions, prerequisites, inputs, outputs, expected result, system/tool, typical working time, user-facing explanation, configuration, common errors and testing checklist. Reference codes, URLs, optimized screenshots and links to projects, tickets, project items and knowledge notes are retained.
 
 Set the starting step, normal successor, additional normal routes and optional exception successor in step details. Save the step to continue building. **Save process** also saves an open step editor, then commits the entire process in one account-document update. Changes in the full editor remain a tab-local draft until that action. **Discard changes** confirms before discarding. Reloading or closing a tab with an open draft triggers the browser's unsaved-work warning. Drafts are not recoverable after closing the page and never transfer between accounts.
 
@@ -36,7 +50,7 @@ Presentation shows the same animated graph and current-step explanation, respons
 
 Choose **Presenter controls**. The current website window keeps your private presenter canvas. A separate **Audience** window opens using the selected display's position and available size, and only that window requests native fullscreen. Share the Audience window in your meeting app and keep the main presenter window unshared. The website cannot identify your meeting app's shared screen.
 
-Choose the shared monitor before launching, or use **View & notes → Choose display** during the session. Placement is applied when the window opens, after its verified ready message, and before fullscreen, so a refused fullscreen request does not switch the audience back into the private main browser. Native display placement still requires browser support and permission.
+Open **Presentation display** and choose the shared monitor before launching, or use **View & notes → Choose display** during the session. Placement is applied when the window opens, after its verified ready message, and before fullscreen, so a refused fullscreen request does not switch the audience back into the private main browser. Native display placement still requires browser support and permission.
 
 The audience contains the process, saved canvas annotations, optional explanations and the transient laser. It contains no toolbars, buttons, editing handles or private notes. Fullscreen is attempted automatically. Some browsers require a direct gesture inside a newly opened window; **click anywhere in the audience** or press Enter there to retry, without an extra fullscreen button or prompt. The private display status distinguishes native fullscreen from a window sized to the monitor. If the browser blocks the audience pop-up, the private canvas stays usable and **Retry audience** appears under View & notes.
 
@@ -75,7 +89,7 @@ Initial sample values use one `Field = value` per line. Step changes use `Field 
 
 ## PDF and PNG exports
 
-For a saved process, choose **Export PDF / Image**, select a format and PDF detail level, then **Prepare file** and the ready download link. **PDF in ZIP** provides an alternative if a browser intercepts direct PDF downloads. PNG contains the complete diagram, numbered cards, normal/exception routes and saved text, arrows and pen marks. Long card titles may be shortened in the diagram; the PDF contains full titles and step text.
+For a saved process, open **Process brief & library actions**, choose **Export PDF / Image**, select a format and PDF detail level, then **Prepare file** and the ready download link. **PDF in ZIP** provides an alternative if a browser intercepts direct PDF downloads. PNG contains the complete diagram, numbered cards, normal/exception routes and saved text, arrows and pen marks. Long card titles may be shortened in the diagram; the PDF contains full titles and step text.
 
 **User handout** includes the diagram, process context, user explanations, responsibilities, prerequisites, inputs, outputs, outcomes, organization/material information and routes. **Full reference** also includes private presenter notes, technical and failure details, reference links, sample changes and all defined scenarios. Exports use a snapshot and never change records. Account changes cancel pending exports and invalidate ready links.
 
