@@ -45,6 +45,63 @@ sheet now accepts Template type; Columns has additional SAP type, SAP length,
 SAP decimals and SAP reference field headers. No new sheets are required by old files.
 You can also import the simple setup and maintain Conditions/References in Studio.
 
+## Projects and company-specific conditions
+
+In **Columns → Linked project**, choose a maintained project, then **Save draft**.
+In **Conditions → Company scope**, keep **All companies in this project** for shared
+rules, or choose **Selected companies only** and tick one or more companies. Apply
+the condition and save the draft. Only active companies from that project are
+available for new assignments. Maintain them in **Projects → Companies & processes**.
+
+Example: one company can require Distribution Channel to be in `60,50` when Sales
+Org equals `FPSO`; another company can use `10,20` in its own condition. These
+company scopes are additional to the rule's IF conditions. Shared column checks
+(including length, required fields, allowed values and SAP formats) and shared
+conditions still apply. Avoid putting company-specific allowed values on a shared
+column; maintain them as company-specific conditions instead.
+
+In **Validate → Company for this validation**, choose the company whose file you
+are checking. Each run checks one company; split mixed-company files before running.
+A linked template cannot run without an active company from its project. Changing
+the company or version invalidates previous results and exports until validation
+runs again. Suggestions and reference descriptions use the same company scope.
+Run summaries and exported reports retain the project/company names used at the time;
+uploaded rows still stay in memory. Template Excel field guides include rule scopes,
+and definition JSON exports retain links. Existing setup workbooks remain unchanged:
+import columns first, then maintain project and company assignments inside Studio.
+
+Published versions freeze the project link and company conditions. Changing a draft's
+project prompts to clear company assignments and pause those conditions; reassign
+and enable them deliberately in Conditions. Inactive/deleted assignments remain
+visible in existing conditions, but cannot be chosen for new validation runs.
+If a linked project was removed, relink the draft or choose another version.
+Existing standalone templates and old published versions retain their behavior.
+
+### Reuse templates and conditions
+
+Use **Template options (•••) → Copy to project / companies…** to create an
+independent draft in another project (or for another company in the same project).
+Choose the new name, destination project and destination company scope. Columns,
+conditions and references are copied; published versions and run history are not.
+The source is kept. Review the new draft and **Save draft**.
+
+Use **Conditions → Copy conditions…** to bring selected conditions from another
+saved template or the current draft. Filter the source by company, tick the rules
+to copy, then assign them to the destination companies or all destination companies.
+Every copied condition uses that chosen destination scope, and paused conditions
+remain paused. Referenced lists travel with the copied conditions as independent
+copies. Matching technical field names must exist in the destination; missing fields
+or incompatible checks stop the copy without partially adding rules. Existing
+destination conditions are kept. Copies do not stay synchronized with their source.
+
+### Open an issue's value
+
+After validation, click an entry in **What needs attention**. Studio switches to
+the row's page, scrolls to the exact column and selects the editable value. A
+**Current value** panel shows the full value and message (including blank values).
+The issue list also previews each value. Correct the cell and run validation again
+before exporting refreshed results. Uploaded values remain in memory.
+
 ## SAP mode
 
 Choose **Template type → SAP** in the column editor. General settings are preserved

@@ -77,10 +77,10 @@ Batch C: [batch-c-engine.js](../batch-c-engine.js) handles deterministic ticket 
 | --- | --- |
 | [workbench.js](../workbench.js), [workbench.css](../workbench.css) | Quick status actions, record previews and troubleshooting case records. |
 | [lab-workshop.js](../lab-workshop.js), [lab-workshop.css](../lab-workshop.css) | Visual investigation board, experiments, gestures and reactions; automatic saved-result loops and local Pause/Stop/speed controls. |
-| [validator-engine.js](../validator-engine.js) | General/SAP template/field/rule definitions (200 columns), DDIC format/precision checks, row validation, lookup checks, context-aware correction suggestions and CSV helpers. |
+| [validator-engine.js](../validator-engine.js) | General/SAP template/field/rule definitions (200 columns), DDIC format/precision checks, project/company-scoped row validation, lookup checks, context-aware correction suggestions and CSV helpers. |
 | [validator-files.js](../validator-files.js) | Local CSV/TSV/XLSX reading and template/results workbook exports. |
 | [validator-setup.js](../validator-setup.js), [validation-setup-simple.xlsx](../validation-setup-simple.xlsx), [validation-setup-sap.xlsx](../validation-setup-sap.xlsx), [validation-setup-template.xlsx](../validation-setup-template.xlsx) | One-sheet General/SAP column setup and backward-compatible advanced Excel setup with conditions, references and unique combinations. Previewed as a new draft before saving. |
-| [validator-studio.js](../validator-studio.js), [validator-studio.css](../validator-studio.css) | Template designer, upload mapping, correction picker and results screens. Uploaded rows remain in memory. |
+| [validator-studio.js](../validator-studio.js), [validator-studio.css](../validator-studio.css) | Template designer with project links and company condition scopes, per-company validation, upload mapping, correction picker and results screens. Uploaded rows remain in memory. |
 
 ## Momo, scenery, focus and sound
 
