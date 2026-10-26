@@ -380,6 +380,37 @@ body[data-hub-theme] .val-metric.passed strong {
   color: var(--hub-success);
 }
 
+/* Override the original light-only !important fills in the validation results. */
+body[data-hub-theme] .validation-studio .val-grid td.error {
+  background: var(--hub-negative-bg) !important;
+  color: var(--hub-negative-text, var(--hub-text));
+  box-shadow: inset 0 -2px 0 var(--hub-danger);
+}
+body[data-hub-theme] .validation-studio .val-grid td.warning {
+  background: var(--hub-caution-bg) !important;
+  color: var(--hub-caution-text, var(--hub-text));
+  box-shadow: inset 0 -2px 0 var(--hub-warning);
+}
+body[data-hub-theme] .validation-studio .val-grid td:is(.error, .warning) input {
+  color: inherit !important;
+  caret-color: currentColor;
+}
+body[data-hub-theme] .validation-studio .val-grid tr.val-target-row :is(td, th) {
+  box-shadow:
+    inset 0 2px 0 var(--hub-accent),
+    inset 0 -2px 0 var(--hub-accent);
+}
+body[data-hub-theme] .validation-studio .val-grid input:focus-visible {
+  outline: 2px solid var(--hub-accent);
+  outline-offset: -2px;
+}
+body[data-hub-theme] .validation-studio .val-segments button.val-btn.is-active {
+  background: var(--hub-accent) !important;
+  border-color: var(--hub-accent) !important;
+  color: var(--hub-on-accent);
+  box-shadow: none;
+}
+
 /* My Day UI uses the theme; its river, trees and terrarium remain illustrated scenery. */
 body[data-hub-theme] .my-day-page .md-day-intro {
   background: linear-gradient(115deg, var(--hub-surface-soft), var(--hub-blue-soft));
