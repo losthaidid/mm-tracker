@@ -114,6 +114,10 @@
     'success',
     'warning',
     'danger',
+    'negative-bg',
+    'negative-text',
+    'caution-bg',
+    'caution-text',
   ];
   function appearanceApply(p) {
     const style = document.body.style;
@@ -131,6 +135,16 @@
         : { success: '#24714f', warning: '#8b5919', danger: '#ad3f46' }
     ))
       style.setProperty('--hub-' + key, readable(value, surface));
+    // Highlighted values need contrast against the tinted cell, not just the page surface.
+    for (const [tone, role] of [
+      ['negative', 'danger'],
+      ['caution', 'warning'],
+    ]) {
+      const roleColor = style.getPropertyValue('--hub-' + role),
+        fill = mix(surface, roleColor, 0.12);
+      style.setProperty('--hub-' + tone + '-bg', fill);
+      style.setProperty('--hub-' + tone + '-text', readable(roleColor, fill));
+    }
     if (p.theme !== 'custom') return;
     const c = p.colors || COLORS,
       ink = readable(c.text, c.surface),

@@ -30,8 +30,13 @@ test('Theme colours: primary buttons, website links and semantic text remain rea
     assert.ok(contrast(token('on-accent'), palette.accent) >= 4.5, p.theme + ' primary text');
     for (const role of ['link', 'success', 'warning', 'danger'])
       assert.ok(contrast(token(role), palette.colors.surface) >= 4.5, p.theme + ' ' + role);
+    for (const tone of ['negative', 'caution']) {
+      assert.ok(contrast(token(tone + '-text'), token(tone + '-bg')) >= 4.5,
+        p.theme + ' ' + tone + ' highlighted values');
+    }
   }
   appearance.apply({ theme: 'forest' });
   assert.equal(dom.window.document.body.style.getPropertyValue('--hub-surface'), '');
   assert.equal(dom.window.document.body.style.getPropertyValue('--hub-bg'), '');
+  assert.notEqual(dom.window.document.body.style.getPropertyValue('--hub-negative-bg'), '');
 });
