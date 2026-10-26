@@ -11,8 +11,28 @@ A General/SAP file validator in the existing WorkHub. All checks are determinist
 5. Save the draft. Publish a version to freeze its columns, rules and references.
 6. Download an Excel template or upload an existing XLSX, CSV or TSV.
 7. Choose a worksheet and header row, then confirm each column mapping.
-8. Validate, inspect field-level issues, correct values and validate again.
+8. Validate, inspect field-level issues, then correct values. Corrections recheck automatically.
 9. Export the issue workbook or the rows without errors.
+
+## Live corrections
+
+Use **Run validation** for the initial file check. After that, editing a result cell
+rechecks the entire upload after a short typing pause (250 ms), or immediately when
+you leave the cell. Selecting a suggested value rechecks immediately. Duplicate
+and unique-combination issues on other rows, cross-field conditions, company rules,
+reference checks, accepted-row decisions and exports all refresh together.
+
+Corrections update the results in place: the surrounding workspace, focused input,
+selection, page, filter and table scroll are preserved. Corrected rows remain visible
+in a filtered list while you work; changing the filter or page refreshes that list.
+Exports are disabled while a typing check is pending. If the company becomes inactive
+or validation cannot finish, exports stay disabled until a valid check completes.
+
+Live corrections stay in browser memory and do not create a cloud write or a new run
+summary for every edit. Saved run history keeps the original check; **Run validation**
+can record a fresh summary when you want one. Changing the file, mapping, version,
+company or template settings still requires a new initial run. Pending corrections
+are cancelled on context/account changes. The original uploaded file is unchanged.
 
 ## Easy Excel setup (one sheet)
 
@@ -99,8 +119,8 @@ destination conditions are kept. Copies do not stay synchronized with their sour
 After validation, click an entry in **What needs attention**. Studio switches to
 the row's page, scrolls to the exact column and selects the editable value. A
 **Current value** panel shows the full value and message (including blank values).
-The issue list also previews each value. Correct the cell and run validation again
-before exporting refreshed results. Uploaded values remain in memory.
+The issue list also previews each value. Correct the cell; errors, warnings and exports update automatically. Uploaded values
+remain in memory.
 
 ## SAP mode
 
