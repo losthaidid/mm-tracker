@@ -118,25 +118,81 @@
     'negative-text',
     'caution-bg',
     'caution-text',
+    'positive-bg',
+    'positive-text',
+    'page-text',
+    'page-muted',
+    'soft-text',
+    'soft-muted',
   ];
   function appearanceApply(p) {
+    document.body.dataset.hubTheme = p.theme;
     const style = document.body.style;
     for (const k of APPLIED) style.removeProperty('--hub-' + k);
-    const surface =
-        p.theme === 'custom' ? (p.colors || COLORS).surface : presetColors(p.theme).surface,
+    const preset = presetColors(p.theme),
+      computed = root.getComputedStyle?.(document.body),
+      fromCSS = (key, fallback) => {
+        const value = computed?.getPropertyValue('--hub-' + key).trim();
+        return color(value) ? value : fallback;
+      },
+      c =
+        p.theme === 'custom'
+          ? p.colors || COLORS
+          : {
+              page: fromCSS('bg', preset.page),
+              surface: fromCSS('surface', preset.surface),
+              text: fromCSS('text', preset.text),
+              secondary: preset.secondary,
+            },
+      surface = c.surface,
+      soft =
+        p.theme === 'custom' ? mix(surface, c.secondary, 0.07) : fromCSS('surface-soft', surface),
+      backgrounds = [
+        surface,
+        soft,
+        ...(p.theme === 'custom'
+          ? [
+              mix(surface, c.secondary, 0.14),
+              mix(surface, c.secondary, 0.18),
+              mix(surface, p.accent, 0.13),
+            ]
+          : ['surface-hover', 'mint', 'yellow', 'peach', 'lavender', 'blue-soft'].map(k =>
+              fromCSS(k, surface)
+            )),
+      ],
+      across = ink =>
+        [
+          ink,
+          ...[0.12, 0.24, 0.4, 0.6, 0.8].map(n => mix(ink, readable(c.text, surface), n)),
+          c.text,
+          '#19242f',
+          '#fff9f3',
+          '#000000',
+          '#ffffff',
+        ].find(value => backgrounds.every(bg => contrast(value, bg) >= 4.5)) ||
+        readable(ink, surface),
+      ink = across(readable(c.text, surface)),
+      muted = across(mix(ink, surface, 0.12)),
       accent = THEMES[p.theme]?.[1] || p.accent,
       dark = luminance(surface) < 0.179;
+    style.setProperty('--hub-text', ink);
+    style.setProperty('--hub-muted', muted);
+    style.setProperty('--hub-page-text', readable(ink, c.page));
+    style.setProperty('--hub-page-muted', readable(muted, c.page));
+    style.setProperty('--hub-soft-text', readable(ink, soft));
+    style.setProperty('--hub-soft-muted', readable(muted, soft));
     style.colorScheme = dark ? 'dark' : 'light';
     style.setProperty('--hub-on-accent', readable('#ffffff', accent));
-    style.setProperty('--hub-link', readable(accent, surface));
+    style.setProperty('--hub-link', across(accent));
     for (const [key, value] of Object.entries(
       dark
         ? { success: '#9ae0b5', warning: '#edc17e', danger: '#ffa9ad' }
         : { success: '#24714f', warning: '#8b5919', danger: '#ad3f46' }
     ))
-      style.setProperty('--hub-' + key, readable(value, surface));
+      style.setProperty('--hub-' + key, across(value));
     // Highlighted values need contrast against the tinted cell, not just the page surface.
     for (const [tone, role] of [
+      ['positive', 'success'],
       ['negative', 'danger'],
       ['caution', 'warning'],
     ]) {
@@ -146,22 +202,20 @@
       style.setProperty('--hub-' + tone + '-text', readable(roleColor, fill));
     }
     if (p.theme !== 'custom') return;
-    const c = p.colors || COLORS,
-      ink = readable(c.text, c.surface),
-      vars = {
-        bg: c.page,
-        surface: c.surface,
-        'surface-soft': mix(c.surface, c.secondary, 0.07),
-        'surface-hover': mix(c.surface, c.secondary, 0.14),
-        text: ink,
-        muted: mix(ink, c.surface, 0.23),
-        border: mix(c.surface, ink, 0.2),
-        mint: mix(c.surface, c.secondary, 0.14),
-        yellow: mix(c.surface, p.accent, 0.13),
-        peach: mix(c.surface, c.secondary, 0.1),
-        lavender: mix(c.surface, c.secondary, 0.18),
-        'blue-soft': mix(c.surface, p.accent, 0.1),
-      };
+    const vars = {
+      bg: c.page,
+      surface: c.surface,
+      'surface-soft': mix(c.surface, c.secondary, 0.07),
+      'surface-hover': mix(c.surface, c.secondary, 0.14),
+      text: ink,
+      muted,
+      border: mix(c.surface, ink, 0.2),
+      mint: mix(c.surface, c.secondary, 0.14),
+      yellow: mix(c.surface, p.accent, 0.13),
+      peach: mix(c.surface, c.secondary, 0.1),
+      lavender: mix(c.surface, c.secondary, 0.18),
+      'blue-soft': mix(c.surface, p.accent, 0.1),
+    };
     for (const [k, v] of Object.entries(vars)) style.setProperty('--hub-' + k, v);
   }
   function appearanceFields(p) {

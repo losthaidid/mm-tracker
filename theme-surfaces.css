@@ -2,6 +2,10 @@
    Deliberately scoped to UI surfaces: scenery, companion art, process diagram palettes,
    annotation colours and exported documents keep their own meaningful colours. */
 body[data-hub-theme] {
+  color: var(--hub-page-text, var(--hub-text));
+  --hub-scenic-text: #fffdf3;
+  --hub-scenic-muted: #d4e2d3;
+  --hub-scenic-accent: #e8d8a8;
   --ink: var(--hub-text);
   --text: var(--hub-text);
   --muted: var(--hub-muted);
@@ -12,6 +16,15 @@ body[data-hub-theme] {
   --hub-positive-bg: color-mix(in srgb, var(--hub-success) 12%, var(--hub-surface));
   --hub-caution-bg: color-mix(in srgb, var(--hub-warning) 12%, var(--hub-surface));
   --hub-negative-bg: color-mix(in srgb, var(--hub-danger) 12%, var(--hub-surface));
+}
+body[data-hub-theme]
+  #view
+  .hub-head:not(.md-day-intro):not(.hero-home)
+  :is(h1, h2, h3, .hub-kicker) {
+  color: var(--hub-page-text, var(--hub-text));
+}
+body[data-hub-theme] #view .hub-head:not(.md-day-intro):not(.hero-home) p {
+  color: var(--hub-page-muted, var(--hub-muted));
 }
 
 /* Feature palettes share the same saved theme, including custom dark surfaces. */
@@ -417,6 +430,38 @@ body[data-hub-theme] .my-day-page .md-day-intro {
   color: var(--hub-text);
   border-color: var(--hub-border);
 }
+/* Scenic headers are dark artwork in every theme. Keep their foreground separate
+   from paper/card text; theme-wide h2, p and button rules must not darken it. */
+body[data-hub-theme] .my-day-page .md-day-intro.mv-hero {
+  color: var(--hub-scenic-text);
+}
+body[data-hub-theme]
+  .my-day-page
+  .md-day-intro.mv-hero
+  :is(h2, .mv-hero-eyebrow, .mv-hero-metric strong) {
+  color: var(--hub-scenic-text);
+}
+body[data-hub-theme]
+  .my-day-page
+  .md-day-intro.mv-hero
+  :is(
+    .mv-welcome,
+    .mv-day-label,
+    .mv-hero-metric small,
+    .mv-hero-metric em,
+    .mv-hero-metric strong > span,
+    .mv-metric-arrow
+  ) {
+  color: var(--hub-scenic-muted);
+}
+body[data-hub-theme] .my-day-page .md-day-intro.mv-hero h2 em {
+  color: var(--hub-scenic-accent);
+}
+body[data-hub-theme]
+  .my-day-page
+  :is(.mv-widget-kicker, .md-orb-wrap > p, .md-kicker, .md-workspace-strip, .md-day-caption) {
+  color: var(--hub-muted);
+}
 body[data-hub-theme]
   :is(
     .md-agenda-card,
@@ -585,6 +630,29 @@ body[data-hub-theme] .ss-status.is-agreed {
 }
 
 /* Private presentation controls adapt without recolouring a saved public process. */
+body[data-hub-theme] .rehearsal-stage {
+  background: var(--hub-surface);
+  color: var(--hub-text);
+}
+body[data-hub-theme] .rehearsal-values {
+  --r-ink: var(--hub-text);
+  --r-muted: var(--hub-muted);
+  --r-line: var(--hub-border);
+  background: var(--hub-surface);
+  color: var(--hub-text);
+}
+body[data-hub-theme] :is(#rehearsalStatus, #rehearsalAudioStatus) {
+  color: var(--hub-muted);
+}
+body[data-hub-theme] .rehearsal-node-main small {
+  color: var(--r-ink);
+}
+body[data-hub-theme] .lab-workshop .lab-eyebrow {
+  color: var(--hub-soft-text, var(--hub-text));
+}
+body[data-hub-theme] :is(.batch-stale-card, .batch-callout) .batch-eyebrow {
+  color: var(--hub-soft-muted, var(--hub-muted));
+}
 body[data-hub-theme] .ss-workspace :is(span, small, b, em, summary, code, li) {
   color: var(--hub-text);
 }
@@ -749,15 +817,15 @@ body[data-hub-theme]
   border-color: var(--hub-accent);
 }
 body[data-hub-theme] :is(.tag.complete, .tag.closed, .experience-health h3) {
-  color: var(--hub-success);
+  color: var(--hub-positive-text, var(--hub-success));
   background: var(--hub-positive-bg);
 }
 body[data-hub-theme] :is(.tag.pending, .tag.hold, .experience-health[data-state='waiting'] h3) {
-  color: var(--hub-warning);
+  color: var(--hub-caution-text, var(--hub-warning));
   background: var(--hub-caution-bg);
 }
 body[data-hub-theme] :is(.tag.high, .tag.critical, .experience-health[data-state='conflict'] h3) {
-  color: var(--hub-danger);
+  color: var(--hub-negative-text, var(--hub-danger));
   background: var(--hub-negative-bg);
 }
 body[data-hub-theme] :is(button.danger, .val-danger, .wl-danger) {
@@ -912,7 +980,7 @@ body[data-hub-theme] .md-idea.md-color-sky {
 body[data-hub-theme] .md-idea.md-color-lavender {
   background: var(--hub-lavender);
 }
-body[data-hub-theme] :is(.md-focus-orb > div > span, .md-break-time) {
+body[data-hub-theme] .md-break-time {
   color: var(--hub-text);
 }
 body[data-hub-theme] .md-group-tag {
@@ -1066,4 +1134,10 @@ body[data-hub-theme]
   :is(.primary, .wl-primary, .val-primary, .ss-primary, .md-primary)
   :is(span, strong, b) {
   color: inherit;
+}
+
+/* The orb keeps its pale illustrated fill even in dark themes. */
+body[data-hub-theme] .my-day-page .md-focus-orb :is(span, small) {
+  color: #244b3d;
+  text-shadow: none;
 }
