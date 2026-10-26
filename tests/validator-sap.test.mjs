@@ -95,7 +95,7 @@ test('SAP currency and quantity references validate schema and required companio
   assert.equal(E.validateRows(t,[{VALUE:'2.500',UNIT:'KG'}]).errors,0);
 });
 test('SAP invalid type, length, scale and malformed metadata cannot publish or restore', () => {
-  for (const extra of [{sapType:'NOT_A_TYPE'},{sapLength:0},{sapLength:30001},{sapLength:true},{sapDecimals:{}},{sapDecimals:15},{sapLength:2,sapDecimals:3}]) {
+  for (const extra of [{sapType:'NOT_A_TYPE'},{sapType:'constructor'},{sapType:'toString'},{sapType:'__proto__'},{sapLength:0},{sapLength:30001},{sapLength:true},{sapDecimals:{}},{sapDecimals:15},{sapLength:2,sapDecimals:3}]) {
     const t=sap('DEC',extra);assert.throws(()=>E.checkSchema(t),/SAP/);
   }
   assert.throws(()=>E.checkSchema(sap('DATS',{sapLength:10})),/SAP/);

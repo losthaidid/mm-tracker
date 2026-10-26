@@ -203,7 +203,7 @@
             (typeof c[k] === 'string' && /^\d+$/.test(c[k]))
           )
       ) ||
-      !spec ||
+      !Object.hasOwn(SAP_TYPES, type) ||
       !Number.isInteger(length) ||
       (spec.min ? length < spec.min || length > spec.max : length !== spec.length)
     )
@@ -230,7 +230,7 @@
   function sapCheck(value, c) {
     const v = normalized(value, c),
       { type, spec, length, decimals } = sapSettings(c);
-    if (!spec) return 'Choose a supported SAP type.';
+    if (!Object.hasOwn(SAP_TYPES, type)) return 'Choose a supported SAP type.';
     if (spec.range) {
       if (!/^[+-]?\d+$/.test(v)) return type + ' requires a whole number.';
       const n = BigInt(v);
