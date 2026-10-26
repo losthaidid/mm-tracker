@@ -170,3 +170,59 @@ test('startup uses only the matching account motion setting, respects reduced mo
   assert.equal(document.documentElement.dataset.startupPhase, 'records'); window.WorkHubStartup.phase('made-up'); assert.equal(document.documentElement.dataset.startupPhase, 'records');
   document.querySelector('script[src]').dispatchEvent(new window.Event('error')); button.click(); assert.equal(scene.classList.contains('is-sparked'), false); assert.equal(document.documentElement.dataset.workhubStartupState, 'error');
 });
+
+const storedAppearance = preferences => JSON.stringify({ document: { data: { workhub: { preferences } } } });
+function startupContrast(a,b) {
+  const light = value => { const c=value.slice(1).match(/../g).map(x=>parseInt(x,16)/255).map(x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4); return .2126*c[0]+.7152*c[1]+.0722*c[2]; };
+  return (Math.max(light(a),light(b))+.05)/(Math.min(light(a),light(b))+.05);
+}
+test('startup restores all eight Studio presets from the matching account and keeps its palette snapshots consistent with Studio',t=>{
+ const h=startup(t),{window,document}=h;window.eval(readFileSync(new URL('../workspace-upgrades.js',import.meta.url),'utf8'));
+ const config=JSON.parse(document.getElementById('startupThemePresets').textContent),surfaces=new Set();
+ assert.deepEqual(Object.keys(config.themes),Object.keys(window.WorkHubAppearance.THEMES));
+ assert.deepEqual(config.backgrounds,Array.from(window.WorkHubAppearance.BACKGROUNDS,x=>x[0]));
+ for(const theme of Object.keys(config.themes)){
+  const p={workspace:'Saved '+theme,theme,accent:'#ff0000',background:'petals',font:'serif',radius:24};
+  window.localStorage.setItem(cacheKey('owner'),storedAppearance(p));window.WorkHubStartup.account(project,'owner');
+  const palette=window.WorkHubAppearance.palette(p,'Test'),get=key=>document.documentElement.style.getPropertyValue('--startup-'+key);
+  assert.equal(config.themes[theme].accent,palette.accent);assert.deepEqual(config.themes[theme],{accent:palette.accent,...JSON.parse(JSON.stringify(palette.colors))});
+  assert.equal(document.documentElement.dataset.startupTheme,theme);assert.equal(get('page'),palette.colors.page);assert.equal(get('surface'),palette.colors.surface);assert.equal(get('font'),'Georgia,serif');assert.equal(get('radius'),'24px');assert.equal(document.documentElement.dataset.startupBackground,'petals');surfaces.add(get('page'));
+ }
+ assert.equal(surfaces.size,8);
+});
+test('startup custom palettes preserve saved colours while keeping text, hints, links and active stages readable',t=>{
+ const {window,document}=startup(t),root=document.documentElement;
+ for(const p of [
+  {theme:'custom',accent:'#ffffff',colors:{page:'#ffffff',surface:'#fffdfb',text:'#ffffff',secondary:'#fffafa'}},
+  {theme:'custom',accent:'#101010',colors:{page:'#080808',surface:'#141414',text:'#151515',secondary:'#241836'}},
+  {theme:'custom',accent:'#ffeebb',colors:{page:'#faf5e8',surface:'#fff9f0',text:'#dddddd',secondary:'#7744a1'}},
+  {theme:'custom',accent:'#a8eaff',colors:{page:'#101820',surface:'#1d2630',text:'#17202a',secondary:'#8888cc'}},
+  {theme:'custom',accent:'#111111',colors:{page:'#777777',surface:'#808080',text:'#ffffff',secondary:'#44aaff'}},
+  {theme:'custom',accent:'#ffffff',colors:{page:'#777777',surface:'#707070',text:'#ffffff',secondary:'#ffffff'}},
+ ]){
+  window.localStorage.setItem(cacheKey('owner'),storedAppearance(p));window.WorkHubStartup.account(project,'owner');
+  const get=key=>root.style.getPropertyValue('--startup-'+key);assert.equal(root.dataset.startupTheme,'custom');assert.equal(get('page'),p.colors.page);assert.equal(get('surface'),p.colors.surface);
+  for(const foreground of ['text','muted','link','accent-color']) for(const bg of ['surface','surface-soft','surface-alt']) assert.ok(startupContrast(get(foreground),get(bg))>=4.5,foreground+' on '+bg);
+  assert.ok(startupContrast(get('active-text'),get('active-surface'))>=4.5);assert.ok(startupContrast(get('art-accent'),get('art-surface'))>=3);
+ }
+});
+test('startup palette rejects corrupt or unsafe cached colours and resets colours when the account changes',t=>{
+ const {window,document}=startup(t),root=document.documentElement;
+ window.localStorage.setItem(cacheKey('owner'),storedAppearance({workspace:'My forest',theme:'forest',background:'grid'}));
+ window.WorkHubStartup.account(project,'owner');assert.equal(root.dataset.startupTheme,'forest');
+ window.WorkHubStartup.account(project,'unknown');assert.equal(root.dataset.startupTheme,'default');assert.equal(root.style.getPropertyValue('--startup-page'),'#081722');
+ for(const p of [{theme:'constructor'},{theme:'__proto__'},{theme:'custom',accent:'url(https://example.com/x)',colors:{page:'#000000',surface:'#ffffff',text:'#111111',secondary:'#444444'}},{theme:'custom',accent:'#112233',colors:{page:'red',surface:'#ffffff',text:'#111111',secondary:'#444444'}}]){
+  window.localStorage.setItem(cacheKey('owner'),storedAppearance(p));window.WorkHubStartup.account(project,'owner');assert.equal(root.dataset.startupTheme,'default');assert.ok(!root.getAttribute('style').includes('url('));
+ }
+ window.localStorage.setItem(cacheKey('owner'),'{corrupt');window.WorkHubStartup.account(project,'owner');assert.equal(root.dataset.startupTheme,'default');
+});
+test('startup theme changes preserve the live animation markup and clear only loading colours after the immediate reveal',t=>{
+ const {window,document,timers}=startup(t),scene=document.querySelector('.startup-scene'),root=document.documentElement;
+ root.style.setProperty('--hub-accent','#abcdef');const stored=JSON.stringify(Object.fromEntries(Object.keys(window.localStorage).map(key=>[key,window.localStorage.getItem(key)])));
+ window.WorkHubStartup.appearance({theme:'rose',background:'plain'});assert.equal(document.querySelector('.startup-scene'),scene);assert.equal(root.dataset.startupTheme,'rose');
+ assert.equal(JSON.stringify(Object.fromEntries(Object.keys(window.localStorage).map(key=>[key,window.localStorage.getItem(key)]))),stored);
+ window.WorkHubStartup.phase('records','Opening records…');assert.equal(root.dataset.startupTheme,'rose');assert.equal(root.style.getPropertyValue('--startup-page'),'#fcf1f5');
+ window.WorkHubStartup.finish();assert.equal(root.hasAttribute('data-workhub-startup'),false);assert.equal(document.getElementById('workhubStartup').classList.contains('is-leaving'),true);
+ [...timers.values()].find(timer=>timer.delay===220).callback();assert.equal(root.hasAttribute('data-startup-theme'),false);assert.equal(root.style.getPropertyValue('--startup-page'),'');assert.equal(root.style.getPropertyValue('--hub-accent'),'#abcdef');
+ window.WorkHubStartup.appearance({theme:'forest'});assert.equal(root.hasAttribute('data-startup-theme'),false);
+});

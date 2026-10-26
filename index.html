@@ -19,46 +19,54 @@
     />
     <!-- Critical startup styles prevent the original markup flashing before assets load. -->
     <style>
-      html[data-workhub-startup] { background: #081722; }
+      html[data-workhub-startup] { background: var(--startup-page, #081722); }
       html[data-workhub-startup] body { overflow: hidden; }
       html[data-workhub-startup] body > :not(#workhubStartup):not(script):not(style) { visibility: hidden; pointer-events: none; }
       #workhubStartup {
+        --startup-accent: var(--startup-accent-color, #91e9df); --startup-soft: var(--startup-active-surface, #91e9df26);
         position: fixed; inset: 0; z-index: 2147483647; box-sizing: border-box;
         display: grid; place-items: center; overflow: auto; overscroll-behavior: contain;
         padding: max(24px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom));
-        background: radial-gradient(ellipse at 50% 43%, #173b4e 0, #0c2030 40%, #081722 76%);
-        color: #e8f6f8; font: 15px/1.6 system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background: radial-gradient(ellipse at 50% 43%, var(--startup-glow, #173b4e) 0, var(--startup-page-mid, #0c2030) 40%, var(--startup-page, #081722) 76%);
+        color: var(--startup-text, #e8f6f8); font: 15px/1.6 var(--startup-font, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif); color-scheme: var(--startup-color-scheme, dark);
         opacity: 1; transition: opacity 180ms ease;
       }
       #workhubStartup.is-leaving { opacity: 0; pointer-events: none; }
       #workhubStartup .startup-card {
-        --startup-accent: #91e9df; --startup-soft: #91e9df26;
         position: relative; box-sizing: border-box; isolation: isolate; width: min(100%, 650px);
-        margin: auto; padding: 24px 38px 22px; border: 1px solid #638b9b55; border-radius: 30px;
-        background: linear-gradient(155deg, #173546e8, #0c202fe8 60%, #17283be8);
-        box-shadow: 0 25px 80px #0004, inset 0 1px #d9f9ff12;
+        margin: auto; padding: 24px 38px 22px; border: 1px solid var(--startup-border, #638b9b55); border-radius: var(--startup-radius, 30px);
+        background: linear-gradient(155deg, var(--startup-surface, #173546e8), var(--startup-surface-soft, #0c202fe8) 60%, var(--startup-surface-alt, #17283be8));
+        box-shadow: 0 25px 80px var(--startup-shadow, #0004), inset 0 1px var(--startup-grid, #d9f9ff12);
         text-align: center; overflow: hidden; overflow-wrap: anywhere;
         animation: startup-arrive 700ms cubic-bezier(.16,1,.3,1) both;
         transition: transform 180ms ease;
       }
       #workhubStartup .startup-card::before {
         content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-        background-image: linear-gradient(#b9ecff05 1px, transparent 1px), linear-gradient(90deg, #b9ecff05 1px, transparent 1px);
+        background-image: linear-gradient(var(--startup-grid, #b9ecff05) 1px, transparent 1px), linear-gradient(90deg, var(--startup-grid, #b9ecff05) 1px, transparent 1px);
         background-size: 36px 36px;
       }
+      html[data-startup-background='plain'] #workhubStartup .startup-card::before { background-image: none; }
+      html[data-startup-background='mist'] #workhubStartup .startup-card::before { background-image: radial-gradient(ellipse at 20% 15%, var(--startup-pattern), transparent 65%); background-size: 100% 100%; }
+      html[data-startup-background='blueprint'] #workhubStartup .startup-card::before { background-size: 28px 28px; }
+      html[data-startup-background='diagonal'] #workhubStartup .startup-card::before { background-image: repeating-linear-gradient(135deg, transparent 0 20px, var(--startup-pattern) 20px 21px); background-size: auto; }
+      html[data-startup-background='weave'] #workhubStartup .startup-card::before { background-size: 7px 7px; }
+      html[data-startup-background='honeycomb'] #workhubStartup .startup-card::before { background-image: linear-gradient(30deg, var(--startup-pattern) 12%, transparent 12.5%, transparent 87%, var(--startup-pattern) 87.5%), linear-gradient(150deg, var(--startup-pattern) 12%, transparent 12.5%, transparent 87%, var(--startup-pattern) 87.5%), linear-gradient(60deg, var(--startup-grid) 25%, transparent 25.5%, transparent 75%, var(--startup-grid) 75%); background-size: 48px 84px; }
+      html[data-startup-background='ripple'] #workhubStartup .startup-card::before { background-image: repeating-radial-gradient(ellipse at 20% 15%, transparent 0 25px, var(--startup-pattern) 26px 27px, transparent 28px 54px); background-size: auto; }
+      html[data-startup-background='confetti'] #workhubStartup .startup-card::before { background-image: radial-gradient(circle at 8px 9px, var(--startup-pattern) 1.8px, transparent 2px), radial-gradient(ellipse at 35px 36px, var(--startup-grid) 2px, transparent 2.5px); background-size: 66px 58px; }
+      html[data-startup-background='petals'] #workhubStartup .startup-card::before { background-image: radial-gradient(ellipse at 20px 16px, var(--startup-pattern) 0 4px, transparent 5px); background-size: 54px 48px; }
+      html:is([data-startup-background='night'],[data-startup-background='stars']) #workhubStartup .startup-card::before { background-image: radial-gradient(circle at 12px 16px, var(--startup-pattern) 1px, transparent 1.5px), radial-gradient(circle at 65px 43px, var(--startup-grid) 1.5px, transparent 2px); background-size: 94px 78px; }
       #workhubStartup .startup-card::after {
         content: ''; position: absolute; top: 0; left: 0; width: 35%; height: 2px;
-        background: linear-gradient(90deg, transparent, var(--startup-accent), #d8b8ff, transparent);
+        background: linear-gradient(90deg, transparent, var(--startup-accent), var(--startup-secondary, #d8b8ff), transparent);
         animation: startup-edge-light 4s ease-in-out infinite;
       }
-      html[data-startup-phase='account'] #workhubStartup .startup-card { --startup-accent: #c7b5ff; --startup-soft: #c7b5ff26; }
-      html[data-startup-phase='records'] #workhubStartup .startup-card { --startup-accent: #a3e5fe; --startup-soft: #a3e5fe26; }
       #workhubStartup.is-leaving .startup-card { transform: translateY(-10px) scale(1.01); }
-      #workhubStartup .startup-topline { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 25px; color: #abc5d2; font-size: 9px; letter-spacing: .13em; text-transform: uppercase; }
+      #workhubStartup .startup-topline { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 25px; color: var(--startup-muted, #abc5d2); font-size: 9px; letter-spacing: .13em; text-transform: uppercase; }
       #workhubStartup .startup-live { display: inline-flex; align-items: center; gap: 7px; }
       #workhubStartup .startup-live::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--startup-accent); box-shadow: 0 0 0 4px var(--startup-soft); animation: startup-beacon 2.4s ease-in-out infinite; }
-      #workhubStartup .startup-eyebrow { margin: 0 0 8px; color: #9fbac9; font-size: 9px; letter-spacing: .24em; }
-      #workhubStartup .startup-brand { margin: 0; color: #f2fcff; font-size: clamp(27px, 5.6vw, 39px); font-weight: 650; line-height: 1.18; letter-spacing: -.045em; animation: startup-name-arrive 850ms cubic-bezier(.16,1,.3,1) both; }
+      #workhubStartup .startup-eyebrow { margin: 0 0 8px; color: var(--startup-muted, #9fbac9); font-size: 9px; letter-spacing: .24em; }
+      #workhubStartup .startup-brand { margin: 0; color: var(--startup-text, #f2fcff); font-size: clamp(27px, 5.6vw, 39px); font-weight: 650; line-height: 1.18; letter-spacing: -.045em; animation: startup-name-arrive 850ms cubic-bezier(.16,1,.3,1) both; }
       #workhubStartup .startup-scene { position: relative; width: 100%; margin: -2px auto -4px; }
       #workhubStartup .startup-art { display: block; width: 100%; height: auto; overflow: visible; }
       #workhubStartup .startup-orbit { transform-origin: 280px 146px; animation: startup-orbit 22s linear infinite; }
@@ -81,28 +89,28 @@
       #workhubStartup .startup-beam { transform-origin: 280px 240px; animation: startup-beam 4.5s ease-in-out infinite; }
       #workhubStartup .startup-floor { transform-origin: 280px 252px; animation: startup-floor 5s ease-in-out infinite; }
       #workhubStartup .startup-tap-wave { transform-origin: 280px 146px; opacity: 0; }
-      #workhubStartup .startup-spark-button { position: absolute; left: 50%; top: 48.6667%; width: 22%; aspect-ratio: 1; transform: translate(-50%,-50%); padding: 0; border: 0; border-radius: 30%; background: transparent; cursor: pointer; color: #d9f6f9; touch-action: manipulation; }
-      #workhubStartup .startup-spark-button:hover { background: #9defff0c; }
-      #workhubStartup .startup-spark-button:focus-visible { outline: 2px solid #c9faff; outline-offset: 4px; }
-      #workhubStartup .startup-touch-hint { margin: -16px 0 13px; color: #a4becb; font-size: 10px; letter-spacing: .035em; }
+      #workhubStartup .startup-spark-button { position: absolute; left: 50%; top: 48.6667%; width: 22%; aspect-ratio: 1; transform: translate(-50%,-50%); padding: 0; border: 0; border-radius: 30%; background: transparent; cursor: pointer; color: var(--startup-text, #d9f6f9); touch-action: manipulation; }
+      #workhubStartup .startup-spark-button:hover { background: var(--startup-hover, #9defff0c); }
+      #workhubStartup .startup-spark-button:focus-visible { outline: 2px solid var(--startup-accent, #c9faff); outline-offset: 4px; }
+      #workhubStartup .startup-touch-hint { margin: -16px 0 13px; color: var(--startup-muted, #a4becb); font-size: 10px; letter-spacing: .035em; }
       #workhubStartup .is-sparked .startup-tap-wave { animation: startup-tap-wave 900ms ease-out both; }
       #workhubStartup .is-sparked .startup-core { animation: startup-tap 700ms ease-out; }
-      #workhubStartup h1 { margin: 0 0 7px; color: #effaff; font-size: clamp(19px, 4.4vw, 24px); font-weight: 550; letter-spacing: -.035em; line-height: 1.3; }
-      #workhubStartupStatus { min-height: 45px; max-width: 420px; margin: 0 auto; color: #b8ced9; font-size: 13px; line-height: 1.7; }
-      #workhubStartup .startup-stages { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 9px; padding: 0; margin: 19px 0 13px; list-style: none; color: #94aebe; font-size: 11px; text-align: left; }
-      #workhubStartup .startup-stages li { display: flex; align-items: center; gap: 8px; position: relative; min-width: 0; padding: 11px 10px; border: 1px solid #64819840; border-radius: 11px; background: #06172238; transition: color .25s, background-color .25s, border-color .25s; }
-      #workhubStartup .startup-stage-icon { position: relative; display: grid; place-items: center; flex: 0 0 19px; width: 19px; height: 19px; font-size: 9px; color: inherit; border: 1px solid #738b9b70; border-radius: 50%; }
-      #workhubStartup .startup-stages li[data-state='active'] { color: #e8fbff; background: var(--startup-soft); border-color: var(--startup-accent); }
+      #workhubStartup h1 { margin: 0 0 7px; color: var(--startup-text, #effaff); font-size: clamp(19px, 4.4vw, 24px); font-weight: 550; letter-spacing: -.035em; line-height: 1.3; }
+      #workhubStartupStatus { min-height: 45px; max-width: 420px; margin: 0 auto; color: var(--startup-muted, #b8ced9); font-size: 13px; line-height: 1.7; }
+      #workhubStartup .startup-stages { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 9px; padding: 0; margin: 19px 0 13px; list-style: none; color: var(--startup-muted, #94aebe); font-size: 11px; text-align: left; }
+      #workhubStartup .startup-stages li { display: flex; align-items: center; gap: 8px; position: relative; min-width: 0; padding: 11px 10px; border: 1px solid var(--startup-border, #64819840); border-radius: 11px; background: var(--startup-inset, #06172238); transition: color .25s, background-color .25s, border-color .25s; }
+      #workhubStartup .startup-stage-icon { position: relative; display: grid; place-items: center; flex: 0 0 19px; width: 19px; height: 19px; font-size: 9px; color: inherit; border: 1px solid var(--startup-border, #738b9b70); border-radius: 50%; }
+      #workhubStartup .startup-stages li[data-state='active'] { color: var(--startup-active-text, #e8fbff); background: var(--startup-soft); border-color: var(--startup-accent); }
       #workhubStartup .startup-stages li[data-state='active'] .startup-stage-icon::after { content: ''; position: absolute; inset: -3px; border: 1px solid transparent; border-top-color: var(--startup-accent); border-right-color: var(--startup-accent); border-radius: 50%; animation: startup-orbit 1.8s linear infinite; }
-      #workhubStartup .startup-stages li[data-state='done'] { color: #b7e1d4; }
-      #workhubStartup .startup-stages li[data-state='done'] .startup-stage-icon { color: transparent; border-color: #99d3bc; background: #99d3bc14; }
-      #workhubStartup .startup-stages li[data-state='done'] .startup-stage-icon::after { content: '✓'; position: absolute; color: #b5e9d1; font-size: 12px; }
-      #workhubStartup .startup-progress { height: 3px; margin: 0 3px 18px; background: #68869b38; overflow: hidden; border-radius: 3px; }
-      #workhubStartup .startup-progress i { display: block; height: 100%; width: 28%; border-radius: 3px; background: linear-gradient(90deg, transparent, var(--startup-accent), #e9fcff, var(--startup-accent)); animation: startup-progress 2.7s ease-in-out infinite; }
-      #workhubStartup .startup-recovery { margin: 0; color: #9cb5c4; font-size: 11px; }
-      #workhubStartup a { display: inline-block; padding: 7px 3px; color: #d7f2ee; text-decoration: underline; text-underline-offset: 3px; }
-      #workhubStartup a:focus-visible { outline: 2px solid #9de9e1; outline-offset: 3px; border-radius: 4px; }
-      #workhubStartup noscript p { margin: 12px 0 0; color: #ffd8b5; }
+      #workhubStartup .startup-stages li[data-state='done'] { color: var(--startup-done, #b7e1d4); }
+      #workhubStartup .startup-stages li[data-state='done'] .startup-stage-icon { color: transparent; border-color: var(--startup-done, #99d3bc); background: var(--startup-done-surface, #99d3bc14); }
+      #workhubStartup .startup-stages li[data-state='done'] .startup-stage-icon::after { content: '✓'; position: absolute; color: var(--startup-done, #b5e9d1); font-size: 12px; }
+      #workhubStartup .startup-progress { height: 3px; margin: 0 3px 18px; background: var(--startup-track, #68869b38); overflow: hidden; border-radius: 3px; }
+      #workhubStartup .startup-progress i { display: block; height: 100%; width: 28%; border-radius: 3px; background: linear-gradient(90deg, transparent, var(--startup-accent), var(--startup-progress-light, #e9fcff), var(--startup-accent)); animation: startup-progress 2.7s ease-in-out infinite; }
+      #workhubStartup .startup-recovery { margin: 0; color: var(--startup-muted, #9cb5c4); font-size: 11px; }
+      #workhubStartup a { display: inline-block; padding: 7px 3px; color: var(--startup-link, #d7f2ee); text-decoration: underline; text-underline-offset: 3px; }
+      #workhubStartup a:focus-visible { outline: 2px solid var(--startup-accent, #9de9e1); outline-offset: 3px; border-radius: 4px; }
+      #workhubStartup noscript p { margin: 12px 0 0; color: var(--startup-text, #ffd8b5); }
       @keyframes startup-arrive { from { opacity: 0; transform: translateY(20px) scale(.97); } to { opacity: 1; transform: none; } }
       @keyframes startup-name-arrive { from { opacity: 0; transform: translateY(10px); letter-spacing: .01em; } to { opacity: 1; transform: none; letter-spacing: -.045em; } }
       @keyframes startup-edge-light { 0%,100% { transform: translateX(-100%); opacity: .2; } 50% { transform: translateX(285%); opacity: 1; } }
@@ -124,7 +132,7 @@
       @keyframes startup-tap { 0% { transform: scale(1) rotate(0); } 35% { transform: scale(1.16) rotate(18deg); } 100% { transform: scale(1) rotate(0); } }
       @media (max-width: 520px) {
         #workhubStartup { padding-left: 14px; padding-right: 14px; }
-        #workhubStartup .startup-card { padding: 20px 20px 18px; border-radius: 24px; }
+        #workhubStartup .startup-card { padding: 20px 20px 18px; border-radius: var(--startup-radius, 24px); }
         #workhubStartup .startup-topline { font-size: 8px; margin-bottom: 22px; }
         #workhubStartup .startup-topline > span:last-child { display: none; }
         #workhubStartup .startup-scene { width: calc(100% + 24px); margin-left: -12px; }
@@ -157,7 +165,84 @@
         "publishableKey": "sb_publishable_fIP1yvDt7MQf8BO7HPl3Cg_j_N8An13"
       }
     </script>
-    <script src="./startup.js?v=20261027-cinematic-startup-1"></script>
+    <!-- Palette snapshots for the critical loading cover; checked against Studio presets. -->
+    <script id="startupThemePresets" type="application/json">
+      {
+        "themes": {
+          "ocean": {
+            "accent": "#2563eb",
+            "page": "#f8f7f2",
+            "surface": "#fffefa",
+            "text": "#243449",
+            "secondary": "#7ca89c"
+          },
+          "forest": {
+            "accent": "#16856d",
+            "page": "#f2f6ef",
+            "surface": "#fefffb",
+            "text": "#253b33",
+            "secondary": "#7a9e68"
+          },
+          "sunset": {
+            "accent": "#bf4c39",
+            "page": "#fcf5ef",
+            "surface": "#fffdf9",
+            "text": "#4a332d",
+            "secondary": "#c48278"
+          },
+          "lavender": {
+            "accent": "#7955b5",
+            "page": "#f6f2fc",
+            "surface": "#fffdfd",
+            "text": "#392d50",
+            "secondary": "#a48ac7"
+          },
+          "rose": {
+            "accent": "#b14373",
+            "page": "#fcf1f5",
+            "surface": "#fffdfb",
+            "text": "#4a2e3c",
+            "secondary": "#bd7b98"
+          },
+          "lagoon": {
+            "accent": "#087f92",
+            "page": "#eef8f7",
+            "surface": "#fcfffc",
+            "text": "#224449",
+            "secondary": "#66a8a5"
+          },
+          "amber": {
+            "accent": "#986218",
+            "page": "#fbf5e8",
+            "surface": "#fffdf6",
+            "text": "#4d3b27",
+            "secondary": "#baa05f"
+          },
+          "dark": {
+            "accent": "#78abff",
+            "page": "#182431",
+            "surface": "#233443",
+            "text": "#eef6fb",
+            "secondary": "#849bbc"
+          }
+        },
+        "backgrounds": [
+          "mist",
+          "plain",
+          "grid",
+          "night",
+          "diagonal",
+          "weave",
+          "honeycomb",
+          "ripple",
+          "confetti",
+          "blueprint",
+          "petals",
+          "stars"
+        ]
+      }
+    </script>
+    <script src="./startup.js?v=20261027-saved-theme-1"></script>
     <script src="./render-profile.js?v=20261025-companion-2"></script>
     <!-- Shared foundation first; feature styles follow; custom.css is your editing space. -->
     <link rel="stylesheet" href="./base.css?v=20261021-schedule-items-letter-1" />
@@ -231,9 +316,9 @@
                 y2="230"
                 gradientUnits="userSpaceOnUse"
               >
-                <stop stop-color="#b6fff1" />
-                <stop offset=".5" stop-color="#7dcced" />
-                <stop offset="1" stop-color="#c6adfa" />
+                <stop stop-color="var(--startup-art-accent, #b6fff1)" />
+                <stop offset=".5" stop-color="var(--startup-art-accent, #7dcced)" />
+                <stop offset="1" stop-color="var(--startup-secondary, #c6adfa)" />
               </linearGradient>
               <linearGradient
                 id="startupCoreInk"
@@ -243,9 +328,9 @@
                 y2="194"
                 gradientUnits="userSpaceOnUse"
               >
-                <stop stop-color="#e4fff9" />
-                <stop offset=".5" stop-color="#94e6e0" />
-                <stop offset="1" stop-color="#97baed" />
+                <stop stop-color="var(--startup-star-light, #e4fff9)" />
+                <stop offset=".5" stop-color="var(--startup-art-accent, #94e6e0)" />
+                <stop offset="1" stop-color="var(--startup-secondary, #97baed)" />
               </linearGradient>
               <linearGradient
                 id="startupBeamInk"
@@ -255,18 +340,22 @@
                 y2="253"
                 gradientUnits="userSpaceOnUse"
               >
-                <stop stop-color="#80e8e4" stop-opacity="0" />
-                <stop offset=".7" stop-color="#80e8e4" stop-opacity=".18" />
-                <stop offset="1" stop-color="#80e8e4" stop-opacity="0" />
+                <stop stop-color="var(--startup-art-accent, #80e8e4)" stop-opacity="0" />
+                <stop
+                  offset=".7"
+                  stop-color="var(--startup-art-accent, #80e8e4)"
+                  stop-opacity=".18"
+                />
+                <stop offset="1" stop-color="var(--startup-art-accent, #80e8e4)" stop-opacity="0" />
               </linearGradient>
             </defs>
-            <g stroke="#86c0d6" stroke-opacity=".12" stroke-width="1">
+            <g stroke="var(--startup-art-line, #86c0d6)" stroke-opacity=".12" stroke-width="1">
               <path
                 d="M62 254h436M97 266h366M164 279h232M280 225 150 280m130-55-66 55m66-55 66 55m-66-55 130 55"
               />
               <path d="M100 70h22m-11-11v22m345 129h18m-9-9v18" />
             </g>
-            <g class="startup-floor" stroke="#88dadd">
+            <g class="startup-floor" stroke="var(--startup-art-accent, #88dadd)">
               <ellipse cx="280" cy="252" rx="112" ry="19" stroke-opacity=".24" />
               <ellipse cx="280" cy="252" rx="77" ry="12" stroke-opacity=".35" />
               <ellipse
@@ -274,16 +363,24 @@
                 cy="252"
                 rx="39"
                 ry="5"
-                fill="#8fe4df"
+                fill="var(--startup-art-accent, #8fe4df)"
                 fill-opacity=".12"
                 stroke-opacity=".35"
               />
             </g>
             <path class="startup-beam" d="M239 171h82l29 82H210Z" fill="url(#startupBeamInk)" />
-            <g class="startup-flow" stroke="#9fddd5" stroke-opacity=".45">
+            <g
+              class="startup-flow"
+              stroke="var(--startup-art-accent, #9fddd5)"
+              stroke-opacity=".45"
+            >
               <path d="M113 164q63 49 116-10m102 9q60 44 119-17M280 91q54-55 132-28" />
             </g>
-            <g class="startup-orbit third" stroke="#82c9df" stroke-opacity=".2">
+            <g
+              class="startup-orbit third"
+              stroke="var(--startup-art-line, #82c9df)"
+              stroke-opacity=".2"
+            >
               <circle cx="280" cy="146" r="121" stroke-dasharray="2 12" />
               <path d="M280 19v9m127 118h-9M280 273v-9m-127-118h9" />
             </g>
@@ -307,8 +404,14 @@
                 stroke="url(#startupOrbitInk)"
                 stroke-width="2"
               />
-              <circle cx="137" cy="176" r="4" fill="#a2f2e3" />
-              <circle cx="137" cy="176" r="8" stroke="#a2f2e3" stroke-opacity=".3" />
+              <circle cx="137" cy="176" r="4" fill="var(--startup-art-accent, #a2f2e3)" />
+              <circle
+                cx="137"
+                cy="176"
+                r="8"
+                stroke="var(--startup-art-accent, #a2f2e3)"
+                stroke-opacity=".3"
+              />
             </g>
             <g class="startup-orbit second">
               <ellipse
@@ -317,7 +420,7 @@
                 rx="142"
                 ry="91"
                 transform="rotate(43 280 146)"
-                stroke="#c3b1ed"
+                stroke="var(--startup-secondary, #c3b1ed)"
                 stroke-opacity=".2"
               />
               <ellipse
@@ -327,17 +430,17 @@
                 rx="142"
                 ry="91"
                 transform="rotate(43 280 146)"
-                stroke="#c7b5fa"
+                stroke="var(--startup-secondary, #c7b5fa)"
                 stroke-width="1.5"
               />
-              <circle cx="385" cy="242" r="3" fill="#cfb9f7" />
+              <circle cx="385" cy="242" r="3" fill="var(--startup-secondary, #cfb9f7)" />
             </g>
             <circle
               class="startup-tap-wave"
               cx="280"
               cy="146"
               r="66"
-              stroke="#b5f7eb"
+              stroke="var(--startup-art-accent, #b5f7eb)"
               stroke-width="1.5"
             />
             <g class="startup-mark">
@@ -348,8 +451,8 @@
                 height="112"
                 rx="31"
                 transform="rotate(-7 280 146)"
-                fill="#103345"
-                stroke="#93e9e2"
+                fill="var(--startup-art-surface, #103345)"
+                stroke="var(--startup-art-accent, #93e9e2)"
                 stroke-opacity=".32"
               />
               <rect
@@ -359,8 +462,8 @@
                 height="98"
                 rx="25"
                 transform="rotate(5 280 146)"
-                fill="#153c4e"
-                stroke="#d0f8f4"
+                fill="var(--startup-art-alt, #153c4e)"
+                stroke="var(--startup-art-line, #d0f8f4)"
                 stroke-opacity=".25"
               />
               <g class="startup-core">
@@ -371,12 +474,12 @@
                 <path
                   class="startup-heart"
                   d="m280 126 5.5 14.5L300 146l-14.5 5.5L280 166l-5.5-14.5L260 146l14.5-5.5Z"
-                  fill="#f1fffa"
+                  fill="var(--startup-star-heart, #f1fffa)"
                 />
               </g>
               <path
                 d="M246 108h10m-10 5h5m49 64h13m-8 5h8"
-                stroke="#c4edea"
+                stroke="var(--startup-art-line, #c4edea)"
                 stroke-opacity=".45"
                 stroke-linecap="round"
               />
@@ -388,8 +491,8 @@
                 width="77"
                 height="88"
                 rx="12"
-                fill="#173748"
-                stroke="#9ed8d0"
+                fill="var(--startup-art-surface, #173748)"
+                stroke="var(--startup-art-accent, #9ed8d0)"
                 stroke-opacity=".6"
               />
               <rect
@@ -398,24 +501,24 @@
                 width="28"
                 height="28"
                 rx="8"
-                fill="#a5e7d7"
+                fill="var(--startup-art-accent, #a5e7d7)"
                 fill-opacity=".15"
               />
               <path
                 class="startup-check"
                 d="m75 133 5 5 10-12"
-                stroke="#bbf5df"
+                stroke="var(--startup-art-line, #bbf5df)"
                 stroke-width="2.5"
                 stroke-linecap="round"
                 stroke-linejoin="round"
               />
               <path
                 d="M69 160h52m-52 8h38m-38 8h27"
-                stroke="#99b9c8"
+                stroke="var(--startup-art-line, #99b9c8)"
                 stroke-width="2"
                 stroke-linecap="round"
               />
-              <circle cx="118" cy="130" r="3" fill="#c7b4e9" />
+              <circle cx="118" cy="130" r="3" fill="var(--startup-secondary, #c7b4e9)" />
             </g>
             <g class="startup-task second">
               <rect
@@ -424,26 +527,26 @@
                 width="78"
                 height="91"
                 rx="12"
-                fill="#263447"
-                stroke="#b7c2ee"
+                fill="var(--startup-art-alt, #263447)"
+                stroke="var(--startup-secondary, #b7c2ee)"
                 stroke-opacity=".6"
               />
               <path
                 d="M435 142h36l13 13v45h-49Z"
-                fill="#3b4860"
-                stroke="#b9c7e9"
+                fill="var(--startup-art-surface, #3b4860)"
+                stroke="var(--startup-secondary, #b9c7e9)"
                 stroke-opacity=".5"
               />
               <path
                 d="M471 142v13h13M444 165h29m-29 8h29m-29 8h18"
-                stroke="#d0d9f0"
+                stroke="var(--startup-art-line, #d0d9f0)"
                 stroke-width="1.5"
                 stroke-linecap="round"
               />
               <path
                 class="startup-page"
                 d="M450 151q-14-10-25-5v40q14-1 25 8Z"
-                fill="#a8c7e4"
+                fill="var(--startup-secondary, #a8c7e4)"
                 fill-opacity=".75"
               />
             </g>
@@ -454,17 +557,17 @@
                 width="53"
                 height="47"
                 rx="9"
-                fill="#253c4d"
-                stroke="#b0cde2"
+                fill="var(--startup-art-surface, #253c4d)"
+                stroke="var(--startup-art-line, #b0cde2)"
                 stroke-opacity=".5"
               />
               <path
                 d="M398 48h53m-40-18v9m26-9v9"
-                stroke="#c2dfeb"
+                stroke="var(--startup-art-line, #c2dfeb)"
                 stroke-opacity=".65"
                 stroke-linecap="round"
               />
-              <g fill="#acd6d9">
+              <g fill="var(--startup-art-accent, #acd6d9)">
                 <rect x="409" y="56" width="6" height="6" rx="2" />
                 <rect x="422" y="56" width="6" height="6" rx="2" />
                 <rect x="435" y="56" width="6" height="6" rx="2" />
@@ -472,13 +575,13 @@
               </g>
               <path
                 d="m423 70 3 3 7-8"
-                stroke="#d2f4df"
+                stroke="var(--startup-art-line, #d2f4df)"
                 stroke-width="1.5"
                 stroke-linecap="round"
                 stroke-linejoin="round"
               />
             </g>
-            <g fill="#badfe7">
+            <g fill="var(--startup-art-accent, #badfe7)">
               <path class="startup-spark" d="m178 53 2 6 6 2-6 2-2 6-2-6-6-2 6-2Z" />
               <path class="startup-spark" d="m374 171 2 5 5 2-5 2-2 5-2-5-5-2 5-2Z" />
               <path
@@ -757,7 +860,7 @@
     <script src="./my-day.js?v=20261024-performance-1"></script>
     <script src="./brand-motion.js?v=20261026-workspace-6"></script>
     <script src="./workspace-reset.js?v=20261026-workspace-6"></script>
-    <script src="./studio.js?v=20261026-task-company-theme-1"></script>
+    <script src="./studio.js?v=20261027-saved-theme-1"></script>
     <!-- Empty starter records and default lists; this is not your saved account data. -->
     <script id="seedData" type="application/json">
       {

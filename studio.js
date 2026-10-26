@@ -857,7 +857,10 @@
           title.textContent = prefs().workspace;
         }
         root.WorkHubBrandMotion?.mount(brand, title, () => a.navigate('home'));
-        if (a.cloud().ready) root.WorkHubStartup?.name(prefs().workspace);
+        if (a.cloud().ready) {
+          root.WorkHubStartup?.name(prefs().workspace);
+          root.WorkHubStartup?.appearance(prefs());
+        }
         $('hubSiteSubtitle').textContent = data().headerSubtitle || '';
         if (a.cloud().ready || !document.documentElement.hasAttribute('data-workhub-startup'))
           document.title = prefs().workspace;
