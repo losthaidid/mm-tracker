@@ -2989,3 +2989,70 @@ test('Workspace reset clears every cloud collection using the actual account ada
  const backup=api.parseBackup(await downloaded[0].text());assert.equal(backup.tickets.length,1);assert.equal(backup.tasks.length,1);assert.equal(db.row.document.data.tickets.length,0);assert.equal(db.row.document.data.tasks.length,0);assert.equal(document.getElementById('modal').open,false);
  const reopened=await app(t,{remote:copy(db.row),login:false});await reopened.api.loadCloud(sessionUser);assert.equal(reopened.api.state().tasks.length,0);assert.equal(reopened.api.state().tickets.length,0);
 });
+
+function taskCompanyFixture(api) {
+ const projectId=api.state().activeProjectId;
+ api.mutate(d=>{
+  d.projects.push({...copy(d.projects[0]),id:'task-other-project',name:'Other project'});
+  d.projectCompanies.push(
+   {id:'task-company-a',projectId,name:'Company Alpha',role:'',active:true},
+   {id:'task-company-b',projectId,name:'Company Beta',role:'',active:true},
+   {id:'task-company-inactive',projectId,name:'Retired company',role:'',active:false},
+   {id:'task-company-other',projectId:'task-other-project',name:'Other project company',role:'',active:true}
+  );
+ });
+ return projectId;
+}
+function chooseTaskProject(ctx,projectId,companyId='') {
+ const {api,document,window}=ctx;
+ api.editRecord('tasks');const form=document.getElementById('editForm');
+ fill(form,{task:'Company-specific task',taskType:'Project'});
+ form.elements.namedItem('taskType').dispatchEvent(new window.Event('change',{bubbles:true}));
+ form.elements.namedItem('projectLink').value=projectId;
+ form.elements.namedItem('projectLink').dispatchEvent(new window.Event('change',{bubbles:true}));
+ if(companyId)form.elements.namedItem('companyId').value=companyId;
+ return form;
+}
+test('Task companies: selected project scopes active choices and changing project/type clears company without saving',async t=>{
+ const ctx=await app(t),{api,document,window,db}=ctx,pid=taskCompanyFixture(api);await settle();const calls=db.calls.length;
+ api.editRecord('tasks');let f=document.getElementById('editForm');assert.equal(document.getElementById('taskCompany').closest('[data-task-link]').hidden,true);
+ f=chooseTaskProject(ctx,pid,'task-company-a');let select=f.elements.namedItem('companyId');assert.deepEqual([...select.options].map(o=>o.value),['','task-company-a','task-company-b']);assert.equal(select.disabled,false);
+ f.elements.namedItem('projectLink').value='task-other-project';f.elements.namedItem('projectLink').dispatchEvent(new window.Event('change',{bubbles:true}));assert.equal(select.value,'');assert.deepEqual([...select.options].map(o=>o.value),['','task-company-other']);
+ select.value='task-company-other';f.elements.namedItem('taskType').value='Ticket';f.elements.namedItem('taskType').dispatchEvent(new window.Event('change',{bubbles:true}));assert.equal(select.value,'');assert.equal(select.closest('[data-task-link]').hidden,true);
+ f.elements.namedItem('taskType').value='Project';f.elements.namedItem('taskType').dispatchEvent(new window.Event('change',{bubbles:true}));assert.equal(select.value,'');await settle();assert.equal(db.calls.length,calls);
+});
+test('Task companies: saved assignment survives inactivity, cannot be assigned to another task, and active company is rechecked on save',async t=>{
+ const ctx=await app(t),{api,document,window}=ctx,pid=taskCompanyFixture(api);let f=chooseTaskProject(ctx,pid,'task-company-a');api.saveEdit(f);const id=api.state().tasks.at(-1).id;
+ api.editCompany('task-company-a');f=document.getElementById('companyForm');assert.equal(f.elements.namedItem('active').checked,true);f.elements.namedItem('active').checked=false;api.saveCompany(f);assert.equal(api.state().tasks.at(-1).companyId,'task-company-a');
+ api.editRecord('tasks',id);f=document.getElementById('editForm');assert.equal(f.elements.namedItem('companyId').value,'task-company-a');assert.equal(f.elements.namedItem('companyId').selectedOptions[0].disabled,true);api.saveEdit(f);assert.equal(api.state().tasks.at(-1).companyId,'task-company-a');
+ f=chooseTaskProject(ctx,pid);assert.equal([...f.elements.namedItem('companyId').options].some(o=>o.value==='task-company-a'),false);
+ const option=document.createElement('option');option.value='task-company-inactive';f.elements.namedItem('companyId').append(option);f.elements.namedItem('companyId').value=option.value;assert.throws(()=>api.saveEdit(f),/active company/);
+ option.value='task-company-other';f.elements.namedItem('companyId').value=option.value;assert.throws(()=>api.saveEdit(f),/active company/);
+ f=chooseTaskProject(ctx,pid,'task-company-b');api.mutate(d=>{d.projectCompanies.find(c=>c.id==='task-company-b').active=false;});assert.throws(()=>api.saveEdit(f),/active company/);
+});
+test('Task references: add/remove rows preserve unsaved form, escape labels, search, open safely, export and reopen from cloud',async t=>{
+ const ctx=await app(t),{api,document,window,db}=ctx,pid=taskCompanyFixture(api);let f=chooseTaskProject(ctx,pid,'task-company-a');
+ fill(f,{referenceLabel:'Notes <img src=x>',referenceUrl:'https://example.com/notes?a=1&b=2'});
+ await api.action(f.querySelector('[data-action="task-reference-add"]'));const rows=f.querySelectorAll('[data-task-reference]');rows[1].querySelector('[name="referenceUrl"]').value='https://example.org/checklist';assert.equal(f.elements.namedItem('task').value,'Company-specific task');
+ api.saveEdit(f);await settle();const saved=copy(api.state().tasks.at(-1));assert.equal(saved.references.length,2);api.hub.setBoard(false);api.showTab('tasks');let card=document.querySelector('.task-main-card');assert.match(card.textContent,/Company Alpha/);assert.equal(card.querySelector('.task-website-references img'),null);const link=card.querySelector('.task-website-references a');assert.equal(link.target,'_blank');assert.equal(link.rel,'noopener noreferrer');assert.equal(link.getAttribute('href'),saved.references[0].url);
+ let search=document.getElementById('tasksSearch');assert.ok(search);search.value='example.org';search.dispatchEvent(new window.Event('input',{bubbles:true}));assert.equal(document.querySelectorAll('.task-main-card').length,1);search=document.getElementById('tasksSearch');search.value='Company Alpha';search.dispatchEvent(new window.Event('input',{bubbles:true}));assert.equal(document.querySelectorAll('.task-main-card').length,1);
+ api.hub.setBoard(true);api.showTab('tasks');assert.equal(document.querySelectorAll('.hub-task .task-website-references a').length,2);await hubAction(api,'task-detail',{id:saved.id});assert.equal(document.querySelectorAll('.hub-detail .task-website-references a').length,2);
+ api.editRecord('tasks',saved.id);f=document.getElementById('editForm');assert.equal(f.querySelector('[name="referenceLabel"]').value,saved.references[0].label);await api.action(f.querySelectorAll('[data-action="task-reference-remove"]')[1]);api.saveEdit(f);assert.equal(api.state().tasks.at(-1).references.length,1);assert.equal(api.state().tasks.at(-1).references[0].id,saved.references[0].id);await settle();
+ const backup=api.parseBackup(api.payload(api.state()));assert.equal(backup.tasks.at(-1).references[0].url,saved.references[0].url);const report=window.WorkHubReports.build(api.state(),{asOf:'2026-10-26'}).sheets.find(s=>s.name==='Tasks');assert.ok(report.rows.some(row=>row.values.includes('Company Alpha')&&row.values.some(v=>String(v).includes('https://example.com/notes'))));
+ const reopened=await app(t,{remote:copy(db.row),login:false});await reopened.api.loadCloud(sessionUser);assert.equal(reopened.api.state().tasks.at(-1).companyId,'task-company-a');assert.equal(reopened.api.state().tasks.at(-1).references[0].url,saved.references[0].url);
+});
+test('Task references: web-only validation rejects unsafe or incomplete links and oversized collections without writes',async t=>{
+ const {api,document,db}=await app(t);api.editRecord('tasks');const f=document.getElementById('editForm');fill(f,{task:'Safe links',referenceLabel:'Label only'});assert.throws(()=>api.saveEdit(f),/http or https/);assert.equal(api.state().tasks.length,0);
+ for(const url of ['javascript:alert(1)','data:text/html,test','file:///secret','https://','https://example.com/ bad','https://example.com/\nunsafe']){f.elements.namedItem('referenceUrl').value=url;if(url.includes('\n'))continue;assert.throws(()=>api.saveEdit(f),/http or https/);}
+ fill(f,{referenceLabel:'',referenceUrl:''});api.saveEdit(f);await settle();assert.equal(api.state().tasks[0].references.length,0);const before=api.payload(api.state()),calls=db.calls.length;
+ const bad=copy(api.state());bad.tasks[0].references=[{id:'r',label:'',url:'javascript:alert(1)'}];assert.throws(()=>api.validate(bad),/http or https/);bad.tasks[0].references=Array.from({length:21},(_,i)=>({id:'r'+i,label:'',url:'https://example.com'}));assert.throws(()=>api.validate(bad),/20 website/);assert.equal(api.payload(api.state()).split('"data":')[1],before.split('"data":')[1]);assert.equal(db.calls.length,calls);
+});
+test('Task companies: deleting company or project unlinks only company assignment and preserves task references',async t=>{
+ const ctx=await app(t),{api,document}=ctx,pid=taskCompanyFixture(api);let f=chooseTaskProject(ctx,pid,'task-company-a');fill(f,{referenceUrl:'https://example.com/evidence'});api.saveEdit(f);const id=api.state().tasks.at(-1).id;
+ await api.action({dataset:{action:'delete-company',id:'task-company-a'}});let task=api.state().tasks.find(t=>t.id===id);assert.equal(task.companyId,'');assert.equal(task.taskType,'Project');assert.equal(task.references.length,1);api.validate(api.state());
+ api.editRecord('tasks',id);f=document.getElementById('editForm');f.elements.namedItem('companyId').value='task-company-b';api.saveEdit(f);await api.action({dataset:{action:'delete-project',id:pid}});task=api.state().tasks.find(t=>t.id===id);assert.equal(task.taskType,'Custom');assert.equal(task.companyId,'');assert.equal(task.references[0].url,'https://example.com/evidence');api.validate(api.state());
+});
+test('Task companies: older backups gain active companies and empty optional task fields, malformed scopes remain rejected',async t=>{
+ const ctx=await app(t),{api}=ctx,pid=taskCompanyFixture(api);api.saveEdit(chooseTaskProject(ctx,pid,'task-company-a'));const legacy=copy(api.state());delete legacy.tasks[0].companyId;delete legacy.tasks[0].references;delete legacy.projectCompanies[0].active;const restored=api.parseBackup(api.payload(legacy));assert.equal(restored.projectCompanies[0].active,true);assert.equal(restored.tasks[0].companyId,'');assert.deepEqual(copy(restored.tasks[0].references),[]);
+ restored.tasks[0].companyId='task-company-other';assert.throws(()=>api.validate(restored),/linked project/);restored.tasks[0].companyId='';restored.projectCompanies[0].active='No';assert.throws(()=>api.validate(restored),/company details/);
+});

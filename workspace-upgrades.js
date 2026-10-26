@@ -95,7 +95,7 @@
   const contrast = (a, b) =>
     (Math.max(luminance(a), luminance(b)) + 0.05) / (Math.min(luminance(a), luminance(b)) + 0.05);
   const readable = (ink, bg) =>
-    contrast(ink, bg) >= 4.5 ? ink : luminance(bg) > 0.179 ? '#19242f' : '#fff9f3';
+    [ink, '#19242f', '#fff9f3', '#000000', '#ffffff'].find(value => contrast(value, bg) >= 4.5);
   const APPLIED = [
     'bg',
     'surface',
@@ -109,10 +109,28 @@
     'peach',
     'lavender',
     'blue-soft',
+    'on-accent',
+    'link',
+    'success',
+    'warning',
+    'danger',
   ];
   function appearanceApply(p) {
     const style = document.body.style;
     for (const k of APPLIED) style.removeProperty('--hub-' + k);
+    const surface =
+        p.theme === 'custom' ? (p.colors || COLORS).surface : presetColors(p.theme).surface,
+      accent = THEMES[p.theme]?.[1] || p.accent,
+      dark = luminance(surface) < 0.179;
+    style.colorScheme = dark ? 'dark' : 'light';
+    style.setProperty('--hub-on-accent', readable('#ffffff', accent));
+    style.setProperty('--hub-link', readable(accent, surface));
+    for (const [key, value] of Object.entries(
+      dark
+        ? { success: '#9ae0b5', warning: '#edc17e', danger: '#ffa9ad' }
+        : { success: '#24714f', warning: '#8b5919', danger: '#ad3f46' }
+    ))
+      style.setProperty('--hub-' + key, readable(value, surface));
     if (p.theme !== 'custom') return;
     const c = p.colors || COLORS,
       ink = readable(c.text, c.surface),

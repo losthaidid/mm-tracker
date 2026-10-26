@@ -1,6 +1,58 @@
 /* task-workspace.css — Task cards/actions, quick update dialogs and project-item feedback.
    See docs/FILE-MAP.md. Keep rule order: later selectors can override earlier ones. */
 /* Keep task actions together at the far right without crowding the title. */
+.task-reference-editor {
+  border-top: 1px solid var(--hub-border);
+  padding-top: 14px;
+}
+.task-reference-editor h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.task-reference-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) auto;
+  gap: 10px;
+  align-items: end;
+  margin-top: 12px;
+}
+.task-reference-row input {
+  display: block;
+  width: 100%;
+  margin-top: 5px;
+}
+.task-reference-row label {
+  min-width: 0;
+}
+.task-reference-row button {
+  margin-bottom: 1px;
+}
+.task-website-references {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--hub-border);
+}
+.task-website-references ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  margin: 5px 0 0;
+  padding-left: 20px;
+}
+.task-website-references a {
+  overflow-wrap: anywhere;
+  color: var(--hub-link, var(--hub-accent));
+}
+.task-company-label {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 620px) {
+  .task-reference-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .task-reference-row button {
+    justify-self: start;
+  }
+}
 body .workspace-v10 .task-card-heading {
   align-items: flex-start;
   gap: 25px;

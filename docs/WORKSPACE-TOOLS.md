@@ -1,5 +1,17 @@
 # Work sessions, account reset and interactive workspace
 
+## Task companies and website references
+
+In **Tasks → Add task / Edit main task**, choose **Task type → Project**, then a **Linked project**. The optional **Company** dropdown contains active companies maintained for that linked project, even when another project is active in navigation. Leave it blank for project-wide work. Changing project or switching to Ticket/Custom clears the company selection. Existing inactive assignments remain visible and may be retained when editing; they cannot be assigned to a different task.
+
+Maintain company availability through **Projects → Companies & processes → Edit company → Active for new task assignments**. Existing companies start active. Deactivating preserves the company, its history and existing task links. Deleting a company clears task company links; deleting a project preserves its tasks as Custom and clears their company selection.
+
+Every task type supports **Website references**. Enter an optional label and a full `https://` or `http://` link, use **+ Add link** for more, and **Save record**. Up to 20 references are supported. Empty rows are ignored; labels without URLs and non-web URLs are rejected. Links appear on task cards and details and open in a separate tab. Companies and references participate in task search, backups, cloud reopening, and the Tasks sheet of Excel exports.
+
+## Theme consistency
+
+The saved or previewed palette controls interface surfaces, text, borders, inputs, cards, tables, dialogs and controls across Tickets, Tasks, Projects, Schedule, Knowledge, Waiting on, Studio, Lab, Validation Studio and Snippets. Shared feature palette aliases are in `theme-surfaces.css`, loaded after feature sheets and before `custom.css`. Primary-button and link foregrounds adjust for contrast, including custom dark palettes. Success, warning and error colours retain their meaning. Illustrated scenery, companion artwork, process diagram palettes and annotation/export colours remain intentional content colours.
+
 ## Start a work session
 
 Use **Start timer** in the workspace toolbar. Completed/archived tasks, completed subtasks, and Closed/Completed tickets are excluded from new session choices. Starting a session also checks the current record, so a record completed after opening the form cannot be used accidentally.

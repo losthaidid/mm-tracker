@@ -1,0 +1,1037 @@
+/* Shared interface colours. Load after feature sheets and before personal overrides.
+   Deliberately scoped to UI surfaces: scenery, companion art, process diagram palettes,
+   annotation colours and exported documents keep their own meaningful colours. */
+body[data-hub-theme] {
+  --ink: var(--hub-text);
+  --text: var(--hub-text);
+  --muted: var(--hub-muted);
+  --line: var(--hub-border);
+  --bg: var(--hub-surface);
+  --panel: var(--hub-surface-soft);
+  --accent: var(--hub-accent);
+  --hub-positive-bg: color-mix(in srgb, var(--hub-success) 12%, var(--hub-surface));
+  --hub-caution-bg: color-mix(in srgb, var(--hub-warning) 12%, var(--hub-surface));
+  --hub-negative-bg: color-mix(in srgb, var(--hub-danger) 12%, var(--hub-surface));
+}
+
+/* Feature palettes share the same saved theme, including custom dark surfaces. */
+body[data-hub-theme] .validation-studio,
+body[data-hub-theme] #modal {
+  --val-ink: var(--hub-text);
+  --val-muted: var(--hub-muted);
+  --val-green: var(--hub-accent);
+  --val-green-dark: var(--hub-accent);
+  --val-line: var(--hub-border);
+  --val-paper: var(--hub-surface);
+  --val-cream: var(--hub-surface-soft);
+  --val-mint: var(--hub-mint);
+  --val-lilac: var(--hub-lavender);
+  --val-rose: var(--hub-peach);
+}
+body[data-hub-theme] :is(.wl-workspace, .wl-snippets-page, #modal) {
+  --wl-ink: var(--hub-text);
+  --wl-muted: var(--hub-muted);
+}
+body[data-hub-theme] .my-day-page {
+  --md-ink: var(--hub-text);
+  --md-muted: var(--hub-muted);
+  --md-line: var(--hub-border);
+  --md-paper: var(--hub-surface);
+  --md-soft: var(--hub-surface-soft);
+  --md-accent: var(--hub-accent);
+}
+body[data-hub-theme] .lab-workshop {
+  --lab-paper: var(--hub-surface);
+  --lab-desk: var(--hub-surface-soft);
+  --lab-ink: var(--hub-text);
+  --lab-muted: var(--hub-muted);
+  --lab-line: var(--hub-border);
+  --lab-green: var(--hub-link);
+  --lab-mint: var(--hub-mint);
+  --lab-copper: var(--hub-warning);
+  --lab-rose: var(--hub-danger);
+  --lab-sand: var(--hub-yellow);
+}
+body[data-hub-theme]
+  :is(
+    .ss-workspace,
+    .ss-form,
+    .ss-detail,
+    .ss-rules,
+    .ss-simulator,
+    .sx-workshop,
+    .sg-start,
+    #modal
+  ) {
+  --ss-ink: var(--hub-text);
+  --ss-muted: var(--hub-muted);
+  --ss-line: var(--hub-border);
+  --ss-paper: var(--hub-surface);
+  --ss-green: var(--hub-link);
+  --ss-plum: var(--hub-link);
+  --sg-ink: var(--hub-text);
+  --sg-muted: var(--hub-muted);
+  --sg-green: var(--hub-link);
+  --sg-line: var(--hub-border);
+}
+body[data-hub-theme] :is(.tng-workspace, #modal) {
+  --tng-green: var(--hub-link);
+  --tng-soft: var(--hub-surface-soft);
+}
+
+/* Shared chrome, records, settings and maintenance dialogs. */
+body[data-hub-theme] :is(#hubSidebar, #hubToolbar) {
+  background: var(--hub-surface);
+  border-color: var(--hub-border);
+  color: var(--hub-text);
+}
+body[data-hub-theme]
+  :is(.panel, .stat, .help, .hub-card, .hub-widget, .settings-panel, #modal, #benchPeek) {
+  background-color: var(--hub-surface);
+  border-color: var(--hub-border);
+  color: var(--hub-text);
+}
+body[data-hub-theme]
+  :is(#modal, #view)
+  :is(
+    input:not([type='color']):not([type='checkbox']):not([type='radio']):not([type='range']),
+    select,
+    textarea
+  ) {
+  background-color: var(--hub-surface);
+  color: var(--hub-text);
+  border-color: var(--hub-border);
+}
+body[data-hub-theme] :is(#modal, #view) :is(input, textarea)::placeholder {
+  color: var(--hub-muted);
+  opacity: 1;
+}
+body[data-hub-theme] :is(#modal, #view) :is(table, th, td) {
+  border-color: var(--hub-border);
+}
+body[data-hub-theme] :is(#modal, #view) thead th {
+  color: var(--hub-text);
+  background-color: var(--hub-surface-soft);
+}
+body[data-hub-theme]
+  :is(
+    .ticket-editor-section,
+    .ticket-facts,
+    .ticket-history-section,
+    .ticket-history-archive .history,
+    .ticket-detail-update,
+    .ticket-detail-milestones,
+    .ticket-context-panel,
+    .task-main-card,
+    .task-child-card,
+    .task-feedback-context,
+    .item-feedback,
+    .governance-detail,
+    .governance-picker,
+    .process-card,
+    .manager-company,
+    .phase-summary-card,
+    .feedback-card,
+    .subtle-card,
+    .project-manager-row
+  ) {
+  background: var(--hub-surface);
+  border-color: var(--hub-border);
+  color: var(--hub-text);
+}
+body[data-hub-theme] :is(.ticket-folio, .ticket-folio[data-ticket-state='closed']) {
+  background: linear-gradient(155deg, var(--hub-surface), var(--hub-surface-soft)) !important;
+  border-color: var(--hub-border) !important;
+  color: var(--hub-text);
+}
+body[data-hub-theme]
+  :is(
+    .ticket-folder-tab,
+    .ticket-folio[data-ticket-state='closed'] .ticket-folder-tab,
+    .ticket-owner-avatar,
+    .ticket-section-number
+  ) {
+  background: var(--hub-blue-soft);
+  color: var(--hub-text);
+  border-color: var(--hub-border);
+}
+body[data-hub-theme] .ticket-folio .ticket-history-preview {
+  background: var(--hub-surface-soft);
+  border-color: var(--hub-accent);
+  color: var(--hub-text);
+}
+body[data-hub-theme]
+  :is(.ticket-folio, .ticket-detail-workspace, .ticket-editor-section, .ticket-context-panel)
+  :is(h2, h3, h4, p, label, dt, dd, strong, summary, .ticket-link, .ticket-number) {
+  color: var(--hub-text);
+}
+body[data-hub-theme]
+  :is(
+    .ticket-charge,
+    .ticket-owner-line,
+    .ticket-update-heading time,
+    .ticket-folio .ticket-update-heading .eyebrow,
+    .ticket-folio .ticket-progress-title,
+    .ticket-folio .ticket-card-footer > span,
+    .ticket-folio .ticket-facts-mini,
+    .ticket-detail-workspace small,
+    .ticket-context-panel small
+  ) {
+  color: var(--hub-muted);
+}
+body[data-hub-theme] .ticket-folio .ticket-progress-title strong {
+  color: var(--hub-text);
+}
+body[data-hub-theme] :is(.ticket-folio .progress, .ticket-detail-milestones > .progress) {
+  background: var(--hub-surface-hover);
+}
+body[data-hub-theme] :is(.ticket-folio .progress span, .ticket-detail-milestones > .progress span) {
+  background: var(--hub-success);
+}
+body[data-hub-theme] .ticket-detail-milestones .milestones label {
+  background: var(--hub-surface-soft);
+  color: var(--hub-text);
+  border-color: var(--hub-border);
+}
+body[data-hub-theme] .ticket-detail-milestones .milestones label:has(input:checked) {
+  background: var(--hub-positive-bg);
+  border-color: var(--hub-success);
+}
+
+/* Knowledge, Snippets and the shared field/reference library. */
+body[data-hub-theme]
+  :is(.batch-filter-toolbar, .batch-context, .batch-dependencies, .batch-label-picker) {
+  background: var(--hub-surface-soft);
+  border-color: var(--hub-border);
+  color: var(--hub-text);
+}
+body[data-hub-theme] :is(.batch-button, .batch-filter-toolbar label, .batch-kicker) {
+  background-color: var(--hub-surface);
+  color: var(--hub-text);
+  border-color: var(--hub-border);
+}
+body[data-hub-theme] :is(.wl-library-summary b, .wl-snippet-count) {
+  color: var(--hub-text);
+}
+body[data-hub-theme] :is(.wl-search-note, .wl-library-heading span, .wl-sidebar-note span) {
+  color: var(--hub-muted);
+}
+body[data-hub-theme]
+  :is(
+    .wl-workspace,
+    .wl-snippets-page,
+    .wl-field,
+    .wl-document,
+    .wl-message-paper,
+    .wl-field-card,
+    .wl-snippet,
+    .wl-snippet-details,
+    .wl-event-note,
+    .wl-undo,
+    .wl-empty
+  ) {
+  color: var(--hub-text);
+  border-color: var(--hub-border);
+}
+body[data-hub-theme]
+  :is(
+    .wl-snippets-page .wl-hero,
+    .wl-sidebar,
+    .wl-snippets-page .wl-sidebar,
+    .wl-search-bar,
+    .wl-soft,
+    .wl-placeholder-tags code,
+    .wl-event-note,
+    .wl-undo,
+    .val-tuple,
+    .val-reference-explanation
+  ) {
+  background: var(--hub-surface-soft);
+  color: var(--hub-text);
+  border-color: var(--hub-border);
+}
+body[data-hub-theme]
+  :is(
+    .wl-document,
+    .wl-snippets-page .wl-snippet,
+    .wl-snippet,
+    .wl-message-paper,
+    .wl-field-card,
+    .wl-empty
+  ) {
+  background: var(--hub-surface);
+}
+body[data-hub-theme]
+  :is(.wl-workspace, .wl-snippets-page, .wl-document, .wl-field-card, .wl-message-paper)
+  :is(h1, h2, h3, h4, p, strong, label, dt, dd, pre) {
+  color: var(--hub-text);
+}
+body[data-hub-theme]
+  :is(
+    .wl-eyebrow,
+    .wl-library-summary,
+    .wl-hero p,
+    .wl-snippet-details,
+    .wl-snippet-footer,
+    .wl-snippet-meta,
+    .wl-event-meta,
+    .wl-field-description,
+    .wl-empty p
+  ) {
+  color: var(--hub-muted);
+}
+body[data-hub-theme] .wl-sidebar > .wl-button b {
+  background: var(--hub-surface-hover);
+  color: var(--hub-text);
+}
+
+/* Validation Studio: definitions, data preview and result colours stay readable. */
+body[data-hub-theme]
+  .validation-studio
+  :is(h1, h2, h3, h4, h5, p, label, legend, span, small, summary) {
+  color: var(--hub-text);
+}
+body[data-hub-theme]
+  .validation-studio
+  :is(
+    .val-muted,
+    .val-eyebrow,
+    .val-heading-note,
+    .val-library-heading,
+    .val-empty p,
+    .val-start p,
+    .val-start small,
+    .val-empty small
+  ) {
+  color: var(--hub-muted);
+}
+body[data-hub-theme] .val-library-heading > span:last-child {
+  background: var(--hub-surface-hover);
+  color: var(--hub-text);
+}
+body[data-hub-theme]
+  :is(
+    .validation-studio .val-heading,
+    .val-library,
+    .val-outline,
+    .val-inspector,
+    .val-card,
+    .val-condition-group,
+    .val-then,
+    .val-ref-icon,
+    .val-dropzone,
+    .val-paste,
+    .val-metric,
+    .val-segments,
+    .val-issue-list > .val-btn,
+    .val-more > div
+  ) {
+  background: var(--hub-surface-soft);
+  border-color: var(--hub-border);
+  color: var(--hub-text);
+}
+body[data-hub-theme]
+  :is(
+    .val-condition-group .val-condition-group,
+    .val-condition-group .val-condition-group .val-condition-group,
+    .val-grid tbody td,
+    .val-grid tbody th,
+    .val-inline-note,
+    .val-message
+  ) {
+  background: var(--hub-surface);
+  border-color: var(--hub-border);
+  color: var(--hub-text);
+}
+body[data-hub-theme] :is(.val-metric.errors, .val-grid td.error, .val-status.error) {
+  background: var(--hub-negative-bg);
+  color: var(--hub-danger);
+}
+body[data-hub-theme] :is(.val-metric.warnings, .val-grid td.warning, .val-status.warning) {
+  background: var(--hub-caution-bg);
+  color: var(--hub-warning);
+}
+body[data-hub-theme] :is(.val-metric.passed, .val-status.passed) {
+  background: var(--hub-positive-bg);
+  color: var(--hub-success);
+}
+body[data-hub-theme] .val-status.pending {
+  background: var(--hub-blue-soft);
+  color: var(--hub-link);
+}
+body[data-hub-theme]
+  :is(.val-col-index, .val-chip, .val-combination code, .val-ref-tags code, .val-rule-summary) {
+  background: var(--hub-surface-hover);
+  border-color: var(--hub-border);
+}
+body[data-hub-theme] .val-column-item b {
+  color: var(--hub-danger);
+}
+body[data-hub-theme] .val-metric :is(span, strong, strong small) {
+  color: var(--hub-text);
+}
+body[data-hub-theme] .val-metric.errors strong {
+  color: var(--hub-danger);
+}
+body[data-hub-theme] .val-metric.warnings strong {
+  color: var(--hub-warning);
+}
+body[data-hub-theme] .val-metric.passed strong {
+  color: var(--hub-success);
+}
+
+/* My Day UI uses the theme; its river, trees and terrarium remain illustrated scenery. */
+body[data-hub-theme] .my-day-page .md-day-intro {
+  background: linear-gradient(115deg, var(--hub-surface-soft), var(--hub-blue-soft));
+  color: var(--hub-text);
+  border-color: var(--hub-border);
+}
+body[data-hub-theme]
+  :is(
+    .md-agenda-card,
+    .md-up-card,
+    .md-mission,
+    .md-drilldown,
+    .md-routine-intro,
+    .md-gap-slots span,
+    .md-canvas-welcome,
+    .md-progress-orbit b
+  ) {
+  background: var(--hub-surface);
+  color: var(--hub-text);
+  border-color: var(--hub-border);
+}
+body[data-hub-theme]
+  .my-day-page
+  :is(h2, h3, h4, .md-day-intro p, .md-kicker, .md-agenda-title, .md-up-title) {
+  color: var(--hub-text);
+}
+body[data-hub-theme]
+  .my-day-page
+  :is(.md-agenda-meta, .md-up-meta, .md-routine-intro p, .md-workspace-strip, .md-day-caption) {
+  color: var(--hub-muted);
+}
+body[data-hub-theme]
+  :is(
+    .md-agenda-card.is-now,
+    .md-energy-choices [aria-pressed='true'],
+    .md-balance-legend [aria-pressed='true']
+  ) {
+  background: var(--hub-blue-soft);
+  color: var(--hub-text);
+  border-color: var(--hub-accent);
+}
+
+/* Studio, Lab and project solution workspaces. Simulation art is intentionally separate. */
+body[data-hub-theme]
+  :is(
+    .ss-workspace,
+    .ss-main,
+    .ss-product-tray,
+    .ss-step-card,
+    .ss-proposal-card,
+    .ss-design-grid > section,
+    .ss-decision,
+    .ss-postings,
+    .ss-transaction-panel,
+    .sx-comparison,
+    .sx-tool-cards > article,
+    .sx-type-facts > article,
+    .sx-behaviour-card,
+    .sx-rule-card,
+    .sx-dependencies > article,
+    .sx-workshop-note,
+    .sg-map,
+    .sg-case,
+    .sg-readiness,
+    .sg-case-options > article,
+    .sg-lesson-grid article,
+    .sg-glossary details
+  ) {
+  background: var(--hub-surface);
+  color: var(--hub-text);
+  border-color: var(--hub-border);
+}
+body[data-hub-theme]
+  :is(
+    .ss-hero,
+    .ss-workspace-toolbar,
+    .ss-mode-switch,
+    .ss-demo-banner,
+    .ss-own-banner,
+    .ss-selected-proposal,
+    .ss-context-pills > span,
+    .ss-step-footer,
+    .ss-step-card.is-proposed,
+    .ss-step-card.is-proposed .ss-step-footer,
+    .ss-discovery-bottom > section:last-child,
+    .ss-handoff,
+    .ss-footer,
+    .ss-model-note,
+    .ss-metrics > div,
+    .ss-trial-inputs,
+    .ss-location-balances > span,
+    .sx-entry-bar,
+    .sx-explorer-hero,
+    .sx-callout,
+    .sx-material-controls,
+    .sx-perspectives,
+    .sx-interview-preview,
+    .sx-workshop,
+    .sx-workshop > header,
+    .sx-workshop > nav,
+    .sx-workshop > footer,
+    .sx-workshop-lanes section > article,
+    .sx-workshop-lanes section:nth-child(2) > article,
+    .sg-context,
+    .sg-source,
+    .sg-source.is-demo,
+    .sg-screen-help,
+    .sg-shortcuts,
+    .sg-welcome,
+    .sg-lesson,
+    .sg-form-help,
+    .sg-glossary details > div,
+    .sg-narrator,
+    .sg-reading-key,
+    .sg-simulation-scope,
+    .sg-start-index,
+    .lab-hero,
+    .experience-rules article,
+    .experience-inbox article
+  ) {
+  background: var(--hub-surface-soft);
+  color: var(--hub-text);
+  border-color: var(--hub-border);
+}
+body[data-hub-theme]
+  :is(
+    .ss-workspace,
+    .ss-form,
+    .ss-detail,
+    .ss-rules,
+    .ss-simulator,
+    .sx-workshop,
+    .sg-welcome,
+    .sg-map,
+    .sg-case,
+    .sg-readiness,
+    .sg-lesson,
+    .lab-workshop
+  )
+  :is(h1, h2, h3, h4, h5, p, label, dt, dd, strong) {
+  color: var(--hub-text);
+}
+body[data-hub-theme]
+  :is(
+    .ss-eyebrow,
+    .ss-muted,
+    .ss-footnote,
+    .ss-hero-stats,
+    .ss-step-open small,
+    .ss-step-open > span:last-child > span,
+    .ss-step-footer > span,
+    .ss-sim-timeline small,
+    .ss-theatre-balance,
+    .ss-location-balances,
+    .sx-eyebrow,
+    .sg-kicker,
+    .ex-kicker,
+    .experience-rules small
+  ) {
+  color: var(--hub-muted);
+}
+body[data-hub-theme] .ss-step-pain {
+  color: var(--hub-warning);
+}
+body[data-hub-theme] .ss-status {
+  background: var(--hub-blue-soft);
+  color: var(--hub-text);
+}
+body[data-hub-theme] .ss-status.is-agreed {
+  background: var(--hub-positive-bg);
+  color: var(--hub-success);
+}
+
+/* Private presentation controls adapt without recolouring a saved public process. */
+body[data-hub-theme] .ss-workspace :is(span, small, b, em, summary, code, li) {
+  color: var(--hub-text);
+}
+body[data-hub-theme]
+  :is(
+    .ss-theatre,
+    .sx-live-stage .ss-theatre,
+    .ss-flow-node > span,
+    .ss-flow-gate > span,
+    .sx-live-stage .ss-flow-node > span,
+    .sx-live-stage .ss-flow-gate > span,
+    .ss-theatre-balance span,
+    .sx-live-stage .ss-theatre-balance span,
+    .sg-orbit-card,
+    .sg-orbit-card.two,
+    .sg-orbit-card.three,
+    .sg-journey-stop,
+    .sg-check,
+    .sg-check.is-done,
+    .sg-lesson-nav,
+    .sg-event-seal,
+    .sg-explain-route,
+    .sg-reason,
+    .sg-balance-changes article,
+    .sg-balance-changes .has-change,
+    .sx-account-card,
+    .sx-warehouse,
+    .sx-storage-zone,
+    .sx-doc-flow,
+    .sx-doc-track > article,
+    .sx-wizard-result
+  ) {
+  background: var(--hub-surface-soft);
+  color: var(--hub-text);
+  border-color: var(--hub-border);
+}
+body[data-hub-theme]
+  :is(
+    .ss-theatre.is-error,
+    .sx-live-stage .ss-theatre.is-error,
+    .ss-outcome.is-error,
+    .sg-narrator.is-error
+  ) {
+  background: var(--hub-negative-bg);
+  border-color: var(--hub-danger);
+}
+body[data-hub-theme]
+  :is(
+    .ss-theatre.is-unsupported,
+    .sx-live-stage .ss-theatre.is-unsupported,
+    .sg-narrator.is-unsupported
+  ) {
+  background: var(--hub-caution-bg);
+  border-color: var(--hub-warning);
+}
+body[data-hub-theme] .ss-workspace :is(.ss-outcome.is-error p, .sg-narrator.is-error p) {
+  color: var(--hub-danger);
+}
+body[data-hub-theme] .ss-workspace .ss-btn.ss-primary :is(span, small, b, strong) {
+  color: var(--hub-on-accent);
+}
+body[data-hub-theme]
+  :is(
+    .ss-art-card,
+    .ss-art-card.b,
+    .ss-art-card.c,
+    .ss-search,
+    .ss-decision pre,
+    .ss-product-glyph,
+    .ss-product-glyph.tone-1,
+    .ss-product-glyph.tone-2,
+    .ss-product-glyph.tone-3,
+    .ss-product-glyph.tone-4,
+    .sx-rule-badge
+  ) {
+  background: var(--hub-surface-soft);
+  color: var(--hub-text);
+  border-color: var(--hub-border);
+}
+body[data-hub-theme] :is(.ss-success-note, .sx-callout) {
+  color: var(--hub-text) !important;
+}
+body[data-hub-theme]
+  :is(.pc-bubble-menu, .pc-step-editor, .pc-node-editor, .pc-properties, .ph-decision) {
+  background: var(--hub-surface);
+  color: var(--hub-text);
+  border-color: var(--hub-border);
+}
+
+/* Consistent controls, selected states and semantic colours across feature families. */
+body[data-hub-theme]
+  :is(
+    .wl-button,
+    .wl-snippets-page .wl-button,
+    .validation-studio .val-btn,
+    .ss-btn,
+    .md-button,
+    .my-day-page .md-button,
+    .lab-workshop button,
+    .pc-bubble-menu button
+  ) {
+  color: var(--hub-text);
+  background: var(--hub-surface);
+  border-color: var(--hub-border);
+}
+body[data-hub-theme]
+  :is(
+    .wl-button,
+    .wl-snippets-page .wl-button,
+    .validation-studio .val-btn,
+    .ss-btn,
+    .md-button,
+    .my-day-page .md-button,
+    .lab-workshop button,
+    .pc-bubble-menu button
+  ):hover:not(:disabled) {
+  color: var(--hub-text);
+  background: var(--hub-surface-hover);
+  border-color: var(--hub-accent);
+}
+body[data-hub-theme]
+  :is(
+    .wl-button.is-active,
+    .wl-snippets-page .wl-sidebar > .wl-button.is-active,
+    .val-template-list > .val-btn.is-active,
+    .val-tabs > .val-btn.is-active,
+    .val-column-item.is-active,
+    .val-segments .is-active,
+    .ss-mode-switch .ss-btn.is-active,
+    .ss-product-list .ss-product-card.is-active,
+    .ss-process-strip > .ss-btn.is-active,
+    .ss-pane-tabs .ss-btn.is-active,
+    .ss-proposal-card.is-active,
+    .sx-type-list > .ss-btn.is-active,
+    .sx-workshop > nav > .ss-btn.is-active
+  ) {
+  background: var(--hub-blue-soft);
+  color: var(--hub-text);
+  border-color: var(--hub-accent);
+}
+body[data-hub-theme]
+  :is(
+    button.primary,
+    .wl-primary,
+    .wl-snippets-page .wl-primary,
+    .validation-studio .val-primary,
+    .ss-btn.ss-primary,
+    .md-button.md-primary,
+    .sg-navigation.ss-pane-tabs > .ss-btn.ss-primary
+  ),
+body[data-hub-theme]
+  :is(
+    button.primary,
+    .wl-primary,
+    .wl-snippets-page .wl-primary,
+    .validation-studio .val-primary,
+    .ss-btn.ss-primary,
+    .md-button.md-primary
+  ):hover:not(:disabled) {
+  background: var(--hub-accent);
+  color: var(--hub-on-accent);
+  border-color: var(--hub-accent);
+}
+body[data-hub-theme] :is(.tag.complete, .tag.closed, .experience-health h3) {
+  color: var(--hub-success);
+  background: var(--hub-positive-bg);
+}
+body[data-hub-theme] :is(.tag.pending, .tag.hold, .experience-health[data-state='waiting'] h3) {
+  color: var(--hub-warning);
+  background: var(--hub-caution-bg);
+}
+body[data-hub-theme] :is(.tag.high, .tag.critical, .experience-health[data-state='conflict'] h3) {
+  color: var(--hub-danger);
+  background: var(--hub-negative-bg);
+}
+body[data-hub-theme] :is(button.danger, .val-danger, .wl-danger) {
+  color: var(--hub-danger);
+}
+body[data-hub-theme]
+  :is(.ticket-folio .ticket-link, .task-website-references a, .wl-document a, .hub-card a) {
+  color: var(--hub-link);
+}
+body[data-hub-theme] :is(.wl-button, .val-btn, .ss-btn, .md-button):focus-visible {
+  outline-color: var(--hub-link);
+}
+
+/* Remaining shared context, calendar and project summary surfaces. */
+body[data-hub-theme]
+  :is(
+    .batch-form-context,
+    .batch-resume,
+    .batch-stale-card,
+    .batch-callout,
+    .batch-next,
+    .batch-chain,
+    .batch-chip,
+    .batch-soft,
+    .batch-detail section,
+    .pe-overview-card,
+    .ss-overview-card,
+    .health-badge,
+    .calendar-weekdays,
+    .workhub-day.weekend,
+    .workhub-day.outside,
+    .workhub-day.today
+  ) {
+  background: var(--hub-surface-soft);
+  color: var(--hub-text);
+  border-color: var(--hub-border);
+}
+body[data-hub-theme]
+  :is(
+    .batch-form-context,
+    .batch-resume,
+    .batch-stale-card,
+    .batch-callout,
+    .batch-detail,
+    .pe-overview-card,
+    .ss-overview-card
+  )
+  :is(h3, p, label, strong, b, span, small) {
+  color: var(--hub-text);
+}
+body[data-hub-theme]
+  :is(
+    .batch-muted,
+    .batch-eyebrow,
+    .batch-field,
+    .batch-section-label small,
+    .calendar-weekdays span,
+    .booking-context,
+    .booking-duration-label
+  ) {
+  color: var(--hub-muted);
+}
+body[data-hub-theme] .more-bookings {
+  color: var(--hub-link);
+  background: var(--hub-blue-soft);
+}
+body[data-hub-theme] .weekday-row {
+  background: var(--hub-surface-soft);
+}
+body[data-hub-theme] .weekday-row span {
+  color: var(--hub-muted);
+}
+body[data-hub-theme] .schedule-metrics .go-live-metric {
+  background: var(--hub-caution-bg);
+}
+body[data-hub-theme] .schedule-metrics .go-live-metric strong {
+  color: var(--hub-warning);
+}
+body[data-hub-theme] .health-on-track {
+  background: var(--hub-positive-bg);
+  color: var(--hub-success);
+}
+body[data-hub-theme] .health-at-risk {
+  background: var(--hub-caution-bg);
+  color: var(--hub-warning);
+}
+body[data-hub-theme] .health-blocked {
+  background: var(--hub-negative-bg);
+  color: var(--hub-danger);
+}
+body[data-hub-theme] :is(.stat.toil strong, .schedule-stat.toil strong) {
+  color: var(--hub-warning);
+}
+body[data-hub-theme] .wl-library-summary b {
+  color: var(--hub-text);
+}
+body[data-hub-theme] :is(.wl-sidebar-note > span, .wl-search-note, .wl-library-title > span) {
+  color: var(--hub-muted);
+}
+
+/* Dashboard text and coloured idea notes use matching theme-aware surfaces. */
+body[data-hub-theme]
+  .my-day-page
+  :is(
+    p,
+    small,
+    label,
+    dt,
+    dd,
+    strong,
+    b,
+    .hub-meta,
+    .md-hour,
+    .md-now-marker span,
+    .md-now-marker b,
+    .md-mission > span,
+    .md-mission-heading p,
+    .md-idea-select span
+  ) {
+  color: var(--hub-text);
+}
+body[data-hub-theme]
+  .my-day-page
+  :is(.hub-widget-actions button, .md-time-handle, .md-idea-handle) {
+  color: var(--hub-text);
+  background-color: var(--hub-surface-soft);
+  border-color: var(--hub-border);
+}
+body[data-hub-theme]
+  .my-day-page
+  :is(.hub-widget-symbol, .md-agenda-dot, .md-up-stack::before, .md-up-stack::after) {
+  background: var(--hub-blue-soft);
+  color: var(--hub-text);
+  border-color: var(--hub-border);
+}
+body[data-hub-theme] .md-idea {
+  --idea-bg: var(--hub-surface-soft);
+  background: var(--hub-surface-soft);
+  color: var(--hub-text);
+  border-color: var(--hub-border);
+}
+body[data-hub-theme] .md-idea.md-color-sage {
+  background: var(--hub-mint);
+}
+body[data-hub-theme] .md-idea.md-color-peach {
+  background: var(--hub-peach);
+}
+body[data-hub-theme] .md-idea.md-color-sky {
+  background: var(--hub-blue-soft);
+}
+body[data-hub-theme] .md-idea.md-color-lavender {
+  background: var(--hub-lavender);
+}
+body[data-hub-theme] :is(.md-focus-orb > div > span, .md-break-time) {
+  color: var(--hub-text);
+}
+body[data-hub-theme] .md-group-tag {
+  color: var(--hub-text);
+  border-color: var(--hub-border);
+}
+body[data-hub-theme] .md-group-tag.md-color-sage {
+  background: var(--hub-mint);
+}
+body[data-hub-theme] .md-group-tag.md-color-peach {
+  background: var(--hub-peach);
+}
+body[data-hub-theme] .md-group-tag.md-color-sky {
+  background: var(--hub-blue-soft);
+}
+body[data-hub-theme] .md-group-tag.md-color-lavender {
+  background: var(--hub-lavender);
+}
+body[data-hub-theme] .md-replay-track button {
+  background: var(--hub-blue-soft);
+  color: var(--hub-text);
+}
+body[data-hub-theme] .md-replay-track:nth-of-type(3) button {
+  background: var(--hub-lavender);
+  color: var(--hub-text);
+}
+body[data-hub-theme] .md-replay-track button span {
+  color: inherit;
+}
+body[data-hub-theme]
+  .my-day-page
+  :is(.mv-section-kicker, .mv-view-switch button, .mv-layout-caption span, .hub-stats span) {
+  color: var(--hub-muted);
+}
+body[data-hub-theme] .my-day-page .hub-desk {
+  background: var(--hub-surface-soft);
+  color: var(--hub-text);
+}
+body[data-hub-theme] .wl-result-line > span {
+  color: var(--hub-muted);
+}
+body[data-hub-theme] .bench-status-badge {
+  background: var(--hub-blue-soft);
+  color: var(--hub-text);
+}
+
+/* People, recipient and finance tools also share the interface palette. */
+body[data-hub-theme] :is(.pe-workspace, .pe-form, .pe-person-detail, .tng-workspace) {
+  color: var(--hub-text);
+}
+body[data-hub-theme]
+  :is(
+    .pe-hero,
+    .pe-metrics,
+    .pe-view-switch,
+    .pe-tray,
+    .pe-board-top,
+    .pe-board-footer,
+    .pe-form-intro,
+    .pe-person-detail header,
+    .pe-filter-notice,
+    .pe-armed-bar,
+    .tng-hero
+  ) {
+  background: var(--hub-surface-soft);
+  color: var(--hub-text);
+  border-color: var(--hub-border);
+}
+body[data-hub-theme]
+  :is(
+    .pe-board,
+    .pe-viewport,
+    .pe-person,
+    .pe-people-list,
+    .pe-empty,
+    .pe-detail-assignments article,
+    .pe-mapped-chip,
+    .pe-area-activities > .pe-chip-row
+  ) {
+  background: var(--hub-surface);
+  color: var(--hub-text);
+  border-color: var(--hub-border);
+}
+body[data-hub-theme]
+  :is(.pe-workspace, .pe-form, .pe-person-detail, .tng-hero)
+  :is(h2, h3, h4, p, span, strong, b, label, small, dt, dd) {
+  color: var(--hub-text);
+}
+body[data-hub-theme] .pe-button {
+  background: var(--hub-surface);
+  color: var(--hub-text);
+  border-color: var(--hub-border);
+}
+body[data-hub-theme]
+  :is(.pe-view-switch .pe-button.is-active, .pe-chip-row.is-armed > .pe-button:first-child) {
+  background: var(--hub-blue-soft);
+  color: var(--hub-text);
+  border-color: var(--hub-accent);
+}
+body[data-hub-theme] .pe-button.pe-primary {
+  background: var(--hub-accent);
+  color: var(--hub-on-accent);
+  border-color: var(--hub-accent);
+}
+body[data-hub-theme] .pe-button.pe-danger {
+  background: var(--hub-negative-bg);
+  color: var(--hub-danger);
+  border-color: var(--hub-danger);
+}
+body[data-hub-theme] :is(.tng-warning, .tng-table tr.is-duplicate td, .recipient-error) {
+  background: var(--hub-caution-bg);
+  color: var(--hub-warning);
+}
+body[data-hub-theme] .tng-table tr.is-selected {
+  background: var(--hub-blue-soft);
+  color: var(--hub-text);
+}
+
+body[data-hub-theme]
+  :is(
+    .rehearsal-stage-bar,
+    .rehearsal-playbar,
+    .rehearsal-data,
+    .rehearsal-journal,
+    .rehearsal-detail,
+    .rehearsal-inspector,
+    .ph-palette,
+    .ph-palette-tip
+  ) {
+  background: var(--hub-surface);
+  color: var(--hub-text);
+  border-color: var(--hub-border);
+}
+body[data-hub-theme]
+  :is(
+    .rehearsal-stage-bar,
+    .rehearsal-playbar,
+    .rehearsal-data,
+    .rehearsal-journal,
+    .rehearsal-detail,
+    .rehearsal-inspector,
+    .ph-palette
+  )
+  :is(p, label, span, small, h3, h4, dt, dd, strong) {
+  color: var(--hub-text);
+}
+body[data-hub-theme] .rehearsal-playbar .hub-meta {
+  color: var(--hub-muted);
+}
+body[data-hub-theme]
+  :is(.primary, .wl-primary, .val-primary, .ss-primary, .md-primary)
+  :is(span, strong, b) {
+  color: inherit;
+}

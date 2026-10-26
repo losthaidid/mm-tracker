@@ -1165,6 +1165,8 @@ function filteredTasks() {
           {
             ...t,
             linkedRecord: taskLinkedLabel(t),
+            company: taskCompanyLabel(t),
+            websiteReferences: (t.references || []).map(r => r.label + ' ' + r.url).join(' '),
             subTaskText: (t.subTasks || [])
               .map(sub => [sub.title, sub.status, sub.remarks, sub.feedback].join(' '))
               .join(' '),
@@ -1194,13 +1196,111 @@ function taskLinkFields(r) {
   const type = r.taskType || 'Custom';
   return (
     (hub?.standup?.taskContext(r.id) || '') +
-    `<div class="wide task-link-fields" data-task-link="Project"${type === 'Project' ? '' : ' hidden'}><label for="taskProjectLink">Linked project *</label><select id="taskProjectLink" name="projectLink"><option value="">Choose a project</option>${state.projects.map(p => `<option value="${esc(p.id)}"${r.linkId === p.id ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div><div class="wide task-link-fields" data-task-link="Ticket"${type === 'Ticket' ? '' : ' hidden'}><label for="taskTicketLink">Linked ticket *</label><select id="taskTicketLink" name="ticketLink"><option value="">Choose a ticket</option>${state.tickets.map(t => `<option value="${esc(t.id)}"${r.linkId === t.id ? ' selected' : ''}>${esc(t.ticket + ' — ' + t.description.slice(0, 90))}</option>`).join('')}</select></div><div class="wide task-link-fields" data-task-link="Custom"${type === 'Custom' ? '' : ' hidden'}><label for="taskCustomLink">Custom link / reference</label><input id="taskCustomLink" name="customLink" maxlength="500" value="${esc(r.customLink || '')}" placeholder="e.g. Internal follow-up or meeting"></div>`
+    `<div class="wide task-link-fields" data-task-link="Project"${type === 'Project' ? '' : ' hidden'}><label for="taskProjectLink">Linked project *</label><select id="taskProjectLink" name="projectLink"><option value="">Choose a project</option>${state.projects.map(p => `<option value="${esc(p.id)}"${r.linkId === p.id ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div>${taskCompanyField(r)}<div class="wide task-link-fields" data-task-link="Ticket"${type === 'Ticket' ? '' : ' hidden'}><label for="taskTicketLink">Linked ticket *</label><select id="taskTicketLink" name="ticketLink"><option value="">Choose a ticket</option>${state.tickets.map(t => `<option value="${esc(t.id)}"${r.linkId === t.id ? ' selected' : ''}>${esc(t.ticket + ' — ' + t.description.slice(0, 90))}</option>`).join('')}</select></div><div class="wide task-link-fields" data-task-link="Custom"${type === 'Custom' ? '' : ' hidden'}><label for="taskCustomLink">Custom link / reference</label><input id="taskCustomLink" name="customLink" maxlength="500" value="${esc(r.customLink || '')}" placeholder="e.g. Internal follow-up or meeting"></div>`
   );
 }
 function updateTaskLinkFields(form) {
   const type = form.elements.namedItem('taskType')?.value || 'Custom';
   for (const box of form.querySelectorAll?.('[data-task-link]') || [])
     box.hidden = box.dataset.taskLink !== type;
+  updateTaskCompanyOptions(form);
+}
+
+function taskCompanyLabel(task, d = state) {
+  if (task.taskType !== 'Project' || !task.companyId) return '';
+  const company = d.projectCompanies.find(
+    c => c.id === task.companyId && c.projectId === task.linkId
+  );
+  return company ? company.name + (company.active === false ? ' (inactive)' : '') : '';
+}
+function taskCompanyOptions(projectId, current = '') {
+  const companies = state.projectCompanies
+    .filter(c => c.projectId === projectId && c.active !== false)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const saved = state.projectCompanies.find(
+    c => c.id === current && c.projectId === projectId && c.active === false
+  );
+  return (
+    '<option value="">Project-wide / no company</option>' +
+    companies
+      .map(
+        c =>
+          `<option value="${esc(c.id)}"${c.id === current ? ' selected' : ''}>${esc(c.name)}</option>`
+      )
+      .join('') +
+    (saved
+      ? `<option value="${esc(saved.id)}" selected disabled>${esc(saved.name)} (inactive · existing assignment)</option>`
+      : '')
+  );
+}
+function taskCompanyHint(projectId, current = '') {
+  if (!projectId) return 'Choose a linked project first.';
+  if (
+    state.projectCompanies.some(
+      c => c.id === current && c.projectId === projectId && c.active === false
+    )
+  )
+    return 'This saved company is inactive. Keep the existing assignment or choose an active company. Maintain status in Projects → Companies & processes → Edit company.';
+  return state.projectCompanies.some(c => c.projectId === projectId && c.active !== false)
+    ? 'Only active companies from the linked project are available. Leave blank for project-wide work.'
+    : 'No active companies in this project. Add or activate a company in Projects → Companies & processes, or leave this task project-wide.';
+}
+function taskCompanyField(task) {
+  const projectId = task.taskType === 'Project' ? task.linkId || '' : '';
+  return `<div class="wide task-link-fields" data-task-link="Project"${task.taskType === 'Project' ? '' : ' hidden'}><label for="taskCompany">Company <span class="muted">(optional)</span></label><select id="taskCompany" name="companyId" data-project-scope="${esc(projectId)}" aria-describedby="taskCompanyHint"${projectId ? '' : ' disabled'}>${taskCompanyOptions(projectId, task.companyId || '')}</select><p class="hint" id="taskCompanyHint">${esc(taskCompanyHint(projectId, task.companyId))}</p></div>`;
+}
+function updateTaskCompanyOptions(form) {
+  const select = form.elements.namedItem('companyId');
+  if (!select) return;
+  const projectId =
+    form.elements.namedItem('taskType')?.value === 'Project'
+      ? form.elements.namedItem('projectLink')?.value || ''
+      : '';
+  const current = select.dataset.projectScope === projectId ? select.value : '';
+  // Only the task's own saved inactive assignment can survive an editor refresh.
+  const old = state.tasks.find(t => t.id === form.dataset.id);
+  const allowed = state.projectCompanies.some(
+    c =>
+      c.id === current &&
+      c.projectId === projectId &&
+      (c.active !== false ||
+        (old?.taskType === 'Project' && old.linkId === projectId && old.companyId === current))
+  );
+  const selected = allowed ? current : '';
+  select.innerHTML = taskCompanyOptions(projectId, selected);
+  select.dataset.projectScope = projectId;
+  select.disabled = !projectId;
+  form.querySelector('#taskCompanyHint').textContent = taskCompanyHint(projectId, selected);
+}
+
+function validTaskWebsite(value) {
+  if (!checkText(value, 2000) || !/^https?:\/\/[^\s]+$/i.test(value)) return false;
+  try {
+    return ['http:', 'https:'].includes(new URL(value).protocol);
+  } catch {
+    return false;
+  }
+}
+function taskReferenceRow(ref = {}) {
+  return `<div class="task-reference-row" data-task-reference="${esc(ref.id || uid())}"><label>Reference label <span class="muted">(optional)</span><input name="referenceLabel" maxlength="200" value="${esc(ref.label || '')}" placeholder="e.g. Meeting notes"></label><label>Website link<input type="url" name="referenceUrl" maxlength="2000" value="${esc(ref.url || '')}" placeholder="https://…"></label><button type="button" class="small" data-action="task-reference-remove" aria-label="Remove website reference">Remove</button></div>`;
+}
+function taskReferenceFields(task) {
+  return `<section class="wide task-reference-editor" aria-labelledby="taskReferencesHeading"><div class="flex-title"><h3 id="taskReferencesHeading">Website references</h3><button type="button" class="small" data-action="task-reference-add">+ Add link</button></div><p class="hint">Save up to 20 website links. Use a label to make each reference easy to recognise.</p><div data-task-reference-rows>${(task.references?.length ? task.references : [{}]).map(taskReferenceRow).join('')}</div></section>`;
+}
+function readTaskReferences(form) {
+  return [...form.querySelectorAll('[data-task-reference]')]
+    .map(row => ({
+      id: row.dataset.taskReference,
+      label: row.querySelector('[name="referenceLabel"]').value.trim(),
+      url: row.querySelector('[name="referenceUrl"]').value.trim(),
+    }))
+    .filter(ref => ref.label || ref.url);
+}
+function taskReferencesMarkup(task) {
+  const refs = (task.references || []).filter(ref => validTaskWebsite(ref.url));
+  return refs.length
+    ? `<section class="task-website-references" aria-label="Website references"><strong>Website references</strong><ul>${refs.map(ref => `<li><a href="${esc(ref.url)}" target="_blank" rel="noopener noreferrer">${esc(ref.label || ref.url)} <span aria-hidden="true">↗</span></a></li>`).join('')}</ul></section>`
+    : '';
 }
 
 function pct(r) {
@@ -2764,6 +2864,8 @@ function upgradeFeaturesV6(d) {
         taskType: 'Custom',
         linkId: '',
         customLink: '',
+        companyId: '',
+        references: [],
       }))
         if (t[k] === undefined) t[k] = v;
       if (!['Project', 'Ticket', 'Custom'].includes(t.taskType)) t.taskType = 'Custom';
@@ -2840,6 +2942,7 @@ function upgradeFeaturesV6(d) {
   if (!Array.isArray(d.projectCompanies)) d.projectCompanies = [];
   for (const c of d.projectCompanies) {
     if (c.role === undefined) c.role = '';
+    if (c.active === undefined) c.active = true;
     for (const k of [
       'organizationStructure',
       'procurement',
@@ -2970,6 +3073,31 @@ function validateFeaturesV6(d) {
       throw Error('Choose a valid project for every project task.');
     if (t.taskType === 'Ticket' && !ticketIds.has(t.linkId))
       throw Error('Choose a valid ticket for every ticket task.');
+    if (
+      t.companyId !== undefined &&
+      (!checkText(t.companyId, 100) ||
+        (t.companyId &&
+          (t.taskType !== 'Project' ||
+            !d.projectCompanies.some(c => c.id === t.companyId && c.projectId === t.linkId))))
+    )
+      throw Error("Choose a company belonging to the task's linked project.");
+    if (t.references !== undefined) {
+      if (!Array.isArray(t.references) || t.references.length > 20)
+        throw Error('Each task supports up to 20 website references.');
+      const ids = new Set();
+      for (const ref of t.references) {
+        if (
+          !ref ||
+          !checkText(ref.id, 100) ||
+          !ref.id ||
+          ids.has(ref.id) ||
+          !checkText(ref.label, 200) ||
+          !validTaskWebsite(ref.url)
+        )
+          throw Error('Use a valid http or https website link for every task reference.');
+        ids.add(ref.id);
+      }
+    }
   }
   if (!Array.isArray(d.projectPlans) || d.projectPlans.length > LIMIT)
     throw Error('Project plans support up to 5,000 activities.');
@@ -3064,7 +3192,8 @@ function validateFeaturesV6(d) {
       !projectIds.has(c.projectId) ||
       !checkText(c.name, 200) ||
       !c.name.trim() ||
-      !checkText(c.role, 500)
+      !checkText(c.role, 500) ||
+      (c.active !== undefined && typeof c.active !== 'boolean')
     )
       throw Error('Check the project company details.');
   for (const s of d.specs)
@@ -3374,7 +3503,7 @@ function editRecord(group, id) {
     projectId = old?.projectId || state.activeProjectId;
   openModal(
     (old ? 'Edit ' : 'Add ') + { tickets: 'ticket', tasks: 'task', specs: 'project item' }[group],
-    `<form id="editForm" data-group="${group}" data-id="${esc(id || '')}"><div class="form-grid">${group === 'specs' ? projectField(projectId) + projectCompanyField(projectId, r.companyId || '') : ''}${FIELDS[group].map(([k, l, t, required]) => field(k, l, t, required, r[k] ?? '', group)).join('')}${group === 'tasks' ? taskLinkFields(r) : ''}</div>${group === 'tickets' ? '<p class="hint">Changing History tracker automatically updates the history date and time when you save.</p>' : ''}<div class="modal-actions"><div>${old ? `<button type="button" class="danger" data-action="delete" data-group="${group}" data-id="${esc(id)}">Delete ${group === 'tickets' ? 'ticket' : 'record'}</button>` : ''}</div><div class="actions"><button type="button" data-action="cancel">Cancel</button><button class="primary" type="submit">Save ${group === 'tickets' ? 'ticket' : 'record'}</button></div></div></form>`
+    `<form id="editForm" data-group="${group}" data-id="${esc(id || '')}"><div class="form-grid">${group === 'specs' ? projectField(projectId) + projectCompanyField(projectId, r.companyId || '') : ''}${FIELDS[group].map(([k, l, t, required]) => field(k, l, t, required, r[k] ?? '', group)).join('')}${group === 'tasks' ? taskLinkFields(r) + taskReferenceFields(r) : ''}</div>${group === 'tickets' ? '<p class="hint">Changing History tracker automatically updates the history date and time when you save.</p>' : ''}<div class="modal-actions"><div>${old ? `<button type="button" class="danger" data-action="delete" data-group="${group}" data-id="${esc(id)}">Delete ${group === 'tickets' ? 'ticket' : 'record'}</button>` : ''}</div><div class="actions"><button type="button" data-action="cancel">Cancel</button><button class="primary" type="submit">Save ${group === 'tickets' ? 'ticket' : 'record'}</button></div></div></form>`
   );
 }
 
@@ -3418,6 +3547,19 @@ function saveEdit(form) {
       r.taskType === 'Custom' ? form.elements.namedItem('customLink')?.value.trim() || '' : '';
     if (r.taskType !== 'Custom' && !r.linkId)
       throw Error('Choose the ' + r.taskType.toLowerCase() + ' to link.');
+    r.companyId = r.taskType === 'Project' ? form.elements.namedItem('companyId')?.value || '' : '';
+    if (
+      r.companyId &&
+      !state.projectCompanies.some(
+        c =>
+          c.id === r.companyId &&
+          c.projectId === r.linkId &&
+          (c.active !== false ||
+            (old?.taskType === 'Project' && old.linkId === r.linkId && old.companyId === c.id))
+      )
+    )
+      throw Error('Choose an active company belonging to the linked project.');
+    r.references = readTaskReferences(form);
     if (r.archived && !r.done) {
       r.archived = false;
       r.archivedAt = '';
@@ -3943,6 +4085,22 @@ async function enhancementAction(b) {
   if (workhubAction(b)) return true;
   const a = b.dataset.action,
     id = b.dataset.id;
+  if (a === 'task-reference-add' || a === 'task-reference-remove') {
+    const form = b.closest?.('#editForm[data-group="tasks"]');
+    if (!form) throw Error('Reopen the task editor before changing its references.');
+    if (a === 'task-reference-add') {
+      if (form.querySelectorAll('[data-task-reference]').length >= 20)
+        throw Error('Each task supports up to 20 website references.');
+      form
+        .querySelector('[data-task-reference-rows]')
+        .insertAdjacentHTML('beforeend', taskReferenceRow());
+      form
+        .querySelector('[data-task-reference-rows]')
+        .lastElementChild.querySelector('input')
+        .focus();
+    } else b.closest('[data-task-reference]').remove();
+    return true;
+  }
   if (a === 'delete-project') {
     deleteProject(id);
     return true;
@@ -4064,7 +4222,7 @@ async function enhancementAction(b) {
     if (
       c &&
       confirm(
-        `Delete company "${c.name}", its process mappings, and its project-item links? Company-linked phase gates will be kept as project-wide gates.`
+        `Delete company "${c.name}", its process mappings, and its project-item and task company links? Company-linked phase gates will be kept as project-wide gates.`
       )
     ) {
       const ok = mutate(d => {
@@ -4072,6 +4230,7 @@ async function enhancementAction(b) {
         d.projectDecisions = d.projectDecisions.filter(x => x.companyId !== id);
         d.projectProcessMappings = d.projectProcessMappings.filter(x => x.companyId !== id);
         for (const s of d.specs) if (s.companyId === id) s.companyId = '';
+        for (const t of d.tasks) if (t.companyId === id) t.companyId = '';
         for (const g of d.phaseGates) if (g.companyId === id) g.companyId = '';
       });
       governanceCompanyId = '';
@@ -4156,6 +4315,10 @@ function enhancementChange(el) {
   }
   if (id === 'field-taskType') {
     updateTaskLinkFields(el.form);
+    return true;
+  }
+  if (id === 'taskProjectLink' || id === 'taskCompany') {
+    updateTaskCompanyOptions(el.form);
     return true;
   }
   if (id === 'field-projectId' && el.form?.dataset.group === 'specs') {
@@ -5728,6 +5891,7 @@ function deleteProject(id) {
         t.taskType = 'Custom';
         t.customLink = 'Former project: ' + p.name;
         t.linkId = '';
+        t.companyId = '';
       }
     if (!d.projects.length)
       d.projects.push({
@@ -6031,7 +6195,7 @@ function workhubAction(b) {
     if (
       c &&
       confirm(
-        `Delete company "${c.name}", its process mappings, and its project-item links? Gates and feedback will be kept as project-wide records.`
+        `Delete company "${c.name}", its process mappings, and its project-item and task company links? Gates and feedback will be kept as project-wide records.`
       )
     ) {
       const ok = mutate(d => {
@@ -6040,6 +6204,7 @@ function workhubAction(b) {
         d.projectProcessMappings = d.projectProcessMappings.filter(x => x.companyId !== id);
         for (const s of d.specs) if (s.companyId === id) s.companyId = '';
         for (const g of d.phaseGates) if (g.companyId === id) g.companyId = '';
+        for (const t of d.tasks) if (t.companyId === id) t.companyId = '';
         for (const f of d.projectFeedback)
           if (f.companyId === id) {
             f.companyId = '';
@@ -6393,7 +6558,7 @@ function editCompany(id = '') {
   const row = old || { name: '', role: '' };
   openModal(
     old ? 'Edit project company' : 'Add company manually',
-    `<form id="companyForm" data-id="${esc(id)}"><div class="manual-entry-hero"><span class="eyebrow">Quick company setup</span><strong>${old ? 'Update the company name or role' : 'Create a company without an Excel upload'}</strong><p>After saving, this company becomes available in Schedule, processes, project items, phase gates and Phase Feedback.</p></div><div class="form-grid"><div class="wide"><label for="companyName">Company *</label><input id="companyName" name="name" maxlength="200" value="${esc(row.name)}" required placeholder="e.g. Farms"></div><div class="wide"><label for="companyRole">Company role</label><input id="companyRole" name="role" maxlength="500" value="${esc(row.role)}" placeholder="e.g. Farm operations"></div></div><p class="hint">Add processes after saving the company. Permanent deletion remains in Settings → Project management.</p><div class="modal-actions"><button type="button" data-action="cancel">Cancel</button><button class="primary" type="submit">${old ? 'Save company changes' : 'Add company'}</button></div></form>`
+    `<form id="companyForm" data-id="${esc(id)}" data-project="${esc(old?.projectId || state.activeProjectId)}"><div class="manual-entry-hero"><span class="eyebrow">Quick company setup</span><strong>${old ? 'Update the company name or role' : 'Create a company without an Excel upload'}</strong><p>After saving, this company becomes available in Schedule, processes, project items, phase gates and Phase Feedback.</p></div><div class="form-grid"><div class="wide"><label for="companyName">Company *</label><input id="companyName" name="name" maxlength="200" value="${esc(row.name)}" required placeholder="e.g. Farms"></div><div class="wide"><label for="companyRole">Company role</label><input id="companyRole" name="role" maxlength="500" value="${esc(row.role)}" placeholder="e.g. Farm operations"></div><div class="wide"><label class="check-label"><input type="checkbox" name="active"${row.active !== false ? ' checked' : ''}>Active for new task assignments</label><p class="hint">Inactive companies remain in project history and existing tasks, but cannot be chosen for a new task assignment.</p></div></div><p class="hint">Add processes after saving the company. Permanent deletion remains in Settings → Project management.</p><div class="modal-actions"><button type="button" data-action="cancel">Cancel</button><button class="primary" type="submit">${old ? 'Save company changes' : 'Add company'}</button></div></form>`
   );
 }
 
@@ -6404,6 +6569,11 @@ function saveCompany(form) {
     name = value('name').trim(),
     role = value('role').trim(),
     nameKey = normalizedHeader(name);
+  if (
+    form.dataset.project !== state.activeProjectId ||
+    (old && old.projectId !== state.activeProjectId)
+  )
+    throw Error('Reopen the company editor in its project before saving.');
   if (!name) throw Error('Enter the company name.');
   if (
     state.projectCompanies.some(
@@ -6418,6 +6588,7 @@ function saveCompany(form) {
     projectId: state.activeProjectId,
     name,
     role,
+    active: form.elements.namedItem('active')?.checked ?? old?.active ?? true,
     organizationStructure: old?.organizationStructure || '',
     procurement: old?.procurement || '',
     inventoryManagement: old?.inventoryManagement || '',
@@ -6462,7 +6633,7 @@ function renderProjectCompanies() {
     hiddenCount = projectMMAreas().filter(area => !area.visible).length;
   return `<section class="panel box governance-shell"><div class="flex-title"><div><span class="eyebrow">Flexible process capture</span><h2>Companies &amp; processes</h2><p class="muted">Add companies individually or use Excel for bulk mapping.</p></div><div class="actions"><button data-action="manage-mm-areas">Manage SAP MM areas</button><a class="button-link" href="./company-process-template.xlsx" download>Download Excel template</a><button data-action="import-governance">Upload Excel</button><button class="primary" data-action="new-company">+ Add company</button></div></div><div class="capture-choice"><div><strong>Company setup</strong><span>Add one company manually or use Excel for a bulk setup.</span></div><div><strong>Process maintenance</strong><span>Select a company and area, then add individual processes.</span></div></div>${
     company
-      ? `<div class="governance-browser"><aside class="governance-picker"><label for="governanceCompany">Company</label><select id="governanceCompany">${companies.map(c => `<option value="${esc(c.id)}"${c.id === company.id ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}</select><div class="company-focus"><span>Company role</span><strong>${esc(company.role) || 'Not supplied'}</strong><small>${rows.length} mapped item${rows.length === 1 ? '' : 's'}</small><button class="small" data-action="edit-company" data-id="${esc(company.id)}">Edit company</button></div><nav class="area-picker" aria-label="Company information areas">${areas
+      ? `<div class="governance-browser"><aside class="governance-picker"><label for="governanceCompany">Company</label><select id="governanceCompany">${companies.map(c => `<option value="${esc(c.id)}"${c.id === company.id ? ' selected' : ''}>${esc(c.name)}${c.active === false ? ' (inactive)' : ''}</option>`).join('')}</select><div class="company-focus"><span>Company role</span><strong>${esc(company.role) || 'Not supplied'}</strong><small>${rows.length} mapped item${rows.length === 1 ? '' : 's'} · ${company.active === false ? 'Inactive for new tasks' : 'Active for new tasks'}</small><button class="small" data-action="edit-company" data-id="${esc(company.id)}">Edit company</button></div><nav class="area-picker" aria-label="Company information areas">${areas
           .map(({ name }) => {
             const count = rows.filter(m => m.area === name).length;
             return `<button type="button" data-action="governance-area" data-area="${esc(name)}" class="${name === governanceArea ? 'active' : ''}"${name === governanceArea ? ' aria-current="page"' : ''}><span>${esc(name)}</span><strong>${count}</strong></button>`;
@@ -7277,7 +7448,7 @@ function saveTaskSub(form) {
 function taskCard(task) {
   const subs = task.subTasks || [],
     done = subs.filter(sub => sub.status === 'Completed').length;
-  return `<article class="task-main-card${taskOverdue(task) ? ' overdue' : ''}"><div class="task-card-heading"><div><span class="eyebrow">Main task${task.number ? ' · ' + esc(task.number) : ''}</span><h3>${esc(task.task)}</h3><div class="task-card-meta">${tag(task.taskType)}${tag(task.priority)}<span>${esc(taskLinkedLabel(task))}</span></div></div></div><div class="task-date-strip"><span>Due <strong>${dateLabel(task.dueDate)}</strong>${taskOverdue(task) ? ' · Overdue' : ''}</span>${task.doneDate ? `<span>Completed ${esc(task.doneDate)}</span>` : ''}${task.archived ? `<span>Archived ${esc(task.archivedAt)}</span>` : ''}</div><dl class="task-parent-notes"><div><dt>Main task remarks</dt><dd>${esc(task.remarks) || 'No remarks yet'}</dd></div><div><dt>Main task feedback</dt><dd>${esc(task.feedback) || 'No feedback yet'}</dd></div></dl><div class="task-subheading"><div><strong>Sub-tasks</strong><span>${done}/${subs.length} complete</span></div><button class="small" data-action="new-task-sub" data-parent="${esc(task.id)}">+ Add sub-task</button></div>${subs.length ? `<div class="progress"><span style="width:${(done / subs.length) * 100}%"></span></div><div class="task-child-list">${subs.map(sub => subTaskCard(task, sub)).join('')}</div>` : '<p class="task-sub-empty">Break this task into smaller actions, each with its own updates.</p>'}<div class="task-card-footer"><button class="small" data-action="edit" data-group="tasks" data-id="${esc(task.id)}">Edit main task</button>${task.archived ? `<button class="small" data-action="restore-task" data-id="${esc(task.id)}">Restore task</button>` : task.done ? `<button class="small" data-action="archive-task" data-id="${esc(task.id)}">Archive task</button>` : `<button class="small" data-action="schedule-task" data-id="${esc(task.id)}">Schedule task</button>`}</div></article>`;
+  return `<article class="task-main-card${taskOverdue(task) ? ' overdue' : ''}"><div class="task-card-heading"><div><span class="eyebrow">Main task${task.number ? ' · ' + esc(task.number) : ''}</span><h3>${esc(task.task)}</h3><div class="task-card-meta">${tag(task.taskType)}${tag(task.priority)}<span>${esc(taskLinkedLabel(task))}</span>${taskCompanyLabel(task) ? `<span class="task-company-label">Company · ${esc(taskCompanyLabel(task))}</span>` : ''}</div></div></div><div class="task-date-strip"><span>Due <strong>${dateLabel(task.dueDate)}</strong>${taskOverdue(task) ? ' · Overdue' : ''}</span>${task.doneDate ? `<span>Completed ${esc(task.doneDate)}</span>` : ''}${task.archived ? `<span>Archived ${esc(task.archivedAt)}</span>` : ''}</div><dl class="task-parent-notes"><div><dt>Main task remarks</dt><dd>${esc(task.remarks) || 'No remarks yet'}</dd></div><div><dt>Main task feedback</dt><dd>${esc(task.feedback) || 'No feedback yet'}</dd></div></dl>${taskReferencesMarkup(task)}<div class="task-subheading"><div><strong>Sub-tasks</strong><span>${done}/${subs.length} complete</span></div><button class="small" data-action="new-task-sub" data-parent="${esc(task.id)}">+ Add sub-task</button></div>${subs.length ? `<div class="progress"><span style="width:${(done / subs.length) * 100}%"></span></div><div class="task-child-list">${subs.map(sub => subTaskCard(task, sub)).join('')}</div>` : '<p class="task-sub-empty">Break this task into smaller actions, each with its own updates.</p>'}<div class="task-card-footer"><button class="small" data-action="edit" data-group="tasks" data-id="${esc(task.id)}">Edit main task</button>${task.archived ? `<button class="small" data-action="restore-task" data-id="${esc(task.id)}">Restore task</button>` : task.done ? `<button class="small" data-action="archive-task" data-id="${esc(task.id)}">Archive task</button>` : `<button class="small" data-action="schedule-task" data-id="${esc(task.id)}">Schedule task</button>`}</div></article>`;
 }
 function taskSummary() {
   const active = state.tasks.filter(task => !task.archived),
@@ -8034,6 +8205,9 @@ function reportModel(d, asof) {
       'Task type',
       'Linked ID',
       'Linked to',
+      'Company ID',
+      'Company',
+      'Website references',
     ],
     d.tasks.map((t, i) => {
       const r = i + 5,
@@ -8069,9 +8243,12 @@ function reportModel(d, asof) {
         t.taskType,
         t.linkId,
         linked,
+        t.companyId || '',
+        taskCompanyLabel(t, d),
+        (t.references || []).map(ref => (ref.label ? ref.label + ': ' : '') + ref.url).join('\n'),
       ];
     }),
-    [22, 10, 75, 14, 16, 12, 16, 14, 16, 65, 65, 18, 16, 24, 45],
+    [22, 10, 75, 14, 16, 12, 16, 14, 16, 65, 65, 18, 16, 24, 45, 24, 35, 65],
     { 4: 'date', 6: 'date', 8: 'date' }
   );
   const weekend = date => [0, 6].includes(new Date(date + 'T12:00:00').getDay()),
@@ -9734,6 +9911,8 @@ hub = WorkHubStudio.install({
   entries: scheduleEntries,
   entryTitle: scheduleEntryTitle,
   taskLabel: taskLinkedLabel,
+  taskCompanyLabel,
+  taskReferences: taskReferencesMarkup,
   itemLabel: projectItemLabel,
   appendTicketHistory: autoHistory,
   rangeSegments,
