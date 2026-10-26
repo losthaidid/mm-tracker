@@ -13,7 +13,7 @@ function hub(t, initial = {}, rich = false) {
   window.URL.createObjectURL = () => 'blob:test-export'; window.URL.revokeObjectURL = () => {};
   window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
   window.HTMLDialogElement.prototype.close = function () { this.open = false; };
-  for (const f of ['rehearsal-engine.js', 'process-hub-files.js', ...(rich?['process-canvas-art.js','process-canvas.js']:[]), 'audience-view.js', 'presentation-screen.js', 'presenter.js', 'rehearsal.js']) window.eval(source(f));
+  for (const f of ['rehearsal-engine.js', 'process-hub-files.js', 'process-canvas-art.js', 'process-inspector.js', ...(rich?['process-canvas.js']:[]), 'audience-view.js', 'presentation-screen.js', 'presenter.js', 'rehearsal.js']) window.eval(source(f));
   const E = window.WorkHubRehearsalEngine, F = window.WorkHubProcessFiles;
   let state = { projects: [], tickets: [], specs: [], workhub: { processes: [], notes: [], tcodes: { records: [] }, ...initial } };
   E.upgrade(state);
@@ -639,4 +639,69 @@ test('Canvas workspace: presenter connection removal, deletion and dock preserve
  h.action('cancel');h.action('undo');h.geometry();h.tool('select');const card=h.host.querySelector('[data-node="no"]');presenterPointer(h,card,'pointerdown',350,250);presenterPointer(h,h.host,'pointercancel',350,250);h.action('delete-steps');
  assert.equal(h.ui.model().steps.length,2);assert.equal(h.ui.snapshot().paused,false);assert.equal(h.audience.querySelectorAll('.av-node').length,2);h.action('undo');assert.equal(h.ui.model().steps.length,3);
  assert.deepEqual(h.order,['window','fullscreen']);assert.equal(h.document.fullscreenElement,null);assert.equal(h.audience.fullscreenElement,h.audience.documentElement);
+});
+
+test('Visio-style links: Delete selection removes selected links only, supports cancellation and Undo, and keeps the live clock', async t=>{
+ const h=hub(t);loadFlow(h,liveFlow(h));const advance=liveClock(h);advance(5);
+ h.document.querySelector('.rehearsal-edge[data-from="po"][data-to="finish"]').dispatchEvent(new h.window.MouseEvent('click',{bubbles:true}));
+ assert.equal(h.ui.snapshot().selectedLinks.length,1);assert.ok(h.document.querySelector('[data-link-handle="start"]'));assert.ok(h.document.getElementById('processConnectorForm'));assert.equal(h.ui.snapshot().selection.length,0);
+ const before=JSON.stringify(h.ui.model()),clock=h.ui.snapshot().elapsed;
+ h.window.confirm=()=>false;await h.click('delete-steps');assert.equal(JSON.stringify(h.ui.model()),before);assert.equal(h.writes.length,0);
+ h.window.confirm=()=>true;await h.click('delete-steps');assert.equal(h.ui.model().steps.length,4);assert.equal(h.ui.model().steps[0].next,'');assert.equal(h.ui.snapshot().paused,false);assert.equal(h.ui.snapshot().elapsed,clock);assert.equal(h.writes.length,1);
+ await h.click('undo-canvas');assert.equal(h.ui.model().steps[0].next,'finish');assert.equal(h.writes.length,2);
+});
+test('Visio-style links: dragging both endpoints reattaches anywhere on step edges with one save on drop, and bends persist with matching animation',async t=>{
+ const h=hub(t);loadFlow(h,liveFlow(h));const geometry=()=>{h.document.getElementById('rehearsalBoard').getBoundingClientRect=()=>({left:0,top:0});};geometry();
+ const pick=(from,to)=>h.document.querySelector('.rehearsal-edge[data-from="'+from+'"][data-to="'+to+'"]').dispatchEvent(new h.window.MouseEvent('click',{bubbles:true}));
+ pick('po','finish');let target=h.ui.model().steps.find(s=>s.id==='branch-a'),handle=h.document.querySelector('[data-link-handle="end"]');
+ presenterPointer(h,handle,'pointerdown',310,100);presenterPointer(h,h.document.getElementById('rehearsalViewport'),'pointermove',target.x+63,target.y);
+ assert.equal(h.writes.length,0);presenterPointer(h,h.document.getElementById('rehearsalViewport'),'pointerup',target.x+63,target.y);assert.equal(h.writes.length,1);assert.equal(h.ui.model().steps[0].next,'branch-a');
+ let edge=h.E.connector(h.ui.model(),'po','branch-a');assert.equal(edge.end.side,'top');assert.ok(Math.abs(edge.end.offset-.3)<1e-8);assert.equal(h.ui.audienceSnapshot().edges.find(e=>e.from==='po'&&e.to==='branch-a').end.side,'top');
+ geometry();handle=h.document.querySelector('[data-link-handle="start"]');target=h.ui.model().steps.find(s=>s.id==='branch-b');
+ presenterPointer(h,handle,'pointerdown',260,105);presenterPointer(h,h.document.getElementById('rehearsalViewport'),'pointermove',target.x+210,target.y+75);presenterPointer(h,h.document.getElementById('rehearsalViewport'),'pointerup',target.x+210,target.y+75);
+ assert.equal(h.writes.length,2);assert.equal(h.ui.model().steps[0].next,'');assert.equal(h.ui.model().steps.find(s=>s.id==='branch-b').next,'branch-a');edge=h.E.connector(h.ui.model(),'branch-b','branch-a');assert.equal(edge.start.side,'right');assert.equal(edge.start.offset,.75);
+ geometry();handle=h.document.querySelector('[data-link-handle="bend-new"]');presenterPointer(h,handle,'pointerdown',600,300);presenterPointer(h,h.document.getElementById('rehearsalViewport'),'pointermove',450,650);presenterPointer(h,h.document.getElementById('rehearsalViewport'),'pointerup',450,650);
+ assert.equal(h.writes.length,3);edge=h.E.connector(h.ui.model(),'branch-b','branch-a');assert.deepEqual(copy(edge.via),[{x:450,y:650}]);assert.equal(h.ui.audienceSnapshot().playing,true);
+ await h.click('undo-canvas');assert.equal(h.E.connector(h.ui.model(),'branch-b','branch-a').via.length,0);
+});
+test('Visio-style links: invalid drops, pointer cancellation and concurrent changes keep the original route and reject stale writes',async t=>{
+ const h=hub(t);loadFlow(h,liveFlow(h));const setup=()=>{h.document.getElementById('rehearsalBoard').getBoundingClientRect=()=>({left:0,top:0});h.document.querySelector('.rehearsal-edge[data-from="po"]').dispatchEvent(new h.window.MouseEvent('click',{bubbles:true}));return h.document.querySelector('[data-link-handle="end"]');};
+ let handle=setup();presenterPointer(h,handle,'pointerdown',300,100);presenterPointer(h,h.document.getElementById('rehearsalViewport'),'pointermove',1800,1800);presenterPointer(h,h.document.getElementById('rehearsalViewport'),'pointerup',1800,1800);assert.equal(h.writes.length,0);assert.equal(h.ui.model().steps[0].next,'finish');
+ handle=setup();presenterPointer(h,handle,'pointerdown',300,100);presenterPointer(h,h.document.getElementById('rehearsalViewport'),'pointermove',650,220);presenterPointer(h,h.document.getElementById('rehearsalViewport'),'pointercancel',650,220);assert.equal(h.writes.length,0);
+ handle=setup();presenterPointer(h,handle,'pointerdown',300,100);presenterPointer(h,h.document.getElementById('rehearsalViewport'),'pointermove',650,220);h.change(d=>{d.workhub.rehearsal.processes[0].notes='Newer remote context';});presenterPointer(h,h.document.getElementById('rehearsalViewport'),'pointerup',650,220);assert.equal(h.writes.length,0);assert.equal(h.ui.model().steps[0].next,'finish');assert.match(h.messages.at(-1),/changed/);assert.equal(h.ui.model().notes,'Newer remote context');
+});
+test('Step inspector tabs retain every field, preserve an unsaved tab across renders, and save hidden values without stopping playback',async t=>{
+ const h=hub(t);loadFlow(h,liveFlow(h));h.ui.stepEditor('po');let f=h.document.getElementById('rehearsalStepForm');assert.equal(f.querySelectorAll('[role="tab"]').length,4);assert.equal(f.querySelector('[data-inspector-page="flow"]').hidden,true);
+ f.querySelector('[data-inspector-tab="details"]').click();f.elements.configuration.value='Retain private setup';f.elements.inputs.value='A file';f.querySelector('[data-inspector-tab="references"]').click();f.elements.link.value='https://example.com/reference';
+ h.change(d=>{d.workhub.rehearsal.preferences.volume=.3;});f=h.document.getElementById('rehearsalStepForm');assert.equal(f.dataset.inspectorSection,'references');assert.equal(f.elements.configuration.value,'Retain private setup');
+ f.querySelector('[data-inspector-tab="step"]').click();assert.equal(f.dataset.inspectorSection,'step');f.elements.title.value='Simpler step editor';h.ui.saveForm(f);assert.equal(h.ui.model().steps[0].configuration,'Retain private setup');assert.equal(h.ui.model().steps[0].inputs,'A file');assert.equal(h.ui.model().steps[0].link,'https://example.com/reference');assert.equal(h.ui.audienceSnapshot().playing,true);
+});
+test('Connection inspector applies precise anchors and route styles, and Undo restores the absence of custom layout metadata',async t=>{
+ const h=hub(t);loadFlow(h,liveFlow(h));h.document.querySelector('.rehearsal-edge[data-from="po"]').dispatchEvent(new h.window.MouseEvent('click',{bubbles:true}));const f=h.document.getElementById('processConnectorForm');
+ f.elements.namedItem('style').value='elbow';f.elements.namedItem('startSide').value='bottom';f.elements.namedItem('startOffset').value='17';f.elements.namedItem('endSide').value='top';f.elements.namedItem('endOffset').value='80';f.dispatchEvent(new h.window.Event('submit',{bubbles:true,cancelable:true}));
+ assert.equal(h.writes.length,1);const edge=h.E.connector(h.ui.model(),'po','finish');assert.equal(edge.style,'elbow');assert.deepEqual(copy(edge.start),{side:'bottom',offset:.17});assert.equal(h.ui.audienceSnapshot().playing,true);
+ await h.click('undo-canvas');assert.equal(h.ui.model().connectors,undefined);assert.equal(h.ui.model().steps[0].next,'finish');
+});
+test('Private presenter connection handles update the live audience, Delete keeps steps, Undo restores routes and no editing handles reach the audience',async t=>{
+ const h=await richPresenter(t),before=copy(h.ui.model()),edge=h.host.querySelector('.av-edge'),from=edge.dataset.from,to=edge.dataset.to;
+ presenterPointer(h,edge,'pointerdown',280,120);assert.ok(h.host.querySelector('[data-link-handle="end"]'));assert.equal(h.audience.querySelectorAll('[data-link-handle],button,input').length,0);
+ let handle=h.host.querySelector('[data-link-handle="bend-new"]');presenterPointer(h,handle,'pointerdown',300,120);presenterPointer(h,h.host,'pointermove',440,410);assert.equal(h.writes.length,0);presenterPointer(h,h.host,'pointerup',440,410);assert.equal(h.writes.length,1);
+ assert.equal(h.E.connector(h.ui.model(),from,to).via.length,1);assert.equal(h.ui.audienceSnapshot().playing,true);const privatePath=h.host.querySelector('.av-edge[data-from="'+from+'"][data-to="'+to+'"] path').getAttribute('d'),publicPath=h.audience.querySelector('.av-edge[data-from="'+from+'"][data-to="'+to+'"] path').getAttribute('d');assert.equal(privatePath,publicPath);
+ h.action('delete-steps');assert.equal(h.ui.model().steps.length,before.steps.length);assert.ok(!h.E.connections(h.ui.model().steps.find(s=>s.id===from)).includes(to));h.action('undo');assert.ok(h.E.connections(h.ui.model().steps.find(s=>s.id===from)).includes(to));h.action('undo');assert.equal(h.ui.model().connectors,undefined);
+});
+test('Custom link routes persist in legacy Process Hub records without converting libraries or losing old references',t=>{
+ const h=hub(t,{processes:[oldProcess()]}),p=h.ui.model();h.E.setConnector(p,{...h.E.connector(p,'s0','s1'),start:{side:'bottom',offset:.35},end:{side:'top',offset:.6},style:'elbow',via:[{x:500,y:500}]});h.E.store(h.state(),p);h.E.validate(h.state());
+ assert.equal(h.state().workhub.rehearsal.processes.length,0);assert.equal(h.state().workhub.processes[0].canvas.connectors[0].via[0].x,500);const again=h.E.library(h.state())[0];assert.equal(again.connectors[0].start.offset,.35);assert.equal(again.steps[0].projectId,'project-old');assert.deepEqual(copy(h.state().workhub.processes[0].steps[0].next),['s1','s2']);
+});
+test('Image and PDF diagram drawing uses the customized route geometry and endpoint rather than reverting to fixed side ports',t=>{
+ const h=hub(t),p=liveFlow(h),a=p.steps[0],b=p.steps[1];h.E.setConnector(p,{...h.E.connector(p,a.id,b.id),start:{side:'bottom',offset:.3},end:{side:'top',offset:.8},via:[{x:500,y:700}],style:'elbow'});
+ const calls=[],context=new Proxy({measureText:text=>({width:String(text).length*8})},{get:(o,k)=>k in o?o[k]:(...args)=>calls.push([k,...args]),set:(o,k,v)=>(o[k]=v,true)});h.window.HTMLCanvasElement.prototype.getContext=()=>context;
+ const g=h.window.WorkHubProcessCanvasArt.linkGeometry(a,b,p.connectors[0]);h.F.diagram(p);assert.ok(calls.some(row=>row[0]==='moveTo'&&row[1]===g.start.x&&row[2]===g.start.y));assert.ok(calls.some(row=>row[0]==='bezierCurveTo'&&row[5]===g.end.x&&row[6]===g.end.y));assert.ok(calls.some(row=>row[0]==='bezierCurveTo'&&row[5]===500&&row[6]===700));
+});
+test('Private presenter reconnects a starting point on a playing branch, supports cancellation, and exposes the same four-tab step inspector',async t=>{
+ const h=await richPresenter(t),edge=h.host.querySelector('.av-edge[data-from="ask"][data-to="yes"]');presenterPointer(h,edge,'pointerdown',260,100);h.geometry();
+ let handle=h.host.querySelector('[data-link-handle="start"]'),target=h.ui.model().steps.find(s=>s.id==='no');presenterPointer(h,handle,'pointerdown',260,100);presenterPointer(h,h.host,'pointermove',target.x+210,target.y+70);presenterPointer(h,h.host,'pointercancel',target.x+210,target.y+70);assert.equal(h.writes.length,0);
+ h.geometry();handle=h.host.querySelector('[data-link-handle="start"]');presenterPointer(h,handle,'pointerdown',260,100);presenterPointer(h,h.host,'pointermove',target.x+210,target.y+70);presenterPointer(h,h.host,'pointerup',target.x+210,target.y+70);
+ assert.equal(h.writes.length,1);assert.ok(h.E.connections(h.ui.model().steps.find(s=>s.id==='no')).includes('yes'));assert.equal(h.E.connector(h.ui.model(),'no','yes').start.offset,.7);assert.equal(h.ui.audienceSnapshot().playing,true);assert.equal(h.audience.querySelectorAll('[data-link-handle],button,input').length,0);
+ h.tool('select');h.geometry();const card=h.host.querySelector('[data-node="no"]');presenterPointer(h,card,'pointerdown',350,250);presenterPointer(h,h.host,'pointercancel',350,250);h.action('edit-step');assert.equal(h.panel.querySelectorAll('[data-pc-form="step"] [role="tab"]').length,4);h.panel.querySelector('[data-inspector-tab="flow"]').click();assert.equal(h.panel.querySelector('[data-inspector-page="flow"]').hidden,false);assert.equal(h.panel.querySelector('[name="changes"]').closest('[data-inspector-page]').dataset.inspectorPage,'flow');
 });

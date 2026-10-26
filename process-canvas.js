@@ -26,7 +26,8 @@
       history = [],
       editor = null,
       tool = 'move',
-      linkFrom = '';
+      linkFrom = '',
+      selectedEdge = null;
     const live = () => a.live() && !!panel.isConnected;
     const model = () => draft || a.canvas.model();
     const notify = s => {
@@ -83,7 +84,8 @@
       '<button type="button" data-pc="select-all">Select all steps</button><button type="button" data-pc="clear-selection">Clear selection</button><button type="button" data-pc="edit-step">Edit selected step</button><button type="button" data-pc="connect">Connect ports</button><button type="button" data-pc="finish-links">Done linking</button><button type="button" data-pc="attach">Attach note / arrow to step</button><button type="button" data-pc="detach">Detach selected</button><button type="button" data-pc="links">Project / knowledge links</button><button type="button" data-pc="undo">Undo canvas edit</button><button type="button" data-pc="copy">Save editable copy</button><button type="button" data-presenter="end">End presentation</button>';
     for (const [action, label] of [
       ['manage-connections', 'Unlink / manage connections'],
-      ['delete-steps', 'Delete selected steps'],
+      ['delete-steps', 'Delete selected steps / links'],
+      ['edit-connection', 'Edit selected connection'],
     ]) {
       const button = doc.createElement('button');
       button.type = 'button';
@@ -298,6 +300,7 @@
       const s = draft.steps.find(s => s.id === stepId);
       if (!s) return;
       node = stepId;
+      selectedEdge = null;
       const refs = a.canvas.references();
       const form =
         '<form data-pc-form="step">' +
@@ -352,7 +355,10 @@
         reference('projectId', 'Related project', refs.projects, s.projectId) +
         reference('noteId', 'Knowledge note', refs.notes, s.noteId) +
         '<div class="pc-editor-actions"><button type="button" data-pc="cancel">Cancel</button><button type="submit">Save step</button><button type="button" data-pc="delete-step">Delete step</button></div><p data-pc-error role="alert"></p></form>';
-      openEditor('Maintain step', form);
+      openEditor('Edit step', form);
+      const stepForm = editor.querySelector('form');
+      stepForm.id = 'presenterStepForm';
+      root.WorkHubProcessInspector?.enhance(stepForm);
       editor.querySelector('form').addEventListener('submit', e => {
         e.preventDefault();
         try {
@@ -405,6 +411,7 @@
               .map(a => a.next)
               .filter(id => id && id !== row.next);
           } else delete row.decision;
+          E.pruneConnectors(draft);
           for (const scenario of draft.scenarios)
             if (
               scenario.routes?.[row.id] !== undefined &&
@@ -509,6 +516,94 @@
       }
       a.publish();
     }
+    function editConnection() {
+      const p = a.canvas.model();
+      if (!selectedEdge) throw Error('Click a connection first.');
+      const edge = copy(E.connector(p, selectedEdge.from, selectedEdge.to)),
+        rows = p.steps.map(s => ({ id: s.id, title: s.title }));
+      const anchor = key =>
+        '<fieldset><legend>' +
+        (key === 'start' ? 'Starting point' : 'Endpoint') +
+        '</legend><label>Edge<select name="' +
+        key +
+        'Side">' +
+        ['top', 'right', 'bottom', 'left']
+          .map(
+            side =>
+              '<option' + (edge[key].side === side ? ' selected' : '') + '>' + side + '</option>'
+          )
+          .join('') +
+        '</select></label><label>Position %<input name="' +
+        key +
+        'Offset" type="number" min="0" max="100" value="' +
+        Math.round(edge[key].offset * 100) +
+        '"></label></fieldset>';
+      openEditor(
+        'Edit connection',
+        '<form data-pc-form="connection">' +
+          reference('from', 'Starting step', rows, edge.from) +
+          reference('to', 'Destination step', rows, edge.to) +
+          '<label>Route style<select name="style">' +
+          [
+            ['curve', 'Smooth curve'],
+            ['elbow', 'Right-angle / Visio'],
+            ['straight', 'Straight line'],
+          ]
+            .map(
+              ([v, l]) =>
+                '<option value="' +
+                v +
+                '"' +
+                (edge.style === v ? ' selected' : '') +
+                '>' +
+                l +
+                '</option>'
+            )
+            .join('') +
+          '</select></label>' +
+          anchor('start') +
+          anchor('end') +
+          '<p>Drag either endpoint to a step edge. Drag the diamond to shape the route. Shift snaps to a 10 px grid.</p><div class="pc-editor-actions"><button type="button" data-pc="add-connection-bend">＋ Route bend</button><button type="button" data-pc="reset-connection">Reset route</button><button type="submit">Apply connection</button><button type="button" data-pc="delete-steps">Delete link</button></div><p data-pc-error role="alert"></p></form>'
+      );
+      editor._before = copy(p);
+      editor.querySelector('form').addEventListener('submit', event => {
+        event.preventDefault();
+        try {
+          const f = event.target,
+            v = k => f.elements.namedItem(k).value,
+            next = copy(p),
+            layout = copy(edge);
+          layout.style = v('style');
+          for (const key of ['start', 'end'])
+            layout[key] = { side: v(key + 'Side'), offset: Number(v(key + 'Offset')) / 100 };
+          E.reconnect(next, edge.from, edge.to, v('from'), v('to'), layout);
+          if (commit(next, p)) {
+            selectedEdge = { from: v('from'), to: v('to') };
+            editor.remove();
+            editor = null;
+            a.publish();
+          }
+        } catch (err) {
+          event.target.querySelector('[data-pc-error]').textContent = err.message;
+        }
+      });
+    }
+    function targetAt(point, p, other) {
+      return p.steps
+        .filter(
+          s =>
+            s.id !== other &&
+            point.x >= s.x - 24 &&
+            point.x <= s.x + 234 &&
+            point.y >= s.y - 24 &&
+            point.y <= s.y + 124
+        )
+        .sort(
+          (a, b) =>
+            Math.hypot(point.x - a.x - 105, point.y - a.y - 50) -
+            Math.hypot(point.x - b.x - 105, point.y - b.y - 50)
+        )[0];
+    }
     function connectionEditor(source = linkFrom || node || model().steps[0]?.id) {
       const p = a.canvas.model(),
         row = p.steps.find(s => s.id === source);
@@ -563,7 +658,47 @@
         }
         return;
       }
+      if (name === 'edit-connection') {
+        editConnection();
+        return;
+      }
+      if ((name === 'add-connection-bend' || name === 'reset-connection') && selectedEdge) {
+        const edge = copy(E.connector(p, selectedEdge.from, selectedEdge.to));
+        if (name === 'reset-connection') {
+          edge.start = { side: 'right', offset: 0.5 };
+          edge.end = { side: 'left', offset: 0.5 };
+          edge.via = [];
+        } else {
+          if (edge.via.length >= 8) throw Error('Use up to eight route bends.');
+          const pt = A.linkGeometry(
+            p.steps.find(s => s.id === edge.from),
+            p.steps.find(s => s.id === edge.to),
+            edge
+          ).point(0.5);
+          edge.via.push({ x: Math.max(0, pt.x + 40), y: Math.max(0, pt.y + 60) });
+        }
+        E.setConnector(next, edge);
+        if (commit(next, editor?._before || p)) editConnection();
+        return;
+      }
       if (name === 'delete-steps') {
+        if (selectedEdge) {
+          if (editor && !editor.querySelector('[data-pc-form="connection"]'))
+            throw Error('Save or cancel step details before deleting a link.');
+          if (
+            !root.confirm('Delete the selected link? Both steps will be kept. Undo can restore it.')
+          )
+            return;
+          E.disconnect(next, selectedEdge.from, selectedEdge.to);
+          if (commit(next, editor?._before || p)) {
+            selectedEdge = null;
+            editor?.remove();
+            editor = null;
+            a.publish();
+            notify('Link deleted. Both steps are kept. Undo can restore it.');
+          }
+          return;
+        }
         if (editor) throw Error('Save or cancel step details before deleting selected steps.');
         const ids = nodes.size ? [...nodes] : node ? [node] : [];
         if (!ids.length) throw Error('Select one or more steps first.');
@@ -590,6 +725,7 @@
         return;
       }
       if (name === 'select-all' || name === 'clear-selection') {
+        selectedEdge = null;
         setTool('select');
         selected = '';
         nodes = new Set(name === 'select-all' ? model().steps.map(s => s.id) : []);
@@ -665,6 +801,8 @@
           throw Error('The process changed after that edit. Undo was left untouched.');
         if (a.canvas.save(last.before, p) !== false) {
           history.pop();
+          if (history.length) history.at(-1).after = JSON.stringify(a.canvas.model());
+          selectedEdge = null;
           selected = '';
           a.publish();
         }
@@ -825,12 +963,63 @@
           } catch {}
           return;
         }
+        const connectionHandle = e.target.closest('[data-link-handle]'),
+          connection = e.target.closest('.av-edge');
+        if (
+          host.contains(e.target) &&
+          (connectionHandle || connection) &&
+          ['move', 'select', 'connect'].includes(tool)
+        ) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          a.freezeCamera?.();
+          if (editor) {
+            notify('Save or cancel the open editor before arranging a connection.');
+            return;
+          }
+          const before = a.canvas.model();
+          if (before.id === '__demo__') {
+            notify('Save an editable copy before editing connections.');
+            return;
+          }
+          if (connectionHandle && selectedEdge) {
+            gesture = {
+              kind: 'connection',
+              handle: connectionHandle.dataset.linkHandle,
+              id: e.pointerId,
+              start: position(e),
+              client: [e.clientX, e.clientY],
+              before: copy(before),
+              edge: copy(E.connector(before, selectedEdge.from, selectedEdge.to)),
+              moved: false,
+              valid: true,
+            };
+            draft = copy(before);
+            try {
+              stage.setPointerCapture(e.pointerId);
+            } catch {}
+          } else if (connection) {
+            selectedEdge = { from: connection.dataset.from, to: connection.dataset.to };
+            selected = '';
+            node = '';
+            nodes.clear();
+            a.publish();
+            notify(
+              'Link selected · drag either endpoint or the route diamond. Steps → Edit selected connection for precise settings. Delete selection removes only this link.'
+            );
+          }
+          host.focus({ preventScroll: true });
+          return;
+        }
         if (!host.contains(e.target) || !position(e)) return;
         const point = position(e),
           markId = e.target.closest('[data-canvas-mark]')?.dataset.canvasMark,
           stepId = e.target.closest('[data-node]')?.dataset.node,
           port = e.target.closest('[data-pc-port]');
-        if (stepId) node = stepId;
+        if (stepId) {
+          node = stepId;
+          selectedEdge = null;
+        }
         if (tool === 'move' && !port) return;
         if (tool === 'laser') return;
         e.preventDefault();
@@ -974,6 +1163,43 @@
         if (!point) return;
         const dx = point.x - gesture.start.x,
           dy = point.y - gesture.start.y;
+        if (gesture.kind === 'connection') {
+          const g = gesture,
+            edge = copy(g.edge),
+            p = copy(g.before),
+            key = g.handle;
+          g.moved ||= Math.hypot(e.clientX - g.client[0], e.clientY - g.client[1]) > 4;
+          if (e.shiftKey) {
+            point.x = Math.round(point.x / 10) * 10;
+            point.y = Math.round(point.y / 10) * 10;
+          }
+          point.x = A.clamp(point.x, 0, 8000);
+          point.y = A.clamp(point.y, 0, 8000);
+          g.valid = true;
+          if (key === 'start' || key === 'end') {
+            const target = targetAt(point, p, key === 'start' ? edge.to : edge.from);
+            if (target) {
+              edge[key] = A.nearestAnchor(target, point);
+              edge[key === 'start' ? 'from' : 'to'] = target.id;
+            } else {
+              g.valid = false;
+              notify('Drop the endpoint onto any edge of a step.');
+            }
+          } else edge.via[key === 'bend-new' ? 0 : Number(key.slice(5))] = point;
+          if (g.valid) {
+            try {
+              E.reconnect(p, g.edge.from, g.edge.to, edge.from, edge.to, edge);
+              draft = p;
+              selectedEdge = { from: edge.from, to: edge.to };
+              g.next = edge;
+              schedule();
+            } catch (err) {
+              g.valid = false;
+              notify(err.message);
+            }
+          }
+          return;
+        }
         if (gesture.kind === 'marquee') {
           const x = Math.min(point.x, gesture.start.x),
             y = Math.min(point.y, gesture.start.y),
@@ -1069,6 +1295,8 @@
       dropPreview?.remove();
       dropPreview = null;
       if (gesture?.kind === 'marquee') nodes = new Set(gesture.base);
+      if (gesture?.kind === 'connection')
+        selectedEdge = { from: gesture.edge.from, to: gesture.edge.to };
       gesture = null;
       draft = null;
       marquee.hidden = true;
@@ -1085,6 +1313,18 @@
         gesture = null;
         marquee.hidden = true;
         try {
+          if (done.kind === 'connection') {
+            if (!done.moved) {
+              draft = null;
+              a.publish();
+              return;
+            }
+            if (!done.valid || !done.next)
+              throw Error('Drop the endpoint on an edge of a step. The original link is kept.');
+            commit(draft, done.before);
+            notify('Connection updated · playback continues. Undo can restore it.');
+            return;
+          }
           if (done.kind === 'marquee') {
             a.publish();
             selectionNotice();
@@ -1184,6 +1424,7 @@
           commit(draft, done.before);
           if (done.kind === 'draw') setTool('select');
         } catch (err) {
+          if (done.kind === 'connection') selectedEdge = { from: done.edge.from, to: done.edge.to };
           draft = null;
           notify(err.message);
           a.publish();
@@ -1223,6 +1464,74 @@
       'keydown',
       e => {
         if (!live()) return;
+        if (selectedEdge && !e.target.closest('input,textarea,select,[contenteditable="true"]')) {
+          const handle = e.target.closest('[data-link-handle]')?.dataset.linkHandle;
+          if (['Delete', 'Backspace'].includes(e.key)) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            try {
+              if (handle?.startsWith('bend-') && handle !== 'bend-new') {
+                const before = a.canvas.model(),
+                  next = copy(before),
+                  edge = copy(E.connector(next, selectedEdge.from, selectedEdge.to));
+                edge.via.splice(Number(handle.slice(5)), 1);
+                E.setConnector(next, edge);
+                commit(next, before);
+              } else action('delete-steps');
+            } catch (err) {
+              notify(err.message);
+            }
+            return;
+          }
+          if (handle && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            try {
+              const before = a.canvas.model(),
+                next = copy(before),
+                edge = copy(E.connector(next, selectedEdge.from, selectedEdge.to)),
+                n = e.shiftKey ? 10 : 2,
+                dx = e.key === 'ArrowLeft' ? -n : e.key === 'ArrowRight' ? n : 0,
+                dy = e.key === 'ArrowUp' ? -n : e.key === 'ArrowDown' ? n : 0;
+              if (handle === 'start' || handle === 'end')
+                edge[handle].offset = A.clamp(edge[handle].offset + (dx || dy) / 100, 0, 1);
+              else {
+                const i = handle === 'bend-new' ? 0 : Number(handle.slice(5)),
+                  pt =
+                    edge.via[i] ||
+                    A.linkGeometry(
+                      next.steps.find(s => s.id === edge.from),
+                      next.steps.find(s => s.id === edge.to),
+                      edge
+                    ).point(0.5);
+                edge.via[i] = { x: A.clamp(pt.x + dx, 0, 8000), y: A.clamp(pt.y + dy, 0, 8000) };
+              }
+              E.setConnector(next, edge);
+              commit(next, before);
+              host
+                .querySelector(
+                  '[data-link-handle="' + (handle === 'bend-new' ? 'bend-0' : handle) + '"]'
+                )
+                ?.focus({ preventScroll: true });
+            } catch (err) {
+              notify(err.message);
+            }
+            return;
+          }
+          if (e.key === 'Enter' && !e.target.closest('[data-pc-port]')) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            editConnection();
+            return;
+          }
+          if (e.key === 'Escape' && !gesture && !editor) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            selectedEdge = null;
+            a.publish();
+            return;
+          }
+        }
         const port = e.target.closest('[data-pc-port]');
         if (port && ['Enter', ' '].includes(e.key)) {
           e.preventDefault();
@@ -1324,6 +1633,7 @@
           selected = '';
           node = '';
           linkFrom = '';
+          selectedEdge = null;
           nodes.clear();
           marquee.hidden = true;
           editor?.remove();
@@ -1351,12 +1661,14 @@
               to,
               failure: to === s.failNext,
               label: E.answers(s).find(a => a.next === to)?.label || '',
+              ...copy(E.connector(p, s.id, to)),
             }))
           ),
         };
       },
       options: () => ({
         canvasSelection: selected,
+        selectedEdge,
         selectedNode: node,
         selectedNodes: [...nodes],
         connectFrom: linkFrom,
@@ -1378,6 +1690,7 @@
         editing: !!editor,
         dragging: !!gesture,
         linking: !!linkFrom,
+        selectedEdge,
       }),
     };
   }

@@ -160,6 +160,8 @@
     const boxes = (p.annotations || [])
       .map(m => root.WorkHubProcessCanvasArt?.box(m, p.steps))
       .filter(Boolean);
+    for (const edge of p.connectors || [])
+      for (const pt of edge.via) boxes.push({ x: pt.x, y: pt.y, w: 40, h: 40 });
     const minX = Math.min(0, ...boxes.map(b => b.x - 20), ...p.steps.map(s => s.x - 90)),
       minY = Math.min(0, ...boxes.map(b => b.y - 20), ...p.steps.map(s => s.y - 40));
     const w =
@@ -197,16 +199,27 @@
       ]) {
         const b = map.get(id);
         if (!b) continue;
+        const geometry = root.WorkHubProcessCanvasArt?.linkGeometry(s, b, E.connector(p, s.id, id));
         const k = Math.max(70, Math.abs(b.x - s.x - 210) * 0.45),
-          x = s.x + 210,
-          y = s.y + 50;
+          x = geometry?.start.x ?? s.x + 210,
+          y = geometry?.start.y ?? s.y + 50;
         c.strokeStyle = kind === 'exception' ? '#ba7770' : '#7a9e8e';
         c.lineWidth = 2.5;
         c.setLineDash(kind === 'exception' ? [6, 6] : []);
         c.beginPath();
         c.moveTo(x, y);
         const offset = b.x <= x ? 150 : 0;
-        c.bezierCurveTo(x + k, y + offset, b.x - k, b.y + 50 + offset, b.x, b.y + 50);
+        if (geometry)
+          for (const segment of geometry.segments)
+            c.bezierCurveTo(
+              segment[1].x,
+              segment[1].y,
+              segment[2].x,
+              segment[2].y,
+              segment[3].x,
+              segment[3].y
+            );
+        else c.bezierCurveTo(x + k, y + offset, b.x - k, b.y + 50 + offset, b.x, b.y + 50);
         c.stroke();
         const answer = s.decision?.answers.findIndex(a => a.next === id);
         if (answer !== undefined && answer >= 0) {
@@ -214,8 +227,9 @@
           c.font = font(12, true);
           const text = keys.get(s.id) + String.fromCharCode(65 + answer),
             tw = c.measureText(text).width;
-          const tx = (x + b.x) / 2 - tw / 2,
-            ty = (y + b.y + 50) / 2 + offset * 0.75 - 7;
+          const middle = geometry?.point(0.5);
+          const tx = (middle?.x ?? (x + b.x) / 2) - tw / 2,
+            ty = (middle?.y ?? (y + b.y + 50) / 2 + offset * 0.75) - 7;
           c.fillStyle = '#f4f4ed';
           c.fillRect(tx - 4, ty - 13, tw + 8, 19);
           c.fillStyle = ink;
@@ -225,9 +239,12 @@
         c.setLineDash([]);
         c.fillStyle = c.strokeStyle;
         c.beginPath();
-        c.moveTo(b.x, b.y + 50);
-        c.lineTo(b.x - 10, b.y + 45);
-        c.lineTo(b.x - 10, b.y + 55);
+        const end = geometry?.end || { x: b.x, y: b.y + 50 },
+          previous = geometry?.point(0.98) || { x: b.x - 10, y: b.y + 50 },
+          angle = Math.atan2(end.y - previous.y, end.x - previous.x);
+        c.moveTo(end.x, end.y);
+        c.lineTo(end.x - 12 * Math.cos(angle - 0.5), end.y - 12 * Math.sin(angle - 0.5));
+        c.lineTo(end.x - 12 * Math.cos(angle + 0.5), end.y - 12 * Math.sin(angle + 0.5));
         c.closePath();
         c.fill();
       }

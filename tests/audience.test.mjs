@@ -69,3 +69,7 @@ test('audience fullscreen can be retried by a direct audience click without addi
  assert.equal(calls,1);assert.equal(h.document.querySelectorAll('button').length,0);assert.ok(h.out.some(({m})=>m.type==='workhub-audience-fullscreen'&&m.fullscreen));
  h.receive({type:'workhub-audience-end'});active=null;h.document.body.click();assert.equal(calls,1);
 });
+test('audience renders custom anchors and bends with matching token paths while keeping private connection handles absent',t=>{
+ const h=audience(t),data=processSnapshot(),edge={from:'a',to:'b',label:'Custom',start:{side:'bottom',offset:.25},end:{side:'top',offset:.75},style:'elbow',via:[{x:280,y:350}]};data.edges=[edge];data.phase=.75;data.playing=false;
+ h.receive({type:'workhub-audience-state',snapshot:data});const geometry=h.w.WorkHubProcessCanvasArt.linkGeometry(data.steps[0],data.steps[1],edge);assert.equal(h.document.querySelector('.av-edge path').getAttribute('d'),geometry.path);const point=geometry.point(.5);assert.equal(h.document.querySelector('.av-token').getAttribute('transform'),`translate(${point.x},${point.y})`);assert.equal(h.document.querySelectorAll('[data-link-handle],button,input').length,0);
+});

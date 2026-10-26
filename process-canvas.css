@@ -574,3 +574,138 @@ html:has(#processAudienceOverlay[open]) {
     bottom: 132px;
   }
 }
+
+/* A selected logical connection has handles only in private editing views. */
+.ph-link-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  overflow: visible;
+  pointer-events: none;
+}
+.pc-connection-handle {
+  fill: #0c2433;
+  stroke: #7ce6ff;
+  stroke-width: 2.5;
+  vector-effect: non-scaling-stroke;
+  pointer-events: all;
+  cursor: grab;
+  touch-action: none;
+  filter: drop-shadow(0 0 4px #32cbf688);
+}
+.pc-connection-handle:focus,
+.pc-connection-handle:hover {
+  fill: #b8f6ff;
+  stroke: #087b9c;
+  outline: none;
+}
+.pc-connection-handle:active {
+  cursor: grabbing;
+}
+.pc-connection-handle[data-link-handle^='bend'] {
+  fill: #ffe4a2;
+  stroke: #b98224;
+}
+.pc-link-handles {
+  pointer-events: none;
+}
+.pc-stage .av-edge {
+  cursor: pointer;
+}
+.pc-stage .av-edge path {
+  pointer-events: stroke;
+}
+.pc-stage .av-edge[data-selected='true'] path {
+  stroke: #8cecff;
+  stroke-width: 5;
+  stroke-dasharray: 8 5;
+}
+.ph-inspector-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 3px;
+  position: sticky;
+  top: -2px;
+  z-index: 2;
+  padding: 5px;
+  margin: 0 0 16px;
+  border: 1px solid #41616f;
+  border-radius: 10px;
+  background: #102936;
+}
+.ph-inspector-tabs > button {
+  min-width: 0;
+  padding: 9px 3px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #cce2ea;
+  font:
+    600 11px/1.2 system-ui,
+    sans-serif;
+  cursor: pointer;
+}
+.ph-inspector-tabs > button[aria-selected='true'] {
+  background: #b3f0ff;
+  color: #102936;
+}
+.ph-inspector-tabs > button:focus-visible {
+  outline: 2px solid #b3f0ff;
+  outline-offset: 2px;
+}
+.ph-inspector-pages > section {
+  display: grid;
+  gap: 12px;
+}
+.ph-inspector-pages > section[hidden] {
+  display: none !important;
+}
+.ph-inspector-pages :is(label, textarea, input, select) {
+  min-width: 0;
+}
+.ph-inspector-pages label {
+  display: grid;
+  gap: 5px;
+}
+.ph-inspector-summary {
+  margin: 0 0 13px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #bed4de;
+}
+.ph-inspector-footer {
+  position: sticky;
+  bottom: -18px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 12px 0 8px;
+  border-top: 1px solid #41616f;
+  background: #102936;
+}
+.ph-inspector-footer > :is(.actions, .pc-editor-actions) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+}
+.ph-inspector-footer [data-rehearsal='delete-step'] {
+  margin-left: auto;
+}
+.pc-editor .ph-inspector-footer {
+  background: #102936;
+}
+.pc-editor:has(.ph-inspector-tabs) {
+  background: #102936;
+  color: #f1faff;
+}
+.pc-editor:has(.ph-inspector-tabs) :is(input, select, textarea) {
+  background: #0b202b;
+  color: #f1faff;
+  border-color: #4a6a78;
+  color-scheme: dark;
+}
+.pc-editor:has(.ph-inspector-tabs) :is(label, p, summary, legend) {
+  color: #e2f1f6;
+}
