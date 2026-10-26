@@ -506,3 +506,71 @@ html:has(#processAudienceOverlay[open]) {
   stroke: #298aff;
   stroke-width: 3;
 }
+
+/* Private playback dock; audience rendering and window placement are unchanged. */
+.pc-playback-dock {
+  position: absolute;
+  z-index: 24;
+  left: 18px;
+  bottom: 18px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  max-width: calc(100% - 36px);
+  padding: 9px 12px;
+  border: 1px solid #b5d9d36b;
+  border-radius: 16px;
+  background: #112e32d9;
+  color: #edfffa;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 8px 25px #0004;
+}
+.pc-playback-dock .presenter-canvas-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: 0;
+}
+.pc-playback-dock button {
+  min-height: 30px;
+  padding: 6px 10px;
+  border: 1px solid #9ecfc660;
+  border-radius: 8px;
+  color: #effffb;
+  background: #d6fff508;
+  font: 11px system-ui;
+}
+.pc-playback-dock button:hover {
+  background: #d6fff51d;
+  border-color: #a6eddb;
+}
+.pc-playback-dock label {
+  color: #d7f0e9;
+  font: 11px system-ui;
+}
+.pc-presenter .pc-notice {
+  bottom: 82px;
+}
+.pc-connected-list > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid #ceded7;
+  padding: 10px 0;
+}
+@media (max-width: 700px) {
+  .pc-playback-dock {
+    left: 9px;
+    bottom: 9px;
+    max-width: calc(100% - 18px);
+  }
+  .pc-presenter .pc-notice {
+    bottom: 132px;
+  }
+}

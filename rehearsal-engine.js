@@ -218,6 +218,51 @@
       }
     }
   }
+  function disconnect(p, from, to) {
+    const step = p.steps.find(s => s.id === from);
+    if (!step || !p.steps.some(s => s.id === to)) throw Error('Choose an existing connection.');
+    if (!connections(step).includes(to)) return false;
+    const normal = [
+      ...new Set(
+        [
+          step.next,
+          ...(step.alternatives || []),
+          ...(step.decision?.answers || []).map(a => a.next),
+        ].filter(id => id && id !== to)
+      ),
+    ];
+    if (step.next === to) step.next = normal[0] || '';
+    if (step.failNext === to) step.failNext = '';
+    step.alternatives = (step.alternatives || []).filter(id => id !== to && id !== step.next);
+    if (step.decision) {
+      step.decision.answers = step.decision.answers.filter(a => a.next !== to);
+      if (step.decision.answers.length < 2) delete step.decision;
+      else {
+        if (!step.decision.answers.some(a => a.next === step.next))
+          step.next = step.decision.answers[0].next;
+        if (step.decision.defaultNext !== undefined) step.decision.defaultNext = step.next;
+        step.alternatives = step.decision.answers
+          .map(a => a.next)
+          .filter(id => id && id !== step.next);
+      }
+    }
+    const child = p.steps.find(s => s.id === to);
+    if (child.stackParent === from) delete child.stackParent;
+    for (const scenario of p.scenarios)
+      if (
+        scenario.routes &&
+        Object.hasOwn(scenario.routes, from) &&
+        ![step.next, ...step.alternatives].includes(scenario.routes[from])
+      )
+        delete scenario.routes[from];
+    return true;
+  }
+  function removeSteps(p, ids) {
+    const targets = [...new Set(ids)].filter(id => p.steps.some(s => s.id === id));
+    if (!targets.length) throw Error('Select one or more steps to delete.');
+    if (targets.length >= p.steps.length) throw Error('Keep at least one process step.');
+    for (const id of targets) removeStep(p, id);
+  }
   const BASE_TIME = '1970-01-01T00:00:00.000Z';
   const stamp = v => text(v, 50) && !!v && Number.isFinite(Date.parse(v));
   const link = v => v === '' || (text(v, 2000) && /^https?:\/\/[^\s<>"]+$/i.test(v));
@@ -905,7 +950,9 @@
     ENTITY_FIELDS,
     validateCanvas,
     connect,
+    disconnect,
     removeStep,
+    removeSteps,
     upgrade,
     validate,
     values,
