@@ -93,28 +93,48 @@
     function live(id = owner) {
       return !!id && a.ready() && a.owner() === id && owner === id;
     }
-    function cleanup() {
-      for (const url of urls.values()) URL.revokeObjectURL(url);
-      urls.clear();
+    function clearPicture() {
       document.getElementById('workspacePhoto')?.remove();
       delete document.body.dataset.photoBackground;
       document.body.style.removeProperty('--workspace-photo');
+    }
+    function cleanup() {
+      for (const url of urls.values()) URL.revokeObjectURL(url);
+      urls.clear();
+      clearPicture();
       applied = '';
     }
     function photoURL(photo) {
       if (!urls.has(photo.id)) urls.set(photo.id, URL.createObjectURL(photo.blob));
       return urls.get(photo.id);
     }
-    function apply() {
+    function releaseUnusedURLs() {
+      const kept = new Set(row.photos.map(photo => photo.id));
+      for (const [id, url] of urls)
+        if (!kept.has(id)) {
+          URL.revokeObjectURL(url);
+          urls.delete(id);
+        }
+    }
+    function apply(force = false) {
       if (!live() || !row) return;
       const photo = row.photos.find(p => p.id === row.selected),
-        key = photo ? [photo.id, row.target, row.strength].join('|') : '';
-      if (key === applied) return;
+        key = photo ? [photo.id, row.target, row.strength].join('|') : '',
+        currentLayer = document.getElementById('workspacePhoto');
+      if (
+        !force &&
+        key === applied &&
+        (photo
+          ? currentLayer && document.body.dataset.photoBackground === row.target
+          : !currentLayer &&
+            !document.body.hasAttribute('data-photo-background') &&
+            !document.body.style.getPropertyValue('--workspace-photo'))
+      )
+        return;
       applied = key;
       if (!photo) {
-        document.getElementById('workspacePhoto')?.remove();
-        delete document.body.dataset.photoBackground;
-        document.body.style.removeProperty('--workspace-photo');
+        clearPicture();
+        a.refreshTheme?.();
         return;
       }
       let layer = document.getElementById('workspacePhoto');
@@ -159,21 +179,32 @@
                 }
               })
           : Promise.resolve();
-      }
+      } else if (row) apply();
       return loading;
     }
     async function save(next) {
       if (busy || !live() || !row) throw Error('Wait for the picture operation to finish.');
       busy = true;
-      const id = owner;
+      const id = owner,
+        epoch = generation,
+        previous = row;
       try {
-        await db.write(next);
-        if (!live(id)) return false;
+        // Apply the choice before IndexedDB finishes writing the picture collection.
         row = next;
-        apply();
+        apply(true);
+        await db.write(next);
+        if (epoch !== generation || !live(id)) return false;
+        releaseUnusedURLs();
         return true;
+      } catch (error) {
+        if (epoch === generation && live(id)) {
+          row = previous;
+          apply(true);
+          releaseUnusedURLs();
+        }
+        throw error;
       } finally {
-        if (live(id)) busy = false;
+        if (epoch === generation && live(id)) busy = false;
       }
     }
     function render() {
@@ -181,7 +212,7 @@
       modalOwner = owner;
       a.openModal(
         'My background pictures',
-        `<form id="photoBackgroundForm" data-owner="${esc(owner)}" class="photo-gallery"><span class="hub-kicker">MAKE THE VIEW YOURS</span><p>Up to six pictures, stored only on this device for this account. Pictures are resized to at most 2560 × 1600 and are not uploaded to Supabase or included in cloud backups.</p><label>Add picture<input type="file" data-photo-upload accept="image/jpeg,image/png,image/webp"></label><div class="photo-grid">${row.photos.map(p => `<article data-active="${row.selected === p.id}"><img src="${esc(photoURL(p))}" alt="${esc(p.name)}"><p>${esc(p.name)}</p><div class="actions"><button type="button" data-photo="use" data-id="${p.id}">${row.selected === p.id ? 'Selected' : 'Use picture'}</button><button type="button" data-photo="delete" data-id="${p.id}">Remove</button></div></article>`).join('') || '<p>No pictures yet. Choose a picture above.</p>'}</div><label>Use picture on<select name="target"><option value="page"${row.target === 'page' ? ' selected' : ''}>Page background</option><option value="hero"${row.target === 'hero' ? ' selected' : ''}>My Day welcome</option><option value="both"${row.target === 'both' ? ' selected' : ''}>Both</option></select></label><label>Page picture strength<input type="range" name="strength" min="20" max="100" step="5" value="${row.strength}"></label><p>Cards keep their solid backgrounds for readability. My Day welcome keeps its text shading.</p><div class="actions"><button type="button" data-photo="theme">Use theme background</button><button type="submit" class="primary">Save picture settings</button></div></form>`
+        `<form id="photoBackgroundForm" data-owner="${esc(owner)}" class="photo-gallery"><span class="hub-kicker">MAKE THE VIEW YOURS</span><p>Up to six pictures, stored only on this device for this account. Pictures are resized to at most 2560 × 1600 and are not uploaded to Supabase or included in cloud backups.</p><p role="status" class="photo-background-status">${row.selected ? 'Picture active · ' + { page: 'Page background', hero: 'My Day welcome', both: 'Page and My Day welcome' }[row.target] : 'Theme background active · your pictures are kept for later.'}</p><label>Add picture<input type="file" data-photo-upload accept="image/jpeg,image/png,image/webp"></label><div class="photo-grid">${row.photos.map(p => `<article data-active="${row.selected === p.id}"><img src="${esc(photoURL(p))}" alt="${esc(p.name)}"><p>${esc(p.name)}</p><div class="actions"><button type="button" data-photo="use" data-id="${p.id}">${row.selected === p.id ? 'Selected' : 'Use picture'}</button><button type="button" data-photo="delete" data-id="${p.id}">Remove</button></div></article>`).join('') || '<p>No pictures yet. Choose a picture above.</p>'}</div><label>Use picture on<select name="target"><option value="page"${row.target === 'page' ? ' selected' : ''}>Page background</option><option value="hero"${row.target === 'hero' ? ' selected' : ''}>My Day welcome</option><option value="both"${row.target === 'both' ? ' selected' : ''}>Both</option></select></label><label>Page picture strength<input type="range" name="strength" min="20" max="100" step="5" value="${row.strength}"></label><p>Cards keep their solid backgrounds for readability. My Day welcome keeps its text shading.</p><div class="actions"><button type="button" data-photo="theme">Use theme background</button><button type="submit" class="primary">Save picture settings</button></div></form>`
       );
     }
     async function open() {
@@ -227,6 +258,7 @@
         }
         if (!live() || document.getElementById('photoBackgroundForm')?.dataset.owner !== owner)
           return;
+        if (busy) throw Error('Wait for the picture operation to finish.');
         let next = { ...row };
         if (action === 'use') next.selected = b.dataset.id;
         else if (action === 'theme') next.selected = '';
@@ -234,12 +266,11 @@
           next.photos = row.photos.filter(p => p.id !== b.dataset.id);
           if (next.selected === b.dataset.id) next.selected = '';
         } else return;
-        if (await save(next)) {
-          if (action === 'delete') {
-            URL.revokeObjectURL(urls.get(b.dataset.id));
-            urls.delete(b.dataset.id);
-          }
-          render();
+        const saved = save(next);
+        if (action === 'theme') a.closeModal();
+        if (await saved) {
+          if (action === 'theme') a.tell('Theme background restored. Your pictures are kept.');
+          else render();
         }
       })().catch(error => a.tell(error.message, true));
     });
@@ -275,6 +306,9 @@
         .catch(error => a.tell(error.message, true));
     });
     root.addEventListener('pagehide', cleanup);
+    root.addEventListener('pageshow', () => {
+      if (live() && row) apply(true);
+    });
     return {
       mount,
       open,
