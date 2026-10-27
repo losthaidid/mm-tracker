@@ -74,3 +74,28 @@ test('Theme surfaces: scenic headings and metric text keep their light foregroun
         assert.ok(contrast(tokens.getPropertyValue('--hub-'+key).trim(),tokens.getPropertyValue('--hub-'+bg).trim())>=4.5,theme+' '+key+' on '+bg);
   }
 });
+
+test('Theme changes update root surfaces and inherited controls immediately without retaining the previous palette', t => {
+  const dom = new JSDOM('<head></head><body><aside id="sidebar"></aside><dialog></dialog></body>', {runScripts:'outside-only'});
+  t.after(() => dom.window.close());
+  const {window} = dom, {document} = window, sheet = document.createElement('style');
+  sheet.textContent = ['base.css','studio.css','workspace-upgrades.css','theme-surfaces.css'].map(file => readFileSync(new URL('../'+file,import.meta.url),'utf8')).join('\n');
+  document.head.append(sheet);
+  window.eval(readFileSync(new URL('../workspace-upgrades.js',import.meta.url),'utf8'));
+  const originalBody=document.body, sidebar=document.getElementById('sidebar'), root=document.documentElement;
+  const changes=[{theme:'forest'},{theme:'dark'},{theme:'ocean'},
+    {theme:'custom',accent:'#9ee8ff',colors:{page:'#101820',surface:'#1d2630',text:'#eef6fb',secondary:'#a287d1'}},
+    {theme:'rose'},{theme:'lagoon'},{theme:'ocean'}];
+  for (const p of changes) {
+    window.WorkHubAppearance.apply(p);
+    const page=window.getComputedStyle(root), body=window.getComputedStyle(document.body);
+    assert.equal(page.getPropertyValue('--hub-bg'),body.getPropertyValue('--hub-bg'),p.theme+' outer page');
+    assert.equal(page.getPropertyValue('--hub-surface'),body.getPropertyValue('--hub-surface'),p.theme+' root surface');
+    assert.equal(page.getPropertyValue('--hub-text'),body.getPropertyValue('--hub-text'),p.theme+' root text');
+    assert.equal(page.getPropertyValue('--hub-on-accent'),body.getPropertyValue('--hub-on-accent'),p.theme+' primary button contrast');
+    assert.equal(root.style.colorScheme,document.body.style.colorScheme);
+    assert.equal(document.body,originalBody); assert.equal(document.getElementById('sidebar'),sidebar);
+  }
+  assert.equal(root.style.getPropertyValue('--hub-bg'),'#f8f7f2');
+  assert.equal(root.style.getPropertyValue('--hub-surface'),'#fffefa');
+});

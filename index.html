@@ -67,7 +67,9 @@
       #workhubStartup .startup-live::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--startup-accent); box-shadow: 0 0 0 4px var(--startup-soft); animation: startup-beacon 2.4s ease-in-out infinite; }
       #workhubStartup .startup-eyebrow { margin: 0 0 8px; color: var(--startup-muted, #9fbac9); font-size: 9px; letter-spacing: .24em; }
       #workhubStartup .startup-brand { margin: 0; color: var(--startup-text, #f2fcff); font-size: clamp(27px, 5.6vw, 39px); font-weight: 650; line-height: 1.18; letter-spacing: -.045em; animation: startup-name-arrive 850ms cubic-bezier(.16,1,.3,1) both; }
-      #workhubStartup .startup-scene { position: relative; width: 100%; margin: -2px auto -4px; }
+      /* Keep the small scene and progress strip on independent transform layers while records prepare. */
+      #workhubStartup .startup-scene { position: relative; width: 100%; margin: -2px auto -4px; contain: layout style; will-change: transform; animation: startup-scene-drift 9s ease-in-out infinite; }
+      #workhubStartup .startup-progress i, #workhubStartup .startup-card::after { will-change: transform; }
       #workhubStartup .startup-art { display: block; width: 100%; height: auto; overflow: visible; }
       #workhubStartup .startup-orbit { transform-origin: 280px 146px; animation: startup-orbit 22s linear infinite; }
       #workhubStartup .startup-orbit.second { animation-direction: reverse; animation-duration: 34s; }
@@ -115,6 +117,7 @@
       @keyframes startup-name-arrive { from { opacity: 0; transform: translateY(10px); letter-spacing: .01em; } to { opacity: 1; transform: none; letter-spacing: -.045em; } }
       @keyframes startup-edge-light { 0%,100% { transform: translateX(-100%); opacity: .2; } 50% { transform: translateX(285%); opacity: 1; } }
       @keyframes startup-orbit { to { transform: rotate(360deg); } }
+      @keyframes startup-scene-drift { 0%,100% { transform: translate3d(0,0,0); } 50% { transform: translate3d(0,-3px,0); } }
       @keyframes startup-flow { to { stroke-dashoffset: -170; } }
       @keyframes startup-trace { to { stroke-dashoffset: -722; } }
       @keyframes startup-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
@@ -143,18 +146,22 @@
       html[data-render-profile='iphone'] #workhubStartup .startup-orbit.third { animation: none; }
       html[data-render-profile='iphone'] #workhubStartup .startup-task.third { display: none; }
       html[data-render-profile='iphone'] #workhubStartup .startup-spark:nth-child(n+7) { display: none; }
-      html[data-startup-hidden] #workhubStartup *, html[data-startup-hidden] #workhubStartup *::before, html[data-startup-hidden] #workhubStartup *::after { animation-play-state: paused !important; }
-      html[data-workhub-startup-state] #workhubStartup *, html[data-workhub-startup-state] #workhubStartup *::before, html[data-workhub-startup-state] #workhubStartup *::after,
-      html[data-startup-motion='off'] #workhubStartup *, html[data-startup-motion='off'] #workhubStartup *::before, html[data-startup-motion='off'] #workhubStartup *::after,
-      #workhubStartup.is-leaving *, #workhubStartup.is-leaving *::before, #workhubStartup.is-leaving *::after { animation: none !important; }
-      html[data-workhub-startup-state] #workhubStartup .startup-spark-button { display: none; }
-      html[data-workhub-startup-state] #workhubStartup .startup-touch-hint { visibility: hidden; }
+      html[data-startup-hidden] #workhubStartup * { animation-play-state: paused !important; }
+      html[data-startup-hidden] #workhubStartup *::before, html[data-startup-hidden] #workhubStartup *::after { animation-play-state: paused !important; }
+      html[data-workhub-startup-state='error'] #workhubStartup *, html[data-startup-motion='off'] #workhubStartup *, #workhubStartup.is-leaving * { animation: none !important; }
+      html[data-workhub-startup-state='error'] #workhubStartup *::before, html[data-workhub-startup-state='error'] #workhubStartup *::after,
+      html[data-startup-motion='off'] #workhubStartup *::before, html[data-startup-motion='off'] #workhubStartup *::after,
+      #workhubStartup.is-leaving *::before, #workhubStartup.is-leaving *::after { animation: none !important; }
+      html[data-workhub-startup-state='error'] #workhubStartup .startup-spark-button { display: none; }
+      html[data-workhub-startup-state='error'] #workhubStartup .startup-touch-hint { visibility: hidden; }
+      html[data-workhub-startup-state='error'] #workhubStartup .startup-scene, html[data-startup-motion='off'] #workhubStartup .startup-scene, #workhubStartup.is-leaving .startup-scene { will-change: auto; }
       html[data-startup-motion='off'] #workhubStartup .startup-touch-hint, html[data-startup-motion='off'] #workhubStartup .startup-spark-button { display: none; }
       html[data-startup-motion='off'] #workhubStartup .startup-card, html[data-startup-motion='off'] #workhubStartup { transition: none; }
       @media (prefers-reduced-motion: reduce) {
         #workhubStartup, #workhubStartup .startup-card { transition: none; }
         #workhubStartup *, #workhubStartup *::before, #workhubStartup *::after { animation: none !important; }
         #workhubStartup .startup-touch-hint, #workhubStartup .startup-spark-button { display: none; }
+        #workhubStartup .startup-scene { will-change: auto; }
       }
     </style>
     <!-- Public connection settings only. Private records are loaded after sign-in. -->
@@ -242,7 +249,7 @@
         ]
       }
     </script>
-    <script src="./startup.js?v=20261027-saved-theme-1"></script>
+    <script src="./startup.js?v=20261027-continuous-motion-1"></script>
     <script src="./render-profile.js?v=20261025-companion-2"></script>
     <!-- Shared foundation first; feature styles follow; custom.css is your editing space. -->
     <link rel="stylesheet" href="./base.css?v=20261021-schedule-items-letter-1" />
@@ -291,7 +298,7 @@
     <link rel="stylesheet" href="./large-display.css?v=20261025-companion-2" />
     <link rel="stylesheet" href="./experience.css?v=20261025-feedback-1" />
     <link rel="stylesheet" href="./brand-motion.css?v=20261026-workspace-6" />
-    <link rel="stylesheet" href="./theme-surfaces.css?v=20261026-site-contrast-1" />
+    <link rel="stylesheet" href="./theme-surfaces.css?v=20261027-live-theme-1" />
     <link rel="stylesheet" href="./process-workspace.css?v=20261027-link-editor-1" />
     <link rel="stylesheet" href="./custom.css?v=20261019-source-1" />
   </head>
@@ -786,7 +793,7 @@
     <script src="./momo-world-art.js?v=20261024-no-aurora-1"></script>
     <script src="./atmosphere.js?v=20261025-feedback-1"></script>
     <script src="./lab-workshop.js?v=20261020-tng-lab-1"></script>
-    <script src="./workspace-upgrades.js?v=20261026-site-contrast-1"></script>
+    <script src="./workspace-upgrades.js?v=20261027-live-theme-1"></script>
     <script src="./workspace-features.js?v=20261023-leave-types-1"></script>
     <script src="./leave-balance-engine.js?v=20261023-corrections-claims-holidays-1"></script>
     <script src="./leave-balances.js?v=20261023-corrections-claims-holidays-1"></script>
@@ -860,7 +867,7 @@
     <script src="./my-day.js?v=20261024-performance-1"></script>
     <script src="./brand-motion.js?v=20261026-workspace-6"></script>
     <script src="./workspace-reset.js?v=20261026-workspace-6"></script>
-    <script src="./studio.js?v=20261027-saved-theme-1"></script>
+    <script src="./studio.js?v=20261027-live-theme-1"></script>
     <!-- Empty starter records and default lists; this is not your saved account data. -->
     <script id="seedData" type="application/json">
       {

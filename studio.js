@@ -403,17 +403,12 @@
       return `<div class="hub-empty"><strong>${esc(title)}</strong><p>${esc(text)}</p>${action}</div>`;
     }
     function applyTheme(p = themePreview || prefs()) {
-      const themes = Object.fromEntries(
-        Object.entries(root.WorkHubAppearance.THEMES).map(([id, v]) => [id, v[1]])
-      );
-      themes.custom = p.accent;
       root.WorkHubAppearance.apply(p);
       root.WorkHubRenderProfile?.setMode(p.displayMode);
       document.body.dataset.hubTheme = p.theme;
       document.body.dataset.motion = p.motion;
       document.body.dataset.density = p.density;
       document.body.dataset.hubBackground = p.background;
-      document.documentElement.style.setProperty('--hub-accent', themes[p.theme]);
       document.documentElement.style.setProperty('--hub-radius', p.radius + 'px');
       document.documentElement.style.setProperty(
         '--hub-font',
@@ -422,16 +417,6 @@
           : p.font === 'rounded'
             ? '"Trebuchet MS",system-ui,sans-serif'
             : 'system-ui,-apple-system,"Segoe UI",sans-serif'
-      );
-      const rgb = themes[p.theme]
-          .slice(1)
-          .match(/../g)
-          .map(x => parseInt(x, 16) / 255)
-          .map(x => (x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4)),
-        luminance = rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
-      document.documentElement.style.setProperty(
-        '--hub-on-accent',
-        luminance > 0.179 ? '#000000' : '#ffffff'
       );
       if ($('hubPet')) $('hubPet').hidden = !p.mascot || !a.cloud().ready;
       root.WorkHubMomoWardrobe.apply(p, a.cloud().user?.id || '');
