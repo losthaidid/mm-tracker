@@ -970,6 +970,42 @@
       E.checkColumnGroups(check);
       draft.columnGroups = check.columnGroups;
     }
+    function columnGroupValue(key, set) {
+      const column = draft.columns.find(c => c.key === key);
+      return `<label class="val-label" data-group-field="${esc(key)}">${esc(column.label)} <code>${esc(key)}</code><textarea data-group-value="${esc(key)}" maxlength="8000" rows="2" placeholder="Values separated by commas, e.g. 60,50">${esc(set.values[key])}</textarea></label>`;
+    }
+    // Keep the expanded picker and its inputs mounted while membership changes.
+    // Only add/remove value fields; a workspace render closes details and loses focus.
+    function patchColumnGroup(form) {
+      const group = draft.columnGroups.find(g => g.id === form.dataset.id),
+        set = group.sets.find(v => v.id === form.dataset.set),
+        grid = form.querySelector('.val-group-values'),
+        previous = new Map(Array.from(grid.children).map(el => [el.dataset.groupField, el]));
+      let cursor = grid.firstElementChild;
+      for (const key of group.fields) {
+        let node = previous.get(key);
+        if (!node) {
+          const template = document.createElement('template');
+          template.innerHTML = columnGroupValue(key, set);
+          node = template.content.firstElementChild;
+        }
+        if (cursor !== node) grid.insertBefore(node, cursor);
+        cursor = node.nextElementSibling;
+        previous.delete(key);
+      }
+      for (const node of previous.values()) node.remove();
+      form.querySelector('.val-group-columns summary').textContent =
+        'Grouped columns · ' + group.fields.length;
+      const outline = Array.from(
+        document.querySelectorAll('[data-val="column-group-select"]')
+      ).find(el => el.dataset.id === group.id);
+      if (outline) {
+        outline.querySelector('strong').textContent = group.name;
+        outline.querySelector('small').textContent =
+          group.fields.length + ' columns · ' + group.sets.length + ' saved sets';
+      }
+      form.elements.namedItem('groupSet').selectedOptions[0].textContent = set.name;
+    }
     function columnGroupsEditor() {
       const groups = draft.columnGroups || [],
         group = groups.find(g => g.id === columnGroupId) || groups[0];
@@ -983,14 +1019,7 @@
               'Saved value set',
               group.sets.map(v => [v.id, v.name]),
               set.id
-            )}<div class="val-actions">${btn('value-set-add', '＋ New set', '', 'val-quiet')}${btn('value-set-duplicate', 'Duplicate as new set', '', 'val-secondary')}${btn('value-set-remove', 'Remove set', '', 'val-quiet val-danger')}</div></div><p class="val-help">Duplicate this set before changing values to keep the previous setup. Each condition chooses its own saved set; other column checks stay the same.</p>${input('setName', 'Value set name', set.name, 'text', 'maxlength="120" required')}<div class="val-group-values">${group.fields
-              .map(key => {
-                const column = draft.columns.find(c => c.key === key);
-                return `<label class="val-label">${esc(column.label)} <code>${esc(key)}</code><textarea data-group-value="${esc(key)}" maxlength="8000" rows="2" placeholder="Values separated by commas, e.g. 60,50">${esc(set.values[key])}</textarea></label>`;
-              })
-              .join(
-                ''
-              )}</div><div class="val-actions"><button type="submit" class="val-btn val-primary">Apply group changes</button>${btn('value-set-condition', 'Use this set in a condition', '', 'val-secondary')}</div><p class="val-help">Values keep leading zeros and follow each column’s SAP type. Keep global Allowed values blank when they would conflict with different sets.</p></form>`
+            )}<div class="val-actions">${btn('value-set-add', '＋ New set', '', 'val-quiet')}${btn('value-set-duplicate', 'Duplicate as new set', '', 'val-secondary')}${btn('value-set-remove', 'Remove set', '', 'val-quiet val-danger')}</div></div><p class="val-help">Duplicate this set before changing values to keep the previous setup. Each condition chooses its own saved set; other column checks stay the same.</p>${input('setName', 'Value set name', set.name, 'text', 'maxlength="120" required')}<div class="val-group-values">${group.fields.map(key => columnGroupValue(key, set)).join('')}</div><div class="val-actions"><button type="submit" class="val-btn val-primary">Apply group changes</button>${btn('value-set-condition', 'Use this set in a condition', '', 'val-secondary')}</div><p class="val-help">Values keep leading zeros and follow each column’s SAP type. Keep global Allowed values blank when they would conflict with different sets.</p></form>`
           : '<div class="val-empty-small"><h3>One template. Several setups.</h3><p>Group Sales Organization, Distribution Channel and Division. Save one set for FPSO and another for a different organization.</p></div>'
       }</section></div>`;
     }
@@ -3189,7 +3218,7 @@
           try {
             commitCurrent();
             mark();
-            paint();
+            patchColumnGroup(el.form);
           } catch (error) {
             el.checked = !el.checked;
             throw error;
