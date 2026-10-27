@@ -172,3 +172,6 @@ Presentation breaks: [presentation-break.js](../presentation-break.js) owns cust
 - `rehearsal-engine.js` / `rehearsal.js`: named decision definitions, automatic defaults and interactive playback.
 - `startup.js` and critical `index.html` styles: maintained branding, lightweight loading illustration and actual startup stages.
 - `docs/BATCH-D-PRESENTING.md`: usage and verification notes for selections 4, 42, 97 and 209.
+
+- `docs/VALIDATION-GROUPS-REVIEW.md` — SAP column groups, saved value sets and reversible per-run issue review.
+- `tests/validator-groups.test.mjs` — group bindings, SAP values, copy/version isolation, ignored counts and Excel review exports.

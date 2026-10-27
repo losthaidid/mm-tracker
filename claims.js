@@ -47,8 +47,13 @@
     '" ' +
     extra +
     '></div>';
+  const office = value =>
+    String(value || '')
+      .trim()
+      .toLowerCase() === 'office';
   function draft(form, kind) {
-    if (root.WorkHubLeave.isLeave(kind)) return null;
+    if (root.WorkHubLeave.isLeave(kind) || office(form.elements.namedItem('location')?.value))
+      return null;
     const get = k => form.elements.namedItem(k)?.value || '',
       locationId = get('travelLocationId');
     if (!locationId || locationId === '__one-off__') return null;
@@ -64,6 +69,8 @@
   }
   function context(form, kind, strict = false) {
     if (root.WorkHubLeave.isLeave(kind)) return {};
+    if (office(form.elements.namedItem('location')?.value))
+      return { claimType: 'client-site', claimLocationName: '' };
     const claimType = form.elements.namedItem('claimType')?.value || 'client-site',
       oneOff = form.elements.namedItem('travelLocationId')?.value === '__one-off__',
       claimLocationName = oneOff
@@ -98,11 +105,11 @@
           ) +
           '</select>'
         : ''
-    }<div class="claim-context-grid"><div><label for="bookingClaimType">Claim type</label><select id="bookingClaimType" name="claimType">${options(Object.entries(E.CLAIM_TYPES), E.claimType(s))}</select></div><div><label for="travelLocationId">Claim destination / mileage route</label><select id="travelLocationId" name="travelLocationId">${options(
+    }<fieldset data-claim-visit-fields${office(s.location) ? ' hidden disabled' : ''}><div class="claim-context-grid"><div><label for="bookingClaimType">Claim type</label><select id="bookingClaimType" name="claimType">${options(Object.entries(E.CLAIM_TYPES), E.claimType(s))}</select></div><div><label for="travelLocationId">Claim destination / mileage route</label><select id="travelLocationId" name="travelLocationId">${options(
       locations.map(l => [l.id, l.name + (l.archived ? ' · archived' : '')]),
       selected,
       'No on-site visit / no mileage'
-    )}<option value="__one-off__"${selected === '__one-off__' ? ' selected' : ''}>One-off destination · no mileage</option>${selected && selected !== '__one-off__' && !locations.some(l => l.id === selected) ? '<option value="' + esc(selected) + '" selected>' + esc(t.locationName) + ' · saved route</option>' : ''}</select></div></div><div data-claim-one-off${selected === '__one-off__' ? '' : ' hidden'}><label for="bookingClaimLocation">One-off destination</label><input id="bookingClaimLocation" name="claimLocationName" maxlength="120" value="${esc(s.claimLocationName || '')}"${selected === '__one-off__' ? ' required' : ' disabled'} placeholder="e.g. Training venue"><p class="hint">Tolls and other expenses can be linked to this visit. Save a mileage route in Settings if you also need a kilometre claim.</p></div>${!locations.length ? '<p class="hint">Add reusable destinations and rates in Settings → On-site locations & mileage.</p>' : ''}<input name="travelLocationName" type="hidden" value="${esc(t?.locationName || '')}"><fieldset data-claim-route-fields${t ? '' : ' hidden'}${t ? '' : ' disabled'}><div class="form-grid">${input('travelKm', 'One-way distance (km)', t?.oneWayKm ?? '', 'number', 'min="0.01" max="10000" step="0.01" required')}${input('travelRate', 'Mileage rate (RM / km)', t?.ratePerKm ?? '', 'number', 'min="0" max="1000" step="0.0001" required')}<div><label for="travelJourney">Journey</label><select id="travelJourney" name="travelJourney">${options(Object.entries(E.JOURNEYS), t?.journey || 'return')}</select></div>${input('travelVisits', 'Visits per date', t?.visits || 1, 'number', 'min="1" max="20" step="1" required')}</div><label class="check-label"><input name="travelClaimable" type="checkbox"${t?.claimable ? ' checked' : ''}>Include this mileage in my monthly claim</label><div class="claim-trip-preview" data-claim-preview aria-live="polite"></div><p class="claim-duplicate-note" data-claim-duplicate hidden></p><div class="claim-route-footer"><small>Saved distance and rate stay with this booking. Toll and parking receipts are added separately.</small><button type="button" class="small" data-claim="latest-route">Use latest mapping</button></div></fieldset></section>`;
+    )}<option value="__one-off__"${selected === '__one-off__' ? ' selected' : ''}>One-off destination · no mileage</option>${selected && selected !== '__one-off__' && !locations.some(l => l.id === selected) ? '<option value="' + esc(selected) + '" selected>' + esc(t.locationName) + ' · saved route</option>' : ''}</select></div></div><div data-claim-one-off${selected === '__one-off__' ? '' : ' hidden'}><label for="bookingClaimLocation">One-off destination</label><input id="bookingClaimLocation" name="claimLocationName" maxlength="120" value="${esc(s.claimLocationName || '')}"${selected === '__one-off__' ? ' required' : ' disabled'} placeholder="e.g. Training venue"><p class="hint">Tolls and other expenses can be linked to this visit. Save a mileage route in Settings if you also need a kilometre claim.</p></div>${!locations.length ? '<p class="hint">Add reusable destinations and rates in Settings → On-site locations & mileage.</p>' : ''}<input name="travelLocationName" type="hidden" value="${esc(t?.locationName || '')}"><fieldset data-claim-route-fields${t ? '' : ' hidden'}${t ? '' : ' disabled'}><div class="form-grid">${input('travelKm', 'One-way distance (km)', t?.oneWayKm ?? '', 'number', 'min="0.01" max="10000" step="0.01" required')}${input('travelRate', 'Mileage rate (RM / km)', t?.ratePerKm ?? '', 'number', 'min="0" max="1000" step="0.0001" required')}<div><label for="travelJourney">Journey</label><select id="travelJourney" name="travelJourney">${options(Object.entries(E.JOURNEYS), t?.journey || 'return')}</select></div>${input('travelVisits', 'Visits per date', t?.visits || 1, 'number', 'min="1" max="20" step="1" required')}</div><label class="check-label"><input name="travelClaimable" type="checkbox"${t?.claimable ? ' checked' : ''}>Include this mileage in my monthly claim</label><div class="claim-trip-preview" data-claim-preview aria-live="polite"></div><p class="claim-duplicate-note" data-claim-duplicate hidden></p><div class="claim-route-footer"><small>Saved distance and rate stay with this booking. Toll and parking receipts are added separately.</small><button type="button" class="small" data-claim="latest-route">Use latest mapping</button></div></fieldset></fieldset><p class="hint" data-claim-office-note${office(s.location) ? '' : ' hidden'}>Office work has no on-site claim destination or mileage.</p></section>`;
   }
   function badge(slot) {
     if (!slot.travel && !slot.claimLocationName) return '';
@@ -228,6 +235,19 @@
       const select = form.elements.namedItem('travelLocationId'),
         section = form.querySelector('[data-claim-route-fields]');
       if (!select || !section) return;
+      const visit = form.querySelector('[data-claim-visit-fields]'),
+        isOffice = office(form.elements.namedItem('location')?.value);
+      if (visit) {
+        visit.hidden = isOffice;
+        visit.disabled = isOffice;
+      }
+      const officeNote = form.querySelector('[data-claim-office-note]');
+      if (officeNote) officeNote.hidden = !isOffice;
+      if (isOffice) {
+        section.hidden = true;
+        section.disabled = true;
+        return;
+      }
       const l = data().locations.find(l => l.id === select.value),
         oneOff = select.value === '__one-off__',
         selected = !!select.value && !oneOff,
@@ -615,7 +635,9 @@
       if (
         f?.id === 'scheduleForm' &&
         (event.target.name.startsWith('travel') ||
-          ['date', 'endDate', 'claimType', 'claimLocationName'].includes(event.target.name))
+          ['date', 'endDate', 'claimType', 'claimLocationName', 'location'].includes(
+            event.target.name
+          ))
       )
         updateTravel(f);
     });
@@ -625,7 +647,9 @@
       if (
         f?.id === 'scheduleForm' &&
         (event.target.name.startsWith('travel') ||
-          ['date', 'endDate', 'claimType', 'claimLocationName'].includes(event.target.name))
+          ['date', 'endDate', 'claimType', 'claimLocationName', 'location'].includes(
+            event.target.name
+          ))
       )
         updateTravel(
           f,

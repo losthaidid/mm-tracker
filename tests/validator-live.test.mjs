@@ -71,3 +71,36 @@ test('live corrections use the chosen company conditions and stop if that compan
  x.edit(0,'TYPE','Urgent');assert.equal(x.ui.snapshot().result.errors,1);
  x.state().projectCompanies[0].active=false;x.edit(0,'TYPE','Standard');assert.equal(x.ui.snapshot().result,null);assert.equal(x.d.querySelector('[data-val="report"]').disabled,true);
 });
+
+test('issue review UI: selected issues can be ignored and restored without changing data or saving uploaded values',async t=>{
+ const x=await workspace(t,header+row('PRIVATE-001','Wrong')+'\n'+row('PRIVATE-002','Wrong')), {ui,d,w}=x;
+ const choose=d.querySelector('[data-issue-choice="0"]');choose.checked=true;choose.dispatchEvent(new w.Event('change',{bubbles:true}));
+ const reason=d.getElementById('valIgnoreReason');reason.value='Agreed for this run';reason.dispatchEvent(new w.Event('input',{bubbles:true}));
+ await ui.handle({dataset:{val:'ignore-selected'}});let result=ui.snapshot().result;
+ assert.equal(result.errors,1);assert.equal(result.ignored,1);assert.equal(result.passed,1);assert.ok(d.getElementById('valIgnoredIssues'));assert.match(d.getElementById('valIgnoredIssues').textContent,/Agreed for this run/);assert.equal(ui.snapshot().rows[0].TYPE,'Wrong');assert.equal(x.state().workhub.validator.runs[0].ignored,1);assert.equal(JSON.stringify(x.state()).includes('PRIVATE-001'),false);
+ await ui.handle(d.querySelector('[data-val="restore-issue"]'));assert.equal(ui.snapshot().result.errors,2);assert.equal(ui.snapshot().result.ignored,0);assert.equal(d.getElementById('valIgnoredIssues'),null);
+});
+test('issue review UI: edits recheck ignored rows automatically and a new upload or account clears review decisions',async t=>{
+ const x=await workspace(t,header+row('PRIVATE-001','Wrong')), {ui,d}=x;
+ await ui.handle({dataset:{val:'select-issues'}});await ui.handle({dataset:{val:'ignore-selected'}});assert.equal(ui.snapshot().result.ignored,1);
+ const counts=x.counts();x.edit(0,'OWNER','Other owner');assert.equal(ui.snapshot().result.errors,1);assert.equal(ui.snapshot().result.ignored,0);assert.deepEqual(x.counts(),counts);
+ await ui.handle({dataset:{val:'select-issues'}});await ui.handle({dataset:{val:'ignore-selected'}});await ui.loadFile({name:'other.csv',size:100,text:async()=>header+row('PRIVATE-002','Wrong')});await ui.run();assert.equal(ui.snapshot().result.ignored,0);assert.equal(ui.snapshot().result.errors,1);
+ await ui.handle({dataset:{val:'select-issues'}});x.signOut();await assert.rejects(ui.handle({dataset:{val:'ignore-selected'}}),/Sign in/);assert.equal(ui.snapshot().result,null);
+});
+test('issue review UI: issue pages allow selecting every listed issue across more than one page',async t=>{
+ const x=await workspace(t,header+Array.from({length:110},(_,i)=>row('PRIVATE-'+i,'Wrong')).join('\n')),{ui,d}=x;
+ assert.equal(d.querySelectorAll('[data-issue-choice]').length,100);await ui.handle({dataset:{val:'select-issues'}});await ui.handle({dataset:{val:'issue-page',kind:'open',delta:'1'}});assert.equal(d.querySelectorAll('[data-issue-choice]').length,10);await ui.handle({dataset:{val:'select-issues'}});await ui.handle({dataset:{val:'ignore-selected'}});
+ assert.equal(ui.snapshot().result.ignored,110);assert.equal(ui.snapshot().result.errors,0);assert.equal(ui.snapshot().result.passed,110);assert.equal(d.getElementById('valAttention'),null);await ui.handle({dataset:{val:'restore-issues'}});assert.equal(ui.snapshot().result.errors,110);
+});
+test('SAP group UI: create grouped columns, duplicate a value set and choose a saved set in Conditions',async t=>{
+ const x=await workspace(t,header+row('PRIVATE-001'),schema=>{schema.mode='sap';for(const c of schema.columns){c.sapType='CHAR';c.sapLength='80';}}), {ui,d,w}=x;
+ await ui.handle({dataset:{val:'mode',mode:'column-groups'}});await ui.handle({dataset:{val:'column-group-add'}});
+ let form=d.getElementById('valColumnGroupForm');for(const el of form.querySelectorAll('[name="groupField"]'))el.checked=['TYPE','OWNER'].includes(el.value);form.querySelector('[name="groupField"][value="TYPE"]').dispatchEvent(new w.Event('change',{bubbles:true}));
+ form=d.getElementById('valColumnGroupForm');form.elements.groupName.value='Sales area';form.elements.setName.value='Original setup';form.querySelector('[data-group-value="TYPE"]').value='Standard';form.querySelector('[data-group-value="OWNER"]').value='Aisha';form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));
+ await ui.handle({dataset:{val:'value-set-duplicate'}});form=d.getElementById('valColumnGroupForm');form.elements.setName.value='Other setup';form.querySelector('[data-group-value="TYPE"]').value='Urgent';form.querySelector('[data-group-value="OWNER"]').value='Daniel';form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));
+ let snapshot=ui.snapshot(),group=snapshot.draft.columnGroups[0];assert.equal(group.sets.length,2);assert.equal(group.sets[0].values.TYPE,'Standard');assert.equal(group.sets[1].values.TYPE,'Urgent');
+ await ui.handle({dataset:{val:'value-set-condition'}});form=d.getElementById('valRuleForm');assert.equal(form.querySelector('[data-clause="valueSource"]').value,'group');assert.equal(form.querySelector('[data-clause="valueSetId"]').value,group.sets[1].id);
+ const sets=form.querySelector('[data-clause="valueSetId"]');sets.value=group.sets[0].id;sets.dispatchEvent(new w.Event('change',{bubbles:true}));snapshot=ui.snapshot();assert.equal(snapshot.draft.rules.at(-1).assertion.valueSetId,group.sets[0].id);assert.match(d.querySelector('.val-rule-summary').textContent,/Original setup.*Standard|Standard.*Original setup/);
+ ui.saveDraft();assert.equal(x.state().workhub.validator.templates[0].columnGroups[0].sets.length,2);assert.equal(x.E.validateRows(ui.snapshot().draft,[{REQUEST_ID:'001',TYPE:'Standard',OWNER:'Aisha',AMOUNT:'25',START_DATE:'2026-10-20',END_DATE:'2026-10-21'}]).errors,0);
+ await ui.handle({dataset:{val:'mode',mode:'column-groups'}});await assert.rejects(ui.handle({dataset:{val:'column-group-remove',id:group.id}}),/condition uses/);
+});
