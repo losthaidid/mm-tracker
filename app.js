@@ -780,6 +780,8 @@ function validateProjects(d) {
       !checkText(s.activity, 500)
     )
       throw Error('Invalid schedule selection.');
+    if (s.kind === 'custom' && s.status !== undefined && !PLAN_STATUS.includes(s.status))
+      throw Error('Choose a valid custom activity status.');
     if (s.kind === 'project' && !ids.has(s.linkId))
       throw Error('A schedule project no longer exists.');
     if (s.kind === 'task' && !d.tasks.some(t => t.id === s.linkId))
@@ -1848,6 +1850,11 @@ function scheduleItemBadge(row) {
     ? `<span class="booking-item" title="Project item: ${esc(context.itemTitle)}${context.subItemTitle ? ' → ' + esc(context.subItemTitle) : ''}"><span class="booking-item-label">Item</span> ${esc(context.itemTitle)}${context.subItemTitle ? `<span class="booking-subitem">↳ ${esc(context.subItemTitle)}</span>` : ''}</span>`
     : '';
 }
+function customActivityStatusField(s) {
+  return s.kind === 'custom'
+    ? `<div class="wide"><label for="bookingStatus">Activity status</label><select id="bookingStatus" name="status">${PLAN_STATUS.map(status => `<option${status === (s.status || 'Planned') ? ' selected' : ''}>${esc(status)}</option>`).join('')}</select><p class="hint">After the start time, this activity stays In Progress until you mark it Completed. Choose On Hold to pause it.</p></div>`
+    : '';
+}
 function renderRangeEditor() {
   const s = scheduleDraft,
     tasks = state.tasks.filter(t => !t.archived || t.id === s.linkId);
@@ -1866,7 +1873,7 @@ function renderRangeEditor() {
       )
       .join(
         ''
-      )}</select></div>${window.WorkHubLeave.fields(s, state)}${window.WorkHubClaims.fields(s, state)}${s.kind === 'task' ? `<div class="wide"><label for="scheduleLink">Task *</label><select id="scheduleLink" name="linkId" required><option value="">Choose a task</option>${tasks.map(t => `<option value="${esc(t.id)}"${t.id === s.linkId ? ' selected' : ''}>[${esc(t.taskType)}] ${esc((t.number ? t.number + '. ' : '') + t.task.slice(0, 105))} · ${esc(taskLinkedLabel(t))}${t.done ? ' (done)' : ''}</option>`).join('')}</select></div>` : s.kind === 'project' ? `<div class="span2"><label for="scheduleLink">Project *</label><select id="scheduleLink" name="linkId" required>${projectOptions(s.linkId || state.activeProjectId)}</select></div><div><label for="scheduleActivity">Project activity</label><select id="scheduleActivity" name="activity">${selectOptions(state.lists.projectActivities, s.activity, '—')}</select></div>${projectLocationField(s.location)}<div class="span2"><label for="bookingTitle">Activity title</label><input id="bookingTitle" name="title" maxlength="500" value="${esc(s.title)}" placeholder="Defaults to the selected activity"></div><div><label for="bookingStatus">Plan status</label><select id="bookingStatus" name="status">${selectOptions(PLAN_STATUS, s.status, 'Choose status')}</select></div>` : ''}${scheduleCompanyField(s)}${scheduleItemFields(s)}<div class="wide"><label for="slotText">${window.WorkHubLeave.isLeave(s.kind) ? 'Leave / handover notes' : s.kind === 'custom' ? 'Activity' : 'Additional notes'}</label><textarea id="slotText" name="text" maxlength="32767">${esc(s.text)}</textarea></div></div><p class="hint">The same time range fills every selected date. Weekend project or ticket-linked task time is marked TOIL automatically. Existing bookings are protected.</p><div class="modal-actions"><div>${s.bookingId || state.schedule.some(r => r.date === s.originalDate && r.time === s.originalTime) ? '<button type="button" class="danger" data-action="clear-booking">Delete activity</button>' : ''}</div><div class="actions"><button type="button" data-action="cancel">Cancel</button><button class="primary" type="submit">Save time range</button></div></div></form>`
+      )}</select></div>${window.WorkHubLeave.fields(s, state)}${window.WorkHubClaims.fields(s, state)}${s.kind === 'task' ? `<div class="wide"><label for="scheduleLink">Task *</label><select id="scheduleLink" name="linkId" required><option value="">Choose a task</option>${tasks.map(t => `<option value="${esc(t.id)}"${t.id === s.linkId ? ' selected' : ''}>[${esc(t.taskType)}] ${esc((t.number ? t.number + '. ' : '') + t.task.slice(0, 105))} · ${esc(taskLinkedLabel(t))}${t.done ? ' (done)' : ''}</option>`).join('')}</select></div>` : s.kind === 'project' ? `<div class="span2"><label for="scheduleLink">Project *</label><select id="scheduleLink" name="linkId" required>${projectOptions(s.linkId || state.activeProjectId)}</select></div><div><label for="scheduleActivity">Project activity</label><select id="scheduleActivity" name="activity">${selectOptions(state.lists.projectActivities, s.activity, '—')}</select></div>${projectLocationField(s.location)}<div class="span2"><label for="bookingTitle">Activity title</label><input id="bookingTitle" name="title" maxlength="500" value="${esc(s.title)}" placeholder="Defaults to the selected activity"></div><div><label for="bookingStatus">Plan status</label><select id="bookingStatus" name="status">${selectOptions(PLAN_STATUS, s.status, 'Choose status')}</select></div>` : ''}${customActivityStatusField(s)}${scheduleCompanyField(s)}${scheduleItemFields(s)}<div class="wide"><label for="slotText">${window.WorkHubLeave.isLeave(s.kind) ? 'Leave / handover notes' : s.kind === 'custom' ? 'Activity' : 'Additional notes'}</label><textarea id="slotText" name="text" maxlength="32767">${esc(s.text)}</textarea></div></div><p class="hint">The same time range fills every selected date. Weekend project or ticket-linked task time is marked TOIL automatically. Existing bookings are protected.</p><div class="modal-actions"><div>${s.bookingId || state.schedule.some(r => r.date === s.originalDate && r.time === s.originalTime) ? '<button type="button" class="danger" data-action="clear-booking">Delete activity</button>' : ''}</div><div class="actions"><button type="button" data-action="cancel">Cancel</button><button class="primary" type="submit">Save time range</button></div></div></form>`
   );
   hub?.claims?.updateTravel($('scheduleForm'));
   hub?.leaveBalances?.updateRange($('scheduleForm'));
@@ -1958,6 +1965,7 @@ function saveRange(form) {
           travel,
           ...claimContext,
           ...leaveData,
+          ...(kind === 'custom' ? { status: value('status') || 'Planned' } : {}),
         });
     window.WorkHubLeaveBalancesEngine.assertWithinBalance(state, d);
     d.calendarMonth = date.slice(0, 7);
@@ -2004,11 +2012,20 @@ function planHasToil(p) {
   return rangeDates(p.date, p.endDate || p.date).some(isWeekend);
 }
 
+function projectPlanStatus(p) {
+  return scheduleTimeStatus({
+    kind: 'project',
+    planId: p.id,
+    date: p.date,
+    time: p.time,
+    endTime: p.endTime,
+  });
+}
 function planStatusClass(p, date = '') {
-  return isWeekend(date || p.date) ? 'toil' : statusClass(p.status);
+  return isWeekend(date || p.date) ? 'toil' : statusClass(projectPlanStatus(p));
 }
 function planRow(p) {
-  return `<button class="plan-row ${planStatusClass(p)}" data-action="view-plan" data-id="${esc(p.id)}"><span class="plan-date">${esc(p.date)}${p.endDate !== p.date ? ' to ' + esc(p.endDate) : ''}<small>${esc(p.time)}–${esc(p.endTime)}</small></span><span class="plan-title">${esc(p.activity || p.title)}${scheduleCompanyBadge(p)}${scheduleItemBadge(p)}<small>${esc([p.location, p.title !== p.activity ? p.title : '', p.text.slice(0, 100)].filter(Boolean).join(' · '))}${planHasToil(p) ? ' · TOIL' : ''}</small></span><span>${tag(p.status)}</span></button>`;
+  return `<button class="plan-row ${planStatusClass(p)}" data-action="view-plan" data-id="${esc(p.id)}"><span class="plan-date">${esc(p.date)}${p.endDate !== p.date ? ' to ' + esc(p.endDate) : ''}<small>${esc(p.time)}–${esc(p.endTime)}</small></span><span class="plan-title">${esc(p.activity || p.title)}${scheduleCompanyBadge(p)}${scheduleItemBadge(p)}<small>${esc([p.location, p.title !== p.activity ? p.title : '', p.text.slice(0, 100)].filter(Boolean).join(' · '))}${planHasToil(p) ? ' · TOIL' : ''}</small></span><span>${tag(projectPlanStatus(p))}</span></button>`;
 }
 
 function viewPlan(id) {
@@ -2017,7 +2034,7 @@ function viewPlan(id) {
   const project = state.projects.find(x => x.id === p.projectId);
   openModal(
     'Planned activity',
-    `<div class="view-details"><div><div class="detail-label">Project</div><div class="detail-value">${esc(project?.name) || '—'}</div></div><div><div class="detail-label">Company</div><div class="detail-value">${esc(scheduleCompanyName(p)) || 'Not specified'}</div></div><div><div class="detail-label">Project item</div><div class="detail-value">${esc(scheduleItemContext(p).itemTitle) || 'General project work'}${scheduleItemContext(p).subItemTitle ? ' → ' + esc(scheduleItemContext(p).subItemTitle) : ''}</div></div><div><div class="detail-label">Project activity</div><div class="detail-value">${esc(p.activity) || '—'}</div></div><div><div class="detail-label">Status</div><div class="detail-value">${tag(p.status)}</div></div><div><div class="detail-label">Date range</div><div class="detail-value">${esc(p.date)}${p.endDate !== p.date ? ' to ' + esc(p.endDate) : ''}</div></div><div><div class="detail-label">Time</div><div class="detail-value">${esc(p.time)}–${esc(p.endTime)}</div></div><div><div class="detail-label">Work location</div><div class="detail-value">${esc(p.location) || '—'}</div></div><div class="wide"><div class="detail-label">Activity title</div><div class="detail-value">${esc(p.title)}</div></div><div class="wide"><div class="detail-label">Notes</div><div class="detail-value">${esc(p.text) || '—'}</div></div>${p.actualReviewedAt ? `<div class="wide"><div class="detail-label">Confirmed actual task</div><div class="detail-value">${esc(p.actualTask)} · ${p.actualSame ? 'Same as planned' : 'Different from plan'} · ${esc(p.actualReviewedAt)}</div></div>` : ''}</div><div class="modal-actions"><span>${planHasToil(p) ? '<span class="phase-badge">TOIL</span>' : ''}</span><div class="actions"><button type="button" data-action="cancel">Close</button><button class="primary" type="button" data-action="edit-plan" data-id="${esc(p.id)}">Edit activity</button></div></div>`
+    `<div class="view-details"><div><div class="detail-label">Project</div><div class="detail-value">${esc(project?.name) || '—'}</div></div><div><div class="detail-label">Company</div><div class="detail-value">${esc(scheduleCompanyName(p)) || 'Not specified'}</div></div><div><div class="detail-label">Project item</div><div class="detail-value">${esc(scheduleItemContext(p).itemTitle) || 'General project work'}${scheduleItemContext(p).subItemTitle ? ' → ' + esc(scheduleItemContext(p).subItemTitle) : ''}</div></div><div><div class="detail-label">Project activity</div><div class="detail-value">${esc(p.activity) || '—'}</div></div><div><div class="detail-label">Status</div><div class="detail-value">${tag(projectPlanStatus(p))}</div></div><div><div class="detail-label">Date range</div><div class="detail-value">${esc(p.date)}${p.endDate !== p.date ? ' to ' + esc(p.endDate) : ''}</div></div><div><div class="detail-label">Time</div><div class="detail-value">${esc(p.time)}–${esc(p.endTime)}</div></div><div><div class="detail-label">Work location</div><div class="detail-value">${esc(p.location) || '—'}</div></div><div class="wide"><div class="detail-label">Activity title</div><div class="detail-value">${esc(p.title)}</div></div><div class="wide"><div class="detail-label">Notes</div><div class="detail-value">${esc(p.text) || '—'}</div></div>${p.actualReviewedAt ? `<div class="wide"><div class="detail-label">Confirmed actual task</div><div class="detail-value">${esc(p.actualTask)} · ${p.actualSame ? 'Same as planned' : 'Different from plan'} · ${esc(p.actualReviewedAt)}</div></div>` : ''}</div><div class="modal-actions"><span>${planHasToil(p) ? '<span class="phase-badge">TOIL</span>' : ''}</span><div class="actions"><button type="button" data-action="cancel">Close</button><button class="primary" type="button" data-action="edit-plan" data-id="${esc(p.id)}">Edit activity</button></div></div>`
   );
 }
 function editPlan(id = '', date = today()) {
@@ -6847,7 +6864,7 @@ function renderProjectCalendar() {
     const dayPlans = plans.filter(p => p.date <= date && p.endDate >= date),
       isGoLive = project.goLiveDate === date;
     cells.push(
-      `<div class="calendar-day${date === today() ? ' today' : ''}${isGoLive ? ' go-live-day' : ''}"><button class="calendar-number" data-action="new-plan" data-date="${date}" aria-label="Plan activity on ${date}">${+date.slice(8)}</button>${isGoLive ? goLiveScheduleCard(project, true) : ''}${dayPlans.map(p => `<button class="calendar-event ${planStatusClass(p, date)}" data-action="view-plan" data-id="${esc(p.id)}"><span>${esc(p.time)}–${esc(p.endTime)}${isWeekend(date) ? ' · TOIL' : ''}</span><strong>${esc(p.activity || p.title)}</strong>${scheduleCompanyBadge(p)}${scheduleItemBadge(p)}<small>${esc(p.status)}${p.location ? ' · ' + esc(p.location) : ''}</small></button>`).join('')}</div>`
+      `<div class="calendar-day${date === today() ? ' today' : ''}${isGoLive ? ' go-live-day' : ''}"><button class="calendar-number" data-action="new-plan" data-date="${date}" aria-label="Plan activity on ${date}">${+date.slice(8)}</button>${isGoLive ? goLiveScheduleCard(project, true) : ''}${dayPlans.map(p => `<button class="calendar-event ${planStatusClass(p, date)}" data-action="view-plan" data-id="${esc(p.id)}"><span>${esc(p.time)}–${esc(p.endTime)}${isWeekend(date) ? ' · TOIL' : ''}</span><strong>${esc(p.activity || p.title)}</strong>${scheduleCompanyBadge(p)}${scheduleItemBadge(p)}<small>${esc(projectPlanStatus(p))}${p.location ? ' · ' + esc(p.location) : ''}</small></button>`).join('')}</div>`
     );
   }
   while (cells.length % 7)
@@ -6878,7 +6895,7 @@ function renderSchedule() {
     })
     .join(
       ''
-    )}</div></div><aside class="workhub-agenda"><span class="eyebrow">Day agenda</span><h3>${esc(new Date(scheduleDay + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }))}</h3><p class="muted">${entries.length} bookings · ${formatDuration(entries.reduce((n, e) => n + e.hours, 0) * 60)} scheduled</p><button class="agenda-add" data-action="schedule-add-day">+ Plan this day</button>${dayGoLives.length ? `<div class="agenda-milestones"><span class="eyebrow">Project milestones</span>${dayGoLives.map(p => goLiveScheduleCard(p)).join('')}</div>` : ''}<div class="agenda-bookings">${entries.map(e => scheduleEntryCard(e)).join('') || (!dayGoLives.length ? '<div class="agenda-empty"><strong>A little breathing room</strong><p>No activities planned for this day.</p></div>' : '')}</div></aside></div><div class="schedule-status-legend"><span class="status-planned">Planned</span><span class="status-in-progress">In Progress</span><span class="status-review-due">Review due</span><span class="status-completed">Completed</span><span class="status-elapsed">Elapsed</span><span class="legend-toil">TOIL</span><span class="legend-go-live">Go-Live milestone</span></div><div class="footerline">01:00–24:00 · Go-Live milestones come directly from each project record and do not reserve working hours.</div></section>`;
+    )}</div></div><aside class="workhub-agenda"><span class="eyebrow">Day agenda</span><h3>${esc(new Date(scheduleDay + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }))}</h3><p class="muted">${entries.length} bookings · ${formatDuration(entries.reduce((n, e) => n + e.hours, 0) * 60)} scheduled</p><button class="agenda-add" data-action="schedule-add-day">+ Plan this day</button>${dayGoLives.length ? `<div class="agenda-milestones"><span class="eyebrow">Project milestones</span>${dayGoLives.map(p => goLiveScheduleCard(p)).join('')}</div>` : ''}<div class="agenda-bookings">${entries.map(e => scheduleEntryCard(e)).join('') || (!dayGoLives.length ? '<div class="agenda-empty"><strong>A little breathing room</strong><p>No activities planned for this day.</p></div>' : '')}</div></aside></div><div class="schedule-status-legend"><span class="status-planned">Planned</span><span class="status-in-progress">In Progress</span><span class="status-on-hold">On Hold</span><span class="status-completed">Completed</span><span class="status-elapsed">Elapsed</span><span class="legend-toil">TOIL</span><span class="legend-go-live">Go-Live milestone</span></div><div class="footerline">01:00–24:00 · Go-Live milestones come directly from each project record and do not reserve working hours.</div></section>`;
 }
 
 function editProject(id, returnTo = '') {
@@ -7153,7 +7170,7 @@ function openRangeEditor(date = today(), time = '09:00', taskId = '', createNew 
     planId: old?.planId || '',
     originalDate: createNew ? '' : date,
     originalTime: createNew ? '' : time,
-    status: plan?.status || 'Planned',
+    status: plan?.status || old?.status || 'Planned',
     title: plan?.title || old?.title || '',
     companyId: old?.companyId || plan?.companyId || '',
     companyName: old?.companyName || plan?.companyName || '',
@@ -7197,21 +7214,22 @@ function scheduleTimeStatus(slot, d = state, date = today(), time = timeNow().sl
   if (slot.sessionId) return 'Completed';
   const plan = d.projectPlans.find(plan => plan.id === slot.planId),
     task = slot.kind === 'task' ? d.tasks.find(task => task.id === slot.linkId) : null;
-  if (plan?.status === 'Completed' || task?.done) return 'Completed';
-  if (plan?.status === 'On Hold') return 'On Hold';
+  const maintainedStatus = plan?.status || (slot.kind === 'custom' ? slot.status : '');
+  if (maintainedStatus === 'Completed' || task?.done) return 'Completed';
+  if (maintainedStatus === 'On Hold') return 'On Hold';
   const block = slot.bookingId
       ? d.schedule.filter(row => row.date === slot.date && row.bookingId === slot.bookingId)
       : [slot],
     startTime = plan?.time || block.map(row => row.time).sort()[0],
     endTime = plan?.endTime || block.map(slotEnd).sort().at(-1),
     now = date + time,
-    start = (plan?.date || slot.date) + startTime,
+    start = slot.date + startTime,
     end = (plan?.endDate || slot.date) + endTime;
   if (now < start) return 'Planned';
-  // A task's planned time ending does not complete the work. Keep started
-  // allocations active until the linked task is completed, even on later days.
-  if (task || now < end) return 'In Progress';
-  return plan ? 'Review due' : 'Elapsed';
+  // A time slot ending does not complete the work. Started activities remain
+  // active until their task or maintained activity status says otherwise.
+  if (task || plan || slot.kind === 'custom' || now < end) return 'In Progress';
+  return 'Elapsed';
 }
 function scheduleEntryStatus(entry, date = today(), time = timeNow().slice(0, 5)) {
   return scheduleTimeStatus(entry.slot, state, date, time);
@@ -7227,7 +7245,15 @@ function scheduleMonthMetrics() {
     bookings: entries.length,
     minutes: Math.round(entries.reduce((sum, entry) => sum + entry.hours * 60, 0)),
     hours: formatHours(entries.reduce((sum, entry) => sum + entry.hours, 0)),
-    review: entries.filter(entry => scheduleEntryStatus(entry) === 'Review due').length,
+    review: entries.filter(entry => {
+      const plan = state.projectPlans.find(plan => plan.id === entry.slot.planId);
+      return (
+        plan &&
+        planNeedsActualReview(plan) &&
+        !plan.actualReviewedAt &&
+        !['Completed', 'On Hold'].includes(plan.status)
+      );
+    }).length,
     toilMinutes: Math.round(
       entries
         .filter(entry => isToilSchedule(entry.slot))
@@ -7518,7 +7544,7 @@ function renderTickets() {
 }
 const scheduleRenderV10 = renderSchedule;
 renderSchedule = function () {
-  return `<div class="workspace-v10 schedule-workspace">${scheduleRenderV10().replace('Bookings and project Go-Live milestones stay synchronized automatically.', 'Plan your time. Open any activity to review or edit its details.').replace('01:00–24:00 ·', '00:00–24:00 ·').replace('<div class="schedule-view-switch"><button class="active" data-action="schedule-layout"', '<button class="small" data-action="schedule-today">Today</button><div class="schedule-view-switch"><button class="active" data-action="schedule-layout"')}<p class="hint schedule-task-status-help">Task bookings stay In Progress after their scheduled time ends until the task is completed.</p></div>`;
+  return `<div class="workspace-v10 schedule-workspace">${scheduleRenderV10().replace('Bookings and project Go-Live milestones stay synchronized automatically.', 'Plan your time. Open any activity to review or edit its details.').replace('01:00–24:00 ·', '00:00–24:00 ·').replace('<div class="schedule-view-switch"><button class="active" data-action="schedule-layout"', '<button class="small" data-action="schedule-today">Today</button><div class="schedule-view-switch"><button class="active" data-action="schedule-layout"')}<p class="hint schedule-task-status-help">Tasks, project activities and custom activities stay In Progress after their scheduled time ends until you mark the work Completed. Use Edit activity to complete or put project and custom work On Hold.</p></div>`;
 };
 function renderScheduleGrid() {
   const days = monthDates(month),

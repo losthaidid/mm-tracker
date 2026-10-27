@@ -278,7 +278,9 @@
           return '';
         let art = '',
           handles = '';
-        const attrs = ' data-canvas-mark="' + esc(m.id) + '"';
+        // Pen strokes are ink, with no selectable object or resize handles.
+        const selectable = m.type !== 'pen';
+        const attrs = selectable ? ' data-canvas-mark="' + esc(m.id) + '"' : '';
         if (m.type === 'text') {
           const fs = clamp(m.fontSize, 8, 96),
             lines = wrap(m.text, m.w, fs),
@@ -328,9 +330,12 @@
         } else if (Array.isArray(m.points) && m.points.length > 1) {
           const points = m.points.map(pt => pt.map(n => clamp(Number(n) || 0, -8000, 8000)));
           art =
-            '<polyline class="pc-mark-hit" points="' +
-            points.map(p => p.join(',')).join(' ') +
-            '" fill="none" stroke="transparent" stroke-width="22"/><polyline class="pc-ink-line" points="' +
+            (selectable
+              ? '<polyline class="pc-mark-hit" points="' +
+                points.map(p => p.join(',')).join(' ') +
+                '" fill="none" stroke="transparent" stroke-width="22"/>'
+              : '') +
+            '<polyline class="pc-ink-line" points="' +
             points.map(p => p.join(',')).join(' ') +
             '" fill="none" stroke="' +
             m.color +
@@ -346,7 +351,7 @@
               '" stroke-width="' +
               m.width +
               '" stroke-linecap="round"/>';
-          if (editable && selected === m.id)
+          if (editable && selectable && selected === m.id)
             handles = [
               ['start', points[0]],
               ['end', points.at(-1)],
@@ -367,7 +372,7 @@
         }
         const b = box(raw, p.steps);
         const ring =
-          editable && selected === m.id
+          editable && selectable && selected === m.id
             ? '<rect class="pc-selection" x="' +
               (b.x - m.x - 5) +
               '" y="' +
@@ -388,7 +393,9 @@
           ',' +
           m.y +
           ')"><title>' +
-          esc(m.type === 'text' ? m.text : 'Process annotation') +
+          esc(
+            m.type === 'text' ? m.text : m.type === 'pen' ? 'Freehand ink' : 'Process annotation'
+          ) +
           '</title>' +
           art +
           ring +

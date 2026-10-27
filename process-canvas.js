@@ -46,6 +46,11 @@
       for (const b of panel.querySelectorAll('[data-presenter="tool"]'))
         b.setAttribute('aria-pressed', String(b.dataset.value === value));
       if (!['select', 'connect'].includes(value)) selected = '';
+      if (value === 'pen') {
+        nodes.clear();
+        node = '';
+        selectedEdge = null;
+      }
       collapse();
       a.publish();
     }
@@ -83,6 +88,7 @@
     quick.innerHTML =
       '<button type="button" data-pc="select-all">Select all steps</button><button type="button" data-pc="clear-selection">Clear selection</button><button type="button" data-pc="edit-step">Edit selected step</button><button type="button" data-pc="connect">Connect ports</button><button type="button" data-pc="finish-links">Done linking</button><button type="button" data-pc="attach">Attach note / arrow to step</button><button type="button" data-pc="detach">Detach selected</button><button type="button" data-pc="links">Project / knowledge links</button><button type="button" data-pc="undo">Undo canvas edit</button><button type="button" data-pc="copy">Save editable copy</button><button type="button" data-presenter="end">End presentation</button>';
     for (const [action, label] of [
+      ['shortcuts', '⌨ Keyboard shortcuts (?)'],
       ['manage-connections', 'Unlink / manage connections'],
       ['delete-steps', 'Delete selected steps / links'],
       ['edit-connection', 'Edit selected connection'],
@@ -99,6 +105,13 @@
       notes = panel.querySelector('.presenter-notes'),
       display = panel.querySelector('.presenter-display-actions'),
       status = panel.querySelector('[data-presenter-status]');
+    if (ink) {
+      const clearInk = doc.createElement('button');
+      clearInk.type = 'button';
+      clearInk.dataset.pc = 'clear-ink';
+      clearInk.textContent = 'Clear pen ink';
+      ink.append(clearInk);
+    }
     const retry = doc.createElement('button');
     retry.type = 'button';
     retry.dataset.presenter = 'window';
@@ -129,6 +142,14 @@
       dock.append(sound);
     }
     stage.append(dock);
+    const shortcutButton = doc.createElement('button');
+    shortcutButton.type = 'button';
+    shortcutButton.dataset.pc = 'shortcuts';
+    shortcutButton.textContent = '⌨';
+    shortcutButton.title = 'Keyboard shortcuts (?)';
+    shortcutButton.setAttribute('aria-label', 'Keyboard shortcuts');
+    shortcutButton.setAttribute('aria-keyshortcuts', '? F1');
+    dock.append(shortcutButton);
     const marquee = doc.createElement('div');
     marquee.className = 'pc-marquee';
     marquee.hidden = true;
@@ -641,6 +662,20 @@
       const p = a.canvas.model(),
         next = copy(p),
         m = next.annotations.find(m => m.id === selected);
+      if (name === 'shortcuts') {
+        root.WorkHubProcessShortcuts?.guide(panel, { presenter: true });
+        return;
+      }
+      if (name === 'clear-ink') {
+        if (editor) throw Error('Save or cancel details before clearing ink.');
+        if (!next.annotations.some(mark => mark.type === 'pen')) return;
+        next.annotations = next.annotations.filter(mark => mark.type !== 'pen');
+        if (commit(next, p)) {
+          selected = '';
+          notify('Pen ink cleared. Text, arrows and steps are kept. Undo can restore the ink.');
+        }
+        return;
+      }
       if (name === 'sound') {
         void a.canvas.sound()?.catch(err => notify(err.message));
         return;
@@ -1016,7 +1051,7 @@
           markId = e.target.closest('[data-canvas-mark]')?.dataset.canvasMark,
           stepId = e.target.closest('[data-node]')?.dataset.node,
           port = e.target.closest('[data-pc-port]');
-        if (stepId) {
+        if (stepId && tool !== 'pen') {
           node = stepId;
           selectedEdge = null;
         }
@@ -1055,7 +1090,10 @@
           before: copy(before),
           original: copy(before),
         };
-        if (port || (tool === 'connect' && stepId)) {
+        if (
+          (port && ['move', 'select', 'connect'].includes(tool)) ||
+          (tool === 'connect' && stepId)
+        ) {
           gesture = {
             ...state,
             kind: 'wire',
@@ -1130,8 +1168,14 @@
             ],
           };
           draft.annotations.push(m);
-          selected = m.id;
-          gesture = { ...state, kind: 'draw', mark: m.id, anchor: stepId };
+          selected = tool === 'pen' ? '' : m.id;
+          gesture = {
+            ...state,
+            kind: 'draw',
+            mark: m.id,
+            anchor: tool === 'pen' ? '' : stepId,
+            freehand: tool === 'pen',
+          };
         }
         if (gesture) {
           try {
@@ -1388,7 +1432,7 @@
           }
           if (done.kind === 'draw') {
             const m = draft.annotations.find(m => m.id === done.mark);
-            if (Math.hypot(...m.points.at(-1)) < 4) {
+            if (!m.points.some(pt => Math.hypot(...pt) >= 4)) {
               draft = null;
               a.publish();
               return;
@@ -1422,7 +1466,7 @@
             }
           }
           commit(draft, done.before);
-          if (done.kind === 'draw') setTool('select');
+          if (done.kind === 'draw' && !done.freehand) setTool('select');
         } catch (err) {
           if (done.kind === 'connection') selectedEdge = { from: done.edge.from, to: done.edge.to };
           draft = null;
@@ -1457,6 +1501,54 @@
           e.stopImmediatePropagation();
           stepEditor(e.target.closest('[data-node]').dataset.node);
         }
+      },
+      true
+    );
+    panel.addEventListener(
+      'keydown',
+      e => {
+        if (!live()) return;
+        root.WorkHubProcessShortcuts?.dispatch(e, {
+          surface: panel,
+          presenter: true,
+          skip: command => command === 'delete' && !!e.target.closest('[data-link-handle]'),
+          run: command => {
+            try {
+              if (command === 'help') action('shortcuts');
+              else if (command === 'save') {
+                const form = editor?.querySelector('form');
+                if (form) form.requestSubmit();
+                else notify('Canvas edits save automatically. This process is already saved.');
+                if (!editor) host.focus({ preventScroll: true });
+              } else if (command === 'insert') {
+                collapse();
+                types.closest('details').open = true;
+                types.querySelector('[data-pc-type]')?.focus({ preventScroll: true });
+              } else if (command === 'edit') {
+                action(selectedEdge ? 'edit-connection' : 'edit-step');
+                editor?.querySelector('input,select,textarea')?.focus({ preventScroll: true });
+              } else {
+                if (['select', 'explore', 'pen', 'arrow', 'text', 'laser'].includes(command))
+                  setTool(command === 'explore' ? 'move' : command);
+                else if (command === 'connect') action('connect');
+                else if (['select-all', 'undo', 'sound'].includes(command)) action(command);
+                else if (command === 'delete') {
+                  if (selected && !selectedEdge) {
+                    if (editor)
+                      throw Error('Save or cancel details before deleting an annotation.');
+                    const before = a.canvas.model(),
+                      next = copy(before);
+                    next.annotations = next.annotations.filter(m => m.id !== selected);
+                    if (commit(next, before)) selected = '';
+                  } else action('delete-steps');
+                } else panel.querySelector('[data-presenter="' + command + '"]')?.click();
+                host.focus({ preventScroll: true });
+              }
+            } catch (err) {
+              notify(err.message);
+            }
+          },
+        });
       },
       true
     );

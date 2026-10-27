@@ -18,7 +18,7 @@ Use **Start timer** in the workspace toolbar. Completed/archived tasks, complete
 
 Only **Project** sessions display **Charge code**. The dropdown uses unique nonempty codes from maintained projects and initially selects the linked project's code. Maintain codes through Settings → Project management → Edit project. Task, Ticket and Custom sessions hide the field and save no charge code. Historical sessions keep their original values.
 
-**Stop & save** records completed work. Its Schedule booking shows **Completed** for all activity types. This remains true if the parent task is unfinished or the session history is later deleted. A manually planned task booking is Planned before its scheduled start, then stays In Progress while the linked task is unfinished—even after the time range ends or on later days. Completing the task updates its bookings to Completed; reopening it restores In Progress for started bookings. The calendar, agenda, time grid and activity details share this rule. These are display statuses: the clock does not change tasks, booking dates, durations or recorded work. Unlinked custom activities still show Elapsed, project plans retain Review due, and leave retains its maintained approval status.
+**Stop & save** records completed work. Its Schedule booking shows **Completed** for all activity types. This remains true if the parent task is unfinished or the session history is later deleted. A manually planned task booking is Planned before its scheduled start, then stays In Progress while the linked task is unfinished—even after the time range ends or on later days. Completing the task updates its bookings to Completed; reopening it restores In Progress for started bookings. The calendar, agenda, time grid and activity details share this rule. These are display statuses: the clock does not change tasks, booking dates, durations or recorded work. Project and custom activities use the same Planned → In Progress rule and stay active after the scheduled end. Set Completed or On Hold through Edit activity; custom status is saved for every segment of that booking and retained in backups. Project calendar cards and project activity details use the same computed status as Schedule. The Review due count and planned-versus-actual review remain separate reminders for unfinished project plans. Leave retains its maintained approval status.
 
 ## Back up & clear all records
 
@@ -50,3 +50,18 @@ Appearance → **Wardrobe → Automatic · morning, afternoon & night** changes 
 ## Animated header
 
 The logo contains an orbiting star, satellites, twinkles and a breathing halo. The maintained website title has a continuous letter wave and travelling light. Hover changes the motion; click or keyboard activation triggers a short burst and opens My day. Custom titles remain literal text and are preserved across renders. Motion uses bounded SVG/CSS layers, respects Animations Off and reduced motion, and pauses while the page is hidden or covered by a break/presentation.
+
+
+## Process Hub keyboard controls and pen
+
+Click the canvas or a Process Hub control, then press **?** (or **F1**) to open the shortcut guide. The canvas also has a **Shortcuts** button. In the private presenter, use the keyboard button in the playback dock or the Steps bubble. The audience view receives no controls.
+
+- **V** selects; **H** explores/pans; **L** links steps; **I** opens step types; **E** edits a selected step or connection.
+- **P** plays/pauses; **[ / ]** goes back/next; **R** restarts; **M** toggles sound.
+- **F / 0** fits the canvas; **+ / =** zooms in; **−** zooms out.
+- **Ctrl / ⌘ S** saves an open editor or full process draft; ordinary canvas edits continue to save automatically. **Ctrl / ⌘ Z** undoes a canvas edit. **Ctrl / ⌘ A** selects all steps. **Delete / Backspace** removes the selection with the existing step/link confirmation.
+- Private presenter only: **B** pen, **A** arrow, **T** text, **G** laser.
+
+Letter shortcuts do not run while typing in fields, and text selection/undo keep their native behavior. Shortcuts run only inside the active Process Hub or private presenter; they do not open windows, select a display or request fullscreen. Existing Space-drag panning, arrow-key movement, Escape cancellation, account guards and edit conflict checks remain in place.
+
+The pen stays active across consecutive strokes. Ink has no selection box, resize handles, magnetic attachment or object dragging, and no entrance animation on redraw. Closed loops are retained. **Clear pen ink** removes only pen strokes, keeps arrows/text/steps, and can be undone. Ink remains visible to the audience and is retained in the saved process and PDF/image exports. Existing saved strokes remain compatible.
