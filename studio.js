@@ -83,6 +83,7 @@
       }));
     if (h.ticketClosures === undefined) h.ticketClosures = [];
     root.WorkHubMyDayEngine.upgrade(d);
+    root.WorkHubScheduleEngine?.upgrade(d);
     root.WorkHubReminders?.upgrade(d);
     if (h.headerSubtitle === undefined) h.headerSubtitle = 'Your work, your rhythm.';
     root.WorkHubWorkbench?.upgrade(d);
@@ -109,6 +110,7 @@
   }
   function validate(d) {
     root.WorkHubMyDayEngine.validate(d);
+    root.WorkHubScheduleEngine?.validate(d);
     root.WorkHubWorkbench?.validate(d);
     root.WorkHubValidatorEngine?.validateState(d);
     root.WorkHubBatchEngine?.validate(d);
@@ -303,7 +305,8 @@
       myDay = null,
       experience = null,
       wardrobe = null,
-      backgrounds = null;
+      backgrounds = null,
+      workSchedule = null;
     const reminders = root.WorkHubReminders?.install({
       ...a,
       hubAction: el => handle(el),
@@ -1956,7 +1959,7 @@
       }
       el.dataset.minimized = String(timerMinimized);
       el.dataset.running = String(!!timerDraft.runningSince);
-      el.innerHTML = `<div class="hub-timer-head"><button type="button" class="hub-float-handle" data-hub="timer-drag" aria-label="Move timer. Drag or use arrow keys." title="Drag to move timer">${icon('drag')}</button><span class="hub-kicker">${timerMinimized ? '<span id="hubTimerClock" class="hub-timer">' + timerText() + '</span>' : timerDraft.runningSince ? 'TIME WELL SPENT' : 'TAKE YOUR TIME'}</span>${btn('timer-minimize', timerMinimized ? '↗' : '−', 'aria-label="' + (timerMinimized ? 'Expand timer' : 'Minimise timer') + '" aria-expanded="' + !timerMinimized + '"', 'small')}</div>${timerMinimized ? '' : `<div class="hub-timer-body"><strong class="hub-sensitive">${esc(timerDraft.title)}</strong>${timerDraft.itemTitle ? '<div class="hub-timer-context hub-sensitive">' + esc(timerDraft.itemTitle) + (timerDraft.subItemTitle ? ' → ' + esc(timerDraft.subItemTitle) : '') + '</div>' : ''}<p class="hub-meta">${timerDraft.runningSince ? '● Running' : 'Ⅱ Paused'} · <span class="hub-sensitive">${esc(projectName(timerDraft.projectId))}</span></p><span id="hubTimerClock" class="hub-timer">${timerText()}</span><div class="actions">${btn(timerDraft.runningSince ? 'timer-pause' : 'timer-resume', timerDraft.runningSince ? 'Pause' : 'Resume', '', 'small')}${btn('timer-notes', 'Notes', '', 'small')}${btn('timer-stop', 'Stop & save', '', 'primary small')}</div></div>`}`;
+      el.innerHTML = `<div class="hub-timer-head"><button type="button" class="hub-float-handle" data-hub="timer-drag" aria-label="Move timer. Drag or use arrow keys." title="Drag to move timer">${icon('drag')}</button><span class="hub-kicker">${timerMinimized ? '<span id="hubTimerClock" class="hub-timer">' + timerText() + '</span>' : timerDraft.runningSince ? 'TIME WELL SPENT' : 'TAKE YOUR TIME'}</span>${btn('timer-minimize', timerMinimized ? '↗' : '−', 'aria-label="' + (timerMinimized ? 'Expand timer' : 'Minimise timer') + '" aria-expanded="' + !timerMinimized + '"', 'small')}</div>${timerMinimized ? '' : `<div class="hub-timer-body"><strong class="hub-sensitive">${esc(timerDraft.title)}</strong>${timerDraft.itemTitle ? '<div class="hub-timer-context hub-sensitive">' + esc(timerDraft.itemTitle) + (timerDraft.subItemTitle ? ' → ' + esc(timerDraft.subItemTitle) : '') + '</div>' : ''}<p class="hub-meta">${timerDraft.runningSince ? '● Running' : 'Ⅱ Paused'} · <span class="hub-sensitive">${esc(timerDraft.unlisted ? [timerDraft.unlistedName || 'Unlisted ' + timerDraft.kind, timerDraft.companyHint].filter(Boolean).join(' · ') : projectName(timerDraft.projectId))}</span></p><span id="hubTimerClock" class="hub-timer">${timerText()}</span><div class="actions">${btn(timerDraft.runningSince ? 'timer-pause' : 'timer-resume', timerDraft.runningSince ? 'Pause' : 'Resume', '', 'small')}${btn('timer-switch', '⇄ Switch work', '', 'small')}${btn('timer-notes', 'Notes', '', 'small')}${btn('timer-stop', 'Stop & save', '', 'primary small')}</div></div>`}`;
       positionTimer();
     }
     document.addEventListener('pointerdown', event => {
@@ -2084,9 +2087,11 @@
       linkId = '',
       subTaskId = '',
       itemId = '',
-      subItemId = ''
+      subItemId = '',
+      switching = false,
+      seed = {}
     ) {
-      if (timerDraft) {
+      if (timerDraft && !switching) {
         a.tell('A timer is already running or paused. Stop it before starting another.');
         renderTimerBar();
         return;
@@ -2095,7 +2100,7 @@
         rows = timerRows(kind);
       if (!rows.some(r => r[0] === linkId)) linkId = '';
       form(
-        'Start a work session',
+        switching && timerDraft ? 'Switch your work' : 'Start a work session',
         'hubTimerStart',
         select(
           'kind',
@@ -2127,28 +2132,37 @@
           '</div>' +
           field('notes', 'Session remarks', '', 'textarea'),
         '',
-        '<p class="hint">Sub-item sessions keep their main item and project link. Stop & save adds the active time to Schedule and the project calendar. Pauses are excluded.</p>'
+        '<p class="hint">Sub-item sessions keep their main item and project link. Stop & save records actual time alongside your original Schedule plan and in project work history. Pauses are excluded.</p>'
       );
+      const startForm = $('hubTimerStart');
+      startForm.dataset.switch = String(switching);
+      if (seed.allocationKey) startForm.dataset.allocation = seed.allocationKey;
+      workSchedule?.enhanceTimerForm(startForm, seed);
     }
-    function startTimer(values) {
-      if (timerDraft) throw Error('Stop the existing timer first.');
+    function startTimer(values, switching = false) {
+      if (!a.cloud().ready || !a.cloud().user?.id) throw Error('Sign in before starting work.');
+      if (timerDraft && !switching) throw Error('Stop the existing timer first.');
       const s = a.state(),
         kind = values.kind,
-        linkId = values.linkId || '',
+        unlisted =
+          (values.captureMode === 'unlisted' || values.unlisted === true) &&
+          ['project', 'ticket'].includes(kind),
+        linkId = unlisted ? '' : values.linkId || '',
         task = kind === 'task' ? s.tasks.find(t => t.id === linkId) : null,
         project = kind === 'project' ? s.projects.find(p => p.id === linkId) : null,
         ticket = kind === 'ticket' ? s.tickets.find(t => t.id === linkId) : null;
       if (
         !TIME_OPTIONS.includes(kind) ||
         (kind === 'task' && !task) ||
-        (kind === 'project' && !project) ||
-        (kind === 'ticket' && !ticket)
+        (kind === 'project' && !project && !unlisted) ||
+        (kind === 'ticket' && !ticket && !unlisted)
       )
         throw Error('Choose a valid activity and linked record.');
       if (task && (task.done || task.archived)) throw Error('Choose an active, unfinished task.');
       if (ticket && !timerTicketOpen(ticket)) throw Error('Choose an open, unfinished ticket.');
       if (
         kind === 'project' &&
+        !unlisted &&
         values.chargeCode &&
         !s.projects.some(p => p.code === values.chargeCode)
       )
@@ -2159,13 +2173,18 @@
             ? s.specs.find(p => p.id === values.itemId && p.projectId === linkId)
             : null,
         subItem = item?.subItems.find(p => p.id === values.subItemId);
-      if (kind === 'project' && ((values.itemId && !item) || (values.subItemId && !subItem)))
+      if (
+        kind === 'project' &&
+        !unlisted &&
+        ((values.itemId && !item) || (values.subItemId && !subItem))
+      )
         throw Error('Choose an item and sub-item belonging to this project.');
       if (kind === 'task' && values.subTaskId && !sub)
         throw Error('Choose a subtask belonging to this task.');
       if (sub?.done || sub?.status === 'Completed') throw Error('Choose an unfinished subtask.');
       const title =
         values.title?.trim() ||
+        (unlisted ? values.unlistedName?.trim() : '') ||
         subItem?.title ||
         item?.description ||
         sub?.title ||
@@ -2174,18 +2193,76 @@
         ticket?.description;
       if (!title || title.length > 500)
         throw Error('Enter a session title of up to 500 characters.');
+      const companyId = !unlisted && kind === 'project' ? values.companyId || '' : '';
+      if (
+        companyId &&
+        !s.projectCompanies.some(
+          c => c.id === companyId && c.projectId === linkId && c.active !== false
+        )
+      )
+        throw Error('Choose an active company from this project.');
+      const plannedAllocation = values.allocationKey
+        ? s.schedule.find(slot => root.WorkHubScheduleEngine.key(slot) === values.allocationKey)
+        : null;
+      const allocationKey =
+        !unlisted &&
+        plannedAllocation &&
+        root.WorkHubScheduleEngine.matches(
+          plannedAllocation,
+          { kind, linkId, projectId: kind === 'project' ? linkId : '', title, companyId },
+          s
+        )
+          ? values.allocationKey
+          : '';
+      for (const key of ['unlistedName', 'companyHint', 'reference'])
+        if (values[key] && (typeof values[key] !== 'string' || values[key].length > 500))
+          throw Error('Keep work context within 500 characters.');
+      let started = values.actualStart ? new Date(values.actualStart).toISOString() : now();
+      if (
+        timerDraft &&
+        Date.parse(started) < Date.parse(timerDraft.started) &&
+        root.WorkHubScheduleEngine.localDate(Date.parse(started)) ===
+          root.WorkHubScheduleEngine.localDate(Date.parse(timerDraft.started)) &&
+        root.WorkHubScheduleEngine.time(Date.parse(started)) ===
+          root.WorkHubScheduleEngine.time(Date.parse(timerDraft.started))
+      )
+        started = timerDraft.started;
+      if (
+        Date.parse(started) > Date.now() ||
+        (timerDraft && Date.parse(started) < Date.parse(timerDraft.started))
+      )
+        throw Error('The switch time must be between this session’s start and now.');
+      if (Date.now() - Date.parse(started) > 366 * 86400000)
+        throw Error('Check the actual start time.');
+      root.WorkHubScheduleEngine?.assertAvailable(s, [{ start: started, end: now() }]);
+      if (timerDraft && switching) {
+        checkTimerOwner();
+        const cutoff = Date.parse(started),
+          parts = [
+            ...timerDraft.segments,
+            ...(timerDraft.runningSince ? [{ start: timerDraft.runningSince, end: started }] : []),
+          ];
+        const elapsed = parts.reduce(
+          (n, p) => n + Math.max(0, Math.min(cutoff, Date.parse(p.end)) - Date.parse(p.start)),
+          0
+        );
+        if (!elapsed) {
+          timerDraft = null;
+          persistTimer();
+        } else finishTimer(false, started, 'switch');
+        if (timerDraft) return false;
+      }
       const key = timerKey();
       if (key && localStorage.getItem(key))
         throw Error('Another tab already has a timer. Refresh to recover it.');
-      const started = now();
       timerDraft = {
         id: uid(),
         title,
         kind,
         linkId,
         subTaskId: sub?.id || '',
-        itemId: item?.id || '',
-        subItemId: subItem?.id || '',
+        itemId: unlisted ? '' : item?.id || '',
+        subItemId: unlisted ? '' : subItem?.id || '',
         itemTitle: item?.description || '',
         subItemTitle: subItem?.title || '',
         projectId:
@@ -2198,12 +2275,22 @@
         runningSince: started,
         segments: [],
         notes: values.notes || '',
-        chargeCode: kind === 'project' ? values.chargeCode || '' : '',
+        chargeCode: kind === 'project' && !unlisted ? values.chargeCode || '' : '',
+        companyId,
+        unlisted,
+        unlistedName: unlisted ? values.unlistedName?.trim() || '' : '',
+        companyHint: unlisted ? values.companyHint?.trim() || '' : '',
+        reference: unlisted ? values.reference?.trim() || '' : '',
+        allocationKey,
+        scheduleVersion: 1,
       };
+      timerDraft.captureIdentity = root.WorkHubScheduleEngine?.identity(timerDraft, s);
       batchA?.timerStarted(timerDraft);
       persistTimer();
       a.closeModal();
       renderTimerBar();
+      a.refreshSchedule?.();
+      workSchedule?.refreshActuals();
       react('busy', 'Timer started. Make room for one thing.');
     }
     function checkTimerOwner() {
@@ -2219,6 +2306,8 @@
       timerDraft.runningSince = null;
       persistTimer();
       renderTimerBar();
+      a.refreshSchedule?.();
+      workSchedule?.refreshActuals();
     }
     function resumeTimer() {
       if (!timerDraft || timerDraft.runningSince) return;
@@ -2227,6 +2316,8 @@
       batchA?.timerResumed(timerDraft);
       persistTimer();
       renderTimerBar();
+      a.refreshSchedule?.();
+      workSchedule?.refreshActuals();
     }
     function sessionRanges(session) {
       const parts = [];
@@ -2260,6 +2351,11 @@
       return out;
     }
     function scheduleSession(session, d) {
+      if (session.scheduleVersion === 1) {
+        root.WorkHubScheduleEngine.assertAvailable(d, session.intervals, session.id);
+        session.scheduled = true;
+        return;
+      }
       const ranges = sessionRanges(session);
       if (!ranges.length) throw Error('Record at least a moment of work before stopping.');
       for (const r of ranges)
@@ -2333,7 +2429,7 @@
       }
       session.scheduled = true;
     }
-    function finishTimer(skipCalendar = false, overrideEnd = '') {
+    function finishTimer(skipCalendar = false, overrideEnd = '', endReason = 'stop') {
       if (!timerDraft) return;
       checkTimerOwner();
       pauseTimer();
@@ -2373,6 +2469,19 @@
         chargeCode: t.chargeCode,
         scheduled: false,
         ...(batchA?.timerFields(t) || {}),
+        ...(t.scheduleVersion === 1
+          ? {
+              scheduleVersion: 1,
+              endReason,
+              unlisted: t.unlisted || false,
+              unlistedName: t.unlistedName || '',
+              companyHint: t.companyHint || '',
+              reference: t.reference || '',
+              companyId: t.companyId || '',
+              allocationKey: t.allocationKey || '',
+              captureIdentity: t.captureIdentity,
+            }
+          : {}),
       };
       if (!skipCalendar) {
         try {
@@ -2401,9 +2510,18 @@
         persistTimer();
         renderTimerBar();
         a.closeModal();
+        a.refreshSchedule?.();
+        workSchedule?.refreshActuals();
         confetti();
+        return true;
       }
+      return false;
     }
+    workSchedule = root.WorkHubWorkSchedule?.install({
+      ...a,
+      timer: () => timerDraft,
+      timerEditor,
+    });
     function commands(query = '') {
       const q = query.toLowerCase().trim(),
         s = a.state(),
@@ -2652,6 +2770,7 @@
       library?.mount();
       people?.mount();
       mountUndo();
+      workSchedule?.mount(tab);
       myDay?.mount();
       document.body.classList.toggle('hub-focus', !!focus);
       const extra = $('hubBoardToggle');
@@ -2733,10 +2852,10 @@
       )
         return;
       if (
-        save(
-          h => (h[collection] = h[collection].filter(x => x.id !== id)),
-          'Deleted. Use Undo in the workspace toolbar to restore.'
-        )
+        save((h, d) => {
+          if (collection === 'sessions') root.WorkHubScheduleEngine?.retain(d, record);
+          h[collection] = h[collection].filter(x => x.id !== id);
+        }, 'Deleted. Use Undo in the workspace toolbar to restore.')
       ) {
         undo = { collection, record };
         mountUndo();
@@ -3155,13 +3274,18 @@
           );
         return;
       }
+      if (action === 'timer-switch') {
+        timerEditor('custom', '', '', '', '', true);
+        return;
+      }
       if (action === 'timer-new') {
         timerEditor(
           el.dataset.kind || 'custom',
           id || '',
           el.dataset.sub || '',
           el.dataset.item || '',
-          el.dataset.subitem || ''
+          el.dataset.subitem || '',
+          !!timerDraft
         );
         return;
       }
@@ -3229,7 +3353,11 @@
           save(h => {
             if (h[u.collection].some(r => r.id === u.record.id))
               throw Error('This record already exists.');
-            h[u.collection].push(u.record);
+            h[u.collection].push(
+              u.collection === 'sessions'
+                ? copy(h.daySchedule?.retained.find(s => s.id === u.record.id) || u.record)
+                : u.record
+            );
           }, 'Deletion undone.')
         ) {
           undo = null;
@@ -3392,7 +3520,12 @@
         return;
       }
       if (form.id === 'hubTimerStart') {
-        startTimer(values);
+        if (!form.isConnected || form.dataset.owner !== a.cloud().user?.id)
+          throw Error('Reopen the work form in the correct account.');
+        startTimer(
+          { ...values, allocationKey: form.dataset.allocation || '' },
+          form.dataset.switch === 'true'
+        );
         return;
       }
       if (form.id === 'hubTimerNotes') {
@@ -4069,6 +4202,8 @@
       simulationValues,
       sessionRanges,
       scheduleSession,
+      workSchedule,
+      timerEditor,
       startTimer,
       pauseTimer,
       resumeTimer,

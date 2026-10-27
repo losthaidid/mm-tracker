@@ -55,6 +55,8 @@ Current work-session filters, completed Schedule recordings, password-verified c
 | Files | What they control |
 | --- | --- |
 | [app.js](../app.js), [base.css](../base.css) | Schedule views, exact minute intervals, bookings, project-calendar links and the original form layouts. |
+| [schedule-engine.js](../schedule-engine.js) | Pure daily execution, plan/actual identities, bounded history, interval unions and overlap validation. Parent lifecycle statuses are not execution inputs. |
+| [work-schedule.js](../work-schedule.js), [work-schedule.css](../work-schedule.css) | Actual-work panels/cards, interruption capture, retrospective intervals, later record/company linking and project work history. Studio owns the recoverable single timer. |
 | [leave-balance-engine.js](../leave-balance-engine.js) | Maintained leave types, yearly allowances, earlier usage, half-day counting, weekday/public holiday policies and reservation limits. |
 | [leave-balances.js](../leave-balances.js), [leave-balances.css](../leave-balances.css) | Settings → Leave types / Leave allowances & balances, maintained public holiday calendar, Schedule cards and live after-save previews. See [LEAVE-BALANCES.md](LEAVE-BALANCES.md). |
 | [claims-engine.js](../claims-engine.js) | Location/rate rules, booking travel snapshots, client/special claim types, integer-sen calculations, monthly totals, recorded submission/payment snapshots and CSV output. |

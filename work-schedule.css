@@ -1,0 +1,113 @@
+/* Automatic day execution shares the selected workspace palette. */
+.day-execution {
+  margin-top: 20px;
+}
+.day-execution h3 {
+  margin: 4px 0;
+}
+.day-execution .hint {
+  line-height: 1.6;
+}
+.day-actual-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+.day-actual-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  padding: 16px;
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface, var(--panel));
+  color: var(--ink);
+}
+.day-actual-row strong,
+.day-actual-row small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.day-actual-row small {
+  color: var(--muted);
+  margin-top: 5px;
+}
+.day-actual-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+.day-status {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.status-active .slot-state,
+.day-status.status-active {
+  background: var(--accent);
+  color: var(--hub-on-accent, #fff);
+}
+.status-actual .slot-state {
+  color: var(--ink);
+  background: var(--panel);
+}
+.status-partial .slot-state,
+.status-changed .slot-state,
+.status-paused .slot-state {
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--accent);
+}
+.day-booking-execution {
+  padding: 16px;
+  margin-top: 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.day-work-capture > label,
+.day-work-capture [data-work-unlisted] > label,
+#dayLinkForm > label,
+#dayLinkCompany > label {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.day-history-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.day-plan-history {
+  margin-top: 20px;
+}
+@media (max-width: 600px) {
+  .day-actual-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .day-actual-actions {
+    justify-content: flex-start;
+  }
+}
+
+.day-actual-card {
+  border-style: dashed;
+  margin-top: 6px;
+}
+.day-actual-card .booking-time {
+  font-size: 10px;
+  color: var(--muted);
+}
