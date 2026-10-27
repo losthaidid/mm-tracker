@@ -1,6 +1,10 @@
 /* Shared interface colours. Load after feature sheets and before personal overrides.
    Deliberately scoped to UI surfaces: scenery, companion art, process diagram palettes,
    annotation colours and exported documents keep their own meaningful colours. */
+:root:not([data-workhub-startup]) {
+  background: var(--hub-bg);
+  color: var(--hub-page-text, var(--hub-text));
+}
 body[data-hub-theme] {
   color: var(--hub-page-text, var(--hub-text));
   --hub-scenic-text: #fffdf3;

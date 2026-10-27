@@ -10,6 +10,7 @@ function startup(t, execute = true, storage = {}) {
   const dom = new JSDOM(html, {
     url: 'https://losthaidid.github.io/mm-tracker/',
     runScripts: 'outside-only',
+    pretendToBeVisual: true,
   });
   t.after(() => dom.window.close());
   const { window } = dom;
@@ -119,6 +120,52 @@ test('slow startup offers recovery while keeping unfinished content covered and 
   assert.equal(document.documentElement.dataset.workhubStartupState, 'slow');
   window.WorkHubStartup.finish();
   assert.equal(document.documentElement.hasAttribute('data-workhub-startup'), false);
+});
+
+test('slow loading keeps the scene, progress and star interaction running until readiness or a real error', t => {
+  const { window, document, timers } = startup(t), scene = document.querySelector('.startup-scene'),
+    progress = document.querySelector('.startup-progress i'), button = document.querySelector('.startup-spark-button');
+  const sceneAnimation = window.getComputedStyle(scene).animation,
+    progressAnimation = window.getComputedStyle(progress).animation;
+  assert.match(sceneAnimation, /startup-scene-drift/);
+  assert.match(progressAnimation, /startup-progress/);
+  [...timers.values()].find(timer => timer.delay === 12000).callback();
+  assert.equal(window.getComputedStyle(scene).animation, sceneAnimation);
+  assert.equal(window.getComputedStyle(progress).animation, progressAnimation);
+  assert.notEqual(window.getComputedStyle(button).display, 'none');
+  assert.notEqual(window.getComputedStyle(document.querySelector('.startup-touch-hint')).visibility, 'hidden');
+  button.click(); assert.equal(scene.classList.contains('is-sparked'), true);
+  window.WorkHubStartup.phase('records', 'Opening your records…');
+  assert.equal(document.querySelector('.startup-scene'), scene);
+  assert.equal(window.getComputedStyle(scene).animation, sceneAnimation);
+  document.querySelector('script[src]').dispatchEvent(new window.Event('error'));
+  assert.equal(window.getComputedStyle(scene).animation, 'none');
+  assert.equal(window.getComputedStyle(progress).animation, 'none');
+  assert.equal(window.getComputedStyle(button).display, 'none');
+  window.WorkHubStartup.finish();
+  assert.equal(document.documentElement.dataset.workhubStartupState, 'error');
+  assert.equal(window.getComputedStyle(document.querySelector('body > header')).visibility, 'hidden');
+});
+
+test('startup resumes the same animation after tab visibility and page restoration, and removes lifecycle listeners on finish', t => {
+  const { window, document } = startup(t, false), page = document.documentElement;
+  let hidden = true;
+  Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
+  window.eval(source);
+  const scene = document.querySelector('.startup-scene'), animation = window.getComputedStyle(scene).animation;
+  assert.equal(page.hasAttribute('data-startup-hidden'), true);
+  assert.equal(window.getComputedStyle(scene).animationPlayState, 'paused');
+  hidden = false; window.dispatchEvent(new window.Event('pageshow'));
+  assert.equal(page.hasAttribute('data-startup-hidden'), false);
+  assert.notEqual(window.getComputedStyle(scene).animationPlayState, 'paused');
+  assert.equal(window.getComputedStyle(scene).animation, animation);
+  hidden = true; document.dispatchEvent(new window.Event('visibilitychange'));
+  assert.equal(page.hasAttribute('data-startup-hidden'), true);
+  hidden = false; document.dispatchEvent(new window.Event('visibilitychange'));
+  assert.equal(page.hasAttribute('data-startup-hidden'), false);
+  window.WorkHubStartup.finish();
+  hidden = true; document.dispatchEvent(new window.Event('visibilitychange')); window.dispatchEvent(new window.Event('pageshow'));
+  assert.equal(page.hasAttribute('data-startup-hidden'), false);
 });
 
 test('failed startup files or runtime errors keep recovery visible without revealing partial layout', t => {

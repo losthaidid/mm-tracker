@@ -3194,3 +3194,16 @@ test('startup theme: reload uses the saved Studio palette rather than an unsaved
  const row=copy(db.row);row.document.data.workhub.preferences.theme='lagoon';resolveRow({data:row,error:null});await settle();
  assert.equal(reloaded.document.body.dataset.hubTheme,'lagoon');assert.equal(root.dataset.startupTheme,'lagoon');assert.equal(root.style.getPropertyValue('--startup-page'),'#eef8f7');assert.equal(root.hasAttribute('data-workhub-startup'),false);assert.equal(reloaded.db.calls.length,0);
 });
+
+test('live theme: preset preview, save, discard and saved combinations update the whole page without a reload',async t=>{
+ const {api,document,window,db}=await app(t,{styles:true});api.hub.setTool('theme');api.showTab('studio');
+ const body=document.body,header=document.getElementById('hubHeader'),page=document.documentElement;
+ document.querySelector('[data-theme-choice="dark"]').click();
+ assert.equal(document.body.dataset.hubTheme,'dark');assert.equal(page.style.getPropertyValue('--hub-bg'),'#18232d');assert.equal(page.style.getPropertyValue('--hub-surface'),'#23313d');assert.equal(page.style.colorScheme,'dark');assert.equal(db.calls.length,0);
+ document.querySelector('[data-hub="theme-reset-preview"]').click();await settle();assert.equal(document.body.dataset.hubTheme,'ocean');assert.equal(page.style.getPropertyValue('--hub-bg'),'#f8f7f2');assert.equal(page.style.colorScheme,'light');
+ document.querySelector('[data-theme-choice="forest"]').click();let form=document.getElementById('hubTheme');api.hub.submit(form);await settle();assert.equal(page.style.getPropertyValue('--hub-bg'),'#f2f6ef');assert.match(document.getElementById('hubThemeStatus').textContent,/Theme saved/);
+ document.getElementById('workspacePaletteName').value='Live forest';document.querySelector('[data-hub="palette-save"]').click();await settle();const id=api.state().workhub.preferences.palettes[0].id;
+ document.querySelector('[data-theme-choice="rose"]').click();api.hub.submit(document.getElementById('hubTheme'));await settle();assert.equal(page.style.getPropertyValue('--hub-bg'),'#fcf1f5');
+ document.getElementById('workspacePalette').value=id;document.querySelector('[data-hub="palette-load"]').click();await settle();assert.equal(document.body.dataset.hubTheme,'custom');assert.equal(page.style.getPropertyValue('--hub-bg'),'#f2f6ef');assert.equal(document.body.style.getPropertyValue('--hub-bg'),'#f2f6ef');assert.equal(db.row.document.data.workhub.preferences.colors.page,'#f2f6ef');
+ assert.equal(document.body,body);assert.equal(document.getElementById('hubHeader'),header);api.showTab('tasks');assert.equal(page.style.getPropertyValue('--hub-bg'),'#f2f6ef');
+});

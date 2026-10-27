@@ -259,16 +259,21 @@
     { once: true }
   );
 
-  document.addEventListener('visibilitychange', () => {
+  function syncVisibility() {
     if (!finished) page.toggleAttribute('data-startup-hidden', document.hidden);
-  });
+  }
+  document.addEventListener('visibilitychange', syncVisibility);
+  // A restored mobile tab may receive pageshow without another visibilitychange.
+  root.addEventListener('pageshow', syncVisibility);
+  syncVisibility();
   function spark(event) {
     const button = event.target.closest?.('#workhubStartup .startup-spark-button');
     if (
       !button ||
       finished ||
       blocked ||
-      page.hasAttribute('data-workhub-startup-state') ||
+      page.dataset.workhubStartupState === 'error' ||
+      document.hidden ||
       page.dataset.startupMotion === 'off' ||
       root.matchMedia?.('(prefers-reduced-motion: reduce)').matches
     )
@@ -304,6 +309,8 @@
       root.removeEventListener('unhandledrejection', rejected);
       document.removeEventListener('click', spark);
       document.removeEventListener('animationend', endSpark);
+      document.removeEventListener('visibilitychange', syncVisibility);
+      root.removeEventListener('pageshow', syncVisibility);
       delete page.dataset.workhubStartup;
       delete page.dataset.workhubStartupState;
       delete page.dataset.startupHidden;

@@ -127,8 +127,15 @@
   ];
   function appearanceApply(p) {
     document.body.dataset.hubTheme = p.theme;
-    const style = document.body.style;
-    for (const k of APPLIED) style.removeProperty('--hub-' + k);
+    const style = document.body.style,
+      pageStyle = document.documentElement.style,
+      accent = THEMES[p.theme]?.[1] || p.accent;
+    // Reset both scopes before reading the next CSS palette, including a return to Ocean.
+    for (const k of APPLIED) {
+      style.removeProperty('--hub-' + k);
+      pageStyle.removeProperty('--hub-' + k);
+    }
+    pageStyle.setProperty('--hub-accent', accent);
     const preset = presetColors(p.theme),
       computed = root.getComputedStyle?.(document.body),
       fromCSS = (key, fallback) => {
@@ -173,7 +180,6 @@
         readable(ink, surface),
       ink = across(readable(c.text, surface)),
       muted = across(mix(ink, surface, 0.12)),
-      accent = THEMES[p.theme]?.[1] || p.accent,
       dark = luminance(surface) < 0.179;
     style.setProperty('--hub-text', ink);
     style.setProperty('--hub-muted', muted);
@@ -201,22 +207,29 @@
       style.setProperty('--hub-' + tone + '-bg', fill);
       style.setProperty('--hub-' + tone + '-text', readable(roleColor, fill));
     }
-    if (p.theme !== 'custom') return;
-    const vars = {
-      bg: c.page,
-      surface: c.surface,
-      'surface-soft': mix(c.surface, c.secondary, 0.07),
-      'surface-hover': mix(c.surface, c.secondary, 0.14),
-      text: ink,
-      muted,
-      border: mix(c.surface, ink, 0.2),
-      mint: mix(c.surface, c.secondary, 0.14),
-      yellow: mix(c.surface, p.accent, 0.13),
-      peach: mix(c.surface, c.secondary, 0.1),
-      lavender: mix(c.surface, c.secondary, 0.18),
-      'blue-soft': mix(c.surface, p.accent, 0.1),
-    };
-    for (const [k, v] of Object.entries(vars)) style.setProperty('--hub-' + k, v);
+    if (p.theme === 'custom') {
+      const vars = {
+        bg: c.page,
+        surface: c.surface,
+        'surface-soft': mix(c.surface, c.secondary, 0.07),
+        'surface-hover': mix(c.surface, c.secondary, 0.14),
+        text: ink,
+        muted,
+        border: mix(c.surface, ink, 0.2),
+        mint: mix(c.surface, c.secondary, 0.14),
+        yellow: mix(c.surface, p.accent, 0.13),
+        peach: mix(c.surface, c.secondary, 0.1),
+        lavender: mix(c.surface, c.secondary, 0.18),
+        'blue-soft': mix(c.surface, p.accent, 0.1),
+      };
+      for (const [k, v] of Object.entries(vars)) style.setProperty('--hub-' + k, v);
+    }
+    // Root surfaces and document-level controls must change in this same update.
+    // Snapshot first so inherited tokens cannot feed values from the previous palette back in.
+    const applied = root.getComputedStyle?.(document.body),
+      tokens = APPLIED.map(k => [k, applied?.getPropertyValue('--hub-' + k).trim()]);
+    for (const [k, value] of tokens) if (color(value)) pageStyle.setProperty('--hub-' + k, value);
+    pageStyle.colorScheme = style.colorScheme;
   }
   function appearanceFields(p) {
     return `<details class="workspace-colour-details"${p.theme === 'custom' ? ' open' : ''}><summary>Build your own colour combination</summary><p class="hub-meta">Pick Custom colours above to use these. Text contrast is adjusted for readability.</p><div class="workspace-colour-grid">${Object.entries(
