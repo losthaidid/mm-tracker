@@ -767,12 +767,12 @@ function validateProjects(d) {
   )
     throw Error('Project names and IDs must be unique.');
   const ids = new Set(d.projects.map(p => p.id));
-  if (!ids.has(d.activeProjectId)) throw Error('Choose an active project.');
+  if (!ids.has(d.activeProjectId)) throw Error('Choose a current project.');
   for (const s of d.specs)
     if (!ids.has(s.projectId)) throw Error('Each project item must belong to a project.');
   for (const s of d.schedule) {
     if (
-      (!['custom', 'task', 'project'].includes(s.kind) &&
+      (!['custom', 'task', 'ticket', 'project'].includes(s.kind) &&
         !(
           window.WorkHubLeave.isLeave(s.kind) && window.WorkHubLeaveBalancesEngine.type(d, s.kind)
         )) ||
@@ -782,6 +782,8 @@ function validateProjects(d) {
       throw Error('Invalid schedule selection.');
     if (s.kind === 'custom' && s.status !== undefined && !PLAN_STATUS.includes(s.status))
       throw Error('Choose a valid custom activity status.');
+    if (s.kind === 'ticket' && !d.tickets.some(t => t.id === s.linkId))
+      throw Error('A schedule ticket no longer exists.');
     if (s.kind === 'project' && !ids.has(s.linkId))
       throw Error('A schedule project no longer exists.');
     if (s.kind === 'task' && !d.tasks.some(t => t.id === s.linkId))
@@ -795,7 +797,7 @@ function projectOptions(current) {
   return state.projects
     .map(
       p =>
-        `<option value="${esc(p.id)}"${p.id === current ? ' selected' : ''}>${esc(p.name)}${p.id === state.activeProjectId ? ' (active)' : ''}</option>`
+        `<option value="${esc(p.id)}"${p.id === current ? ' selected' : ''}>${esc(p.name)}${p.id === state.activeProjectId ? ' (current)' : ''}</option>`
     )
     .join('');
 }
@@ -1039,9 +1041,29 @@ function removeDraftBooking(d, draft) {
   if (draft.planId) d.projectPlans = d.projectPlans.filter(p => p.id !== draft.planId);
 }
 
+function draftBookingRows(d, draft) {
+  return d.schedule.filter(s =>
+    draft.bookingId
+      ? s.bookingId === draft.bookingId
+      : s.date === draft.originalDate && s.time === draft.originalTime
+  );
+}
+function rememberScheduleMove(d, rows, date, endDate, time, endTime) {
+  const dates = [...new Set(rows.map(s => s.date))].sort(),
+    times = rows.map(s => s.time).sort(),
+    ends = rows.map(slotEnd).sort();
+  if (
+    rows.length &&
+    (dates[0] !== date || dates.at(-1) !== endDate || times[0] !== time || ends.at(-1) !== endTime)
+  )
+    window.WorkHubScheduleEngine.history(d, rows, 'Moved');
+}
 function clearDraftBooking() {
   if (!scheduleDraft) return;
-  const ok = mutate(d => removeDraftBooking(d, scheduleDraft));
+  const ok = mutate(d => {
+    window.WorkHubScheduleEngine.history(d, draftBookingRows(d, scheduleDraft), 'Cancelled');
+    removeDraftBooking(d, scheduleDraft);
+  });
   closeModal();
   scheduleDraft = null;
   if (ok) tell('Activity cleared from Schedule and the project calendar.');
@@ -1509,7 +1531,7 @@ function openChargeCodes(scope = 'tickets') {
 function renderCodeScreen() {
   const project = state.projects.find(p => p.id === selectedCodeProject) || activeProject(),
     ticketCodes = [...new Set(state.tickets.map(t => t.jira).filter(Boolean))];
-  return `<div class="tabs" aria-label="Charge-code type"><button type="button" data-action="code-scope" data-scope="tickets" class="${codeScope === 'tickets' ? 'active' : ''}">Tickets</button><button type="button" data-action="code-scope" data-scope="projects" class="${codeScope === 'projects' ? 'active' : ''}">Projects</button></div><div class="list-grid"><section class="panel box">${codeScope === 'projects' ? `<h2>Project charge code</h2><label for="codeProject" style="margin-top:16px">Project</label><select id="codeProject">${projectOptions(project?.id)}</select><div class="actions" style="margin-top:12px"><button class="primary" type="button" data-action="activate-project" data-id="${esc(project?.id || '')}" data-return="codes"${project?.id === state.activeProjectId ? ' disabled' : ''}>Set active project</button><button type="button" data-action="edit-project" data-id="${esc(project?.id || '')}" data-return="codes">Edit project</button></div><label for="chargeCode" style="margin-top:15px">Charge code</label><input id="chargeCode" readonly value="${esc(project?.code || '')}" placeholder="Set in Project management"><label for="chargeActivity" style="margin-top:15px">Project activity</label><select id="chargeActivity">${state.lists.projectActivities.map(c => `<option>${esc(c)}</option>`).join('')}</select>` : `<h2>Ticket charge code</h2><label for="chargeCode" style="margin-top:16px">Ticket / charge code</label><select id="chargeCode">${ticketCodes.map(c => `<option>${esc(c)}</option>`).join('')}</select><p class="hint">Ticket activities were removed because they were not connected to ticket status or progress.</p>`}<div class="copy-output" id="chargeOutput"></div><div class="actions" style="margin-top:12px"><button type="button" class="primary" id="copyChargeButton" data-action="copy-charge">Copy text</button></div></section><section class="panel box"><div class="flex-title"><h2>${codeScope === 'projects' ? 'Projects' : 'Built-in lists'}</h2>${codeScope === 'projects' ? '<button type="button" data-action="project-management">Manage</button>' : ''}</div>${codeScope === 'projects' ? `<div class="scroll" style="margin-top:12px"><table><thead><tr><th>Project</th><th>Phase</th><th>Active</th></tr></thead><tbody>${state.projects.map(p => `<tr><td>${esc(p.name)}<div class="hint">${esc(p.code)}</div></td><td>${esc(p.phase)}</td><td>${p.id === state.activeProjectId ? 'Yes' : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<p>Milestones, project activities, work locations, and project phases can be maintained without changing ticket or project records.</p>'}<div class="actions" style="margin-top:16px"><button type="button" data-action="edit-lists">Edit built-in lists</button></div></section></div>`;
+  return `<div class="tabs" aria-label="Charge-code type"><button type="button" data-action="code-scope" data-scope="tickets" class="${codeScope === 'tickets' ? 'active' : ''}">Tickets</button><button type="button" data-action="code-scope" data-scope="projects" class="${codeScope === 'projects' ? 'active' : ''}">Projects</button></div><div class="list-grid"><section class="panel box">${codeScope === 'projects' ? `<h2>Project charge code</h2><label for="codeProject" style="margin-top:16px">Project</label><select id="codeProject">${projectOptions(project?.id)}</select><div class="actions" style="margin-top:12px"><button class="primary" type="button" data-action="activate-project" data-id="${esc(project?.id || '')}" data-return="codes"${project?.id === state.activeProjectId ? ' disabled' : ''}>Set current project</button><button type="button" data-action="edit-project" data-id="${esc(project?.id || '')}" data-return="codes">Edit project</button></div><label for="chargeCode" style="margin-top:15px">Charge code</label><input id="chargeCode" readonly value="${esc(project?.code || '')}" placeholder="Set in Project management"><label for="chargeActivity" style="margin-top:15px">Project activity</label><select id="chargeActivity">${state.lists.projectActivities.map(c => `<option>${esc(c)}</option>`).join('')}</select>` : `<h2>Ticket charge code</h2><label for="chargeCode" style="margin-top:16px">Ticket / charge code</label><select id="chargeCode">${ticketCodes.map(c => `<option>${esc(c)}</option>`).join('')}</select><p class="hint">Ticket activities were removed because they were not connected to ticket status or progress.</p>`}<div class="copy-output" id="chargeOutput"></div><div class="actions" style="margin-top:12px"><button type="button" class="primary" id="copyChargeButton" data-action="copy-charge">Copy text</button></div></section><section class="panel box"><div class="flex-title"><h2>${codeScope === 'projects' ? 'Projects' : 'Built-in lists'}</h2>${codeScope === 'projects' ? '<button type="button" data-action="project-management">Manage</button>' : ''}</div>${codeScope === 'projects' ? `<div class="scroll" style="margin-top:12px"><table><thead><tr><th>Project</th><th>Phase</th><th>Current</th></tr></thead><tbody>${state.projects.map(p => `<tr><td>${esc(p.name)}<div class="hint">${esc(p.code)}</div></td><td>${esc(p.phase)}</td><td>${p.id === state.activeProjectId ? 'Yes' : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<p>Milestones, project activities, work locations, and project phases can be maintained without changing ticket or project records.</p>'}<div class="actions" style="margin-top:16px"><button type="button" data-action="edit-lists">Edit built-in lists</button></div></section></div>`;
 }
 function updateCharge() {
   const code = $('chargeCode')?.value || '',
@@ -1572,6 +1594,9 @@ function scheduleDisplayText(s, d = state) {
     linked = t
       ? `[${t.taskType}] ${t.task}${taskLinkedLabel(t, d) ? ' · ' + taskLinkedLabel(t, d) : ''}`
       : '';
+  } else if (s.kind === 'ticket') {
+    const t = d.tickets.find(t => t.id === s.linkId);
+    linked = t ? t.ticket + ' · ' + t.description : '';
   } else if (s.kind === 'project') {
     const p = d.projectPlans.find(p => p.id === s.planId);
     linked = [
@@ -1851,8 +1876,8 @@ function scheduleItemBadge(row) {
     : '';
 }
 function customActivityStatusField(s) {
-  return s.kind === 'custom'
-    ? `<div class="wide"><label for="bookingStatus">Activity status</label><select id="bookingStatus" name="status">${PLAN_STATUS.map(status => `<option${status === (s.status || 'Planned') ? ' selected' : ''}>${esc(status)}</option>`).join('')}</select><p class="hint">After the start time, this activity stays In Progress until you mark it Completed. Choose On Hold to pause it.</p></div>`
+  return !window.WorkHubLeave.isLeave(s.kind)
+    ? '<p class="hint wide">Schedule status changes automatically: Planned → Active → Actual. Use Start / switch work to record interruptions. Linked record progress stays separate.</p>'
     : '';
 }
 function renderRangeEditor() {
@@ -1863,6 +1888,7 @@ function renderRangeEditor() {
     `<form id="scheduleForm"><div class="form-grid">${hub?.leaveBalances?.range(s) || ''}${scheduleRangeFields(s)}<div class="wide"><label for="scheduleKind">Schedule type</label><select id="scheduleKind" name="kind">${[
       ['custom', 'Custom activity'],
       ['task', 'Task'],
+      ['ticket', 'Ticket'],
       ['project', 'Project'],
       ...window.WorkHubLeaveBalancesEngine.types(state)
         .filter(t => !t.archived || t.id === s.kind)
@@ -1873,7 +1899,7 @@ function renderRangeEditor() {
       )
       .join(
         ''
-      )}</select></div>${window.WorkHubLeave.fields(s, state)}${window.WorkHubClaims.fields(s, state)}${s.kind === 'task' ? `<div class="wide"><label for="scheduleLink">Task *</label><select id="scheduleLink" name="linkId" required><option value="">Choose a task</option>${tasks.map(t => `<option value="${esc(t.id)}"${t.id === s.linkId ? ' selected' : ''}>[${esc(t.taskType)}] ${esc((t.number ? t.number + '. ' : '') + t.task.slice(0, 105))} · ${esc(taskLinkedLabel(t))}${t.done ? ' (done)' : ''}</option>`).join('')}</select></div>` : s.kind === 'project' ? `<div class="span2"><label for="scheduleLink">Project *</label><select id="scheduleLink" name="linkId" required>${projectOptions(s.linkId || state.activeProjectId)}</select></div><div><label for="scheduleActivity">Project activity</label><select id="scheduleActivity" name="activity">${selectOptions(state.lists.projectActivities, s.activity, '—')}</select></div>${projectLocationField(s.location)}<div class="span2"><label for="bookingTitle">Activity title</label><input id="bookingTitle" name="title" maxlength="500" value="${esc(s.title)}" placeholder="Defaults to the selected activity"></div><div><label for="bookingStatus">Plan status</label><select id="bookingStatus" name="status">${selectOptions(PLAN_STATUS, s.status, 'Choose status')}</select></div>` : ''}${customActivityStatusField(s)}${scheduleCompanyField(s)}${scheduleItemFields(s)}<div class="wide"><label for="slotText">${window.WorkHubLeave.isLeave(s.kind) ? 'Leave / handover notes' : s.kind === 'custom' ? 'Activity' : 'Additional notes'}</label><textarea id="slotText" name="text" maxlength="32767">${esc(s.text)}</textarea></div></div><p class="hint">The same time range fills every selected date. Weekend project or ticket-linked task time is marked TOIL automatically. Existing bookings are protected.</p><div class="modal-actions"><div>${s.bookingId || state.schedule.some(r => r.date === s.originalDate && r.time === s.originalTime) ? '<button type="button" class="danger" data-action="clear-booking">Delete activity</button>' : ''}</div><div class="actions"><button type="button" data-action="cancel">Cancel</button><button class="primary" type="submit">Save time range</button></div></div></form>`
+      )}</select></div>${window.WorkHubLeave.fields(s, state)}${window.WorkHubClaims.fields(s, state)}${s.kind === 'task' ? `<div class="wide"><label for="scheduleLink">Task *</label><select id="scheduleLink" name="linkId" required><option value="">Choose a task</option>${tasks.map(t => `<option value="${esc(t.id)}"${t.id === s.linkId ? ' selected' : ''}>[${esc(t.taskType)}] ${esc((t.number ? t.number + '. ' : '') + t.task.slice(0, 105))} · ${esc(taskLinkedLabel(t))}${t.done ? ' (done)' : ''}</option>`).join('')}</select></div>` : s.kind === 'ticket' ? `<div class="wide"><label for="scheduleLink">Ticket *</label><select id="scheduleLink" name="linkId" required><option value="">Choose a ticket</option>${state.tickets.map(t => `<option value="${esc(t.id)}"${t.id === s.linkId ? ' selected' : ''}>${esc(t.ticket + ' · ' + t.description)}</option>`).join('')}</select></div>` : s.kind === 'project' ? `<div class="span2"><label for="scheduleLink">Project *</label><select id="scheduleLink" name="linkId" required>${projectOptions(s.linkId || state.activeProjectId)}</select></div><div><label for="scheduleActivity">Project activity</label><select id="scheduleActivity" name="activity">${selectOptions(state.lists.projectActivities, s.activity, '—')}</select></div>${projectLocationField(s.location)}<div class="span2"><label for="bookingTitle">Activity title</label><input id="bookingTitle" name="title" maxlength="500" value="${esc(s.title)}" placeholder="Defaults to the selected activity"></div>` : ''}${customActivityStatusField(s)}${scheduleCompanyField(s)}${scheduleItemFields(s)}<div class="wide"><label for="slotText">${window.WorkHubLeave.isLeave(s.kind) ? 'Leave / handover notes' : s.kind === 'custom' ? 'Activity' : 'Additional notes'}</label><textarea id="slotText" name="text" maxlength="32767">${esc(s.text)}</textarea></div></div><p class="hint">The same time range fills every selected date. Weekend project or ticket-linked task time is marked TOIL automatically. Existing bookings are protected.</p><div class="modal-actions"><div>${s.bookingId || state.schedule.some(r => r.date === s.originalDate && r.time === s.originalTime) ? '<button type="button" class="danger" data-action="clear-booking">Delete activity</button>' : ''}</div><div class="actions"><button type="button" data-action="cancel">Cancel</button><button class="primary" type="submit">Save time range</button></div></div></form>`
   );
   hub?.claims?.updateTravel($('scheduleForm'));
   hub?.leaveBalances?.updateRange($('scheduleForm'));
@@ -1886,7 +1912,7 @@ function saveRange(form) {
     time = value('time') || form.dataset.time,
     endTime = value('endTime') || hourTime(+time.slice(0, 2) + 1),
     kind = value('kind') || 'custom',
-    linkId = ['task', 'project'].includes(kind) ? value('linkId') : '',
+    linkId = ['task', 'ticket', 'project'].includes(kind) ? value('linkId') : '',
     text = value('text'),
     activity = kind === 'project' ? value('activity') : '',
     location = window.WorkHubLeave.isLeave(kind) ? '' : value('location'),
@@ -1912,6 +1938,7 @@ function saveRange(form) {
   const daySet = new Set(dates),
     timeSet = new Set(times);
   const ok = mutate(d => {
+    rememberScheduleMove(d, draftBookingRows(d, draft), date, endDate, time, endTime);
     removeDraftBooking(d, draft);
     if (window.WorkHubLeave.isLeave(kind)) {
       const leaveType = window.WorkHubLeaveBalancesEngine.type(d, kind);
@@ -1920,6 +1947,7 @@ function saveRange(form) {
     }
     if (!text.trim() && kind === 'custom') throw Error('Enter the activity details.');
     if (kind === 'task' && !d.tasks.some(t => t.id === linkId)) throw Error('Choose a task.');
+    if (kind === 'ticket' && !d.tickets.some(t => t.id === linkId)) throw Error('Choose a ticket.');
     if (kind === 'project' && !d.projects.some(p => p.id === linkId))
       throw Error('Choose a project.');
     if (bookingOverlaps(d.schedule, dates, time, endTime))
@@ -1940,7 +1968,7 @@ function saveRange(form) {
         time,
         endTime,
         location,
-        status: value('status') || 'Planned',
+        status: oldPlan?.status || 'Planned',
         source: oldPlan?.source || 'Schedule',
         actualTask: oldPlan?.actualTask || '',
         actualSame: oldPlan?.actualSame ?? null,
@@ -1965,7 +1993,15 @@ function saveRange(form) {
           travel,
           ...claimContext,
           ...leaveData,
-          ...(kind === 'custom' ? { status: value('status') || 'Planned' } : {}),
+          ...(['custom', 'task', 'ticket', 'project'].includes(kind)
+            ? {
+                executionIdentity: window.WorkHubScheduleEngine.identity(
+                  { kind, linkId, ...company, ...itemLink, text },
+                  d
+                ),
+              }
+            : {}),
+          ...(kind === 'custom' && oldBooking?.status ? { status: oldBooking.status } : {}),
         });
     window.WorkHubLeaveBalancesEngine.assertWithinBalance(state, d);
     d.calendarMonth = date.slice(0, 7);
@@ -2012,20 +2048,26 @@ function planHasToil(p) {
   return rangeDates(p.date, p.endDate || p.date).some(isWeekend);
 }
 
-function projectPlanStatus(p) {
+function projectPlanStatus(p, date = '') {
+  date ||=
+    today() < p.date ? p.date : today() > (p.endDate || p.date) ? p.endDate || p.date : today();
   return scheduleTimeStatus({
     kind: 'project',
     planId: p.id,
-    date: p.date,
+    date,
     time: p.time,
     endTime: p.endTime,
+    sessionId: p.sessionId,
   });
 }
+function projectExecutionBadge(p, date = p.date) {
+  return `<span class="tag" data-project-execution="${esc(p.id)}" data-date="${esc(date)}" title="Daily execution · ${esc(date)}">${esc(projectPlanStatus(p, date))}</span>`;
+}
 function planStatusClass(p, date = '') {
-  return isWeekend(date || p.date) ? 'toil' : statusClass(projectPlanStatus(p));
+  return isWeekend(date || p.date) ? 'toil' : statusClass(projectPlanStatus(p, date || p.date));
 }
 function planRow(p) {
-  return `<button class="plan-row ${planStatusClass(p)}" data-action="view-plan" data-id="${esc(p.id)}"><span class="plan-date">${esc(p.date)}${p.endDate !== p.date ? ' to ' + esc(p.endDate) : ''}<small>${esc(p.time)}–${esc(p.endTime)}</small></span><span class="plan-title">${esc(p.activity || p.title)}${scheduleCompanyBadge(p)}${scheduleItemBadge(p)}<small>${esc([p.location, p.title !== p.activity ? p.title : '', p.text.slice(0, 100)].filter(Boolean).join(' · '))}${planHasToil(p) ? ' · TOIL' : ''}</small></span><span>${tag(projectPlanStatus(p))}</span></button>`;
+  return `<button class="plan-row ${planStatusClass(p)}" data-action="view-plan" data-id="${esc(p.id)}"><span class="plan-date">${esc(p.date)}${p.endDate !== p.date ? ' to ' + esc(p.endDate) : ''}<small>${esc(p.time)}–${esc(p.endTime)}</small></span><span class="plan-title">${esc(p.activity || p.title)}${scheduleCompanyBadge(p)}${scheduleItemBadge(p)}<small>${esc([p.location, p.title !== p.activity ? p.title : '', p.text.slice(0, 100)].filter(Boolean).join(' · '))}${planHasToil(p) ? ' · TOIL' : ''}</small></span><span>${projectExecutionBadge(p)}</span></button>`;
 }
 
 function viewPlan(id) {
@@ -2034,7 +2076,7 @@ function viewPlan(id) {
   const project = state.projects.find(x => x.id === p.projectId);
   openModal(
     'Planned activity',
-    `<div class="view-details"><div><div class="detail-label">Project</div><div class="detail-value">${esc(project?.name) || '—'}</div></div><div><div class="detail-label">Company</div><div class="detail-value">${esc(scheduleCompanyName(p)) || 'Not specified'}</div></div><div><div class="detail-label">Project item</div><div class="detail-value">${esc(scheduleItemContext(p).itemTitle) || 'General project work'}${scheduleItemContext(p).subItemTitle ? ' → ' + esc(scheduleItemContext(p).subItemTitle) : ''}</div></div><div><div class="detail-label">Project activity</div><div class="detail-value">${esc(p.activity) || '—'}</div></div><div><div class="detail-label">Status</div><div class="detail-value">${tag(projectPlanStatus(p))}</div></div><div><div class="detail-label">Date range</div><div class="detail-value">${esc(p.date)}${p.endDate !== p.date ? ' to ' + esc(p.endDate) : ''}</div></div><div><div class="detail-label">Time</div><div class="detail-value">${esc(p.time)}–${esc(p.endTime)}</div></div><div><div class="detail-label">Work location</div><div class="detail-value">${esc(p.location) || '—'}</div></div><div class="wide"><div class="detail-label">Activity title</div><div class="detail-value">${esc(p.title)}</div></div><div class="wide"><div class="detail-label">Notes</div><div class="detail-value">${esc(p.text) || '—'}</div></div>${p.actualReviewedAt ? `<div class="wide"><div class="detail-label">Confirmed actual task</div><div class="detail-value">${esc(p.actualTask)} · ${p.actualSame ? 'Same as planned' : 'Different from plan'} · ${esc(p.actualReviewedAt)}</div></div>` : ''}</div><div class="modal-actions"><span>${planHasToil(p) ? '<span class="phase-badge">TOIL</span>' : ''}</span><div class="actions"><button type="button" data-action="cancel">Close</button><button class="primary" type="button" data-action="edit-plan" data-id="${esc(p.id)}">Edit activity</button></div></div>`
+    `<div class="view-details"><div><div class="detail-label">Project</div><div class="detail-value">${esc(project?.name) || '—'}</div></div><div><div class="detail-label">Company</div><div class="detail-value">${esc(scheduleCompanyName(p)) || 'Not specified'}</div></div><div><div class="detail-label">Project item</div><div class="detail-value">${esc(scheduleItemContext(p).itemTitle) || 'General project work'}${scheduleItemContext(p).subItemTitle ? ' → ' + esc(scheduleItemContext(p).subItemTitle) : ''}</div></div><div><div class="detail-label">Project activity</div><div class="detail-value">${esc(p.activity) || '—'}</div></div><div><div class="detail-label">Status</div><div class="detail-value">${projectExecutionBadge(p)}</div></div><div><div class="detail-label">Date range</div><div class="detail-value">${esc(p.date)}${p.endDate !== p.date ? ' to ' + esc(p.endDate) : ''}</div></div><div><div class="detail-label">Time</div><div class="detail-value">${esc(p.time)}–${esc(p.endTime)}</div></div><div><div class="detail-label">Work location</div><div class="detail-value">${esc(p.location) || '—'}</div></div><div class="wide"><div class="detail-label">Activity title</div><div class="detail-value">${esc(p.title)}</div></div><div class="wide"><div class="detail-label">Notes</div><div class="detail-value">${esc(p.text) || '—'}</div></div>${p.actualReviewedAt ? `<div class="wide"><div class="detail-label">Confirmed actual task</div><div class="detail-value">${esc(p.actualTask)} · ${p.actualSame ? 'Same as planned' : 'Different from plan'} · ${esc(p.actualReviewedAt)}</div></div>` : ''}</div><div class="modal-actions"><span>${planHasToil(p) ? '<span class="phase-badge">TOIL</span>' : ''}</span><div class="actions"><button type="button" data-action="cancel">Close</button><button class="primary" type="button" data-action="edit-plan" data-id="${esc(p.id)}">Edit activity</button></div></div>`
   );
 }
 function editPlan(id = '', date = today()) {
@@ -2054,7 +2096,7 @@ function editPlan(id = '', date = today()) {
   };
   openModal(
     p ? 'Edit planned activity' : 'Plan project activity',
-    `<form id="planForm" data-id="${esc(id)}"><div class="form-grid">${hub?.leaveBalances?.range(r) || ''}<div class="wide"><label for="planProject">Project *</label><select id="planProject" name="projectId">${projectOptions(r.projectId)}</select></div>${scheduleCompanyField(r)}${scheduleItemFields(r)}<div class="span2"><label for="planTitle">Activity title *</label><input id="planTitle" name="title" value="${esc(r.title)}" maxlength="500" required></div><div><label for="planActivity">Project activity</label><select id="planActivity" name="activity">${selectOptions(state.lists.projectActivities, r.activity, '—')}</select></div>${scheduleRangeFields(r)}${projectLocationField(r.location)}<div><label for="planStatus">Status</label><select id="planStatus" name="status">${selectOptions(PLAN_STATUS, r.status, 'Choose status')}</select></div><div class="wide"><label for="planNotes">Notes</label><textarea id="planNotes" name="text" maxlength="32767">${esc(r.text)}</textarea></div></div><p class="hint">Times use the 24-hour system. Saving also updates Schedule.</p><div class="modal-actions"><div>${p ? `<button class="danger" type="button" data-action="delete-plan" data-id="${esc(p.id)}">Delete activity</button>` : ''}</div><div class="actions"><button type="button" data-action="cancel">Cancel</button><button class="primary" type="submit">Save activity</button></div></div></form>`
+    `<form id="planForm" data-id="${esc(id)}"><div class="form-grid">${hub?.leaveBalances?.range(r) || ''}<div class="wide"><label for="planProject">Project *</label><select id="planProject" name="projectId">${projectOptions(r.projectId)}</select></div>${scheduleCompanyField(r)}${scheduleItemFields(r)}<div class="span2"><label for="planTitle">Activity title *</label><input id="planTitle" name="title" value="${esc(r.title)}" maxlength="500" required></div><div><label for="planActivity">Project activity</label><select id="planActivity" name="activity">${selectOptions(state.lists.projectActivities, r.activity, '—')}</select></div>${scheduleRangeFields(r)}${projectLocationField(r.location)}<input type="hidden" name="status" value="${esc(r.status)}"><p class="hint">Daily execution is automatic and separate from project progress.</p><div class="wide"><label for="planNotes">Notes</label><textarea id="planNotes" name="text" maxlength="32767">${esc(r.text)}</textarea></div></div><p class="hint">Times use the 24-hour system. Saving also updates Schedule.</p><div class="modal-actions"><div>${p ? `<button class="danger" type="button" data-action="delete-plan" data-id="${esc(p.id)}">Delete activity</button>` : ''}</div><div class="actions"><button type="button" data-action="cancel">Cancel</button><button class="primary" type="submit">Save activity</button></div></div></form>`
   );
 }
 function savePlan(form) {
@@ -2075,7 +2117,7 @@ function savePlan(form) {
       time: value('time'),
       endTime: value('endTime'),
       location: value('location'),
-      status: value('status'),
+      status: old?.status || 'Planned',
       source: old?.source || 'Projects',
       actualTask: old?.actualTask || '',
       actualSame: old?.actualSame ?? null,
@@ -2089,6 +2131,14 @@ function savePlan(form) {
   const daySet = new Set(dates),
     timeSet = new Set(times),
     ok = mutate(d => {
+      rememberScheduleMove(
+        d,
+        d.schedule.filter(s => s.planId === id),
+        p.date,
+        p.endDate,
+        p.time,
+        p.endTime
+      );
       d.schedule = d.schedule.filter(s => s.planId !== id);
       if (bookingOverlaps(d.schedule, dates, p.time, p.endTime))
         throw Error('This range overlaps an existing activity. Choose an empty range.');
@@ -2113,6 +2163,10 @@ function savePlan(form) {
             location: p.location,
             bookingId: id,
             planId: id,
+            executionIdentity: window.WorkHubScheduleEngine.identity(
+              { kind: 'project', linkId: p.projectId, ...p },
+              d
+            ),
           });
       d.calendarMonth = p.date.slice(0, 7);
     });
@@ -2192,29 +2246,8 @@ function planNeedsActualReview(p, date = today(), time = timeNow().slice(0, 5)) 
 }
 function reviewPastPlans() {
   refreshScheduleStatuses();
-  if ($('modal').open) {
-    if (typeof window !== 'undefined') queueActualReview(30000);
-    return;
-  }
-  const p = state.projectPlans
-    .filter(
-      p =>
-        planNeedsActualReview(p) &&
-        !p.actualReviewedAt &&
-        !['Completed', 'On Hold'].includes(p.status)
-    )
-    .sort((a, b) =>
-      ((a.endDate || a.date) + a.endTime).localeCompare((b.endDate || b.date) + b.endTime)
-    )[0];
-  if (!p) {
-    if (typeof window !== 'undefined') queueActualReview(30000);
-    return;
-  }
-  const project = state.projects.find(x => x.id === p.projectId);
-  openModal(
-    'Confirm planned versus actual work',
-    `<p><strong>${esc(project?.name || 'Project')} · ${esc(p.activity || p.title)}</strong></p><p class="muted">Planned for ${esc(p.date)}${p.endDate !== p.date ? ' to ' + esc(p.endDate) : ''}, ${esc(p.time)}–${esc(p.endTime)}. Was the actual task the same as planned?</p><div class="view-details" style="margin-top:16px"><div class="wide"><div class="detail-label">Planned title</div><div class="detail-value">${esc(p.title)}</div></div><div class="wide"><div class="detail-label">Notes</div><div class="detail-value">${esc(p.text) || '—'}</div></div></div><div class="modal-actions"><button type="button" data-action="actual-later">Review later</button><div class="actions"><button type="button" data-action="actual-different" data-id="${esc(p.id)}">Different actual task</button><button class="primary" type="button" data-action="actual-same" data-id="${esc(p.id)}">Same as planned</button></div></div>`
-  );
+  hub?.workSchedule?.refreshActuals();
+  if (typeof window !== 'undefined') queueActualReview(30000);
 }
 function actualDifferent(id) {
   const p = state.projectPlans.find(p => p.id === id);
@@ -2297,7 +2330,7 @@ function activateProject(id, returnTo = 'codes') {
   selectedCodeProject = id;
   if (returnTo === 'manager') openProjectManagement();
   else openChargeCodes('projects');
-  if (ok) tell('Active project changed.');
+  if (ok) tell('Current project changed.');
 }
 
 function closeModal() {
@@ -2359,6 +2392,17 @@ async function action(b) {
           if (g === 'tasks')
             d.schedule.forEach(s => {
               if (s.kind === 'task' && s.linkId === id) {
+                s.executionIdentity ||= window.WorkHubScheduleEngine.identity(s, d);
+                s.text = scheduleDisplayText(s, d);
+                s.kind = 'custom';
+                s.linkId = '';
+                s.activity = '';
+              }
+            });
+          if (g === 'tickets')
+            d.schedule.forEach(s => {
+              if (s.kind === 'ticket' && s.linkId === id) {
+                s.executionIdentity ||= window.WorkHubScheduleEngine.identity(s, d);
                 s.text = scheduleDisplayText(s, d);
                 s.kind = 'custom';
                 s.linkId = '';
@@ -3526,6 +3570,8 @@ function editRecord(group, id) {
 
 /** Read known form fields, preserve existing linked details, and commit one complete mutation. */
 function saveEdit(form) {
+  if (form.dataset.captureSession && form.dataset.captureOwner !== cloud.user?.id)
+    throw Error('Reopen this record form in the correct account.');
   const group = form.dataset.group,
     id = form.dataset.id,
     old = id ? state[group].find(r => r.id === id) : null,
@@ -3628,6 +3674,13 @@ function saveEdit(form) {
     }
   });
   closeModal();
+  if (ok && group === 'tickets' && form.dataset.captureSession)
+    hub?.workSchedule?.linkCreated(
+      'ticket',
+      r.id,
+      form.dataset.captureSession,
+      form.dataset.captureOwner
+    );
   if (ok) tell('Saved.');
 }
 
@@ -4200,6 +4253,11 @@ async function enhancementAction(b) {
       await authorizeActivityDeletion('Delete this project activity and its scheduled time range?')
     ) {
       mutate(d => {
+        window.WorkHubScheduleEngine.history(
+          d,
+          d.schedule.filter(s => s.planId === id),
+          'Cancelled'
+        );
         d.projectPlans = d.projectPlans.filter(p => p.id !== id);
         d.schedule = d.schedule.filter(s => s.planId !== id);
       });
@@ -4292,7 +4350,7 @@ async function enhancementAction(b) {
     return true;
   }
   if (a === 'delete-gate') {
-    if (confirm('Permanently delete this phase gate from the active project?')) {
+    if (confirm('Permanently delete this phase gate from the current project?')) {
       const ok = mutate(d => (d.phaseGates = d.phaseGates.filter(x => x.id !== id)));
       openProjectManagement();
       if (ok) tell('Phase gate deleted.');
@@ -4457,6 +4515,8 @@ function scheduleEntryTitle(e) {
       'Project activity'
     );
   if (s.kind === 'task') return state.tasks.find(t => t.id === s.linkId)?.task || 'Task';
+  if (s.kind === 'ticket')
+    return state.tickets.find(t => t.id === s.linkId)?.description || 'Ticket';
   return s.text || 'Custom activity';
 }
 function scheduleEntryContext(e) {
@@ -4475,6 +4535,8 @@ function scheduleEntryContext(e) {
     ]
       .filter(Boolean)
       .join(' · ');
+  if (s.kind === 'ticket')
+    return 'Ticket · ' + (state.tickets.find(t => t.id === s.linkId)?.ticket || '');
   return s.kind === 'project'
     ? [state.projects.find(p => p.id === s.linkId)?.name, s.location].filter(Boolean).join(' · ')
     : s.kind === 'task'
@@ -4499,6 +4561,10 @@ function refreshScheduleStatuses() {
       .filter(Boolean)
       .join(' ');
     if (badge) badge.textContent = status;
+  }
+  for (const label of document.querySelectorAll('[data-project-execution]')) {
+    const plan = state.projectPlans.find(p => p.id === label.dataset.projectExecution);
+    if (plan) label.textContent = projectPlanStatus(plan, label.dataset.date);
   }
   const count = $('scheduleReviewCount');
   if (count) count.textContent = scheduleMonthMetrics().review;
@@ -4830,9 +4896,15 @@ function projectMetrics(id = state.activeProjectId) {
     gates,
     feedback,
     upcoming: plans
-      .filter(p => (p.endDate || p.date) >= today() && p.status !== 'Completed')
+      .filter(
+        p =>
+          (p.endDate || p.date) > today() ||
+          ((p.endDate || p.date) === today() && projectPlanStatus(p, today()) !== 'Actual')
+      )
       .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)),
-    overdue: plans.filter(p => (p.endDate || p.date) < today() && p.status !== 'Completed'),
+    overdue: plans.filter(
+      p => (p.endDate || p.date) < today() && ['Partial', 'Changed'].includes(projectPlanStatus(p))
+    ),
   };
 }
 
@@ -4958,7 +5030,7 @@ function renderProjectDashboard() {
     phaseRate = projectPhasePercent(p),
     health = projectHealthDetails(p.id),
     openFeedback = m.feedback.filter(feedbackOpen).length;
-  return `<section class="project-banner"><div><div class="project-kicker">SAP Projects${p.code ? ' · ' + esc(p.code) : ''}</div><h2>${esc(p.name)}</h2><div class="actions" style="margin-top:12px"><select id="dashboardProject" aria-label="Active project">${projectOptions(p.id)}</select><span class="phase-badge">${esc(p.phase)}</span>${goLiveInfo(p)}</div></div><div class="phase-rings"><div class="completion-ring" style="--completion:${rate}%"><div><strong>${rate}%</strong><span>Items complete</span></div></div><div class="completion-ring" style="--completion:${phaseRate}%"><div><strong>${phaseRate}%</strong><span>Project phase</span></div></div></div></section><div class="stats"><div class="stat"><span>Current phase</span><strong style="font-size:1.05rem">${esc(p.phase)}</strong></div><div class="stat calculated-health-stat"><span>Project health · automatic</span>${healthBadge(health)}<small>${esc(health.summary)}</small></div><div class="stat"><span>Open phase gates</span><strong>${m.gates.filter(g => ['Pending', 'Blocked'].includes(g.status)).length}</strong></div><div class="stat"><span>Open phase feedback</span><strong>${openFeedback}</strong></div></div><div class="project-nav"><div class="tabs" aria-label="Project views">${[
+  return `<section class="project-banner"><div><div class="project-kicker">SAP Projects${p.code ? ' · ' + esc(p.code) : ''}</div><h2>${esc(p.name)}</h2><div class="actions" style="margin-top:12px"><select id="dashboardProject" aria-label="Current project">${projectOptions(p.id)}</select><span class="phase-badge">${esc(p.phase)}</span>${goLiveInfo(p)}</div></div><div class="phase-rings"><div class="completion-ring" style="--completion:${rate}%"><div><strong>${rate}%</strong><span>Items complete</span></div></div><div class="completion-ring" style="--completion:${phaseRate}%"><div><strong>${phaseRate}%</strong><span>Project phase</span></div></div></div></section><div class="stats"><div class="stat"><span>Current phase</span><strong style="font-size:1.05rem">${esc(p.phase)}</strong></div><div class="stat calculated-health-stat"><span>Project health · automatic</span>${healthBadge(health)}<small>${esc(health.summary)}</small></div><div class="stat"><span>Open phase gates</span><strong>${m.gates.filter(g => ['Pending', 'Blocked'].includes(g.status)).length}</strong></div><div class="stat"><span>Open phase feedback</span><strong>${openFeedback}</strong></div></div><div class="project-nav"><div class="tabs" aria-label="Project views">${[
     ['overview', 'Overview'],
     ['calendar', 'Timeline calendar'],
     ['items', 'Project items'],
@@ -5873,7 +5945,7 @@ function openProjectManagement() {
       .sort((a, b) => (a.phase + a.summary).localeCompare(b.phase + b.summary));
   openModal(
     'Project management',
-    `<div class="flex-title"><div><p class="muted" style="margin:0">Manage projects and keep every destructive governance control in one protected workspace.</p></div><button class="primary" data-action="new-project" data-return="manager">Add project</button></div><h3 class="section-label">Projects</h3><div class="project-manager-list">${managerProjectRows()}</div><div class="manager-divider"><div><h3>Company &amp; proposal controls</h3><p class="muted">Active project: ${esc(p.name)}. Expand a company to review import versions, upload a revision, or remove records.</p></div></div><div class="manager-company-list">${managerCompanyRows(companies, mappings) || '<div class="governance-empty"><strong>No companies in the active project</strong><p>Use Companies &amp; processes to upload the first Excel mapping.</p></div>'}</div><div class="manager-divider"><div><h3>Phase-gate controls</h3><p class="muted">Edit or skip gates in Phase Gates. Permanent deletion is available only here.</p></div></div><div class="project-manager-list gate-manager-list">${managerGateRows(gates) || '<div class="governance-empty"><strong>No phase gates in the active project</strong><p>Add a gate from the Phase Gates tab.</p></div>'}</div><div class="manager-divider"><div><h3>Phase Feedback controls</h3><p class="muted">Feedback stays visible in normal workflows. Permanent deletion is isolated here.</p></div></div><div class="project-manager-list feedback-manager-list">${managerFeedbackRows(feedback) || '<div class="governance-empty"><strong>No Phase Feedback in the active project</strong><p>Add feedback from the project workspace.</p></div>'}</div>`
+    `<div class="flex-title"><div><p class="muted" style="margin:0">Manage projects and keep every destructive governance control in one protected workspace.</p></div><button class="primary" data-action="new-project" data-return="manager">Add project</button></div><h3 class="section-label">Projects</h3><div class="project-manager-list">${managerProjectRows()}</div><div class="manager-divider"><div><h3>Company &amp; proposal controls</h3><p class="muted">Current project: ${esc(p.name)}. Expand a company to review import versions, upload a revision, or remove records.</p></div></div><div class="manager-company-list">${managerCompanyRows(companies, mappings) || '<div class="governance-empty"><strong>No companies in the current project</strong><p>Use Companies &amp; processes to upload the first Excel mapping.</p></div>'}</div><div class="manager-divider"><div><h3>Phase-gate controls</h3><p class="muted">Edit or skip gates in Phase Gates. Permanent deletion is available only here.</p></div></div><div class="project-manager-list gate-manager-list">${managerGateRows(gates) || '<div class="governance-empty"><strong>No phase gates in the current project</strong><p>Add a gate from the Phase Gates tab.</p></div>'}</div><div class="manager-divider"><div><h3>Phase Feedback controls</h3><p class="muted">Feedback stays visible in normal workflows. Permanent deletion is isolated here.</p></div></div><div class="project-manager-list feedback-manager-list">${managerFeedbackRows(feedback) || '<div class="governance-empty"><strong>No Phase Feedback in the current project</strong><p>Add feedback from the project workspace.</p></div>'}</div>`
   );
 }
 
@@ -6516,7 +6588,7 @@ function saveProcess(form) {
   if (
     !state.projectCompanies.some(c => c.id === companyId && c.projectId === state.activeProjectId)
   )
-    throw Error('Choose a company maintained for the active project.');
+    throw Error('Choose a company maintained for the current project.');
   if (
     !mmAreaNames().includes(area) ||
     !state.lists.departments.includes(department) ||
@@ -6864,7 +6936,7 @@ function renderProjectCalendar() {
     const dayPlans = plans.filter(p => p.date <= date && p.endDate >= date),
       isGoLive = project.goLiveDate === date;
     cells.push(
-      `<div class="calendar-day${date === today() ? ' today' : ''}${isGoLive ? ' go-live-day' : ''}"><button class="calendar-number" data-action="new-plan" data-date="${date}" aria-label="Plan activity on ${date}">${+date.slice(8)}</button>${isGoLive ? goLiveScheduleCard(project, true) : ''}${dayPlans.map(p => `<button class="calendar-event ${planStatusClass(p, date)}" data-action="view-plan" data-id="${esc(p.id)}"><span>${esc(p.time)}–${esc(p.endTime)}${isWeekend(date) ? ' · TOIL' : ''}</span><strong>${esc(p.activity || p.title)}</strong>${scheduleCompanyBadge(p)}${scheduleItemBadge(p)}<small>${esc(projectPlanStatus(p))}${p.location ? ' · ' + esc(p.location) : ''}</small></button>`).join('')}</div>`
+      `<div class="calendar-day${date === today() ? ' today' : ''}${isGoLive ? ' go-live-day' : ''}"><button class="calendar-number" data-action="new-plan" data-date="${date}" aria-label="Plan activity on ${date}">${+date.slice(8)}</button>${isGoLive ? goLiveScheduleCard(project, true) : ''}${dayPlans.map(p => `<button class="calendar-event ${planStatusClass(p, date)}" data-action="view-plan" data-id="${esc(p.id)}"><span>${esc(p.time)}–${esc(p.endTime)}${isWeekend(date) ? ' · TOIL' : ''}</span><strong>${esc(p.activity || p.title)}</strong>${scheduleCompanyBadge(p)}${scheduleItemBadge(p)}<small>${projectExecutionBadge(p, date)}${p.location ? ' · ' + esc(p.location) : ''}</small></button>`).join('')}<div data-day-actuals="${date}" data-project="${esc(project.id)}">${hub?.workSchedule?.actualCards(date, null, project.id) || ''}</div></div>`
     );
   }
   while (cells.length % 7)
@@ -6886,16 +6958,16 @@ function renderSchedule() {
       month: 'long',
       year: 'numeric',
     });
-  return `<section class="panel workhub-schedule"><div class="panel-top schedule-heading"><div class="schedule-heading-copy"><span class="eyebrow">Your work, in view</span><h2>Schedule</h2><p class="muted">Bookings and project Go-Live milestones stay synchronized automatically.</p></div><div class="actions schedule-heading-controls"><div class="schedule-month-control"><label for="month">Month</label><input id="month" type="month" min="1900-01" max="9999-12" value="${esc(month)}"></div><button class="primary" data-action="new-range">Add date / time range</button></div></div><div class="schedule-metrics"><div><span>Daily bookings</span><strong>${metrics.bookings}</strong></div><div><span>Scheduled time</span><strong>${formatDuration(metrics.minutes)}</strong></div><div><span>Review due</span><strong id="scheduleReviewCount">${metrics.review}</strong></div><div><span>Weekend TOIL</span><strong>${formatDuration(metrics.toilMinutes)}</strong></div><div class="go-live-metric"><span>Go-Lives this month</span><strong>${monthGoLives}</strong></div></div><div class="schedule-navigation"><div class="actions"><button class="small" data-action="schedule-month" data-step="-1" aria-label="Previous month">‹</button><h3>${esc(label)}</h3><button class="small" data-action="schedule-month" data-step="1" aria-label="Next month">›</button></div><div class="schedule-view-switch"><button class="active" data-action="schedule-layout" data-layout="calendar">Month &amp; agenda</button><button data-action="schedule-layout" data-layout="grid">Time grid</button></div></div><div class="workhub-schedule-body"><div class="workhub-calendar"><div class="weekday-row">${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => `<span>${d}</span>`).join('')}</div><div class="workhub-month-grid">${Array.from({ length: offset }, () => '<div class="calendar-pad" aria-hidden="true"></div>').join('')}${days
+  return `<section class="panel workhub-schedule"><div class="panel-top schedule-heading"><div class="schedule-heading-copy"><span class="eyebrow">Your work, in view</span><h2>Schedule</h2><p class="muted">Bookings and project Go-Live milestones stay synchronized automatically.</p></div><div class="actions schedule-heading-controls"><div class="schedule-month-control"><label for="month">Month</label><input id="month" type="month" min="1900-01" max="9999-12" value="${esc(month)}"></div><button class="primary" data-action="new-range">Add date / time range</button></div></div><div class="schedule-metrics"><div><span>Daily bookings</span><strong>${metrics.bookings}</strong></div><div><span>Scheduled time</span><strong>${formatDuration(metrics.minutes)}</strong></div><div><span>Actual bookings</span><strong id="scheduleReviewCount">${metrics.review}</strong></div><div><span>Weekend TOIL</span><strong>${formatDuration(metrics.toilMinutes)}</strong></div><div class="go-live-metric"><span>Go-Lives this month</span><strong>${monthGoLives}</strong></div></div><div class="schedule-navigation"><div class="actions"><button class="small" data-action="schedule-month" data-step="-1" aria-label="Previous month">‹</button><h3>${esc(label)}</h3><button class="small" data-action="schedule-month" data-step="1" aria-label="Next month">›</button></div><div class="schedule-view-switch"><button class="active" data-action="schedule-layout" data-layout="calendar">Month &amp; agenda</button><button data-action="schedule-layout" data-layout="grid">Time grid</button></div></div><div class="workhub-schedule-body"><div class="workhub-calendar"><div class="weekday-row">${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => `<span>${d}</span>`).join('')}</div><div class="workhub-month-grid">${Array.from({ length: offset }, () => '<div class="calendar-pad" aria-hidden="true"></div>').join('')}${days
     .map(d => {
       const es = scheduleEntries(d),
         goLives = goLiveProjectsOn(d),
         visible = es.slice(0, goLives.length ? 1 : 2);
-      return `<div class="workhub-day${isWeekend(d) ? ' weekend' : ''}${d === scheduleDay ? ' selected' : ''}${d === today() ? ' today' : ''}${goLives.length ? ' go-live-day' : ''}"><button class="calendar-day-select" data-action="schedule-day" data-date="${d}" aria-label="View ${d}" aria-pressed="${d === scheduleDay}"><span>${Number(d.slice(8))}</span><small>${es.length ? es.length + ' booking' + (es.length === 1 ? '' : 's') : ''}</small></button><div class="day-bookings">${goLives.map(p => goLiveScheduleCard(p, true)).join('')}${visible.map(e => scheduleEntryCard(e, true)).join('')}${es.length > visible.length ? `<button class="more-bookings" data-action="schedule-day" data-date="${d}">+${es.length - visible.length} more</button>` : ''}</div></div>`;
+      return `<div class="workhub-day${isWeekend(d) ? ' weekend' : ''}${d === scheduleDay ? ' selected' : ''}${d === today() ? ' today' : ''}${goLives.length ? ' go-live-day' : ''}"><button class="calendar-day-select" data-action="schedule-day" data-date="${d}" aria-label="View ${d}" aria-pressed="${d === scheduleDay}"><span>${Number(d.slice(8))}</span><small>${es.length ? es.length + ' booking' + (es.length === 1 ? '' : 's') : ''}</small></button><div class="day-bookings">${goLives.map(p => goLiveScheduleCard(p, true)).join('')}${visible.map(e => scheduleEntryCard(e, true)).join('')}<div data-day-actuals="${d}">${hub?.workSchedule?.actualCards(d) || ''}</div>${es.length > visible.length ? `<button class="more-bookings" data-action="schedule-day" data-date="${d}">+${es.length - visible.length} more</button>` : ''}</div></div>`;
     })
     .join(
       ''
-    )}</div></div><aside class="workhub-agenda"><span class="eyebrow">Day agenda</span><h3>${esc(new Date(scheduleDay + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }))}</h3><p class="muted">${entries.length} bookings · ${formatDuration(entries.reduce((n, e) => n + e.hours, 0) * 60)} scheduled</p><button class="agenda-add" data-action="schedule-add-day">+ Plan this day</button>${dayGoLives.length ? `<div class="agenda-milestones"><span class="eyebrow">Project milestones</span>${dayGoLives.map(p => goLiveScheduleCard(p)).join('')}</div>` : ''}<div class="agenda-bookings">${entries.map(e => scheduleEntryCard(e)).join('') || (!dayGoLives.length ? '<div class="agenda-empty"><strong>A little breathing room</strong><p>No activities planned for this day.</p></div>' : '')}</div></aside></div><div class="schedule-status-legend"><span class="status-planned">Planned</span><span class="status-in-progress">In Progress</span><span class="status-on-hold">On Hold</span><span class="status-completed">Completed</span><span class="status-elapsed">Elapsed</span><span class="legend-toil">TOIL</span><span class="legend-go-live">Go-Live milestone</span></div><div class="footerline">01:00–24:00 · Go-Live milestones come directly from each project record and do not reserve working hours.</div></section>`;
+    )}</div></div><aside class="workhub-agenda"><span class="eyebrow">Day agenda</span><h3>${esc(new Date(scheduleDay + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }))}</h3><p class="muted">${entries.length} bookings · ${formatDuration(entries.reduce((n, e) => n + e.hours, 0) * 60)} scheduled</p><button class="agenda-add" data-action="schedule-add-day">+ Plan this day</button>${dayGoLives.length ? `<div class="agenda-milestones"><span class="eyebrow">Project milestones</span>${dayGoLives.map(p => goLiveScheduleCard(p)).join('')}</div>` : ''}<div class="agenda-bookings">${entries.map(e => scheduleEntryCard(e)).join('')}<div data-day-actuals="${scheduleDay}">${hub?.workSchedule?.actualCards(scheduleDay) || ''}</div>${!entries.length && !hub?.workSchedule?.actualCards(scheduleDay) && !dayGoLives.length ? '<div class="agenda-empty"><strong>A little breathing room</strong><p>No activities planned for this day.</p></div>' : ''}</div></aside></div><div class="schedule-status-legend"><span class="status-planned">Planned</span><span class="status-active">Active</span><span class="status-paused">Paused</span><span class="status-actual">Actual</span><span class="status-partial">Partial</span><span class="status-changed">Changed</span><span class="legend-toil">TOIL</span><span class="legend-go-live">Go-Live milestone</span></div><div class="footerline">01:00–24:00 · Go-Live milestones come directly from each project record and do not reserve working hours.</div></section>`;
 }
 
 function editProject(id, returnTo = '') {
@@ -6917,11 +6989,13 @@ function editProject(id, returnTo = '') {
         };
   openModal(
     project ? 'Edit project' : 'Add project',
-    `<form id="projectForm" data-id="${esc(id || '')}" data-return="${esc(returnTo)}"><div class="form-grid"><div class="span2"><label for="projectName">Project name *</label><input id="projectName" name="name" value="${esc(row.name)}" maxlength="80" required></div><div><label for="projectCode">Charge code</label><input id="projectCode" name="code" value="${esc(row.code)}" maxlength="80"></div><div><label for="projectPhase">Current phase *</label><select id="projectPhase" name="phase" required>${selectOptions(state.lists.projectPhases, row.phase, 'Choose phase')}</select></div><div><label for="projectGoLive">Go-Live date</label><input id="projectGoLive" name="goLiveDate" type="date" min="1900-01-01" max="9999-12-31" value="${esc(normalizeGoLiveDate(row.goLiveDate))}"><p class="hint">One saved date feeds Overview, Project Timeline and Schedule.</p></div><div><label>Project health</label><div class="calculated-health ${healthClass(health.status)}"><strong>${esc(health.status)}</strong><small>${esc(health.summary)}</small></div></div><div class="wide"><label for="projectNextMilestone">Next milestone</label><input id="projectNextMilestone" name="nextMilestone" maxlength="500" value="${esc(row.nextMilestone)}" placeholder="Next outcome, owner, or target"></div></div><p class="hint">Project health is calculated automatically and also considers blocked or overdue sub-items.</p>${project?.id === state.activeProjectId ? '<p class="hint">This is the active project. Saving its name also renames the project tab.</p>' : `<label class="check-label"><input type="checkbox" name="makeActive"${project ? '' : ' checked'}>Set as the active project</label>`}<div class="modal-actions"><span class="hint">Deletion is available from Project management.</span><div class="actions"><button type="button" data-action="cancel">Cancel</button><button type="submit" class="primary">Save project</button></div></div></form>`
+    `<form id="projectForm" data-id="${esc(id || '')}" data-return="${esc(returnTo)}"><div class="form-grid"><div class="span2"><label for="projectName">Project name *</label><input id="projectName" name="name" value="${esc(row.name)}" maxlength="80" required></div><div><label for="projectCode">Charge code</label><input id="projectCode" name="code" value="${esc(row.code)}" maxlength="80"></div><div><label for="projectPhase">Current phase *</label><select id="projectPhase" name="phase" required>${selectOptions(state.lists.projectPhases, row.phase, 'Choose phase')}</select></div><div><label for="projectGoLive">Go-Live date</label><input id="projectGoLive" name="goLiveDate" type="date" min="1900-01-01" max="9999-12-31" value="${esc(normalizeGoLiveDate(row.goLiveDate))}"><p class="hint">One saved date feeds Overview, Project Timeline and Schedule.</p></div><div><label>Project health</label><div class="calculated-health ${healthClass(health.status)}"><strong>${esc(health.status)}</strong><small>${esc(health.summary)}</small></div></div><div class="wide"><label for="projectNextMilestone">Next milestone</label><input id="projectNextMilestone" name="nextMilestone" maxlength="500" value="${esc(row.nextMilestone)}" placeholder="Next outcome, owner, or target"></div></div><p class="hint">Project health is calculated automatically and also considers blocked or overdue sub-items.</p>${project?.id === state.activeProjectId ? '<p class="hint">This is the current project. Saving its name also renames the project tab.</p>' : `<label class="check-label"><input type="checkbox" name="makeActive"${project ? '' : ' checked'}>Set as the current project</label>`}<div class="modal-actions"><span class="hint">Deletion is available from Project management.</span><div class="actions"><button type="button" data-action="cancel">Cancel</button><button type="submit" class="primary">Save project</button></div></div></form>`
   );
 }
 
 function saveProject(form) {
+  if (form.dataset.captureSession && form.dataset.captureOwner !== cloud.user?.id)
+    throw Error('Reopen this project form in the correct account.');
   const id = form.dataset.id || uid(),
     isNew = !form.dataset.id,
     old = state.projects.find(p => p.id === id),
@@ -6957,6 +7031,13 @@ function saveProject(form) {
     hub?.batchA?.capture(d, form, 'projects', id);
     if (setActive) d.activeProjectId = id;
   });
+  if (ok && isNew && form.dataset.captureSession)
+    hub?.workSchedule?.linkCreated(
+      'project',
+      id,
+      form.dataset.captureSession,
+      form.dataset.captureOwner
+    );
   if (setActive) specQuery = specFilter = '';
   selectedCodeProject = id;
   if (form.dataset.return === 'codes') openChargeCodes('projects');
@@ -6974,7 +7055,7 @@ function managerProjectRows() {
   return state.projects
     .map(
       project =>
-        `<div class="project-manager-row"><div><strong>${esc(project.name)}</strong><div class="hint">${esc(project.code) || 'No charge code'} · ${esc(project.phase)} · Health: ${esc(projectHealthDetails(project.id).status)}${project.id === state.activeProjectId ? ' · Active' : ''}</div>${project.goLiveDate ? `<div class="manager-go-live"><span>Go-Live</span><strong>${esc(project.goLiveDate)}</strong><small>${daysUntil(project.goLiveDate)} days</small></div>` : '<div class="hint">Go-Live not set</div>'}</div><div class="actions">${project.id !== state.activeProjectId ? `<button class="small" data-action="activate-project" data-id="${esc(project.id)}" data-return="manager">Set active</button>` : ''}<button class="small" data-action="edit-project" data-id="${esc(project.id)}" data-return="manager">Edit</button><button class="small danger" data-action="delete-project" data-id="${esc(project.id)}">Delete</button></div></div>`
+        `<div class="project-manager-row"><div><strong>${esc(project.name)}</strong><div class="hint">${esc(project.code) || 'No charge code'} · ${esc(project.phase)} · Health: ${esc(projectHealthDetails(project.id).status)}${project.id === state.activeProjectId ? ' · Current' : ''}</div>${project.goLiveDate ? `<div class="manager-go-live"><span>Go-Live</span><strong>${esc(project.goLiveDate)}</strong><small>${daysUntil(project.goLiveDate)} days</small></div>` : '<div class="hint">Go-Live not set</div>'}</div><div class="actions">${project.id !== state.activeProjectId ? `<button class="small" data-action="activate-project" data-id="${esc(project.id)}" data-return="manager">Set current</button>` : ''}<button class="small" data-action="edit-project" data-id="${esc(project.id)}" data-return="manager">Edit</button><button class="small danger" data-action="delete-project" data-id="${esc(project.id)}">Delete</button></div></div>`
     )
     .join('');
 }
@@ -7206,38 +7287,23 @@ function scheduleEntries(date) {
   }
   return [...entries.values()];
 }
-function scheduleTimeStatus(slot, d = state, date = today(), time = timeNow().slice(0, 5)) {
+function scheduleTimeStatus(slot, d = state, date = null, time = null) {
   if (!slot) return '';
   if (window.WorkHubLeave.isLeave(slot.kind)) return slot.leave.status;
-  // Stopwatch bookings represent work already performed, including retained calendar
-  // entries whose session has since been archived or deleted.
-  if (slot.sessionId) return 'Completed';
-  const plan = d.projectPlans.find(plan => plan.id === slot.planId),
-    task = slot.kind === 'task' ? d.tasks.find(task => task.id === slot.linkId) : null;
-  const maintainedStatus = plan?.status || (slot.kind === 'custom' ? slot.status : '');
-  if (maintainedStatus === 'Completed' || task?.done) return 'Completed';
-  if (maintainedStatus === 'On Hold') return 'On Hold';
-  const block = slot.bookingId
-      ? d.schedule.filter(row => row.date === slot.date && row.bookingId === slot.bookingId)
-      : [slot],
-    startTime = plan?.time || block.map(row => row.time).sort()[0],
-    endTime = plan?.endTime || block.map(slotEnd).sort().at(-1),
-    now = date + time,
-    start = slot.date + startTime,
-    end = (plan?.endDate || slot.date) + endTime;
-  if (now < start) return 'Planned';
-  // A time slot ending does not complete the work. Started activities remain
-  // active until their task or maintained activity status says otherwise.
-  if (task || plan || slot.kind === 'custom' || now < end) return 'In Progress';
-  return 'Elapsed';
+  return window.WorkHubScheduleEngine.describe(
+    d,
+    slot,
+    date ? new Date(date + 'T' + (time || timeNow().slice(0, 5)) + ':00').getTime() : Date.now(),
+    d === state ? hub?.timer() : null
+  ).status;
 }
-function scheduleEntryStatus(entry, date = today(), time = timeNow().slice(0, 5)) {
+function scheduleEntryStatus(entry, date = null, time = null) {
   return scheduleTimeStatus(entry.slot, state, date, time);
 }
 function scheduleEntryCard(entry, compact = false) {
   const slot = entry.slot,
     status = scheduleEntryStatus(entry);
-  return `<button type="button" class="slot workhub-booking${compact ? ' compact' : ''} status-${statusClass(status)}${isToilSchedule(slot) ? ' toil' : ''}" data-schedule-status="${esc(slot.date + '|' + slot.time)}" data-schedule-class="slot workhub-booking${compact ? ' compact' : ''}" data-action="open-booking" data-date="${esc(slot.date)}" data-time="${esc(slot.time)}"><span class="booking-time">${entry.time}–${entry.endTime}${isToilSchedule(slot) ? ' · TOIL' : ''}</span><strong>${esc(scheduleEntryTitle(entry))}</strong>${scheduleCompanyBadge(slot)}${scheduleItemBadge(slot)}${window.WorkHubClaims.badge(slot)}${!compact ? `<span class="booking-context">${esc(scheduleEntryContext(entry))}</span><span class="booking-duration-label">${formatDuration(entry.hours * 60)} · View details ↗</span>` : ''}<span class="slot-state">${esc(status)}</span></button>`;
+  return `<button type="button" class="slot workhub-booking${compact ? ' compact' : ''} status-${statusClass(status)}${isToilSchedule(slot) ? ' toil' : ''}" data-schedule-status="${esc(slot.date + '|' + slot.time)}" data-schedule-class="slot workhub-booking${compact ? ' compact' : ''}" data-action="open-booking" data-date="${esc(slot.date)}" data-time="${esc(slot.time)}"><span class="booking-time">${entry.time}–${entry.endTime}${isToilSchedule(slot) ? ' · TOIL' : ''}</span><strong>${esc(scheduleEntryTitle(entry))}</strong>${scheduleCompanyBadge(slot)}${scheduleItemBadge(slot)}${window.WorkHubClaims.badge(slot)}${!compact ? `<span class="booking-context">${esc(scheduleEntryContext(entry))}</span><span class="booking-duration-label">${formatDuration(entry.hours * 60)} · View details ↗</span>` : ''}<span class="slot-state" title="${slot.sessionId ? 'Tracked work' : window.WorkHubLeave.isLeave(slot.kind) ? 'Maintained leave status' : window.WorkHubScheduleEngine.describe(state, slot, Date.now(), hub?.timer()).source + ' · daily execution, independent of record progress'}">${esc(status)}</span></button>`;
 }
 function scheduleMonthMetrics() {
   const entries = monthDates(month).flatMap(scheduleEntries);
@@ -7245,15 +7311,7 @@ function scheduleMonthMetrics() {
     bookings: entries.length,
     minutes: Math.round(entries.reduce((sum, entry) => sum + entry.hours * 60, 0)),
     hours: formatHours(entries.reduce((sum, entry) => sum + entry.hours, 0)),
-    review: entries.filter(entry => {
-      const plan = state.projectPlans.find(plan => plan.id === entry.slot.planId);
-      return (
-        plan &&
-        planNeedsActualReview(plan) &&
-        !plan.actualReviewedAt &&
-        !['Completed', 'On Hold'].includes(plan.status)
-      );
-    }).length,
+    review: entries.filter(entry => scheduleEntryStatus(entry) === 'Actual').length,
     toilMinutes: Math.round(
       entries
         .filter(entry => isToilSchedule(entry.slot))
@@ -7428,7 +7486,7 @@ function viewBooking(date, time) {
     status = scheduleEntryStatus(entry);
   openModal(
     'Scheduled activity',
-    `<div class="booking-view-hero"><span class="eyebrow">${esc(window.WorkHubLeave.isLeave(slot.kind) ? window.WorkHubLeave.name(slot.kind, state) : slot.kind === 'task' ? 'Main task' : slot.kind === 'project' ? 'Project activity' : 'Activity')}</span><h3>${esc(scheduleEntryTitle(entry))}</h3><p>${esc(scheduleEntryContext(entry))}</p>${tag(status)}</div><dl class="booking-facts"><div><dt>Company</dt><dd>${esc(scheduleCompanyName(slot)) || 'Not specified'}</dd></div>${slot.kind === 'project' ? `<div><dt>Project item</dt><dd>${esc(scheduleItemContext(slot).itemTitle) || 'General project work'}</dd></div>${scheduleItemContext(slot).subItemTitle ? `<div><dt>Sub-item</dt><dd>${esc(scheduleItemContext(slot).subItemTitle)}</dd></div>` : ''}` : ''}<div><dt>Dates</dt><dd>${esc(dates[0])}${dates.length > 1 ? ' → ' + esc(dates.at(-1)) : ''}</dd></div><div><dt>Time each day</dt><dd>${esc(entry.time)}–${esc(entry.endTime)}</dd></div><div><dt>Duration</dt><dd>${formatDuration(entry.hours * 60)} per day${dates.length > 1 ? ' · ' + formatDuration(block.reduce((sum, row) => sum + slotMinutes(row), 0)) + ' total' : ''}</dd></div><div><dt>Work location</dt><dd>${esc(slot.location) || 'Not specified'}</dd></div></dl>${window.WorkHubLeave.details(slot, state)}${window.WorkHubClaims.details(slot, state)}<h3 class="section-label">${slot.kind === 'custom' ? 'Activity details' : 'Remarks / notes'}</h3><p class="prewrap">${esc(slot.text) || 'No notes added.'}</p>${plan?.actualReviewedAt ? `<h3 class="section-label">Actual work</h3><p class="prewrap">${esc(plan.actualTask) || 'Same as planned'}</p>` : ''}${slot.kind === 'task' && task?.subTasks?.length ? `<h3 class="section-label">Sub-tasks · ${task.subTasks.filter(sub => sub.status === 'Completed').length}/${task.subTasks.length} complete</h3>${task.subTasks.map(sub => `<p><strong>${esc(sub.title)}</strong> · ${esc(sub.status)}</p>`).join('')}` : ''}<div class="modal-actions"><button type="button" data-action="cancel">Close</button><button type="button" class="primary" data-action="edit-booking" data-date="${esc(date)}" data-time="${esc(entry.slot.time)}">Edit activity</button></div>`
+    `<div class="booking-view-hero"><span class="eyebrow">${esc(window.WorkHubLeave.isLeave(slot.kind) ? window.WorkHubLeave.name(slot.kind, state) : slot.kind === 'task' ? 'Main task' : slot.kind === 'project' ? 'Project activity' : 'Activity')}</span><h3>${esc(scheduleEntryTitle(entry))}</h3><p>${esc(scheduleEntryContext(entry))}</p>${tag(status)}</div><dl class="booking-facts"><div><dt>Company</dt><dd>${esc(scheduleCompanyName(slot)) || 'Not specified'}</dd></div>${slot.kind === 'project' ? `<div><dt>Project item</dt><dd>${esc(scheduleItemContext(slot).itemTitle) || 'General project work'}</dd></div>${scheduleItemContext(slot).subItemTitle ? `<div><dt>Sub-item</dt><dd>${esc(scheduleItemContext(slot).subItemTitle)}</dd></div>` : ''}` : ''}<div><dt>Dates</dt><dd>${esc(dates[0])}${dates.length > 1 ? ' → ' + esc(dates.at(-1)) : ''}</dd></div><div><dt>Time each day</dt><dd>${esc(entry.time)}–${esc(entry.endTime)}</dd></div><div><dt>Duration</dt><dd>${formatDuration(entry.hours * 60)} per day${dates.length > 1 ? ' · ' + formatDuration(block.reduce((sum, row) => sum + slotMinutes(row), 0)) + ' total' : ''}</dd></div><div><dt>Work location</dt><dd>${esc(slot.location) || 'Not specified'}</dd></div></dl>${window.WorkHubLeave.details(slot, state)}${window.WorkHubClaims.details(slot, state)}${hub?.workSchedule?.details(slot) || ''}<h3 class="section-label">${slot.kind === 'custom' ? 'Activity details' : 'Remarks / notes'}</h3><p class="prewrap">${esc(slot.text) || 'No notes added.'}</p>${plan?.actualReviewedAt ? `<h3 class="section-label">Actual work</h3><p class="prewrap">${esc(plan.actualTask) || 'Same as planned'}</p>` : ''}${slot.kind === 'task' && task?.subTasks?.length ? `<h3 class="section-label">Sub-tasks · ${task.subTasks.filter(sub => sub.status === 'Completed').length}/${task.subTasks.length} complete</h3>${task.subTasks.map(sub => `<p><strong>${esc(sub.title)}</strong> · ${esc(sub.status)}</p>`).join('')}` : ''}<div class="modal-actions"><button type="button" data-action="cancel">Close</button><button type="button" class="primary" data-action="edit-booking" data-date="${esc(date)}" data-time="${esc(entry.slot.time)}">Edit activity</button></div>`
   );
 }
 function subTaskCard(task, sub) {
@@ -7544,7 +7602,7 @@ function renderTickets() {
 }
 const scheduleRenderV10 = renderSchedule;
 renderSchedule = function () {
-  return `<div class="workspace-v10 schedule-workspace">${scheduleRenderV10().replace('Bookings and project Go-Live milestones stay synchronized automatically.', 'Plan your time. Open any activity to review or edit its details.').replace('01:00–24:00 ·', '00:00–24:00 ·').replace('<div class="schedule-view-switch"><button class="active" data-action="schedule-layout"', '<button class="small" data-action="schedule-today">Today</button><div class="schedule-view-switch"><button class="active" data-action="schedule-layout"')}<p class="hint schedule-task-status-help">Tasks, project activities and custom activities stay In Progress after their scheduled time ends until you mark the work Completed. Use Edit activity to complete or put project and custom work On Hold.</p></div>`;
+  return `<div class="workspace-v10 schedule-workspace">${scheduleRenderV10().replace('Bookings and project Go-Live milestones stay synchronized automatically.', 'Plan your time. Open any activity to review or edit its details.').replace('01:00–24:00 ·', '00:00–24:00 ·').replace('<div class="schedule-view-switch"><button class="active" data-action="schedule-layout"', '<button class="small" data-action="schedule-today">Today</button><div class="schedule-view-switch"><button class="active" data-action="schedule-layout"')}<p class="hint schedule-task-status-help">Daily execution is automatic and independent of task, ticket and project progress. Actual · From plan assumes you followed the booking; tracked interruptions adjust it to Partial or Changed.</p>${hub?.workSchedule?.section(scheduleDay || today()) || ''}</div>`;
 };
 function renderScheduleGrid() {
   const days = monthDates(month),
@@ -7575,7 +7633,7 @@ function renderScheduleGrid() {
               timeMinutes(entry.time) < (hour + 1) * 60 &&
               timeMinutes(entry.endTime, true) > hour * 60
           );
-          return `<td>${entries.length ? entries.map(entry => scheduleEntryCard(entry, true)).join('') : `<button class="grid-add" data-action="new-grid-booking" data-date="${date}" data-time="${hourTime(hour)}" aria-label="Plan ${date} at ${hourTime(hour)}">+</button>`}</td>`;
+          return `<td><div data-day-actuals="${date}" data-hour="${hour}">${hub?.workSchedule?.actualCards(date, hour) || ''}</div>${entries.length ? entries.map(entry => scheduleEntryCard(entry, true)).join('') : `<button class="grid-add" data-action="new-grid-booking" data-date="${date}" data-time="${hourTime(hour)}" aria-label="Plan ${date} at ${hourTime(hour)}">+</button>`}</td>`;
         })
         .join('')}</tr>`
   ).join(
@@ -9908,6 +9966,32 @@ filteredTasks = () =>
 hub = WorkHubStudio.install({
   state: () => state,
   cloud: () => cloud,
+  refreshSchedule: refreshScheduleStatuses,
+  openWorkDay(date) {
+    month = date.slice(0, 7);
+    scheduleDay = date;
+    tab = 'schedule';
+    render();
+    document.querySelector('[data-day-execution]')?.scrollIntoView?.({ block: 'start' });
+  },
+  createWorkRecord(kind, session) {
+    if (kind === 'project') {
+      editProject();
+      const f = $('projectForm');
+      f.elements.name.value = (session.unlistedName || session.title).slice(0, 80);
+      f.elements.makeActive.checked = false;
+      f.dataset.captureSession = session.id;
+      f.dataset.captureOwner = cloud.user?.id || '';
+    } else {
+      editRecord('tickets');
+      const f = $('editForm');
+      f.elements.ticket.value = (session.reference || session.unlistedName || '').slice(0, 200);
+      f.elements.description.value = session.title;
+      f.elements.history.value = session.notes || '';
+      f.dataset.captureSession = session.id;
+      f.dataset.captureOwner = cloud.user?.id || '';
+    }
+  },
   syncHealth: () => ({ cacheAvailable: !temporary && !!cloud.lastCache }),
   today,
   month: () => month,
