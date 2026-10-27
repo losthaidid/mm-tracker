@@ -1166,7 +1166,9 @@ function render() {
     hidden = new Set(state.preferences.hiddenTabs || []),
     visible = mainTabs.filter(t => !hidden.has(t));
   if (!visible.includes(tab)) tab = visible[0] || 'tickets';
-  const preserved = tab === 'lab' && hub?.workbench?.workshop?.patchRender();
+  const preserved =
+    (tab === 'lab' && hub?.workbench?.workshop?.patchRender()) ||
+    (tab === 'validator' && hub?.validator?.patchRender());
   if (!preserved) {
     const fn = {
         tickets: renderTickets,

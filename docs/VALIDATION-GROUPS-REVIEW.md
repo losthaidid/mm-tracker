@@ -22,3 +22,9 @@ After validation, select issue checkboxes in What needs attention, optionally en
 Ignored issues move to Ignored issues and stop contributing to unresolved error/warning totals. Restore an individual issue or Restore all to undo the review. An otherwise acceptable row with ignored issues is labelled Accepted · ignored issues rather than Passed. Accepted Excel exports include those rows plus a separate Ignored issues sheet with their reason; issue reports retain both unresolved and ignored issues. Source values and rule definitions never change when ignoring.
 
 Reviews apply only to this in-memory validation run. Editing any field restores ignored checks on that row, because its context changed. A new upload/run, remapping, different company/version/template, changed definition or account switch clears decisions. Only numeric review counts and review timestamp are saved on the existing run summary. Uploaded values, row snapshots and ignore reasons are not stored in the database. Normal live corrections remain local and do not add per-keystroke cloud writes.
+
+## Editing without resetting the workspace
+
+Columns, Conditions, Column groups, References and Validate update their existing controls in place. SAP type/format changes, adding clauses, switching value sets, mapping changes, Apply and Save preserve unaffected fields, caret/focus, open panels and scroll positions. Copy-dialog filters also update inside the existing dialog. Reference imports keep their review inputs; file selectors reset after reading so the same file can be chosen again. New reference still explicitly clears a new-reference draft.
+
+The main application's ordinary save render uses the same Studio update path. Switching to a different template or account creates a fresh workspace, and invalid/stale saves remain guarded by the existing schema, company, published-version and account checks. Draft values are preserved locally rather than written on every keystroke.
