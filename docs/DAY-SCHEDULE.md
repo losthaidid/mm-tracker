@@ -48,3 +48,11 @@ No network request, record mutation, new animation loop or per-tick database wri
 ## Verification
 
 Focused application checks cover automatic progression, independent parent statuses, switching, empty and retrospective switches, unlisted ticket/project creation, scoped companies, cloud/backup reopening, calendar/grid/project projections, safe retained history, and stale account/form guards. Pure tests cover interval unions, pauses, overtime, day boundaries and preserved execution identity. Existing leave, claims, minute scheduling and account-reset checks are retained.
+
+## Booking selections and claims
+
+New Task selections list unfinished, unarchived tasks. An existing booking for a task that was completed later retains a read-only saved-task summary; its notes and dates can still be edited, or Choose another unfinished task replaces the link. Completing a task never removes the historical booking. A task completed while a new booking is open cannot be newly scheduled by submitting the old form.
+
+The Company picker supports searchable checkboxes, Select all and Clear. For project bookings it uses the chosen project's active companies. Select all snapshots the currently available companies; a company added afterward does not rewrite earlier bookings. Saved inactive/deleted company names remain available in historical bookings. Project item choices are the union of the selected companies. All selections remain one booking and one duration, with one mileage visit per date. Project calendar edits, backup and cloud reopening retain the company selections.
+
+Choosing Office immediately hides and disables claim type, destination, one-off destination and route inputs. Switching back before saving restores the visit draft. Saving Office clears the booking's mileage and one-off claim destination; separate saved receipts remain in their existing ledger.

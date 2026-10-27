@@ -98,6 +98,17 @@
       ...(d.workhub.sessions || []).filter(s => s.scheduleVersion === 1),
     ])
       validateSession(s);
+    for (const row of [...(d.schedule || []), ...(d.workhub?.sessions || []), ...h.retained]) {
+      const ids = (row.executionIdentity || row.captureIdentity)?.companyIds;
+      if (
+        ids !== undefined &&
+        (!Array.isArray(ids) ||
+          ids.length > 200 ||
+          ids.some(id => !text(id, 100) || !id) ||
+          new Set(ids).size !== ids.length)
+      )
+        throw Error('Check the original work companies.');
+    }
     for (const slot of d.schedule || [])
       if (slot.executionIdentity !== undefined) {
         const i = slot.executionIdentity;
@@ -176,6 +187,7 @@
         (s.kind === 'project' ? s.linkId : task?.taskType === 'Project' ? task.linkId : '') ||
         '',
       companyId: s.companyId || task?.companyId || '',
+      ...(s.companies?.length > 1 ? { companyIds: s.companies.map(c => c.id) } : {}),
       itemId: s.itemId || '',
       subItemId: s.subItemId || '',
       allocationKey: s.allocationKey || '',
@@ -186,7 +198,12 @@
     const actual = s.captureIdentity || identity(s, d),
       planned = identity(slot, d);
     if (actual.allocationKey) return actual.allocationKey === key(slot);
-    if (planned.companyId && actual.companyId && planned.companyId !== actual.companyId)
+    if (
+      actual.companyId &&
+      (planned.companyIds?.length
+        ? !planned.companyIds.includes(actual.companyId)
+        : planned.companyId && planned.companyId !== actual.companyId)
+    )
       return false;
     if (planned.itemId && actual.itemId && planned.itemId !== actual.itemId) return false;
     if (planned.subItemId && actual.subItemId && planned.subItemId !== actual.subItemId)

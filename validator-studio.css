@@ -235,10 +235,10 @@
   --val-mint: #e7f1e9;
   --val-lilac: #eeebf8;
   --val-rose: #fbe9e6;
-  color: var(--val-ink);
+  color: var(--hub-text);
   font-size: 14px;
   background: var(--val-paper);
-  border: 1px solid var(--val-line);
+  border: 1px solid var(--hub-border);
   border-radius: 24px;
   box-shadow: 0 14px 50px #38574709;
   overflow: clip;
@@ -261,7 +261,7 @@
 .validation-studio textarea,
 .validation-studio select {
   font-size: 13px;
-  color: var(--val-ink);
+  color: var(--hub-text);
   border: 1px solid #dce3d8;
   border-radius: 10px;
   background: #fffefb;
@@ -288,9 +288,9 @@
   gap: 24px;
   padding: 27px 30px;
   background: linear-gradient(110deg, #f3f5e9, #f4f1fa 90%);
-  color: var(--val-ink);
+  color: var(--hub-text);
   border: 0;
-  border-bottom: 1px solid var(--val-line);
+  border-bottom: 1px solid var(--hub-border);
 }
 .val-brand {
   display: flex;
@@ -346,7 +346,7 @@
 .val-library {
   padding: 26px 16px 20px;
   background: #f9f9f2;
-  border-right: 1px solid var(--val-line);
+  border-right: 1px solid var(--hub-border);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -391,7 +391,7 @@
   border: 1px solid #dce4d8;
   border-radius: 11px;
   background: var(--val-paper);
-  color: var(--val-ink);
+  color: var(--hub-text);
   box-shadow: none;
   font-size: 12px;
   line-height: 1.35;
@@ -648,7 +648,7 @@
   gap: 4px;
   min-width: 185px;
   background: #fffef9;
-  border: 1px solid var(--val-line);
+  border: 1px solid var(--hub-border);
   box-shadow: 0 8px 25px #2d503415;
   border-radius: 12px;
   padding: 7px;
@@ -657,7 +657,7 @@
 .val-tabs {
   display: flex;
   gap: 6px;
-  border-bottom: 1px solid var(--val-line);
+  border-bottom: 1px solid var(--hub-border);
   padding-bottom: 13px;
   margin-bottom: 25px;
   overflow: auto;
@@ -712,7 +712,7 @@
   gap: 18px;
 }
 .val-outline {
-  border: 1px solid var(--val-line);
+  border: 1px solid var(--hub-border);
   border-radius: 15px;
   padding: 11px;
   background: #fafbf5;
@@ -803,7 +803,7 @@
 }
 .val-inspector {
   background: #fffefa;
-  border: 1px solid var(--val-line);
+  border: 1px solid var(--hub-border);
   border-radius: 15px;
   padding: 23px;
   min-width: 0;
@@ -819,7 +819,7 @@
   margin: 0;
 }
 .val-meta {
-  border-bottom: 1px dashed var(--val-line);
+  border-bottom: 1px dashed var(--hub-border);
   padding-bottom: 20px;
   margin-bottom: 23px;
 }
@@ -888,7 +888,7 @@
 }
 .val-card {
   padding: 22px;
-  border: 1px solid var(--val-line);
+  border: 1px solid var(--hub-border);
   border-radius: 15px;
   background: #fffefa;
   margin-top: 20px;
@@ -1243,7 +1243,7 @@
   justify-content: space-between;
   align-items: center;
   gap: 18px;
-  border-top: 1px dashed var(--val-line);
+  border-top: 1px dashed var(--hub-border);
   padding-top: 17px;
   margin-top: 21px;
 }
@@ -1564,7 +1564,7 @@
   align-items: center;
   gap: 12px;
   padding: 20px 0;
-  border-bottom: 1px solid var(--val-line);
+  border-bottom: 1px solid var(--hub-border);
   flex-wrap: wrap;
 }
 .val-release > div {
@@ -1595,7 +1595,7 @@
   align-items: flex-start;
   gap: 10px;
   padding: 17px 0;
-  border-bottom: 1px solid var(--val-line);
+  border-bottom: 1px solid var(--hub-border);
 }
 .val-run-history .val-rule-dot {
   margin-top: 4px;
@@ -1803,7 +1803,7 @@
   }
   .val-library {
     border-right: 0;
-    border-bottom: 1px solid var(--val-line);
+    border-bottom: 1px solid var(--hub-border);
     padding: 16px;
     gap: 8px;
     display: grid;
@@ -1960,4 +1960,126 @@ body[data-motion='off'] .validation-studio * {
   .val-main {
     padding: 0;
   }
+}
+
+/* Saved column setups and explicit, reversible issue review. */
+.val-group-columns {
+  margin: 16px 0;
+  padding: 12px;
+  border: 1px solid var(--hub-border);
+  border-radius: 12px;
+}
+.val-group-columns .val-check-list {
+  max-height: 240px;
+  overflow: auto;
+  margin-top: 12px;
+}
+.val-set-picker {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 16px;
+  border-top: 1px solid var(--hub-border);
+}
+.val-set-picker > .val-label {
+  flex: 1;
+  min-width: 200px;
+}
+.val-group-values {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+.val-group-binding {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  grid-column: 2 / -1;
+}
+.val-group-binding small {
+  grid-column: 1 / -1;
+  overflow-wrap: anywhere;
+}
+.val-value-source {
+  min-width: 140px;
+}
+.val-review-toolbar {
+  display: flex;
+  align-items: end;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+.val-review-toolbar > .val-label {
+  flex: 1;
+  min-width: 200px;
+}
+.val-review-issue {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--hub-border);
+}
+.val-review-issue > [data-val='issue'] {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+}
+.val-issue-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 4px;
+}
+.validation-studio .val-issue-check input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--hub-accent);
+}
+.val-ignored-issues {
+  border-style: dashed;
+}
+.val-issue-marker.ignored {
+  color: var(--hub-text);
+  background: var(--hub-surface-soft);
+}
+.val-metric.ignored strong {
+  color: var(--hub-text);
+}
+@media (max-width: 700px) {
+  .val-group-binding {
+    grid-column: 1 / -1;
+    grid-template-columns: 1fr;
+  }
+  .val-review-issue {
+    flex-wrap: wrap;
+  }
+}
+
+.val-review-issue > [data-val='issue'] {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  padding: 12px;
+  background: var(--hub-surface-soft);
+  color: var(--hub-text);
+}
+.val-review-issue > [data-val='issue'] > span:nth-child(2) {
+  flex: 1;
+}
+.val-review-issue strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.val-review-issue small {
+  font-size: 11px;
+  color: var(--hub-muted);
+}
+.val-review-issue .val-issue-value {
+  font-size: 12px;
 }

@@ -425,6 +425,17 @@
         ],
         widths: [25, 100],
       });
+    if (t.columnGroups?.length)
+      sheets.push({
+        name: 'Column groups',
+        rows: [
+          ['Group', 'Value set', 'Technical field', 'Allowed values'],
+          ...t.columnGroups.flatMap(g =>
+            g.sets.flatMap(v => g.fields.map(key => [g.name, v.name, key, v.values[key]]))
+          ),
+        ],
+        widths: [28, 28, 28, 60],
+      });
     for (const l of t.lookups) sheets.push({ name: 'Ref ' + l.name, rows: [l.headers, ...l.rows] });
     return workbook(sheets);
   }
@@ -439,10 +450,13 @@
     const data = [
         t.columns
           .map(c => c.label)
-          .concat(acceptedOnly ? [] : ['Validation status', 'Errors', 'Warnings']),
+          .concat(
+            acceptedOnly ? [] : ['Validation status', 'Errors', 'Warnings', 'Ignored issues']
+          ),
       ],
       styles = new Map();
     for (const x of result.issues) {
+      if (x.ignored) continue;
       const key = x.index + '\0' + x.field;
       if (x.severity === 'error' || !styles.has(key))
         styles.set(key, x.severity === 'error' ? 2 : 3);
@@ -458,9 +472,12 @@
             ? 'Needs correction'
             : result.status[i].warnings
               ? 'Review warnings'
-              : 'Passed',
+              : result.status[i].ignored
+                ? 'Accepted with ignored issues'
+                : 'Passed',
           result.status[i].errors,
-          result.status[i].warnings
+          result.status[i].warnings,
+          result.status[i].ignored || 0
         );
       data.push(values);
     });
@@ -469,7 +486,17 @@
       sheets.push({
         name: 'Issues',
         rows: [
-          ['Excel row', 'Column', 'Technical field', 'Severity', 'Rule', 'Value', 'Message'],
+          [
+            'Excel row',
+            'Column',
+            'Technical field',
+            'Severity',
+            'Rule',
+            'Value',
+            'Message',
+            'Review status',
+            'Ignore reason',
+          ],
           ...result.issues.map(x => [
             x.row,
             x.column,
@@ -478,9 +505,11 @@
             x.rule,
             x.value,
             x.message,
+            x.ignored ? 'Ignored' : 'Unresolved',
+            x.ignoreReason || '',
           ]),
         ],
-        widths: [13, 24, 24, 14, 35, 35, 70],
+        widths: [13, 24, 24, 14, 35, 35, 70, 20, 50],
       });
     sheets.push({
       name: 'Run details',
@@ -500,11 +529,47 @@
         ['Rows without errors', result.passed],
         ['Errors', result.errors],
         ['Warnings', result.warnings],
+        ['Ignored issues', result.ignored || 0],
+        ['Ignored errors', result.ignoredErrors || 0],
+        ['Ignored warnings', result.ignoredWarnings || 0],
+        [
+          'Review policy',
+          'Ignored issues are excluded from unresolved totals. Uploaded values and validation rules are unchanged.',
+        ],
         ['Issues listed', result.issues.length],
         ['Issues truncated', result.truncated ? 'Yes; split the file for the full report.' : 'No'],
         ['Generated', new Date().toISOString()],
       ],
     });
+    if (result.ignored)
+      sheets.push({
+        name: 'Ignored issues',
+        rows: [
+          [
+            'Excel row',
+            'Column',
+            'Technical field',
+            'Severity',
+            'Rule',
+            'Value',
+            'Message',
+            'Ignore reason',
+          ],
+          ...result.issues
+            .filter(x => x.ignored)
+            .map(x => [
+              x.row,
+              x.column,
+              x.field,
+              x.severity,
+              x.rule,
+              x.value,
+              x.message,
+              x.ignoreReason || '',
+            ]),
+        ],
+        widths: [13, 24, 24, 14, 35, 35, 70, 50],
+      });
     if (t.lookups.some(l => l.nameColumn || l.descriptionColumns?.length)) {
       const matches = [
           [

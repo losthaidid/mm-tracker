@@ -318,6 +318,7 @@
       rules: [],
       lookups: [],
       uniqueGroups: [],
+      columnGroups: [],
       releases: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -353,7 +354,137 @@
       rules: t.rules,
       lookups: t.lookups,
       uniqueGroups: t.uniqueGroups,
+      columnGroups: t.columnGroups || [],
     });
+  }
+  const GROUP_OPS = ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'in', 'notIn'];
+  function resolveCondition(c, t) {
+    if (c.valueSource !== 'group') return c;
+    const g = t.columnGroups?.find(g => g.id === c.groupId),
+      set = g?.sets.find(v => v.id === c.valueSetId);
+    if (!g || !set || !g.fields.includes(c.field) || !GROUP_OPS.includes(c.operator))
+      throw Error(
+        'Choose an existing column group, value set and grouped field for this condition.'
+      );
+    return { ...c, value: set.values[c.field] };
+  }
+  function groupReferences(t, id, setId = '') {
+    const found = [];
+    const clause = c => {
+      if (c.valueSource === 'group' && c.groupId === id && (!setId || c.valueSetId === setId))
+        found.push(c);
+    };
+    const walk = g => {
+      g.conditions.forEach(clause);
+      g.groups.forEach(walk);
+    };
+    t.rules.forEach(r => {
+      walk(r.when);
+      clause(r.assertion);
+    });
+    return found;
+  }
+  function checkColumnGroups(t) {
+    if (t.columnGroups === undefined) return;
+    if (!Array.isArray(t.columnGroups) || t.columnGroups.length > 40)
+      throw Error('Use up to 40 column groups.');
+    const ids = new Set(),
+      names = new Set();
+    for (const g of t.columnGroups) {
+      if (
+        !g ||
+        !text(g.id, 100) ||
+        !g.id ||
+        ids.has(g.id) ||
+        !text(g.name, 120) ||
+        !g.name.trim() ||
+        names.has(g.name.trim().toLowerCase()) ||
+        !Array.isArray(g.fields) ||
+        !g.fields.length ||
+        g.fields.length > 200 ||
+        new Set(g.fields).size !== g.fields.length ||
+        g.fields.some(key => !t.columns.some(c => c.key === key)) ||
+        !Array.isArray(g.sets) ||
+        !g.sets.length ||
+        g.sets.length > 30
+      )
+        throw Error(
+          'Column groups need unique names, existing fields and one to thirty value sets.'
+        );
+      ids.add(g.id);
+      names.add(g.name.trim().toLowerCase());
+      const setIds = new Set(),
+        setNames = new Set();
+      for (const v of g.sets) {
+        if (
+          !v ||
+          !text(v.id, 100) ||
+          !v.id ||
+          setIds.has(v.id) ||
+          !text(v.name, 120) ||
+          !v.name.trim() ||
+          setNames.has(v.name.trim().toLowerCase()) ||
+          !v.values ||
+          typeof v.values !== 'object' ||
+          Array.isArray(v.values) ||
+          Object.keys(v.values).length !== g.fields.length ||
+          Object.keys(v.values).some(k => !g.fields.includes(k)) ||
+          g.fields.some(k => !Object.hasOwn(v.values, k) || !text(v.values[k], 8000))
+        )
+          throw Error('Value sets need unique names and a value list for every grouped column.');
+        setIds.add(v.id);
+        setNames.add(v.name.trim().toLowerCase());
+        for (const key of g.fields) {
+          const field = t.columns.find(c => c.key === key);
+          if (
+            tokens(v.values[key]).some(
+              value =>
+                comparable(value, field, t.mode) === null ||
+                (sapMode(t) && !!sapCheck(value, field))
+            )
+          )
+            throw Error(
+              'Use valid ' + (sapMode(t) ? 'SAP ' : '') + 'values for grouped column ' + key + '.'
+            );
+        }
+      }
+    }
+  }
+  // Review decisions stay with the current in-memory upload; no source values are saved.
+  function issueKey(issue) {
+    return JSON.stringify([issue.index, issue.field, issue.ruleId, issue.message, issue.severity]);
+  }
+  function reviewIssues(raw, rows, decisions = new Map()) {
+    const result = copy(raw),
+      snapshots = new Map();
+    result.ignored = 0;
+    result.ignoredErrors = 0;
+    result.ignoredWarnings = 0;
+    result.rawErrors = raw.errors;
+    result.rawWarnings = raw.warnings;
+    result.status.forEach(s => {
+      s.ignored = 0;
+    });
+    for (const issue of result.issues) {
+      const decision = decisions.get(issueKey(issue));
+      if (!decision) continue;
+      if (!snapshots.has(issue.index))
+        snapshots.set(issue.index, JSON.stringify(rows[issue.index]));
+      if (decision.row !== snapshots.get(issue.index)) continue;
+      if (!text(decision.reason || '', 500))
+        throw Error('Keep the ignore reason within 500 characters.');
+      issue.ignored = true;
+      issue.ignoreReason = decision.reason || '';
+      const kind = issue.severity === 'warning' ? 'warnings' : 'errors';
+      result.status[issue.index][kind]--;
+      result.status[issue.index].ignored++;
+      result[kind]--;
+      result.ignored++;
+      result[issue.severity === 'warning' ? 'ignoredWarnings' : 'ignoredErrors']++;
+    }
+    result.passed = result.status.filter(s => !s.errors).length;
+    result.clean = result.status.filter(s => !s.errors && !s.warnings && !s.ignored).length;
+    return result;
   }
   function checkSchema(t, allowEmpty = false) {
     if (!t || !text(t.name, 120) || !t.name.trim() || !text(t.description || '', 2000))
@@ -463,7 +594,11 @@
     }
     if (!Array.isArray(t.rules) || t.rules.length > LIMITS.rules)
       throw Error('Keep up to 100 conditions per template.');
+    checkColumnGroups(t);
     function checkCondition(c) {
+      if (c?.valueSource !== undefined && !['literal', 'group'].includes(c.valueSource))
+        throw Error('Choose a condition value source.');
+      c = resolveCondition(c || {}, t);
       if (
         !c ||
         !has(c.field) ||
@@ -644,6 +779,20 @@
       )
         throw Error('Check validation run summaries.');
       runIds.add(r.id);
+      if (
+        [
+          'ignored',
+          'ignoredErrors',
+          'ignoredWarnings',
+          'reviewedPassed',
+          'reviewedErrors',
+          'reviewedWarnings',
+        ].some(
+          k => r[k] !== undefined && (!Number.isInteger(r[k]) || r[k] < 0 || r[k] > 10000000)
+        ) ||
+        (r.reviewedAt !== undefined && !text(r.reviewedAt, 50))
+      )
+        throw Error('Check validation review summaries.');
       if (r.context !== undefined) checkContext({ projectId: r.context?.projectId }, r.context);
     }
     if (JSON.stringify(v).length > 6000000)
@@ -682,6 +831,7 @@
     return c?.caseSensitive ? s : s.toLowerCase();
   }
   function testCondition(c, row, t, cache) {
+    c = resolveCondition(c, t);
     const field = t.columns.find(f => f.key === c.field),
       raw = own(row, c.field),
       a = comparable(raw, field, t.mode),
@@ -806,7 +956,7 @@
     };
     for (const value of tokens(field.values)) add(value, 'Allowed values');
     for (const rule of t.rules) {
-      const c = rule.assertion;
+      const c = resolveCondition(rule.assertion, t);
       if (
         !ruleApplies(rule, context) ||
         c.field !== fieldKey ||
@@ -947,6 +1097,10 @@
     return !checks.length || g.join === 'all' ? checks.every(Boolean) : checks.some(Boolean);
   }
   function describe(c, t) {
+    const binding =
+      c.valueSource === 'group' ? t.columnGroups?.find(g => g.id === c.groupId) : null;
+    const set = binding?.sets.find(v => v.id === c.valueSetId);
+    c = resolveCondition(c, t);
     const label = t.columns.find(f => f.key === c.field)?.label || c.field;
     return (
       label +
@@ -969,7 +1123,8 @@
                     .join(' + ') + ' in '
                 : '') +
               (t.lookups.find(l => l.id === c.lookupId)?.name || 'reference')
-            : ' ' + (c.value || '…'))
+            : ' ' + (c.value || '…')) +
+      (binding ? ' [' + binding.name + ' / ' + set.name + ']' : '')
     );
   }
   /** A run is for one maintained company; scope is separate from uploaded cell values. */
@@ -1046,8 +1201,40 @@
       throw Error('Choose at least one source condition to copy.');
     const next = copy(target),
       lookups = new Map(),
+      columnGroups = new Map(),
       rules = source.rules.filter(r => ruleIds.includes(r.id)).map(copy);
     const clause = c => {
+      if (c.valueSource === 'group') {
+        if (!columnGroups.has(c.groupId)) {
+          const group = copy(source.columnGroups.find(g => g.id === c.groupId)),
+            setIds = new Map();
+          for (const key of group.fields)
+            if (!next.columns.some(c => c.key === key))
+              throw Error(
+                'Add the technical field ' +
+                  key +
+                  ' to the destination template before copying this condition.'
+              );
+          const oldId = group.id;
+          group.id = uid();
+          group.sets.forEach(v => {
+            const old = v.id;
+            v.id = uid();
+            setIds.set(old, v.id);
+          });
+          next.columnGroups ||= [];
+          let name = group.name,
+            n = 2;
+          while (next.columnGroups.some(g => g.name.toLowerCase() === name.toLowerCase()))
+            name = group.name.slice(0, 105) + ' copy ' + n++;
+          group.name = name;
+          next.columnGroups.push(group);
+          columnGroups.set(oldId, { id: group.id, sets: setIds });
+        }
+        const binding = columnGroups.get(c.groupId);
+        c.groupId = binding.id;
+        c.valueSetId = binding.sets.get(c.valueSetId);
+      }
       for (const key of [
         c.field,
         ...(c.otherField && c.operator.startsWith('field') ? [c.otherField] : []),
@@ -1449,6 +1636,12 @@
     group,
     rule,
     schema,
+    GROUP_OPS,
+    resolveCondition,
+    groupReferences,
+    checkColumnGroups,
+    issueKey,
+    reviewIssues,
     checkSchema,
     checkContext,
     runContext,

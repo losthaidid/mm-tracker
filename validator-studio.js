@@ -119,6 +119,8 @@
       mode = 'columns',
       columnId = '',
       ruleId = '',
+      columnGroupId = '',
+      valueSetId = '',
       message = '',
       search = '',
       book = null,
@@ -129,6 +131,11 @@
       mapping = {},
       rows = [],
       result = null,
+      rawResult = null,
+      currentRunId = '',
+      ignoreReason = '',
+      issuePage = 0,
+      ignoredPage = 0,
       resultSchema = null,
       version = 'draft',
       runCompanyId = '',
@@ -145,7 +152,78 @@
       liveTimer = null,
       livePending = false,
       liveCheck = null,
-      pinnedRows = new Set();
+      pinnedRows = new Set(),
+      ignoredIssues = new Map(),
+      issueSelection = new Set();
+    function resetReview() {
+      rawResult = null;
+      currentRunId = '';
+      ignoreReason = '';
+      issuePage = 0;
+      ignoredPage = 0;
+      ignoredIssues.clear();
+      issueSelection.clear();
+    }
+    function reviewed(raw) {
+      const keys = new Set(raw.issues.map(E.issueKey));
+      for (const [key, decision] of ignoredIssues)
+        if (!keys.has(key) || decision.row !== JSON.stringify(rows[decision.index]))
+          ignoredIssues.delete(key);
+      for (const key of issueSelection) if (!keys.has(key)) issueSelection.delete(key);
+      return E.reviewIssues(raw, rows, ignoredIssues);
+    }
+    function applyIssueReview(action, el) {
+      if (livePending) checkEdit();
+      if (!rawResult || !result || !resultSchema)
+        throw Error('Run validation before reviewing issues.');
+      const before = new Map(ignoredIssues),
+        previous = result;
+      if (action === 'ignore-selected') {
+        const selected = result.issues.filter(i => !i.ignored && issueSelection.has(E.issueKey(i)));
+        if (!selected.length) throw Error('Select at least one current issue to ignore.');
+        const snapshots = new Map();
+        for (const issue of selected) {
+          if (!snapshots.has(issue.index))
+            snapshots.set(issue.index, JSON.stringify(rows[issue.index]));
+          ignoredIssues.set(E.issueKey(issue), {
+            index: issue.index,
+            row: snapshots.get(issue.index),
+            reason: ignoreReason.trim(),
+          });
+        }
+      } else if (action === 'restore-issues') ignoredIssues.clear();
+      else {
+        const issue = result.issues[Number(el.dataset.issue)];
+        if (!issue || el.dataset.issueKey !== E.issueKey(issue))
+          throw Error('Choose a current ignored issue.');
+        ignoredIssues.delete(E.issueKey(issue));
+      }
+      result = reviewed(rawResult);
+      issueSelection.clear();
+      try {
+        const ok = a.mutate(d => {
+          const summary = d.workhub.validator.runs.find(r => r.id === currentRunId);
+          if (!summary) throw Error('This run summary is unavailable. Run validation again.');
+          Object.assign(summary, {
+            ignored: result.ignored,
+            ignoredErrors: result.ignoredErrors,
+            ignoredWarnings: result.ignoredWarnings,
+            reviewedPassed: result.passed,
+            reviewedErrors: result.errors,
+            reviewedWarnings: result.warnings,
+            reviewedAt: new Date().toISOString(),
+          });
+        });
+        if (!ok) throw Error('The review summary could not be saved. Try again.');
+      } catch (error) {
+        ignoredIssues.clear();
+        for (const [key, value] of before) ignoredIssues.set(key, value);
+        result = previous;
+        throw error;
+      }
+      say(result.ignored + ' ignored issue(s) · ' + result.errors + ' unresolved errors.');
+      patchResults();
+    }
     function cancelLive() {
       root.clearTimeout(liveTimer);
       liveTimer = null;
@@ -168,6 +246,7 @@
         sourceRows = [];
         rows = [];
         result = null;
+        resetReview();
         resultSchema = null;
         selectedIssue = null;
         fileName = '';
@@ -201,6 +280,7 @@
       busy = false;
       dirty = true;
       result = null;
+      resetReview();
       resultSchema = null;
       selectedIssue = null;
       const el = $('valDraftStatus');
@@ -242,6 +322,7 @@
       mapping = {};
       rows = [];
       result = null;
+      resetReview();
       resultSchema = null;
       fileName = '';
       page = 0;
@@ -276,13 +357,33 @@
         if (r.assertion.otherField === oldKey) r.assertion.otherField = newKey;
         for (const pair of r.assertion.pairs || []) if (pair.field === oldKey) pair.field = newKey;
       }
+      for (const g of draft.columnGroups || []) {
+        g.fields = g.fields.map(k => (k === oldKey ? newKey : k));
+        for (const set of g.sets)
+          if (Object.hasOwn(set.values, oldKey)) {
+            set.values[newKey] = set.values[oldKey];
+            delete set.values[oldKey];
+          }
+      }
       draft.uniqueGroups = draft.uniqueGroups.map(g => g.map(k => (k === oldKey ? newKey : k)));
       for (const c of draft.columns) if (c.sapReference === oldKey) c.sapReference = newKey;
     }
     function readClause(el) {
       if (!el) return null;
       const get = k => el.querySelector('[data-clause="' + k + '"]')?.value || '';
+      const field = get('field'),
+        operator = get('operator');
+      const binding =
+        get('valueSource') === 'group' && E.GROUP_OPS.includes(operator)
+          ? (draft.columnGroups || []).find(
+              g => g.id === get('groupId') && g.fields.includes(field)
+            ) || (draft.columnGroups || []).find(g => g.fields.includes(field))
+          : null;
+      const set = binding?.sets.find(v => v.id === get('valueSetId')) || binding?.sets[0];
       return {
+        ...(binding && set
+          ? { valueSource: 'group', groupId: binding.id, valueSetId: set.id }
+          : {}),
         field: get('field'),
         operator: get('operator'),
         value: get('value'),
@@ -312,6 +413,7 @@
     }
     function commitCurrent() {
       if (!draft) return;
+      commitColumnGroup();
       const meta = $('valMetaForm');
       if (meta) {
         draft.name = meta.elements.namedItem('name').value.trim();
@@ -422,6 +524,7 @@
       if (saveDraft(true)) {
         version = String(release.version);
         result = null;
+        resetReview();
         say('Version ' + version + ' published. Its rules are now frozen.');
         paint();
       }
@@ -515,6 +618,9 @@
         [
           ['columns', 'Columns', 'columns'],
           ['rules', 'Conditions', 'rules'],
+          ...(draft.mode === 'sap' || draft.columnGroups?.length
+            ? [['column-groups', 'Column groups', 'columns']]
+            : []),
           ['references', 'References', 'reference'],
           ['check', 'Validate', 'check'],
           ['history', 'Versions & runs', 'history'],
@@ -824,6 +930,82 @@
         '</div><button type="submit" class="val-btn val-secondary">Add selected combination</button></form></section>'
       );
     }
+    function commitColumnGroup() {
+      const form = $('valColumnGroupForm');
+      if (!form || !draft) return;
+      const group = draft.columnGroups?.find(g => g.id === form.dataset.id);
+      if (!group) throw Error('Reopen this column group.');
+      const fields = Array.from(form.querySelectorAll('[name="groupField"]:checked')).map(
+        el => el.value
+      );
+      if (!fields.length) throw Error('Select at least one grouped column.');
+      if (E.groupReferences(draft, group.id).some(c => !fields.includes(c.field)))
+        throw Error(
+          'A condition uses a column you removed from this group. Update that condition first.'
+        );
+      const values = new Map(
+        Array.from(form.querySelectorAll('[data-group-value]')).map(el => [
+          el.dataset.groupValue,
+          el.value,
+        ])
+      );
+      const proposed = E.copy(group);
+      proposed.name = form.elements.namedItem('groupName').value.trim();
+      proposed.fields = fields;
+      for (const set of proposed.sets) {
+        set.values = Object.fromEntries(
+          fields.map(key => [
+            key,
+            set.id === form.dataset.set && values.has(key)
+              ? values.get(key)
+              : set.values[key] || '',
+          ])
+        );
+        if (set.id === form.dataset.set) set.name = form.elements.namedItem('setName').value.trim();
+      }
+      const check = {
+        ...draft,
+        columnGroups: draft.columnGroups.map(g => (g.id === group.id ? proposed : g)),
+      };
+      E.checkColumnGroups(check);
+      draft.columnGroups = check.columnGroups;
+    }
+    function columnGroupsEditor() {
+      const groups = draft.columnGroups || [],
+        group = groups.find(g => g.id === columnGroupId) || groups[0];
+      const set = group?.sets.find(v => v.id === valueSetId) || group?.sets[0];
+      columnGroupId = group?.id || '';
+      valueSetId = set?.id || '';
+      return `<div class="val-section-heading"><div><h3>Related columns. Reusable setups.</h3><p>Keep common column checks, then choose a named value set in each condition.</p></div>${btn('column-group-add', '＋ New column group', !draft.columns.length ? 'disabled' : '', 'val-secondary')}</div><div class="val-designer"><aside class="val-outline"><div class="val-outline-title">COLUMN GROUPS <span>${groups.length}</span></div>${groups.map(g => btn('column-group-select', `<span><strong>${esc(g.name)}</strong><small>${g.fields.length} columns · ${g.sets.length} saved sets</small></span>`, 'data-id="' + esc(g.id) + '"', g.id === group?.id ? 'is-active' : '')).join('') || '<p class="val-help">Create a group such as Sales area or Plant setup.</p>'}</aside><section class="val-inspector">${
+        group && set
+          ? `<form id="valColumnGroupForm" data-id="${esc(group.id)}" data-set="${esc(set.id)}"><div class="val-panel-title"><span class="val-eyebrow">GROUPED SAP VALUES</span>${btn('column-group-remove', 'Remove group', 'data-id="' + esc(group.id) + '"', 'val-quiet val-danger')}</div>${input('groupName', 'Column group name', group.name, 'text', 'maxlength="120" required')}<details class="val-group-columns"><summary>Grouped columns · ${group.fields.length}</summary><div class="val-check-list">${draft.columns.map(c => `<label class="val-toggle"><input type="checkbox" name="groupField" value="${esc(c.key)}"${group.fields.includes(c.key) ? ' checked' : ''}><span>${esc(c.label)} <code>${esc(c.key)}</code></span></label>`).join('')}</div></details><div class="val-set-picker">${select(
+              'groupSet',
+              'Saved value set',
+              group.sets.map(v => [v.id, v.name]),
+              set.id
+            )}<div class="val-actions">${btn('value-set-add', '＋ New set', '', 'val-quiet')}${btn('value-set-duplicate', 'Duplicate as new set', '', 'val-secondary')}${btn('value-set-remove', 'Remove set', '', 'val-quiet val-danger')}</div></div><p class="val-help">Duplicate this set before changing values to keep the previous setup. Each condition chooses its own saved set; other column checks stay the same.</p>${input('setName', 'Value set name', set.name, 'text', 'maxlength="120" required')}<div class="val-group-values">${group.fields
+              .map(key => {
+                const column = draft.columns.find(c => c.key === key);
+                return `<label class="val-label">${esc(column.label)} <code>${esc(key)}</code><textarea data-group-value="${esc(key)}" maxlength="8000" rows="2" placeholder="Values separated by commas, e.g. 60,50">${esc(set.values[key])}</textarea></label>`;
+              })
+              .join(
+                ''
+              )}</div><div class="val-actions"><button type="submit" class="val-btn val-primary">Apply group changes</button>${btn('value-set-condition', 'Use this set in a condition', '', 'val-secondary')}</div><p class="val-help">Values keep leading zeros and follow each column’s SAP type. Keep global Allowed values blank when they would conflict with different sets.</p></form>`
+          : '<div class="val-empty-small"><h3>One template. Several setups.</h3><p>Group Sales Organization, Distribution Channel and Division. Save one set for FPSO and another for a different organization.</p></div>'
+      }</section></div>`;
+    }
+    function groupValueControls(c) {
+      const groups = (draft.columnGroups || []).filter(g => g.fields.includes(c.field)),
+        g = groups.find(g => g.id === c.groupId) || groups[0];
+      const set = g?.sets.find(v => v.id === c.valueSetId) || g?.sets[0];
+      return `<div class="val-group-binding"><label class="val-label">Column group<select data-clause="groupId">${options(
+        groups.map(g => [g.id, g.name]),
+        g?.id
+      )}</select></label><label class="val-label">Value set<select data-clause="valueSetId">${options(
+        (g?.sets || []).map(v => [v.id, v.name]),
+        set?.id
+      )}</select></label><small>Values: ${esc(set?.values[c.field] || '(empty — maintain this set first)')}</small></div>`;
+    }
     function clause(c, path, assertion = false) {
       const fields = draft.columns.map(f => [f.key, f.label + ' (' + f.key + ')']),
         op = c.operator || 'eq',
@@ -844,36 +1026,51 @@
         '>' +
         control('field', fields, c.field) +
         control('operator', Object.entries(E.OPS), op) +
-        (op.startsWith('field')
-          ? control('otherField', fields, c.otherField)
-          : op === 'lookupTuple'
-            ? tupleView(c, path, reference, fields)
-            : op === 'lookup'
-              ? '<div class="val-lookup-select">' +
-                control(
-                  'lookupId',
-                  draft.lookups.map(l => [l.id, l.name]),
-                  c.lookupId || reference?.id
-                ) +
-                control(
-                  'lookupColumn',
-                  (reference?.headers || []).map(h => [h, h]),
-                  c.lookupColumn
-                ) +
-                '</div>'
-              : op === 'pattern'
-                ? control(
-                    'value',
-                    Object.keys(E.FORMATS).map(f => [f, f]),
-                    c.value
-                  )
-                : ['empty', 'notEmpty'].includes(op)
-                  ? '<span class="val-clause-note">No value needed</span>'
-                  : '<input data-clause="value" aria-label="Condition value" value="' +
-                    esc(c.value) +
-                    '" placeholder="Value' +
-                    (['in', 'notIn'].includes(op) ? 's, separated by commas' : '') +
-                    '" maxlength="8000">') +
+        (E.GROUP_OPS.includes(op) &&
+        (draft.columnGroups || []).some(g => g.fields.includes(c.field))
+          ? '<label class="val-label val-value-source">Value source' +
+            control(
+              'valueSource',
+              [
+                ['literal', 'Enter values'],
+                ['group', 'Saved column group'],
+              ],
+              c.valueSource || 'literal'
+            ) +
+            '</label>'
+          : '') +
+        (c.valueSource === 'group' && E.GROUP_OPS.includes(op)
+          ? groupValueControls(c)
+          : op.startsWith('field')
+            ? control('otherField', fields, c.otherField)
+            : op === 'lookupTuple'
+              ? tupleView(c, path, reference, fields)
+              : op === 'lookup'
+                ? '<div class="val-lookup-select">' +
+                  control(
+                    'lookupId',
+                    draft.lookups.map(l => [l.id, l.name]),
+                    c.lookupId || reference?.id
+                  ) +
+                  control(
+                    'lookupColumn',
+                    (reference?.headers || []).map(h => [h, h]),
+                    c.lookupColumn
+                  ) +
+                  '</div>'
+                : op === 'pattern'
+                  ? control(
+                      'value',
+                      Object.keys(E.FORMATS).map(f => [f, f]),
+                      c.value
+                    )
+                  : ['empty', 'notEmpty'].includes(op)
+                    ? '<span class="val-clause-note">No value needed</span>'
+                    : '<input data-clause="value" aria-label="Condition value" value="' +
+                      esc(c.value) +
+                      '" placeholder="Value' +
+                      (['in', 'notIn'].includes(op) ? 's, separated by commas' : '') +
+                      '" maxlength="8000">') +
         (!assertion
           ? btn(
               'remove-clause',
@@ -1175,6 +1372,7 @@
       mapping = E.autoMap(headers, activeSchema());
       rows = [];
       result = null;
+      resetReview();
       resultSchema = null;
       page = 0;
     }
@@ -1295,6 +1493,7 @@
         account = owner;
       busy = true;
       result = null;
+      resetReview();
       rows = mapped;
       selectedIssue = null;
       targetRow = -1;
@@ -1306,7 +1505,8 @@
         E.runContext(a.state(), t, context.companyId);
         const checked = E.validateRows(t, rows, context);
         if (token !== generation || account !== a.owner?.()) return;
-        result = checked;
+        rawResult = checked;
+        result = reviewed(checked);
         resultSchema = E.copy(t);
         filter = 'all';
         page = 0;
@@ -1323,6 +1523,7 @@
           warnings: checked.warnings,
           context: E.copy(context),
         };
+        currentRunId = summary.id;
         a.mutate(d => {
           const history = d.workhub.validator.runs;
           history.unshift(summary);
@@ -1361,6 +1562,7 @@
         if (node.nodeType !== 1) return '';
         if (node.id) return 'id:' + node.id;
         const d = node.dataset;
+        if (d.issueRowKey !== undefined) return 'issue-row:' + d.issueRowKey;
         if (d.cell !== undefined) return 'cell:' + d.cell + ':' + d.field;
         if (d.rowIndex !== undefined) return 'row:' + d.rowIndex;
         if (d.val === 'issue') return 'issue:' + d.issueKey;
@@ -1378,6 +1580,7 @@
         for (const attr of Array.from(next.attributes))
           if (current.getAttribute(attr.name) !== attr.value)
             current.setAttribute(attr.name, attr.value);
+        if (current.matches('input[type="checkbox"]')) current.checked = next.checked;
         if (current.matches('input[data-cell]') && current.value !== next.value)
           current.value = next.value;
         const old = Array.from(current.childNodes),
@@ -1423,7 +1626,8 @@
       }
       try {
         const context = E.runContext(a.state(), check.schema, runCompanyId);
-        result = E.validateRows(check.schema, rows, context);
+        rawResult = E.validateRows(check.schema, rows, context);
+        result = reviewed(rawResult);
         if (selectedIssue)
           selectedIssue =
             result.issues.find(
@@ -1437,6 +1641,7 @@
           ' warnings.';
       } catch (error) {
         result = null;
+        resetReview();
         resultSchema = null;
         selectedIssue = null;
         message = 'Automatic check could not finish. ' + error.message;
@@ -1451,6 +1656,9 @@
       if (!Number.isInteger(source) || source < 0)
         throw Error('Map this field before editing its value.');
       if (rows[index][field] === value && !livePending) return;
+      for (const [key, decision] of ignoredIssues)
+        if (decision.index === index) ignoredIssues.delete(key);
+      issueSelection.clear();
       rows[index][field] = value;
       sourceRows[index][source] = value;
       root.clearTimeout(liveTimer);
@@ -1533,7 +1741,7 @@
       page = Math.max(0, Math.min(page, Math.ceil(indices.length / 25) - 1));
       const shown = indices.slice(page * 25, page * 25 + 25),
         t = resultSchema || activeSchema(),
-        issues = result?.issues || [],
+        issues = (result?.issues || []).filter(i => !i.ignored),
         byCell = new Map();
       for (const issue of issues) {
         const key = issue.index + ':' + issue.field;
@@ -1560,6 +1768,8 @@
             result.errors +
             '</strong></div><div class="val-metric warnings"><span>Warnings to review</span><strong>' +
             result.warnings +
+            '</strong></div><div class="val-metric ignored"><span>Ignored issues</span><strong>' +
+            result.ignored +
             '</strong></div><div class="val-metric"><span>Template used</span><strong class="val-version-text">' +
             (version === 'draft' ? 'Saved draft' : 'Version ' + version) +
             '</strong></div></div>'
@@ -1577,7 +1787,7 @@
           !result || livePending || !result.passed ? 'disabled' : '',
           'val-primary'
         ) +
-        '</div></div><p class="val-help">Accepted exports exclude rows with errors. Rows with warnings remain included for your review.</p><div class="val-result-toolbar"><div class="val-segments">' +
+        '</div></div><p class="val-help">Accepted exports exclude unresolved errors. Rows with warnings or explicitly ignored issues remain included; ignored issues are listed separately in the workbook.</p><div class="val-result-toolbar"><div class="val-segments">' +
         [
           ['all', 'All rows'],
           ['errors', 'Errors'],
@@ -1609,7 +1819,7 @@
             esc(selectedIssue.message) +
             '</p><span class="val-eyebrow">CURRENT VALUE</span><pre>' +
             esc(rows[selectedIssue.index]?.[selectedIssue.field] || '(blank)') +
-            '</pre><small>The exact cell is selected below. Edit it, then Run validation again.</small></section>'
+            '</pre><small>The exact cell is selected below. Edits recheck automatically and restore ignored issues on that row.</small></section>'
           : '') +
         '<div id="valResultsScroll" class="val-table-scroll"><table class="val-grid"><thead><tr><th>Excel row</th><th>Check</th>' +
         t.columns
@@ -1640,7 +1850,9 @@
                   ? 'Needs correction'
                   : result.status[i].warnings
                     ? 'Review'
-                    : 'Passed') +
+                    : result.status[i].ignored
+                      ? 'Accepted · ignored issues'
+                      : 'Passed') +
               '</span>' +
               (result && t.lookups.some(l => l.nameColumn || l.descriptionColumns?.length)
                 ? btn(
@@ -1722,49 +1934,38 @@
           'val-quiet'
         ) +
         '</div></section>' +
-        (result && issues.length
-          ? '<section id="valAttention" class="val-card"><div class="val-panel-title"><h3>What needs attention</h3><span class="val-chip">' +
-            issues.length +
-            ' listed' +
-            (result.truncated ? ' · capped at 15,000' : '') +
-            '</span></div><div class="val-issue-list">' +
-            issues
-              .slice(0, 100)
-              .map((issue, issueIndex) =>
-                btn(
-                  'issue',
-                  '<span class="val-issue-marker ' +
-                    issue.severity +
-                    '">' +
-                    (issue.severity === 'error' ? '!' : 'i') +
-                    '</span><span><strong>' +
-                    esc(issue.message) +
-                    '</strong><small>Row ' +
-                    (headerRow + issue.index + 1) +
-                    ' · ' +
-                    esc(issue.column) +
-                    ' · ' +
-                    esc(issue.rule) +
-                    '</small><small class="val-issue-value">Value: ' +
-                    esc(issue.value || '(blank)') +
-                    '</small></span><span>↗</span>',
-                  'data-index="' +
-                    issue.index +
-                    '" data-issue="' +
-                    issueIndex +
-                    '" data-issue-key="' +
-                    esc(JSON.stringify([issue.index, issue.field, issue.ruleId, issue.message])) +
-                    '"'
-                )
-              )
-              .join('') +
-            '</div>' +
-            (issues.length > 100
-              ? '<p class="val-help">Showing the first 100 issues here. Export the workbook for all listed issues.</p>'
-              : '') +
-            '</section>'
-          : '') +
+        issueReviewView() +
         '</div>'
+      );
+    }
+    function issueReviewView() {
+      if (!result?.issues.length) return '';
+      const open = result.issues
+          .map((issue, index) => ({ issue, index }))
+          .filter(x => !x.issue.ignored),
+        ignored = result.issues
+          .map((issue, index) => ({ issue, index }))
+          .filter(x => x.issue.ignored);
+      issuePage = Math.max(0, Math.min(issuePage, Math.ceil(open.length / 100) - 1));
+      ignoredPage = Math.max(0, Math.min(ignoredPage, Math.ceil(ignored.length / 100) - 1));
+      const shown = open.slice(issuePage * 100, issuePage * 100 + 100),
+        selected = shown.filter(x => issueSelection.has(E.issueKey(x.issue))).length;
+      const row = ({ issue, index }, isIgnored = false) =>
+        `<div class="val-review-issue" data-issue-row-key="${esc(E.issueKey(issue))}">${!isIgnored ? `<label class="val-issue-check"><input type="checkbox" data-issue-choice="${index}" data-issue-key="${esc(E.issueKey(issue))}" aria-label="Select issue on row ${headerRow + issue.index + 1}: ${esc(issue.message)}"${issueSelection.has(E.issueKey(issue)) ? ' checked' : ''}${livePending ? ' disabled' : ''}></label>` : ''}${btn('issue', `<span class="val-issue-marker ${isIgnored ? 'ignored' : issue.severity}">${isIgnored ? '✓' : issue.severity === 'error' ? '!' : 'i'}</span><span><strong>${esc(issue.message)}</strong><small>Row ${headerRow + issue.index + 1} · ${esc(issue.column)} · ${esc(issue.rule)}</small><small class="val-issue-value">Value: ${esc(issue.value || '(blank)')}</small>${isIgnored ? `<small>Ignored${issue.ignoreReason ? ': ' + esc(issue.ignoreReason) : ' · no reason entered'}</small>` : ''}</span><span>↗</span>`, `data-index="${issue.index}" data-issue="${index}" data-issue-key="${esc(E.issueKey(issue))}"`)}${isIgnored ? btn('restore-issue', 'Restore', `data-issue="${index}" data-issue-key="${esc(E.issueKey(issue))}"${livePending ? ' disabled' : ''}`, 'val-quiet') : ''}</div>`;
+      const pager = (kind, at, count) =>
+        count > 100
+          ? `<div class="val-pagination">${btn('issue-page', '← Previous', `data-kind="${kind}" data-delta="-1"${!at ? ' disabled' : ''}`, 'val-quiet')}<span>${at * 100 + 1}–${Math.min(count, (at + 1) * 100)} of ${count}</span>${btn('issue-page', 'Next →', `data-kind="${kind}" data-delta="1"${(at + 1) * 100 >= count ? ' disabled' : ''}`, 'val-quiet')}</div>`
+          : '';
+      return (
+        (open.length
+          ? `<section id="valAttention" class="val-card"><div class="val-panel-title"><h3>What needs attention</h3><span class="val-chip">${open.length} unresolved listed${result.truncated ? ' · capped at 15,000' : ''}</span></div><div class="val-review-toolbar"><div class="val-actions">${btn('select-issues', selected === shown.length ? 'Deselect this page' : 'Select this page', livePending ? 'disabled' : '', 'val-secondary')}${btn('ignore-selected', 'Ignore selected (' + issueSelection.size + ')', !issueSelection.size || livePending ? 'disabled' : '', 'val-secondary')}</div><label class="val-label">Reason (optional)<input id="valIgnoreReason" maxlength="500" value="${esc(ignoreReason)}" placeholder="Why is this acceptable for this upload?"></label></div><p class="val-help">Ignore applies to this validation run. Editing a row restores its checks; a new run or upload starts fresh.</p><div class="val-issue-list">${shown.map(x => row(x)).join('')}</div>${pager('open', issuePage, open.length)}</section>`
+          : '') +
+        (ignored.length
+          ? `<section id="valIgnoredIssues" class="val-card val-ignored-issues"><div class="val-panel-title"><h3>Ignored issues · ${ignored.length}</h3>${btn('restore-issues', 'Restore all', livePending ? 'disabled' : '', 'val-secondary')}</div><p class="val-help">Source values and rules are unchanged. These issues are excluded from unresolved totals and included in exports.</p><div class="val-issue-list">${ignored
+              .slice(ignoredPage * 100, ignoredPage * 100 + 100)
+              .map(x => row(x, true))
+              .join('')}</div>${pager('ignored', ignoredPage, ignored.length)}</section>`
+          : '')
       );
     }
     function checkView() {
@@ -1901,7 +2102,15 @@
               r.errors +
               ' errors · ' +
               r.warnings +
-              ' warnings</small></div></article>'
+              ' warnings' +
+              (r.reviewedAt
+                ? ' · reviewed: ' +
+                  r.reviewedErrors +
+                  ' unresolved errors, ' +
+                  r.ignored +
+                  ' ignored'
+                : '') +
+              '</small></div></article>'
           )
           .join('') +
         (!runs.length
@@ -1927,9 +2136,14 @@
                 '</div>'
               : '') +
             (
-              { columns: columnEditor, rules: rulesEditor, references, check: checkView, history }[
-                mode
-              ] || columnEditor
+              {
+                columns: columnEditor,
+                rules: rulesEditor,
+                'column-groups': columnGroupsEditor,
+                references,
+                check: checkView,
+                history,
+              }[mode] || columnEditor
             )()
           : empty()) +
         '</main></div><input id="valFile" type="file" accept=".xlsx,.csv,.tsv" hidden><input id="valSetupFile" type="file" accept=".xlsx" hidden><input id="valDefinitionFile" type="file" accept=".json" hidden><input id="valReferenceFile" type="file" accept=".xlsx,.csv,.tsv" hidden></section>'
@@ -2011,6 +2225,28 @@
       }
       if (!draft) throw Error('Create or choose a template first.');
       commitCurrent();
+      if (['ignore-selected', 'restore-issue', 'restore-issues'].includes(action)) {
+        applyIssueReview(action, el);
+        return;
+      }
+      if (action === 'select-issues') {
+        if (livePending || !result) throw Error('Wait for validation to finish.');
+        const shown = result.issues
+            .filter(i => !i.ignored)
+            .slice(issuePage * 100, issuePage * 100 + 100),
+          all = shown.every(i => issueSelection.has(E.issueKey(i)));
+        shown.forEach(i =>
+          all ? issueSelection.delete(E.issueKey(i)) : issueSelection.add(E.issueKey(i))
+        );
+        patchResults();
+        return;
+      }
+      if (action === 'issue-page') {
+        if (el.dataset.kind === 'ignored') ignoredPage += Number(el.dataset.delta);
+        else issuePage += Number(el.dataset.delta);
+        patchResults();
+        return;
+      }
       if (action === 'copy-template' || action === 'copy-conditions') {
         copyPreview = {
           owner,
@@ -2048,6 +2284,90 @@
           }
         );
         return;
+      }
+      if (action === 'column-group-add') {
+        if (!draft.columns.length) throw Error('Add a column first.');
+        draft.columnGroups ||= [];
+        if (draft.columnGroups.length >= 40) throw Error('Use up to 40 column groups.');
+        let name = 'Column group',
+          n = 2;
+        while (draft.columnGroups.some(g => g.name.toLowerCase() === name.toLowerCase()))
+          name = 'Column group ' + n++;
+        const group = {
+          id: E.uid(),
+          name,
+          fields: [draft.columns[0].key],
+          sets: [{ id: E.uid(), name: 'Value set 1', values: { [draft.columns[0].key]: '' } }],
+        };
+        draft.columnGroups.push(group);
+        columnGroupId = group.id;
+        valueSetId = group.sets[0].id;
+        mode = 'column-groups';
+        mark();
+      }
+      if (action === 'column-group-select') {
+        columnGroupId = id;
+        valueSetId = '';
+      }
+      if (action === 'column-group-remove') {
+        if (E.groupReferences(draft, id).length)
+          throw Error('A condition uses this column group. Update that condition first.');
+        draft.columnGroups = draft.columnGroups.filter(g => g.id !== id);
+        columnGroupId = '';
+        valueSetId = '';
+        mark();
+      }
+      if (
+        [
+          'value-set-add',
+          'value-set-duplicate',
+          'value-set-remove',
+          'value-set-condition',
+        ].includes(action)
+      ) {
+        const g = draft.columnGroups?.find(g => g.id === columnGroupId),
+          set = g?.sets.find(v => v.id === valueSetId);
+        if (!g || !set) throw Error('Select a column group and value set first.');
+        if (action === 'value-set-remove') {
+          if (g.sets.length === 1) throw Error('Keep at least one value set in this group.');
+          if (E.groupReferences(draft, g.id, set.id).length)
+            throw Error(
+              'A condition uses this value set. Choose another set in that condition first.'
+            );
+          g.sets = g.sets.filter(v => v.id !== set.id);
+          valueSetId = g.sets[0].id;
+        } else if (action === 'value-set-condition') {
+          const r = E.rule(g.fields[0]);
+          r.name = (g.name + ' · ' + set.name).slice(0, 160);
+          r.assertion = {
+            ...E.condition(g.fields[0]),
+            operator: 'in',
+            valueSource: 'group',
+            groupId: g.id,
+            valueSetId: set.id,
+          };
+          draft.rules.push(r);
+          ruleId = r.id;
+          mode = 'rules';
+        } else {
+          if (g.sets.length >= 30) throw Error('Use up to thirty value sets per group.');
+          const next = {
+            id: E.uid(),
+            name:
+              action === 'value-set-duplicate' ? set.name.slice(0, 100) + ' copy' : 'New value set',
+            values:
+              action === 'value-set-duplicate'
+                ? E.copy(set.values)
+                : Object.fromEntries(g.fields.map(k => [k, ''])),
+          };
+          let n = 2,
+            base = next.name;
+          while (g.sets.some(v => v.name.toLowerCase() === next.name.toLowerCase()))
+            next.name = base + ' ' + n++;
+          g.sets.push(next);
+          valueSetId = next.id;
+        }
+        mark();
       }
       if (action === 'tuple-add') {
         const c = getPath(el.dataset.path);
@@ -2093,10 +2413,11 @@
           used =
             draft.rules.some(r => JSON.stringify(r).includes('"' + c.key + '"')) ||
             draft.uniqueGroups.some(g => g.includes(c.key)) ||
+            (draft.columnGroups || []).some(g => g.fields.includes(c.key)) ||
             draft.columns.some(f => f.sapReference === c.key);
         if (used)
           throw Error(
-            'This field is used in a condition, unique combination or SAP currency/unit reference. Update those first.'
+            'This field is used in a condition, column group, unique combination or SAP currency/unit reference. Update those first.'
           );
         draft.columns = draft.columns.filter(c => c.id !== id);
         columnId = draft.columns[0]?.id || '';
@@ -2173,7 +2494,8 @@
       }
       if (action === 'issue') {
         const issue = result?.issues[Number(el.dataset.issue)];
-        if (!issue) throw Error('Run validation again before opening this issue.');
+        if (!issue || (el.dataset.issueKey && el.dataset.issueKey !== E.issueKey(issue)))
+          throw Error('Run validation again before opening this issue.');
         selectedIssue = E.copy(issue);
         targetRow = issue.index;
         filter = 'all';
@@ -2759,9 +3081,11 @@
       E.checkSchema(draft, true);
       mark();
       say(
-        form.id === 'valRuleForm'
-          ? 'Condition applied to draft.'
-          : 'Column changes applied to draft.'
+        form.id === 'valColumnGroupForm'
+          ? 'Column group and value set applied to draft.'
+          : form.id === 'valRuleForm'
+            ? 'Condition applied to draft.'
+            : 'Column changes applied to draft.'
       );
       paint();
     }
@@ -2785,6 +3109,7 @@
       }
     });
     document.addEventListener('input', event => {
+      if (event.target.id === 'valIgnoreReason') ignoreReason = event.target.value;
       if (event.target.id === 'valSuggestionSearch') paintCorrections();
       if (event.target.matches?.('.val-grid input[data-cell]')) {
         try {
@@ -2798,7 +3123,8 @@
           say(error.message, true);
         }
       }
-      if (event.target.closest?.('#valColumnForm,#valRuleForm,#valMetaForm')) mark();
+      if (event.target.closest?.('#valColumnForm,#valRuleForm,#valMetaForm,#valColumnGroupForm'))
+        mark();
     });
     document.addEventListener('change', event => {
       const el = event.target;
@@ -2817,6 +3143,16 @@
       if (!el.closest?.('.validation-studio')) return;
       void (async () => {
         ensure();
+        if (el.dataset.issueChoice !== undefined) {
+          const issue = result?.issues[Number(el.dataset.issueChoice)];
+          if (!issue || livePending || issue.ignored || E.issueKey(issue) !== el.dataset.issueKey)
+            throw Error('Select a current unresolved issue.');
+          el.checked
+            ? issueSelection.add(E.issueKey(issue))
+            : issueSelection.delete(E.issueKey(issue));
+          patchResults();
+          return;
+        }
         if (el.name === 'projectId' && el.form?.id === 'valMetaForm') {
           if (
             el.value !== (draft.projectId || '') &&
@@ -2843,6 +3179,23 @@
           paint();
           return;
         }
+        if (el.name === 'groupSet' && el.form?.id === 'valColumnGroupForm') {
+          commitCurrent();
+          valueSetId = el.value;
+          paint();
+          return;
+        }
+        if (el.name === 'groupField' && el.form?.id === 'valColumnGroupForm') {
+          try {
+            commitCurrent();
+            mark();
+            paint();
+          } catch (error) {
+            el.checked = !el.checked;
+            throw error;
+          }
+          return;
+        }
         if (el.name === 'companyScope' && el.form?.id === 'valRuleForm') {
           commitCurrent();
           mark();
@@ -2856,6 +3209,7 @@
           generation++;
           busy = false;
           result = null;
+          resetReview();
           resultSchema = null;
           correction = null;
           if ($('valCorrectionReview')) a.closeModal?.();
@@ -2938,6 +3292,7 @@
           runCompanyId = '';
           if (book) getDataFromSheet();
           result = null;
+          resetReview();
           rows = [];
           paint();
           return;
@@ -2963,6 +3318,7 @@
           mapping[el.dataset.map] = Number(el.value);
           rows = [];
           result = null;
+          resetReview();
           paint();
           return;
         }
@@ -2970,7 +3326,11 @@
           editCell(Number(el.dataset.cell), el.dataset.field, el.value, true);
           return;
         }
-        if (el.dataset.clause === 'operator' || el.dataset.clause === 'lookupId') {
+        if (
+          ['operator', 'lookupId', 'valueSource', 'groupId', 'valueSetId', 'field'].includes(
+            el.dataset.clause
+          )
+        ) {
           commitCurrent();
           mark();
           paint();
