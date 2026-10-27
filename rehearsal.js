@@ -969,7 +969,7 @@
         )}</select></label>${field('objective', 'Purpose / intended outcome', true)}${field('notes', 'Description & context', true)}${field('presenterNotes', 'Private presenter notes (hidden in presentation)', true)}${canvasLinks(p)}</form></details>`;
     }
     function canvasToolbar(p, isSaved, isPresent) {
-      return `<div class="rehearsal-stage-bar"><div class="ph-flow-identity"><span class="ph-signal" aria-hidden="true"></span><div><strong>${esc(p.name)}</strong><span id="rehearsalStatus" aria-live="polite"></span></div></div><div class="actions ph-edit-tools">${isSaved && !isPresent ? button('add-step', '＋ Step', `aria-pressed="${paletteOpen}"`) + button('link-mode', '↗ Link steps', `aria-pressed="${!!linkFrom}"`) + button('manage-links', 'Unlink') + button('delete-steps', 'Delete selection', 'title="Delete selected steps or links"') + button('undo-canvas', '↶ Undo', editHistory.length ? '' : 'disabled') + button('layout', 'Auto arrange') : ''}${!isPresent ? button('pan-mode', '✥ Explore', `aria-pressed="${!selectionMode}"`) + button('select-mode', '▧ Select steps', `aria-pressed="${selectionMode}"`) + button('select-all', 'Select all') : ''}${button('details', '▤ Details', `aria-pressed="${panelOpen}"`)}</div></div>`;
+      return `<div class="rehearsal-stage-bar"><div class="ph-flow-identity"><span class="ph-signal" aria-hidden="true"></span><div><strong>${esc(p.name)}</strong><span id="rehearsalStatus" aria-live="polite"></span></div></div><div class="actions ph-edit-tools">${isSaved && !isPresent ? button('add-step', '＋ Step', `aria-pressed="${paletteOpen}"`) + button('link-mode', '↗ Link steps', `aria-pressed="${!!linkFrom}"`) + button('manage-links', 'Unlink') + button('delete-steps', 'Delete selection', 'title="Delete selected steps or links"') + button('undo-canvas', '↶ Undo', editHistory.length ? '' : 'disabled') + button('layout', 'Auto arrange') : ''}${!isPresent ? button('pan-mode', '✥ Explore', `aria-pressed="${!selectionMode}"`) + button('select-mode', '▧ Select steps', `aria-pressed="${selectionMode}"`) + button('select-all', 'Select all') : ''}${button('details', '▤ Details', `aria-pressed="${panelOpen}"`)}${button('shortcuts', '⌨ Shortcuts', 'title="Keyboard shortcuts (?)" aria-keyshortcuts="? F1"')}</div></div>`;
     }
     function playbackDock() {
       return `<div class="ph-playback-dock" role="group" aria-label="Canvas playback controls"><div class="ph-dock-live"><i aria-hidden="true"></i><span id="phPlaybackState">LIVE FLOW</span><span class="ph-selection-count" role="status">${selection.size ? selection.size + ' selected' : ''}</span></div><div class="rehearsal-playbar">${button('back', '↶', 'aria-label="Previous step / rewind"')}${button('play', paused ? 'Play' : 'Pause', 'id="rehearsalPlay"', 'primary small')}${button('next', '↷', 'aria-label="Next step"')}${button('restart', '↺', 'aria-label="Restart"')}${button('sound', soundLabel(), 'id="rehearsalSound" aria-pressed="false" aria-describedby="rehearsalAudioStatus"')}${button('zoom-out', '−', 'aria-label="Zoom out"')}<span class="ph-zoom">${Math.round(zoom * 100)}%</span>${button('zoom-in', '＋', 'aria-label="Zoom in"')}${button('fit', 'Fit')}${button('follow', '◎ Follow', `aria-pressed="${followCamera}"`)}<details class="ph-dock-options" data-ph-panel="playback"><summary aria-label="Playback settings" title="Playback settings">⚙</summary><div><label>Decisions<select id="rehearsalDecisionMode"><option value="auto"${!interactive ? ' selected' : ''}>Automatic · explore connected paths</option><option value="interactive"${interactive ? ' selected' : ''}>Interactive · ask me</option></select></label><label>Speed<select id="rehearsalSpeed">${[0.5, 1, 1.5, 2].map(v => `<option value="${v}"${v === prefs().speed ? ' selected' : ''}>${v}×</option>`).join('')}</select></label><label>Volume<input id="rehearsalVolume" aria-label="Rehearsal volume" type="range" min="0" max="1" step="0.05" value="${prefs().volume}"></label><p id="rehearsalAudioStatus" class="hub-meta" role="status">${esc(audioMessage())}</p></div></details></div></div>`;
@@ -2134,6 +2134,10 @@
       const action = el.dataset.rehearsal,
         id = el.dataset.id,
         p = model();
+      if (action === 'shortcuts') {
+        root.WorkHubProcessShortcuts?.guide($('rehearsalRoot'), { readOnly: mode === 'present' });
+        return;
+      }
       if (action === 'details' || action === 'close-details') {
         if (editing && (action === 'close-details' || panelOpen)) {
           a.tell('Save or cancel the step details first.');
@@ -3058,9 +3062,78 @@
       drag = null;
       a.render();
     });
+    async function keyboardCommand(command, form = null) {
+      guard(owner);
+      if (command === 'help') {
+        root.WorkHubProcessShortcuts.guide($('rehearsalRoot'), { readOnly: mode === 'present' });
+        return;
+      }
+      if (command === 'save') {
+        const openForm = form || $('rehearsalStepForm') || $('processConnectorForm');
+        if (openForm && !openForm.reportValidity()) return;
+        if (openForm?.id === 'processConnectorForm') openForm.requestSubmit();
+        else if (draft) saveDraft();
+        else if (openForm) saveForm(openForm);
+        else a.tell('Canvas edits save automatically. This process is already saved.');
+      } else if (command === 'edit') {
+        if (editing) return;
+        if (activeLink) {
+          panelOpen = true;
+          syncPanels();
+          $('rehearsalInspector').innerHTML = connectorInspector();
+        } else {
+          const id = [...selection][0] || selected;
+          if (!id) {
+            a.tell('Select a step or link first, then press E to edit it.');
+            return;
+          }
+          stepEditor(id);
+        }
+        $('rehearsalInspector')
+          ?.querySelector('input,select,textarea')
+          ?.focus({ preventScroll: true });
+        return;
+      } else {
+        const action =
+          {
+            select: 'select-mode',
+            explore: 'pan-mode',
+            connect: 'link-mode',
+            insert: 'add-step',
+            undo: 'undo-canvas',
+            delete: 'delete-steps',
+          }[command] || command;
+        if (['select', 'explore'].includes(command) && linkFrom)
+          await handle({ dataset: { rehearsal: 'finish-linking' } });
+        if (command !== 'select' || !selectionMode)
+          await handle({ dataset: { rehearsal: action } });
+        if (command === 'insert') {
+          document.querySelector('.ph-palette [data-step-type]')?.focus({ preventScroll: true });
+          return;
+        }
+      }
+      $('rehearsalViewport')?.focus({ preventScroll: true });
+    }
     document.addEventListener(
       'keydown',
       event => {
+        const surface = event.target.closest?.('#rehearsalRoot'),
+          form = event.target.closest?.('#rehearsalProcessForm,#rehearsalScenarioForm');
+        if (
+          a.ready() &&
+          (!a.active || a.active()) &&
+          root.WorkHubProcessShortcuts?.dispatch(event, {
+            surface: surface || form,
+            readOnly: mode === 'present',
+            skip: command =>
+              (!surface && command !== 'save') ||
+              (command === 'delete' && !!event.target.closest('[data-link-handle]')),
+            run: command => {
+              void keyboardCommand(command, form).catch(err => a.tell(err.message, true));
+            },
+          })
+        )
+          return;
         if (
           event.target.closest?.('#rehearsalViewport') &&
           !event.target.closest('input,textarea,select,[contenteditable="true"]') &&
@@ -3077,7 +3150,11 @@
             a.render();
             return;
           }
-          if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
+          if (
+            (event.ctrlKey || event.metaKey) &&
+            !event.shiftKey &&
+            event.key.toLowerCase() === 'z'
+          ) {
             event.preventDefault();
             event.stopImmediatePropagation();
             try {

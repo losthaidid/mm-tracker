@@ -3028,7 +3028,7 @@ test('Work sessions show Completed in Schedule for custom, task and ticket recor
  }
  for(const slot of api.state().schedule)assert.equal(api.scheduleTimeStatus(slot,api.state(),'2026-10-26','12:00'),'Completed');
  api.mutate(d=>d.workhub.sessions=[]);await settle();for(const slot of api.state().schedule)assert.equal(api.scheduleTimeStatus(slot),'Completed');
- const plain={date:'2026-10-16',time:'18:00',endTime:'19:00',kind:'custom'};assert.equal(api.scheduleTimeStatus(plain,api.state(),'2026-10-26','12:00'),'Elapsed');
+ const plain={date:'2026-10-16',time:'18:00',endTime:'19:00',kind:'custom'};assert.equal(api.scheduleTimeStatus(plain,api.state(),'2026-10-26','12:00'),'In Progress');
 });
 test('Workspace reset clears every cloud collection using the actual account adapter and keeps a restorable backup',async t=>{
  const {api,document,window,db}=await app(t);addMainTask(api,document,'Saved before clear');addWishlistTicket(api,document);await settle();api.closeModal();
@@ -3226,11 +3226,12 @@ test('Schedule task status: unfinished allocations stay in progress after their 
  for(const slot of api.state().schedule)assert.equal(api.scheduleTimeStatus(slot,api.state(),'2026-10-28','17:00'),'In Progress');
  assert.deepEqual(copy(api.state().schedule),copy(slots));
  const d=copy(api.state()),past={date:'2026-10-27',time:'15:00',endTime:'16:00',bookingId:'',planId:'',kind:'custom',linkId:''};
- assert.equal(api.scheduleTimeStatus(past,d,'2026-10-28','17:00'),'Elapsed');
+ assert.equal(api.scheduleTimeStatus(past,d,'2026-10-28','17:00'),'In Progress');
  assert.equal(api.scheduleTimeStatus({...past,kind:'task',linkId:'missing-task'},d,'2026-10-28','17:00'),'Elapsed');
  assert.equal(api.scheduleTimeStatus({...past,kind:'task',linkId:taskId,sessionId:'recorded-work'},d,'2026-10-28','17:00'),'Completed');
  d.projectPlans.push({id:'status-plan',date:'2026-10-27',endDate:'2026-10-27',time:'15:00',endTime:'16:00',status:'In Progress'});
- assert.equal(api.scheduleTimeStatus({...past,kind:'project',planId:'status-plan'},d,'2026-10-28','17:00'),'Review due');
+ assert.equal(api.scheduleTimeStatus({...past,kind:'project',planId:'status-plan'},d,'2026-10-28','17:00'),'In Progress');
+ d.projectPlans.at(-1).endDate='2026-10-29';assert.equal(api.scheduleTimeStatus({...past,date:'2026-10-29',kind:'project',planId:'status-plan'},d,'2026-10-28','17:00'),'Planned');
  assert.equal(api.scheduleTimeStatus({...past,kind:'annual-leave',leave:{status:'Approved'}},d,'2026-10-28','17:00'),'Approved');
 });
 
@@ -3248,4 +3249,40 @@ test('Schedule task status: calendar, agenda, details and time grid follow unfin
  await api.action(document.querySelector('[data-action="schedule-layout"][data-layout="grid"]'));assert.ok(document.querySelector('.precision-grid'));assert.ok(cards().length>=2);assert.ok(cards().every(card=>card.querySelector('.slot-state').textContent==='In Progress'));
  api.hub.moveTask(taskId,'done');await settle();assert.ok(cards().every(card=>card.querySelector('.slot-state').textContent==='Completed'));
  api.viewBooking('2026-10-27','09:15');assert.match(document.querySelector('.booking-view-hero').textContent,/Completed/);
+});
+
+test('Schedule activity progress: custom status survives saving, segmented dates and backup reload without time completing the work',async t=>{
+ const {api,document,db}=await app(t);api.openRangeEditor('2026-10-27','09:15','',true);let form=document.getElementById('scheduleForm');
+ assert.equal(form.elements.status.value,'Planned');fill(form,{text:'Continue personal planning tomorrow',endDate:'2026-10-28',endTime:'10:45'});api.saveRange(form);await settle();
+ const bookingId=api.state().schedule[0].bookingId,slots=api.state().schedule;assert.equal(slots.length,4);assert.ok(slots.every(s=>s.status==='Planned'));
+ assert.equal(api.scheduleTimeStatus(slots[0],api.state(),'2026-10-27','09:14'),'Planned');
+ for(const date of ['2026-10-27','2026-10-28','2026-10-30'])assert.equal(api.scheduleTimeStatus(slots[0],api.state(),date,'17:00'),'In Progress');
+ assert.equal(api.scheduleTimeStatus(slots.at(-1),api.state(),'2026-10-27','17:00'),'Planned');
+ const before=copy(api.state());api.validate(api.state());assert.deepEqual(copy(api.parseBackup(api.payload(api.state()))),before);
+ for(const status of ['Completed','On Hold','In Progress']){
+  api.openRangeEditor('2026-10-27','09:15');form=document.getElementById('scheduleForm');form.elements.status.value=status;api.saveRange(form);await settle();
+  const expected=status;for(const s of api.state().schedule)assert.equal(api.scheduleTimeStatus(s,api.state(),'2026-10-30','17:00'),expected);
+  assert.ok(api.state().schedule.every(s=>s.bookingId===bookingId&&s.status===status));
+  api.openRangeEditor('2026-10-27','09:15');assert.equal(document.getElementById('bookingStatus').value,status);api.closeModal();
+ }
+ const reload=await app(t,{remote:db.row});await reload.api.loadCloud({id:'11111111-1111-4111-8111-111111111111',email:'owner@example.com'});await settle();
+ assert.ok(reload.api.state().schedule.every(s=>s.status==='In Progress'));
+ const invalid=copy(api.state());invalid.schedule[0].status='Elapsed';assert.throws(()=>api.validate(invalid),/custom activity status/);
+ const legacy=copy(api.state());for(const s of legacy.schedule)delete s.status;api.validate(legacy);assert.equal(api.scheduleTimeStatus(legacy.schedule[0],legacy,'2026-10-30','17:00'),'In Progress');
+ assert.equal(api.scheduleTimeStatus({...slots[0],sessionId:'saved-work',status:'On Hold'},api.state(),'2026-10-30','17:00'),'Completed');
+});
+
+test('Schedule activity progress: project and custom calendar, details and grid stay in progress while project actual review remains separate',async t=>{
+ const {api,document,window}=await app(t),RealDate=window.Date;let clock=RealDate.parse('2026-10-27T09:00:00+08:00');
+ window.Date=class extends RealDate{constructor(...args){super(...(args.length?args:[clock]));}static now(){return clock;}};
+ api.editPlan('','2026-10-27');let form=document.getElementById('planForm');fill(form,{title:'Continue project work',activity:api.state().lists.projectActivities[0],location:api.state().lists.workLocations[0],time:'10:00',endTime:'11:00'});api.savePlan(form);await settle();const planId=api.state().projectPlans[0].id;
+ api.openRangeEditor('2026-10-27','12:00','',true);form=document.getElementById('scheduleForm');fill(form,{text:'Continue custom work',endTime:'13:00'});api.saveRange(form);await settle();api.setMonth('2026-10');api.showTab('schedule');
+ const cards=()=>[...document.querySelectorAll('.workhub-booking[data-date="2026-10-27"]')];assert.ok(cards().every(c=>c.querySelector('.slot-state').textContent==='Planned'));
+ clock=RealDate.parse('2026-10-28T17:00:00+08:00');api.reviewPastPlans();api.closeModal();assert.ok(cards().every(c=>c.querySelector('.slot-state').textContent==='In Progress'));assert.equal(api.scheduleMonthMetrics().review,1);assert.equal(api.state().projectPlans[0].status,'Planned');
+ for(const time of ['10:00','12:00']){api.viewBooking('2026-10-27',time);assert.match(document.querySelector('.booking-view-hero').textContent,/In Progress/);api.closeModal();}
+ await api.action(document.querySelector('[data-action="schedule-layout"][data-layout="grid"]'));assert.ok(cards().every(c=>c.querySelector('.slot-state').textContent==='In Progress'));
+ api.showTab('specs');await api.action({dataset:{action:'project-view',view:'calendar'}});assert.match(document.querySelector('[data-action="view-plan"][data-id="'+planId+'"]').textContent,/In Progress/);
+ api.editPlan(planId);form=document.getElementById('planForm');form.elements.status.value='On Hold';api.savePlan(form);await settle();api.showTab('schedule');assert.equal(api.scheduleTimeStatus(api.state().schedule.find(s=>s.planId===planId)),'On Hold');assert.equal(api.scheduleMonthMetrics().review,0);
+ api.editPlan(planId);form=document.getElementById('planForm');form.elements.status.value='Completed';api.savePlan(form);await settle();assert.equal(api.scheduleTimeStatus(api.state().schedule.find(s=>s.planId===planId)),'Completed');
+ api.validate(api.state());
 });

@@ -862,3 +862,66 @@
   min-width: 0;
   flex: 1;
 }
+
+/* Shared private keyboard guide. The audience renderer never receives controls. */
+.process-shortcut-guide {
+  width: min(680px, calc(100vw - 32px));
+  max-height: min(80vh, 760px);
+  padding: 24px;
+  overflow: auto;
+  color: var(--ink);
+  background: var(--panel, var(--surface, #142a35));
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: 0 24px 80px #0007;
+}
+.process-shortcut-guide::backdrop {
+  background: #07111cb3;
+}
+.process-shortcut-guide header {
+  background: transparent;
+  color: var(--ink);
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.process-shortcut-guide h2 {
+  margin: 4px 0;
+}
+.process-shortcut-guide header span {
+  color: var(--accent);
+  font-size: 11px;
+  letter-spacing: 0.15em;
+}
+.process-shortcut-guide p {
+  color: var(--muted);
+  line-height: 1.6;
+}
+.process-shortcut-guide table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.process-shortcut-guide th,
+.process-shortcut-guide td {
+  padding: 10px 6px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+.process-shortcut-guide td:first-child {
+  width: 36%;
+}
+.process-shortcut-guide kbd {
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+}
+@media (max-width: 540px) {
+  .process-shortcut-guide {
+    padding: 16px;
+  }
+}

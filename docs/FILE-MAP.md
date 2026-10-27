@@ -162,7 +162,8 @@ Presentation breaks: [presentation-break.js](../presentation-break.js) owns cust
 - `presenter-window.html` / `presenter-window.js`: legacy private control shell retained for compatibility; new launches use the isolated audience page.
 - `process-canvas.js` / `process-canvas.css`: private in-canvas tool bubbles, staged step forms, live multi-destination ports, magnetic groups, annotation attachment and guarded saved edits while playback continues.
 - `process-workspace.css`: futuristic full-width Process Hub, floating inspector/step/connection drawers, enlarged draggable workspace and translucent playback dock; no audience-window or screen-placement changes.
-- `process-canvas-art.js`: shared graph-space annotation SVG, geometry, resize/attachment and canvas export drawing.
+- `process-canvas-art.js`: shared graph-space annotation SVG, geometry, resize/attachment and canvas export drawing; freehand pen strokes render as inert ink with no object handles.
+- `process-shortcuts.js`: shared focus-scoped keyboard command matching and private shortcut guide for Process Hub and presenter controls; preserves typing/native text undo, bounds repeat handling and never controls presentation display placement.
 - `presentation-screen.js`: explicitly selected display discovery/placement and fullscreen requests with current-account and disconnection guards.
 - `audience-view.js` / `audience.css`: shared 16:9 public scene and preview renderer.
 - `audience.html` / `audience.js`: isolated audience window; no account client or record storage.

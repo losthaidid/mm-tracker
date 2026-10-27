@@ -13,7 +13,7 @@ function hub(t, initial = {}, rich = false) {
   window.URL.createObjectURL = () => 'blob:test-export'; window.URL.revokeObjectURL = () => {};
   window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
   window.HTMLDialogElement.prototype.close = function () { this.open = false; };
-  for (const f of ['rehearsal-engine.js', 'process-hub-files.js', 'process-canvas-art.js', 'process-inspector.js', ...(rich?['process-canvas.js']:[]), 'audience-view.js', 'presentation-screen.js', 'presenter.js', 'rehearsal.js']) window.eval(source(f));
+  for (const f of ['rehearsal-engine.js', 'process-hub-files.js', 'process-canvas-art.js', 'process-inspector.js', 'process-shortcuts.js', ...(rich?['process-canvas.js']:[]), 'audience-view.js', 'presentation-screen.js', 'presenter.js', 'rehearsal.js']) window.eval(source(f));
   const E = window.WorkHubRehearsalEngine, F = window.WorkHubProcessFiles;
   let state = { projects: [], tickets: [], specs: [], workhub: { processes: [], notes: [], tcodes: { records: [] }, ...initial } };
   E.upgrade(state);
@@ -704,4 +704,55 @@ test('Private presenter reconnects a starting point on a playing branch, support
  h.geometry();handle=h.host.querySelector('[data-link-handle="start"]');presenterPointer(h,handle,'pointerdown',260,100);presenterPointer(h,h.host,'pointermove',target.x+210,target.y+70);presenterPointer(h,h.host,'pointerup',target.x+210,target.y+70);
  assert.equal(h.writes.length,1);assert.ok(h.E.connections(h.ui.model().steps.find(s=>s.id==='no')).includes('yes'));assert.equal(h.E.connector(h.ui.model(),'no','yes').start.offset,.7);assert.equal(h.ui.audienceSnapshot().playing,true);assert.equal(h.audience.querySelectorAll('[data-link-handle],button,input').length,0);
  h.tool('select');h.geometry();const card=h.host.querySelector('[data-node="no"]');presenterPointer(h,card,'pointerdown',350,250);presenterPointer(h,h.host,'pointercancel',350,250);h.action('edit-step');assert.equal(h.panel.querySelectorAll('[data-pc-form="step"] [role="tab"]').length,4);h.panel.querySelector('[data-inspector-tab="flow"]').click();assert.equal(h.panel.querySelector('[data-inspector-page="flow"]').hidden,false);assert.equal(h.panel.querySelector('[name="changes"]').closest('[data-inspector-page]').dataset.inspectorPage,'flow');
+});
+
+async function processKey(h,key,init={},target=null){
+ const event=new h.window.KeyboardEvent('keydown',{key,bubbles:true,cancelable:true,...init});
+ (target||h.document.getElementById('rehearsalViewport')||h.host).dispatchEvent(event);await settle();return event;
+}
+test('Process keyboard: tools, playback, zoom and shortcut guide work without writes or changes to presentation displays',async t=>{
+ const h=hub(t);loadFlow(h,liveFlow(h));const writes=h.writes.length;
+ await processKey(h,'v');assert.equal(h.document.getElementById('rehearsalViewport').dataset.selectMode,'true');await processKey(h,'v');assert.equal(h.document.getElementById('rehearsalViewport').dataset.selectMode,'true');
+ await processKey(h,'h');assert.equal(h.document.getElementById('rehearsalViewport').dataset.selectMode,'false');await processKey(h,'l');assert.equal(h.document.querySelector('[data-rehearsal="link-mode"]').getAttribute('aria-pressed'),'true');
+ await processKey(h,'Escape');await processKey(h,'i');assert.equal(h.document.querySelector('.ph-palette').hidden,false);assert.ok(h.document.activeElement.matches('[data-step-type]'));
+ await processKey(h,'p');assert.equal(h.ui.snapshot().paused,true);await processKey(h,'p');assert.equal(h.ui.snapshot().paused,false);
+ const zoom=parseInt(h.document.querySelector('.ph-zoom').textContent);await processKey(h,'+',{shiftKey:true});assert.ok(parseInt(h.document.querySelector('.ph-zoom').textContent)>zoom);await processKey(h,'f');
+ const view=h.document.getElementById('rehearsalViewport');view.focus();await processKey(h,'?',{shiftKey:true});let guide=h.document.querySelector('.process-shortcut-guide');assert.ok(guide.open);assert.match(guide.textContent,/Ctrl \/ ⌘ S/);assert.doesNotMatch(guide.textContent,/Laser pointer/);guide.close();guide.dispatchEvent(new h.window.Event('close'));assert.equal(h.document.querySelector('.process-shortcut-guide'),null);assert.equal(h.document.activeElement,view);
+ assert.equal(h.writes.length,writes);assert.equal(h.document.getElementById('processPresenter'),null);
+});
+test('Process keyboard: save works from draft and step inputs while native text selection, undo and letter typing remain available',async t=>{
+ const h=hub(t);await h.click('new');const details=h.fill('processHubDetails',{name:'Saved with keyboard'}),input=details.elements.name;input.focus();
+ for(const [key,init]of [['p',{}],['i',{}],['z',{ctrlKey:true}],['a',{metaKey:true}],['Delete',{}]])assert.equal((await processKey(h,key,init,input)).defaultPrevented,false);
+ assert.equal((await processKey(h,'s',{ctrlKey:true},input)).defaultPrevented,true);assert.equal(h.ui.snapshot().drafting,false);assert.equal(h.writes.length,1);assert.equal(h.ui.model().name,'Saved with keyboard');
+ h.ui.stepEditor(h.ui.model().steps[0].id);let form=h.document.getElementById('rehearsalStepForm');form.elements.title.value='Edited with keyboard';await processKey(h,'s',{metaKey:true},form.elements.title);assert.equal(h.ui.model().steps[0].title,'Edited with keyboard');assert.equal(h.writes.length,2);assert.equal(h.ui.snapshot().paused,false);
+ h.account.active=false;h.render();const outside=h.document.getElementById('view');assert.equal((await processKey(h,'p',{},outside)).defaultPrevented,false);
+});
+test('Process keyboard: edit selected steps, delete with confirmation, select all and undo preserve live playback',async t=>{
+ const h=hub(t);loadFlow(h,liveFlow(h));h.document.querySelector('[data-rehearsal="inspect"][data-id="branch-a"]').click();await settle();await processKey(h,'e');assert.ok(h.document.getElementById('rehearsalStepForm'));await h.click('cancel-edit');
+ const before=h.ui.model().steps.length;h.window.confirm=()=>false;await processKey(h,'Delete');assert.equal(h.ui.model().steps.length,before);h.window.confirm=()=>true;await processKey(h,'Delete');assert.equal(h.ui.model().steps.length,before-1);await processKey(h,'z',{ctrlKey:true});assert.equal(h.ui.model().steps.length,before);
+ await processKey(h,'a',{metaKey:true});assert.equal(h.document.querySelectorAll('[data-node][data-selected="true"]').length,before);assert.equal(h.ui.snapshot().paused,false);
+});
+test('Presenter keyboard: private tools, saving, playback and help never change audience window placement',async t=>{
+ const h=await richPresenter(t);await processKey(h,'b',{},h.host);assert.equal(h.host.dataset.tool,'pen');await processKey(h,'t',{},h.host);assert.equal(h.host.dataset.tool,'text');await processKey(h,'g',{},h.host);assert.equal(h.host.dataset.tool,'laser');
+ await processKey(h,'h',{},h.host);assert.equal(h.host.dataset.tool,'move');await processKey(h,'v',{},h.host);assert.equal(h.host.dataset.tool,'select');
+ await processKey(h,'p',{},h.host);assert.equal(h.ui.snapshot().paused,true);await processKey(h,'p',{},h.host);assert.equal(h.ui.snapshot().paused,false);
+ await processKey(h,'i',{},h.host);assert.equal(h.panel.querySelector('.pc-type-tray').closest('details').open,true);assert.ok(h.document.activeElement.matches('[data-pc-type]'));
+ const windowCalls=h.order.length;await processKey(h,'?',{shiftKey:true},h.host);const guide=h.document.querySelector('.process-shortcut-guide');assert.ok(guide.open);assert.match(guide.textContent,/Laser pointer/);guide.close();guide.dispatchEvent(new h.window.Event('close'));assert.equal(h.order.length,windowCalls);assert.equal(h.audience.querySelector('.process-shortcut-guide'),null);assert.equal(h.audience.querySelector('button'),null);assert.equal(h.writes.length,0);
+});
+test('Presenter freehand ink: consecutive and closed strokes stay in pen mode without objects, handles or magnetic attachment; clear ink and undo keep other content',async t=>{
+ const h=await richPresenter(t);const initial=h.ui.model().steps.length;h.tool('pen');
+ const stroke=(points)=>{presenterPointer(h,h.host,'pointerdown',...points[0]);for(const point of points.slice(1))presenterPointer(h,h.host,'pointermove',...point);presenterPointer(h,h.host,'pointerup',...points.at(-1));h.geometry();};
+ stroke([[100,100],[150,80],[180,130],[100,100]]);assert.equal(h.host.dataset.tool,'pen');assert.equal(h.ui.model().annotations.length,1);assert.equal(h.ui.model().annotations[0].anchorId,undefined);
+ stroke([[200,200],[230,180],[260,230]]);assert.equal(h.host.dataset.tool,'pen');assert.equal(h.ui.model().annotations.length,2);assert.equal(h.host.querySelector('.pc-selection'),null);assert.equal(h.host.querySelector('.pc-pen [data-pc-resize]'),null);assert.ok([...h.host.querySelectorAll('.pc-pen')].every(mark=>!mark.hasAttribute('data-canvas-mark')));
+ h.tool('select');assert.equal(h.host.querySelector('.pc-pen[data-canvas-mark]'),null);h.change(d=>d.workhub.rehearsal.processes[0].annotations.push({id:'kept-text',type:'text',text:'Keep me',x:400,y:400,w:200,h:100,fontSize:24,color:'#ffffff',width:4}));
+ h.action('clear-ink');assert.deepEqual(copy(h.ui.model().annotations).map(m=>m.id),['kept-text']);assert.equal(h.ui.model().steps.length,initial);h.action('undo');assert.equal(h.ui.model().annotations.filter(m=>m.type==='pen').length,2);assert.equal(h.ui.model().annotations.find(m=>m.id==='kept-text').text,'Keep me');assert.equal(h.ui.snapshot().paused,false);
+ const reopened=hub(t,copy(h.state().workhub));assert.equal(reopened.ui.model().annotations.filter(m=>m.type==='pen').length,2);
+});
+
+test('Presenter keyboard: editing and saving step details use guarded form validation and keep text undo native',async t=>{
+ const h=await richPresenter(t);h.tool('select');const step=h.host.querySelector('[data-node]'),id=step.dataset.node;
+ presenterPointer(h,step,'pointerdown',150,150);presenterPointer(h,h.host,'pointercancel',150,150);await processKey(h,'e',{},h.host);
+ const form=h.panel.querySelector('[data-pc-form="step"]');assert.ok(form);const title=form.elements.namedItem('title');title.value='Reviewed with keyboard';
+ assert.equal((await processKey(h,'z',{ctrlKey:true},title)).defaultPrevented,false);assert.equal((await processKey(h,'s',{ctrlKey:true},title)).defaultPrevented,true);
+ assert.equal(h.ui.model().steps.find(s=>s.id===id).title,'Reviewed with keyboard');assert.equal(h.panel.querySelector('[data-pc-form="step"]'),null);assert.equal(h.writes.length,1);assert.equal(h.ui.snapshot().paused,false);
 });

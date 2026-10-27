@@ -709,3 +709,10 @@ html:has(#processAudienceOverlay[open]) {
 .pc-editor:has(.ph-inspector-tabs) :is(label, p, summary, legend) {
   color: #e2f1f6;
 }
+
+/* Freehand ink never becomes a movable object or replays an entrance per stroke. */
+.pc-pen,
+.pc-pen * {
+  pointer-events: none !important;
+  animation: none !important;
+}
