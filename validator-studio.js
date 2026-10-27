@@ -144,6 +144,7 @@
       page = 0,
       busy = false,
       refEditing = '',
+      referenceEpoch = 0,
       targetRow = -1,
       selectedIssue = null,
       setupPreview = null,
@@ -262,8 +263,186 @@
       }
       return next;
     }
+    // Reconcile the current workspace instead of replacing it on every edit.
+    // Preserve uncommitted controls unless the new model explicitly changes them.
+    function surfaceKey(node) {
+      if (node.nodeType !== 1) return '';
+      const d = node.dataset;
+      if (node.id) return 'id:' + node.id + (node.tagName === 'FORM' ? ':' + (d.id || '') : '');
+      for (const key of ['columnId', 'groupField', 'groupValue', 'issueRowKey', 'rowIndex'])
+        if (d[key] !== undefined) return key + ':' + d[key];
+      if (d.map !== undefined) return 'mapping:' + d.map;
+      if (d.cell !== undefined) return 'cell:' + d.cell + ':' + d.field;
+      if (d.path !== undefined) return 'path:' + node.className + ':' + d.path;
+      if (d.clause !== undefined) return 'clause:' + d.clause;
+      if (d.val !== undefined)
+        return (
+          'action:' +
+          [
+            d.val,
+            d.id,
+            d.index,
+            d.field,
+            d.filter,
+            d.delta,
+            d.path,
+            d.mode,
+            d.version,
+            d.issueKey,
+            d.choice,
+          ].join(':')
+        );
+      if (node.hasAttribute('name'))
+        return (
+          node.tagName +
+          ':' +
+          node.name +
+          ':' +
+          node.type +
+          (['checkbox', 'radio'].includes(node.type) ? ':' + node.value : '')
+        );
+      if (node.tagName === 'OPTION') return 'option:' + node.value;
+      if (node.tagName === 'LABEL') {
+        const control = node.querySelector('input,textarea,select');
+        if (control) return 'label:' + surfaceKey(control);
+      }
+      if (node.tagName === 'MAIN' && node.classList.contains('val-main'))
+        return 'main:' + d.valSection;
+      if (
+        ['DIV', 'SECTION', 'ASIDE', 'NAV', 'FIELDSET', 'DETAILS'].includes(node.tagName) &&
+        node.className
+      )
+        return node.tagName + ':' + node.className;
+      return '';
+    }
+    function patchSurface(current, html, preservePage = true) {
+      const template = document.createElement('template');
+      template.innerHTML = html;
+      const next = template.content.firstElementChild;
+      if (!next) return false;
+      const active = document.activeElement,
+        position = [root.scrollX || 0, root.scrollY || 0];
+      let selection = null;
+      try {
+        if (
+          active &&
+          current.contains(active) &&
+          active.selectionStart !== null &&
+          active.selectionStart !== undefined
+        )
+          selection = [active.selectionStart, active.selectionEnd, active.selectionDirection];
+      } catch {}
+      const scrolling = [current, ...current.querySelectorAll('*')]
+        .filter(el => el.scrollTop || el.scrollLeft)
+        .map(el => [el, el.scrollLeft, el.scrollTop]);
+      const same = (a, b) => a.nodeType === b.nodeType && a.nodeName === b.nodeName;
+      const selected = (el, defaults = false) => {
+        const choices = Array.from(el.options),
+          values = choices
+            .filter(o => (defaults ? o.defaultSelected : o.selected))
+            .map(o => o.value);
+        return values.length || el.multiple ? values : [choices[0]?.value || ''];
+      };
+      const equal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+      function patch(node, next, fresh = false) {
+        if (node.nodeType !== 1) {
+          if (node.nodeValue !== next.nodeValue) node.nodeValue = next.nodeValue;
+          return;
+        }
+        fresh ||=
+          node.dataset.valContext !== next.dataset.valContext ||
+          (node.tagName === 'FORM' && node.dataset.set !== next.dataset.set);
+        let control = null;
+        if (node.tagName === 'SELECT') {
+          const live = selected(node),
+            original = selected(node, true),
+            desired = selected(next);
+          control = {
+            value:
+              !fresh &&
+              equal(desired, original) &&
+              live.every(value => Array.from(next.options).some(o => o.value === value))
+                ? live
+                : desired,
+            select: true,
+          };
+        } else if (
+          node.tagName === 'TEXTAREA' ||
+          (node.tagName === 'INPUT' && node.type !== 'file')
+        ) {
+          const check = ['checkbox', 'radio'].includes(node.type),
+            live = check ? node.checked : node.value,
+            original = check ? node.defaultChecked : node.defaultValue,
+            desired = check ? next.checked : next.value;
+          control = { value: !fresh && desired === original ? live : desired, check };
+        }
+        const open = node.tagName === 'DETAILS' ? node.open : null;
+        const resized = node.tagName === 'TEXTAREA' ? [node.style.width, node.style.height] : null;
+        for (const attr of Array.from(node.attributes))
+          if (!next.hasAttribute(attr.name)) node.removeAttribute(attr.name);
+        for (const attr of Array.from(next.attributes))
+          if (node.getAttribute(attr.name) !== attr.value) node.setAttribute(attr.name, attr.value);
+        const old = Array.from(node.childNodes),
+          used = new Set(),
+          keyed = new Map();
+        for (const child of old) {
+          const key = surfaceKey(child);
+          if (key) {
+            if (!keyed.has(key)) keyed.set(key, []);
+            keyed.get(key).push(child);
+          }
+        }
+        let cursor = node.firstChild;
+        for (const child of Array.from(next.childNodes)) {
+          const key = surfaceKey(child);
+          let match = key
+            ? keyed.get(key)?.find(n => !used.has(n) && same(n, child))
+            : old.find(n => !used.has(n) && !surfaceKey(n) && same(n, child));
+          if (!match) match = child.cloneNode(true);
+          else patch(match, child, fresh);
+          used.add(match);
+          if (cursor !== match) node.insertBefore(match, cursor);
+          cursor = match.nextSibling;
+        }
+        for (const child of old) if (!used.has(child)) child.remove();
+        if (control?.select) {
+          for (const option of node.options) option.selected = control.value.includes(option.value);
+        } else if (control?.check) {
+          if (node.checked !== control.value) node.checked = control.value;
+        } else if (control && node.value !== control.value) node.value = control.value;
+        if (open !== null) node.open = open;
+        if (resized) {
+          if (resized[0]) node.style.width = resized[0];
+          if (resized[1]) node.style.height = resized[1];
+        }
+      }
+      patch(current, next);
+      for (const [el, left, top] of scrolling)
+        if (el.isConnected) {
+          el.scrollLeft = left;
+          el.scrollTop = top;
+        }
+      if (active && current.contains(active) && active.isConnected) {
+        if (document.activeElement !== active) active.focus({ preventScroll: true });
+        if (selection)
+          try {
+            active.setSelectionRange(...selection);
+          } catch {}
+      }
+      if (preservePage && (root.scrollX !== position[0] || root.scrollY !== position[1]))
+        root.scrollTo?.(...position);
+      return true;
+    }
+    function patchRender() {
+      const current = document.querySelector('.validation-studio');
+      if (!current || !a.ready()) return false;
+      const html = render();
+      if (current.dataset.valOwner !== owner || current.dataset.valTemplate !== (draft?.id || ''))
+        return false;
+      return patchSurface(current, html, current.dataset.valMode === mode);
+    }
     function paint() {
-      a.render();
+      if (!patchRender()) a.render();
     }
     function say(text, error = false) {
       message = text;
@@ -1330,7 +1509,9 @@
               '</div></article>'
           )
           .join('') +
-        '</div><section class="val-card"><form id="valReferenceForm" data-id="' +
+        '</div><section class="val-card"><form id="valReferenceForm" data-val-context="' +
+        referenceEpoch +
+        '" data-id="' +
         esc(current?.id || '') +
         '"><div class="val-panel-title"><h3>' +
         (current ? 'Edit ' + esc(current.name) : 'Add a reference list') +
@@ -1576,66 +1757,7 @@
     // swallow the next click, and editing never rebuilds the surrounding workspace.
     function patchResults() {
       const current = $('valResultsArea');
-      if (!current) return;
-      const template = document.createElement('template');
-      template.innerHTML = resultsView();
-      const next = template.content.firstElementChild;
-      if (!next) return;
-      const active = document.activeElement,
-        selection = active?.matches?.('input[data-cell]')
-          ? [active.selectionStart, active.selectionEnd, active.selectionDirection]
-          : null,
-        scroll = $('valResultsScroll'),
-        position = scroll ? [scroll.scrollLeft, scroll.scrollTop] : null;
-      const key = node => {
-        if (node.nodeType !== 1) return '';
-        if (node.id) return 'id:' + node.id;
-        const d = node.dataset;
-        if (d.issueRowKey !== undefined) return 'issue-row:' + d.issueRowKey;
-        if (d.cell !== undefined) return 'cell:' + d.cell + ':' + d.field;
-        if (d.rowIndex !== undefined) return 'row:' + d.rowIndex;
-        if (d.val === 'issue') return 'issue:' + d.issueKey;
-        if (d.val) return [d.val, d.index, d.field, d.filter, d.delta].join(':');
-        return '';
-      };
-      const same = (a, b) => a.nodeType === b.nodeType && a.nodeName === b.nodeName;
-      function patch(current, next) {
-        if (current.nodeType !== 1) {
-          if (current.nodeValue !== next.nodeValue) current.nodeValue = next.nodeValue;
-          return;
-        }
-        for (const attr of Array.from(current.attributes))
-          if (!next.hasAttribute(attr.name)) current.removeAttribute(attr.name);
-        for (const attr of Array.from(next.attributes))
-          if (current.getAttribute(attr.name) !== attr.value)
-            current.setAttribute(attr.name, attr.value);
-        if (current.matches('input[type="checkbox"]')) current.checked = next.checked;
-        if (current.matches('input[data-cell]') && current.value !== next.value)
-          current.value = next.value;
-        const old = Array.from(current.childNodes),
-          used = new Set(),
-          keyed = new Map(old.filter(n => key(n)).map(n => [key(n), n]));
-        let cursor = current.firstChild;
-        for (const child of Array.from(next.childNodes)) {
-          const id = key(child);
-          let match = id ? keyed.get(id) : old.find(n => !used.has(n) && !key(n) && same(n, child));
-          if (!match || !same(match, child)) match = child.cloneNode(true);
-          else patch(match, child);
-          used.add(match);
-          if (cursor !== match) current.insertBefore(match, cursor);
-          cursor = match.nextSibling;
-        }
-        for (const child of old) if (!used.has(child)) child.remove();
-      }
-      patch(current, next);
-      if (position && scroll?.isConnected) {
-        scroll.scrollLeft = position[0];
-        scroll.scrollTop = position[1];
-      }
-      if (selection && active.isConnected) {
-        if (document.activeElement !== active) active.focus({ preventScroll: true });
-        active.setSelectionRange(...selection);
-      }
+      if (current) patchSurface(current, resultsView());
       const status = document.querySelector('.validation-studio .val-message');
       if (status) status.textContent = message;
     }
@@ -2152,11 +2274,19 @@
       sync();
       if (!draft && store().templates.length) pick(store().templates[0].id, true);
       return (
-        '<section class="validation-studio"><header class="val-heading"><div class="val-brand"><span class="val-brand-mark">' +
+        '<section class="validation-studio" data-val-owner="' +
+        esc(owner) +
+        '" data-val-template="' +
+        esc(draft?.id || '') +
+        '" data-val-mode="' +
+        esc(mode) +
+        '"><header class="val-heading"><div class="val-brand"><span class="val-brand-mark">' +
         icon('leaf', 29) +
         '</span><div><span class="val-eyebrow">YOUR WORKHUB TOOLKIT</span><h1>Validation Studio</h1></div></div><div class="val-heading-note"><span class="val-dot"></span> A calmer way to check your data</div></header><div class="val-shell">' +
         library() +
-        '<main class="val-main">' +
+        '<main class="val-main" data-val-section="' +
+        esc(mode) +
+        '">' +
         (draft
           ? header() +
             (message
@@ -2485,6 +2615,7 @@
         mark();
       }
       if (action === 'reference-new') {
+        referenceEpoch++;
         refEditing = '';
       }
       if (action === 'reference-edit') refEditing = id;
@@ -2804,7 +2935,9 @@
           ],
           sourceCompany
         ) +
-        '<fieldset class="val-company-scope"><legend>Conditions to copy</legend><div class="val-check-list">' +
+        '<fieldset class="val-company-scope" data-val-context="' +
+        esc(JSON.stringify([sourceId, sourceCompany])) +
+        '"><legend>Conditions to copy</legend><div class="val-check-list">' +
         sourceRules
           .map(
             r =>
@@ -2837,7 +2970,9 @@
           scope
         ) +
         (scope === 'selected'
-          ? '<fieldset class="val-company-scope"><legend>Destination companies</legend><div class="val-check-list">' +
+          ? '<fieldset class="val-company-scope" data-val-context="' +
+            esc(projectId) +
+            '"><legend>Destination companies</legend><div class="val-check-list">' +
             companies
               .map(
                 c =>
@@ -2859,12 +2994,15 @@
         '<p class="val-help">Every copied condition uses the destination scope above. Source conditions stay unchanged. Paused conditions remain paused. Review the new draft, then Save draft.</p><div class="modal-actions"><button type="submit" class="primary">' +
         (p.kind === 'template' ? 'Create template copy' : 'Copy selected conditions') +
         '</button></div></section></form>';
-      a.openModal(
-        p.kind === 'template'
-          ? 'Copy template to another project or company'
-          : 'Copy conditions from a project or company',
-        body
-      );
+      const current = $('valCopyForm');
+      if (current?.closest('dialog[open]')) patchSurface(current, body);
+      else
+        a.openModal(
+          p.kind === 'template'
+            ? 'Copy template to another project or company'
+            : 'Copy conditions from a project or company',
+          body
+        );
     }
     function applyCopy(form) {
       const p = copyPreview;
@@ -3071,6 +3209,7 @@
         const keys = Array.from(form.querySelectorAll('input:checked')).map(el => el.name);
         if (keys.length < 2) throw Error('Select at least two fields.');
         draft.uniqueGroups.push(keys);
+        form.reset();
         mark();
         paint();
         return;
@@ -3266,7 +3405,9 @@
           return;
         }
         if (el.id === 'valFile') {
-          if (el.files[0]) await loadFile(el.files[0]);
+          const file = el.files[0];
+          el.value = '';
+          if (file) await loadFile(file);
           return;
         }
         if (el.id === 'valSetupFile') {
@@ -3276,11 +3417,14 @@
           return;
         }
         if (el.id === 'valReferenceFile') {
-          if (el.files[0]) await loadFile(el.files[0], 'reference');
+          const file = el.files[0];
+          el.value = '';
+          if (file) await loadFile(file, 'reference');
           return;
         }
         if (el.id === 'valDefinitionFile') {
           const file = el.files[0];
+          el.value = '';
           if (!file) return;
           if (file.size > 1000000) throw Error('Template definitions must be below 1 MB.');
           const account = owner,
@@ -3419,6 +3563,7 @@
     });
     return {
       render,
+      patchRender,
       sync,
       handle,
       loadFile,
