@@ -108,6 +108,8 @@ body[data-motion='off'] #hubPet[data-pose='hobby'] .pet-body {
 }
 body[data-photo-background] {
   isolation: isolate;
+}
+body:is([data-photo-background='page'], [data-photo-background='both']) {
   background-image: none !important;
 }
 #workspacePhoto {
@@ -141,6 +143,14 @@ body:is([data-photo-background='page'], [data-photo-background='both']) .mv-atmo
 .photo-gallery {
   display: grid;
   gap: 14px;
+}
+.photo-gallery .photo-background-status {
+  margin: 0;
+  padding: 10px 12px;
+  color: var(--hub-text);
+  background: var(--hub-surface-soft);
+  border: 1px solid var(--hub-border);
+  border-radius: 10px;
 }
 .photo-gallery .photo-grid {
   display: grid;

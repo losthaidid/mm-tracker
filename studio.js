@@ -4010,6 +4010,7 @@
       openModal: a.openModal,
       closeModal: a.closeModal,
       tell: a.tell,
+      refreshTheme: applyTheme,
     });
     experience = root.WorkHubExperience?.install({
       ...a,

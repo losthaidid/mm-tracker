@@ -88,7 +88,7 @@ Batch C: [batch-c-engine.js](../batch-c-engine.js) handles deterministic ticket 
 | --- | --- |
 | [momo-art.js](../momo-art.js), [momo-anime.css](../momo-anime.css) | Momo's rendered character, rig layers, expressions and poses. |
 | [momo-wardrobe.js](../momo-wardrobe.js), [momo-wardrobe.css](../momo-wardrobe.css) | Stable daily garment/palette/accessory choices, matching sleeves, single-body umbrella rig and finite in-place hobbies. See [COMPANION-WARDROBE.md](COMPANION-WARDROBE.md). |
-| [photo-background.js](../photo-background.js) | Account-scoped device-only picture gallery, bounded raster resizing and page/My Day welcome backgrounds. Styles share `momo-wardrobe.css`; pictures never enter the cloud document. |
+| [photo-background.js](../photo-background.js) | Account-scoped device-only picture gallery, bounded raster resizing and page/My Day welcome backgrounds. Picture/theme changes apply before the device save completes, roll back on failure and reject older account sessions. Use theme background restores the active palette/pattern, closes the gallery and retains pictures. Page restoration rebuilds active picture URLs. Styles share `momo-wardrobe.css`; a welcome-only photo keeps the page pattern; pictures never enter the cloud document. |
 | [assets/momo/anime-rig.webp](../assets/momo/anime-rig.webp), [assets/momo/README.md](../assets/momo/README.md) | Character image asset and its artwork notes. |
 | [momo-life.js](../momo-life.js) | Basic expressions, dragging, home and simple play. |
 | [momo-behaviour-engine.js](../momo-behaviour-engine.js), [momo-behaviour.css](../momo-behaviour.css) | Pure activity phases, shared ball/kick calculations, visitor roles and safe resting positions; staged poses and temporary weather/friend props. |
