@@ -7208,7 +7208,9 @@ function scheduleTimeStatus(slot, d = state, date = today(), time = timeNow().sl
     start = (plan?.date || slot.date) + startTime,
     end = (plan?.endDate || slot.date) + endTime;
   if (now < start) return 'Planned';
-  if (now < end) return 'In Progress';
+  // A task's planned time ending does not complete the work. Keep started
+  // allocations active until the linked task is completed, even on later days.
+  if (task || now < end) return 'In Progress';
   return plan ? 'Review due' : 'Elapsed';
 }
 function scheduleEntryStatus(entry, date = today(), time = timeNow().slice(0, 5)) {
@@ -7516,7 +7518,7 @@ function renderTickets() {
 }
 const scheduleRenderV10 = renderSchedule;
 renderSchedule = function () {
-  return `<div class="workspace-v10 schedule-workspace">${scheduleRenderV10().replace('Bookings and project Go-Live milestones stay synchronized automatically.', 'Plan your time. Open any activity to review or edit its details.').replace('01:00–24:00 ·', '00:00–24:00 ·').replace('<div class="schedule-view-switch"><button class="active" data-action="schedule-layout"', '<button class="small" data-action="schedule-today">Today</button><div class="schedule-view-switch"><button class="active" data-action="schedule-layout"')}</div>`;
+  return `<div class="workspace-v10 schedule-workspace">${scheduleRenderV10().replace('Bookings and project Go-Live milestones stay synchronized automatically.', 'Plan your time. Open any activity to review or edit its details.').replace('01:00–24:00 ·', '00:00–24:00 ·').replace('<div class="schedule-view-switch"><button class="active" data-action="schedule-layout"', '<button class="small" data-action="schedule-today">Today</button><div class="schedule-view-switch"><button class="active" data-action="schedule-layout"')}<p class="hint schedule-task-status-help">Task bookings stay In Progress after their scheduled time ends until the task is completed.</p></div>`;
 };
 function renderScheduleGrid() {
   const days = monthDates(month),

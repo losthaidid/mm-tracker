@@ -18,7 +18,7 @@ Use **Start timer** in the workspace toolbar. Completed/archived tasks, complete
 
 Only **Project** sessions display **Charge code**. The dropdown uses unique nonempty codes from maintained projects and initially selects the linked project's code. Maintain codes through Settings → Project management → Edit project. Task, Ticket and Custom sessions hide the field and save no charge code. Historical sessions keep their original values.
 
-**Stop & save** records completed work. Its Schedule booking shows **Completed** for all activity types. This remains true if the parent task is unfinished or the session history is later deleted. Ordinary past planned activities retain their existing Elapsed / Review due rules.
+**Stop & save** records completed work. Its Schedule booking shows **Completed** for all activity types. This remains true if the parent task is unfinished or the session history is later deleted. A manually planned task booking is Planned before its scheduled start, then stays In Progress while the linked task is unfinished—even after the time range ends or on later days. Completing the task updates its bookings to Completed; reopening it restores In Progress for started bookings. The calendar, agenda, time grid and activity details share this rule. These are display statuses: the clock does not change tasks, booking dates, durations or recorded work. Unlinked custom activities still show Elapsed, project plans retain Review due, and leave retains its maintained approval status.
 
 ## Back up & clear all records
 
