@@ -46,7 +46,7 @@ async function app(t,{storage={},rpcError=null,remote=null,login=true,styles=fal
  // Use production's script order, replacing only the network client with the stub above.
  for(const script of window.document.querySelectorAll('script[src]')){const file=new URL(script.src).pathname.split('/mm-tracker/')[1];if(!['supabase-client.js','app.js'].includes(file))window.eval(readFileSync(new URL('../'+file,import.meta.url),'utf8'));}
  window.eval(readFileSync(new URL('../app.js',import.meta.url),'utf8')+`\nwindow.api={
-  hub,workspaceReset,scheduleTimeStatus,queueCloudReview,state:()=>state,steps:()=>STEPS,cloud,KEY,payload,parseBackup,emptyState,validate,mutate,loadCloud,flushCloud,refreshCloud,retryCloud,closeModal,
+  hub,workspaceReset,scheduleTimeStatus,reviewPastPlans,queueCloudReview,state:()=>state,steps:()=>STEPS,cloud,KEY,payload,parseBackup,emptyState,validate,mutate,loadCloud,flushCloud,refreshCloud,retryCloud,closeModal,
   openMMAreaManager,saveMMAreas,editLists,saveLists,editMMAreaDraft,canonicalArea,summarizeGovernanceRows,
   renderProjectCompanies,editCompany,saveCompany,editProcess,saveProcess,editProject,saveProject,
   browserMigrationAction,notice,action,projectMMAreas,editRecord,saveEdit,editSubItem,saveSubItem,openSubItems,editTaskSub,saveTaskSub,openRangeEditor,saveRange,scheduleEntries,viewBooking,workhubAction,workhubChange,rangeSegments,rangeTimes,editPlan,savePlan,reportModel,reportDashboard,exportReport,scheduleMonthMetrics,formatDuration,
@@ -3206,4 +3206,46 @@ test('live theme: preset preview, save, discard and saved combinations update th
  document.querySelector('[data-theme-choice="rose"]').click();api.hub.submit(document.getElementById('hubTheme'));await settle();assert.equal(page.style.getPropertyValue('--hub-bg'),'#fcf1f5');
  document.getElementById('workspacePalette').value=id;document.querySelector('[data-hub="palette-load"]').click();await settle();assert.equal(document.body.dataset.hubTheme,'custom');assert.equal(page.style.getPropertyValue('--hub-bg'),'#f2f6ef');assert.equal(document.body.style.getPropertyValue('--hub-bg'),'#f2f6ef');assert.equal(db.row.document.data.workhub.preferences.colors.page,'#f2f6ef');
  assert.equal(document.body,body);assert.equal(document.getElementById('hubHeader'),header);api.showTab('tasks');assert.equal(page.style.getPropertyValue('--hub-bg'),'#f2f6ef');
+});
+
+test('Schedule task status: unfinished allocations stay in progress after their end and overnight without changing the task or booking',async t=>{
+ const {api,document,db}=await app(t),taskId=addMainTask(api,document,'Continue the review tomorrow');await settle();
+ api.openRangeEditor('2026-10-27','09:15',taskId,true);const form=document.getElementById('scheduleForm');fill(form,{endDate:'2026-10-28',endTime:'10:45'});api.saveRange(form);await settle();
+ const before=copy(api.state()),writes=db.calls.length,slots=api.state().schedule;
+ assert.equal(slots.length,4);
+ for(const slot of slots.filter(s=>s.date==='2026-10-27')){
+  assert.equal(api.scheduleTimeStatus(slot,api.state(),'2026-10-27','09:14'),'Planned');
+  for(const time of ['09:15','10:15','10:45','23:59'])assert.equal(api.scheduleTimeStatus(slot,api.state(),'2026-10-27',time),'In Progress',time);
+  assert.equal(api.scheduleTimeStatus(slot,api.state(),'2026-10-28','08:00'),'In Progress');
+ }
+ for(const slot of slots.filter(s=>s.date==='2026-10-28'))assert.equal(api.scheduleTimeStatus(slot,api.state(),'2026-10-27','23:59'),'Planned');
+ assert.deepEqual(copy(api.state()),before);assert.equal(db.calls.length,writes);assert.equal(api.state().tasks[0].done,false);
+ api.hub.moveTask(taskId,'done');await settle();
+ for(const slot of api.state().schedule)assert.equal(api.scheduleTimeStatus(slot,api.state(),'2026-10-28','17:00'),'Completed');
+ api.hub.moveTask(taskId,'doing');await settle();
+ for(const slot of api.state().schedule)assert.equal(api.scheduleTimeStatus(slot,api.state(),'2026-10-28','17:00'),'In Progress');
+ assert.deepEqual(copy(api.state().schedule),copy(slots));
+ const d=copy(api.state()),past={date:'2026-10-27',time:'15:00',endTime:'16:00',bookingId:'',planId:'',kind:'custom',linkId:''};
+ assert.equal(api.scheduleTimeStatus(past,d,'2026-10-28','17:00'),'Elapsed');
+ assert.equal(api.scheduleTimeStatus({...past,kind:'task',linkId:'missing-task'},d,'2026-10-28','17:00'),'Elapsed');
+ assert.equal(api.scheduleTimeStatus({...past,kind:'task',linkId:taskId,sessionId:'recorded-work'},d,'2026-10-28','17:00'),'Completed');
+ d.projectPlans.push({id:'status-plan',date:'2026-10-27',endDate:'2026-10-27',time:'15:00',endTime:'16:00',status:'In Progress'});
+ assert.equal(api.scheduleTimeStatus({...past,kind:'project',planId:'status-plan'},d,'2026-10-28','17:00'),'Review due');
+ assert.equal(api.scheduleTimeStatus({...past,kind:'annual-leave',leave:{status:'Approved'}},d,'2026-10-28','17:00'),'Approved');
+});
+
+test('Schedule task status: calendar, agenda, details and time grid follow unfinished and completed work as the clock advances',async t=>{
+ const {api,document,window,db}=await app(t),ActualDate=window.Date;let clock=ActualDate.parse('2026-10-27T09:14:00+08:00');
+ window.Date=class extends ActualDate{constructor(...args){super(...(args.length?args:[clock]));}static now(){return clock;}};
+ const taskId=addMainTask(api,document,'Review draft over two days');await settle();api.openRangeEditor('2026-10-27','09:15',taskId,true);let form=document.getElementById('scheduleForm');fill(form,{endTime:'10:45'});api.saveRange(form);await settle();api.setMonth('2026-10');api.showTab('schedule');
+ const cards=()=>[...document.querySelectorAll('.workhub-booking[data-date="2026-10-27"]')];assert.equal(cards().length,2);assert.ok(cards().every(card=>card.querySelector('.slot-state').textContent==='Planned'));
+ const existing=cards()[0],before=copy(api.state()),writes=db.calls.length;
+ for(const instant of ['2026-10-27T09:15:00+08:00','2026-10-27T10:45:00+08:00','2026-10-28T17:00:00+08:00']){
+  clock=ActualDate.parse(instant);api.reviewPastPlans();assert.equal(cards()[0],existing);assert.ok(cards().every(card=>card.querySelector('.slot-state').textContent==='In Progress'));assert.ok(cards().every(card=>card.classList.contains('status-in-progress')));
+ }
+ assert.deepEqual(copy(api.state()),before);assert.equal(db.calls.length,writes);
+ api.viewBooking('2026-10-27','09:15');assert.match(document.querySelector('.booking-view-hero').textContent,/In Progress/);assert.doesNotMatch(document.querySelector('.booking-view-hero').textContent,/Elapsed/);api.closeModal();
+ await api.action(document.querySelector('[data-action="schedule-layout"][data-layout="grid"]'));assert.ok(document.querySelector('.precision-grid'));assert.ok(cards().length>=2);assert.ok(cards().every(card=>card.querySelector('.slot-state').textContent==='In Progress'));
+ api.hub.moveTask(taskId,'done');await settle();assert.ok(cards().every(card=>card.querySelector('.slot-state').textContent==='Completed'));
+ api.viewBooking('2026-10-27','09:15');assert.match(document.querySelector('.booking-view-hero').textContent,/Completed/);
 });
