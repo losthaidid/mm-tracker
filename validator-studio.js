@@ -110,6 +110,7 @@
   function install(a) {
     const $ = id => document.getElementById(id),
       store = () => a.state().workhub.validator;
+    const runner = root.WorkHubValidatorRunner?.create();
     let owner = '',
       generation = 0,
       draft = null,
@@ -238,6 +239,7 @@
         pinnedRows.clear();
         owner = next;
         generation++;
+        runner?.cancel();
         draft = null;
         selected = '';
         baseStamp = '';
@@ -456,6 +458,7 @@
       cancelLive();
       pinnedRows.clear();
       generation++;
+      runner?.cancel();
       busy = false;
       dirty = true;
       result = null;
@@ -489,6 +492,7 @@
       cancelLive();
       pinnedRows.clear();
       generation++;
+      runner?.cancel();
       runCompanyId = '';
       selectedIssue = null;
       targetRow = -1;
@@ -1592,6 +1596,7 @@
       if (!draft) throw Error('Create a template first.');
       const token = ++generation,
         account = owner;
+      runner?.cancel();
       busy = true;
       say('Reading ' + file.name + '…');
       paint();
@@ -1644,6 +1649,10 @@
     }
     function loadSample() {
       commitCurrent();
+      generation++;
+      runner?.cancel();
+      cancelLive();
+      busy = false;
       const t = activeSchema();
       E.checkSchema(t);
       const sample = t.columns.map(c =>
@@ -1701,6 +1710,7 @@
       if (version === 'draft' && !saveDraft(true)) return;
       const token = ++generation,
         account = owner;
+      runner?.cancel();
       busy = true;
       result = null;
       resetReview();
@@ -1713,8 +1723,12 @@
       if (token !== generation || account !== a.owner?.() || !a.ready()) return;
       try {
         E.runContext(a.state(), t, context.companyId);
-        const checked = E.validateRows(t, rows, context);
-        if (token !== generation || account !== a.owner?.()) return;
+        const checked = runner
+          ? await runner.run(t, rows, context)
+          : E.validateRows(t, rows, context);
+        if (token !== generation || account !== a.owner?.() || !a.ready()) return;
+        // Company availability may change while a worker is running.
+        E.runContext(a.state(), t, context.companyId);
         rawResult = checked;
         result = reviewed(checked);
         resultSchema = E.copy(t);
@@ -1746,6 +1760,8 @@
               ? 'No errors. ' + checked.warnings + ' warnings to review.'
               : 'All ' + checked.rows + ' rows passed. Nicely done.'
         );
+      } catch (error) {
+        if (error.name !== 'AbortError' || token === generation) throw error;
       } finally {
         if (token === generation) {
           busy = false;
@@ -1814,6 +1830,7 @@
       sourceRows[index][source] = value;
       root.clearTimeout(liveTimer);
       generation++;
+      runner?.cancel();
       busy = false;
       if (!resultSchema || !result) {
         cancelLive();
@@ -3150,6 +3167,7 @@
       commitCurrent();
       const token = ++generation,
         account = owner;
+      runner?.cancel();
       setupPreview = null;
       busy = true;
       say('Reading Excel setup…');
@@ -3192,6 +3210,10 @@
       }
       if (form.id === 'valPasteForm') {
         commitCurrent();
+        generation++;
+        runner?.cancel();
+        cancelLive();
+        busy = false;
         book = {
           sheets: [
             { name: 'Pasted data', rows: E.parseCSV(form.elements.namedItem('data').value) },
@@ -3375,6 +3397,7 @@
           pinnedRows.clear();
           runCompanyId = el.value;
           generation++;
+          runner?.cancel();
           busy = false;
           result = null;
           resetReview();
@@ -3428,8 +3451,9 @@
           if (!file) return;
           if (file.size > 1000000) throw Error('Template definitions must be below 1 MB.');
           const account = owner,
-            token = ++generation,
-            value = JSON.parse(await file.text());
+            token = ++generation;
+          runner?.cancel();
+          const value = JSON.parse(await file.text());
           if (token !== generation || account !== a.owner?.()) return;
           if (value.app !== 'workhub-validator' || value.version !== 1)
             throw Error('Choose a Validation Studio template definition.');
@@ -3460,6 +3484,7 @@
           cancelLive();
           pinnedRows.clear();
           generation++;
+          runner?.cancel();
           busy = false;
           version = el.value;
           runCompanyId = '';
@@ -3474,6 +3499,7 @@
           cancelLive();
           pinnedRows.clear();
           generation++;
+          runner?.cancel();
           busy = false;
           if (el.name === 'sheet') sheetIndex = Number(el.value);
           else headerRow = Number(el.value);
@@ -3487,6 +3513,7 @@
           cancelLive();
           pinnedRows.clear();
           generation++;
+          runner?.cancel();
           busy = false;
           mapping[el.dataset.map] = Number(el.value);
           rows = [];
