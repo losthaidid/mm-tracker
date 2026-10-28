@@ -292,6 +292,7 @@
     <link rel="stylesheet" href="./focus-panel.css?v=20261024-break-shortcut-1" />
     <link rel="stylesheet" href="./presentation-break.css?v=20261026-workspace-6" />
     <link rel="stylesheet" href="./settings-panel.css?v=20261026-workspace-6" />
+    <link rel="stylesheet" href="./user-management.css?v=20261029-users-1" />
     <link rel="stylesheet" href="./built-in-lists.css?v=20261020-workspace-refresh-1" />
     <link rel="stylesheet" href="./dramatic-motion.css?v=20261025-feedback-1" />
     <link rel="stylesheet" href="./momo-behaviour.css?v=20261021-umbrella-hand-1" />
@@ -666,6 +667,7 @@
             ><button type="button" data-action="manage-mm-areas">SAP MM areas</button
             ><button type="button" data-action="edit-lists">Built-in lists</button
             ><button type="button" data-action="tab-visibility">Screen visibility</button
+            ><button id="workhubUserManagement" type="button" hidden>User management</button
             ><button id="backupButton">Backup</button><button id="restoreButton">Restore</button
             ><button type="button" class="danger" id="workspaceResetButton">
               Back up &amp; clear all records</button
@@ -697,15 +699,21 @@
           <label for="cloudAuthMode">Account</label
           ><select id="cloudAuthMode" name="mode">
             <option value="signin">Sign in</option>
-            <option value="signup">Create tracker login</option></select
+            <option value="signup">Request access</option></select
           ><label for="cloudEmail" style="margin-top:15px">Email</label
-          ><input
-            id="cloudEmail"
-            name="email"
-            type="email"
-            autocomplete="username"
-            required
-          /><label for="cloudPassword" style="margin-top:15px">Password</label
+          ><input id="cloudEmail" name="email" type="email" autocomplete="username" required />
+          <div id="cloudRequestFields" hidden>
+            <label for="cloudRequestName">Your name</label
+            ><input
+              id="cloudRequestName"
+              name="requestName"
+              maxlength="120"
+              autocomplete="name"
+            /><label for="cloudRequestReason">Reason for joining (optional)</label
+            ><textarea id="cloudRequestReason" name="requestReason" maxlength="1000"></textarea>
+            <p class="hint">The Owner reviews your request before a login account is created.</p>
+          </div>
+          <label id="cloudPasswordLabel" for="cloudPassword" style="margin-top:15px">Password</label
           ><input
             id="cloudPassword"
             name="password"
@@ -723,8 +731,9 @@
           <p id="cloudAuthMessage" role="status" aria-live="polite"></p>
         </form>
         <p class="hint">
-          Create a tracker login once and confirm your email. Use that same login on each device.
-          After signing in, use Restore once to bring in your previous backup.
+          Request access first. After the Owner approves, use your invitation to confirm your email
+          and set a password. Use that same login on each device. After signing in, use Restore once
+          to bring in your previous backup.
         </p>
       </section>
       <nav class="tabs" aria-label="Tracker sections" id="tabs">
@@ -809,7 +818,7 @@
     <script src="./validator-files.js?v=20261027-schedule-review-1"></script>
     <script src="./validator-setup.js?v=20261026-sap-200-simple-1"></script>
     <script src="./validator-runner.js?v=20261028-perf-1"></script>
-    <script src="./validator-studio.js?v=20261028-perf-1"></script>
+    <script src="./validator-studio.js?v=20261029-users-1"></script>
     <!-- Personal Notes: engine before editor; records use the existing private save pipeline. -->
     <script src="./notes-engine.js?v=20261028-notes-1"></script>
     <script src="./notes.js?v=20261028-notes-1"></script>
@@ -865,7 +874,7 @@
     <script src="./claims.js?v=20261027-schedule-review-1"></script>
     <script src="./recipients-engine.js?v=20261019-source-1"></script>
     <script src="./recipients.js?v=20261019-source-1"></script>
-    <script src="./settings-panel.js?v=20261026-workspace-6"></script>
+    <script src="./settings-panel.js?v=20261029-users-1"></script>
     <script src="./built-in-lists.js?v=20261025-canvas-4"></script>
     <script src="./dramatic-motion.js?v=20261025-companion-2"></script>
     <script src="./my-day-engine.js?v=20261024-terrarium-1"></script>
@@ -880,7 +889,10 @@
     <script src="./workspace-reset.js?v=20261026-workspace-6"></script>
     <script src="./schedule-engine.js?v=20261027-schedule-review-1"></script>
     <script src="./work-schedule.js?v=20261027-day-execution-1"></script>
-    <script src="./studio.js?v=20261028-reader-1"></script>
+    <script src="./access-catalog.js?v=20261029-users-1"></script>
+    <script src="./access-control.js?v=20261029-users-1"></script>
+    <script src="./user-management.js?v=20261029-users-1"></script>
+    <script src="./studio.js?v=20261029-users-1"></script>
     <!-- Empty starter records and default lists; this is not your saved account data. -->
     <script id="seedData" type="application/json">
       {
@@ -1075,6 +1087,6 @@
       }
     </script>
     <!-- Start the application after all feature modules and the empty seed defaults are ready. -->
-    <script src="./app.js?v=20261028-reader-1"></script>
+    <script src="./app.js?v=20261029-users-1"></script>
   </body>
 </html>

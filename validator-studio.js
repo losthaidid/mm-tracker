@@ -1699,6 +1699,8 @@
     }
     async function run() {
       ensure();
+      if (root.WorkHubCurrentAccess && !root.WorkHubCurrentAccess.can('validator', 'run'))
+        throw Error('Running validation is disabled for this account.');
       cancelLive();
       pinnedRows.clear();
       commitCurrent();
@@ -1707,7 +1709,15 @@
       const context = E.runContext(a.state(), t, runCompanyId);
       const mapped = E.mapRows(headers, sourceRows, t, mapping);
       if (!mapped.length) throw Error('Upload or paste at least one data row.');
-      if (version === 'draft' && !saveDraft(true)) return;
+      if (version === 'draft') {
+        if (root.WorkHubCurrentAccess && !root.WorkHubCurrentAccess.can('validator', 'edit')) {
+          const saved = store().templates.find(saved => saved.id === draft.id);
+          if (!saved || JSON.stringify(E.schema(saved)) !== JSON.stringify(E.schema(draft)))
+            throw Error(
+              'You can run saved templates. Ask the Owner to save these template changes first.'
+            );
+        } else if (!saveDraft(true)) return;
+      }
       const token = ++generation,
         account = owner;
       runner?.cancel();

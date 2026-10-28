@@ -8,6 +8,8 @@
 
 'use strict';
 let hub = null;
+let access = null,
+  userManagement = null;
 
 // =============================================================================
 // 1. Defaults, field definitions and shared helpers
@@ -281,8 +283,10 @@ function tell(text, error = false) {
 
 /** Prepare derived context/history first, then save through the selected storage mode. */
 function save(next, restoring = false) {
+  access?.assertChange(state, next);
   if (hub) hub.prepare(next, state, restoring);
   if (typeof syncCalculatedProjectHealth === 'function') syncCalculatedProjectHealth(next);
+  access?.restoreDerived(state, next);
   if (CLOUD_MODE) return saveCloud(next, restoring);
   if (corrupt && !restoring) throw Error('Restore a valid backup before editing.');
   validate(next);
@@ -424,10 +428,13 @@ function renderSpecs() {
 
 /** Use the shared dialog and decorate linked feature controls after its HTML is inserted. */
 function openModal(title, body) {
+  $('modal').classList.toggle('um-dialog', body.includes('class="um-room"'));
   $('modal').classList.toggle('standup-dialog', body.includes('class="standup-report"'));
   $('modal').classList.toggle(
     'hub-drawer',
-    !body.includes('<form') && !/Search|Quick|Review/.test(title)
+    !body.includes('class="um-room"') &&
+      !body.includes('<form') &&
+      !/Search|Quick|Review/.test(title)
   );
   $('modalTitle').textContent = title;
   $('modalBody').innerHTML = body;
@@ -714,6 +721,8 @@ document.addEventListener('change', e => {
   }
 });
 function download(data, name, type) {
+  if (access && cloud.ready && !access.can(access.feature(document.activeElement), 'export'))
+    throw Error('Export is disabled for this feature.');
   const url = URL.createObjectURL(new Blob([data], { type })),
     a = document.createElement('a');
   a.href = url;
@@ -1149,28 +1158,27 @@ function render() {
     hub?.afterRender(tab);
     return;
   }
-  const mainTabs = [
-      'home',
-      'tickets',
-      'tasks',
-      'schedule',
-      'specs',
-      'knowledge',
-      'notes',
-      'processhub',
-      'waiting',
-      'studio',
-      'lab',
-      'validator',
-      'snippets',
-    ],
+  access?.sync();
+  userManagement?.sync();
+  const mainTabs = WorkHubAccessCatalog.screens.map(f => f.id),
     hidden = new Set(state.preferences.hiddenTabs || []),
-    visible = mainTabs.filter(t => !hidden.has(t));
+    visible = mainTabs.filter(t => !hidden.has(t) && (!access || access.can(t)));
+  if (!visible.length) {
+    $('view').innerHTML =
+      '<section class="access-empty"><h2>No screens are available</h2><p>Check Settings → Screen visibility, or ask the website Owner to review your permissions.</p></section>';
+    $('tabs').hidden = false;
+    hub?.afterRender(tab);
+    access?.apply();
+    return;
+  }
   if (!visible.includes(tab)) tab = visible[0] || 'tickets';
   const preserved =
     (tab === 'lab' && hub?.workbench?.workshop?.patchRender()) ||
     (tab === 'validator' && hub?.validator?.patchRender()) ||
-    (tab === 'studio' && hub?.patchReader()) ||
+    (tab === 'studio' &&
+      !hidden.has('studio.' + hub?.currentTool()) &&
+      (!access || access.can('studio.' + hub.currentTool())) &&
+      hub?.patchReader()) ||
     (tab === 'notes' && hub?.notes?.patchRender());
   if (!preserved) {
     const fn = {
@@ -1198,6 +1206,7 @@ function render() {
   updateSelectAllControls();
   queueActualReview();
   hub?.afterRender(tab);
+  access?.apply();
 }
 
 function taskLinkedLabel(t, d = state) {
@@ -1528,15 +1537,21 @@ function editVisibility() {
   const hidden = new Set(state.preferences.hiddenTabs);
   openModal(
     'Screen visibility',
-    `<form id="visibilityForm"><p class="muted">Choose which main screens appear. At least one must remain visible.</p><div class="visibility-list" style="margin-top:16px">${[
-      ['tickets', 'Tickets'],
-      ['tasks', 'Tasks'],
-      ['schedule', 'Schedule'],
-      ['specs', 'SAP Projects'],
+    `<form id="visibilityForm"><p class="muted">Choose the screens, tools and shortcuts shown in your workspace. These personal choices cannot enable features restricted by the Owner. Keep at least one permitted screen visible.</p><div class="visibility-groups">${[
+      'Screens',
+      'Studio tools',
+      'Project tools',
+      'Workspace tools',
     ]
       .map(
-        ([v, l]) =>
-          `<label><input type="checkbox" name="visibleTabs" value="${v}"${hidden.has(v) ? '' : ' checked'}>${l}</label>`
+        group =>
+          `<section><h3>${group}</h3>${WorkHubAccessCatalog.features
+            .filter(f => f.group === group && f.id !== 'workspace')
+            .map(
+              f =>
+                `<label><input type="checkbox" name="visibleTabs" value="${f.id}"${hidden.has(f.id) ? '' : ' checked'}${access && !access.can(f.id) ? ' disabled' : ''}><span>${esc(f.name)}</span>${access && !access.can(f.id) ? '<small>Owner restricted</small>' : ''}</label>`
+            )
+            .join('')}</section>`
       )
       .join(
         ''
@@ -1545,8 +1560,11 @@ function editVisibility() {
 }
 function saveVisibility(form) {
   const visible = [...form.querySelectorAll('input[name="visibleTabs"]:checked')].map(x => x.value);
-  if (!visible.length) throw Error('Keep at least one screen visible.');
-  const all = ['tickets', 'tasks', 'schedule', 'specs'],
+  if (
+    !WorkHubAccessCatalog.screens.some(f => visible.includes(f.id) && (!access || access.can(f.id)))
+  )
+    throw Error('Keep at least one permitted screen visible.');
+  const all = WorkHubAccessCatalog.features.filter(f => f.id !== 'workspace').map(f => f.id),
     ok = mutate(d => (d.preferences.hiddenTabs = all.filter(x => !visible.includes(x))));
   closeModal();
   if (ok) tell('Screen visibility saved.');
@@ -3459,12 +3477,14 @@ function validateFeaturesV6(d) {
       g.done !== ['Completed', 'Skipped'].includes(g.status)
     )
       throw Error('Check the phase-gate checklist.');
-  const allowedTabs = ['tickets', 'tasks', 'schedule', 'specs'];
+  const allowedTabs = WorkHubAccessCatalog.features
+    .filter(f => f.id !== 'workspace')
+    .map(f => f.id);
   if (
     !Array.isArray(d.preferences.hiddenTabs) ||
     d.preferences.hiddenTabs.some(t => !allowedTabs.includes(t)) ||
     new Set(d.preferences.hiddenTabs).size !== d.preferences.hiddenTabs.length ||
-    d.preferences.hiddenTabs.length === allowedTabs.length
+    WorkHubAccessCatalog.screens.every(f => d.preferences.hiddenTabs.includes(f.id))
   )
     throw Error('Keep at least one main screen visible.');
 }
@@ -5157,6 +5177,12 @@ function watchlistPanel() {
 }
 
 function renderProjectDashboard() {
+  const feature = { solution: 'projects.solution', people: 'projects.people' }[projectView];
+  if (
+    feature &&
+    ((access && !access.can(feature)) || state.preferences.hiddenTabs.includes(feature))
+  )
+    projectView = 'overview';
   const p = activeProject(),
     m = projectMetrics(),
     rate = Math.round(m.rate * 100),
@@ -9298,6 +9324,7 @@ async function browserMigrationAction(action) {
 }
 function cloudCacheValue() {
   return JSON.stringify({
+    accessVersion: access?.snapshot()?.version || 0,
     document: JSON.parse(payload(state)),
     revision: cloud.revision,
     pending: cloud.pending,
@@ -9375,6 +9402,11 @@ function applyCloudDocument(document) {
   if (!$('modal').open) detailTicketId = '';
 }
 async function fetchCloudRevision() {
+  if (access?.snapshot()?.role !== 'owner') {
+    const { data, error } = await cloud.client.rpc('load_mm_tracker_revision');
+    if (error) throw error;
+    return data?.[0] || null;
+  }
   const { data, error } = await cloud.client
     .from('mm_tracker_documents')
     .select('revision,mutation_id,updated_at')
@@ -9384,6 +9416,11 @@ async function fetchCloudRevision() {
   return data;
 }
 async function fetchCloudRow() {
+  if (access?.snapshot()?.role !== 'owner') {
+    const { data, error } = await cloud.client.rpc('load_mm_tracker');
+    if (error) throw error;
+    return data?.[0] || null;
+  }
   const { data, error } = await cloud.client
     .from('mm_tracker_documents')
     .select('document,revision,mutation_id,updated_at')
@@ -9449,6 +9486,8 @@ function queueCloudReview(row, cache) {
 /** Load one signed-in account. Generation checks reject responses from a previous account/session. */
 async function loadCloud(session) {
   if (!session?.user) {
+    access?.clear();
+    userManagement?.clear();
     window.WorkHubStartup?.account(cloudConfig.project, null);
     cloud.generation++;
     cloud.user = null;
@@ -9472,6 +9511,9 @@ async function loadCloud(session) {
     if (cloud.ready) void refreshCloud();
     return;
   }
+  access?.clear();
+  userManagement?.clear();
+  if (cloud.user?.id !== session.user.id) state = emptyState();
   cloud.generation++;
   const generation = cloud.generation;
   cloud.user = session.user;
@@ -9500,6 +9542,21 @@ async function loadCloud(session) {
     temporary = true;
   }
   try {
+    const profile = await access.load(session.user);
+    if (generation !== cloud.generation) return;
+    if (profile.needsPassword) {
+      cloud.loading = false;
+      cloud.status = 'Set your password to finish account setup.';
+      notice();
+      openInitialPassword();
+      window.WorkHubStartup?.finish();
+      return;
+    }
+    if (profile.role !== 'owner' && cache?.accessVersion !== profile.version) {
+      cache = null;
+      localStorage.removeItem(cloud.key);
+      cloud.lastCache = null;
+    }
     const row = await fetchCloudRow();
     if (generation !== cloud.generation) return;
     const reviewed =
@@ -9529,7 +9586,7 @@ async function loadCloud(session) {
     if (generation !== cloud.generation) return;
     cloud.loading = false;
     cloud.error = true;
-    if (cache) {
+    if (cache && !err.accessDenied && !['42501', 'PGRST301', 'PGRST302'].includes(err.code)) {
       applyCloudDocument(cache.document);
       cloud.revision = cache.revision;
       cloud.baseDocument = cache.baseDocument || null;
@@ -9984,12 +10041,21 @@ async function submitCloudAuth(form) {
     email = form.elements.namedItem('email').value.trim(),
     password = form.elements.namedItem('password').value,
     signup = form.elements.namedItem('mode').value === 'signup';
-  $('cloudAuthMessage').textContent = signup ? 'Creating your tracker login…' : 'Signing in…';
+  $('cloudAuthMessage').textContent = signup ? 'Sending your access request…' : 'Signing in…';
   button.disabled = true;
   try {
-    const response = signup
-      ? await cloud.client.auth.signUp({ email, password })
-      : await cloud.client.auth.signInWithPassword({ email, password });
+    if (signup) {
+      const { error } = await cloud.client.rpc('workhub_request_access', {
+        p_email: email,
+        p_name: form.elements.namedItem('requestName').value.trim(),
+        p_reason: form.elements.namedItem('requestReason').value.trim(),
+      });
+      if (error) throw error;
+      $('cloudAuthMessage').textContent =
+        'Your request has been received. If approved, you will receive an invitation to finish account setup.';
+      return;
+    }
+    const response = await cloud.client.auth.signInWithPassword({ email, password });
     if (response.error) throw response.error;
     form.elements.namedItem('password').value = '';
     if (response.data.session) {
@@ -10004,6 +10070,43 @@ async function submitCloudAuth(form) {
     button.disabled = false;
   }
 }
+function openInitialPassword() {
+  openModal(
+    'Finish account setup',
+    '<form id="initialPasswordForm"><p>Your invitation is approved. Choose a password for future sign-ins.</p><label>New password<input name="password" type="password" autocomplete="new-password" minlength="8" required></label><label>Confirm password<input name="confirm" type="password" autocomplete="new-password" minlength="8" required></label><p id="initialPasswordMessage" role="status"></p><button class="primary" type="submit">Save password & open workspace</button></form>'
+  );
+}
+document.addEventListener('submit', event => {
+  if (event.target.id !== 'initialPasswordForm') return;
+  event.preventDefault();
+  const form = event.target,
+    account = cloud.user?.id,
+    password = form.elements.password.value;
+  if (password !== form.elements.confirm.value) {
+    $('initialPasswordMessage').textContent = 'Passwords do not match.';
+    return;
+  }
+  const b = form.querySelector('button');
+  b.disabled = true;
+  void (async () => {
+    try {
+      if (!account || !access?.snapshot()?.needsPassword) throw Error('Reopen account setup.');
+      const { error } = await cloud.client.auth.updateUser({ password });
+      if (error) throw error;
+      form.reset();
+      if (account !== cloud.user?.id) return;
+      closeModal();
+      cloud.loading = false;
+      cloud.ready = false;
+      await loadCloud({ user: cloud.user });
+    } catch (error) {
+      if (form.isConnected) {
+        $('initialPasswordMessage').textContent = error.message;
+        b.disabled = false;
+      }
+    }
+  })();
+});
 /** Add a request timeout while preserving a caller-provided cancellation signal. */
 function cloudFetch(input, init = {}) {
   const controller = new AbortController(),
@@ -10220,6 +10323,69 @@ hub = WorkHubStudio.install({
     detail(id);
   },
 });
+access = CLOUD_MODE
+  ? WorkHubAccess.install({
+      cloud: () => cloud,
+      tell,
+      feature: () =>
+        tab === 'studio'
+          ? 'studio.' + hub.currentTool()
+          : tab === 'specs' && projectView === 'solution'
+            ? 'projects.solution'
+            : tab,
+      hidden: () => state.preferences.hiddenTabs || [],
+      async changed() {
+        localStorage.removeItem(cloud.key);
+        cloud.lastCache = null;
+        cloud.pending = cloud.inFlight = null;
+        cloud.ready = false;
+        cloud.loading = false;
+        closeModal();
+        await loadCloud({ user: cloud.user });
+        tell('Your access settings changed. The workspace has been refreshed.');
+      },
+      lock(message) {
+        cloud.generation++;
+        try {
+          localStorage.removeItem(cloud.key);
+        } catch {}
+        cloud.lastCache = null;
+        cloud.ready = false;
+        cloud.loading = false;
+        cloud.pending = cloud.inFlight = null;
+        cloud.status = message;
+        state = emptyState();
+        closeModal();
+        userManagement?.clear();
+        notice();
+        render();
+        tell(message, true);
+      },
+    })
+  : null;
+window.WorkHubCurrentAccess = access;
+userManagement = WorkHubUserManagement.install({
+  access: () => access,
+  cloud: () => cloud,
+  url: () => cloudConfig.url,
+  key: () => cloudConfig.publishableKey,
+  openModal,
+  closeModal,
+  tell,
+});
+$('workhubUserManagement').addEventListener('click', () => {
+  closeSettingsMenu();
+  void userManagement.open().catch(e => tell(e.message, true));
+});
+$('cloudAuthMode').addEventListener('change', () => {
+  const request = $('cloudAuthMode').value === 'signup';
+  $('cloudRequestFields').hidden = !request;
+  $('cloudRequestName').required = request;
+  $('cloudPasswordLabel').hidden = $('cloudPassword').hidden = request;
+  $('cloudPassword').required = !request;
+  $('cloudPassword').value = '';
+  $('cloudAuthMessage').textContent = '';
+});
 const workspaceReset = WorkHubWorkspaceReset.install({
   cloud: () => cloud,
   state: () => state,
@@ -10341,6 +10507,8 @@ if (document.modelContext?.registerTool) {
         },
         annotations: { readOnlyHint: true, untrustedContentHint: true },
         execute(input) {
+          if (access && !access.can('tickets'))
+            throw Error('Ticket access is disabled for this account.');
           if (typeof input?.query !== 'string' || input.query.length > 200)
             throw Error('Provide a query of up to 200 characters.');
           tab = 'tickets';
