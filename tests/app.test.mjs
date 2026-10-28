@@ -3351,3 +3351,54 @@ test('Notes workspace: notebook creation, company links, pin, trash and restore 
 test('Notes workspace: ordinary application renders and account resets preserve or clear editors at the correct boundary',async t=>{
  const {api,document,window}=await app(t);api.showTab('notes');const notes=api.hub.notes;notes.open();const body=document.getElementById('ntBody');body.value='Pending private thought';body.dispatchEvent(new window.Event('input',{bubbles:true}));api.mutate(d=>{d.calendarMonth='2026-11';});assert.equal(document.getElementById('ntBody'),body);assert.equal(body.value,'Pending private thought');assert.equal(notes.flush(),true);const id=api.state().workhub.notebook.notes[0].id;notes.close();notes.open(id);body.value='Old DOM reference';const live=document.getElementById('ntBody');live.value='Do not send to another account';live.dispatchEvent(new window.Event('input',{bubbles:true}));api.cloud.user={id:'different-owner',email:'other@example.com'};api.showTab('home');assert.equal(document.getElementById('notesRoom'),null);assert.equal(api.state().workhub.notebook.notes[0].body,'Pending private thought');
 });
+
+test('Performance: ordinary saves retain navigation and the editor while real palette changes still apply immediately',async t=>{
+ const {api,document,window}=await app(t,{styles:true}),appearance=window.WorkHubAppearance,apply=appearance.apply;
+ let palettes=0;appearance.apply=p=>{palettes++;return apply(p);};
+ const nav=[...document.querySelectorAll('#tabs .hub-nav-label,#tabs .hub-nav-icon')];
+ api.showTab('notes');api.hub.notes.open();const body=document.getElementById('ntBody');body.focus();
+ for(let i=0;i<3;i++){body.value='Saved note '+i;body.dispatchEvent(new window.Event('input',{bubbles:true}));api.hub.notes.flush();await settle();}
+ assert.equal(palettes,0);assert.equal(document.getElementById('ntBody'),body);assert.equal(document.activeElement,body);
+ assert.deepEqual([...document.querySelectorAll('#tabs .hub-nav-label,#tabs .hub-nav-icon')],nav);
+ api.hub.notes.close();api.mutate(d=>{d.workhub.preferences.theme='forest';});await settle();
+ assert.equal(palettes,1);assert.equal(document.documentElement.style.getPropertyValue('--hub-bg'),'#f2f6ef');
+ api.mutate(d=>{d.workhub.preferences.font='serif';d.workhub.preferences.radius=24;});await settle();
+ assert.equal(palettes,1);assert.equal(document.documentElement.style.getPropertyValue('--hub-font'),'Georgia,serif');assert.equal(document.documentElement.style.getPropertyValue('--hub-radius'),'24px');
+ api.showTab('specs');api.showTab('home');assert.equal(palettes,1);
+ assert.deepEqual([...document.querySelectorAll('#tabs .hub-nav-label,#tabs .hub-nav-icon')],nav);
+});
+
+test('Performance: unchanged atmosphere ticks avoid DOM writes while time, scenery and weather remain live',async t=>{
+ const ctx=await app(t),{api,document,window}=ctx,ui=api.hub.atmosphere,RealDate=window.Date;
+ let now=new RealDate(2026,9,28,18,0,0).getTime();window.Date=class extends RealDate{constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}};
+ await atmosphereChoices(ctx,{mode:'evening',scenery:'valley',weather:'rain',visitors:false});ui.sync();
+ const observer=new window.MutationObserver(()=>{});observer.observe(document.body,{attributes:true,childList:true,characterData:true,subtree:true});
+ for(let i=0;i<10;i++)ui.tick();assert.equal(observer.takeRecords().length,0);observer.disconnect();
+ now+=60000;ui.tick();assert.match(document.getElementById('hubAtmosphereClock').textContent,/01/);
+ const weather=Object.keys(ui.weathers).find(k=>k!=='rain');await atmosphereChoices(ctx,{mode:'morning',scenery:'valley',weather,visitors:false});
+ assert.equal(document.getElementById('hubAtmosphereCard').dataset.phase,'morning');assert.equal(document.body.style.getPropertyValue('--ambient-sun-x'),'-65px');assert.equal(document.body.dataset.weather,weather);
+ document.body.classList.add('hub-private');ui.sync();assert.equal(document.getElementById('hubVisitors').hidden,true);
+});
+
+async function largeWorkerValidation(ctx){
+ const {window,api}=ctx,workers=[];
+ window.Worker=class{constructor(){workers.push(this);}postMessage(packet){this.packet=packet;}terminate(){this.stopped=true;}};
+ const {ui}=await companyValidationWorkspace(ctx);
+ const csv='REQUEST_ID,TYPE,OWNER,AMOUNT,START_DATE,END_DATE\n'+Array.from({length:3500},(_,i)=>'R'+i+',Standard,Aisha,25,2026-10-20,2026-10-21').join('\n');
+ const file=new window.File([csv],'performance.csv',{type:'text/csv'});file.text=async()=>csv;await ui.loadFile(file);validationCompany(ctx,'task-company-a');
+ window.setTimeout=(callback,ms)=>{if(ms===50)queueMicrotask(callback);return 0;};
+ const job=ui.run();await settle();assert.equal(workers.length,1);return{ui,worker:workers[0],job};
+}
+test('Performance: company changes and new uploads terminate background validation without publishing stale results',async t=>{
+ const ctx=await app(t),{api}=ctx,{ui,worker,job}=await largeWorkerValidation(ctx);
+ validationCompany(ctx,'task-company-b');await job;assert.equal(worker.stopped,true);assert.equal(ui.snapshot().result,null);assert.equal(api.state().workhub.validator.runs.length,0);
+ worker.onmessage({data:{id:worker.packet.id,result:{rows:3500}}});assert.equal(ui.snapshot().result,null);
+ validationCompany(ctx,'task-company-a');const next=ui.run();await settle();ui.loadSample();await next;assert.equal(ui.snapshot().result,null);assert.equal(api.state().workhub.validator.runs.length,0);
+});
+test('Performance: worker results recheck company availability and cannot leak across accounts',async t=>{
+ const ctx=await app(t),{api}=ctx,{ui,worker,job}=await largeWorkerValidation(ctx),rejected=assert.rejects(job,/active company/);
+ api.mutate(d=>{d.projectCompanies.find(c=>c.id==='task-company-a').active=false;});await settle();
+ worker.onmessage({data:{id:worker.packet.id,result:{rows:3500}}});await rejected;assert.equal(api.state().workhub.validator.runs.length,0);
+ api.mutate(d=>{d.projectCompanies.find(c=>c.id==='task-company-a').active=true;});const pending=ui.run();await settle();api.cloud.user={id:'another-owner'};api.showTab('home');await pending;
+ assert.equal(ui.snapshot().result,null);assert.equal(ui.snapshot().draft,null);assert.equal(api.state().workhub.validator.runs.length,0);
+});

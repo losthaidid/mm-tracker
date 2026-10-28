@@ -17,6 +17,16 @@
   const uid = () =>
     root.crypto?.randomUUID?.() ||
     'hub-' + Date.now().toString(36) + Math.random().toString(36).slice(2);
+  const dataValue = (el, key, value) => {
+    if (el && el.dataset[key] !== String(value)) el.dataset[key] = String(value);
+  };
+  const styleValue = (el, key, value) => {
+    if (el && el.style.getPropertyValue(key) !== value) el.style.setProperty(key, value);
+  };
+  const styleValues = (el, values) => {
+    for (const [key, value] of Object.entries(values))
+      if (el.style[key] !== value) el.style[key] = value;
+  };
   const DEFAULT_WIDGETS = ['today', 'tasks', 'waiting', 'journey', 'achievements', 'desk'];
   const WIDGETS = {
     today: 'Your day',
@@ -408,15 +418,29 @@
     function empty(title, text, action = '') {
       return `<div class="hub-empty"><strong>${esc(title)}</strong><p>${esc(text)}</p>${action}</div>`;
     }
+    let paletteKey = '';
     function applyTheme(p = themePreview || prefs()) {
-      root.WorkHubAppearance.apply(p);
+      // Colour resolution reads computed styles and rewrites inherited tokens. Ordinary
+      // saves/navigation reuse the resolved palette; real previews/account changes apply now.
+      const key = JSON.stringify([
+        a.cloud().ready,
+        a.cloud().user?.id,
+        p.theme,
+        p.accent,
+        p.colors,
+      ]);
+      if (paletteKey !== key || document.body.dataset.hubTheme !== p.theme) {
+        root.WorkHubAppearance.apply(p);
+        paletteKey = key;
+      }
       root.WorkHubRenderProfile?.setMode(p.displayMode);
-      document.body.dataset.hubTheme = p.theme;
-      document.body.dataset.motion = p.motion;
-      document.body.dataset.density = p.density;
-      document.body.dataset.hubBackground = p.background;
-      document.documentElement.style.setProperty('--hub-radius', p.radius + 'px');
-      document.documentElement.style.setProperty(
+      dataValue(document.body, 'hubTheme', p.theme);
+      dataValue(document.body, 'motion', p.motion);
+      dataValue(document.body, 'density', p.density);
+      dataValue(document.body, 'hubBackground', p.background);
+      styleValue(document.documentElement, '--hub-radius', p.radius + 'px');
+      styleValue(
+        document.documentElement,
         '--hub-font',
         p.font === 'serif'
           ? 'Georgia,serif'
@@ -561,7 +585,7 @@
         };
       const left = b.left + petPosition.x * b.width,
         top = b.top + petPosition.y * b.height;
-      Object.assign(pet.style, {
+      styleValues(pet, {
         position: 'fixed',
         left: left + 'px',
         top: top + 'px',
@@ -570,20 +594,20 @@
         width: b.size + 'px',
         height: b.size + 'px',
         zIndex: '90',
-        padding: '0',
-        border: '0',
+        padding: '0px',
+        border: '0px',
         background: 'transparent',
         boxShadow: 'none',
       });
       const svg = pet.querySelector('svg');
-      if (svg) Object.assign(svg.style, { width: '100%', height: '100%', display: 'block' });
+      if (svg) styleValues(svg, { width: '100%', height: '100%', display: 'block' });
       const button = pet.querySelector('button');
       if (button)
-        Object.assign(button.style, {
+        styleValues(button, {
           width: '100%',
           height: '100%',
-          padding: '0',
-          border: '0',
+          padding: '0px',
+          border: '0px',
           background: 'transparent',
           boxShadow: 'none',
           touchAction: 'none',
@@ -596,7 +620,7 @@
           Math.min(b.left + b.viewportWidth - 24 - bubbleWidth, left + b.size / 2 - bubbleWidth / 2)
         );
       if (bubble)
-        Object.assign(bubble.style, {
+        styleValues(bubble, {
           position: 'absolute',
           width: bubbleWidth + 'px',
           maxWidth: 'none',
@@ -605,7 +629,7 @@
           top: top - b.top < 110 ? 'calc(100% + 10px)' : 'auto',
           bottom: top - b.top < 110 ? 'auto' : 'calc(100% + 10px)',
         });
-      pet.dataset.positionPinned = String(companionPinned);
+      dataValue(pet, 'positionPinned', companionPinned);
       life?.layout();
       adventures?.moved(before, { x: left, y: top });
     }
@@ -703,7 +727,7 @@
       petWalk = null;
       if (petFrame) root.cancelAnimationFrame(petFrame);
       petFrame = 0;
-      if ($('hubPet')) $('hubPet').dataset.roaming = 'false';
+      dataValue($('hubPet'), 'roaming', false);
     }
     function canCompanionWalk() {
       const p = themePreview || prefs(),
@@ -905,13 +929,17 @@
       for (const b of $('tabs').querySelectorAll('[data-tab]')) {
         const key = b.dataset.tab;
         if (!names[key]) continue;
-        b.innerHTML =
-          '<span class="hub-nav-icon">' +
-          icon(key) +
-          '</span><span class="hub-nav-label">' +
-          names[key] +
-          '</span>';
-        if (key === 'specs') b.title = 'Projects · ' + projectName(a.state().activeProjectId);
+        if (b.querySelector('.hub-nav-label')?.textContent !== names[key])
+          b.innerHTML =
+            '<span class="hub-nav-icon">' +
+            icon(key) +
+            '</span><span class="hub-nav-label">' +
+            names[key] +
+            '</span>';
+        if (key === 'specs') {
+          const title = 'Projects · ' + projectName(a.state().activeProjectId);
+          if (b.title !== title) b.title = title;
+        }
       }
     }
     function syncViewModes() {
@@ -3908,9 +3936,11 @@
       life?.tick();
       moments?.tick();
       tickCompanion();
-      if ($('hubTimerClock')) $('hubTimerClock').textContent = timerText();
+      if ($('hubTimerClock') && $('hubTimerClock').textContent !== timerText())
+        $('hubTimerClock').textContent = timerText();
       if (focus) {
-        if ($('hubFocusClock')) $('hubFocusClock').textContent = focusText();
+        if ($('hubFocusClock') && $('hubFocusClock').textContent !== focusText())
+          $('hubFocusClock').textContent = focusText();
         if (!focus.pausedAt && Date.now() >= focus.end) {
           focus = null;
           document.body.classList.remove('hub-focus');

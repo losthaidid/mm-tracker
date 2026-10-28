@@ -19,6 +19,19 @@
     scenery: 'random',
     weather: 'random',
   };
+  // Do not invalidate the whole animated page when the clock/scene is unchanged.
+  const dataValue = (el, key, value) => {
+    if (el && el.dataset[key] !== String(value)) el.dataset[key] = String(value);
+  };
+  const styleValue = (el, key, value) => {
+    if (el.style.getPropertyValue(key) !== value) el.style.setProperty(key, value);
+  };
+  const hidden = (el, value) => {
+    if (el && el.hidden !== value) el.hidden = value;
+  };
+  const label = (el, value) => {
+    if (el.getAttribute('aria-label') !== value) el.setAttribute('aria-label', value);
+  };
   const PHASES = {
     morning: 'Morning light',
     afternoon: 'Afternoon glow',
@@ -144,12 +157,13 @@
         );
         nextWeather = now + 90000 + Math.random() * 150000;
       }
-      document.body.dataset.scenery = worldScene;
-      document.body.dataset.weather = worldWeather;
+      dataValue(document.body, 'scenery', worldScene);
+      dataValue(document.body, 'weather', worldWeather);
       for (const el of document.querySelectorAll('#hubAtmosphereCard,#hubAtmospherePocket')) {
-        el.dataset.scenery = worldScene;
-        el.dataset.weather = worldWeather;
-        el.title = SCENERY[worldScene] + ' · ' + WEATHER[worldWeather] + ' · Change your window';
+        dataValue(el, 'scenery', worldScene);
+        dataValue(el, 'weather', worldWeather);
+        const title = SCENERY[worldScene] + ' · ' + WEATHER[worldWeather] + ' · Change your window';
+        if (el.title !== title) el.title = title;
       }
     }
     function positionVisitor(x, y) {
@@ -213,33 +227,41 @@
         hours = date.getHours() + date.getMinutes() / 60,
         day = Math.max(0, Math.min(1, (hours - 6) / 13)),
         night = ((hours + 4) % 24) / 10;
-      document.body.style.setProperty('--ambient-sun-x', Math.round(-115 + day * 150) + 'px');
-      document.body.style.setProperty(
-        '--ambient-sun-y',
-        Math.round(40 - Math.sin(day * Math.PI) * 40) + 'px'
-      );
-      document.body.style.setProperty(
-        '--ambient-moon-x',
-        Math.round(-60 + Math.min(1, night) * 75) + 'px'
-      );
-      document.body.style.setProperty(
-        '--ambient-moon-y',
-        Math.round(13 - Math.sin(Math.min(1, night) * Math.PI) * 15) + 'px'
-      );
       const selectedMode =
         a.lighting?.() && a.lighting() !== 'auto' ? a.lighting() : preferences.mode;
       const next = selectedMode === 'auto' ? phaseAt(date) : selectedMode;
-      document.body.dataset.atmospherePaused = String(document.hidden || !motion());
-      if (selectedMode !== 'auto') {
-        const fixed = {
-          morning: [-65, 14],
-          afternoon: [-15, -4],
-          evening: [12, 36],
-          night: [0, 0],
-        }[next] || [0, 0];
-        document.body.style.setProperty('--ambient-sun-x', fixed[0] + 'px');
-        document.body.style.setProperty('--ambient-sun-y', fixed[1] + 'px');
-      }
+      const fixed =
+        selectedMode === 'auto'
+          ? null
+          : {
+              morning: [-65, 14],
+              afternoon: [-15, -4],
+              evening: [12, 36],
+              night: [0, 0],
+            }[next] || [0, 0];
+      // Resolve fixed vs automatic positions before writing, avoiding two conflicting
+      // sun positions (and forced style work) on every tick of a fixed scene.
+      styleValue(
+        document.body,
+        '--ambient-sun-x',
+        (fixed ? fixed[0] : Math.round(-115 + day * 150)) + 'px'
+      );
+      styleValue(
+        document.body,
+        '--ambient-sun-y',
+        (fixed ? fixed[1] : Math.round(40 - Math.sin(day * Math.PI) * 40)) + 'px'
+      );
+      styleValue(
+        document.body,
+        '--ambient-moon-x',
+        Math.round(-60 + Math.min(1, night) * 75) + 'px'
+      );
+      styleValue(
+        document.body,
+        '--ambient-moon-y',
+        Math.round(13 - Math.sin(Math.min(1, night) * Math.PI) * 15) + 'px'
+      );
+      dataValue(document.body, 'atmospherePaused', document.hidden || !motion());
       if (phase !== next) {
         phase = next;
         clearVisitor();
@@ -257,12 +279,11 @@
           );
       const layer = $('hubAtmosphere');
       if (layer) {
-        layer.hidden = !ready || present || phase === 'off';
-        layer.dataset.rain = String(preferences.rain);
-        layer.dataset.paused = String(paused);
+        hidden(layer, !ready || present || phase === 'off');
+        dataValue(layer, 'rain', preferences.rain);
+        dataValue(layer, 'paused', paused);
       }
       const visitors = $('hubVisitors');
-      if (visitors) visitors.hidden = !ready || paused || !preferences.visitors;
       const hardPause =
         !ready ||
         document.hidden ||
@@ -270,28 +291,28 @@
         document.body.matches('.hub-present,.hub-private,.hub-focus,.hub-sorting') ||
         !!document.querySelector('dialog[open]') ||
         editing();
-      if (visitors) visitors.hidden = hardPause || !preferences.visitors;
+      hidden(visitors, hardPause || !preferences.visitors);
       if (hardPause || !preferences.visitors) clearVisitor();
       const card = $('hubAtmosphereCard');
       if (card) {
-        card.hidden = !ready || present || phase === 'off';
-        card.dataset.phase = phase;
-        card.dataset.paused = String(weatherPaused);
-        card.setAttribute('aria-label', PHASES[phase] + '. Change atmosphere and visitors.');
+        hidden(card, !ready || present || phase === 'off');
+        dataValue(card, 'phase', phase);
+        dataValue(card, 'paused', weatherPaused);
+        label(card, PHASES[phase] + '. Change atmosphere and visitors.');
       }
       const pocket = $('hubAtmospherePocket');
       if (pocket) {
-        pocket.hidden = !ready || present || phase === 'off';
-        pocket.dataset.phase = phase;
-        pocket.dataset.paused = String(weatherPaused);
-        pocket.setAttribute('aria-label', PHASES[phase] + '. Open atmosphere settings.');
+        hidden(pocket, !ready || present || phase === 'off');
+        dataValue(pocket, 'phase', phase);
+        dataValue(pocket, 'paused', weatherPaused);
+        label(pocket, PHASES[phase] + '. Open atmosphere settings.');
       }
       const badge = $('hubAtmosphereBadge');
       if (badge) {
-        badge.hidden = !ready || present || phase === 'off';
-        badge.textContent = PHASES[phase];
+        hidden(badge, !ready || present || phase === 'off');
+        if (badge.textContent !== PHASES[phase]) badge.textContent = PHASES[phase];
       }
-      if ($('atmosphereSettings')) $('atmosphereSettings').hidden = !ready;
+      hidden($('atmosphereSettings'), !ready);
       updateWorld();
       const minute = date.toDateString() + ':' + date.getHours() + ':' + date.getMinutes();
       if (lastMinute !== minute || $('hubAtmosphereCaption')?.dataset.phase !== phase) {

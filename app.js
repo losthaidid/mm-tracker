@@ -1186,11 +1186,11 @@ function render() {
   for (const b of $('tabs').querySelectorAll('button')) {
     const key = b.dataset.tab;
     b.hidden = hidden.has(key);
-    if (key === 'specs') b.textContent = activeProject()?.name || 'SAP Projects';
+    if (key === 'specs' && !hub) b.textContent = activeProject()?.name || 'SAP Projects';
     const active = key === tab;
     b.classList.toggle('active', active);
-    if (active) b.setAttribute('aria-current', 'page');
-    else b.removeAttribute('aria-current');
+    if (active && b.getAttribute('aria-current') !== 'page') b.setAttribute('aria-current', 'page');
+    else if (!active && b.hasAttribute('aria-current')) b.removeAttribute('aria-current');
   }
   $('recordSummary').textContent =
     `${state.tickets.length} tickets · ${state.tasks.length} tasks · ${state.specs.length} project items`;
