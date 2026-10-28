@@ -32,7 +32,7 @@ Opening the website shows a small illustrated loading screen while the current l
 
 ## Cloud login
 
-The website is configured for the Supabase project identified in `index.html`. Create a tracker login in the website and confirm your email, then sign in. The database must have the compatible private-record schema described below. Signing in to the Supabase dashboard does not create a tracker login.
+The website is configured for the Supabase project identified in `index.html`. New visitors choose **Request access**; the Owner reviews the request in **Settings → Account → User management**, assigns feature permissions and sends an approved invitation. The recipient follows that invitation and sets a password. Unapproved signups are blocked in the database. See the [user management guide](docs/USER-MANAGEMENT.md) for permissions, suspension, account deletion, expanded screen visibility and deployment requirements. Signing in to the Supabase dashboard does not create a tracker login.
 
 In Supabase Authentication → URL Configuration, set Site URL to the published website address and add that address to Redirect URLs. This makes confirmation emails return to the website. If a default confirmation redirect cannot open, return to the tracker and sign in after confirming the email.
 

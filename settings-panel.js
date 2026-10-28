@@ -53,8 +53,8 @@
     ],
     'tab-visibility': [
       'workspace',
-      'Choose the screens shown in navigation.',
-      'tabs sidebar menu show hide screens',
+      'Choose visible screens, tools and Focus / Break shortcuts.',
+      'tabs sidebar menu show hide screens studio projects focus break terrarium presentation',
     ],
     'charge-codes': [
       'work',
@@ -150,6 +150,11 @@
       'account',
       'Sign in or manage your account.',
       'account login sign in email password',
+    ],
+    workhubUserManagement: [
+      'account',
+      'Approve requests, manage feature access and account status.',
+      'user management owner permissions approve reject suspend delete accounts invitations',
     ],
     cloudSignOut: ['account', 'Leave this account on this device.', 'account logout sign out'],
   };

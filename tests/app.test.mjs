@@ -34,6 +34,9 @@ async function app(t,{storage={},rpcError=null,remote=null,login=true,styles=fal
   auth:{getSession:sessionLookup||(async()=>({data:{session:null},error:null})),onAuthStateChange:()=>({data:{subscription:{unsubscribe(){}}}})},
   from:()=>({select:columns=>{db.selects.push(columns);return{eq:()=>({maybeSingle:async()=>db.read?db.read():({data:copy(db.row),error:null})})};}}),
   rpc:async(name,args)=>{
+   if(name==='workhub_my_access')return{data:db.access||{userId:window.api?.cloud.user?.id||'11111111-1111-4111-8111-111111111111',role:'owner',status:'active',version:1,permissions:window.WorkHubAccessCatalog.preset(),needsPassword:false},error:db.accessError||null};
+   if(name==='load_mm_tracker'||name==='load_mm_tracker_revision')return{data:db.row?[copy(db.row)]:[],error:null};
+   if(name==='workhub_request_access'){db.request=copy(args);return{data:{received:true},error:null};}
    db.calls.push({name,args:copy(args)});
    if(db.error)return{data:null,error:db.error};
    if(db.row?.mutation_id===args.p_mutation_id)return{data:[{revision:db.row.revision,mutation_id:db.row.mutation_id}],error:null};
@@ -46,16 +49,16 @@ async function app(t,{storage={},rpcError=null,remote=null,login=true,styles=fal
  // Use production's script order, replacing only the network client with the stub above.
  for(const script of window.document.querySelectorAll('script[src]')){const file=new URL(script.src).pathname.split('/mm-tracker/')[1];if(!['supabase-client.js','app.js'].includes(file))window.eval(readFileSync(new URL('../'+file,import.meta.url),'utf8'));}
  window.eval(readFileSync(new URL('../app.js',import.meta.url),'utf8')+`\nwindow.api={
-  hub,workspaceReset,scheduleTimeStatus,reviewPastPlans,queueCloudReview,state:()=>state,steps:()=>STEPS,cloud,KEY,payload,parseBackup,emptyState,validate,mutate,loadCloud,flushCloud,refreshCloud,retryCloud,closeModal,
+  hub,access,userManagement,editVisibility,saveVisibility,workspaceReset,scheduleTimeStatus,reviewPastPlans,queueCloudReview,state:()=>state,steps:()=>STEPS,cloud,KEY,payload,parseBackup,emptyState,validate,mutate,loadCloud,flushCloud,refreshCloud,retryCloud,closeModal,
   openMMAreaManager,saveMMAreas,editLists,saveLists,editMMAreaDraft,canonicalArea,summarizeGovernanceRows,
   renderProjectCompanies,editCompany,saveCompany,editProcess,saveProcess,editProject,saveProject,
   browserMigrationAction,notice,action,projectMMAreas,editRecord,saveEdit,editSubItem,saveSubItem,openSubItems,editTaskSub,saveTaskSub,openRangeEditor,saveRange,scheduleEntries,viewBooking,workhubAction,workhubChange,rangeSegments,rangeTimes,editPlan,savePlan,reportModel,reportDashboard,exportReport,scheduleMonthMetrics,formatDuration,
   showTab(value){tab=value;render();},showProjectItems(){tab='specs';projectView='items';render();},setMonth(value){month=value;},
-  login(){cloud.user={id:'11111111-1111-4111-8111-111111111111',email:'owner@example.com'};cloud.ready=true;cloud.key='mm-tracker.cloud.v1:'+cloudConfig.project+':'+cloud.user.id;cloud.status='Saved to Supabase';persistCloudCache();notice();render();},
+  async login(){cloud.user={id:'11111111-1111-4111-8111-111111111111',email:'owner@example.com'};await access.load(cloud.user);cloud.ready=true;cloud.key='mm-tracker.cloud.v1:'+cloudConfig.project+':'+cloud.user.id;cloud.status='Saved to Supabase';persistCloudCache();notice();render();},
   showCompanies(){tab='specs';projectView='companies';render();}
  };`);
  await settle();
- if(login)window.api.login();
+ if(login)await window.api.login();
  return{window,document:window.document,api:window.api,db,intervals,frames};
 }
 
@@ -259,6 +262,7 @@ test('people: stale editors, replaced forms and foreign-account drops cannot ove
  ui.personEditor(buyer.id);let stale=document.getElementById('peForm');stale.elements.namedItem('name').value='Outdated';api.mutate(d=>d.workhub.projectPeople.people.find(p=>p.id===buyer.id).title='New title');assert.throws(()=>ui.submit(stale),/record changed/);assert.equal(api.state().workhub.projectPeople.people[1].name,'Daniel');
  ui.personEditor(buyer.id);stale=document.getElementById('peForm');ui.personEditor();assert.throws(()=>ui.submit(stale),/Reopen/);
  ui.personEditor(buyer.id);stale=document.getElementById('peForm');api.cloud.user={id:'another-owner'};api.showTab('home');assert.equal(document.getElementById('modal').open,false);assert.throws(()=>ui.submit(stale),/Reopen|signing in/);
+ await api.access.load(api.cloud.user);
  api.showTab('specs');document.querySelector('[data-action="project-view"][data-view="people"]').click();await settle();const event=new window.Event('drop',{bubbles:true,cancelable:true});Object.defineProperty(event,'dataTransfer',{value:{getData:()=>JSON.stringify({owner:'old-owner',projectId:api.state().activeProjectId,type:'activity',id:activity.id})}});document.querySelector('[data-pe-person]').dispatchEvent(event);assert.equal(api.state().workhub.projectPeople.assignments.length,0);
 });
 
@@ -303,7 +307,7 @@ test('stand-up: search survives refreshes and Action saves, preserves drafts and
  search('PO');document.querySelector('.standup-sub-row [data-standup="add"]').click();let form=document.getElementById('standupActionForm');form.elements.namedItem('text').value='Email the business owner';submitLocal(window,form);await settle();assert.equal(document.getElementById('standupSearch').value,'PO');
  const task=api.state().tasks[0];let input=search('email');input.focus();input.setSelectionRange(2,4);api.hub.moveTask(task.id,'blocked');await settle();input=document.getElementById('standupSearch');assert.equal(input.value,'email');assert.equal(document.activeElement,input);assert.equal(input.selectionStart,2);assert.equal(input.selectionEnd,4);assert.match(document.querySelector('.standup-item:not([hidden])').textContent,/Blocked/);
  document.querySelector('.standup-sub-row [data-standup="add"]').click();form=document.getElementById('standupActionForm');form.elements.namedItem('text').value='Unsaved instruction';search('no-match');assert.equal(document.getElementById('standupActionForm'),form);document.querySelector('[data-standup="clear-search"]').click();assert.equal(form.elements.namedItem('text').value,'Unsaved instruction');assert.equal(api.state().tasks.length,1);document.querySelector('[data-standup="cancel-action"]').click();
- search('email');api.closeModal();ui.open(item.projectId);assert.equal(document.getElementById('standupSearch').value,'');search('private term');api.cloud.user={id:'next-account'};api.showTab('home');assert.equal(document.getElementById('modal').open,false);api.login();ui.open(item.projectId);assert.equal(document.getElementById('standupSearch').value,'');
+ search('email');api.closeModal();ui.open(item.projectId);assert.equal(document.getElementById('standupSearch').value,'');search('private term');api.cloud.user={id:'next-account'};api.showTab('home');assert.equal(document.getElementById('modal').open,false);await api.login();ui.open(item.projectId);assert.equal(document.getElementById('standupSearch').value,'');
 });
 
 test('stand-up: saving Actions creates linked tasks once, persists together and shows task completion',async t=>{
@@ -1377,7 +1381,7 @@ test('workspace lab records attempts, saves privately, restores backups and reus
 });
 
 test('workspace lab requires a verified solution, supports archive/search and clears account-specific view state',async t=>{
- const {api,document,window}=await app(t);const id=addLabCase(api,document);await settle();api.hub.workbench.caseForm(id);let f=document.getElementById('benchCaseForm');fill(f,{status:'Solved'});assert.throws(()=>api.hub.workbench.saveCase(f),/verified solution/);assert.equal(api.state().workhub.lab[0].status,'Investigating');api.closeModal();api.showTab('lab');document.querySelector('[data-bench="case-archive"]').click();await settle();assert.equal(api.state().workhub.lab[0].archived,true);assert.equal(document.querySelector('.bench-case-detail'),null);const view=document.getElementById('benchLabView');view.value='archived';view.dispatchEvent(new window.Event('change',{bubbles:true}));document.querySelector('[data-bench="case-archive"]').click();await settle();assert.equal(api.state().workhub.lab[0].archived,false);let search=document.getElementById('benchLabSearch');search.value='private search';search.dispatchEvent(new window.Event('input',{bubbles:true}));api.cloud.user={id:'22222222-2222-4222-8222-222222222222',email:'second@example.com'};api.showTab('lab');assert.equal(document.getElementById('benchLabSearch').value,'');assert.equal(document.getElementById('benchLabView').value,'active');
+ const {api,document,window}=await app(t);const id=addLabCase(api,document);await settle();api.hub.workbench.caseForm(id);let f=document.getElementById('benchCaseForm');fill(f,{status:'Solved'});assert.throws(()=>api.hub.workbench.saveCase(f),/verified solution/);assert.equal(api.state().workhub.lab[0].status,'Investigating');api.closeModal();api.showTab('lab');document.querySelector('[data-bench="case-archive"]').click();await settle();assert.equal(api.state().workhub.lab[0].archived,true);assert.equal(document.querySelector('.bench-case-detail'),null);const view=document.getElementById('benchLabView');view.value='archived';view.dispatchEvent(new window.Event('change',{bubbles:true}));document.querySelector('[data-bench="case-archive"]').click();await settle();assert.equal(api.state().workhub.lab[0].archived,false);let search=document.getElementById('benchLabSearch');search.value='private search';search.dispatchEvent(new window.Event('input',{bubbles:true}));api.cloud.user={id:'22222222-2222-4222-8222-222222222222',email:'second@example.com'};await api.access.load(api.cloud.user);api.showTab('lab');assert.equal(document.getElementById('benchLabSearch').value,'');assert.equal(document.getElementById('benchLabView').value,'active');
 });
 
 test('workspace lab validates imported cases and merges independent investigation edits across devices',async t=>{
@@ -1924,12 +1928,12 @@ test('recipients: account saves, reopened records and JSON backups retain compan
  const ctx=await app(t),{api,document,window,db}=ctx,ui=api.hub.recipients;const a=addRecipientCompany(ctx,'Client A','Team notes');addRecipient(ctx,'owner@example.com','Owner');addRecipient(ctx,'hidden@example.com','','bcc',false);await settle();assert.deepEqual(db.row.document.data.workhub.recipients,copy(api.state().workhub.recipients));
  const restored=api.parseBackup(api.payload(api.state()));assert.deepEqual(copy(restored.workhub.recipients),copy(api.state().workhub.recipients));const bad=copy(restored);bad.workhub.recipients.companies[0].contacts[0].email='bad@@example.com';assert.throws(()=>api.parseBackup(api.payload(bad)),/recipient/);
  const second=await app(t,{remote:copy(db.row),login:false});await second.api.loadCloud(sessionUser);await settle();second.api.hub.recipients.open(a);assert.equal(second.document.getElementById('recipientCopyPreview').value,'owner@example.com');assert.equal(second.api.state().workhub.recipients.companies[0].contacts[1].enabled,false);
- ui.contactForm();const stale=document.getElementById('recipientContactForm');fill(stale,{email:'stale@example.com'});api.cloud.ready=false;api.cloud.user=null;api.showTab('home');assert.equal(document.getElementById('modal').open,false);assert.equal(document.getElementById('recipientSettingsButton').hidden,true);assert.throws(()=>ui.saveContact(stale),/Sign in/);api.login();assert.throws(()=>ui.saveContact(stale),/Reopen/);assert.equal(api.state().workhub.recipients.companies[0].contacts.length,2);
+ ui.contactForm();const stale=document.getElementById('recipientContactForm');fill(stale,{email:'stale@example.com'});api.cloud.ready=false;api.cloud.user=null;api.showTab('home');assert.equal(document.getElementById('modal').open,false);assert.equal(document.getElementById('recipientSettingsButton').hidden,true);assert.throws(()=>ui.saveContact(stale),/Sign in/);await api.login();assert.throws(()=>ui.saveContact(stale),/Reopen/);assert.equal(api.state().workhub.recipients.companies[0].contacts.length,2);
 });
 
 test('grouped Settings: five sections keep all existing actions and section changes stay open',async t=>{
  const {api,document,window,db}=await app(t),ui=api.hub.settingsPanel,menu=document.getElementById('settingsMenu');api.hub.chromeUX.open();await settle();
- assert.equal(document.querySelectorAll('#settingsCategories [role="tab"]').length,5);assert.deepEqual(copy(ui.snapshot().groups.map(g=>[g.id,g.count])),[['workspace',4],['work',8],['companion',4],['data',5],['account',2]]);assert.equal(document.querySelectorAll('.settings-group:not([hidden])').length,1);assert.equal(document.querySelector('.settings-group:not([hidden])').id,'settingsGroup-workspace');assert.equal(document.querySelectorAll('.settings-option').length,23);assert.equal(document.querySelector('#hubSettingsAppearance button'),null);
+ assert.equal(document.querySelectorAll('#settingsCategories [role="tab"]').length,5);assert.deepEqual(copy(ui.snapshot().groups.map(g=>[g.id,g.count])),[['workspace',4],['work',8],['companion',4],['data',5],['account',3]]);assert.equal(document.querySelectorAll('.settings-group:not([hidden])').length,1);assert.equal(document.querySelector('.settings-group:not([hidden])').id,'settingsGroup-workspace');assert.equal(document.querySelectorAll('.settings-option').length,24);assert.equal(document.querySelector('#hubSettingsAppearance button'),null);
  for(const [id,group]of [['hubSettingsHeader','workspace'],['claimSettingsButton','work'],['recipientSettingsButton','work'],['momoAdventureSettings','companion'],['soundscapeSettings','companion'],['backupButton','data'],['workspaceResetButton','data'],['cloudSignOut','account']])assert.equal(document.getElementById(id).closest('.settings-group').id,'settingsGroup-'+group);
  document.querySelector('[data-settings-group="work"]').click();assert.equal(menu.open,true);assert.equal(ui.snapshot().active,'work');document.getElementById('recipientSettingsButton').click();await settle();assert.equal(menu.open,false);assert.ok(document.getElementById('recipientDirectory'));api.closeModal();api.hub.chromeUX.open();document.querySelector('[data-settings-group="companion"]').click();document.getElementById('soundscapeSettings').click();await settle();assert.equal(menu.open,false);assert.ok(document.querySelector('#modalBody .soundscape-room'));assert.equal(db.calls.length,0);
 });
@@ -1955,7 +1959,7 @@ test('grouped Settings: later launchers and sync visibility update without cloni
 
 test('grouped Settings: sign-out clears the search and hides account-owned options while sign-in remains available',async t=>{
  const {api,document,window,db}=await app(t),search=document.getElementById('settingsSearch');search.value='company';search.dispatchEvent(new window.Event('input',{bubbles:true}));api.cloud.ready=false;api.cloud.user=null;api.notice();api.showTab('home');await settle();assert.equal(search.value,'');assert.equal(document.getElementById('settingsTab-work').hidden,true);assert.equal(document.getElementById('settingsTab-companion').hidden,true);assert.equal(document.getElementById('hubSettingsHeader').closest('.settings-entry').hidden,true);assert.equal(document.getElementById('recipientSettingsButton').closest('.settings-entry').hidden,true);assert.equal(document.getElementById('cloudAccountButton').hidden,false);assert.equal(document.getElementById('cloudAccountButton').textContent,'Sign in');assert.equal(api.hub.settingsPanel.snapshot().active,'account');
- api.login();await settle();assert.equal(document.getElementById('settingsTab-work').hidden,false);assert.equal(document.getElementById('hubSettingsHeader').closest('.settings-entry').hidden,false);assert.equal(api.hub.settingsPanel.snapshot().active,'workspace');assert.equal(db.calls.length,0);
+ await api.login();await settle();assert.equal(document.getElementById('settingsTab-work').hidden,false);assert.equal(document.getElementById('hubSettingsHeader').closest('.settings-entry').hidden,false);assert.equal(api.hub.settingsPanel.snapshot().active,'workspace');assert.equal(db.calls.length,0);
 });
 
 function tngFixtureRow(patch={}){return {id:'t1',transactionNo:'0001',section:'offline',page:1,width:595,height:842,date:'2026-10-09',postedDate:'2026-10-10',time:'09:00:00',type:'Fare Usage - Toll/Bus',sector:'TOLL',entry:'Demo entry',exit:'Demo exit',amountCents:166,kind:'toll',category:'toll',rect:{x:20,y:60,w:555,h:30},originalRect:{x:20,y:60,w:555,h:30},headerRect:{x:20,y:20,w:555,h:30},errors:[],manual:false,selected:false,bookingKey:'',description:'Demo toll',...patch};}
@@ -2003,6 +2007,7 @@ test('TNG desk: late exports and stale manual forms cannot cross accounts',async
  assert.equal(reader.closed(),1);
  assert.equal(ui.snapshot().rows.length,0);
  assert.equal(document.getElementById('modal').open,false);
+ await api.access.load(api.cloud.user);
  ui.open();
  document.querySelector('[data-tng="manual"]').click();
  const stale=document.getElementById('tngRowForm');
@@ -2309,6 +2314,7 @@ test('rehearsal UI: scenario changes, rewind, failure routes and off-route inspe
 test('rehearsal UI: account switches reject stale step editors and motion off stops automatic advance',async t=>{
  const {api,document}=await app(t);api.showTab('processhub');document.querySelector('[data-rehearsal="keep"]').click();await settle();const r=api.hub.rehearsal;r.stepEditor('po');const stale=document.getElementById('rehearsalStepForm');stale.elements.namedItem('title').value='Private old draft';
  api.cloud.user={id:'22222222-2222-4222-8222-222222222222'};api.showTab('home');assert.throws(()=>r.saveForm(stale),/Sign in/);
+ await api.access.load(api.cloud.user);
  api.mutate(d=>{d.workhub.preferences.motion='off';});api.showTab('processhub');const before=r.snapshot().index;for(let n=1;n<=80;n++)r.tick(n*150);assert.equal(r.snapshot().index,before);
 });
 
@@ -2804,7 +2810,7 @@ test('My Day design: chart categories drill down without writes and motion guard
  let cancelled=0,started=0;window.Element.prototype.animate=()=>{started++;return{cancel(){cancelled++;},finished:new Promise(()=>{})};};api.showTab('tasks');api.showTab('home');assert.ok(started>0);reduced=true;ui.visual.sync();assert.equal(document.querySelector('.my-day-page').dataset.mvMotion,'still');assert.ok(cancelled>0);
  reduced=false;document.body.classList.add('hub-private');ui.visual.sync();assert.equal(document.querySelector('.my-day-page').dataset.mvMotion,'still');document.body.classList.remove('hub-private');
  Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new window.Event('visibilitychange'));assert.equal(document.querySelector('.my-day-page').dataset.mvMotion,'still');Object.defineProperty(document,'hidden',{configurable:true,value:false});ui.visual.sync();assert.equal(document.querySelector('.my-day-page').dataset.mvMotion,'flow');
- document.querySelector('[data-mv="view"][data-view="work"]').click();api.cloud.user={id:'22222222-2222-4222-8222-222222222222'};api.showTab('home');assert.equal(document.querySelector('.my-day-page').dataset.mvView,'all');assert.equal(db.calls.length,calls);
+ document.querySelector('[data-mv="view"][data-view="work"]').click();api.cloud.user={id:'22222222-2222-4222-8222-222222222222'};await api.access.load(api.cloud.user);api.showTab('home');assert.equal(document.querySelector('.my-day-page').dataset.mvView,'all');assert.equal(db.calls.length,calls);
 });
 test('My Day: canvas ideas, groups and connections persist through cloud reload and backup, with idempotent task conversion',async t=>{
  const {api,document,window,db}=await app(t),ui=api.hub.myDay;api.showTab('home');
@@ -3333,7 +3339,7 @@ test('Validation stable editing: SAP fields, Apply and Save retain the mounted e
 
 test('Validation stable editing: draft and published views, company scope and account reset preserve ownership while using incremental updates',async t=>{
  const {api,window,document}=await app(t),E=window.WorkHubValidatorEngine,template=E.example();api.mutate(d=>{d.workhub.validator.templates=[template];});await settle();api.showTab('validator');const ui=api.hub.validator,root=document.querySelector('.validation-studio');await ui.handle({dataset:{val:'publish'}});await settle();assert.equal(document.querySelector('.validation-studio'),root);await ui.handle({dataset:{val:'mode',mode:'check'}});assert.equal(document.querySelector('.validation-studio'),root);const version=document.querySelector('[name="version"]');version.focus();version.value='draft';version.dispatchEvent(new window.Event('change',{bubbles:true}));await settle();assert.equal(document.querySelector('[name="version"]'),version);assert.equal(document.activeElement,version);assert.equal(document.querySelector('.validation-studio'),root);
- const oldOwner=root.dataset.valOwner;api.cloud.user={id:'22222222-2222-4222-8222-222222222222',email:'other@example.com'};api.showTab('validator');assert.notEqual(document.querySelector('.validation-studio'),root);assert.notEqual(document.querySelector('.validation-studio').dataset.valOwner,oldOwner);assert.equal(root.isConnected,false);
+ const oldOwner=root.dataset.valOwner;api.cloud.user={id:'22222222-2222-4222-8222-222222222222',email:'other@example.com'};api.showTab('validator');assert.equal(document.querySelector('.validation-studio'),null);assert.equal(root.isConnected,false);await api.access.load(api.cloud.user);api.showTab('validator');assert.notEqual(document.querySelector('.validation-studio').dataset.valOwner,oldOwner);
 });
 
 test('Notes workspace: private cloud save and backup reopen retain content while Knowledge and editor focus stay intact',async t=>{
@@ -3415,6 +3421,66 @@ test('Data reader integration: Studio navigation, in-memory reports and pending 
 test('Data reader integration: logout and switching accounts erase uploaded content, draft text and report options',async t=>{
  const {api,document,window}=await app(t);window.setTimeout=(fn,ms)=>{if(ms===30)queueMicrotask(fn);return 0;};api.hub.setTool('reader');api.showTab('studio');const ui=api.hub.reader;await ui.openText(window.WorkHubDataReaderEngine.sample('idoc'));const oldSource=document.getElementById('drSource');
  api.cloud.ready=false;api.cloud.user=null;api.showTab('home');assert.equal(ui.snapshot().source,'');assert.equal(ui.snapshot().kind,'');assert.equal(oldSource.isConnected,false);
- api.login();api.hub.setTool('reader');api.showTab('studio');assert.equal(document.getElementById('drSource').value,'');assert.equal(ui.snapshot().source,'');
- await ui.openText('{"private":"first-account-only"}');api.cloud.user={id:'different-owner',email:'other@example.com'};api.showTab('studio');assert.equal(ui.snapshot().source,'');assert.equal(document.getElementById('drSource').value,'');assert.doesNotMatch(document.getElementById('view').textContent,/first-account-only/);
+ await api.login();api.hub.setTool('reader');api.showTab('studio');assert.equal(document.getElementById('drSource').value,'');assert.equal(ui.snapshot().source,'');
+ await ui.openText('{"private":"first-account-only"}');api.cloud.user={id:'different-owner',email:'other@example.com'};await api.access.load(api.cloud.user);api.showTab('studio');assert.equal(ui.snapshot().source,'');assert.equal(document.getElementById('drSource').value,'');assert.doesNotMatch(document.getElementById('view').textContent,/first-account-only/);
+});
+
+test('User access: Screen visibility includes every screen and Studio tool and hiding the current tool switches immediately',async t=>{
+ const {api,document,window}=await app(t),C=window.WorkHubAccessCatalog;window.setTimeout=(fn,ms)=>{if(ms===30)queueMicrotask(fn);return 0;};api.editVisibility();const f=document.getElementById('visibilityForm');
+ assert.equal(f.querySelectorAll('[name="visibleTabs"]').length,C.features.length-1);
+ for(const id of ['home','notes','processhub','knowledge','waiting','lab','validator','snippets','projects.solution','projects.people','projects.standup','focus','break','presentation-break'])assert.ok(f.querySelector('[value="'+id+'"]'));
+ f.querySelector('[value="notes"]').checked=false;api.saveVisibility(f);await settle();assert.equal(document.querySelector('#tabs [data-tab="notes"]').hidden,true);api.showTab('notes');assert.equal(document.querySelector('#tabs [aria-current="page"]').dataset.tab,'home');
+ api.editVisibility();const shortcuts=document.getElementById('visibilityForm');for(const id of ['focus','break','presentation-break','projects.solution'])shortcuts.querySelector('[value="'+id+'"]').checked=false;api.saveVisibility(shortcuts);await settle();for(const id of ['focusModeButton','breakTerrariumButton','presentationBreakButton'])assert.equal(document.getElementById(id).hidden,true);api.showTab('specs');assert.equal(document.querySelector('[data-action="project-view"][data-view="solution"]').hidden,true);api.validate(api.state());
+ api.hub.setTool('reader');api.showTab('studio');await api.hub.reader.openText('{"a":"0001"}');api.editVisibility();const f2=document.getElementById('visibilityForm');f2.querySelector('[value="studio.reader"]').checked=false;api.saveVisibility(f2);await settle();assert.equal(document.getElementById('dataReader'),null);assert.ok(document.getElementById('hubTheme'));api.validate(api.state());
+ const disabled=document.createElement('button');disabled.dataset.ss='delete';disabled.disabled=true;document.body.append(disabled);api.access.apply();assert.equal(disabled.disabled,true,'permissions must preserve business-rule disabled controls');disabled.remove();
+});
+test('User access: hidden and disabled routes cannot be opened, view-only writes fail and Owner management stays private',async t=>{
+ const {api,document,window,db}=await app(t),perms=window.WorkHubAccessCatalog.preset('view');perms.notes={mode:'hidden'};perms.validator={mode:'disabled'};perms.workspace=window.WorkHubAccessCatalog.preset().workspace;
+ db.access={userId:api.cloud.user.id,role:'member',status:'active',version:2,permissions:perms};await api.access.load(api.cloud.user);api.showTab('home');assert.equal(document.querySelector('#tabs [data-tab="notes"]').hidden,true);assert.equal(document.querySelector('#tabs [data-tab="validator"]').disabled,true);assert.equal(document.getElementById('workhubUserManagement').hidden,true);
+ api.showTab('notes');assert.equal(document.querySelector('.nt-workspace'),null);assert.throws(()=>api.mutate(d=>d.tasks.push({id:'bad',task:'Unauthorized'})),/permissions/);assert.equal(api.state().tasks.length,0);await assert.rejects(api.userManagement.open(),/Owner access/);
+ api.showTab('home');assert.throws(()=>api.exportReport(api.state()),/every visible feature/);document.getElementById('backupButton').click();assert.match(document.getElementById('toast').textContent,/every visible feature/);document.querySelector('[data-md="break-start"]').click();assert.equal(api.hub.myDay.breakSnapshot(),null);document.querySelector('[data-md="focus-open"]').click();assert.equal(document.getElementById('mdFocus'),null);
+});
+test('User access: public registration submits a request without collecting a password or creating an Auth account',async t=>{
+ const {api,document,window,db}=await app(t,{login:false});const mode=document.getElementById('cloudAuthMode');mode.value='signup';mode.dispatchEvent(new window.Event('change',{bubbles:true}));assert.equal(document.getElementById('cloudPassword').hidden,true);assert.equal(document.getElementById('cloudPassword').required,false);document.getElementById('cloudEmail').value='applicant@example.test';document.getElementById('cloudRequestName').value='Applicant';document.getElementById('cloudRequestReason').value='Try the tools';
+ document.getElementById('cloudAuthForm').dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));await settle();assert.equal(db.request.p_email,'applicant@example.test');assert.equal(db.request.p_name,'Applicant');assert.match(document.getElementById('cloudAuthMessage').textContent,/received/);assert.equal(db.calls.length,0);assert.equal(api.cloud.user,null);
+});
+test('User access: validation can run and save a summary while template edits remain forbidden',async t=>{
+ const ctx=await app(t),{api,document,window,db}=ctx;api.showTab('validator');const ui=api.hub.validator;await ui.handle({dataset:{val:'example'}});ui.saveDraft();await settle();ui.loadSample();
+ const templates=copy(api.state().workhub.validator.templates),perms=window.WorkHubAccessCatalog.preset('view');perms.workspace=window.WorkHubAccessCatalog.preset().workspace;perms.validator={mode:'use',run:true,export:true,create:false,edit:false,delete:false};
+ db.access={userId:api.cloud.user.id,role:'member',status:'active',version:2,permissions:perms};await api.access.load(api.cloud.user);api.showTab('validator');window.setTimeout=(fn,ms)=>{if(ms===50)queueMicrotask(fn);return 0;};await ui.run();await settle();assert.ok(ui.snapshot().result);assert.ok(api.state().workhub.validator.runs.length);assert.deepEqual(copy(api.state().workhub.validator.templates),templates);
+ assert.throws(()=>api.mutate(d=>d.workhub.validator.templates[0].name='Changed'),/permissions/);
+});
+
+test('User access: Owner request review preserves its controls, freezes approval targets and sends only the chosen permissions',async t=>{
+ const {api,document,window}=await app(t),C=window.WorkHubAccessCatalog,owner=api.cloud.user.id,request='33333333-3333-4333-8333-333333333333';
+ const records={users:[{id:owner,name:'Owner',email:'owner@example.test',role:'owner',status:'active',permissions:C.preset(),version:1}],requests:[{id:request,name:'Fictional applicant',email:'applicant@example.test',status:'pending',permissions:{},created_at:'2026-10-28T00:00:00Z'}],history:[]};
+ api.cloud.client.auth.getSession=async()=>({data:{session:{access_token:'fictional-owner-session'}},error:null});let finish;const calls=[];
+ window.fetch=async(url,options)=>{const body=JSON.parse(options.body);calls.push({url,body});if(body.action==='approve')return new Promise(resolve=>finish=()=>resolve({ok:true,json:async()=>({ok:true})}));return{ok:true,json:async()=>({data:copy(records)})};};
+ await api.userManagement.open();assert.equal(document.getElementById('modal').classList.contains('hub-drawer'),false);document.querySelector('[data-um="select"][data-id="'+request+'"]').click();
+ const select=document.querySelector('[data-permission-mode="tickets"]'),inspector=document.getElementById('umInspector');select.value='view';select.dispatchEvent(new window.Event('change',{bubbles:true}));assert.equal(document.querySelector('[data-permission-mode="tickets"]'),select);assert.ok([...select.closest('.um-permission').querySelectorAll('input')].every(x=>x.disabled&&!x.checked));assert.equal(document.getElementById('umInspector'),inspector);
+ document.querySelector('[data-um="approve"]').click();await settle();assert.equal(calls.at(-1).body.target,request);assert.equal(calls.at(-1).body.payload.permissions.tickets.mode,'view');assert.ok([...document.querySelectorAll('.um-room button')].every(x=>x.disabled));assert.doesNotMatch(JSON.stringify(calls),/service.role|server.only.secret/i);
+ records.requests[0].status='approved';finish();await new Promise(resolve=>setImmediate(resolve));assert.match(document.getElementById('umNotice').textContent,/Invitation sent/);assert.equal(document.querySelector('[data-um="tab"]').disabled,false);
+ document.querySelector('[data-um-tab="users"]').click();document.querySelector('[data-um="select"][data-id="'+owner+'"]').click();assert.match(document.getElementById('umInspector').textContent,/cannot be suspended or deleted/);assert.equal(document.querySelector('[data-um="preview-delete"]'),null);
+});
+test('User access: late administration responses cannot restore private account details after an account change',async t=>{
+ const {api,document,window}=await app(t);api.cloud.client.auth.getSession=async()=>({data:{session:{access_token:'fictional-owner-session'}},error:null});let finish;
+ window.fetch=()=>new Promise(resolve=>finish=()=>resolve({ok:true,json:async()=>({data:{users:[{id:'old-person',email:'private-old-account@example.test'}],requests:[],history:[]}})}));
+ const job=api.userManagement.open();await settle();assert.ok(finish);api.cloud.user={id:'22222222-2222-4222-8222-222222222222'};api.showTab('home');assert.equal(document.getElementById('modal').open,false);finish();await job;assert.doesNotMatch(document.getElementById('modalBody').textContent,/private-old-account/);assert.equal(document.querySelector('.um-room')?.textContent||'','');
+});
+test('User access: server projections remain valid across every restricted section and retain cross-screen links safely',async t=>{
+ const {PGlite}=await import('@electric-sql/pglite'),ctx=await app(t),{api,document,window}=ctx,C=window.WorkHubAccessCatalog,db=new PGlite();t.after(()=>db.close());
+ const ticket=addWishlistTicket(api,document);api.editRecord('tasks');let form=document.getElementById('editForm');fill(form,{task:'PRIVATE_TASK',taskType:'Custom'});api.saveEdit(form);await settle();
+ const source=copy(api.state());source.projects[0].name='PRIVATE_PROJECT';source.tasks[0].taskType='Ticket';source.tasks[0].linkId=ticket;
+ source.schedule.push({date:'2026-10-29',time:'09:00',endTime:'09:30',kind:'task',linkId:source.tasks[0].id,activity:'',text:'Scheduled task',location:'',bookingId:'plan-one',planId:''});
+ const full=JSON.parse(api.payload(api.parseBackup(api.payload(source))));
+ await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;create schema auth;create table auth.users(id uuid primary key,email text,encrypted_password text,created_at timestamptz default now(),last_sign_in_at timestamptz);create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;insert into auth.users(id,email,encrypted_password) values('11111111-1111-4111-8111-111111111111','owner@example.test','hashed');`);
+ for(const file of ['cloud-schema.sql','supabase/user-management.sql','supabase/access-catalog.sql'])await db.exec(readFileSync(new URL('../'+file,import.meta.url),'utf8'));
+ await db.query("insert into public.workhub_members(user_id,email,role,permissions) values($1,'owner@example.test','member',$2::jsonb)",[api.cloud.user.id,JSON.stringify(C.preset())]);await db.query('insert into public.mm_tracker_documents(user_id,document,mutation_id) values($1,$2::jsonb,$3)',[api.cloud.user.id,JSON.stringify(full),'33333333-3333-4333-8333-333333333333']);
+ for(const feature of C.features){
+  const perms=C.preset();perms[feature.id]={mode:'hidden'};await db.exec('reset role');await db.query('update public.workhub_members set permissions=workhub_private.clean_permissions($1::jsonb)',[JSON.stringify(perms)]);await db.exec('set role authenticated');await db.query("select set_config('request.jwt.claim.sub',$1,false)",[api.cloud.user.id]);
+  const projected=(await db.query('select * from public.load_mm_tracker()')).rows[0].document;
+  assert.doesNotThrow(()=>api.parseBackup(JSON.stringify(projected)),feature.id);
+  if(feature.id==='specs')assert.doesNotMatch(JSON.stringify(projected),/PRIVATE_PROJECT/);
+  if(feature.id==='tasks')assert.doesNotMatch(JSON.stringify(projected),/PRIVATE_TASK/);
+ }
 });

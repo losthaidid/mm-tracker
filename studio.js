@@ -1838,6 +1838,14 @@
         screenshots: 'Screenshot tools',
       };
       if (!Object.hasOwn(tools, currentTool)) currentTool = 'theme';
+      const available = Object.keys(tools).filter(
+        id =>
+          !a.state().preferences.hiddenTabs?.includes('studio.' + id) &&
+          (!root.WorkHubCurrentAccess || root.WorkHubCurrentAccess.can('studio.' + id))
+      );
+      if (!available.includes(currentTool)) currentTool = available[0] || '';
+      if (!currentTool)
+        return '<section class="access-empty"><h2>No Studio tools are available</h2><p>Check Screen visibility or ask the Owner to review your access.</p></section>';
       return `<section class="hub">${head('A WORKSPACE WITH PERSONALITY', 'Studio', 'Useful tools. A little play. Everything in its place.')}<div class="hub-toolbar">${Object.entries(
         tools
       )
@@ -4274,6 +4282,7 @@
       setTool(value) {
         currentTool = value;
       },
+      currentTool: () => currentTool,
       refreshTheme: applyTheme,
     };
   }
