@@ -352,3 +352,92 @@ test('Data reader: text-only and mixed-content segments retain their text and pa
   for (let i = 0; i < 8; i++) data = { ['key'.repeat(100)]: data };
   assert.throws(() => E.parse(JSON.stringify(data)), /long paths/);
 });
+
+test('Data reader presentation: folding and jumping through report sections never removes exported records', async t => {
+  const { reader, d, E, w } = setup(t, true);
+  await reader.openText(E.sample('idoc'));
+  const original = clone(reader.report()),
+    content = d.getElementById('drContent');
+  assert.match(content.textContent, /MESSAGE JOURNEY/);
+  assert.match(content.textContent, /DEMO_SOURCE/);
+  assert.match(content.textContent, /DEMO_TARGET/);
+  assert.equal(d.querySelectorAll('.dr-field-grid').length, 3);
+  await reader.handle({ dataset: { dr: 'fold' } });
+  assert.equal(d.querySelectorAll('[data-report-section][open]').length, 0);
+  assert.deepEqual(clone(reader.report()), original);
+  await reader.handle({ dataset: { dr: 'tab', tab: 'explore' } });
+  await reader.handle({ dataset: { dr: 'tab', tab: 'report' } });
+  assert.equal(d.querySelectorAll('[data-report-section][open]').length, 0);
+  const target = d.querySelectorAll('[data-report-section]')[3];
+  content.scrollTop = 200;
+  content.getBoundingClientRect = () => ({ top: 100 });
+  target.getBoundingClientRect = () => ({ top: 400 });
+  await reader.handle({ dataset: { dr: 'jump-section', id: target.dataset.reportSection } });
+  assert.equal(target.open, true);
+  assert.equal(content.scrollTop, 484);
+  assert.equal(d.activeElement, target.querySelector('summary'));
+  assert.equal(w.scrollY, 0);
+  await reader.handle({ dataset: { dr: 'unfold' } });
+  assert.equal(d.querySelectorAll('[data-report-section][open]').length, original.sections.length);
+  assert.deepEqual(clone(reader.report()), original);
+  const checkbox = d.querySelector('#drSectionOptions [data-section]');
+  checkbox.checked = false;
+  checkbox.dispatchEvent(new w.Event('change', { bubbles: true }));
+  assert.equal(reader.report().sections.length, original.sections.length - 1);
+});
+
+test('Data reader presentation: expanded mode supports Escape, returns focus and clears on account changes', async t => {
+  const { reader, d, w, setOwner } = setup(t, true);
+  await reader.openText('{"identifier":"00001","items":[{"a":"first"},{"a":"second"}]}');
+  const expand = d.querySelector('[data-dr="expand-view"]'),
+    root = d.getElementById('dataReader');
+  expand.focus();
+  await reader.handle(expand);
+  assert.equal(reader.snapshot().expandedView, true);
+  assert.equal(root.getAttribute('role'), 'dialog');
+  assert.equal(root.getAttribute('aria-modal'), 'true');
+  d.getElementById('drExportMenu').open = true;
+  d.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+  assert.equal(d.getElementById('drExportMenu').open, false);
+  assert.equal(reader.snapshot().expandedView, true);
+  d.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+  assert.equal(reader.snapshot().expandedView, false);
+  assert.equal(root.hasAttribute('aria-modal'), false);
+  assert.equal(d.activeElement, expand);
+  await reader.handle(expand);
+  await reader.handle({ dataset: { dr: 'clear' } });
+  assert.equal(root.classList.contains('dr-expanded'), false);
+  assert.equal(reader.snapshot().source, '');
+  await reader.openText('{"private":"first-owner-only"}');
+  await reader.handle(expand);
+  setOwner('second-owner');
+  reader.sync();
+  assert.equal(reader.snapshot().expandedView, false);
+  assert.equal(reader.snapshot().source, '');
+  assert.equal(root.classList.contains('dr-expanded'), false);
+  assert.doesNotMatch(d.body.textContent, /first-owner-only/);
+});
+
+test('Data reader presentation: outline changes keep the report mounted and section choices keep keyboard focus', async t => {
+  const { reader, d, w, E } = setup(t, true);
+  await reader.openText(E.sample('idoc'));
+  const content = d.getElementById('drContent'),
+    heading = content.querySelector('[data-report-title]');
+  content.scrollTop = 275;
+  const branch = d.querySelectorAll('#drTree [data-dr="expand"]')[1];
+  await reader.handle(branch);
+  assert.equal(content.querySelector('[data-report-title]'), heading);
+  assert.equal(content.scrollTop, 275);
+  const checkbox = d.querySelector('#drSectionOptions [data-section]');
+  await reader.handle({ dataset: { dr: 'options' } });
+  checkbox.focus();
+  checkbox.checked = false;
+  checkbox.dispatchEvent(new w.Event('change', { bubbles: true }));
+  assert.equal(d.activeElement, checkbox);
+  assert.equal(d.querySelector('#drSectionOptions [data-section]'), checkbox);
+  assert.equal(d.getElementById('drOptions').open, true);
+  assert.equal(content.scrollTop, 275);
+  await reader.handle({ dataset: { dr: 'composer' } });
+  assert.equal(d.getElementById('drComposer').open, true);
+  assert.equal(d.activeElement, d.getElementById('drSource'));
+});
