@@ -24,6 +24,8 @@ Select someone in **User accounts**, choose permissions and save.
 
 There are 29 permission entries: 13 main screens, nine Studio tools, three Project tools, and Focus mode, Break Terrarium, Presentation break and personal settings. Parent restrictions also apply to child tools. Basic personal settings remain readable. Validation can run an existing saved template without permission to change the template.
 
+Full workspace backups and Excel reports require Export permission for every visible feature. Per-feature exports follow that feature's Export permission. These controls govern the website's export actions; someone who can view information can still copy what they have already seen.
+
 Each account continues to own a separate workspace. User management shows account details and deletion counts; it does not open another person's private records. Server-side projected reads and checked writes enforce workspace access, with immediate database suspension checks. The browser refreshes changed permissions within 30 seconds or when returning to the tab, clears its old recovery copy and reloads the permitted records. Other copies someone previously exported or saved outside the website cannot be revoked. Browser-only tools and static source assets are publicly hosted; their interface restrictions do not make the downloaded source confidential.
 
 ## Suspend or delete

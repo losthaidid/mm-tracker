@@ -720,8 +720,23 @@ document.addEventListener('change', e => {
     tell(err.message, true);
   }
 });
-function download(data, name, type) {
-  if (access && cloud.ready && !access.can(access.feature(document.activeElement), 'export'))
+function assertWorkspaceExport() {
+  if (
+    access &&
+    cloud.ready &&
+    WorkHubAccessCatalog.features.some(f => access.can(f.id) && !access.can(f.id, 'export'))
+  )
+    throw Error(
+      'A full workspace export needs Export permission for every visible feature. Use an allowed feature export or ask the Owner.'
+    );
+}
+function download(data, name, type, feature = '') {
+  if (feature === 'workspace') assertWorkspaceExport();
+  if (
+    access &&
+    cloud.ready &&
+    !access.can(feature || access.feature(document.activeElement), 'export')
+  )
     throw Error('Export is disabled for this feature.');
   const url = URL.createObjectURL(new Blob([data], { type })),
     a = document.createElement('a');
@@ -734,8 +749,17 @@ function download(data, name, type) {
 }
 $('backupButton').addEventListener('click', () => {
   closeSettingsMenu();
-  download(payload(state), 'MM-Tracker-backup-' + today() + '.json', 'application/json');
-  tell('Backup download started.');
+  try {
+    download(
+      payload(state),
+      'MM-Tracker-backup-' + today() + '.json',
+      'application/json',
+      'workspace'
+    );
+    tell('Backup download started.');
+  } catch (error) {
+    tell(error.message, true);
+  }
 });
 $('restoreButton').addEventListener('click', () => void beginRestore());
 $('restoreFile').addEventListener('change', async e => {
@@ -9134,6 +9158,7 @@ function reportDashboard(d, asof) {
 
 /** Build the current Excel report through reports.js; validate before exporting. */
 function exportReport(d, asof = today(), options = {}) {
+  assertWorkspaceExport();
   validate(d);
   return WorkHubReports.export(d, { asOf: asof, ...options }, zip);
 }
@@ -9142,7 +9167,8 @@ $('exportButton').addEventListener('click', () => {
     download(
       exportReport(state),
       'MM-Tracker-Report-' + today() + '.xlsx',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'workspace'
     );
     tell(
       'Excel report downloaded. Dashboard and all records, including archived tasks, are included.'
@@ -9275,7 +9301,12 @@ async function browserMigrationAction(action) {
   if (!legacy)
     throw Error('No earlier browser records were found. Use Restore to import a saved backup.');
   if (action === 'cloud-download-browser') {
-    download(legacy.raw, 'MM-Tracker-browser-backup-' + today() + '.json', 'application/json');
+    download(
+      legacy.raw,
+      'MM-Tracker-browser-backup-' + today() + '.json',
+      'application/json',
+      'workspace'
+    );
     return true;
   }
   if (
@@ -10393,7 +10424,7 @@ const workspaceReset = WorkHubWorkspaceReset.install({
   validate,
   empty: emptyState,
   today,
-  download,
+  download: (data, name, type) => download(data, name, type, 'workspace'),
   openModal,
   closeModal,
   tell,
