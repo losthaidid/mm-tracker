@@ -1156,6 +1156,7 @@ function render() {
       'schedule',
       'specs',
       'knowledge',
+      'notes',
       'processhub',
       'waiting',
       'studio',
@@ -1168,7 +1169,8 @@ function render() {
   if (!visible.includes(tab)) tab = visible[0] || 'tickets';
   const preserved =
     (tab === 'lab' && hub?.workbench?.workshop?.patchRender()) ||
-    (tab === 'validator' && hub?.validator?.patchRender());
+    (tab === 'validator' && hub?.validator?.patchRender()) ||
+    (tab === 'notes' && hub?.notes?.patchRender());
   if (!preserved) {
     const fn = {
         tickets: renderTickets,
@@ -9165,6 +9167,8 @@ function hasTrackerRecords(d) {
     d.workhub?.solutionStudio?.businessRules?.length ||
     d.workhub?.solutionStudio?.workshopNotes?.length ||
     d.workhub?.solutionStudio?.preparations?.length ||
+    d.workhub?.notebook?.notes?.length ||
+    d.workhub?.notebook?.notebooks?.length ||
     d.workhub?.validator?.templates?.length ||
     d.workhub?.validator?.runs?.length
   )
