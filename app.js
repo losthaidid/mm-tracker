@@ -1170,6 +1170,7 @@ function render() {
   const preserved =
     (tab === 'lab' && hub?.workbench?.workshop?.patchRender()) ||
     (tab === 'validator' && hub?.validator?.patchRender()) ||
+    (tab === 'studio' && hub?.patchReader()) ||
     (tab === 'notes' && hub?.notes?.patchRender());
   if (!preserved) {
     const fn = {
