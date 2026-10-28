@@ -10,6 +10,23 @@
     );
   const button = (action, text, attrs = '', cls = '') =>
     `<button type="button" class="dr-button ${cls}" data-dr="${action}" ${attrs}>${text}</button>`;
+  const icons = {
+    upload: '<path d="M12 16V4m-4 4 4-4 4 4M4 15v5h16v-5"/>',
+    file: '<path d="M14 3H5v18h14V8l-5-5Zm0 0v5h5M8 12h8M8 16h6"/>',
+    report: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h5M8 16h8"/>',
+    tree: '<path d="M6 4v12h12M6 9h12M6 16v4"/><circle cx="6" cy="4" r="2"/><circle cx="18" cy="9" r="2"/><circle cx="18" cy="16" r="2"/>',
+    code: '<path d="m8 7-5 5 5 5m8-10 5 5-5 5m-3-13-2 20"/>',
+    expand: '<path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/>',
+    close: '<path d="m6 6 12 12M6 18 18 6"/>',
+    download: '<path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5"/>',
+    settings:
+      '<path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/>',
+    search: '<circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/>',
+    arrow: '<path d="M4 12h16m-6-6 6 6-6 6"/>',
+    layers: '<path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5"/>',
+  };
+  const icon = key =>
+    `<svg class="dr-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[key] || icons.file}</svg>`;
   function install(a) {
     const $ = id => document.getElementById(id);
     let owner = '',
@@ -41,7 +58,12 @@
       activeExport = null,
       columnPage = 0,
       prepared = null,
-      customTitle = false;
+      customTitle = false,
+      expandedView = false,
+      expandedReturn = null,
+      collapsed = new Set(),
+      renderedContent = '',
+      contentLocation = '';
     const mounted = new WeakSet(),
       allowed = () => a.ready() && !!a.owner();
     function clearDownload() {
@@ -54,6 +76,7 @@
       clearDownload();
     }
     function reset() {
+      setExpanded(false);
       changed();
       root.clearTimeout(searchTimer);
       doc = null;
@@ -71,6 +94,8 @@
       friendly = true;
       customTitle = false;
       tab = 'report';
+      collapsed.clear();
+      renderedContent = contentLocation = '';
     }
     function sync() {
       const next = allowed() ? a.owner() : '';
@@ -175,22 +200,41 @@
     }
     function shell() {
       guard();
-      return `<section id="dataReader" class="dr-workspace" data-owner="${esc(owner)}" aria-label="JSON and IDoc reader">
-        <header class="dr-hero"><div><span class="dr-eyebrow">A CLEARER VIEW OF YOUR DATA</span><h2>Data, made readable.</h2><p>Open the structure. Follow the details. Create a report worth sharing.</p><span class="dr-privacy">◈ Browser memory only</span></div><div class="dr-art" aria-hidden="true"><i></i><i></i><div><span>{ }</span><b></b><b></b><b></b><em>✦</em></div></div></header>
-        <div class="dr-import"><div class="dr-import-actions">${button('browse', '↥ Open JSON / IDoc', '', 'dr-primary')}${button('sample-json', 'Try JSON example')}${button('sample-idoc', 'Try IDoc example')}${button('clear', 'Clear reader')}</div><input id="drFile" type="file" accept=".json,.xml,.idoc,.txt,application/json,application/xml,text/xml" hidden><details id="drComposer"${doc ? '' : ' open'}><summary>Paste content or change the file</summary><form id="drPaste"><label for="drSource">JSON or IDoc XML</label><textarea id="drSource" name="source" spellcheck="false" placeholder="Paste JSON or an XML IDoc here…">${esc(draft)}</textarea><div class="dr-import-actions"><button class="dr-button dr-primary" type="submit">Read content</button><span>Content is cleared when you leave this account or reload.</span></div></form></details></div>
+      renderedContent = contentLocation = '';
+      return `<section id="dataReader" class="dr-workspace${expandedView ? ' dr-expanded' : ''}" data-owner="${esc(owner)}" aria-label="JSON and IDoc reader"${expandedView ? ' role="dialog" aria-modal="true"' : ''}>
+        <header class="dr-hero"><div class="dr-hero-copy"><span class="dr-eyebrow"><i class="dr-live-dot" aria-hidden="true"></i> THE DATA READING ROOM</span><h2>Complex data.<br><em>Beautifully clear.</em></h2><p>A little structure. A fresh perspective. Turn JSON and IDoc XML into reports you can explore and share.</p><span class="dr-privacy">${icon('file')} Your file stays in browser memory</span></div><div class="dr-art" aria-hidden="true"><div class="dr-art-source"><small>SOURCE</small><span>{ }</span><b>JSON / XML</b></div><div class="dr-art-bridge"><i></i><i></i><i></i></div><div class="dr-art-paper"><small>THE BIG PICTURE</small><strong>Clarity, by design.</strong><div class="dr-art-metrics"><i></i><i></i><i></i></div><b></b><b></b><b></b><span class="dr-art-seal">✧</span></div><span class="dr-art-caption">FROM STRUCTURE TO STORY</span></div></header>
+        <div class="dr-import"><div class="dr-import-top"><div class="dr-file-identity">${icon('file')}<div><strong id="drFileName">Bring your data into focus</strong><span id="drFileMeta">JSON or IDoc XML · Up to 2 MB · Drag a file here</span></div></div><div class="dr-import-actions">${button('browse', icon('upload') + '<span>Open file</span>', '', 'dr-primary')}${button('composer', icon('code') + '<span>Paste content</span>', 'aria-controls="drComposer" aria-expanded="' + !doc + '"')}${button('clear', 'Clear', '', 'dr-quiet')}</div></div><input id="drFile" type="file" accept=".json,.xml,.idoc,.txt,application/json,application/xml,text/xml" hidden><details id="drComposer"${doc ? '' : ' open'}><summary>Paste JSON or IDoc XML</summary><form id="drPaste"><label for="drSource">Your source content</label><textarea id="drSource" name="source" spellcheck="false" placeholder='Paste JSON or an XML IDoc here…'>${esc(draft)}</textarea><div class="dr-import-actions"><button class="dr-button dr-primary" type="submit">${icon('report')} Create readable report</button><span>Exact values. Original structure. A clearer view.</span></div></form></details><div class="dr-samples"><span>Take a look around</span>${button('sample-json', 'Try JSON example')}${button('sample-idoc', 'Try IDoc example')}<span class="dr-sample-note">Fictional sample data</span></div></div>
         <p id="drStatus" role="status" class="dr-status" aria-live="polite">${esc(error || sourceSummary())}</p>
         <div id="drTools" class="dr-tools"${doc ? '' : ' hidden'}><div class="dr-view-tabs" role="group" aria-label="Reader view">${[
-          ['report', 'Report'],
-          ['explore', 'Explore'],
-          ['raw', 'Original source'],
+          ['report', 'Report', 'report'],
+          ['explore', 'Explore', 'tree'],
+          ['raw', 'Source', 'code'],
         ]
-          .map(([id, text]) => button('tab', text, `data-tab="${id}" aria-pressed="${tab === id}"`))
+          .map(([id, text, glyph]) =>
+            button('tab', icon(glyph) + text, `data-tab="${id}" aria-pressed="${tab === id}"`)
+          )
           .join(
             ''
-          )}</div><div class="dr-export-actions">${button('xlsx', '↓ Excel')}${button('csv', '↓ CSV')}${button('pdf', '↓ PDF', '', 'dr-primary')}${button('original', '↓ Original')}</div></div>
+          )}</div><div class="dr-toolbar-actions">${button('options', icon('settings') + '<span>Customize</span>', 'aria-controls="drOptions" aria-expanded="false"')}${button('expand-view', icon('expand') + '<span>Expand reader</span>', 'aria-pressed="false"')}<details id="drExportMenu" class="dr-export-menu"><summary class="dr-button dr-primary">${icon('download')} Export <span aria-hidden="true">⌄</span></summary><div class="dr-export-popover"><span class="dr-eyebrow">TAKE YOUR REPORT WITH YOU</span>${button('pdf', icon('report') + '<span><strong>PDF report</strong><small>A polished, paginated document</small></span>')}${button('xlsx', icon('layers') + '<span><strong>Excel workbook</strong><small>All selected sections · text-safe values</small></span>')}${button('csv', icon('code') + '<span><strong>CSV data</strong><small>Section, field and value rows</small></span>')}${button('original', icon('file') + '<span><strong>Original file</strong><small>Your source, unchanged</small></span>')}</div></details></div></div>
         <details id="drOptions" class="dr-options"${doc ? '' : ' hidden'}><summary>Report options &amp; field labels</summary><div class="dr-options-grid"><div><label for="drTitle">Report title</label><input id="drTitle" maxlength="120" value="${esc(title)}"><label class="dr-check"><input id="drHideEmpty" type="checkbox"${hideEmpty ? ' checked' : ''}> Hide empty fields</label><label class="dr-check"><input id="drFriendly" type="checkbox"${friendly ? ' checked' : ''}> Friendly field labels</label><p>Exports include your selected report sections. Search filters the on-screen explorer.</p></div><form id="drAliasForm"><label for="drAliasKey">Original field name</label><input id="drAliasKey" maxlength="200" placeholder="e.g. ZCUSTOM_FIELD" required><label for="drAliasValue">Display label</label><input id="drAliasValue" maxlength="100" placeholder="Your readable label" required><button class="dr-button" type="submit">Apply label</button><p>Labels apply to this open file. Codes and values keep their original meaning.</p></form><div><strong>Include report sections</strong><div id="drSectionOptions" class="dr-section-options"></div></div></div></details>
-        <div id="drEmpty" class="dr-empty"${doc ? ' hidden' : ''}><span aria-hidden="true">{ ✧ }</span><h3>Every structure has a story.</h3><p>Open a file or try an example. Objects become sections, repeated records become tables, and the original values stay close at hand.</p><p>XML IDocs are detected dynamically. Fixed-width IDoc text requires a segment definition and is not decoded here.</p></div>
-        <div id="drGrid" class="dr-reader-grid"${doc ? '' : ' hidden'}><aside class="dr-navigation" aria-label="Document navigation"><label for="drDocument">Document</label><select id="drDocument"></select><label for="drSearch">Find a field or value</label><input id="drSearch" type="search" maxlength="200" value="${esc(query)}" placeholder="Search this document…"><div id="drTree" class="dr-tree"></div></aside><div id="drContent" class="dr-content" tabindex="-1"></div></div>
+        <div id="drEmpty" class="dr-welcome"${doc ? ' hidden' : ''}>${[
+          ['01', 'Bring it in', 'Open a file, drop it here, or paste your source.', 'upload'],
+          [
+            '02',
+            'See the picture',
+            'Readable fields, connected details and record tables.',
+            'tree',
+          ],
+          ['03', 'Make it yours', 'Label the details and export a report worth sharing.', 'report'],
+        ]
+          .map(
+            ([number, heading, text, glyph]) =>
+              `<article><span class="dr-welcome-number">${number}</span>${icon(glyph)}<h3>${heading}</h3><p>${text}</p></article>`
+          )
+          .join(
+            ''
+          )}<p class="dr-welcome-note">Dynamic XML structures are discovered automatically. Fixed-width IDoc text needs segment definitions and is not decoded here.</p></div>
+        <div id="drGrid" class="dr-reader-grid"${doc ? '' : ' hidden'}><aside class="dr-navigation" aria-label="Document navigation"><div class="dr-navigation-heading"><span class="dr-eyebrow">DOCUMENT OUTLINE</span>${icon('tree')}</div><label for="drDocument">Current document</label><select id="drDocument"></select><label for="drSearch">Find a field or value</label><div class="dr-search-wrap">${icon('search')}<input id="drSearch" type="search" maxlength="200" value="${esc(query)}" placeholder="Search this document…"></div><div id="drTree" class="dr-tree"></div><p class="dr-navigation-note">Select a branch to explore its original values.</p></aside><div id="drContent" class="dr-content" tabindex="-1"></div></div>
       </section>`;
     }
     function mount() {
@@ -199,6 +243,34 @@
       if (!el || mounted.has(el)) return;
       mounted.add(el);
       paint(true);
+    }
+    function setExpanded(value) {
+      const el = $('dataReader'),
+        next = !!value && !!doc;
+      if (next && !expandedView) expandedReturn = document.activeElement;
+      const leaving = expandedView && !next;
+      expandedView = next;
+      if (!el) return;
+      el.classList.toggle('dr-expanded', next);
+      if (next) {
+        el.setAttribute('role', 'dialog');
+        el.setAttribute('aria-modal', 'true');
+      } else {
+        el.removeAttribute('role');
+        el.removeAttribute('aria-modal');
+      }
+      const control = el.querySelector('[data-dr="expand-view"]');
+      if (control) {
+        const html =
+          icon(next ? 'close' : 'expand') +
+          '<span>' +
+          (next ? 'Exit expanded view' : 'Expand reader') +
+          '</span>';
+        if (control.innerHTML !== html) control.innerHTML = html;
+        control.setAttribute('aria-pressed', String(next));
+      }
+      if (leaving && expandedReturn?.isConnected) expandedReturn.focus({ preventScroll: true });
+      if (leaving) expandedReturn = null;
     }
     function patchRender() {
       return sync() && $('dataReader')?.dataset.owner === owner;
@@ -258,35 +330,38 @@
         (query && !total ? '<p>No matching field or value in this document.</p>' : '')
       );
     }
-    function overview() {
-      if (doc.kind === 'json')
-        return `<div class="dr-report-intro"><span class="dr-eyebrow">JSON REPORT</span><h2 data-report-title>${esc(title)}</h2><p>${esc(doc.name)} · ${doc.fields} values · Numbers and identifiers retain their original text.</p>${doc.duplicates ? '<p class="dr-note">Duplicate JSON keys are retained as separate occurrences.</p>' : ''}</div>`;
-      const info = E.idocInfo(currentRoot());
-      return `<div class="dr-report-intro"><span class="dr-eyebrow">IDOC REPORT · DOCUMENT ${rootIndex + 1} OF ${doc.roots.length}</span><h2 data-report-title>${esc(title)}</h2><p>${esc(info.type || doc.wrapper)}${info.message ? ' · ' + esc(info.message) : ''}</p></div><div class="dr-summary-cards">${[
-        ['IDoc number', info.number || 'Not supplied'],
-        ['Technical status', info.status || 'Not supplied'],
-        [
-          'Sender → receiver',
-          (info.sender || 'Not supplied') + ' → ' + (info.receiver || 'Not supplied'),
-        ],
-        [
-          'Created · source time',
-          [E.date(info.date) || info.date, E.time(info.time) || info.time]
-            .filter(Boolean)
-            .join(' · ') || 'Not supplied',
-        ],
+    function overview(sections) {
+      const idoc = doc.kind === 'idoc',
+        info = idoc ? E.idocInfo(currentRoot()) : null,
+        tables = sections.filter(s => s.columns[0] === 'Record'),
+        rowCount = tables.reduce((count, s) => count + s.rows.length, 0);
+      const intro = `<header class="dr-report-intro"><div><span class="dr-format-badge">${icon(idoc ? 'tree' : 'code')}${idoc ? 'IDOC XML' : 'JSON'} REPORT</span><h2 data-report-title>${esc(title)}</h2><p>${esc(idoc ? info.type || doc.wrapper : doc.name)}${idoc && info.message ? '<span class="dr-intro-divider">/</span>' + esc(info.message) : ''}</p></div><span class="dr-report-mark" aria-hidden="true">${icon('report')}</span></header><div class="dr-report-metrics">${[
+        [doc.fields.toLocaleString(), 'Values in file', 'code'],
+        [sections.length.toLocaleString(), 'Report sections', 'layers'],
+        [rowCount.toLocaleString(), 'Rows in record tables', 'tree'],
       ]
         .map(
-          ([key, value]) =>
-            `<article><span>${esc(key)}</span><strong>${esc(value)}</strong></article>`
+          ([value, label, glyph]) =>
+            `<div>${icon(glyph)}<strong>${value}</strong><span>${label}</span></div>`
         )
-        .join(
-          ''
-        )}</div>${info.statusText ? '<p class="dr-note">Exported status text: ' + esc(info.statusText) + '</p>' : ''}<p class="dr-context">Custom segment statuses appear in their own sections. The supplied codes and messages are shown as exported. Source timestamps have no assumed time zone.</p>${timeline(info.statuses)}`;
+        .join('')}</div>`;
+      if (!idoc)
+        return (
+          intro +
+          `<p class="dr-context dr-fidelity-note">Original numbers, identifiers and value types are preserved.${doc.duplicates ? ' Duplicate JSON keys remain separate occurrences.' : ''}</p>`
+        );
+      const created =
+        [E.date(info.date) || info.date, E.time(info.time) || info.time]
+          .filter(Boolean)
+          .join(' · ') || 'Not supplied';
+      return (
+        intro +
+        `<section class="dr-message-card" aria-label="IDoc message journey"><div class="dr-message-heading"><span class="dr-eyebrow">MESSAGE JOURNEY</span><span>Document ${rootIndex + 1} of ${doc.roots.length}</span></div><div class="dr-message-route"><div><span>Sender partner</span><strong>${esc(info.sender || 'Not supplied')}</strong></div><div class="dr-message-connector" aria-hidden="true"><i></i>${icon('arrow')}</div><div><span>Receiver partner</span><strong>${esc(info.receiver || 'Not supplied')}</strong></div></div><div class="dr-message-meta"><div><span>IDoc number</span><strong>${esc(info.number || 'Not supplied')}</strong></div><div><span>Technical status code</span><strong class="dr-status-code">${esc(info.status || 'Not supplied')}</strong></div><div><span>Created · source time</span><strong>${esc(created)}</strong></div></div>${info.statusText ? '<p class="dr-message-text">' + esc(info.statusText) + '</p>' : ''}</section><p class="dr-context dr-fidelity-note">Custom segment statuses are shown separately. Codes and messages keep their exported meaning; source times have no assumed time zone.</p>${timeline(info.statuses)}`
+      );
     }
     function timeline(statuses) {
       if (!statuses.length) return '';
-      return `<details class="dr-history" open><summary>Exported status history · ${statuses.length}</summary><ol>${statuses
+      return `<details class="dr-history" open><summary><span>${icon('layers')} Exported status history</span><span class="dr-count-badge">${statuses.length} entries</span></summary><ol>${statuses
         .slice(0, 50)
         .map(
           n =>
@@ -301,34 +376,43 @@
         const all = sectionList(),
           visible = all.filter(s => !excluded.has(s.id));
         return (
-          overview() +
-          `<div class="dr-scope">Report scope: <code>${esc((doc.byId.get(scope) || currentRoot()).path)}</code>${scope !== currentRoot().id || scopeGroup ? button('reset-scope', 'Use whole document') : ''}</div>` +
+          overview(visible) +
+          `<div class="dr-report-directory"><details class="dr-report-index"><summary>${icon('layers')} Contents <span class="dr-count-badge">${visible.length} sections</span></summary><nav aria-label="Report contents">${visible.map((s, index) => button('jump-section', `<span>${String(index + 1).padStart(2, '0')}</span>${esc(s.title)}`, `data-id="${s.id}"`)).join('')}</nav></details><div class="dr-import-actions">${button('unfold', 'Expand all')}${button('fold', 'Collapse all')}</div></div><div class="dr-scope"><span>${scope === currentRoot().id && !scopeGroup ? 'Whole document' : 'Selected section'} · ${visible.length} of ${all.length} sections included</span>${scope !== currentRoot().id || scopeGroup ? button('reset-scope', 'Use whole document') : ''}<details><summary>Source path</summary><code>${esc((doc.byId.get(scope) || currentRoot()).path)}</code></details></div>` +
           visible
             .map(
-              s =>
-                `<section class="dr-report-section"><header><div><span class="dr-eyebrow">${s.rows.length} ${s.columns[0] === 'Field' ? 'FIELDS' : 'RECORDS'}</span><h3>${esc(s.title)}</h3><code>${esc(s.source)}</code></div>${button('inspect-section', 'Explore', `data-id="${s.id}"`)}</header><div class="dr-table-scroll"><table><thead><tr>${s.columns
-                  .slice(0, 8)
-                  .map(c => `<th scope="col">${esc(c)}</th>`)
-                  .join('')}</tr></thead><tbody>${s.rows
-                  .slice(0, 8)
-                  .map(
-                    row =>
-                      `<tr>${row
+              (s, index) =>
+                `<details class="dr-report-section" data-report-section="${s.id}"${collapsed.has(s.id) ? '' : ' open'}><summary><span class="dr-section-number">${String(index + 1).padStart(2, '0')}</span><h3>${esc(s.title)}</h3><span class="dr-count-badge">${s.rows.length} ${s.columns[0] === 'Field' ? 'fields' : 'records'}</span><span class="dr-section-chevron" aria-hidden="true">⌄</span></summary><div class="dr-section-body"><div class="dr-section-meta"><details><summary>Source path</summary><code>${esc(s.source)}</code></details>${button('inspect-section', icon('tree') + 'Explore values', `data-id="${s.id}"`)}</div>${
+                  s.columns[0] === 'Field'
+                    ? `<dl class="dr-field-grid">${s.rows
                         .slice(0, 8)
                         .map(
-                          v =>
-                            `<td>${esc(E.visibleText(v)) || '<span class="dr-empty-value">Empty</span>'}</td>`
+                          row =>
+                            `<div><dt>${esc(row[0])}</dt><dd>${esc(E.visibleText(row[1])) || '<span class="dr-empty-value">Empty</span>'}</dd>${row[2] ? '<small>' + esc(row[2]) + '</small>' : ''}</div>`
                         )
-                        .join('')}</tr>`
-                  )
-                  .join(
-                    ''
-                  )}</tbody></table></div>${s.rows.length > 8 || s.columns.length > 8 ? '<p class="dr-context">Preview: ' + Math.min(8, s.rows.length) + ' of ' + s.rows.length + ' rows, ' + Math.min(8, s.columns.length) + ' of ' + s.columns.length + ' columns. Explore to browse all values; exports include the complete selected section.</p>' : ''}</section>`
+                        .join('')}</dl>`
+                    : `<div class="dr-table-scroll dr-record-table"><table><thead><tr>${s.columns
+                        .slice(0, 8)
+                        .map(c => `<th scope="col">${esc(c)}</th>`)
+                        .join('')}</tr></thead><tbody>${s.rows
+                        .slice(0, 8)
+                        .map(
+                          row =>
+                            `<tr>${row
+                              .slice(0, 8)
+                              .map(
+                                v =>
+                                  `<td>${esc(E.visibleText(v)) || '<span class="dr-empty-value">Empty</span>'}</td>`
+                              )
+                              .join('')}</tr>`
+                        )
+                        .join('')}</tbody></table></div>`
+                }${s.rows.length > 8 || s.columns.length > 8 ? '<p class="dr-context dr-preview-note">Preview: ' + Math.min(8, s.rows.length) + ' of ' + s.rows.length + ' rows' + (s.columns[0] === 'Field' ? '' : ', ' + Math.min(8, s.columns.length) + ' of ' + s.columns.length + ' columns') + '. Explore to browse all values; exports include the complete selected section.</p>' : ''}</div></details>`
             )
             .join('') +
           (!visible.length
             ? '<div class="dr-empty"><h3>No report sections selected</h3><p>Choose sections in Report options.</p></div>'
-            : '')
+            : '') +
+          `<footer class="dr-report-footer">${icon('file')}<span>${esc(doc.name)}<small>Original values preserved · ${visible.length} sections selected for export</small></span><span class="dr-eyebrow">MY WORKHUB</span></footer>`
         );
       } catch (err) {
         return `<div class="dr-empty"><h3>Choose a smaller report scope</h3><p>${esc(err.message)}</p>${button('tab', 'Open Explore', 'data-tab="explore"', 'dr-primary')}</div>`;
@@ -404,8 +488,14 @@
       const el = $('dataReader');
       if (!el || el.dataset.owner !== owner) return;
       el.classList.toggle('dr-loaded', !!doc);
+      el.dataset.view = tab;
+      setExpanded(expandedView);
       for (const id of ['drTools', 'drOptions', 'drGrid']) $(id).hidden = !doc;
       $('drEmpty').hidden = !!doc;
+      $('drFileName').textContent = doc ? doc.name : 'Bring your data into focus';
+      $('drFileMeta').textContent = doc
+        ? `${doc.kind === 'idoc' ? 'IDoc XML' : 'JSON'} · ${doc.fields.toLocaleString()} values · ${doc.roots.length} ${doc.roots.length === 1 ? 'document' : 'documents'}`
+        : 'JSON or IDoc XML · Up to 2 MB · Drag a file here';
       for (const b of el.querySelectorAll(
         '[data-dr="xlsx"],[data-dr="csv"],[data-dr="pdf"],[data-dr="original"]'
       ))
@@ -420,17 +510,24 @@
         $('drFriendly').checked = friendly;
       }
       if (!doc) {
-        for (const id of ['drTree', 'drContent', 'drSectionOptions', 'drDocument'])
+        for (const id of ['drTree', 'drContent', 'drSectionOptions', 'drDocument']) {
           $(id).replaceChildren();
+          delete $(id).dataset.signature;
+        }
+        renderedContent = contentLocation = '';
         notice(error || sourceSummary(), !!error);
         return;
       }
-      $('drDocument').innerHTML = doc.roots
+      const documents = doc.roots
         .map(
           (n, i) =>
             `<option value="${i}"${i === rootIndex ? ' selected' : ''}>${doc.kind === 'idoc' ? 'IDoc ' + (i + 1) + ' · ' + esc(E.idocInfo(n).number || E.idocInfo(n).type || 'Document') : 'JSON document'}</option>`
         )
         .join('');
+      if ($('drDocument').dataset.signature !== documents) {
+        $('drDocument').innerHTML = documents;
+        $('drDocument').dataset.signature = documents;
+      }
       const old = $('drTree').scrollTop,
         active = document.activeElement?.closest?.('[data-dr="select"],[data-dr="expand"]'),
         action = active?.dataset.dr,
@@ -443,23 +540,44 @@
           ?.focus({ preventScroll: true });
       for (const b of el.querySelectorAll('[data-dr="tab"]'))
         b.setAttribute('aria-pressed', String(tab === b.dataset.tab));
-      $('drContent').innerHTML =
+      const html =
         tab === 'raw'
           ? `<header><span class="dr-eyebrow">ORIGINAL SOURCE</span><h2>Your file, intact.</h2><p>${esc(doc.name)} · Original text, including whitespace and CDATA.</p></header><textarea class="dr-raw" aria-label="Original source" readonly spellcheck="false">${esc(doc.source)}</textarea>`
           : tab === 'explore'
             ? explorer()
             : reportView();
+      const location = JSON.stringify(
+          tab === 'explore'
+            ? [tab, selected, group, page, columnPage, rootIndex]
+            : [tab, scope, scopeGroup, rootIndex]
+        ),
+        content = $('drContent'),
+        contentScroll = content.scrollTop;
+      if (html !== renderedContent) {
+        content.innerHTML = html;
+        content.scrollTop = location === contentLocation ? contentScroll : 0;
+        renderedContent = html;
+      }
+      contentLocation = location;
       let sections = [];
       try {
         sections = sectionList();
       } catch {}
-      $('drSectionOptions').innerHTML =
-        sections
-          .map(
-            s =>
-              `<label class="dr-check"><input type="checkbox" data-section="${s.id}"${excluded.has(s.id) ? '' : ' checked'}><span>${esc(s.title)} <small>· ${s.rows.length} rows</small></span></label>`
-          )
-          .join('') || '<p>Choose a smaller section in Explore to create a report.</p>';
+      const sectionOptions = $('drSectionOptions'),
+        signature = JSON.stringify(sections.map(s => [s.id, s.title, s.rows.length]));
+      if (sectionOptions.dataset.signature !== signature) {
+        sectionOptions.innerHTML =
+          sections
+            .map(
+              s =>
+                `<label class="dr-check"><input type="checkbox" data-section="${s.id}"${excluded.has(s.id) ? '' : ' checked'}><span>${esc(s.title)} <small>· ${s.rows.length} rows</small></span></label>`
+            )
+            .join('') || '<p>Choose a smaller section in Explore to create a report.</p>';
+        sectionOptions.dataset.signature = signature;
+      } else {
+        for (const input of sectionOptions.querySelectorAll('[data-section]'))
+          input.checked = !excluded.has(input.dataset.section);
+      }
       notice(error || sourceSummary(), !!error);
     }
     async function openText(text, filename = '', bytes = null) {
@@ -501,6 +619,7 @@
             ? (E.idocInfo(currentRoot()).type || doc.wrapper) + ' · IDoc report'
             : doc.name.replace(/\.[^.]+$/, '') + ' · Data report';
         customTitle = false;
+        collapsed = new Set([currentRoot().id + '-overview']);
         $('drComposer')?.removeAttribute('open');
       } catch (err) {
         error = err.message;
@@ -678,6 +797,11 @@
         $('drFile').click();
         return;
       }
+      if (op === 'composer') {
+        $('drComposer').open = !$('drComposer').open;
+        if ($('drComposer').open) $('drSource').focus({ preventScroll: true });
+        return;
+      }
       if (op === 'sample-json' || op === 'sample-idoc') {
         const kind = op === 'sample-json' ? 'json' : 'idoc';
         await openText(E.sample(kind), 'Example.' + (kind === 'json' ? 'json' : 'xml'));
@@ -691,7 +815,39 @@
         return;
       }
       if (!doc) return;
+      if (op === 'options') {
+        $('drOptions').open = !$('drOptions').open;
+        return;
+      }
+      if (op === 'expand-view') {
+        setExpanded(!expandedView);
+        if (expandedView) $('drContent').focus({ preventScroll: true });
+        return;
+      }
+      if (op === 'jump-section') {
+        const section = Array.from($('drContent').querySelectorAll('[data-report-section]')).find(
+          n => n.dataset.reportSection === el.dataset.id
+        );
+        if (!section) return;
+        collapsed.delete(el.dataset.id);
+        section.open = true;
+        const content = $('drContent');
+        content.scrollTop +=
+          section.getBoundingClientRect().top - content.getBoundingClientRect().top - 16;
+        section.querySelector('summary').focus({ preventScroll: true });
+        return;
+      }
+      if (op === 'fold' || op === 'unfold') {
+        for (const section of $('drContent').querySelectorAll('[data-report-section]')) {
+          const id = section.dataset.reportSection;
+          if (op === 'fold') collapsed.add(id);
+          else collapsed.delete(id);
+          section.open = op !== 'fold';
+        }
+        return;
+      }
       if (['xlsx', 'csv', 'pdf', 'original'].includes(op)) {
+        $('drExportMenu').open = false;
         await exportFile(op);
         return;
       }
@@ -754,6 +910,7 @@
       }
     }
     document.addEventListener('click', event => {
+      if (!event.target.closest?.('#drExportMenu')) $('drExportMenu')?.removeAttribute('open');
       if (
         event.target.closest?.('#drPreparedDownload') &&
         (!allowed() || prepared?.owner !== a.owner() || prepared?.revision !== revision)
@@ -769,6 +926,56 @@
         void handle(el).catch(err => notice(err.message, true));
       }
     });
+    document.addEventListener(
+      'toggle',
+      event => {
+        const el = event.target;
+        if (!el.isConnected || el.closest?.('#dataReader') !== $('dataReader')) return;
+        if (el.dataset.reportSection) {
+          if (el.open) collapsed.delete(el.dataset.reportSection);
+          else collapsed.add(el.dataset.reportSection);
+        }
+        const action = el.id === 'drOptions' ? 'options' : el.id === 'drComposer' ? 'composer' : '';
+        if (action)
+          $('dataReader')
+            ?.querySelector(`[data-dr="${action}"]`)
+            ?.setAttribute('aria-expanded', String(el.open));
+      },
+      true
+    );
+    document.addEventListener(
+      'keydown',
+      event => {
+        if (!expandedView || !$('dataReader')?.isConnected) return;
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          if ($('drExportMenu').open) $('drExportMenu').open = false;
+          else setExpanded(false);
+        }
+        if (event.key === 'Tab') {
+          const controls = Array.from(
+            $('dataReader').querySelectorAll(
+              'button:not(:disabled),input:not(:disabled),select,textarea,summary,a[href],[tabindex="0"]'
+            )
+          ).filter(n => n.getClientRects().length);
+          if (!controls.length) return;
+          const first = controls[0],
+            last = controls.at(-1);
+          if (
+            event.shiftKey &&
+            (document.activeElement === first || document.activeElement === $('drContent'))
+          ) {
+            event.preventDefault();
+            last.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+          }
+        }
+      },
+      true
+    );
     document.addEventListener('submit', event => {
       const form = event.target;
       if (!form.closest?.('#dataReader')) return;
@@ -843,6 +1050,7 @@
           $('drSearch').value = '';
           excluded.clear();
           expanded = new Set([selected]);
+          collapsed = new Set([currentRoot().id + '-overview']);
           if (!customTitle) {
             title = (E.idocInfo(currentRoot()).type || doc.wrapper) + ' · IDoc report';
             $('drTitle').value = title;
@@ -914,6 +1122,7 @@
         error,
         source: doc?.source || '',
         title,
+        expandedView,
       }),
     };
   }

@@ -3,8 +3,12 @@
 Open **Studio → JSON & IDoc Reader**. Paste a document or upload a JSON / XML file. The built-in examples use fictional records.
 
 - **Report** creates a readable overview and field / record tables. Choose the title, friendly labels, empty-field visibility and included sections in **Report options & field labels**.
+- The report starts with document totals and, for IDocs with control fields, an animated **Message journey** from sender to receiver. Single-value sections use readable field cards; repeated records use tables. Technical status codes are displayed without assigning a universal success / failure meaning.
+- **Contents** jumps to a report section inside the reader. Open or collapse individual sections, or use **Expand all / Collapse all**. Folding a section only changes your view; use **Customize → Include report sections** to leave it out of exports.
+- **Expand reader** creates a spacious reading view in the current browser tab. Report view hides the outline; Explore keeps it available. **Exit expanded view** or **Escape** restores the normal layout. It does not change the Process Hub or break presentation windows.
+- **Customize** opens report options. **Export** groups the PDF, Excel, CSV and original file downloads in one menu. The import panel remains available for replacing the file or pasting another document.
 - **Explore** opens sections and nested values. Repeated XML siblings and JSON arrays become tables; fields are discovered across every row. Tables page through 30 records and 25 fields at a time. **Report this section** narrows the report and exports; **Use whole document** restores the scope.
-- **Original source** retains the original text, including whitespace and CDATA. Original file downloads retain the uploaded bytes and encoding.
+- **Source** retains the original text, including whitespace and CDATA. Original file downloads retain the uploaded bytes and encoding.
 - **Search** filters the document navigation and explorer. It does not silently remove data from report exports.
 - **Excel** exports one worksheet per selected report section with values stored as text. **CSV** exports section/path/record/field/value rows and neutralises spreadsheet formula prefixes; spreadsheet applications can still reinterpret CSV identifiers, so prefer Excel for leading-zero codes. **PDF** downloads the visual report with wrapping, pagination, repeated table headings and column continuations for wide tables. A prepared download link remains visible for browsers requiring a fresh user gesture.
 
