@@ -262,6 +262,7 @@ test('people: stale editors, replaced forms and foreign-account drops cannot ove
  ui.personEditor(buyer.id);let stale=document.getElementById('peForm');stale.elements.namedItem('name').value='Outdated';api.mutate(d=>d.workhub.projectPeople.people.find(p=>p.id===buyer.id).title='New title');assert.throws(()=>ui.submit(stale),/record changed/);assert.equal(api.state().workhub.projectPeople.people[1].name,'Daniel');
  ui.personEditor(buyer.id);stale=document.getElementById('peForm');ui.personEditor();assert.throws(()=>ui.submit(stale),/Reopen/);
  ui.personEditor(buyer.id);stale=document.getElementById('peForm');api.cloud.user={id:'another-owner'};api.showTab('home');assert.equal(document.getElementById('modal').open,false);assert.throws(()=>ui.submit(stale),/Reopen|signing in/);
+ await api.access.load(api.cloud.user);
  api.showTab('specs');document.querySelector('[data-action="project-view"][data-view="people"]').click();await settle();const event=new window.Event('drop',{bubbles:true,cancelable:true});Object.defineProperty(event,'dataTransfer',{value:{getData:()=>JSON.stringify({owner:'old-owner',projectId:api.state().activeProjectId,type:'activity',id:activity.id})}});document.querySelector('[data-pe-person]').dispatchEvent(event);assert.equal(api.state().workhub.projectPeople.assignments.length,0);
 });
 
