@@ -82,6 +82,7 @@
         span: ['today', 'journey'].includes(id) ? 'wide' : 'normal',
       }));
     if (h.ticketClosures === undefined) h.ticketClosures = [];
+    root.WorkHubNotesEngine?.upgrade(d);
     root.WorkHubMyDayEngine.upgrade(d);
     root.WorkHubScheduleEngine?.upgrade(d);
     root.WorkHubReminders?.upgrade(d);
@@ -109,6 +110,7 @@
     return d;
   }
   function validate(d) {
+    root.WorkHubNotesEngine?.validate(d);
     root.WorkHubMyDayEngine.validate(d);
     root.WorkHubScheduleEngine?.validate(d);
     root.WorkHubWorkbench?.validate(d);
@@ -281,6 +283,7 @@
     let batchA = null,
       validator = null,
       library = null,
+      notes = null,
       batchC = null,
       standup = null,
       people = null,
@@ -814,6 +817,7 @@
         tasks: 'M8 6h13M8 12h13M8 18h13M2 6l1 1 2-2M2 12l1 1 2-2M2 18l1 1 2-2',
         schedule: 'M4 5h16v16H4V5M8 2v6M16 2v6M4 10h16M8 14h3m3 3h3',
         specs: 'M3 7h7l2-3h9v16H3V7M3 10h18',
+        notes: 'M4 3h13a3 3 0 0 1 3 3v15H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3Zm2 0v18M9 8h7M9 12h5',
         knowledge: 'M12 5c-3-3-7-2-10-1v15c4-1 7-1 10 1 3-2 6-2 10-1V4c-3-1-7-2-10 1v15',
         processhub: 'M8 3h8v5H8V3M4 16h6v5H4v-5M15 16h6v5h-6v-5M12 8v4M7 16v-4h11v4',
         waiting: 'M6 3h12M6 21h12M7 3v4l5 5-5 5v4M17 3v4l-5 5 5 5v4',
@@ -889,6 +893,7 @@
         tasks: 'Tasks',
         schedule: 'Schedule',
         specs: 'Projects',
+        notes: 'Notes',
         knowledge: 'Knowledge',
         processhub: 'Process Hub',
         waiting: 'Waiting on',
@@ -981,6 +986,7 @@
       }
       const extra = {
         home: '⌂ My day',
+        notes: 'Notes',
         knowledge: 'Knowledge',
         processhub: 'Process Hub',
         waiting: 'Waiting on',
@@ -2531,6 +2537,7 @@
           ['go:tasks', 'Open Tasks'],
           ['go:schedule', 'Open Schedule'],
           ['go:specs', 'Open Projects'],
+          ['go:notes', 'Open Notes'],
           ['go:knowledge', 'Open Knowledge'],
           ['go:processhub', 'Open Process Hub'],
           ['go:waiting', 'Open Waiting on'],
@@ -2753,6 +2760,7 @@
       batchA?.sync();
       validator?.sync();
       library?.sync();
+      notes?.sync();
       batchC?.sync();
       myDay?.sync();
       standup?.sync();
@@ -2768,6 +2776,7 @@
       projectDates?.decorate();
       batchA?.mount(tab);
       library?.mount();
+      notes?.mount();
       people?.mount();
       mountUndo();
       workSchedule?.mount(tab);
@@ -2824,6 +2833,7 @@
     }
     const renderers = {
       home: dashboard,
+      notes: () => notes?.render(),
       knowledge,
       processhub: processHub,
       waiting,
@@ -4011,6 +4021,11 @@
       owner: () => a.cloud().user?.id || '',
       hubAction: handle,
     });
+    notes = root.WorkHubNotes?.install({
+      ...a,
+      ready: () => a.cloud().ready,
+      owner: () => a.cloud().user?.id || '',
+    });
     validator = root.WorkHubValidatorStudio?.install({
       ...a,
       ready: () => a.cloud().ready,
@@ -4171,6 +4186,7 @@
       batchA,
       validator,
       library,
+      notes,
       batchC,
       standup,
       people,

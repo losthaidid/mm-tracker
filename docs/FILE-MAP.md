@@ -175,3 +175,6 @@ Presentation breaks: [presentation-break.js](../presentation-break.js) owns cust
 
 - `docs/VALIDATION-GROUPS-REVIEW.md` — SAP column groups, saved value sets and reversible per-run issue review.
 - `tests/validator-groups.test.mjs` — group bindings, SAP values, copy/version isolation, ignored counts and Excel review exports.
+
+
+Personal Notes: [notes-engine.js](../notes-engine.js) owns the bounded `workhub.notebook` document, notebook validation, stale-edit guards, text version history, search and escaped Markdown rendering. [notes.js](../notes.js) supplies the library, stable editor, save status, My Day Quick note action, project/company context, recoverable Trash and Markdown exports. [notes.css](../notes.css) provides theme-aware surfaces, responsive writing/focus views and reduced-motion-aware notebook/card animation. Load the engine before the UI and both before Studio. See [WORKSPACE-TOOLS.md](WORKSPACE-TOOLS.md#personal-notes).
