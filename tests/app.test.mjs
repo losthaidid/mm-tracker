@@ -3402,3 +3402,19 @@ test('Performance: worker results recheck company availability and cannot leak a
  api.mutate(d=>{d.projectCompanies.find(c=>c.id==='task-company-a').active=true;});const pending=ui.run();await settle();api.cloud.user={id:'another-owner'};api.showTab('home');await pending;
  assert.equal(ui.snapshot().result,null);assert.equal(ui.snapshot().draft,null);assert.equal(api.state().workhub.validator.runs.length,0);
 });
+
+test('Data reader integration: Studio navigation, in-memory reports and pending source survive unrelated saves without writing uploads',async t=>{
+ const {api,document,window,db}=await app(t);window.setTimeout=(fn,ms)=>{if(ms===30)queueMicrotask(fn);return 0;};api.hub.setTool('reader');api.showTab('studio');
+ const ui=api.hub.reader,root=document.getElementById('dataReader');assert.ok(root);assert.match(document.querySelector('[data-tool="reader"]').textContent,/JSON & IDoc/);const before=copy(api.state()),calls=db.calls.length;
+ await ui.openText('{"private_marker":"reader-only-example","code":"0001","rows":[{"x":1},{"y":2}]}');assert.equal(db.calls.length,calls);assert.deepEqual(copy(api.state()),before);assert.doesNotMatch(api.payload(api.state()),/reader-only-example/);
+ const source=document.getElementById('drSource'),title=document.getElementById('drTitle');source.value='Pending source';source.dispatchEvent(new window.Event('input',{bubbles:true}));title.value='My report';title.dispatchEvent(new window.Event('input',{bubbles:true}));title.focus();title.setSelectionRange(2,5);api.mutate(d=>{d.calendarMonth='2026-11';});await settle();
+ assert.equal(document.getElementById('dataReader'),root);assert.equal(document.getElementById('drSource'),source);assert.equal(source.value,'Pending source');assert.equal(document.activeElement,title);assert.equal(title.selectionStart,2);assert.equal(ui.snapshot().source.includes('reader-only-example'),true);
+ api.hub.setTool('theme');api.showTab('studio');assert.equal(document.getElementById('dataReader'),null);assert.ok(document.getElementById('hubTheme'));api.hub.setTool('reader');api.showTab('studio');assert.equal(document.getElementById('drSource').value,'Pending source');assert.equal(document.getElementById('drTitle').value,'My report');
+ api.showTab('notes');assert.ok(document.querySelector('.nt-workspace'));api.showTab('validator');assert.ok(document.querySelector('.validation-studio'));api.validate(api.state());
+});
+test('Data reader integration: logout and switching accounts erase uploaded content, draft text and report options',async t=>{
+ const {api,document,window}=await app(t);window.setTimeout=(fn,ms)=>{if(ms===30)queueMicrotask(fn);return 0;};api.hub.setTool('reader');api.showTab('studio');const ui=api.hub.reader;await ui.openText(window.WorkHubDataReaderEngine.sample('idoc'));const oldSource=document.getElementById('drSource');
+ api.cloud.ready=false;api.cloud.user=null;api.showTab('home');assert.equal(ui.snapshot().source,'');assert.equal(ui.snapshot().kind,'');assert.equal(oldSource.isConnected,false);
+ api.login();api.hub.setTool('reader');api.showTab('studio');assert.equal(document.getElementById('drSource').value,'');assert.equal(ui.snapshot().source,'');
+ await ui.openText('{"private":"first-account-only"}');api.cloud.user={id:'different-owner',email:'other@example.com'};api.showTab('studio');assert.equal(ui.snapshot().source,'');assert.equal(document.getElementById('drSource').value,'');assert.doesNotMatch(document.getElementById('view').textContent,/first-account-only/);
+});

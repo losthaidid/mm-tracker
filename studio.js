@@ -294,6 +294,7 @@
       validator = null,
       library = null,
       notes = null,
+      reader = null,
       batchC = null,
       standup = null,
       people = null,
@@ -1827,6 +1828,7 @@
     function studio() {
       const tools = {
         theme: 'Theme studio',
+        reader: 'JSON & IDoc Reader',
         tcodes: 'SAP T-codes',
         focus: 'Focus room',
         journey: 'Project journey',
@@ -1844,7 +1846,7 @@
         )
         .join(
           ''
-        )}</div>${currentTool === 'screenshots' ? batchC?.cards() || '' : currentTool === 'theme' ? themeStudio() : currentTool === 'tcodes' ? tcodes?.render() || '' : currentTool === 'focus' ? `<section class="hub-card">${focusWidget()}${prefs().desk ? desk() : ''}</section>` : currentTool === 'journey' ? `<section class="hub-card">${journey()}</section>` : currentTool === 'scrapbook' ? scrapbook() : currentTool === 'wrap' ? dailySummary() : sessionsView()}</section>`;
+        )}</div>${currentTool === 'reader' ? reader?.render() || '' : currentTool === 'screenshots' ? batchC?.cards() || '' : currentTool === 'theme' ? themeStudio() : currentTool === 'tcodes' ? tcodes?.render() || '' : currentTool === 'focus' ? `<section class="hub-card">${focusWidget()}${prefs().desk ? desk() : ''}</section>` : currentTool === 'journey' ? `<section class="hub-card">${journey()}</section>` : currentTool === 'scrapbook' ? scrapbook() : currentTool === 'wrap' ? dailySummary() : sessionsView()}</section>`;
     }
     function timerKey() {
       return a.cloud().user ? 'mm-tracker.timer.v1:' + a.cloud().user.id : null;
@@ -2789,6 +2791,7 @@
       validator?.sync();
       library?.sync();
       notes?.sync();
+      reader?.sync();
       batchC?.sync();
       myDay?.sync();
       standup?.sync();
@@ -2805,6 +2808,7 @@
       batchA?.mount(tab);
       library?.mount();
       notes?.mount();
+      reader?.mount();
       people?.mount();
       mountUndo();
       workSchedule?.mount(tab);
@@ -4062,6 +4066,11 @@
       owner: () => a.cloud().user?.id || '',
       fieldLibrary: (source, onInsert) => library?.openFields(source, onInsert),
     });
+    reader = root.WorkHubDataReader?.install({
+      ...a,
+      ready: () => a.cloud().ready,
+      owner: () => a.cloud().user?.id || '',
+    });
     soundscape = root.WorkHubSoundscape?.install({
       ready: () => a.cloud().ready,
       tell: a.tell,
@@ -4217,6 +4226,8 @@
       validator,
       library,
       notes,
+      reader,
+      patchReader: () => currentTool === 'reader' && reader?.patchRender(),
       batchC,
       standup,
       people,
