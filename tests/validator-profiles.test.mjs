@@ -58,7 +58,7 @@ test('profiles are bounded, uniquely named per template and survive normal state
  next.workhub.validator.profiles=[{...p,companyId:'a'}];assert.throws(()=>E.validateState(next),/company settings/);
 });
 
-async function workspace(t,{linked=false,worker=false}={}){
+async function workspace(t,{linked=false,worker=false,configure}={}){
  const dom=new JSDOM('<div id="view"></div><dialog id="modal"><div id="modalBody"></div></dialog>',{url:'https://example.test',runScripts:'outside-only',pretendToBeVisual:true}),w=dom.window,d=w.document;t.after(()=>w.close());
  Object.assign(w,{TextEncoder,TextDecoder,Blob,setImmediate,clearImmediate});w.confirm=()=>true;let account='owner',ready=true,writes=0,captured,resolveWorker;
  w.setTimeout=(fn,ms)=>{if(ms===50)queueMicrotask(fn);return 0;};w.clearTimeout=()=>{};
@@ -67,6 +67,7 @@ async function workspace(t,{linked=false,worker=false}={}){
  if(worker)w.WorkHubValidatorRunner={create:()=>({cancel(){},run(schema,rows,context){captured={schema,rows:copy(rows),context};return new Promise(r=>resolveWorker=r);}})};
  w.eval(read('validator-studio.js'));const engine=w.WorkHubValidatorEngine,s=template(engine);
  if(linked){s.projectId='project';s.projectName='Rollout';s.rules[0].companyScope='selected';s.rules[0].companies=[{id:'a',name:'Company A'}];s.rules[1].companyScope='selected';s.rules[1].companies=[{id:'b',name:'Company B'}];}
+ configure?.(s,engine);
  let state={projects:linked?[{id:'project',name:'Rollout'}]:[],projectCompanies:linked?['a','b'].map(id=>({id,name:'Company '+id.toUpperCase(),projectId:'project',active:true})):[],workhub:{validator:{templates:[s],runs:[]}}},ui,downloads=[];
  const render=()=>{if(!ui.patchRender())d.getElementById('view').innerHTML=ui.render();};
  ui=w.WorkHubValidatorStudio.install({state:()=>state,ready:()=>ready,owner:()=>account,render,tell:()=>{},mutate(fn){const next=engine.copy(state);fn(next);engine.prepare(next,state);engine.validateState(next);state=next;writes++;render();return true;},openModal(title,body){d.getElementById('modalBody').innerHTML=body;d.getElementById('modal').showModal();},closeModal(){d.getElementById('modal').close();},download(blob,name){downloads.push({blob,name});}});
@@ -97,6 +98,36 @@ test('setup controls stay mounted, preserve expanded panels/focus, and do not sa
  const x=await workspace(t),{d,w}=x,root=d.getElementById('valRunSetup'),details=root.querySelector('details'),a=d.querySelector('[data-setup-rule="a"]'),map=d.querySelector('[data-map="PLANT"]'),writes=x.writes();details.open=true;root.querySelector('.val-setup-choices').scrollTop=50;a.focus();x.toggle('a',false);
  assert.equal(d.querySelector('[name="validationProfile"]').value,'__custom');assert.equal(d.getElementById('valRunSetup'),root);assert.equal(d.querySelector('[data-setup-rule="a"]'),a);assert.equal(d.activeElement,a);assert.equal(details.open,true);assert.equal(d.querySelector('[data-map="PLANT"]'),map);
  const search=d.getElementById('valSetupSearch');search.focus();search.value='Company B';search.dispatchEvent(new w.Event('input',{bubbles:true}));assert.equal(d.getElementById('valSetupSearch'),search);assert.equal(d.activeElement,search);assert.equal(d.querySelectorAll('[data-setup-rule]').length,1);assert.equal(x.writes(),writes);
+});
+const referenceChoice=(x,id,field='PLANT')=>[...x.d.querySelectorAll('[data-setup-reference]')].find(el=>{const c=JSON.parse(el.dataset.setupReference);return c[0]===field&&c[1]===id;});
+test('reference checklist selects existing mappings and profiles without re-entering them or losing uploaded corrections',async t=>{
+ const x=await workspace(t),{ui,d}=x;assert.equal(referenceChoice(x,'ref-a').disabled,true);assert.equal(referenceChoice(x,'ref-a').checked,true);
+ await ui.handle({dataset:{val:'run-setup-none'}});const rows=copy(ui.snapshot().sourceRows),mapping=copy(ui.snapshot().mapping),definitions=copy(ui.snapshot().draft),writes=x.writes();
+ const b=referenceChoice(x,'ref-b'),panel=b.closest('details'),list=b.closest('.val-setup-choices');panel.open=true;list.scrollTop=40;b.focus();x.change(b,true);
+ assert.equal(referenceChoice(x,'ref-b'),b);assert.equal(d.activeElement,b);assert.equal(panel.open,true);assert.equal(list.scrollTop,40);assert.equal(x.writes(),writes);
+ assert.deepEqual(copy(ui.snapshot().draft),definitions);assert.deepEqual(copy(ui.snapshot().sourceRows),rows);assert.deepEqual(copy(ui.snapshot().mapping),mapping);
+ await x.save('B checklist');const saved=copy(x.state().workhub.validator.profiles[0]);assert.equal(saved.referenceChecks[0].lookupId,'ref-b');await ui.run();assert.equal(ui.snapshot().result.errors,1);
+ x.change(referenceChoice(x,'ref-b'),false);assert.equal(ui.snapshot().result,null);await ui.run();assert.equal(ui.snapshot().result.errors,0);assert.deepEqual(copy(x.state().workhub.validator.profiles[0]),saved);
+ x.profile(saved.id);assert.equal(referenceChoice(x,'ref-b').checked,true);await ui.run();assert.equal(ui.snapshot().result.errors,1);
+});
+test('reference search is independent and bulk selection keeps condition dependencies while clearing standalone checks',async t=>{
+ const x=await workspace(t),{ui,d,w}=x;x.toggle('b',false);const writes=x.writes(),search=d.getElementById('valSetupReferenceSearch');search.focus();search.value='Company B';search.dispatchEvent(new w.Event('input',{bubbles:true}));
+ assert.equal(d.activeElement,search);assert.equal(d.getElementById('valSetupReferenceSearch'),search);assert.equal(d.querySelectorAll('[data-setup-reference]').length,1);assert.equal(d.querySelectorAll('[data-setup-rule]').length,3);
+ await ui.handle({dataset:{val:'run-setup-references-all'}});assert.deepEqual(copy(ui.snapshot().runSelection.ruleIds),['a']);assert.equal(ui.snapshot().runSelection.referenceChecks.length,1);assert.equal(ui.snapshot().runSelection.referenceChecks[0].lookupId,'ref-b');
+ await ui.handle({dataset:{val:'run-setup-references-none'}});assert.equal(ui.snapshot().runSelection.referenceChecks.length,0);search.value='';search.dispatchEvent(new w.Event('input',{bubbles:true}));
+ assert.equal(referenceChoice(x,'ref-a').checked,true);assert.equal(referenceChoice(x,'ref-a').disabled,true);assert.equal(referenceChoice(x,'ref-b').checked,false);assert.equal(x.writes(),writes);await ui.run();assert.equal(ui.snapshot().result.errors,0);
+ x.toggle('a',false);assert.equal(referenceChoice(x,'ref-a').checked,false);assert.equal(referenceChoice(x,'ref-a').disabled,false);
+});
+test('newly mapped checks stay available after deselection and unavailable saved mappings can be removed individually',async t=>{
+ const x=await workspace(t),{ui,d}=x;await ui.handle({dataset:{val:'run-setup-none'}});const form=d.getElementById('valRunReferenceForm');form.elements.setupField.value='MAT';x.change(form.elements.setupReference,'ref-a');form.dispatchEvent(new x.w.Event('submit',{bubbles:true,cancelable:true}));
+ const choice=referenceChoice(x,'ref-a','MAT');assert.equal(choice.checked,true);x.change(choice,false);assert.equal(referenceChoice(x,'ref-a','MAT'),choice);assert.equal(choice.checked,false);x.change(choice,true);await x.save('Material reference');
+ const p=x.state().workhub.validator.profiles[0];p.referenceChecks=[{...p.referenceChecks[0],lookupId:'removed',lookupColumn:'missing'}];x.profile(p.id);const stale=referenceChoice(x,'removed','MAT');assert.equal(stale.checked,true);assert.equal(stale.disabled,false);assert.match(stale.closest('label').textContent,/Unavailable/);await assert.rejects(ui.run(),/unavailable/);
+ x.change(stale,false);await ui.run();assert.equal(ui.snapshot().result.errors,0);assert.equal(p.referenceChecks[0].lookupId,'removed');
+});
+test('combined reference dependencies retain tuple validation and never become unconditional single-field checks',async t=>{
+ const x=await workspace(t,{configure(s,E){s.rules[0].assertion={...E.condition('PLANT'),operator:'lookupTuple',lookupId:'ref-a',pairs:[{field:'PLANT',referenceColumn:'Code'},{field:'MAT',referenceColumn:'Name'}]};}}),{ui,d}=x;x.toggle('b',false);
+ const tuple=[...d.querySelectorAll('.val-setup-reference-choices label')].find(el=>el.textContent.includes('Combined field check'));assert.ok(tuple);assert.equal(tuple.querySelector('input').checked,true);assert.equal(tuple.querySelector('input').disabled,true);
+ await ui.handle({dataset:{val:'run-setup-references-none'}});await ui.run();assert.equal(ui.snapshot().result.errors,1);assert.match(ui.snapshot().result.setup.references[0].column,/PLANT → Code; MAT → Name/);assert.equal(ui.snapshot().runSelection.referenceChecks.length,0);
 });
 test('additional reference bindings save once and drive validation, suggestions, live edits and literal Excel setup audit',async t=>{
  const x=await workspace(t),{ui,d}=x;await ui.handle({dataset:{val:'run-setup-none'}});const form=d.getElementById('valRunReferenceForm');form.elements.setupField.value='PLANT';x.change(form.elements.setupReference,'ref-b');assert.equal(form.elements.setupReferenceColumn.value,'Plant');form.dispatchEvent(new x.w.Event('submit',{bubbles:true,cancelable:true}));
@@ -136,9 +167,9 @@ test('changing a setup prevents a late Excel download from exporting a previous 
  const x=await workspace(t);x.toggle('b',false);await x.ui.run();const pending=x.ui.handle({dataset:{val:'report'}});x.toggle('a',false);await pending;assert.equal(x.downloads.length,0);assert.equal(x.ui.snapshot().result,null);
 });
 test('access capture allows run setup controls and reference forms while protecting profile creation and updates',async t=>{
- const dom=new JSDOM('<section data-access-feature="validator"><button type="button" data-val="run-setup-none">Deselect all</button><input type="checkbox" data-setup-rule="a"><select name="validationProfile"><option>A</option></select><form id="valRunReferenceForm"></form><form id="valProfileForm"></form></section>',{runScripts:'outside-only'}),w=dom.window,d=w.document;t.after(()=>w.close());for(const f of ['access-catalog.js','access-control.js'])w.eval(read(f));
+ const dom=new JSDOM('<section data-access-feature="validator"><button type="button" data-val="run-setup-none">Deselect all</button><input type="checkbox" data-setup-rule="a"><input type="checkbox" data-setup-reference="binding"><select name="validationProfile"><option>A</option></select><form id="valRunReferenceForm"></form><form id="valProfileForm"></form></section>',{runScripts:'outside-only'}),w=dom.window,d=w.document;t.after(()=>w.close());for(const f of ['access-catalog.js','access-control.js'])w.eval(read(f));
  const permissions=w.WorkHubAccessCatalog.preset('view');permissions.validator={mode:'use',run:true,create:false,edit:false,delete:false,export:true};let profile={userId:'member',role:'member',status:'active',version:1,permissions};const cloud={ready:true,user:{id:'member'},client:{rpc:async()=>({data:profile,error:null})}};
  const access=w.WorkHubAccess.install({cloud:()=>cloud,feature:()=> 'validator',hidden:()=>[],tell:()=>{}});await access.load(cloud.user);let actions=0,submits=0;d.querySelector('section').addEventListener('click',()=>actions++);d.addEventListener('submit',e=>{e.preventDefault();submits++;});
- d.querySelector('button').click();d.querySelector('input').click();d.getElementById('valRunReferenceForm').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));d.getElementById('valProfileForm').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));assert.equal(actions,2);assert.equal(submits,1);
- profile={...profile,version:2,permissions:w.WorkHubAccessCatalog.preset('view')};await access.load(cloud.user);d.querySelector('button').click();d.querySelector('input').click();d.getElementById('valRunReferenceForm').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));assert.equal(actions,2);assert.equal(submits,1);
+ d.querySelector('button').click();d.querySelector('input').click();d.querySelector('[data-setup-reference]').click();d.getElementById('valRunReferenceForm').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));d.getElementById('valProfileForm').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));assert.equal(actions,3);assert.equal(submits,1);
+ profile={...profile,version:2,permissions:w.WorkHubAccessCatalog.preset('view')};await access.load(cloud.user);d.querySelector('button').click();d.querySelector('input').click();d.querySelector('[data-setup-reference]').click();d.getElementById('valRunReferenceForm').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));assert.equal(actions,3);assert.equal(submits,1);
 });

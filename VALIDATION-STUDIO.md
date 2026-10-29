@@ -14,6 +14,27 @@ A General/SAP file validator in the existing WorkHub. All checks are determinist
 8. Validate, inspect field-level issues, then correct values. Corrections recheck automatically.
 9. Export the issue workbook or the rows without errors.
 
+## Choose checks for a validation run
+
+In **Validate → Validation setup**, expand **Conditions · choose individually** or
+**References · choose individually**. Both panels have a searchable checklist and
+**Select applicable / Deselect all** controls. Reference choices reuse field mappings
+from the template's conditions and saved profiles. Use **Map another reference check**
+when a reference needs a new uploaded-field/reference-column mapping; the new check
+then appears in the checklist and can be switched off and on.
+
+References needed by selected conditions are checked automatically and marked
+**Required by …**. Deselect the condition to release its dependency. Deselect all
+in References removes independent checks while keeping those dependencies included.
+Independent reference checks validate the mapped field on every row; the original
+condition's IF/company restrictions still apply only to that condition. Combined-field
+reference dependencies keep their full tuple behavior.
+
+Save selections with **Save as new profile**, or explicitly **Update profile**.
+Changing a selection keeps the upload, column mapping and corrections, clears old
+results, and requires **Run validation** again. Searches and selection changes do not
+save workspace data; saved profiles contain check definitions rather than uploaded rows.
+
 ## Live corrections
 
 Use **Run validation** for the initial file check. After that, editing a result cell

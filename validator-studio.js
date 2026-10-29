@@ -151,6 +151,8 @@
       runSelection = null,
       runProfileId = '',
       setupSearch = '',
+      setupReferenceSearch = '',
+      extraReferenceChoices = [],
       fileName = '',
       filter = 'all',
       page = 0,
@@ -531,6 +533,110 @@
       say('Validation profile saved. Your template rules and uploaded records are unchanged.');
       paint();
     }
+    function referenceKey(c) {
+      return JSON.stringify([c.field, c.lookupId, c.lookupColumn]);
+    }
+    function referenceChoices(t = activeSchema(), s = setupChoices(t)) {
+      const choices = new Map(),
+        selected = new Set(s.referenceChecks.map(referenceKey));
+      const add = c => {
+        const key = referenceKey(c);
+        if (choices.has(key)) return choices.get(key);
+        const field = t.columns.find(f => f.key === c.field),
+          list = t.lookups.find(l => l.id === c.lookupId),
+          available = !!field && !!list?.headers.includes(c.lookupColumn);
+        const choice = {
+          key,
+          check: { field: c.field, lookupId: c.lookupId, lookupColumn: c.lookupColumn },
+          field: field?.label || c.field,
+          name: list?.name || 'Unavailable reference',
+          available,
+          selected: selected.has(key),
+          requiredBy: [],
+        };
+        choices.set(key, choice);
+        return choice;
+      };
+      for (const r of t.rules)
+        for (const c of E.ruleReferences(r)) {
+          if (c.operator !== 'lookup') continue;
+          const choice = add(c);
+          if (s.ruleIds.includes(r.id) && E.ruleApplies(r, { companyId: runCompanyId }))
+            choice.requiredBy.push(r.name);
+        }
+      for (const c of [
+        ...profiles().flatMap(p => p.referenceChecks),
+        ...extraReferenceChoices,
+        ...s.referenceChecks,
+      ])
+        add(c);
+      return [...choices.values()].filter(c => c.available || c.selected);
+    }
+    function rememberReferenceChoices(s) {
+      for (const c of s.referenceChecks)
+        if (!extraReferenceChoices.some(x => referenceKey(x) === referenceKey(c)))
+          extraReferenceChoices.push(E.copy(c));
+    }
+    function runReferencesView(t, s, can) {
+      const choices = referenceChoices(t, s),
+        q = setupReferenceSearch.trim().toLowerCase(),
+        matches = c =>
+          !q || [c.name, c.field, c.check.lookupColumn].join(' ').toLowerCase().includes(q),
+        unmapped = t.lookups.filter(l => !choices.some(c => c.check.lookupId === l.id)),
+        tuples = t.rules
+          .filter(r => s.ruleIds.includes(r.id) && E.ruleApplies(r, { companyId: runCompanyId }))
+          .flatMap(r =>
+            E.ruleReferences(r)
+              .filter(c => c.operator === 'lookupTuple')
+              .map(c => ({
+                name: t.lookups.find(l => l.id === c.lookupId)?.name || 'Unavailable reference',
+                field: c.pairs
+                  .map(
+                    p =>
+                      (t.columns.find(f => f.key === p.field)?.label || p.field) +
+                      ' → ' +
+                      p.referenceColumn
+                  )
+                  .join('; '),
+                check: { lookupColumn: '' },
+                requiredBy: r.name,
+              }))
+          );
+      const control = c =>
+        `<label class="val-setup-choice"><input type="checkbox" data-setup-reference="${esc(c.key)}"${c.selected || c.requiredBy.length ? ' checked' : ''}${!can('run') || busy || c.requiredBy.length || (!c.available && !c.selected) ? ' disabled' : ''}><span><strong>${esc(c.name)} · ${esc(c.field)} → ${esc(c.check.lookupColumn)}</strong><small>${c.requiredBy.length ? 'Required by ' + esc([...new Set(c.requiredBy)].join(', ')) + (c.selected ? ' · Also selected independently' : '') : !c.available ? 'Unavailable in this version · Uncheck to remove it from this run' : c.selected ? 'Selected for this run' : 'Skipped · not selected'}</small></span></label>`;
+      const entries =
+        choices.filter(matches).map(control).join('') +
+        tuples
+          .filter(matches)
+          .map(
+            c =>
+              `<label class="val-setup-choice"><input type="checkbox" checked disabled><span><strong>${esc(c.name)} · ${esc(c.field)}</strong><small>Required by ${esc(c.requiredBy)} · Combined field check</small></span></label>`
+          )
+          .join('') +
+        unmapped
+          .filter(l => !q || l.name.toLowerCase().includes(q))
+          .map(
+            l =>
+              `<div class="val-setup-choice"><span><strong>${esc(l.name)}</strong><small>No field mapping yet. Use Map another reference check below to choose its uploaded field and reference column.</small></span></div>`
+          )
+          .join('');
+      return `<details class="val-setup-details"><summary>References · choose individually</summary><p class="val-help">Tick the reference checks for this run. References required by selected conditions stay included; deselect those conditions to release them. Independent checks validate the mapped field on every row. Blank values follow the existing reference behaviour; mark a column Required to require a value.</p><div class="val-setup-condition-tools"><label class="val-label">Find references<input id="valSetupReferenceSearch" type="search" value="${esc(setupReferenceSearch)}" placeholder="Search references or fields"></label><div class="val-actions">${btn('run-setup-references-all', 'Select applicable', !can('run') || busy ? 'disabled' : '', 'val-quiet')}${btn('run-setup-references-none', 'Deselect all', !can('run') || busy ? 'disabled' : '', 'val-quiet')}</div></div><div class="val-setup-choices val-setup-reference-choices">${entries || '<p class="val-help">No matching reference checks. Maintain reference lists in References, or map a check below.</p>'}</div><details class="val-setup-details"><summary>Map another reference check</summary><form id="valRunReferenceForm"><div class="val-fields">${select(
+        'setupField',
+        'Uploaded field',
+        t.columns.map(c => [c.key, c.label]),
+        t.columns[0]?.key
+      )}${select(
+        'setupReference',
+        'Reference',
+        t.lookups.map(l => [l.id, l.name]),
+        t.lookups[0]?.id
+      )}${select(
+        'setupReferenceColumn',
+        'Reference column',
+        (t.lookups[0]?.headers || []).map(h => [h, h]),
+        t.lookups[0]?.codeColumn || t.lookups[0]?.headers[0]
+      )}</div><button type="submit" class="val-btn val-secondary"${!can('run') || !t.lookups.length || !t.columns.length || busy ? ' disabled' : ''}>Add reference check</button></form></details></details>`;
+    }
     function runSetupView() {
       const t = activeSchema(),
         s = setupChoices(t),
@@ -564,35 +670,8 @@
           refs = E.ruleReferences(r);
         return `<label class="val-setup-choice"><input type="checkbox" data-setup-rule="${esc(r.id)}"${ids.has(r.id) ? ' checked' : ''}${!can('run') || busy || (!available && !ids.has(r.id)) ? ' disabled' : ''}><span><strong>${esc(r.name)}</strong><small>${!r.enabled ? 'Paused in template' : !available ? 'Different company — skipped' : ids.has(r.id) ? 'Selected for this run' : 'Skipped · not selected'}${refs.length ? ' · Uses ' + esc([...new Set(refs.map(c => t.lookups.find(l => l.id === c.lookupId)?.name))].join(', ')) : ''}</small></span></label>`;
       };
-      const used = plan?.summary.references || [],
-        required = used.filter(
-          r =>
-            !s.referenceChecks.some(
-              c => c.field === r.field && c.lookupId === r.lookupId && c.lookupColumn === r.column
-            )
-        );
-      return `<section id="valRunSetup" class="val-run-setup" data-val-context="${esc(runProfileId + ':' + runCompanyId + ':' + version)}"><div class="val-panel-title"><div><span class="val-eyebrow">CHOOSE WHAT TO CHECK</span><h3>Validation setup</h3><p>Your columns stay the same. Choose the conditions and reference checks for this run.</p></div><span class="val-chip">${esc(setupName())}</span></div><div class="val-setup-profile">${select('validationProfile', 'Validation profile', [['', 'All applicable checks'], ...(!runProfileId && runSelection ? [['__custom', 'Custom selection']] : []), ...profiles().map(p => [p.id, p.name])], runProfileId || (runSelection ? '__custom' : ''), !can('run') || busy ? 'disabled' : '')}<div class="val-actions">${btn('run-setup-save', 'Save as new profile', !can('create') || busy ? 'disabled' : '', 'val-secondary')}${btn('run-setup-update', 'Update profile', !p || !can('edit') || busy ? 'disabled' : '', 'val-quiet')}${btn('profile-delete', 'Delete profile', !p || !can('delete') || busy ? 'disabled' : '', 'val-quiet')}</div></div>${p && profileChanged(p) ? '<p class="val-help">Temporary changes · the saved profile is unchanged until you choose Update profile.</p>' : ''}<div class="val-setup-summary" role="status"><strong>${plan ? countLabel(plan.summary.conditions.length, 'condition') + ' · ' + countLabel(used.length, 'reference check') + ' · ' + countLabel(plan.summary.skipped.length, 'skipped condition') : 'Review this setup'}</strong><span>Base column checks always apply: required fields, types/SAP formats, lengths, allowed values and duplicate checks.</span></div>${problem ? `<p class="val-setup-problem" role="alert">${esc(problem)}</p>` : ''}<details class="val-setup-details"><summary>Conditions · choose individually</summary><div class="val-setup-condition-tools"><label class="val-label">Find conditions<input id="valSetupSearch" type="search" value="${esc(setupSearch)}" placeholder="Search conditions or references"></label><div class="val-actions">${btn('run-setup-all', 'Select applicable', !can('run') || busy ? 'disabled' : '', 'val-quiet')}${btn('run-setup-none', 'Deselect all', !can('run') || busy ? 'disabled' : '', 'val-quiet')}</div></div><div class="val-setup-choices">${rules.map(control).join('') || '<p class="val-help">No matching conditions. Maintain business rules in Conditions.</p>'}${missing.map(id => `<label class="val-setup-choice"><input type="checkbox" data-setup-rule="${esc(id)}" checked${!can('run') || busy ? ' disabled' : ''}><span>Unavailable condition · ${esc(id)}<small>Uncheck to remove it from this run.</small></span></label>`).join('')}</div></details><details class="val-setup-details"><summary>References · required and additional checks</summary><p class="val-help">References used by selected conditions are included automatically. Add a separate field-to-reference check below when needed. Blank values follow the existing reference condition behaviour; mark a column Required to require a value.</p><div class="val-setup-references">${required.map(r => `<div class="val-setup-reference"><strong>${esc(t.columns.find(c => c.key === r.field)?.label || r.field)} → ${esc(r.name)}</strong><small>${esc(r.column)} · Required by ${esc(r.requiredBy)}</small></div>`).join('') || '<p class="val-help">No reference checks selected.</p>'}</div><div class="val-setup-additional">${s.referenceChecks
-        .map(c => {
-          const f = t.columns.find(f => f.key === c.field),
-            l = t.lookups.find(l => l.id === c.lookupId);
-          return `<div class="val-setup-reference"><span><strong>${esc(f?.label || c.field)} → ${esc(l?.name || 'Unavailable reference')}</strong><small>${esc(c.lookupColumn)} · Additional check</small></span>${btn('run-setup-remove-reference', 'Remove', `data-id="${esc(c.id)}"${!can('run') || busy ? ' disabled' : ''}`, 'val-quiet')}</div>`;
-        })
-        .join('')}</div><form id="valRunReferenceForm"><div class="val-fields">${select(
-        'setupField',
-        'Uploaded field',
-        t.columns.map(c => [c.key, c.label]),
-        t.columns[0]?.key
-      )}${select(
-        'setupReference',
-        'Reference',
-        t.lookups.map(l => [l.id, l.name]),
-        t.lookups[0]?.id
-      )}${select(
-        'setupReferenceColumn',
-        'Reference column',
-        (t.lookups[0]?.headers || []).map(h => [h, h]),
-        t.lookups[0]?.codeColumn || t.lookups[0]?.headers[0]
-      )}</div><button type="submit" class="val-btn val-secondary"${!can('run') || !t.lookups.length || !t.columns.length || busy ? ' disabled' : ''}>Add reference check</button></form></details><p class="val-help">Choose a profile or adjust these selections, then Run validation. Your upload and mapping stay in place. Profiles use the chosen template version; paused and company-restricted conditions cannot be forced on.</p></section>`;
+      const used = plan?.summary.references || [];
+      return `<section id="valRunSetup" class="val-run-setup" data-val-context="${esc(runProfileId + ':' + runCompanyId + ':' + version)}"><div class="val-panel-title"><div><span class="val-eyebrow">CHOOSE WHAT TO CHECK</span><h3>Validation setup</h3><p>Your columns stay the same. Choose the conditions and reference checks for this run.</p></div><span class="val-chip">${esc(setupName())}</span></div><div class="val-setup-profile">${select('validationProfile', 'Validation profile', [['', 'All applicable checks'], ...(!runProfileId && runSelection ? [['__custom', 'Custom selection']] : []), ...profiles().map(p => [p.id, p.name])], runProfileId || (runSelection ? '__custom' : ''), !can('run') || busy ? 'disabled' : '')}<div class="val-actions">${btn('run-setup-save', 'Save as new profile', !can('create') || busy ? 'disabled' : '', 'val-secondary')}${btn('run-setup-update', 'Update profile', !p || !can('edit') || busy ? 'disabled' : '', 'val-quiet')}${btn('profile-delete', 'Delete profile', !p || !can('delete') || busy ? 'disabled' : '', 'val-quiet')}</div></div>${p && profileChanged(p) ? '<p class="val-help">Temporary changes · the saved profile is unchanged until you choose Update profile.</p>' : ''}<div class="val-setup-summary" role="status"><strong>${plan ? countLabel(plan.summary.conditions.length, 'condition') + ' · ' + countLabel(used.length, 'reference check') + ' · ' + countLabel(plan.summary.skipped.length, 'skipped condition') : 'Review this setup'}</strong><span>Base column checks always apply: required fields, types/SAP formats, lengths, allowed values and duplicate checks.</span></div>${problem ? `<p class="val-setup-problem" role="alert">${esc(problem)}</p>` : ''}<details class="val-setup-details"><summary>Conditions · choose individually</summary><div class="val-setup-condition-tools"><label class="val-label">Find conditions<input id="valSetupSearch" type="search" value="${esc(setupSearch)}" placeholder="Search conditions or references"></label><div class="val-actions">${btn('run-setup-all', 'Select applicable', !can('run') || busy ? 'disabled' : '', 'val-quiet')}${btn('run-setup-none', 'Deselect all', !can('run') || busy ? 'disabled' : '', 'val-quiet')}</div></div><div class="val-setup-choices">${rules.map(control).join('') || '<p class="val-help">No matching conditions. Maintain business rules in Conditions.</p>'}${missing.map(id => `<label class="val-setup-choice"><input type="checkbox" data-setup-rule="${esc(id)}" checked${!can('run') || busy ? ' disabled' : ''}><span>Unavailable condition · ${esc(id)}<small>Uncheck to remove it from this run.</small></span></label>`).join('')}</div></details>${runReferencesView(t, s, can)}<p class="val-help">Choose a profile or adjust these selections, then Run validation. Your upload and mapping stay in place. Profiles use the chosen template version; paused and company-restricted conditions cannot be forced on.</p></section>`;
     }
     function addRunReference(form) {
       setupAccess();
@@ -627,6 +706,7 @@
         );
       s.referenceChecks.push(c);
       E.runSetup(activeSchema(), s, { companyId: runCompanyId });
+      rememberReferenceChoices(s);
       runSelection = s;
       setupChanged();
     }
@@ -724,6 +804,8 @@
         runSelection = null;
         runProfileId = '';
         setupSearch = '';
+        setupReferenceSearch = '';
+        extraReferenceChoices = [];
         setupPreview = null;
         correction = null;
         copyPreview = null;
@@ -751,6 +833,7 @@
         'issueRowKey',
         'rowIndex',
         'setupRule',
+        'setupReference',
       ])
         if (d[key] !== undefined) return key + ':' + d[key];
       if (d.map !== undefined) return 'mapping:' + d.map;
@@ -978,6 +1061,8 @@
       runSelection = null;
       runProfileId = '';
       setupSearch = '';
+      setupReferenceSearch = '';
+      extraReferenceChoices = [];
       selectedIssue = null;
       targetRow = -1;
       setupPreview = null;
@@ -2876,8 +2961,16 @@
             .rules.filter(r => E.ruleApplies(r, { companyId: runCompanyId }))
             .map(r => r.id);
         if (action === 'run-setup-none') s.ruleIds = [];
-        if (action === 'run-setup-remove-reference')
-          s.referenceChecks = s.referenceChecks.filter(c => c.id !== id);
+        if (action === 'run-setup-references-all') {
+          for (const c of referenceChoices(activeSchema(), s))
+            if (c.available && !c.requiredBy.length && !c.selected)
+              s.referenceChecks.push({ id: E.uid(), ...c.check });
+          E.runSetup(activeSchema(), s, { companyId: runCompanyId });
+        }
+        if (action === 'run-setup-references-none') {
+          rememberReferenceChoices(s);
+          s.referenceChecks = [];
+        }
         runSelection = s;
         setupChanged();
         return;
@@ -3938,8 +4031,9 @@
       }
     });
     document.addEventListener('input', event => {
-      if (event.target.id === 'valSetupSearch') {
-        setupSearch = event.target.value;
+      if (['valSetupSearch', 'valSetupReferenceSearch'].includes(event.target.id)) {
+        if (event.target.id === 'valSetupSearch') setupSearch = event.target.value;
+        else setupReferenceSearch = event.target.value;
         paint();
         return;
       }
@@ -4025,6 +4119,28 @@
             s.ruleIds = el.checked
               ? [...new Set([...s.ruleIds, id])]
               : s.ruleIds.filter(x => x !== id);
+            runSelection = s;
+            setupChanged();
+          } catch (error) {
+            el.checked = !el.checked;
+            throw error;
+          }
+          return;
+        }
+        if (el.dataset.setupReference !== undefined) {
+          try {
+            setupAccess();
+            const s = E.copy(setupChoices()),
+              c = referenceChoices(activeSchema(), s).find(
+                c => c.key === el.dataset.setupReference
+              );
+            if (!c || c.requiredBy.length || (el.checked && !c.available))
+              throw Error('This reference is required by a selected condition or unavailable.');
+            rememberReferenceChoices(s);
+            s.referenceChecks = s.referenceChecks.filter(x => referenceKey(x) !== c.key);
+            if (el.checked) s.referenceChecks.push({ id: E.uid(), ...c.check });
+            // Allow removing stale mappings one at a time before validating the full setup.
+            if (el.checked) E.runSetup(activeSchema(), s, { companyId: runCompanyId });
             runSelection = s;
             setupChanged();
           } catch (error) {
@@ -4211,6 +4327,8 @@
           runSelection = null;
           runProfileId = '';
           setupSearch = '';
+          setupReferenceSearch = '';
+          extraReferenceChoices = [];
           if (book) getDataFromSheet();
           result = null;
           resetReview();
@@ -4270,7 +4388,12 @@
       })().catch(error => {
         busy = false;
         say(error.message, true);
-        if (el.name === 'validationProfile' || el.dataset.setupRule !== undefined) paint();
+        if (
+          el.name === 'validationProfile' ||
+          el.dataset.setupRule !== undefined ||
+          el.dataset.setupReference !== undefined
+        )
+          paint();
       });
     });
     let dragging = '';
