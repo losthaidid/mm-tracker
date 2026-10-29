@@ -2083,3 +2083,204 @@ body[data-motion='off'] .validation-studio * {
 .val-review-issue .val-issue-value {
   font-size: 12px;
 }
+
+/* Upload preparations share the current theme and keep configuration controls mounted. */
+.val-prep-toolbar {
+  margin: 22px 0;
+  padding: 24px;
+  border: 1px solid var(--hub-border, #ccdad3);
+  border-radius: 18px;
+  background: linear-gradient(
+    125deg,
+    color-mix(in srgb, var(--hub-accent, #356c62) 10%, var(--hub-surface, #fff)),
+    var(--hub-surface, #fff)
+  );
+  color: var(--hub-text, #314b4a);
+}
+.val-prep-toolbar h3 {
+  margin: 10px 0;
+  font-size: 23px;
+  color: var(--hub-text, #314b4a);
+}
+.val-prep-toolbar,
+.val-preparation-room {
+  --val-muted: var(--hub-muted, #64786d);
+  --val-ink: var(--hub-text, #314b4a);
+}
+.val-preparation-room .val-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  border: 1px solid var(--hub-border, #ccdad3);
+  border-radius: 10px;
+  background: var(--hub-surface-soft, #edf3ec);
+  color: var(--hub-text, #314b4a);
+  cursor: pointer;
+  font: inherit;
+}
+.val-preparation-room .val-primary {
+  background: var(--hub-accent, #356c62);
+  color: var(--hub-on-accent, #fff);
+}
+.val-preparation-room .val-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.val-preparation-room .val-btn:focus-visible {
+  outline: 3px solid var(--hub-accent, #356c62);
+  outline-offset: 3px;
+}
+.val-prep-toolbar p,
+.val-preparation-room p {
+  line-height: 1.8;
+  font-size: 13px;
+}
+.val-prep-toolbar .val-actions {
+  flex-wrap: wrap;
+  margin: 18px 0;
+}
+.val-preparation-room {
+  color: var(--hub-text, #314b4a);
+}
+.modal:has(.val-preparation-room) .modal-head {
+  background: var(--hub-surface, #fff);
+  color: var(--hub-text, #314b4a);
+  border-color: var(--hub-border, #ccdad3);
+}
+.modal:has(.val-preparation-room) .modal-head h2 {
+  color: inherit;
+}
+.val-preparation-room .val-label {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 16px;
+  font-size: 12px;
+}
+.val-preparation-room [hidden] {
+  display: none !important;
+}
+.val-preparation-room select,
+.val-preparation-room input {
+  color: var(--hub-text, #314b4a);
+  background: var(--hub-surface, #fff);
+  border: 1px solid var(--hub-border, #ccdad3);
+  border-radius: 8px;
+  padding: 9px;
+  max-width: 100%;
+}
+.val-prep-fields {
+  max-height: 45vh;
+  overflow: auto;
+  border: 1px solid var(--hub-border, #ccdad3);
+  border-radius: 12px;
+  margin: 18px 0;
+}
+.val-prep-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px;
+  border-bottom: 1px solid var(--hub-border, #ccdad3);
+}
+.val-prep-field strong,
+.val-prep-field small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.val-prep-field small {
+  margin-top: 6px;
+  color: var(--hub-muted, #64786d);
+}
+.val-prep-mapped {
+  margin: 18px 0;
+  border: 1px solid var(--hub-border, #ccdad3);
+  border-radius: 12px;
+  max-height: 32vh;
+  overflow: auto;
+}
+.val-preparation-room .val-toggle {
+  padding: 6px 0;
+  margin: 5px 0;
+  font-size: 12px;
+}
+.val-prep-summary {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+  margin: 20px 0;
+  border: 1px solid var(--hub-border, #ccdad3);
+  border-radius: 12px;
+  background: var(--hub-surface-soft, #edf3ec);
+  animation: val-prep-arrive 0.4s ease-out;
+}
+.val-prep-summary strong {
+  font-size: 19px;
+}
+.val-prep-summary.is-blocked {
+  border-color: var(--hub-danger, #a6374b);
+}
+.val-prep-warnings {
+  font-size: 12px;
+  line-height: 1.8;
+  max-height: 180px;
+  overflow: auto;
+}
+.val-preparation-room table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.val-preparation-room th,
+.val-preparation-room td {
+  padding: 10px;
+  border-bottom: 1px solid var(--hub-border, #ccdad3);
+  text-align: left;
+  overflow-wrap: anywhere;
+  max-width: 280px;
+}
+.val-preparation-room .val-actions {
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+.val-row-origin {
+  display: block;
+  font-weight: 400;
+  font-size: 10px;
+  margin-top: 6px;
+  color: var(--hub-muted, #64786d);
+}
+@keyframes val-prep-arrive {
+  from {
+    opacity: 0.4;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .val-prep-summary {
+    animation: none;
+  }
+}
+body[data-motion='off'] .val-prep-summary {
+  animation: none;
+}
+@media (max-width: 600px) {
+  .val-preparation-room .val-fields {
+    grid-template-columns: 1fr;
+  }
+  .val-prep-toolbar {
+    padding: 17px;
+  }
+  .val-prep-field {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .val-prep-toolbar .val-btn {
+    flex: 1 1 140px;
+  }
+}

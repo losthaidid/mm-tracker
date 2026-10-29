@@ -185,7 +185,8 @@
       )
         action = 'export';
       else if (
-        (id === 'validator' && /^(run|validate)$/.test(op)) ||
+        (id === 'validator' &&
+          (/^(run|validate|prep-.*)$/.test(op) || t.id === 'valPreparationForm')) ||
         (id === 'studio.reader' && ['browse', 'sample-json', 'sample-idoc'].includes(op)) ||
         ['focus', 'break', 'presentation-break'].includes(id)
       )

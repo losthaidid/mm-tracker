@@ -446,7 +446,7 @@
     ];
     return values.length ? values.join(g.join === 'all' ? ' AND ' : ' OR ') : 'Every row';
   }
-  async function report(t, rows, result, acceptedOnly = false) {
+  async function report(t, rows, result, acceptedOnly = false, preparation = null) {
     const data = [
         t.columns
           .map(c => c.label)
@@ -464,7 +464,12 @@
     rows.forEach((r, i) => {
       if (acceptedOnly && result.status[i].errors) return;
       const values = t.columns.map(c =>
-        typed(r[c.key], c, acceptedOnly ? 0 : styles.get(i + '\0' + c.key) || 0)
+        t.mode === 'sap'
+          ? {
+              value: String(r[c.key] ?? ''),
+              style: acceptedOnly ? 0 : styles.get(i + '\0' + c.key) || 0,
+            }
+          : typed(r[c.key], c, acceptedOnly ? 0 : styles.get(i + '\0' + c.key) || 0)
       );
       if (!acceptedOnly)
         values.push(
@@ -482,12 +487,38 @@
       data.push(values);
     });
     const sheets = [{ name: acceptedOnly ? 'Accepted data' : 'Validated data', rows: data }];
+    if (preparation) {
+      const indices = rows.map((r, i) => i).filter(i => !acceptedOnly || !result.status[i].errors);
+      sheets.push({
+        name: 'Prepared upload',
+        rows: [preparation.headers, ...indices.map(i => preparation.sourceRows[i].map(String))],
+      });
+      sheets.push({
+        name: 'Row origins',
+        rows: [
+          [
+            'Exported data row (1-based)',
+            'Working data row (1-based)',
+            'Original worksheet',
+            'Original Excel row',
+            'Split part',
+          ],
+          ...indices.map((i, n) => [
+            n + 1,
+            i + 1,
+            preparation.sheet,
+            preparation.origins[i].row,
+            preparation.origins[i].part || 'Unsplit',
+          ]),
+        ],
+      });
+    }
     if (!acceptedOnly)
       sheets.push({
         name: 'Issues',
         rows: [
           [
-            'Excel row',
+            preparation ? 'Working Excel row' : 'Excel row',
             'Column',
             'Technical field',
             'Severity',
@@ -539,6 +570,20 @@
         ['Issues listed', result.issues.length],
         ['Issues truncated', result.truncated ? 'Yes; split the file for the full report.' : 'No'],
         ['Generated', new Date().toISOString()],
+        ...(preparation
+          ? [
+              [
+                'Data preparation',
+                preparation.steps
+                  .map(s => (s.kind === 'sap' ? 'SAP formatting' : 'Explode & map'))
+                  .join(' → '),
+              ],
+              [
+                'Prepared upload',
+                'All original upload columns are retained in Prepared upload. Row origins links working data rows to the original worksheet and Excel rows.',
+              ],
+            ]
+          : []),
       ],
     });
     if (result.ignored)
