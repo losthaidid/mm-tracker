@@ -487,6 +487,26 @@
       data.push(values);
     });
     const sheets = [{ name: acceptedOnly ? 'Accepted data' : 'Validated data', rows: data }];
+    if (result.setup) {
+      sheets.push({
+        name: 'Validation setup',
+        rows: [
+          ['Profile / run setup', result.setup.name],
+          ['Base column checks', 'Always active'],
+          ['Conditions active', result.setup.conditions.length],
+          ['Reference checks active', result.setup.references.length],
+          ['Conditions skipped', result.setup.skipped.length],
+          ['Check', 'Status', 'Detail'],
+          ...result.setup.conditions.map(r => [r.name, 'Active condition', '']),
+          ...result.setup.references.map(r => [
+            r.field + ' → ' + r.name,
+            'Active reference check',
+            r.column + ' · ' + r.requiredBy,
+          ]),
+          ...result.setup.skipped.map(r => [r.name, 'Skipped', r.reason]),
+        ],
+      });
+    }
     if (preparation) {
       const indices = rows.map((r, i) => i).filter(i => !acceptedOnly || !result.status[i].errors);
       sheets.push({
