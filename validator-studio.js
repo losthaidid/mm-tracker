@@ -47,6 +47,7 @@
     '>' +
     label +
     '</button>';
+  const countLabel = (n, word) => n + ' ' + word + (n === 1 ? '' : 's');
   const options = (rows, value) =>
     rows
       .map(
@@ -72,12 +73,14 @@
     '" ' +
     attrs +
     '></label>';
-  const select = (name, label, rows, value) =>
+  const select = (name, label, rows, value, attrs = '') =>
     '<label class="val-label">' +
     label +
     '<select name="' +
     name +
-    '">' +
+    '"' +
+    (attrs ? ' ' + attrs : '') +
+    '>' +
     options(rows, value) +
     '</select></label>';
   const area = (name, label, value = '', attrs = '') =>
@@ -145,6 +148,9 @@
       resultSchema = null,
       version = 'draft',
       runCompanyId = '',
+      runSelection = null,
+      runProfileId = '',
+      setupSearch = '',
       fileName = '',
       filter = 'all',
       page = 0,
@@ -395,6 +401,235 @@
     function preparationView() {
       return `<section class="val-prep-toolbar"><div><span class="val-eyebrow">PREPARE BEFORE YOU CHECK</span><h3>Your data, ready for the next step.</h3><p>${sourceRows.length} working row(s) · ${originalRows.length} original row(s)${preparationSteps.length ? ' · ' + preparationSteps.length + ' preparation(s) applied' : ''}. Preview first. The file on your device stays unchanged.</p></div><div class="val-actions">${btn('prep-sap', 'Apply SAP formatting', activeSchema().mode !== 'sap' || busy ? 'disabled title="Use a SAP template for field formatting"' : '', 'val-secondary')}${btn('prep-explode', 'Explode & map rows', busy ? 'disabled' : '', 'val-secondary')}${btn('prep-undo', 'Undo last change', !preparationUndo.length || busy ? 'disabled' : '', 'val-quiet')}${btn('prep-restore', 'Restore original upload', !preparationSteps.length || busy ? 'disabled' : '', 'val-quiet')}</div><p class="val-help">Formatting uses the current column mapping and selected template version. Undo keeps the last three transformations. Validate after preparing to refresh issue counts and exports.</p></section>`;
     }
+    function setupAccess(action = 'run') {
+      ensure();
+      if (root.WorkHubCurrentAccess && !root.WorkHubCurrentAccess.can('validator', action))
+        throw Error('Your account cannot ' + action + ' validation setups.');
+    }
+    function profiles() {
+      return (store().profiles || []).filter(p => p.templateId === draft?.id);
+    }
+    function setupChoices(t = activeSchema()) {
+      return (
+        runSelection || {
+          ruleIds: t.rules
+            .filter(r => E.ruleApplies(r, { companyId: runCompanyId }))
+            .map(r => r.id),
+          referenceChecks: [],
+        }
+      );
+    }
+    function profileChanged(p) {
+      const s = setupChoices();
+      return (
+        JSON.stringify([s.ruleIds, s.referenceChecks, runCompanyId]) !==
+        JSON.stringify([p.ruleIds, p.referenceChecks, p.companyId || ''])
+      );
+    }
+    function setupName() {
+      const p = profiles().find(p => p.id === runProfileId);
+      return p
+        ? p.name + (profileChanged(p) ? ' (modified)' : '')
+        : runSelection
+          ? 'Custom selection'
+          : 'All applicable checks';
+    }
+    function setupPlan(t = activeSchema()) {
+      const plan = E.runSetup(t, setupChoices(t), { companyId: runCompanyId });
+      plan.summary.name = setupName();
+      plan.summary.profileId = runProfileId;
+      return plan;
+    }
+    function setupChanged() {
+      closePreparation();
+      correction = null;
+      if ($('valCorrectionReview')) a.closeModal?.();
+      resetPreparedResults();
+      say(
+        'Validation setup changed. Your upload, mapping and corrections are kept. Run validation to refresh the results.'
+      );
+      paint();
+    }
+    function chooseProfile(id) {
+      setupAccess();
+      if (id === '__custom' && runSelection && !runProfileId) return;
+      if (!id) {
+        runSelection = null;
+        runProfileId = '';
+      } else {
+        const p = profiles().find(p => p.id === id);
+        if (!p) throw Error('Choose an available profile for this template.');
+        const t = activeSchema();
+        if ((p.projectId || '') !== (t.projectId || ''))
+          throw Error(
+            'This profile uses a different linked project. Choose its original version or save a new profile.'
+          );
+        if (p.companyId) E.runContext(a.state(), t, p.companyId);
+        runSelection = E.copy({ ruleIds: p.ruleIds, referenceChecks: p.referenceChecks });
+        runProfileId = p.id;
+        runCompanyId = p.companyId || '';
+      }
+      setupChanged();
+    }
+    function openProfileForm(update = false) {
+      setupAccess(update ? 'edit' : 'create');
+      commitCurrent();
+      const t = activeSchema(),
+        saved = store().templates.find(t => t.id === draft.id),
+        p = profiles().find(p => p.id === runProfileId);
+      if (
+        !saved ||
+        (version === 'draft' && JSON.stringify(E.schema(saved)) !== JSON.stringify(E.schema(draft)))
+      )
+        throw Error('Save your template changes before saving a validation profile.');
+      setupPlan(t);
+      if (update && !p) throw Error('Select a saved profile to update.');
+      a.openModal(
+        update ? 'Update validation profile' : 'Save validation profile',
+        `<section class="val-profile-room" data-access-feature="validator"><form id="valProfileForm" data-id="${update ? esc(p.id) : ''}" data-owner="${esc(owner)}" data-template="${esc(draft.id)}" data-token="${generation}" data-stamp="${update ? esc(p.updatedAt) : ''}">${input('profileName', 'Profile name', update ? p.name : '', 'text', 'maxlength="120" placeholder="Company A — Material Master" required')}${t.projectId ? toggle('rememberCompany', 'Remember the current company with this profile', !!runCompanyId) : ''}<p class="val-help">Saves the selected check identifiers and reference mappings for this template. Uploaded records are never included. This profile uses definitions from the template version selected when you run.</p><button type="submit" class="val-btn val-primary">${update ? 'Update profile' : 'Save profile'}</button><p id="valProfileError" role="status"></p></form></section>`
+      );
+    }
+    function saveProfileForm(form) {
+      const id = form.dataset.id;
+      setupAccess(id ? 'edit' : 'create');
+      if (
+        form.dataset.owner !== a.owner?.() ||
+        form.dataset.template !== draft?.id ||
+        Number(form.dataset.token) !== generation
+      )
+        throw Error('The setup changed. Close this dialog and save the profile again.');
+      const t = activeSchema(),
+        selection = setupChoices(t);
+      setupPlan(t);
+      if (form.elements.rememberCompany?.checked && t.projectId)
+        E.runContext(a.state(), t, runCompanyId);
+      const p = {
+        id: id || E.uid(),
+        templateId: draft.id,
+        name: form.elements.profileName.value.trim(),
+        projectId: t.projectId || '',
+        companyId: form.elements.rememberCompany?.checked ? runCompanyId : '',
+        ...E.copy(selection),
+        updatedAt: new Date().toISOString(),
+      };
+      const ok = a.mutate(d => {
+        const v = d.workhub.validator;
+        v.profiles ||= [];
+        const i = v.profiles.findIndex(p => p.id === id && p.templateId === draft.id);
+        if (id && i >= 0 && v.profiles[i].updatedAt !== form.dataset.stamp)
+          throw Error('This profile changed elsewhere. Reopen it before updating.');
+        if (id && i < 0) throw Error('This profile was removed elsewhere. Save a new profile.');
+        if (i < 0) v.profiles.push(p);
+        else v.profiles[i] = p;
+        E.checkProfiles(v);
+      });
+      if (!ok) throw Error('The profile could not be saved. Try again.');
+      runProfileId = p.id;
+      runSelection = E.copy(selection);
+      // A profile without a remembered company can still use the current company for this run.
+      a.closeModal?.();
+      say('Validation profile saved. Your template rules and uploaded records are unchanged.');
+      paint();
+    }
+    function runSetupView() {
+      const t = activeSchema(),
+        s = setupChoices(t),
+        ids = new Set(s.ruleIds),
+        p = profiles().find(p => p.id === runProfileId),
+        q = setupSearch.trim().toLowerCase(),
+        can = action =>
+          !root.WorkHubCurrentAccess || root.WorkHubCurrentAccess.can('validator', action);
+      let plan,
+        problem = '';
+      try {
+        plan = setupPlan(t);
+      } catch (error) {
+        problem = error.message;
+      }
+      const rules = t.rules.filter(
+        r =>
+          !q ||
+          [
+            r.name,
+            r.message,
+            ...E.ruleReferences(r).map(c => t.lookups.find(l => l.id === c.lookupId)?.name || ''),
+          ]
+            .join(' ')
+            .toLowerCase()
+            .includes(q)
+      );
+      const missing = s.ruleIds.filter(id => !t.rules.some(r => r.id === id));
+      const control = r => {
+        const available = E.ruleApplies(r, { companyId: runCompanyId }),
+          refs = E.ruleReferences(r);
+        return `<label class="val-setup-choice"><input type="checkbox" data-setup-rule="${esc(r.id)}"${ids.has(r.id) ? ' checked' : ''}${!can('run') || busy || (!available && !ids.has(r.id)) ? ' disabled' : ''}><span><strong>${esc(r.name)}</strong><small>${!r.enabled ? 'Paused in template' : !available ? 'Different company — skipped' : ids.has(r.id) ? 'Selected for this run' : 'Skipped · not selected'}${refs.length ? ' · Uses ' + esc([...new Set(refs.map(c => t.lookups.find(l => l.id === c.lookupId)?.name))].join(', ')) : ''}</small></span></label>`;
+      };
+      const used = plan?.summary.references || [],
+        required = used.filter(
+          r =>
+            !s.referenceChecks.some(
+              c => c.field === r.field && c.lookupId === r.lookupId && c.lookupColumn === r.column
+            )
+        );
+      return `<section id="valRunSetup" class="val-run-setup" data-val-context="${esc(runProfileId + ':' + runCompanyId + ':' + version)}"><div class="val-panel-title"><div><span class="val-eyebrow">CHOOSE WHAT TO CHECK</span><h3>Validation setup</h3><p>Your columns stay the same. Choose the conditions and reference checks for this run.</p></div><span class="val-chip">${esc(setupName())}</span></div><div class="val-setup-profile">${select('validationProfile', 'Validation profile', [['', 'All applicable checks'], ...(!runProfileId && runSelection ? [['__custom', 'Custom selection']] : []), ...profiles().map(p => [p.id, p.name])], runProfileId || (runSelection ? '__custom' : ''), !can('run') || busy ? 'disabled' : '')}<div class="val-actions">${btn('run-setup-save', 'Save as new profile', !can('create') || busy ? 'disabled' : '', 'val-secondary')}${btn('run-setup-update', 'Update profile', !p || !can('edit') || busy ? 'disabled' : '', 'val-quiet')}${btn('profile-delete', 'Delete profile', !p || !can('delete') || busy ? 'disabled' : '', 'val-quiet')}</div></div>${p && profileChanged(p) ? '<p class="val-help">Temporary changes · the saved profile is unchanged until you choose Update profile.</p>' : ''}<div class="val-setup-summary" role="status"><strong>${plan ? countLabel(plan.summary.conditions.length, 'condition') + ' · ' + countLabel(used.length, 'reference check') + ' · ' + countLabel(plan.summary.skipped.length, 'skipped condition') : 'Review this setup'}</strong><span>Base column checks always apply: required fields, types/SAP formats, lengths, allowed values and duplicate checks.</span></div>${problem ? `<p class="val-setup-problem" role="alert">${esc(problem)}</p>` : ''}<details class="val-setup-details"><summary>Conditions · choose individually</summary><div class="val-setup-condition-tools"><label class="val-label">Find conditions<input id="valSetupSearch" type="search" value="${esc(setupSearch)}" placeholder="Search conditions or references"></label><div class="val-actions">${btn('run-setup-all', 'Select applicable', !can('run') || busy ? 'disabled' : '', 'val-quiet')}${btn('run-setup-none', 'Deselect all', !can('run') || busy ? 'disabled' : '', 'val-quiet')}</div></div><div class="val-setup-choices">${rules.map(control).join('') || '<p class="val-help">No matching conditions. Maintain business rules in Conditions.</p>'}${missing.map(id => `<label class="val-setup-choice"><input type="checkbox" data-setup-rule="${esc(id)}" checked${!can('run') || busy ? ' disabled' : ''}><span>Unavailable condition · ${esc(id)}<small>Uncheck to remove it from this run.</small></span></label>`).join('')}</div></details><details class="val-setup-details"><summary>References · required and additional checks</summary><p class="val-help">References used by selected conditions are included automatically. Add a separate field-to-reference check below when needed. Blank values follow the existing reference condition behaviour; mark a column Required to require a value.</p><div class="val-setup-references">${required.map(r => `<div class="val-setup-reference"><strong>${esc(t.columns.find(c => c.key === r.field)?.label || r.field)} → ${esc(r.name)}</strong><small>${esc(r.column)} · Required by ${esc(r.requiredBy)}</small></div>`).join('') || '<p class="val-help">No reference checks selected.</p>'}</div><div class="val-setup-additional">${s.referenceChecks
+        .map(c => {
+          const f = t.columns.find(f => f.key === c.field),
+            l = t.lookups.find(l => l.id === c.lookupId);
+          return `<div class="val-setup-reference"><span><strong>${esc(f?.label || c.field)} → ${esc(l?.name || 'Unavailable reference')}</strong><small>${esc(c.lookupColumn)} · Additional check</small></span>${btn('run-setup-remove-reference', 'Remove', `data-id="${esc(c.id)}"${!can('run') || busy ? ' disabled' : ''}`, 'val-quiet')}</div>`;
+        })
+        .join('')}</div><form id="valRunReferenceForm"><div class="val-fields">${select(
+        'setupField',
+        'Uploaded field',
+        t.columns.map(c => [c.key, c.label]),
+        t.columns[0]?.key
+      )}${select(
+        'setupReference',
+        'Reference',
+        t.lookups.map(l => [l.id, l.name]),
+        t.lookups[0]?.id
+      )}${select(
+        'setupReferenceColumn',
+        'Reference column',
+        (t.lookups[0]?.headers || []).map(h => [h, h]),
+        t.lookups[0]?.codeColumn || t.lookups[0]?.headers[0]
+      )}</div><button type="submit" class="val-btn val-secondary"${!can('run') || !t.lookups.length || !t.columns.length || busy ? ' disabled' : ''}>Add reference check</button></form></details><p class="val-help">Choose a profile or adjust these selections, then Run validation. Your upload and mapping stay in place. Profiles use the chosen template version; paused and company-restricted conditions cannot be forced on.</p></section>`;
+    }
+    function addRunReference(form) {
+      setupAccess();
+      const s = E.copy(setupChoices()),
+        c = {
+          id: E.uid(),
+          field: form.elements.setupField.value,
+          lookupId: form.elements.setupReference.value,
+          lookupColumn: form.elements.setupReferenceColumn.value,
+        };
+      if (
+        s.referenceChecks.some(
+          x => x.field === c.field && x.lookupId === c.lookupId && x.lookupColumn === c.lookupColumn
+        )
+      )
+        throw Error('This additional reference check is already selected.');
+      if (
+        activeSchema().rules.some(
+          r =>
+            s.ruleIds.includes(r.id) &&
+            E.ruleApplies(r, { companyId: runCompanyId }) &&
+            E.ruleReferences(r).some(
+              x =>
+                x.field === c.field &&
+                x.lookupId === c.lookupId &&
+                x.lookupColumn === c.lookupColumn
+            )
+        )
+      )
+        throw Error(
+          'A selected condition already uses this reference mapping. It is included automatically.'
+        );
+      s.referenceChecks.push(c);
+      E.runSetup(activeSchema(), s, { companyId: runCompanyId });
+      runSelection = s;
+      setupChanged();
+    }
     function reviewed(raw) {
       const keys = new Set(raw.issues.map(E.issueKey));
       for (const [key, decision] of ignoredIssues)
@@ -486,12 +721,20 @@
         busy = false;
         mode = 'columns';
         runCompanyId = '';
+        runSelection = null;
+        runProfileId = '';
+        setupSearch = '';
         setupPreview = null;
         correction = null;
         copyPreview = null;
         if ($('valCopyReview')) a.closeModal?.();
         if ($('valCorrectionReview')) a.closeModal?.();
         if ($('valSetupReview')) a.closeModal?.();
+        const profileRoom = document.querySelector('.val-profile-room');
+        if (profileRoom) {
+          profileRoom.replaceChildren();
+          a.closeModal?.();
+        }
       }
       return next;
     }
@@ -501,7 +744,14 @@
       if (node.nodeType !== 1) return '';
       const d = node.dataset;
       if (node.id) return 'id:' + node.id + (node.tagName === 'FORM' ? ':' + (d.id || '') : '');
-      for (const key of ['columnId', 'groupField', 'groupValue', 'issueRowKey', 'rowIndex'])
+      for (const key of [
+        'columnId',
+        'groupField',
+        'groupValue',
+        'issueRowKey',
+        'rowIndex',
+        'setupRule',
+      ])
         if (d[key] !== undefined) return key + ':' + d[key];
       if (d.map !== undefined) return 'mapping:' + d.map;
       if (d.cell !== undefined) return 'cell:' + d.cell + ':' + d.field;
@@ -725,6 +975,9 @@
       generation++;
       runner?.cancel();
       runCompanyId = '';
+      runSelection = null;
+      runProfileId = '';
+      setupSearch = '';
       selectedIssue = null;
       targetRow = -1;
       setupPreview = null;
@@ -1938,9 +2191,11 @@
       cancelLive();
       pinnedRows.clear();
       commitCurrent();
-      const t = activeSchema();
-      E.checkSchema(t);
-      const context = E.runContext(a.state(), t, runCompanyId);
+      const base = activeSchema();
+      E.checkSchema(base);
+      const context = E.runContext(a.state(), base, runCompanyId);
+      const plan = setupPlan(base),
+        t = plan.schema;
       const mapped = E.mapRows(headers, sourceRows, t, mapping);
       if (!mapped.length) throw Error('Upload or paste at least one data row.');
       if (version === 'draft') {
@@ -1973,6 +2228,7 @@
         if (token !== generation || account !== a.owner?.() || !a.ready()) return;
         // Company availability may change while a worker is running.
         E.runContext(a.state(), t, context.companyId);
+        checked.setup = E.copy(plan.summary);
         rawResult = checked;
         result = reviewed(checked);
         resultSchema = E.copy(t);
@@ -1990,6 +2246,13 @@
           errors: checked.errors,
           warnings: checked.warnings,
           context: E.copy(context),
+          setup: {
+            name: plan.summary.name,
+            profileId: runProfileId,
+            conditions: plan.summary.conditions.length,
+            references: plan.summary.references.length,
+            skipped: plan.summary.skipped.length,
+          },
         };
         currentRunId = summary.id;
         a.mutate(d => {
@@ -2037,7 +2300,9 @@
       }
       try {
         const context = E.runContext(a.state(), check.schema, runCompanyId);
+        const setup = rawResult?.setup;
         rawResult = E.validateRows(check.schema, rows, context);
+        if (setup) rawResult.setup = E.copy(setup);
         result = reviewed(rawResult);
         if (selectedIssue)
           selectedIssue =
@@ -2170,6 +2435,9 @@
         '</p>' +
         (filter !== 'all' && pinnedRows.size
           ? '<p class="val-help">Edited rows stay visible while you work. Change the filter to refresh the list.</p>'
+          : '') +
+        (result?.setup
+          ? `<details class="val-card val-setup-results"><summary>Checks used · ${esc(result.setup.name)} · ${countLabel(result.setup.conditions.length, 'condition')} · ${countLabel(result.setup.references.length, 'reference check')}</summary><p class="val-help">Base column checks ran. Listed conditions were active; skipped conditions were not evaluated or counted as passed.</p><div class="val-setup-audit">${result.setup.conditions.map(r => `<div><strong>${esc(r.name)}</strong><span>Active condition</span></div>`).join('')}${result.setup.references.map(r => `<div><strong>${esc(r.field)} → ${esc(r.name)}</strong><span>Active reference check · ${esc(r.column)}</span></div>`).join('')}${result.setup.skipped.map(r => `<div><strong>${esc(r.name)}</strong><span>Skipped · ${esc(r.reason)}</span></div>`).join('')}</div></details>`
           : '') +
         (result
           ? '<div class="val-metrics"><div class="val-metric passed"><span>Rows without errors</span><strong>' +
@@ -2402,6 +2670,7 @@
         select('version', 'Validate against', versions, version) +
         '</div></div>' +
         validationScopeView() +
+        runSetupView() +
         (busy
           ? '<div class="val-scanning" role="status"><span class="val-scanner-orb">' +
             icon('spark', 28) +
@@ -2434,7 +2703,7 @@
     function validationScopeView() {
       const t = activeSchema();
       if (!t.projectId)
-        return '<p class="val-help">Standalone template · all enabled conditions apply.</p>';
+        return '<p class="val-help">Standalone template · choose checks in Validation setup below.</p>';
       const companies = a
           .state()
           .projectCompanies.filter(c => c.projectId === t.projectId && c.active !== false),
@@ -2443,7 +2712,7 @@
       return (
         '<section class="val-card val-run-scope"><div><span class="val-eyebrow">PROJECT &amp; COMPANY</span><h3>' +
         esc(projectName(t)) +
-        '</h3><p class="val-help">One company per file. Shared column checks and conditions always apply; company-specific conditions use your choice below.</p></div>' +
+        '</h3><p class="val-help">One company per file. Base column checks always apply. Select conditions in Validation setup; company restrictions still apply.</p></div>' +
         select(
           'validationCompany',
           'Company for this validation',
@@ -2452,7 +2721,7 @@
         ) +
         '<p class="val-help">' +
         (runCompanyId && companies.some(c => c.id === runCompanyId)
-          ? applicable + ' enabled condition(s) apply to this company.'
+          ? applicable + ' condition(s) available for this company before your setup selection.'
           : 'Choose an active company before running validation.') +
         (scoped ? ' ' + scoped + ' company-specific condition(s) maintained.' : '') +
         (!companies.length
@@ -2524,6 +2793,17 @@
               ' errors · ' +
               r.warnings +
               ' warnings' +
+              (r.setup
+                ? ' · ' +
+                  esc(r.setup.name) +
+                  ' · ' +
+                  r.setup.conditions +
+                  ' conditions / ' +
+                  r.setup.references +
+                  ' reference checks / ' +
+                  r.setup.skipped +
+                  ' skipped'
+                : '') +
               (r.reviewedAt
                 ? ' · reviewed: ' +
                   r.reviewedErrors +
@@ -2583,6 +2863,49 @@
       const action = el.dataset.val,
         id = el.dataset.id;
       message = '';
+      if (action.startsWith('run-setup-')) {
+        setupAccess();
+        commitCurrent();
+        if (action === 'run-setup-save' || action === 'run-setup-update') {
+          openProfileForm(action === 'run-setup-update');
+          return;
+        }
+        const s = E.copy(setupChoices());
+        if (action === 'run-setup-all')
+          s.ruleIds = activeSchema()
+            .rules.filter(r => E.ruleApplies(r, { companyId: runCompanyId }))
+            .map(r => r.id);
+        if (action === 'run-setup-none') s.ruleIds = [];
+        if (action === 'run-setup-remove-reference')
+          s.referenceChecks = s.referenceChecks.filter(c => c.id !== id);
+        runSelection = s;
+        setupChanged();
+        return;
+      }
+      if (action === 'profile-delete') {
+        setupAccess('delete');
+        const p = profiles().find(p => p.id === runProfileId);
+        if (!p) throw Error('Choose a saved profile first.');
+        if (
+          !root.confirm(
+            'Delete profile "' +
+              p.name +
+              '"? The template, conditions, references and uploaded data will remain.'
+          )
+        )
+          return;
+        if (
+          !a.mutate(d => {
+            d.workhub.validator.profiles = (d.workhub.validator.profiles || []).filter(
+              x => x.id !== p.id
+            );
+          })
+        )
+          throw Error('The profile could not be deleted.');
+        runProfileId = '';
+        setupChanged();
+        return;
+      }
       if (action === 'prep-sap' || action === 'prep-explode') {
         openPreparation(action === 'prep-sap' ? 'sap' : 'explode');
         return;
@@ -3024,6 +3347,10 @@
             d.workhub.validator.templates = d.workhub.validator.templates.filter(
               t => t.id !== templateId
             );
+            if (d.workhub.validator.profiles)
+              d.workhub.validator.profiles = d.workhub.validator.profiles.filter(
+                p => p.templateId !== templateId
+              );
           })
         ) {
           draft = null;
@@ -3413,7 +3740,7 @@
       if (!correction || correction.owner !== a.owner?.() || correction.token !== generation)
         return;
       const result = E.suggestions(
-        activeSchema(),
+        resultSchema,
         rows[correction.index],
         correction.field,
         $('valSuggestionSearch')?.value || '',
@@ -3491,6 +3818,14 @@
     }
     function formSubmit(form) {
       ensure();
+      if (form.id === 'valProfileForm') {
+        saveProfileForm(form);
+        return;
+      }
+      if (form.id === 'valRunReferenceForm') {
+        addRunReference(form);
+        return;
+      }
       if (form.id === 'valPreparationForm') {
         previewPreparation(form);
         return;
@@ -3580,6 +3915,12 @@
         if (el.dataset.val.startsWith('prep-') && $('valPreparationPreview'))
           $('valPreparationPreview').textContent = error.message;
         say(error.message, true);
+        if (
+          (el.dataset.val.startsWith('run-setup-') || el.dataset.val === 'profile-delete') &&
+          a.ready() &&
+          draft
+        )
+          paint();
       });
     });
     document.addEventListener('submit', event => {
@@ -3588,12 +3929,20 @@
       try {
         formSubmit(event.target);
       } catch (error) {
+        if (event.target.id === 'valProfileForm' && $('valProfileError'))
+          $('valProfileError').textContent = error.message;
         if (event.target.id === 'valPreparationForm' && $('valPreparationPreview'))
           $('valPreparationPreview').textContent = error.message;
         say(error.message, true);
+        if (event.target.id === 'valRunReferenceForm') paint();
       }
     });
     document.addEventListener('input', event => {
+      if (event.target.id === 'valSetupSearch') {
+        setupSearch = event.target.value;
+        paint();
+        return;
+      }
       if (event.target.form?.id === 'valPreparationForm') {
         if (preparation) preparation.plan = null;
         const apply = document.querySelector('[data-val="prep-apply"]');
@@ -3652,6 +4001,48 @@
       if (!el.closest?.('.validation-studio')) return;
       void (async () => {
         ensure();
+        if (el.name === 'validationProfile') {
+          try {
+            chooseProfile(el.value);
+          } catch (error) {
+            el.value = runProfileId;
+            throw error;
+          }
+          return;
+        }
+        if (el.dataset.setupRule !== undefined) {
+          try {
+            setupAccess();
+            const s = E.copy(setupChoices()),
+              id = el.dataset.setupRule;
+            if (
+              el.checked &&
+              !activeSchema().rules.some(
+                r => r.id === id && E.ruleApplies(r, { companyId: runCompanyId })
+              )
+            )
+              throw Error('This condition is paused or unavailable for the selected company.');
+            s.ruleIds = el.checked
+              ? [...new Set([...s.ruleIds, id])]
+              : s.ruleIds.filter(x => x !== id);
+            runSelection = s;
+            setupChanged();
+          } catch (error) {
+            el.checked = !el.checked;
+            throw error;
+          }
+          return;
+        }
+        if (el.name === 'setupReference' && el.form?.id === 'valRunReferenceForm') {
+          setupAccess();
+          const l = activeSchema().lookups.find(l => l.id === el.value),
+            target = el.form.elements.setupReferenceColumn;
+          target.innerHTML = options(
+            (l?.headers || []).map(h => [h, h]),
+            l?.codeColumn || l?.headers[0]
+          );
+          return;
+        }
         if (el.dataset.issueChoice !== undefined) {
           const issue = result?.issues[Number(el.dataset.issueChoice)];
           if (!issue || livePending || issue.ignored || E.issueKey(issue) !== el.dataset.issueKey)
@@ -3712,6 +4103,7 @@
           return;
         }
         if (el.name === 'validationCompany') {
+          setupAccess();
           cancelLive();
           pinnedRows.clear();
           runCompanyId = el.value;
@@ -3816,6 +4208,9 @@
           busy = false;
           version = el.value;
           runCompanyId = '';
+          runSelection = null;
+          runProfileId = '';
+          setupSearch = '';
           if (book) getDataFromSheet();
           result = null;
           resetReview();
@@ -3875,6 +4270,7 @@
       })().catch(error => {
         busy = false;
         say(error.message, true);
+        if (el.name === 'validationProfile' || el.dataset.setupRule !== undefined) paint();
       });
     });
     let dragging = '';
@@ -3951,6 +4347,8 @@
         result: E.copy(result),
         mapping: { ...mapping },
         runCompanyId,
+        runSelection: draft ? E.copy(setupChoices()) : null,
+        runProfileId,
         livePending,
         owner,
       }),

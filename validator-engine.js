@@ -717,6 +717,158 @@
       throw Error('Unique combinations need two to ten different existing fields.');
     return t;
   }
+  function checkRunSelection(s) {
+    if (
+      !s ||
+      !Array.isArray(s.ruleIds) ||
+      s.ruleIds.length > LIMITS.rules ||
+      s.ruleIds.some(id => !text(id, 100) || !id.trim()) ||
+      new Set(s.ruleIds).size !== s.ruleIds.length ||
+      !Array.isArray(s.referenceChecks) ||
+      s.referenceChecks.length > 20
+    )
+      throw Error('Choose up to 100 conditions and 20 additional reference checks.');
+    const ids = new Set(),
+      mappings = new Set();
+    for (const c of s.referenceChecks) {
+      if (
+        !c ||
+        !text(c.id, 80) ||
+        !c.id.trim() ||
+        ids.has(c.id) ||
+        !text(c.field, 64) ||
+        !c.field.trim() ||
+        !text(c.lookupId, 100) ||
+        !c.lookupId.trim() ||
+        !text(c.lookupColumn, 120) ||
+        !c.lookupColumn.trim()
+      )
+        throw Error('Each reference check needs a field, reference and reference column.');
+      const mapping = JSON.stringify([c.field, c.lookupId, c.lookupColumn]);
+      if (mappings.has(mapping)) throw Error('Choose each additional reference mapping once.');
+      mappings.add(mapping);
+      ids.add(c.id);
+    }
+  }
+  function checkProfiles(v) {
+    if (v.profiles === undefined) return;
+    if (!Array.isArray(v.profiles) || v.profiles.length > 120)
+      throw Error('Keep up to 120 validation profiles in this workspace.');
+    const ids = new Set(),
+      names = new Set(),
+      counts = new Map();
+    for (const p of v.profiles) {
+      if (
+        !p ||
+        !text(p.id, 100) ||
+        !p.id.trim() ||
+        ids.has(p.id) ||
+        !text(p.templateId, 100) ||
+        !p.templateId.trim() ||
+        !text(p.name, 120) ||
+        !p.name.trim() ||
+        !text(p.projectId || '', 100) ||
+        !text(p.companyId || '', 100) ||
+        (p.companyId && !p.projectId) ||
+        !text(p.updatedAt, 50) ||
+        !p.updatedAt
+      )
+        throw Error('Check validation profile identifiers, names and company settings.');
+      const name = p.templateId + '\0' + p.name.trim().toLowerCase();
+      if (names.has(name)) throw Error('Use a different profile name for this template.');
+      counts.set(p.templateId, (counts.get(p.templateId) || 0) + 1);
+      if (counts.get(p.templateId) > 30) throw Error('Keep up to 30 profiles per template.');
+      ids.add(p.id);
+      names.add(name);
+      checkRunSelection(p);
+    }
+  }
+  function ruleReferences(r) {
+    const refs = [];
+    const walk = g => {
+      g.conditions.forEach(add);
+      g.groups.forEach(walk);
+    };
+    const add = c => {
+      if (['lookup', 'lookupTuple'].includes(c.operator)) refs.push(c);
+    };
+    walk(r.when);
+    add(r.assertion);
+    return refs;
+  }
+  /** Compile a run-only schema. Definitions, published releases and base checks stay unchanged. */
+  function runSetup(t, selection, context = {}) {
+    checkSchema(t);
+    checkRunSelection(selection);
+    if (selection.ruleIds.some(id => !t.rules.some(r => r.id === id)))
+      throw Error(
+        'This setup includes conditions unavailable in this version. Remove the unavailable selections or choose their template version.'
+      );
+    const selected = new Set(selection.ruleIds),
+      active = t.rules.filter(r => selected.has(r.id) && ruleApplies(r, context)),
+      skipped = t.rules
+        .filter(r => !active.includes(r))
+        .map(r => ({
+          id: r.id,
+          name: r.name,
+          reason: !r.enabled
+            ? 'Paused in template'
+            : !ruleApplies(r, context)
+              ? 'Different company'
+              : 'Not selected for this run',
+        })),
+      schema = { ...t },
+      additional = [];
+    for (const c of selection.referenceChecks) {
+      const field = t.columns.find(f => f.key === c.field),
+        list = t.lookups.find(l => l.id === c.lookupId);
+      if (!field || !list || !list.headers.includes(c.lookupColumn))
+        throw Error(
+          'A selected reference check is unavailable in this version. Remove it or choose its original field and reference again.'
+        );
+      const r = rule(c.field);
+      r.id = 'runref:' + c.id;
+      if (t.rules.some(saved => saved.id === r.id))
+        throw Error('Choose another reference check identifier.');
+      r.name = (field.label + ' → ' + list.name).slice(0, 160);
+      r.assertion = {
+        ...condition(c.field),
+        operator: 'lookup',
+        lookupId: c.lookupId,
+        lookupColumn: c.lookupColumn,
+      };
+      additional.push(r);
+    }
+    if (active.length + additional.length > LIMITS.rules)
+      throw Error('Select up to 100 active conditions and additional reference checks combined.');
+    schema.rules = [...copy(active), ...additional];
+    checkSchema(schema);
+    const seen = new Set(),
+      references = [];
+    for (const r of schema.rules)
+      for (const c of ruleReferences(r)) {
+        const signature = JSON.stringify([c.field, c.lookupId, c.lookupColumn, c.pairs]);
+        if (seen.has(signature)) continue;
+        seen.add(signature);
+        references.push({
+          field: c.field,
+          name: t.lookups.find(l => l.id === c.lookupId).name,
+          lookupId: c.lookupId,
+          column:
+            c.lookupColumn || c.pairs.map(p => p.field + ' → ' + p.referenceColumn).join('; '),
+          requiredBy: r.name,
+        });
+      }
+    return {
+      schema,
+      summary: {
+        conditions: active.map(r => ({ id: r.id, name: r.name })),
+        references,
+        skipped,
+        additionalChecks: additional.length,
+      },
+    };
+  }
   function upgrade(d) {
     if (!d.workhub) return d;
     if (d.workhub.validator === undefined) d.workhub.validator = { templates: [], runs: [] };
@@ -732,6 +884,7 @@
       v.runs.length > 150
     )
       throw Error('Check the validation workspace.');
+    checkProfiles(v);
     const ids = new Set();
     for (const t of v.templates) {
       if (
@@ -794,6 +947,16 @@
       )
         throw Error('Check validation review summaries.');
       if (r.context !== undefined) checkContext({ projectId: r.context?.projectId }, r.context);
+      if (
+        r.setup !== undefined &&
+        (!r.setup ||
+          !text(r.setup.name, 160) ||
+          !text(r.setup.profileId || '', 100) ||
+          ['conditions', 'references', 'skipped'].some(
+            k => !Number.isInteger(r.setup[k]) || r.setup[k] < 0 || r.setup[k] > 500
+          ))
+      )
+        throw Error('Check the validation setup summary.');
     }
     if (JSON.stringify(v).length > 6000000)
       throw Error(
@@ -1646,6 +1809,10 @@
     checkContext,
     runContext,
     ruleApplies,
+    checkRunSelection,
+    checkProfiles,
+    ruleReferences,
+    runSetup,
     copyTemplate,
     copyConditions,
     upgrade,

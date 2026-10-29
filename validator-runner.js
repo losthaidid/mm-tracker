@@ -22,7 +22,7 @@
       return new Promise((resolve, reject) => {
         let worker;
         try {
-          worker = new root.Worker(new URL('./validator-worker.js?v=20261028-perf-1', base), {
+          worker = new root.Worker(new URL('./validator-worker.js?v=20261029-profiles-1', base), {
             name: 'WorkHub validation',
           });
         } catch {

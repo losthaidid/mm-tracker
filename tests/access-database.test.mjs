@@ -85,6 +85,16 @@ test('Access database: validation runs are permitted independently of template e
  await command('permissions',member,{version:2,permissions:tasks});await sign(member);await save(db,doc({tasks:[{id:'new-task',task:'Hello'}]}),0);
  const loaded=(await db.query('select * from public.load_mm_tracker()')).rows[0];assert.equal(loaded.document.data.projects.length,1);assert.equal(loaded.document.data.projects[0].id,'project-default');assert.equal(loaded.document.data.tasks[0].task,'Hello');
 });
+test('Access database: saved validation profiles enforce create, edit and delete permissions, including a first profile',async t=>{
+ const {db,sign,command,add}=await setup(t);await db.exec("update public.workhub_feature_catalog set paths=array_remove(paths,'workhub.validator.profiles') where id='validator'");for(let i=0;i<2;i++)await db.exec(read('supabase/migrations/20261029024903_validation_profiles_access_path.sql'));assert.equal((await db.query("select cardinality(array_positions(paths,'workhub.validator.profiles')) as copies from public.workhub_feature_catalog where id='validator'")).rows[0].copies,1);await add();const full=doc({workhub:{validator:{templates:[{id:'schema',name:'Keep'}],runs:[]}}});await save(db,full,0);
+ const profile={id:'profile',templateId:'schema',name:'PRIVATE_PROFILE',ruleIds:['a'],referenceChecks:[]},first=structuredClone(full);first.data.workhub.validator.profiles=[profile];
+ await sign();const perms=C.preset('view');perms.validator={mode:'use',run:true,export:true,create:true,edit:false,delete:false};await command('permissions',member,{version:1,permissions:perms});await sign(member);
+ C.assertChange({role:'member',status:'active',permissions:perms},full.data,first.data);const restored=structuredClone(first.data);C.restoreDerived({role:'member',status:'active',permissions:perms},full.data,restored);assert.equal(restored.workhub.validator.profiles.length,1);
+ await save(db,first,1);const edited=structuredClone(first);edited.data.workhub.validator.profiles[0].name='Changed';await assert.rejects(save(db,edited,2),e=>e.code==='42501');const deleted=structuredClone(first);deleted.data.workhub.validator.profiles=[];await assert.rejects(save(db,deleted,2),e=>e.code==='42501');
+ await sign();perms.validator={mode:'use',run:true,create:false,edit:true,delete:false};await command('permissions',member,{version:2,permissions:perms});await sign(member);await save(db,edited,2);const extra=structuredClone(edited);extra.data.workhub.validator.profiles.push({...profile,id:'another'});await assert.rejects(save(db,extra,3),e=>e.code==='42501');
+ await sign();perms.validator={mode:'hidden'};await command('permissions',member,{version:3,permissions:perms});await sign(member);const projected=(await db.query('select * from public.load_mm_tracker()')).rows[0].document;assert.doesNotMatch(JSON.stringify(projected),/PRIVATE_PROFILE|Changed|ruleIds/);
+ await sign();perms.validator={mode:'use',run:true,create:false,edit:false,delete:true};await command('permissions',member,{version:4,permissions:perms});await sign(member);await save(db,deleted,3);
+});
 
 test('Access database: unrelated edits retain filtered history, reminders and record metadata with idempotent retries',async t=>{
  const {db,sign,command,add}=await setup(t);await add();

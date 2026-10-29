@@ -2085,6 +2085,214 @@ body[data-motion='off'] .validation-studio * {
 }
 
 /* Upload preparations share the current theme and keep configuration controls mounted. */
+.val-run-setup {
+  --val-muted: var(--hub-muted, #64786d);
+  margin: 20px 0 26px;
+  padding: 22px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--hub-accent, #356c62) 8%, var(--hub-surface, #fff)),
+    var(--hub-surface, #fff)
+  );
+  border: 1px solid var(--hub-border, #ccdad3);
+  border-radius: 18px;
+  color: var(--hub-text, #314b4a);
+}
+.val-run-setup h3 {
+  margin: 7px 0;
+  color: var(--hub-text, #314b4a);
+}
+.val-run-setup .val-panel-title p {
+  max-width: 660px;
+  margin: 5px 0;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.val-setup-profile,
+.val-setup-condition-tools {
+  display: flex;
+  align-items: end;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.val-setup-profile > label,
+.val-setup-condition-tools > label {
+  flex: 1 1 240px;
+}
+.val-run-setup .val-actions {
+  flex-wrap: wrap;
+}
+.val-setup-summary {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  margin: 15px 0;
+  border: 1px solid var(--hub-border);
+  border-radius: 12px;
+  background: var(--hub-surface-soft);
+}
+.val-setup-summary strong {
+  font-size: 15px;
+}
+.val-setup-summary span,
+.val-setup-reference small {
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--hub-muted);
+}
+.val-setup-details {
+  margin: 10px 0;
+  border: 1px solid var(--hub-border);
+  border-radius: 12px;
+  background: var(--hub-surface);
+}
+.val-setup-details > summary {
+  padding: 14px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--hub-text);
+}
+.val-setup-details > :not(summary) {
+  margin: 12px 14px;
+}
+.val-setup-choices {
+  max-height: 330px;
+  overflow: auto;
+}
+.val-setup-choice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--hub-border);
+  font-size: 12px;
+}
+.val-setup-choice input {
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
+  min-height: 0 !important;
+  accent-color: var(--hub-accent);
+}
+.val-setup-choice strong,
+.val-setup-choice small,
+.val-setup-reference strong,
+.val-setup-reference small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.val-setup-choice small {
+  margin-top: 5px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--hub-muted);
+}
+.val-setup-reference {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  margin-top: 8px;
+  border: 1px solid var(--hub-border);
+  border-radius: 10px;
+}
+.val-setup-reference:has(> strong) {
+  display: block;
+}
+.val-setup-reference strong {
+  font-size: 12px;
+}
+.val-setup-reference small {
+  margin-top: 5px;
+}
+.val-setup-problem {
+  padding: 12px;
+  border: 1px solid var(--hub-danger, #a6374b);
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.val-setup-results > summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.8;
+}
+.val-setup-audit {
+  max-height: 320px;
+  overflow: auto;
+}
+.val-setup-audit > div {
+  display: grid;
+  gap: 5px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--hub-border);
+}
+.val-setup-audit strong {
+  font-size: 12px;
+}
+.val-setup-audit span {
+  color: var(--hub-muted);
+  font-size: 11px;
+}
+.val-profile-room {
+  color: var(--hub-text);
+}
+.val-profile-room .val-label {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0;
+  font-size: 13px;
+}
+.val-profile-room input {
+  background: var(--hub-surface);
+  color: var(--hub-text);
+  border: 1px solid var(--hub-border);
+  border-radius: 9px;
+  padding: 10px;
+}
+.val-profile-room .val-help {
+  --val-muted: var(--hub-muted);
+}
+.val-profile-room .val-primary {
+  background: var(--hub-accent);
+  color: var(--hub-on-accent, #fff);
+  padding: 11px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--hub-border);
+  font: inherit;
+  cursor: pointer;
+}
+.modal:has(.val-profile-room) .modal-head {
+  background: var(--hub-surface);
+  color: var(--hub-text);
+}
+.modal:has(.val-profile-room) .modal-head h2 {
+  color: inherit;
+}
+@media (max-width: 600px) {
+  .val-run-setup {
+    padding: 15px;
+  }
+  .val-run-setup .val-fields {
+    grid-template-columns: 1fr;
+  }
+  .val-run-setup .val-panel-title {
+    flex-wrap: wrap;
+  }
+  .val-setup-profile > label,
+  .val-setup-condition-tools > label {
+    flex-basis: 100%;
+  }
+  .val-setup-profile .val-actions {
+    gap: 6px;
+  }
+  .val-setup-profile .val-actions .val-btn {
+    flex: 1 1 100px;
+  }
+}
 .val-prep-toolbar {
   margin: 22px 0;
   padding: 24px;

@@ -11,7 +11,7 @@ insert into public.workhub_feature_catalog(id,name,parent,paths) values
 ('waiting','Waiting on','',array['workhub.waiting']::text[]),
 ('studio','Studio','',array[]::text[]),
 ('lab','Troubleshooting lab','',array['workhub.lab']::text[]),
-('validator','Validation Studio','',array['workhub.validator.templates','workhub.validator.runs']::text[]),
+('validator','Validation Studio','',array['workhub.validator.templates','workhub.validator.runs','workhub.validator.profiles']::text[]),
 ('snippets','Snippets','',array['workhub.workLibrary']::text[]),
 ('studio.theme','Theme studio','studio',array[]::text[]),
 ('studio.reader','JSON & IDoc Reader','studio',array[]::text[]),

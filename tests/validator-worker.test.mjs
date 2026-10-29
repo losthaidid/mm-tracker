@@ -40,7 +40,7 @@ test('validation worker uses the production engine with matching duplicate, form
   const sandbox = { Blob, console, postMessage: value => messages.push(value) };
   sandbox.self = sandbox;
   sandbox.importScripts = url => {
-    assert.equal(url, './validator-engine.js?v=20261027-schedule-review-1');
+    assert.equal(url, './validator-engine.js?v=20261029-profiles-1');
     vm.runInContext(source('validator-engine.js'), scope);
   };
   const scope = vm.createContext(sandbox);

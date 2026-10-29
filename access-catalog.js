@@ -47,7 +47,7 @@
       'Validation Studio',
       'Screens',
       '',
-      ['workhub.validator.templates', 'workhub.validator.runs'],
+      ['workhub.validator.templates', 'workhub.validator.runs', 'workhub.validator.profiles'],
     ],
     ['snippets', 'Snippets', 'Screens', '', ['workhub.workLibrary']],
     ['studio.theme', 'Theme studio', 'Studio tools', 'studio', []],
@@ -144,7 +144,9 @@
     );
   }
   function get(data, path) {
-    return path.split('.').reduce((v, k) => v?.[k], data);
+    const value = path.split('.').reduce((v, k) => v?.[k], data);
+    // A first profile is a record creation, even for workspaces created before profiles existed.
+    return path === 'workhub.validator.profiles' && value === undefined ? [] : value;
   }
   function delta(old, next, allow) {
     if (same(old, next)) return true;
