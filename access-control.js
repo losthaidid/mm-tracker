@@ -189,6 +189,7 @@
           (/^(run|validate|prep-.*|run-setup-.*)$/.test(op) ||
             ['valPreparationForm', 'valRunReferenceForm'].includes(t.id) ||
             control.dataset.setupRule !== undefined ||
+            control.dataset.setupReference !== undefined ||
             ['validationProfile', 'validationCompany', 'setupReference'].includes(control.name))) ||
         (id === 'studio.reader' && ['browse', 'sample-json', 'sample-idoc'].includes(op)) ||
         ['focus', 'break', 'presentation-break'].includes(id)
