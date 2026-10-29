@@ -87,6 +87,7 @@ Batch C: [batch-c-engine.js](../batch-c-engine.js) handles deterministic ticket 
 | [validator-runner.js](../validator-runner.js), [validator-worker.js](../validator-worker.js) | Short-lived same-origin workers run the existing validation engine for uploads with at least 20,000 mapped cells. Small jobs and unavailable workers use the same local engine. Context changes cancel pending jobs; uploaded rows are never persisted by the worker. |
 | [validator-setup.js](../validator-setup.js), [validation-setup-simple.xlsx](../validation-setup-simple.xlsx), [validation-setup-sap.xlsx](../validation-setup-sap.xlsx), [validation-setup-template.xlsx](../validation-setup-template.xlsx) | One-sheet General/SAP column setup and backward-compatible advanced Excel setup with conditions, references and unique combinations. Previewed as a new draft before saving. |
 | [validator-studio.js](../validator-studio.js), [validator-studio.css](../validator-studio.css) | Template designer with project links and company condition scopes, per-company validation, upload mapping, correction picker and in-place live rechecks (no cloud write per edit). Uploaded rows remain in memory. |
+| [validator-transform.js](../validator-transform.js) | Pure SAP formatting and positional delimiter expansion, with preview samples, strict pairing and bounded output. The Studio keeps working rows, original-row links and undo in browser memory. See [upload preparation](VALIDATION-PREPARATION.md). |
 
 ## Momo, scenery, focus and sound
 

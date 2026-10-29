@@ -129,6 +129,11 @@
       headerRow = 1,
       headers = [],
       sourceRows = [],
+      originalRows = [],
+      origins = [],
+      preparation = null,
+      preparationSteps = [],
+      preparationUndo = [],
       mapping = {},
       rows = [],
       result = null,
@@ -165,6 +170,230 @@
       ignoredPage = 0;
       ignoredIssues.clear();
       issueSelection.clear();
+    }
+    function closePreparation() {
+      preparation = null;
+      const room = document.querySelector('.val-preparation-room');
+      if (room) {
+        room.replaceChildren();
+        a.closeModal?.();
+      }
+    }
+    function resetPreparation() {
+      closePreparation();
+      originalRows = [];
+      origins = [];
+      preparationSteps = [];
+      preparationUndo = [];
+    }
+    function prepareAccess() {
+      ensure();
+      if (root.WorkHubCurrentAccess && !root.WorkHubCurrentAccess.can('validator', 'run'))
+        throw Error('Preparing uploaded data is disabled for this account.');
+      if (!root.WorkHubValidatorTransform)
+        throw Error('Refresh the page to load the preparation tools.');
+      if (busy) throw Error('Wait for the current operation to finish.');
+      if (!book || !sourceRows.length) throw Error('Upload or paste data first.');
+    }
+    function preparationOptions(form) {
+      if (preparation.kind === 'sap')
+        return Object.fromEntries(
+          [...form.querySelectorAll('[data-prep-mode]')].map(el => [el.dataset.prepMode, el.value])
+        );
+      return {
+        primary: Number(form.elements.primary.value),
+        mapped: [...form.querySelectorAll('[name="mapped"]:checked')].map(el => Number(el.value)),
+        delimiter:
+          form.elements.delimiter.value === 'custom'
+            ? form.elements.customDelimiter.value
+            : form.elements.delimiter.value,
+        trim: form.elements.trim.checked,
+        repeatSingle: form.elements.repeatSingle.checked,
+      };
+    }
+    function openPreparation(kind) {
+      prepareAccess();
+      if (livePending) checkEdit();
+      commitCurrent();
+      const schema = activeSchema();
+      E.checkSchema(schema);
+      if (kind === 'sap' && schema.mode !== 'sap')
+        throw Error('Choose a SAP template to apply SAP formatting.');
+      closePreparation();
+      preparation = {
+        kind,
+        owner,
+        token: generation,
+        source: sourceRows,
+        schema: JSON.stringify(schema),
+        mapping: JSON.stringify(mapping),
+        company: runCompanyId,
+        plan: null,
+      };
+      const fields =
+        kind === 'sap'
+          ? `<p>Use your maintained SAP types and lengths. NUMC / CLNT codes gain leading zeros; ISO dates become YYYYMMDD and colon-separated times become HHMMSS. Blanks stay blank. Other values are retained.</p><p class="val-help">For Availability Check defined as CHAR length 2, choose <strong>Zero-pad code</strong> to turn 2 into 02. This is an explicit field conversion, not a guess based on its name. No domain lookups, unit conversions, rounding or truncation are performed.</p><div class="val-prep-fields">${schema.columns
+              .map(c => {
+                const s = E.sapSettings(c),
+                  mapped = Number(mapping[c.key]) >= 0;
+                return `<label class="val-prep-field"><span><strong>${esc(c.label)}</strong><small>${esc(c.key)} · ${s.type} (${s.length})${mapped ? '' : ' · not mapped'}</small></span><select data-prep-mode="${esc(c.key)}" aria-label="Formatting for ${esc(c.label)}"${mapped ? '' : ' disabled'}>${options([['auto', 'SAP type format'], ...(['CHAR', 'NUMC', 'CLNT'].includes(s.type) ? [['zero', 'Zero-pad code']] : []), ['keep', 'Keep unchanged']], mapped ? 'auto' : 'keep')}</select></label>`;
+              })
+              .join('')}</div>`
+          : `<p>Choose the column that determines the number of records, then map other lists by position. Every other upload column is copied. Empty positions are retained; no combinations are generated.</p><div class="val-fields">${select(
+              'primary',
+              'Column to explode',
+              headers.map((h, i) => [i, F.col(i) + ' · ' + h]),
+              0
+            )}${select(
+              'delimiter',
+              'Delimiter',
+              [
+                [',', 'Comma (,)'],
+                [';', 'Semicolon (;)'],
+                ['|', 'Pipe (|)'],
+                ['\t', 'Tab'],
+                ['custom', 'Custom delimiter'],
+              ],
+              ','
+            )}${input('customDelimiter', 'Custom delimiter', '', 'text', 'maxlength="5" placeholder="Used only when Custom is selected"')}</div><fieldset class="val-prep-mapped"><legend>Map these columns in the same sequence</legend>${headers.map((h, i) => `<label class="val-toggle"><input type="checkbox" name="mapped" value="${i}"${i === 0 ? ' disabled' : ''}><span>${esc(F.col(i) + ' · ' + h)}</span></label>`).join('')}</fieldset>${toggle('trim', 'Trim spaces around each split value', true)}${toggle('repeatSingle', 'Repeat a single mapped value across all primary values (including blanks)', false)}<p class="val-help">Example: FF01, FF02, FF03 with ST00, WH00, WH01 creates three paired records. Unequal list counts block Apply. Delimiters are literal characters inside each cell.</p>`;
+      a.openModal(
+        kind === 'sap' ? 'Apply SAP formatting' : 'Explode & map rows',
+        `<section class="val-preparation-room" data-access-feature="validator"><span class="val-eyebrow">PREPARE YOUR UPLOAD</span><form id="valPreparationForm">${fields}<button type="submit" class="val-btn val-secondary">Preview changes</button></form><div id="valPreparationPreview" aria-live="polite"><p class="val-help">Your data stays unchanged until you preview and apply.</p></div><div class="val-actions">${btn('prep-cancel', 'Cancel', '', 'val-quiet')}${btn('prep-apply', 'Apply to working data', 'disabled', 'val-primary')}</div><p class="val-help">The original file and saved template are unchanged. Uploaded values, previews and undo remain in this browser only.</p></section>`
+      );
+      if (kind === 'explode')
+        $('valPreparationForm').elements.customDelimiter.closest('label').hidden = true;
+    }
+    function currentPreparation() {
+      const form = $('valPreparationForm');
+      if (
+        !preparation ||
+        !form?.isConnected ||
+        form.closest('dialog')?.open === false ||
+        preparation.owner !== a.owner?.() ||
+        preparation.token !== generation ||
+        preparation.source !== sourceRows ||
+        preparation.schema !== JSON.stringify(activeSchema()) ||
+        preparation.mapping !== JSON.stringify(mapping) ||
+        preparation.company !== runCompanyId
+      )
+        throw Error('The upload or context changed. Reopen preparation and preview it again.');
+      return form;
+    }
+    function previewPreparation(form) {
+      prepareAccess();
+      if (form !== currentPreparation()) throw Error('Reopen preparation.');
+      preparation.plan = null;
+      document.querySelector('[data-val="prep-apply"]').disabled = true;
+      const opts = preparationOptions(form),
+        T = root.WorkHubValidatorTransform;
+      const plan =
+        preparation.kind === 'sap'
+          ? T.sap(headers, sourceRows, activeSchema(), mapping, opts)
+          : T.explode(headers, sourceRows, opts);
+      preparation.plan = plan;
+      preparation.options = JSON.stringify(opts);
+      const previewValue = v => esc(String(v).length > 160 ? String(v).slice(0, 160) + '…' : v);
+      const sample =
+        plan.kind === 'sap'
+          ? `<table><thead><tr><th>Source row</th><th>Field</th><th>Before</th><th>After</th></tr></thead><tbody>${plan.sample.map(x => `<tr><td>${origins[x.index]?.row || headerRow + x.index + 1}</td><td>${esc(x.field)}</td><td>${previewValue(x.before)}</td><td><strong>${previewValue(x.after)}</strong></td></tr>`).join('')}</tbody></table>`
+          : `<table><thead><tr><th>Source row</th><th>Part</th>${(plan.columns || []).map(c => `<th>${esc(headers[c])}</th>`).join('')}</tr></thead><tbody>${plan.sample.map(x => `<tr><td>${origins[x.index]?.row || headerRow + x.index + 1}</td><td>${x.part}</td>${x.values.map(v => `<td>${previewValue(v || '(blank)')}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+      $('valPreparationPreview').innerHTML =
+        `<div class="val-prep-summary${plan.blocked ? ' is-blocked' : ''}"><strong>${plan.kind === 'sap' ? plan.changes + ' cell value(s) will change' : sourceRows.length + ' records → ' + plan.outputCount + ' records'}</strong><span>${plan.warningCount ? plan.warningCount + (plan.blocked ? ' pairing mismatch(es). Nothing will be applied.' : ' value(s) retained for review.') : 'Preview ready.'}</span></div>${plan.warnings.length ? `<ul class="val-prep-warnings">${plan.warnings.map(w => `<li>Source row ${origins[w.index]?.row || headerRow + w.index + 1} · ${esc(w.field)}: ${esc(w.message)}</li>`).join('')}</ul>` : ''}${plan.sample.length ? `<p class="val-help">First ${plan.sample.length} ${plan.kind === 'sap' ? 'changed values' : 'output records'} shown.</p><div class="val-table-scroll">${sample}</div>` : ''}${!plan.changes ? '<p>No values need changing with these options.</p>' : ''}`;
+      document.querySelector('[data-val="prep-apply"]').disabled = plan.blocked || !plan.changes;
+      if (plan.sample.length)
+        $('valPreparationPreview').insertAdjacentHTML(
+          'beforeend',
+          '<p class="val-help">Long preview values are shortened; working data and exports keep the full value.</p>'
+        );
+    }
+    function resetPreparedResults() {
+      cancelLive();
+      pinnedRows.clear();
+      generation++;
+      runner?.cancel();
+      busy = false;
+      result = null;
+      resultSchema = null;
+      selectedIssue = null;
+      targetRow = -1;
+      resetReview();
+      filter = 'all';
+      page = 0;
+      // Keep preparation usable before required fields have all been mapped.
+      try {
+        rows = E.mapRows(headers, sourceRows, activeSchema(), mapping);
+      } catch {
+        rows = [];
+      }
+    }
+    function applyPreparation() {
+      prepareAccess();
+      const form = currentPreparation(),
+        p = preparation,
+        plan = p.plan;
+      if (
+        !plan ||
+        plan.blocked ||
+        !plan.changes ||
+        p.options !== JSON.stringify(preparationOptions(form))
+      )
+        throw Error('Preview the current options before applying.');
+      const schema = activeSchema();
+      if (schema.projectId && runCompanyId) E.runContext(a.state(), schema, runCompanyId);
+      preparationUndo.push({
+        rows: sourceRows.map(r => r.slice()),
+        origins: origins.map(o => ({ ...o })),
+        steps: preparationSteps.slice(),
+      });
+      while (preparationUndo.length > 3) preparationUndo.shift();
+      sourceRows = plan.rows;
+      if (plan.kind === 'explode')
+        origins = plan.parents.map(p => ({
+          row: origins[p.index].row,
+          part: [origins[p.index].part, p.part].filter(Boolean).join('.'),
+        }));
+      preparationSteps.push({ kind: plan.kind, changes: plan.changes, rows: sourceRows.length });
+      closePreparation();
+      resetPreparedResults();
+      say(
+        'Preparation applied to ' +
+          sourceRows.length +
+          ' working row(s). Run validation to check and export these values.'
+      );
+      paint();
+    }
+    function undoPreparation(restore = false) {
+      prepareAccess();
+      if (!preparationUndo.length && !restore) throw Error('There is no preparation to undo.');
+      if (
+        !root.confirm(
+          (restore ? 'Restore the original upload?' : 'Undo the last transformation?') +
+            ' Later cell corrections and current validation results will be cleared.'
+        )
+      )
+        return;
+      closePreparation();
+      if (restore) {
+        sourceRows = originalRows.map(r => r.slice());
+        origins = sourceRows.map((r, i) => ({ row: headerRow + i + 1, part: '' }));
+        preparationSteps = [];
+        preparationUndo = [];
+      } else {
+        const previous = preparationUndo.pop();
+        sourceRows = previous.rows;
+        origins = previous.origins;
+        preparationSteps = previous.steps;
+      }
+      resetPreparedResults();
+      say(
+        restore
+          ? 'Original upload restored. Run validation again.'
+          : 'Last transformation undone. Run validation again.'
+      );
+      paint();
+    }
+    function preparationView() {
+      return `<section class="val-prep-toolbar"><div><span class="val-eyebrow">PREPARE BEFORE YOU CHECK</span><h3>Your data, ready for the next step.</h3><p>${sourceRows.length} working row(s) · ${originalRows.length} original row(s)${preparationSteps.length ? ' · ' + preparationSteps.length + ' preparation(s) applied' : ''}. Preview first. The file on your device stays unchanged.</p></div><div class="val-actions">${btn('prep-sap', 'Apply SAP formatting', activeSchema().mode !== 'sap' || busy ? 'disabled title="Use a SAP template for field formatting"' : '', 'val-secondary')}${btn('prep-explode', 'Explode & map rows', busy ? 'disabled' : '', 'val-secondary')}${btn('prep-undo', 'Undo last change', !preparationUndo.length || busy ? 'disabled' : '', 'val-quiet')}${btn('prep-restore', 'Restore original upload', !preparationSteps.length || busy ? 'disabled' : '', 'val-quiet')}</div><p class="val-help">Formatting uses the current column mapping and selected template version. Undo keeps the last three transformations. Validate after preparing to refresh issue counts and exports.</p></section>`;
     }
     function reviewed(raw) {
       const keys = new Set(raw.issues.map(E.issueKey));
@@ -235,6 +464,7 @@
     function sync() {
       const next = a.owner?.() || '';
       if (next !== owner) {
+        resetPreparation();
         cancelLive();
         pinnedRows.clear();
         owner = next;
@@ -489,6 +719,7 @@
       message = '';
     }
     function clearFile() {
+      resetPreparation();
       cancelLive();
       pinnedRows.clear();
       generation++;
@@ -1583,6 +1814,9 @@
       if (!headers.length) throw Error('The selected header row is empty.');
       if (sourceRows.length > 5000 || sourceRows.length * headers.length > E.LIMITS.cells)
         throw Error('Use up to 5,000 rows and 200,000 cells.');
+      resetPreparation();
+      originalRows = sourceRows.map(r => r.slice());
+      origins = sourceRows.map((r, i) => ({ row: headerRow + i + 1, part: '' }));
       mapping = E.autoMap(headers, activeSchema());
       rows = [];
       result = null;
@@ -1999,7 +2233,9 @@
             esc(rows[selectedIssue.index]?.[selectedIssue.field] || '(blank)') +
             '</pre><small>The exact cell is selected below. Edits recheck automatically and restore ignored issues on that row.</small></section>'
           : '') +
-        '<div id="valResultsScroll" class="val-table-scroll"><table class="val-grid"><thead><tr><th>Excel row</th><th>Check</th>' +
+        '<div id="valResultsScroll" class="val-table-scroll"><table class="val-grid"><thead><tr><th>' +
+        (preparationSteps.length ? 'Working Excel row' : 'Excel row') +
+        '</th><th>Check</th>' +
         t.columns
           .map(c => '<th>' + esc(c.label) + '<code>' + esc(c.key) + '</code></th>')
           .join('') +
@@ -2013,6 +2249,13 @@
               (targetRow === i ? ' class="val-target-row"' : '') +
               '><th>' +
               (headerRow + i + 1) +
+              (origins[i]?.part
+                ? '<small class="val-row-origin">Source ' +
+                  origins[i].row +
+                  ' · part ' +
+                  esc(origins[i].part) +
+                  '</small>'
+                : '') +
               '</th><td><span class="val-status ' +
               (!result
                 ? 'pending'
@@ -2184,7 +2427,7 @@
           'rows="6" placeholder="Include the header row" required'
         ) +
         '<button type="submit" class="val-btn val-secondary">Use pasted data</button></form><p class="val-help">Values only. Excel formulas must be pasted as values before upload.</p></details></div>' +
-        (book ? mappingView() : '') +
+        (book ? preparationView() + mappingView() : '') +
         resultsView()
       );
     }
@@ -2340,6 +2583,22 @@
       const action = el.dataset.val,
         id = el.dataset.id;
       message = '';
+      if (action === 'prep-sap' || action === 'prep-explode') {
+        openPreparation(action === 'prep-sap' ? 'sap' : 'explode');
+        return;
+      }
+      if (action === 'prep-cancel') {
+        closePreparation();
+        return;
+      }
+      if (action === 'prep-apply') {
+        applyPreparation();
+        return;
+      }
+      if (action === 'prep-undo' || action === 'prep-restore') {
+        undoPreparation(action === 'prep-restore');
+        return;
+      }
       if (action === 'setup-help') {
         a.openModal(
           'Fill your setup in 3 steps',
@@ -2701,9 +2960,27 @@
         if (!result || !resultSchema || livePending)
           throw Error('Wait for validation to finish before exporting.');
         const outcome = E.copy(result);
+        const exportToken = generation,
+          exportOwner = owner;
         outcome.issues.forEach(i => (i.row = headerRow + i.index + 1));
+        const exported = await F.report(
+          resultSchema,
+          rows,
+          outcome,
+          action === 'accepted',
+          preparationSteps.length
+            ? {
+                headers,
+                sourceRows,
+                origins,
+                sheet: book.sheets[sheetIndex].name,
+                steps: preparationSteps,
+              }
+            : null
+        );
+        if (exportToken !== generation || exportOwner !== a.owner?.() || !a.ready()) return;
         a.download(
-          await F.report(resultSchema, rows, outcome, action === 'accepted'),
+          exported,
           safeName(
             resultSchema.name +
               (result.context?.companyName ? '-' + result.context.companyName : '')
@@ -3214,6 +3491,10 @@
     }
     function formSubmit(form) {
       ensure();
+      if (form.id === 'valPreparationForm') {
+        previewPreparation(form);
+        return;
+      }
       if (form.id === 'valCopyForm') {
         applyCopy(form);
         return;
@@ -3296,6 +3577,8 @@
       event.stopPropagation();
       void handle(el).catch(error => {
         busy = false;
+        if (el.dataset.val.startsWith('prep-') && $('valPreparationPreview'))
+          $('valPreparationPreview').textContent = error.message;
         say(error.message, true);
       });
     });
@@ -3305,10 +3588,20 @@
       try {
         formSubmit(event.target);
       } catch (error) {
+        if (event.target.id === 'valPreparationForm' && $('valPreparationPreview'))
+          $('valPreparationPreview').textContent = error.message;
         say(error.message, true);
       }
     });
     document.addEventListener('input', event => {
+      if (event.target.form?.id === 'valPreparationForm') {
+        if (preparation) preparation.plan = null;
+        const apply = document.querySelector('[data-val="prep-apply"]');
+        if (apply) apply.disabled = true;
+        if ($('valPreparationPreview'))
+          $('valPreparationPreview').textContent =
+            'Options changed. Preview again before applying.';
+      }
       if (event.target.id === 'valIgnoreReason') ignoreReason = event.target.value;
       if (event.target.id === 'valSuggestionSearch') paintCorrections();
       if (event.target.matches?.('.val-grid input[data-cell]')) {
@@ -3328,6 +3621,22 @@
     });
     document.addEventListener('change', event => {
       const el = event.target;
+      if (el.form?.id === 'valPreparationForm') {
+        if (el.name === 'delimiter')
+          el.form.elements.customDelimiter.closest('label').hidden = el.value !== 'custom';
+        if (el.name === 'primary')
+          for (const choice of el.form.querySelectorAll('[name="mapped"]')) {
+            choice.disabled = choice.value === el.value;
+            if (choice.disabled) choice.checked = false;
+          }
+        if (preparation) preparation.plan = null;
+        const apply = document.querySelector('[data-val="prep-apply"]');
+        if (apply) apply.disabled = true;
+        if ($('valPreparationPreview'))
+          $('valPreparationPreview').textContent =
+            'Options changed. Preview again before applying.';
+        return;
+      }
       if (
         el.form?.id === 'valCopyForm' &&
         ['copyProject', 'copySource', 'copySourceCompany', 'copyScope'].includes(el.name)
@@ -3491,6 +3800,15 @@
           return;
         }
         if (el.name === 'version') {
+          if (
+            preparationSteps.length &&
+            !root.confirm(
+              'Changing version restores the original upload and clears preparations and cell corrections. Continue?'
+            )
+          ) {
+            el.value = version;
+            return;
+          }
           cancelLive();
           pinnedRows.clear();
           generation++;
@@ -3506,6 +3824,15 @@
           return;
         }
         if (el.name === 'sheet' || el.name === 'headerRow') {
+          if (
+            preparationSteps.length &&
+            !root.confirm(
+              'Changing the worksheet or header restores its original values and clears preparations and cell corrections. Continue?'
+            )
+          ) {
+            el.value = el.name === 'sheet' ? sheetIndex : headerRow;
+            return;
+          }
           cancelLive();
           pinnedRows.clear();
           generation++;
@@ -3617,6 +3944,10 @@
         dirty,
         mode,
         rows: E.copy(rows),
+        sourceRows: E.copy(sourceRows),
+        origins: E.copy(origins),
+        preparations: E.copy(preparationSteps),
+        undoCount: preparationUndo.length,
         result: E.copy(result),
         mapping: { ...mapping },
         runCompanyId,
@@ -3624,6 +3955,9 @@
         owner,
       }),
       loadSample,
+      openPreparation,
+      applyPreparation,
+      undoPreparation,
     };
   }
   root.WorkHubValidatorStudio = { install };
