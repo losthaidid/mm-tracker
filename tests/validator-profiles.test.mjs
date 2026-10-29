@@ -101,7 +101,7 @@ test('setup controls stay mounted, preserve expanded panels/focus, and do not sa
 });
 const referenceChoice=(x,id,field='PLANT')=>[...x.d.querySelectorAll('[data-setup-reference]')].find(el=>{const c=JSON.parse(el.dataset.setupReference);return c[0]===field&&c[1]===id;});
 test('reference checklist selects existing mappings and profiles without re-entering them or losing uploaded corrections',async t=>{
- const x=await workspace(t),{ui,d}=x;assert.equal(referenceChoice(x,'ref-a').disabled,true);assert.equal(referenceChoice(x,'ref-a').checked,true);
+ const x=await workspace(t),{ui,d}=x;assert.equal(referenceChoice(x,'ref-a').disabled,false);assert.equal(referenceChoice(x,'ref-a').checked,true);
  await ui.handle({dataset:{val:'run-setup-none'}});const rows=copy(ui.snapshot().sourceRows),mapping=copy(ui.snapshot().mapping),definitions=copy(ui.snapshot().draft),writes=x.writes();
  const b=referenceChoice(x,'ref-b'),panel=b.closest('details'),list=b.closest('.val-setup-choices');panel.open=true;list.scrollTop=40;b.focus();x.change(b,true);
  assert.equal(referenceChoice(x,'ref-b'),b);assert.equal(d.activeElement,b);assert.equal(panel.open,true);assert.equal(list.scrollTop,40);assert.equal(x.writes(),writes);
@@ -110,13 +110,24 @@ test('reference checklist selects existing mappings and profiles without re-ente
  x.change(referenceChoice(x,'ref-b'),false);assert.equal(ui.snapshot().result,null);await ui.run();assert.equal(ui.snapshot().result.errors,0);assert.deepEqual(copy(x.state().workhub.validator.profiles[0]),saved);
  x.profile(saved.id);assert.equal(referenceChoice(x,'ref-b').checked,true);await ui.run();assert.equal(ui.snapshot().result.errors,1);
 });
-test('reference search is independent and bulk selection keeps condition dependencies while clearing standalone checks',async t=>{
+test('reference search is independent and bulk deselection confirms dependent conditions',async t=>{
  const x=await workspace(t),{ui,d,w}=x;x.toggle('b',false);const writes=x.writes(),search=d.getElementById('valSetupReferenceSearch');search.focus();search.value='Company B';search.dispatchEvent(new w.Event('input',{bubbles:true}));
  assert.equal(d.activeElement,search);assert.equal(d.getElementById('valSetupReferenceSearch'),search);assert.equal(d.querySelectorAll('[data-setup-reference]').length,1);assert.equal(d.querySelectorAll('[data-setup-rule]').length,3);
  await ui.handle({dataset:{val:'run-setup-references-all'}});assert.deepEqual(copy(ui.snapshot().runSelection.ruleIds),['a']);assert.equal(ui.snapshot().runSelection.referenceChecks.length,1);assert.equal(ui.snapshot().runSelection.referenceChecks[0].lookupId,'ref-b');
  await ui.handle({dataset:{val:'run-setup-references-none'}});assert.equal(ui.snapshot().runSelection.referenceChecks.length,0);search.value='';search.dispatchEvent(new w.Event('input',{bubbles:true}));
- assert.equal(referenceChoice(x,'ref-a').checked,true);assert.equal(referenceChoice(x,'ref-a').disabled,true);assert.equal(referenceChoice(x,'ref-b').checked,false);assert.equal(x.writes(),writes);await ui.run();assert.equal(ui.snapshot().result.errors,0);
+ assert.equal(referenceChoice(x,'ref-a').checked,false);assert.equal(referenceChoice(x,'ref-a').disabled,false);assert.equal(referenceChoice(x,'ref-b').checked,false);assert.deepEqual(copy(ui.snapshot().runSelection.ruleIds),[]);assert.equal(x.writes(),writes);await ui.run();assert.equal(ui.snapshot().result.errors,0);
  x.toggle('a',false);assert.equal(referenceChoice(x,'ref-a').checked,false);assert.equal(referenceChoice(x,'ref-a').disabled,false);
+});
+test('required reference cancellation preserves results and confirmation deselects every active dependent condition only for this run',async t=>{
+ const x=await workspace(t,{configure(s){const shared=copy(s.rules[0]);shared.id='shared';shared.name='Shared plant condition';s.rules.push(shared);s.rules.find(r=>r.id==='paused').assertion=copy(shared.assertion);}}),{ui,w}=x;x.toggle('b',false);await x.save('Original dependencies');await ui.run();
+ const before=ui.snapshot(),saved=copy(x.state()),writes=x.writes(),messages=[];w.confirm=message=>{messages.push(message);return false;};const choice=referenceChoice(x,'ref-a');assert.equal(choice.disabled,false);x.change(choice,false);
+ assert.equal(choice.checked,true);assert.deepEqual(copy(ui.snapshot().result),copy(before.result));assert.deepEqual(copy(ui.snapshot().runSelection),copy(before.runSelection));assert.equal(x.writes(),writes);assert.match(messages[0],/Company A plant check/);assert.match(messages[0],/Shared plant condition/);assert.doesNotMatch(messages[0],/Company B plant check|Paused check/);
+ w.confirm=()=>true;x.change(choice,false);assert.equal(choice.checked,false);assert.deepEqual(copy(ui.snapshot().runSelection.ruleIds),[]);assert.equal(ui.snapshot().result,null);assert.deepEqual(copy(ui.snapshot().sourceRows),copy(before.sourceRows));assert.deepEqual(copy(ui.snapshot().mapping),copy(before.mapping));assert.deepEqual(copy(x.state()),saved);
+ x.change(choice,true);assert.equal(ui.snapshot().runSelection.referenceChecks[0].lookupId,'ref-a');assert.deepEqual(copy(ui.snapshot().runSelection.ruleIds),[]);await ui.run();assert.equal(ui.snapshot().result.errors,0);
+});
+test('bulk reference cancellation and denied run permission leave the setup untouched',async t=>{
+ const x=await workspace(t),{ui,w}=x;await ui.run();const before=ui.snapshot();let prompts=0;w.confirm=()=>{prompts++;return false;};await ui.handle({dataset:{val:'run-setup-references-none'}});assert.equal(prompts,1);assert.deepEqual(copy(ui.snapshot().result),copy(before.result));assert.deepEqual(copy(ui.snapshot().runSelection),copy(before.runSelection));assert.equal(referenceChoice(x,'ref-a').checked,true);
+ w.WorkHubCurrentAccess={can:()=>false};x.render();assert.equal(referenceChoice(x,'ref-a').disabled,true);x.change(referenceChoice(x,'ref-a'),false);await new Promise(r=>setImmediate(r));assert.equal(prompts,1);assert.deepEqual(copy(ui.snapshot().runSelection),copy(before.runSelection));assert.equal(referenceChoice(x,'ref-a').checked,true);
 });
 test('newly mapped checks stay available after deselection and unavailable saved mappings can be removed individually',async t=>{
  const x=await workspace(t),{ui,d}=x;await ui.handle({dataset:{val:'run-setup-none'}});const form=d.getElementById('valRunReferenceForm');form.elements.setupField.value='MAT';x.change(form.elements.setupReference,'ref-a');form.dispatchEvent(new x.w.Event('submit',{bubbles:true,cancelable:true}));

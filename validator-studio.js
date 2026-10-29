@@ -577,6 +577,28 @@
         if (!extraReferenceChoices.some(x => referenceKey(x) === referenceKey(c)))
           extraReferenceChoices.push(E.copy(c));
     }
+    function deselectRunReferences(s, keys) {
+      const dependent = activeSchema().rules.filter(
+        r =>
+          s.ruleIds.includes(r.id) &&
+          E.ruleApplies(r, { companyId: runCompanyId }) &&
+          E.ruleReferences(r).some(c => c.operator === 'lookup' && keys.has(referenceKey(c)))
+      );
+      if (
+        dependent.length &&
+        !root.confirm(
+          'Deselecting these reference checks will also deselect these conditions for this validation run:\n\n' +
+            dependent.map(r => '• ' + r.name).join('\n') +
+            '\n\nYour saved template and profiles stay unchanged. Continue?'
+        )
+      )
+        return false;
+      const ids = new Set(dependent.map(r => r.id));
+      s.ruleIds = s.ruleIds.filter(id => !ids.has(id));
+      rememberReferenceChoices(s);
+      s.referenceChecks = s.referenceChecks.filter(c => !keys.has(referenceKey(c)));
+      return true;
+    }
     function runReferencesView(t, s, can) {
       const choices = referenceChoices(t, s),
         q = setupReferenceSearch.trim().toLowerCase(),
@@ -603,14 +625,14 @@
               }))
           );
       const control = c =>
-        `<label class="val-setup-choice"><input type="checkbox" data-setup-reference="${esc(c.key)}"${c.selected || c.requiredBy.length ? ' checked' : ''}${!can('run') || busy || c.requiredBy.length || (!c.available && !c.selected) ? ' disabled' : ''}><span><strong>${esc(c.name)} · ${esc(c.field)} → ${esc(c.check.lookupColumn)}</strong><small>${c.requiredBy.length ? 'Required by ' + esc([...new Set(c.requiredBy)].join(', ')) + (c.selected ? ' · Also selected independently' : '') : !c.available ? 'Unavailable in this version · Uncheck to remove it from this run' : c.selected ? 'Selected for this run' : 'Skipped · not selected'}</small></span></label>`;
+        `<label class="val-setup-choice"><input type="checkbox" data-setup-reference="${esc(c.key)}"${c.selected || c.requiredBy.length ? ' checked' : ''}${!can('run') || busy || (!c.available && !c.selected) ? ' disabled' : ''}><span><strong>${esc(c.name)} · ${esc(c.field)} → ${esc(c.check.lookupColumn)}</strong><small>${c.requiredBy.length ? 'Required by ' + esc([...new Set(c.requiredBy)].join(', ')) + (c.selected ? ' · Also selected independently' : '') + ' · Untick to review dependent conditions' : !c.available ? 'Unavailable in this version · Uncheck to remove it from this run' : c.selected ? 'Selected for this run' : 'Skipped · not selected'}</small></span></label>`;
       const entries =
         choices.filter(matches).map(control).join('') +
         tuples
           .filter(matches)
           .map(
             c =>
-              `<label class="val-setup-choice"><input type="checkbox" checked disabled><span><strong>${esc(c.name)} · ${esc(c.field)}</strong><small>Required by ${esc(c.requiredBy)} · Combined field check</small></span></label>`
+              `<label class="val-setup-choice"><input type="checkbox" checked disabled><span><strong>${esc(c.name)} · ${esc(c.field)}</strong><small>Required by ${esc(c.requiredBy)} · Combined field check · Manage in Conditions</small></span></label>`
           )
           .join('') +
         unmapped
@@ -620,7 +642,7 @@
               `<div class="val-setup-choice"><span><strong>${esc(l.name)}</strong><small>No field mapping yet. Use Map another reference check below to choose its uploaded field and reference column.</small></span></div>`
           )
           .join('');
-      return `<details class="val-setup-details"><summary>References · choose individually</summary><p class="val-help">Tick the reference checks for this run. References required by selected conditions stay included; deselect those conditions to release them. Independent checks validate the mapped field on every row. Blank values follow the existing reference behaviour; mark a column Required to require a value.</p><div class="val-setup-condition-tools"><label class="val-label">Find references<input id="valSetupReferenceSearch" type="search" value="${esc(setupReferenceSearch)}" placeholder="Search references or fields"></label><div class="val-actions">${btn('run-setup-references-all', 'Select applicable', !can('run') || busy ? 'disabled' : '', 'val-quiet')}${btn('run-setup-references-none', 'Deselect all', !can('run') || busy ? 'disabled' : '', 'val-quiet')}</div></div><div class="val-setup-choices val-setup-reference-choices">${entries || '<p class="val-help">No matching reference checks. Maintain reference lists in References, or map a check below.</p>'}</div><details class="val-setup-details"><summary>Map another reference check</summary><form id="valRunReferenceForm"><div class="val-fields">${select(
+      return `<details class="val-setup-details"><summary>References · choose individually</summary><p class="val-help">Tick the reference checks for this run. Unticking a single-field reference asks you to confirm which dependent conditions will also be deselected for this run. Independent checks validate the mapped field on every row. Blank values follow the existing reference behaviour; mark a column Required to require a value.</p><div class="val-setup-condition-tools"><label class="val-label">Find references<input id="valSetupReferenceSearch" type="search" value="${esc(setupReferenceSearch)}" placeholder="Search references or fields"></label><div class="val-actions">${btn('run-setup-references-all', 'Select applicable', !can('run') || busy ? 'disabled' : '', 'val-quiet')}${btn('run-setup-references-none', 'Deselect all', !can('run') || busy ? 'disabled' : '', 'val-quiet')}</div></div><div class="val-setup-choices val-setup-reference-choices">${entries || '<p class="val-help">No matching reference checks. Maintain reference lists in References, or map a check below.</p>'}</div><details class="val-setup-details"><summary>Map another reference check</summary><form id="valRunReferenceForm"><div class="val-fields">${select(
         'setupField',
         'Uploaded field',
         t.columns.map(c => [c.key, c.label]),
@@ -2968,8 +2990,8 @@
           E.runSetup(activeSchema(), s, { companyId: runCompanyId });
         }
         if (action === 'run-setup-references-none') {
-          rememberReferenceChoices(s);
-          s.referenceChecks = [];
+          const keys = new Set(referenceChoices(activeSchema(), s).map(c => c.key));
+          if (!deselectRunReferences(s, keys)) return;
         }
         runSelection = s;
         setupChanged();
@@ -4134,8 +4156,11 @@
               c = referenceChoices(activeSchema(), s).find(
                 c => c.key === el.dataset.setupReference
               );
-            if (!c || c.requiredBy.length || (el.checked && !c.available))
-              throw Error('This reference is required by a selected condition or unavailable.');
+            if (!c || (el.checked && !c.available)) throw Error('This reference is unavailable.');
+            if (!el.checked && !deselectRunReferences(s, new Set([c.key]))) {
+              el.checked = true;
+              return;
+            }
             rememberReferenceChoices(s);
             s.referenceChecks = s.referenceChecks.filter(x => referenceKey(x) !== c.key);
             if (el.checked) s.referenceChecks.push({ id: E.uid(), ...c.check });
