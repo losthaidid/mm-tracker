@@ -24,8 +24,12 @@ when a reference needs a new uploaded-field/reference-column mapping; the new ch
 then appears in the checklist and can be switched off and on.
 
 References needed by selected conditions are checked automatically and marked
-**Required by …**. Deselect the condition to release its dependency. Deselect all
-in References removes independent checks while keeping those dependencies included.
+**Required by …**. Single-field reference checkboxes remain usable: unticking one
+shows a confirmation naming every active dependent condition that will also be
+deselected for this run. Cancel keeps the setup and results unchanged. **Deselect all**
+uses the same confirmation for single-field references. Template definitions and saved
+profiles stay unchanged until you explicitly save or update them. Combined-field
+references remain controlled by their conditions.
 Independent reference checks validate the mapped field on every row; the original
 condition's IF/company restrictions still apply only to that condition. Combined-field
 reference dependencies keep their full tuple behavior.
