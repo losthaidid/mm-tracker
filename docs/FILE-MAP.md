@@ -132,7 +132,7 @@ Batch C: [batch-c-engine.js](../batch-c-engine.js) handles deterministic ticket 
 | [tests/tng.test.mjs](../tests/tng.test.mjs) | Synthetic offline/online statement parsing, amount/date rules, Schedule matching, duplicate prevention and bounded evidence provenance. No private statement fixture. |
 | [tests/tng-pdf.test.mjs](../tests/tng-pdf.test.mjs) | Actual evidence PDF generation and reading: crop counts, continuation pages, captions, noon split, special format and cancellation, using synthetic source crops. |
 | [tests/reminders.test.mjs](../tests/reminders.test.mjs) | Exact due boundaries, local-time conversion, legacy snoozes, restored-record validation and escaped UTF-8 calendar alarms. Timed reminder interactions are also covered in `tests/app.test.mjs`. |
-| [tests/validator.test.mjs](../tests/validator.test.mjs), [tests/work-library.test.mjs](../tests/work-library.test.mjs) | Validation and reusable-library tests. |
+| [tests/validator.test.mjs](../tests/validator.test.mjs), [tests/validator-queue.test.mjs](../tests/validator-queue.test.mjs), [tests/validator-capacity.test.mjs](../tests/validator-capacity.test.mjs), [tests/work-library.test.mjs](../tests/work-library.test.mjs) | Validation, isolated multi-file queues, large-file imports/exports and reusable-library tests. |
 | [tests/source-layout.test.mjs](../tests/source-layout.test.mjs) | Checks production asset paths/order and the protected vendor/empty-seed layout after extraction. |
 | `tests/*-preview.html` | Manual feature preview pages for Momo, Batch A, Validation Studio and wishlist tools. These are development previews, not extra live application pages. |
 | [README.md](../README.md) | Setup, deployment, cloud saving and feature usage. |

@@ -75,4 +75,19 @@ rechecks the upload and refreshes comparison results; downloads wait for that ch
 
 The file on your device is unchanged. Uploaded values, transformation previews, row origins and undo snapshots remain in browser memory. Only the existing validation count/history summary is saved to your account. A new upload, clearing the file, switching templates or changing accounts clears preparations. Close/reload does not retain this working upload.
 
-The existing limits still apply after expansion: 200 columns, 5,000 records and 200,000 cells. Preparation also bounds total text to 12 million characters. Split larger files before preparing. Preparing data requires Validation Studio's **Run/use** permission; changing the saved template requires **Edit**, and downloading needs **Export**. Preparation does not require template-edit permission when using an existing saved template.
+The limits apply after expansion: 200 columns, 25,000 records and 5,000,000 cells per file, with a 50 MB original file and 50 million text characters. An explosion that exceeds the limit is blocked before changing the working data. Large comparison reports use side-by-side groups of Original / Prepared / Validated / Change / Field check columns. Numbered continuation worksheets repeat the headers and retain every record. Split larger files before preparing. Preparing data requires Validation Studio's **Run/use** permission; changing the saved template requires **Edit**, and downloading needs **Export**. Preparation does not require template-edit permission when using an existing saved template.
+
+
+## Validate multiple files (N158)
+
+Open **Validate → File validation queue → Add files**. Add up to 10 XLSX, CSV or TSV files for the current template. Each file has its own worksheet/header row, mapping, company, selected conditions/references, preparation history and corrections.
+
+1. Open the first file, choose its company when the template is linked to a project, and check its worksheet, header row and mapping.
+2. Apply any **Explode & map rows** or SAP formatting required for this file. Review the parent rows and paired fields in the preview.
+3. Choose **Confirm file setup**. Configure and confirm each remaining file. Company choices are explicit for every file.
+4. Choose **Start queue**. Studio processes the files sequentially; duplicate checks cover the whole current file and never mix separate files. A failed validation is marked for review while the remaining files continue.
+5. Open a completed file to use grouped attention, edit records, compare with the original or download its individual report. **Download completed reports** creates a ZIP with each completed file's full comparison/issue workbook and a queue summary.
+
+Changing a file's company, worksheet, header row, mapping, preparation or check selection requires confirming its setup again. Changing the template/version requires reviewing the queued setups. A stopped queue retains completed results and confirmed setups; start it again to process the remaining ready files. A failed file must be reviewed and confirmed before retrying.
+
+Queue uploads total up to 150 MB. Inactive working sessions are compressed in browser memory with a 100 MB combined limit, so only the open file has live editing arrays. Download and remove completed files to free capacity. Nothing resumes after reload: queue files, original/prepared rows, corrections, ignore reasons and undo history clear when the page closes/reloads, the template changes or the account changes. Ordinary saved templates and numeric run summaries keep their existing behavior. Each file retains the existing first-15,000 listed-issue limit; all errors still count, and comparisons include every row and field. Reference-list limits remain 2,000 rows per list.

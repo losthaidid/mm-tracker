@@ -160,11 +160,11 @@ test('200 fields round-trip setup, CSV, TSV and XLSX while 201 fields and excess
   const loaded=await F.read({name:'200.xlsx',size:blob.size,arrayBuffer:()=>blob.arrayBuffer()});
   assert.equal(loaded.sheets[0].rows[1][199],'00199');
   const mapped=E.mapRows(headers,[values],t,E.autoMap(headers,t));assert.equal(E.validateRows(t,mapped).errors,0);
-  assert.equal(E.validateRows(t,Array.from({length:1000},()=>({}))).rows,1000);
-  assert.throws(()=>E.validateRows(t,Array.from({length:1001},()=>({}))),/200,000 cells/);
+  assert.equal(E.validateRows(t,Array.from({length:25000},()=>({}))).rows,25000);
+  assert.throws(()=>E.validateRows(t,Array.from({length:25001},()=>({}))),/25,000 rows/);
   b.sheets[0].rows.push(['FIELD_200','','text']);assert.throws(()=>S.parse(b),/200 columns/);
   assert.throws(()=>E.parseCSV(Array.from({length:201},(_,i)=>'C'+i).join(',')),/200 upload columns/);
-  assert.throws(()=>E.parseCSV([headers,...Array.from({length:1001},()=>values)].map(r=>r.join(',')).join('\n')),/200,000 data cells/);
+  assert.throws(()=>E.parseCSV([headers,...Array.from({length:25001},()=>values)].map(r=>r.join(',')).join('\n')),/5,000,000 data cells/);
   const tooWide=await F.workbook([{name:'Data',rows:[[...headers,'Field 200']]}]);
   await assert.rejects(F.read({name:'201.xlsx',size:tooWide.size,arrayBuffer:()=>tooWide.arrayBuffer()}),/200 columns/);
 });
