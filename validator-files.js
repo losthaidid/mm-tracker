@@ -213,7 +213,7 @@
     if (!Number.isFinite(d.getTime())) throw Error('Invalid workbook date.');
     return d.toISOString().slice(0, 10);
   }
-  async function read(file) {
+  async function read(file, { valuesOnly = false } = {}) {
     if (!file || file.size > E().LIMITS.fileBytes) throw Error('Choose a file below 50 MB.');
     if (/\.(csv|tsv)$/i.test(file.name)) {
       return {
@@ -290,7 +290,8 @@
             throw Error('Use up to 200 columns and 25,000 data rows.');
           if (++cells > E().LIMITS.cells + E().LIMITS.columns)
             throw Error('Use up to 5,000,000 data cells.');
-          if (first(c, 'f'))
+          const formula = first(c, 'f');
+          if (formula && !valuesOnly)
             throw Error(
               sheet.getAttribute('name') +
                 '!' +
@@ -299,6 +300,20 @@
             );
           const type = c.getAttribute('t'),
             raw = content(c, 'v');
+          // Standalone comparison consumes Excel's saved result, never formula
+          // source. An absent cache must not silently become a matching blank.
+          if (
+            formula &&
+            valuesOnly &&
+            (!first(c, type === 'inlineStr' ? 'is' : 'v') ||
+              (raw === '' && !['str', 'inlineStr'].includes(type)))
+          )
+            throw Error(
+              sheet.getAttribute('name') +
+                '!' +
+                ref +
+                ' contains a formula without a saved result. Recalculate and save the workbook in Excel, then upload it again.'
+            );
           if (type === 's' && (!/^\d+$/.test(raw) || Number(raw) >= shared.length))
             throw Error('A workbook cell points to an invalid shared string.');
           let value =
@@ -313,7 +328,7 @@
                     ? 'true'
                     : 'false'
                   : raw;
-          if (type === 'e')
+          if (type === 'e' && !valuesOnly)
             throw Error(sheet.getAttribute('name') + '!' + ref + ' contains an Excel error.');
           const fmtId = styleIds[+(c.getAttribute('s') || 0)] || 0,
             fmt = formats.get(fmtId) || '';
