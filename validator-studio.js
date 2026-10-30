@@ -127,7 +127,9 @@
         duplicate && message.startsWith('Duplicate combination: ')
           ? message.slice('Duplicate combination: '.length).replace(/\.$/, '').split(' + ')
           : [issue.field];
-      const key = JSON.stringify([issue.severity, fields, issue.ruleId, issue.rule, message]);
+      const identity = [issue.severity, fields, issue.ruleId, issue.rule, message];
+      if (issue.requirementIndex !== undefined) identity.push(issue.requirementIndex);
+      const key = JSON.stringify(identity);
       if (!groups.has(key))
         groups.set(key, {
           key,
@@ -1720,9 +1722,11 @@
           for (const c of g.groups) walk(c);
         };
         walk(r.when);
-        if (r.assertion.field === oldKey) r.assertion.field = newKey;
-        if (r.assertion.otherField === oldKey) r.assertion.otherField = newKey;
-        for (const pair of r.assertion.pairs || []) if (pair.field === oldKey) pair.field = newKey;
+        for (const c of E.requirements(r)) {
+          if (c.field === oldKey) c.field = newKey;
+          if (c.otherField === oldKey) c.otherField = newKey;
+          for (const pair of c.pairs || []) if (pair.field === oldKey) pair.field = newKey;
+        }
       }
       for (const g of draft.columnGroups || []) {
         g.fields = g.fields.map(k => (k === oldKey ? newKey : k));
@@ -1845,7 +1849,10 @@
               })
             : [];
         r.when = readGroup(rf.querySelector('[data-group-root]'));
-        r.assertion = readClause(rf.querySelector('[data-assertion]'));
+        const checks = [...rf.querySelectorAll('[data-assertion]')].map(readClause);
+        r.assertion = checks[0];
+        if (checks.length > 1) r.additionalAssertions = checks.slice(1);
+        else delete r.additionalAssertions;
       }
     }
     function saveDraft(quiet = false) {
@@ -2577,11 +2584,57 @@
     function getPath(path) {
       let value = draft.rules.find(r => r.id === ruleId);
       for (const k of path.split('.')) {
-        if (!/^(when|assertion|groups|conditions|\d+)$/.test(k))
+        if (!/^(when|assertion|additionalAssertions|groups|conditions|\d+)$/.test(k))
           throw Error('Invalid condition path.');
         value = value[k];
       }
       return value;
+    }
+    function requirementsSummary(r) {
+      const summary = E.describeRequirements(r, draft);
+      return summary.length > 4000
+        ? summary.slice(0, 4000) + '… (see all field checks above)'
+        : summary;
+    }
+    function requirementsView(r) {
+      const checks = E.requirements(r);
+      return (
+        '<section class="val-then" aria-label="THEN requirements"><div class="val-then-heading"><span class="val-eyebrow">THEN REQUIRE</span><span class="val-chip">' +
+        checks.length +
+        ' requirement' +
+        (checks.length === 1 ? '' : 's') +
+        ' · ALL must pass</span></div><p class="val-help">For records matching WHEN, all field requirements below must pass.</p>' +
+        checks
+          .map(
+            (c, i) =>
+              '<div class="val-requirement" data-requirement="' +
+              i +
+              '"><div class="val-requirement-heading"><strong>' +
+              (i ? 'AND · ' : '') +
+              'Requirement ' +
+              (i + 1) +
+              '</strong>' +
+              (checks.length > 1
+                ? btn(
+                    'remove-requirement',
+                    'Remove',
+                    'data-index="' + i + '" aria-label="Remove requirement ' + (i + 1) + '"',
+                    'val-quiet'
+                  )
+                : '') +
+              '</div>' +
+              clause(c, i ? 'additionalAssertions.' + (i - 1) : 'assertion', true) +
+              '</div>'
+          )
+          .join('') +
+        btn(
+          'add-requirement',
+          '＋ Add field requirement',
+          checks.length >= E.LIMITS.requirements ? 'disabled' : '',
+          'val-secondary'
+        ) +
+        '</section>'
+      );
     }
     function rulesEditor() {
       const r = draft.rules.find(r => r.id === ruleId) || draft.rules[0];
@@ -2647,9 +2700,7 @@
             toggle('enabled', 'Enable this condition', r.enabled) +
             companyScopeEditor(r) +
             groupView(r.when, 'when') +
-            '<div class="val-then"><span class="val-eyebrow">THEN REQUIRE</span>' +
-            clause(r.assertion, 'assertion', true) +
-            '</div>' +
+            requirementsView(r) +
             area(
               'message',
               'Your validation message',
@@ -2661,7 +2712,7 @@
             '<p>If ' +
             esc(F.describeGroup(r.when, draft)) +
             ', require ' +
-            esc(E.describe(r.assertion, draft)) +
+            esc(requirementsSummary(r)) +
             '.</p></div><button type="submit" class="val-btn val-secondary">Apply condition</button></form>'
           : '<div class="val-empty-small"><h3>Let your rules do the checking.</h3><p>“If type is Urgent, require an owner.”<br>“End date must be after start date.”<br>“This value must exist in my reference list.”</p></div>') +
         '</div></div>'
@@ -3516,8 +3567,11 @@
                       t.rules.some(
                         r =>
                           r.enabled &&
-                          r.assertion.field === c.key &&
-                          ['lookup', 'lookupTuple', 'in'].includes(r.assertion.operator)
+                          E.requirements(r).some(
+                            check =>
+                              check.field === c.key &&
+                              ['lookup', 'lookupTuple', 'in'].includes(check.operator)
+                          )
                       ))
                       ? btn(
                           'suggest',
@@ -4361,6 +4415,34 @@
       if (action === 'remove-rule') {
         draft.rules = draft.rules.filter(r => r.id !== id);
         ruleId = draft.rules[0]?.id || '';
+        mark();
+      }
+      if (action === 'add-requirement') {
+        const r = draft.rules.find(r => r.id === ruleId),
+          checks = E.requirements(r);
+        if (checks.length >= E.LIMITS.requirements)
+          throw Error('Use up to 200 THEN requirements per condition.');
+        if (
+          draft.rules.reduce((n, rule) => n + E.requirements(rule).length - 1, 0) >=
+          E.LIMITS.additionalRequirements
+        )
+          throw Error('Use up to 400 additional THEN requirements per template.');
+        const field =
+          draft.columns.find(c => !checks.some(check => check.field === c.key)) || draft.columns[0];
+        (r.additionalAssertions ||= []).push({ ...E.condition(field.key), operator: 'notEmpty' });
+        mark();
+      }
+      if (action === 'remove-requirement') {
+        const r = draft.rules.find(r => r.id === ruleId),
+          index = Number(el.dataset.index),
+          checks = E.requirements(r);
+        if (checks.length <= 1) throw Error('Keep at least one THEN requirement.');
+        if (!Number.isInteger(index) || index < 0 || index >= checks.length)
+          throw Error('Choose a current requirement.');
+        checks.splice(index, 1);
+        r.assertion = checks[0];
+        if (checks.length > 1) r.additionalAssertions = checks.slice(1);
+        else delete r.additionalAssertions;
         mark();
       }
       if (action === 'add-clause') {

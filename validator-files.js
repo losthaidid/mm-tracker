@@ -625,16 +625,21 @@
           ['Rule', 'Severity', 'When', 'Requirement', 'Message', 'Company scope'],
           ...t.rules
             .filter(r => r.enabled)
-            .map(r => [
-              r.name,
-              r.severity,
-              describeGroup(r.when, t),
-              E().describe(r.assertion, t),
-              r.message,
-              r.companyScope === 'selected'
-                ? r.companies.map(c => c.name).join(', ')
-                : 'All companies',
-            ]),
+            .flatMap(r =>
+              E()
+                .requirements(r)
+                .map((c, i, checks) => [
+                  r.name,
+                  r.severity,
+                  describeGroup(r.when, t),
+                  (checks.length > 1 ? i + 1 + ' of ' + checks.length + ' · ' : '') +
+                    E().describe(c, t),
+                  r.message,
+                  r.companyScope === 'selected'
+                    ? r.companies.map(c => c.name).join(', ')
+                    : 'All companies',
+                ])
+            ),
         ],
         widths: [30, 14, 60, 60, 65, 40],
       },

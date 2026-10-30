@@ -96,7 +96,6 @@ test('Excel setup: incomplete rules and invalid reference links cannot silently 
     [b => set(b, 'Conditions', 1, 'Reference ID', 'missing'), /reference list/],
     [b => set(b, 'Conditions', 3, 'Pairs', 'PLANT'), /write pairs/],
     [b => sheet(b, 'Conditions').rows.pop(), /needs an assert row/],
-    [b => sheet(b, 'Conditions').rows.push(copy(sheet(b, 'Conditions').rows[1])), /exactly one assert/],
     [b => set(b, 'Conditions', 2, 'Join', 'maybe'), /Join must/],
     [b => set(b, 'Conditions', 2, 'Group', '1.1.1.1.1'), /up to four levels/],
     [b => set(b, 'Conditions', 3, 'Name', 'Different rule name'), /conflicting Name/],
