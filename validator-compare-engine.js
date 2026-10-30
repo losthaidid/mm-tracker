@@ -76,7 +76,6 @@
         b: bi,
         aHeader: ai === null ? '' : a.headers[ai],
         bHeader: bi === null ? '' : b.headers[bi],
-        headerMatch: ai !== null && bi !== null && a.headers[ai] === b.headers[bi],
         differences: 0,
       };
     });
@@ -85,7 +84,7 @@
       b,
       columns,
       rowCount: Math.max(a.rows.length, b.rows.length),
-      headerDifferences: columns.filter(c => !c.headerMatch).length,
+      extraColumns: Math.abs(a.columns.length - b.columns.length),
       differentCells: 0,
       differentRows: 0,
       rowDifferences: new Uint16Array(Math.max(a.rows.length, b.rows.length)),
@@ -120,7 +119,7 @@
     }
     report.matchingRows = report.rowCount - report.differentRows;
     report.matchingCells = report.rowCount * columns.length - report.differentCells;
-    report.match = !report.headerDifferences && !report.differentRows;
+    report.match = !report.extraColumns && !report.differentRows;
     return report;
   }
   root.WorkHubValidatorCompareEngine = Object.freeze({ sheet, selected, cell, compare });
