@@ -1641,6 +1641,16 @@
 .val-release > div {
   flex: 1;
 }
+.val-release > .val-release-actions {
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: stretch;
+}
+.val-release .val-release-usage {
+  color: var(--hub-text, #405648);
+  max-width: 40ch;
+  overflow-wrap: anywhere;
+}
 .val-release strong {
   font-size: 12px;
 }

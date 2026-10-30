@@ -365,6 +365,7 @@
           'The queue has reached 100 MB of compressed working data. Download and remove completed files before adding more work.'
         );
       job.packed = packed;
+      job.parkedVersion = version;
       job.status = queueStatus(job);
       job.savedGeneration = generation;
       job.savedResult = result;
@@ -562,6 +563,7 @@
       if (!E.mapRows(headers, sourceRows, schema, mapping).length)
         throw Error('Choose a file with at least one data record.');
       job.schema = queueStamp();
+      job.setupVersion = version;
       job.config = queueConfig();
       job.error = '';
       job.status = result ? 'completed' : 'ready';
@@ -1891,15 +1893,18 @@
       E.checkSchema(draft);
       if (draft.releases.length >= E.LIMITS.versions)
         throw Error(
-          'This template has 15 published versions. Duplicate it to start a new version series.'
+          'This template has 15 published versions. Delete unused versions in Versions & runs, or duplicate the template to start a new series.'
         );
       if (!saveDraft(true)) return;
+      const nextVersion = E.publishedVersion(draft, store().runs) + 1;
+      if (!Number.isSafeInteger(nextVersion)) throw Error('Start a new template version series.');
       const release = {
-        version: (draft.releases.at(-1)?.version || 0) + 1,
+        version: nextVersion,
         publishedAt: new Date().toISOString(),
         schema: E.schema(draft),
       };
       draft.releases.push(release);
+      draft.lastPublishedVersion = nextVersion;
       dirty = true;
       if (saveDraft(true)) {
         version = String(release.version);
@@ -2727,11 +2732,28 @@
       );
     }
     function references() {
-      const current = draft.lookups.find(l => l.id === refEditing);
+      const current = draft.lookups.find(l => l.id === refEditing),
+        unitList = draft.lookups.find(l => l.preset === 'unit-of-measurement'),
+        action = store().templates.some(t => t.id === draft.id) ? 'edit' : 'create',
+        allowed = !root.WorkHubCurrentAccess || root.WorkHubCurrentAccess.can('validator', action);
       return (
         '<div class="val-section-heading"><div><h3>Your trusted reference shelf</h3><p>Maintain your own codes and values, then check individual values or a combination in the same reference row.</p></div>' +
+        '<div class="val-actions">' +
+        btn(
+          'reference-uom',
+          unitList ? 'Unit of Measurement added' : '＋ Unit of Measurement',
+          !allowed ||
+            unitList ||
+            busy ||
+            queueBusy ||
+            queueIO ||
+            draft.lookups.length >= E.LIMITS.lookups
+            ? 'disabled'
+            : '',
+          'val-secondary'
+        ) +
         btn('reference-new', '＋ New reference', '', 'val-secondary') +
-        '</div><div class="val-reference-grid">' +
+        '</div></div><div class="val-reference-grid">' +
         draft.lookups
           .map(
             l =>
@@ -2743,7 +2765,9 @@
               l.rows.length +
               ' rows · ' +
               l.headers.length +
-              ' columns</p><div class="val-ref-tags">' +
+              ' columns' +
+              (l.caseSensitive ? ' · Case-sensitive matching' : '') +
+              '</p><div class="val-ref-tags">' +
               l.headers.map(h => '<code>' + esc(h) + '</code>').join('') +
               '</div><div class="val-actions">' +
               btn('reference-edit', 'Edit list', 'data-id="' + esc(l.id) + '"', 'val-secondary') +
@@ -2778,6 +2802,8 @@
           current ? E.csv([current.headers, ...current.rows]).replace(/^\uFEFF/, '') : '',
           'rows="7" placeholder="CODE,DESCRIPTION\n1000,Head office\n2000,Regional office" required'
         ) +
+        toggle('refCaseSensitive', 'Case-sensitive reference matching', !!current?.caseSensitive) +
+        '<p class="val-help">Turn this on when case changes the code’s meaning, such as BTL (Bottle) and btl (Btu/lb). Other field checks keep their existing settings.</p>' +
         (current
           ? '<fieldset class="val-description-options"><legend>Readable reference details</legend><div class="val-fields">' +
             select(
@@ -3875,15 +3901,114 @@
         '</section>'
       );
     }
+    function releaseUsage(releaseVersion) {
+      const saved = E.versionRuns(a.state(), draft.id, releaseVersion).length,
+        current = version === String(releaseVersion),
+        active = current && !!(result || rawResult || busy || livePending),
+        prepared = current && !!preparationSteps.length,
+        queued = fileQueue.filter(
+          job => current || [job.setupVersion, job.parkedVersion].includes(String(releaseVersion))
+        ).length,
+        can = action =>
+          !root.WorkHubCurrentAccess || root.WorkHubCurrentAccess.can('validator', action),
+        reasons = [];
+      if (saved) reasons.push(countLabel(saved, 'saved validation run'));
+      if (queued) reasons.push(countLabel(queued, 'queued file'));
+      if (active) reasons.push('Active validation result');
+      if (prepared) reasons.push('Prepared upload uses this version');
+      if (!store().templates.some(t => t.id === draft.id)) reasons.push('Save this template first');
+      if (busy || livePending || queueBusy || queueIO)
+        reasons.push('Wait for the current operation');
+      if (!can('edit') || !can('delete'))
+        reasons.push('Requires template edit and delete permissions');
+      return { saved, queued, active, reason: reasons.join(' · ') };
+    }
+    function deleteVersion(releaseVersion) {
+      setupAccess('edit');
+      setupAccess('delete');
+      const templateId = draft.id,
+        account = owner,
+        token = generation,
+        saved = store().templates.find(t => t.id === templateId);
+      if (
+        !Number.isSafeInteger(releaseVersion) ||
+        !draft.releases.some(r => r.version === releaseVersion)
+      )
+        throw Error('Choose an available published version.');
+      const reason = releaseUsage(releaseVersion).reason;
+      if (reason) throw Error('Cannot delete this version: ' + reason + '.');
+      if (saved.updatedAt !== baseStamp)
+        throw Error('This template changed elsewhere. Reopen it before deleting a version.');
+      if (
+        !root.confirm(
+          'Delete published version ' +
+            releaseVersion +
+            ' of “' +
+            draft.name +
+            '”? This removes its frozen definition and frees a version slot. Export the template definition first if you need a copy.' +
+            (version === String(releaseVersion) ? ' Validation will switch to Current draft.' : '')
+        )
+      )
+        return;
+      ensure();
+      if (account !== owner || token !== generation || draft?.id !== templateId)
+        throw Error('The template or account changed. Reopen the version before deleting it.');
+      setupAccess('edit');
+      setupAccess('delete');
+      const changed = releaseUsage(releaseVersion).reason;
+      if (changed) throw Error('Cannot delete this version: ' + changed + '.');
+      let updated;
+      if (
+        !a.mutate(d => {
+          const t = d.workhub.validator.templates.find(t => t.id === templateId);
+          if (!t || t.updatedAt !== baseStamp)
+            throw Error('This template changed elsewhere. Reopen it before deleting a version.');
+          t.lastPublishedVersion = E.publishedVersion(t, d.workhub.validator.runs);
+          t.releases = t.releases.filter(r => r.version !== releaseVersion);
+          t.updatedAt = new Date().toISOString();
+          updated = E.copy(t);
+        })
+      )
+        return;
+      if (account !== a.owner?.() || !a.ready()) {
+        sync();
+        return;
+      }
+      draft.releases = updated.releases;
+      draft.lastPublishedVersion = updated.lastPublishedVersion;
+      draft.updatedAt = updated.updatedAt;
+      baseStamp = updated.updatedAt;
+      if (version === String(releaseVersion)) {
+        version = 'draft';
+        runCompanyId = '';
+        runSelection = null;
+        runProfileId = '';
+        extraReferenceChoices = [];
+        if (book) getDataFromSheet();
+      }
+      say(
+        'Published version ' +
+          releaseVersion +
+          ' deleted. Future version numbers will continue from ' +
+          (updated.lastPublishedVersion + 1) +
+          '.'
+      );
+      paint();
+    }
     function history() {
       const runs = store().runs.filter(r => r.templateId === draft.id);
       return (
-        '<div class="val-section-heading"><div><h3>A little history, clearly kept.</h3><p>Published versions stay frozen. Run history contains counts, never uploaded rows.</p></div></div><div class="val-history-layout"><section class="val-card"><h3>Published versions</h3>' +
+        '<div class="val-section-heading"><div><h3>A little history, clearly kept.</h3><p>Published versions stay frozen. Delete an unused version to free a slot; version numbers are never reused. Run history contains counts, never uploaded rows.</p></div></div><div class="val-history-layout"><section class="val-card"><div class="val-panel-title"><h3>Published versions</h3><span class="val-chip">' +
+        draft.releases.length +
+        ' / ' +
+        E.LIMITS.versions +
+        ' slots used</span></div>' +
         draft.releases
           .slice()
           .reverse()
-          .map(
-            r =>
+          .map(r => {
+            const usage = releaseUsage(r.version);
+            return (
               '<article class="val-release"><span class="val-version-bubble">' +
               r.version +
               '</span><div><strong>Version ' +
@@ -3894,15 +4019,27 @@
               r.schema.columns.length +
               ' columns · ' +
               r.schema.rules.length +
-              ' conditions</p></div>' +
+              ' conditions</p><p class="val-release-usage">' +
+              esc(usage.reason || 'Unused · available to delete') +
+              '</p></div><div class="val-actions val-release-actions">' +
               btn(
                 'restore-version',
                 'Copy to draft',
                 'data-version="' + r.version + '"',
                 'val-secondary'
               ) +
-              '</article>'
-          )
+              btn(
+                'delete-version',
+                'Delete version',
+                'data-version="' +
+                  r.version +
+                  '"' +
+                  (usage.reason ? ' disabled title="' + esc(usage.reason) + '"' : ''),
+                'val-quiet val-danger'
+              ) +
+              '</div></article>'
+            );
+          })
           .join('') +
         (!draft.releases.length
           ? '<p class="val-muted">Publish a version when your template is ready. Later draft edits won’t change it.</p>'
@@ -4545,6 +4682,32 @@
         referenceEpoch++;
         refEditing = '';
       }
+      if (action === 'reference-uom') {
+        setupAccess(store().templates.some(t => t.id === draft.id) ? 'edit' : 'create');
+        if (busy || livePending) throw Error('Wait for the current validation to finish.');
+        if (draft.lookups.some(l => l.preset === 'unit-of-measurement'))
+          throw Error(
+            'This draft already has its Unit of Measurement reference. Use Edit list to maintain it.'
+          );
+        if (!root.WorkHubValidatorReferences)
+          throw Error('Refresh the page to load the Unit of Measurement reference.');
+        const list = root.WorkHubValidatorReferences.unitOfMeasurement(),
+          proposed = E.copy(draft);
+        let suffix = 1;
+        while (proposed.lookups.some(l => l.name.toLowerCase() === list.name.toLowerCase()))
+          list.name = 'Unit of Measurement (' + ++suffix + ')';
+        proposed.lookups.push(list);
+        E.checkSchema(proposed, true);
+        draft = proposed;
+        refEditing = list.id;
+        referenceEpoch++;
+        mark();
+        say(
+          'Unit of Measurement added to the draft: ' +
+            list.rows.length +
+            ' codes. Save draft, then map your unit field to MEINS in Validation setup or Conditions.'
+        );
+      }
       if (action === 'reference-edit') refEditing = id;
       if (action === 'reference-remove') {
         if (draft.rules.some(r => JSON.stringify(r).includes('"' + id + '"')))
@@ -4655,11 +4818,13 @@
         t.id = E.uid();
         t.name = (t.name + ' copy').slice(0, 120);
         t.releases = [];
+        delete t.lastPublishedVersion;
         t.createdAt = new Date().toISOString();
         draft = t;
         selected = t.id;
         baseStamp = '';
         dirty = true;
+        version = 'draft';
         clearFile();
         mode = 'columns';
       }
@@ -4699,6 +4864,10 @@
         version = 'draft';
         mark();
         mode = 'columns';
+      }
+      if (action === 'delete-version') {
+        deleteVersion(Number(el.dataset.version));
+        return;
       }
       paint();
       if (action === 'issue') {
@@ -5213,6 +5382,9 @@
               .map(x => x.value)
               .filter(h => headers.includes(h)),
           };
+        const current = draft.lookups.find(x => x.id === l.id);
+        if (current?.preset) l.preset = current.preset;
+        if (form.elements.namedItem('refCaseSensitive')?.checked) l.caseSensitive = true;
         const proposed = E.copy(draft),
           i = proposed.lookups.findIndex(x => x.id === l.id);
         if (i < 0) proposed.lookups.push(l);

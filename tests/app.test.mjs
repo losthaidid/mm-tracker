@@ -1055,6 +1055,14 @@ test('Validation Studio is navigable and saves general-purpose definitions, refe
  assert.match(api.payload(api.state()),/Intake reference/);api.validate(api.state());
 });
 
+test('Validation references and version cleanup persist exact units, frozen releases and increasing numbers across devices',async t=>{
+ const {api,document,db}=await app(t),ui=api.hub.validator;api.showTab('validator');await ui.handle({dataset:{val:'example'}});ui.saveDraft();ui.publish();await settle();const frozen=copy(api.state().workhub.validator.templates[0].releases[0]);
+ await ui.handle({dataset:{val:'mode',mode:'references'}});await ui.handle({dataset:{val:'reference-uom'}});assert.equal(document.querySelector('[data-val="reference-uom"]').disabled,true);ui.saveDraft();ui.publish();await settle();
+ const units=api.state().workhub.validator.templates[0].lookups.find(l=>l.preset==='unit-of-measurement');assert.equal(units.rows.length,291);assert.equal(units.caseSensitive,true);assert.equal(new Map(units.rows).get('001'),'');assert.equal(new Map(units.rows).get('btl'),'Btu/lb');
+ await ui.handle({dataset:{val:'mode',mode:'history'}});await ui.handle({dataset:{val:'delete-version',version:'2'}});await settle();assert.deepEqual(copy(api.state().workhub.validator.templates[0].releases),[frozen]);assert.equal(api.state().workhub.validator.templates[0].lastPublishedVersion,2);
+ const loaded=await app(t,{remote:copy(db.row),login:false});await loaded.api.loadCloud(sessionUser);await settle();loaded.api.showTab('validator');loaded.api.hub.validator.publish();await settle();const template=loaded.api.state().workhub.validator.templates[0];assert.deepEqual(copy(template.releases.map(r=>r.version)),[1,3]);assert.equal(template.lastPublishedVersion,3);assert.equal(template.releases[1].schema.lookups.find(l=>l.preset==='unit-of-measurement').caseSensitive,true);assert.deepEqual(copy(template.releases[0]),frozen);loaded.api.validate(loaded.api.state());
+});
+
 test('validator mapping, correction and revalidation keep uploaded data out of cloud records',async t=>{
  const {api,document,window,db}=await app(t),ui=api.hub.validator;api.showTab('validator');await ui.handle({dataset:{val:'example'}});ui.saveDraft();await settle();
  ui.loadSample();window.setTimeout=callback=>{queueMicrotask(callback);return 0;};await ui.run();await settle();
