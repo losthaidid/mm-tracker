@@ -163,6 +163,7 @@
     const $ = id => document.getElementById(id),
       store = () => a.state().workhub.validator;
     const runner = root.WorkHubValidatorRunner?.create();
+    const fileCompare = root.WorkHubValidatorCompare?.install({ ...a, render: paint });
     let owner = '',
       generation = 0,
       draft = null,
@@ -1392,6 +1393,7 @@
       liveCheck = null;
     }
     function sync() {
+      fileCompare?.sync();
       const next = a.owner?.() || '';
       if (next !== owner) {
         resetQueue();
@@ -1960,6 +1962,7 @@
         '</span></div><span class="val-eyebrow">A HOME FOR YOUR DATA RULES</span><h2>Any file. Your rules.</h2><p>Give your columns a name, shape the conditions and let your data tell you what needs attention.</p><div class="val-actions">' +
         btn('new', 'Create a template', '', 'val-primary') +
         btn('example', 'Explore an example', '', 'val-secondary') +
+        btn('mode', 'Compare two files', 'data-mode="file-compare"', 'val-secondary') +
         '</div><div class="val-welcome-steps"><span>' +
         icon('columns') +
         'Design columns</span><span>' +
@@ -2001,6 +2004,7 @@
             : []),
           ['references', 'References', 'reference'],
           ['check', 'Validate', 'check'],
+          ['file-compare', 'Compare two files', 'columns'],
           ['history', 'Versions & runs', 'history'],
         ]
           .map(([key, label, art]) =>
@@ -3198,6 +3202,7 @@
           .join('') +
         '</div><div class="val-run-bar"><p>Uploaded rows stay in this browser. Only the run summary is saved.</p>' +
         btn('run', icon('check', 18) + ' Run validation', busy ? 'disabled' : '', 'val-primary') +
+        btn('mode', 'Compare two files', 'data-mode="file-compare"', 'val-secondary') +
         '</div></section>'
       );
     }
@@ -3957,6 +3962,7 @@
       if (!draft && store().templates.length) pick(store().templates[0].id, true);
       return (
         '<section class="validation-studio' +
+        (mode === 'file-compare' ? ' val-compare-wide' : '') +
         (roomyReview && mode === 'check' && rows.length ? ' val-review-wide' : '') +
         '" data-val-owner="' +
         esc(owner) +
@@ -3971,24 +3977,36 @@
         '<main class="val-main" data-val-section="' +
         esc(mode) +
         '">' +
-        (draft
-          ? header() +
-            (message
-              ? '<div class="val-message" role="status" aria-live="polite">' +
-                esc(message) +
-                '</div>'
-              : '') +
-            (
-              {
-                columns: columnEditor,
-                rules: rulesEditor,
-                'column-groups': columnGroupsEditor,
-                references,
-                check: checkView,
-                history,
-              }[mode] || columnEditor
-            )()
-          : empty()) +
+        (mode === 'file-compare'
+          ? '<nav class="val-tabs" aria-label="Validation workspace">' +
+            btn('mode', icon('check', 17) + 'Validate', 'data-mode="check"', '') +
+            btn(
+              'mode',
+              icon('columns', 17) + 'Compare two files',
+              'data-mode="file-compare" aria-current="page"',
+              'is-active'
+            ) +
+            '</nav>' +
+            (fileCompare?.render() ||
+              '<p>The file comparison tool is unavailable. Refresh the page.</p>')
+          : draft
+            ? header() +
+              (message
+                ? '<div class="val-message" role="status" aria-live="polite">' +
+                  esc(message) +
+                  '</div>'
+                : '') +
+              (
+                {
+                  columns: columnEditor,
+                  rules: rulesEditor,
+                  'column-groups': columnGroupsEditor,
+                  references,
+                  check: checkView,
+                  history,
+                }[mode] || columnEditor
+              )()
+            : empty()) +
         '</main></div><input id="valFile" type="file" accept=".xlsx,.csv,.tsv" hidden><input id="valQueueFiles" type="file" multiple accept=".xlsx,.csv,.tsv" hidden><input id="valSetupFile" type="file" accept=".xlsx" hidden><input id="valDefinitionFile" type="file" accept=".json" hidden><input id="valReferenceFile" type="file" accept=".xlsx,.csv,.tsv" hidden></section>'
       );
     }
@@ -4255,6 +4273,12 @@
       }
       if (action === 'apply-correction') {
         applyCorrection(Number(el.dataset.choice));
+        return;
+      }
+      if (action === 'mode' && (el.dataset.mode === 'file-compare' || !draft)) {
+        commitCurrent();
+        mode = el.dataset.mode;
+        paint();
         return;
       }
       if (!draft) throw Error('Create or choose a template first.');
@@ -5720,6 +5744,7 @@
       publish,
       addLibraryField,
       referenceDetails,
+      fileComparison: fileCompare,
       snapshot: () => ({
         draft: E.copy(draft),
         dirty,
