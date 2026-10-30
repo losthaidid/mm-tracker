@@ -110,6 +110,53 @@
           minute: '2-digit',
         })
       : '';
+  // Group only the same check on the same field(s). Row-specific duplicate
+  // pointers vary, but are presentation details of the engine's duplicate check.
+  // Custom condition messages are never broadly normalized or merged by wording.
+  function groupIssues(issues) {
+    const groups = new Map();
+    issues.forEach((issue, index) => {
+      if (issue.ignored) return;
+      let message = issue.message;
+      const duplicate =
+        issue.ruleId === 'unique' &&
+        issue.rule === 'Duplicate check' &&
+        /^Duplicate (?:value\.|combination: )/.test(message);
+      if (duplicate) message = message.replace(/ Also appears on row \d+\.$/, '');
+      const fields =
+        duplicate && message.startsWith('Duplicate combination: ')
+          ? message.slice('Duplicate combination: '.length).replace(/\.$/, '').split(' + ')
+          : [issue.field];
+      const key = JSON.stringify([issue.severity, fields, issue.ruleId, issue.rule, message]);
+      if (!groups.has(key))
+        groups.set(key, {
+          key,
+          message,
+          fields,
+          field: issue.field,
+          column: issue.column,
+          ruleId: issue.ruleId,
+          rule: issue.rule,
+          severity: issue.severity,
+          entries: [],
+          rowSet: new Set(),
+        });
+      const group = groups.get(key);
+      group.entries.push({ issue, index });
+      group.rowSet.add(issue.index);
+    });
+    return [...groups.values()]
+      .map(({ rowSet, ...group }) => ({ ...group, indices: [...rowSet].sort((a, b) => a - b) }))
+      .sort(
+        (a, b) =>
+          (a.severity === 'error' ? 0 : 1) - (b.severity === 'error' ? 0 : 1) ||
+          b.indices.length - a.indices.length ||
+          b.entries.length - a.entries.length ||
+          a.column.localeCompare(b.column) ||
+          a.message.localeCompare(b.message) ||
+          a.key.localeCompare(b.key)
+      );
+  }
   function install(a) {
     const $ = id => document.getElementById(id),
       store = () => a.state().workhub.validator;
@@ -151,6 +198,12 @@
       ignoreReason = '',
       issuePage = 0,
       ignoredPage = 0,
+      attentionGroup = null,
+      attentionSearch = '',
+      attentionSeverity = 'all',
+      attentionPage = 0,
+      attentionCache = null,
+      roomyReview = false,
       resultSchema = null,
       version = 'draft',
       runCompanyId = '',
@@ -182,6 +235,11 @@
       ignoreReason = '';
       issuePage = 0;
       ignoredPage = 0;
+      attentionGroup = null;
+      attentionSearch = '';
+      attentionSeverity = 'all';
+      attentionPage = 0;
+      attentionCache = null;
       ignoredIssues.clear();
       issueSelection.clear();
     }
@@ -203,6 +261,7 @@
       comparisonField = 'all';
       comparisonRow = '';
       comparisonPage = 0;
+      roomyReview = false;
       preparationSteps = [];
       preparationUndo = [];
     }
@@ -872,6 +931,7 @@
         'rowIndex',
         'setupRule',
         'setupReference',
+        'attentionGroupKey',
       ])
         if (d[key] !== undefined) return key + ':' + d[key];
       if (d.map !== undefined) return 'mapping:' + d.map;
@@ -893,6 +953,7 @@
             d.version,
             d.issueKey,
             d.choice,
+            d.groupKey,
           ].join(':')
         );
       if (node.hasAttribute('name'))
@@ -2632,22 +2693,31 @@
     }
     function resultsView() {
       if (!rows.length) return '';
-      const indices = rows
-        .map((r, i) => i)
-        .filter(
-          i =>
-            !result ||
-            filter === 'all' ||
-            pinnedRows.has(i) ||
-            (filter === 'errors' && result.status[i].errors) ||
-            (filter === 'warnings' && result.status[i].warnings) ||
-            (filter === 'passed' && !result.status[i].errors)
-        );
+      const group = currentAttentionGroup(),
+        affected = group ? new Set(group.indices) : null,
+        indices = rows
+          .map((r, i) => i)
+          .filter(
+            i =>
+              (!group &&
+                (!result ||
+                  filter === 'all' ||
+                  pinnedRows.has(i) ||
+                  (filter === 'errors' && result.status[i].errors) ||
+                  (filter === 'warnings' && result.status[i].warnings) ||
+                  (filter === 'passed' && !result.status[i].errors))) ||
+              (group && (affected.has(i) || pinnedRows.has(i)))
+          );
       page = Math.max(0, Math.min(page, Math.ceil(indices.length / 25) - 1));
       const shown = indices.slice(page * 25, page * 25 + 25),
         t = resultSchema || activeSchema(),
         issues = (result?.issues || []).filter(i => !i.ignored),
-        byCell = new Map();
+        byCell = new Map(),
+        extraColumns = group
+          ? headers
+              .map((label, index) => ({ label, index }))
+              .filter(c => !t.columns.some(field => Number(mapping[field.key]) === c.index))
+          : [];
       for (const issue of issues) {
         const key = issue.index + ':' + issue.field;
         if (!byCell.has(key)) byCell.set(key, []);
@@ -2682,7 +2752,20 @@
             (version === 'draft' ? 'Saved draft' : 'Version ' + version) +
             '</strong></div></div>'
           : '<div class="val-inline-note">Your data changed. Run validation again to refresh the results and exports.</div>') +
-        '<section id="valResultsCard" class="val-card val-results"><div class="val-panel-title"><div><span class="val-eyebrow">LOOK CLOSER</span><h3>Your data, with the answers beside it</h3></div><div class="val-actions">' +
+        issueReviewView() +
+        '<section id="valResultsCard" class="val-card val-results' +
+        (group ? ' val-group-records' : '') +
+        '"><div class="val-panel-title"><div><span class="val-eyebrow">' +
+        (group ? 'FOCUSED REVIEW' : 'LOOK CLOSER') +
+        '</span><h3 id="valRecordsTitle" tabindex="-1">' +
+        (group ? 'Affected records' : 'Your data, with the answers beside it') +
+        '</h3></div><div class="val-actions">' +
+        btn(
+          'review-wide',
+          roomyReview ? 'Exit roomy view' : 'Roomy view',
+          'aria-pressed="' + roomyReview + '"',
+          'val-quiet'
+        ) +
         btn(
           'report',
           'Export issue workbook',
@@ -2695,7 +2778,11 @@
           !result || livePending || !result.passed ? 'disabled' : '',
           'val-primary'
         ) +
-        '</div></div><p class="val-help">Accepted exports exclude unresolved errors. Rows with warnings or explicitly ignored issues remain included; ignored issues are listed separately in the workbook.</p><div class="val-result-toolbar"><div class="val-segments">' +
+        '</div></div>' +
+        (group
+          ? `<section id="valGroupContext" class="val-group-context ${group.severity}"><div><span class="val-eyebrow">${group.indices.length ? 'SELECTED ISSUE GROUP' : 'GROUP REVIEWED'}</span><strong>${esc(group.message)}</strong><p>${esc(attentionFieldLabel(group))} · ${esc(group.rule)} · ${countLabel(group.indices.length, 'affected record')}${result.truncated ? ' listed' : ''} · ${countLabel(group.entries.length, 'issue')}</p></div><div class="val-actions">${btn('attention-back', '← Back to error groups', '', 'val-secondary')}${pinnedRows.size ? btn('attention-refresh', 'Refresh record list', livePending ? 'disabled' : '', 'val-quiet') : ''}</div>${!group.indices.length ? `<p class="val-group-resolved">${result.truncated ? 'No listed issues remain in this group. Other unlisted issues may still exist.' : 'No unresolved issues remain in this group.'}${pinnedRows.size ? ' Edited records stay visible so you can finish typing.' : ''}</p>` : ''}</section>`
+          : '') +
+        `<p class="val-help">${group ? 'Edit the highlighted fields in their full record. Every edit rechecks automatically.' + (extraColumns.length ? ' Extra upload columns are shown read-only and were not checked by the template.' : '') + (pinnedRows.size ? ' Edited records stay visible until you refresh the list or choose another group.' : '') : 'Accepted exports exclude unresolved errors. Rows with warnings or explicitly ignored issues remain included.'} Exports always include their complete run scope, regardless of this view.</p><div class="val-result-toolbar"><div class="val-segments">` +
         [
           ['all', 'All rows'],
           ['errors', 'Errors'],
@@ -2707,7 +2794,7 @@
               'filter',
               label,
               'data-filter="' + key + '"' + (!result && key !== 'all' ? ' disabled' : ''),
-              filter === key ? 'is-active' : ''
+              !group && filter === key ? 'is-active' : ''
             )
           )
           .join('') +
@@ -2730,10 +2817,25 @@
             '</pre><small>The exact cell is selected below. Edits recheck automatically and restore ignored issues on that row.</small></section>'
           : '') +
         '<div id="valResultsScroll" class="val-table-scroll"><table class="val-grid"><thead><tr><th>' +
-        (preparationSteps.length ? 'Working Excel row' : 'Excel row') +
+        (group ? 'Record / source' : preparationSteps.length ? 'Working Excel row' : 'Excel row') +
         '</th><th>Check</th>' +
         t.columns
-          .map(c => '<th>' + esc(c.label) + '<code>' + esc(c.key) + '</code></th>')
+          .map(
+            c =>
+              '<th' +
+              (group?.fields.includes(c.key) ? ' class="val-group-column"' : '') +
+              '>' +
+              esc(c.label) +
+              '<code>' +
+              esc(c.key) +
+              '</code></th>'
+          )
+          .join('') +
+        extraColumns
+          .map(
+            c =>
+              '<th>' + esc(c.label) + '<code>Upload ' + F.col(c.index) + ' · read-only</code></th>'
+          )
           .join('') +
         '</tr></thead><tbody>' +
         shown
@@ -2744,8 +2846,10 @@
               '"' +
               (targetRow === i ? ' class="val-target-row"' : '') +
               '><th>' +
-              (headerRow + i + 1) +
-              (origins[i]?.part
+              (group
+                ? `<strong>Record ${i + 1}</strong><small class="val-row-origin">Working Excel row ${headerRow + i + 1}</small><small class="val-row-origin">${esc(book.sheets[sheetIndex].name)} · original row ${origins[i]?.row || headerRow + i + 1}${origins[i]?.part ? ' · part ' + esc(origins[i].part) : ' · unsplit'}</small>`
+                : headerRow + i + 1) +
+              (!group && origins[i]?.part
                 ? '<small class="val-row-origin">Source ' +
                   origins[i].row +
                   ' · part ' +
@@ -2771,6 +2875,9 @@
                       ? 'Accepted · ignored issues'
                       : 'Passed') +
               '</span>' +
+              (group && !affected.has(i)
+                ? '<small class="val-row-resolved">Resolved in this group</small>'
+                : '') +
               (result && t.lookups.some(l => l.nameColumn || l.descriptionColumns?.length)
                 ? btn(
                     'reference-details',
@@ -2791,6 +2898,7 @@
                   return (
                     '<td class="' +
                     severity +
+                    (group?.fields.includes(c.key) && affected.has(i) ? ' val-group-cell' : '') +
                     (selectedIssue?.index === i && selectedIssue.field === c.key
                       ? ' val-target-cell'
                       : '') +
@@ -2804,7 +2912,9 @@
                     esc(c.label) +
                     '" value="' +
                     esc(rows[i][c.key]) +
-                    '" maxlength="32000" title="' +
+                    '" maxlength="32000" aria-invalid="' +
+                    (severity === 'error') +
+                    '" title="' +
                     esc(found.map(x => x.message).join('\n') || 'Edit this value') +
                     '">' +
                     (found.length &&
@@ -2834,6 +2944,14 @@
                   );
                 })
                 .join('') +
+              extraColumns
+                .map(
+                  c =>
+                    '<td class="val-unmapped-record"><div class="val-read-only">' +
+                    esc(sourceRows[i][c.index] || '(blank)') +
+                    '</div><small>Not checked · read-only</small></td>'
+                )
+                .join('') +
               '</tr>'
           )
           .join('') +
@@ -2852,21 +2970,87 @@
         ) +
         '</div></section>' +
         comparisonView() +
-        issueReviewView() +
         '</div>'
       );
     }
+    function attentionData() {
+      if (!attentionCache || attentionCache.result !== result)
+        attentionCache = { result, groups: groupIssues(result?.issues || []) };
+      return attentionCache.groups;
+    }
+    function currentAttentionGroup() {
+      if (!attentionGroup || !result) return null;
+      return (
+        attentionData().find(g => g.key === attentionGroup.key) || {
+          ...attentionGroup,
+          entries: [],
+          indices: [],
+        }
+      );
+    }
+    function attentionFieldLabel(group) {
+      const schema = resultSchema || activeSchema();
+      return group.fields
+        .map(key => schema.columns.find(c => c.key === key)?.label || key)
+        .join(' + ');
+    }
+    function reviewEntries() {
+      const group = currentAttentionGroup();
+      return group
+        ? group.entries
+        : (result?.issues || [])
+            .map((issue, index) => ({ issue, index }))
+            .filter(x => !x.issue.ignored);
+    }
+    function attentionOverviewView(open) {
+      const groups = attentionData(),
+        errors = groups.filter(g => g.severity === 'error'),
+        warnings = groups.filter(g => g.severity === 'warning'),
+        affected = new Set(open.map(x => x.issue.index)),
+        needle = attentionSearch.trim().toLocaleLowerCase(),
+        filtered = groups.filter(
+          g =>
+            (attentionSeverity === 'all' || attentionSeverity === g.severity) &&
+            [g.message, g.column, g.fields.join(' '), g.rule, attentionFieldLabel(g)]
+              .join(' ')
+              .toLocaleLowerCase()
+              .includes(needle)
+        );
+      attentionPage = Math.max(0, Math.min(attentionPage, Math.ceil(filtered.length / 6) - 1));
+      const shown = filtered.slice(attentionPage * 6, attentionPage * 6 + 6);
+      return `<div class="val-attention-heading"><div><span class="val-eyebrow">REVIEW ONE PATTERN AT A TIME</span><h3 tabindex="-1" id="valAttentionTitle">What needs attention</h3><p>Choose an issue group to see and edit its affected records.</p></div><div class="val-attention-totals"><span><strong>${errors.length}</strong> error ${errors.length === 1 ? 'group' : 'groups'}</span><span><strong>${warnings.length}</strong> warning ${warnings.length === 1 ? 'group' : 'groups'}</span><span><strong>${affected.size}</strong> affected ${affected.size === 1 ? 'record' : 'records'}${result.truncated ? ' listed' : ''}</span></div></div>
+        ${result.truncated ? '<p class="val-attention-cap" role="note">Groups cover the first 15,000 listed issues. Additional issues still count toward validation totals; split the file for a complete review.</p>' : ''}
+        <div class="val-attention-filters"><div class="val-segments" role="group" aria-label="Issue group severity">${[
+          ['all', 'All groups'],
+          ['error', 'Errors'],
+          ['warning', 'Warnings'],
+        ]
+          .map(([key, label]) =>
+            btn(
+              'attention-filter',
+              label,
+              'data-filter="' + key + '" aria-pressed="' + (attentionSeverity === key) + '"',
+              attentionSeverity === key ? 'is-active' : ''
+            )
+          )
+          .join(
+            ''
+          )}</div><label class="val-label">Find a group<input id="valAttentionSearch" type="search" value="${esc(attentionSearch)}" placeholder="Search message, field or check" maxlength="160"></label></div>
+        <div class="val-attention-groups">${shown.length ? shown.map(g => btn('attention-open', `<span class="val-attention-group-top"><span class="val-attention-kind ${g.severity}">${g.severity === 'error' ? '! Error' : 'i Warning'}</span><span>${esc(attentionFieldLabel(g))}</span></span><strong>${esc(g.message)}</strong><span class="val-attention-rule">${esc(g.rule)} · ${esc(g.fields.join(' + '))}</span><span class="val-attention-group-foot"><span><b>${g.indices.length}</b> ${g.indices.length === 1 ? 'record' : 'records'}${result.truncated ? ' listed' : ''} <small>· ${g.entries.length} ${g.entries.length === 1 ? 'issue' : 'issues'}</small></span><span>Review records →</span></span>`, `data-group-key="${esc(g.key)}" data-attention-group-key="${esc(g.key)}" aria-controls="valResultsCard" aria-pressed="${attentionGroup?.key === g.key}"${livePending ? ' disabled' : ''}`, 'val-attention-group ' + g.severity + (attentionGroup?.key === g.key ? ' is-selected' : ''))).join('') : '<p class="val-attention-empty">' + (groups.length ? 'No issue groups match these filters.' : 'There are no unresolved listed issue groups.') + '</p>'}</div>
+        ${filtered.length > 6 ? `<div class="val-pagination">${btn('attention-page', '← Previous', 'data-delta="-1"' + (!attentionPage ? ' disabled' : ''), 'val-quiet')}<span>Groups ${attentionPage * 6 + 1}–${Math.min(filtered.length, (attentionPage + 1) * 6)} of ${filtered.length}</span>${btn('attention-page', 'Next →', 'data-delta="1"' + ((attentionPage + 1) * 6 >= filtered.length ? ' disabled' : ''), 'val-quiet')}</div>` : ''}`;
+    }
     function issueReviewView() {
-      if (!result?.issues.length) return '';
+      if (!result || (!result.issues.length && !attentionGroup)) return '';
       const open = result.issues
           .map((issue, index) => ({ issue, index }))
           .filter(x => !x.issue.ignored),
         ignored = result.issues
           .map((issue, index) => ({ issue, index }))
           .filter(x => x.issue.ignored);
-      issuePage = Math.max(0, Math.min(issuePage, Math.ceil(open.length / 100) - 1));
+      const scope = reviewEntries();
+      issuePage = Math.max(0, Math.min(issuePage, Math.ceil(scope.length / 100) - 1));
       ignoredPage = Math.max(0, Math.min(ignoredPage, Math.ceil(ignored.length / 100) - 1));
-      const shown = open.slice(issuePage * 100, issuePage * 100 + 100),
+      const shown = scope.slice(issuePage * 100, issuePage * 100 + 100),
         selected = shown.filter(x => issueSelection.has(E.issueKey(x.issue))).length;
       const row = ({ issue, index }, isIgnored = false) =>
         `<div class="val-review-issue" data-issue-row-key="${esc(E.issueKey(issue))}">${!isIgnored ? `<label class="val-issue-check"><input type="checkbox" data-issue-choice="${index}" data-issue-key="${esc(E.issueKey(issue))}" aria-label="Select issue on row ${headerRow + issue.index + 1}: ${esc(issue.message)}"${issueSelection.has(E.issueKey(issue)) ? ' checked' : ''}${livePending ? ' disabled' : ''}></label>` : ''}${btn('issue', `<span class="val-issue-marker ${isIgnored ? 'ignored' : issue.severity}">${isIgnored ? '✓' : issue.severity === 'error' ? '!' : 'i'}</span><span><strong>${esc(issue.message)}</strong><small>Row ${headerRow + issue.index + 1} · ${esc(issue.column)} · ${esc(issue.rule)}</small><small class="val-issue-value">Value: ${esc(issue.value || '(blank)')}</small>${isIgnored ? `<small>Ignored${issue.ignoreReason ? ': ' + esc(issue.ignoreReason) : ' · no reason entered'}</small>` : ''}</span><span>↗</span>`, `data-index="${issue.index}" data-issue="${index}" data-issue-key="${esc(E.issueKey(issue))}"`)}${isIgnored ? btn('restore-issue', 'Restore', `data-issue="${index}" data-issue-key="${esc(E.issueKey(issue))}"${livePending ? ' disabled' : ''}`, 'val-quiet') : ''}</div>`;
@@ -2875,8 +3059,8 @@
           ? `<div class="val-pagination">${btn('issue-page', '← Previous', `data-kind="${kind}" data-delta="-1"${!at ? ' disabled' : ''}`, 'val-quiet')}<span>${at * 100 + 1}–${Math.min(count, (at + 1) * 100)} of ${count}</span>${btn('issue-page', 'Next →', `data-kind="${kind}" data-delta="1"${(at + 1) * 100 >= count ? ' disabled' : ''}`, 'val-quiet')}</div>`
           : '';
       return (
-        (open.length
-          ? `<section id="valAttention" class="val-card"><div class="val-panel-title"><h3>What needs attention</h3><span class="val-chip">${open.length} unresolved listed${result.truncated ? ' · capped at 15,000' : ''}</span></div><div class="val-review-toolbar"><div class="val-actions">${btn('select-issues', selected === shown.length ? 'Deselect this page' : 'Select this page', livePending ? 'disabled' : '', 'val-secondary')}${btn('ignore-selected', 'Ignore selected (' + issueSelection.size + ')', !issueSelection.size || livePending ? 'disabled' : '', 'val-secondary')}</div><label class="val-label">Reason (optional)<input id="valIgnoreReason" maxlength="500" value="${esc(ignoreReason)}" placeholder="Why is this acceptable for this upload?"></label></div><p class="val-help">Ignore applies to this validation run. Editing a row restores its checks; a new run or upload starts fresh.</p><div class="val-issue-list">${shown.map(x => row(x)).join('')}</div>${pager('open', issuePage, open.length)}</section>`
+        (open.length || attentionGroup
+          ? `<section id="valAttention" class="val-card val-attention">${attentionOverviewView(open)}${scope.length ? `<details class="val-individual-review"><summary>Individual issues &amp; ignore review · ${scope.length}${attentionGroup ? ' in this group' : ''}</summary><div class="val-review-toolbar"><div class="val-actions">${btn('select-issues', selected === shown.length ? 'Deselect this page' : 'Select this page', livePending ? 'disabled' : '', 'val-secondary')}${btn('ignore-selected', 'Ignore selected (' + issueSelection.size + ')', !issueSelection.size || livePending ? 'disabled' : '', 'val-secondary')}</div><label class="val-label">Reason (optional)<input id="valIgnoreReason" maxlength="500" value="${esc(ignoreReason)}" placeholder="Why is this acceptable for this upload?"></label></div><p class="val-help">Select this page applies to the ${attentionGroup ? 'selected group' : 'unresolved issue list'}. Ignore applies to this run; editing a record restores its checks.</p><div class="val-issue-list">${shown.map(x => row(x)).join('')}</div>${pager('open', issuePage, scope.length)}</details>` : ''}</section>`
           : '') +
         (ignored.length
           ? `<section id="valIgnoredIssues" class="val-card val-ignored-issues"><div class="val-panel-title"><h3>Ignored issues · ${ignored.length}</h3>${btn('restore-issues', 'Restore all', livePending ? 'disabled' : '', 'val-secondary')}</div><p class="val-help">Source values and rules are unchanged. These issues are excluded from unresolved totals and included in exports.</p><div class="val-issue-list">${ignored
@@ -3053,7 +3237,9 @@
       sync();
       if (!draft && store().templates.length) pick(store().templates[0].id, true);
       return (
-        '<section class="validation-studio" data-val-owner="' +
+        '<section class="validation-studio' +
+        (roomyReview && mode === 'check' && rows.length ? ' val-review-wide' : '') +
+        '" data-val-owner="' +
         esc(owner) +
         '" data-val-template="' +
         esc(draft?.id || '') +
@@ -3095,6 +3281,71 @@
       if (action === 'comparison-page') {
         comparisonPage += Number(el.dataset.delta);
         patchResults();
+        return;
+      }
+      if (action === 'review-wide') {
+        roomyReview = !roomyReview;
+        paint();
+        $('valResultsCard')?.scrollIntoView?.({ block: 'start', behavior: 'auto' });
+        return;
+      }
+      if (action.startsWith('attention-')) {
+        if (livePending) throw Error('Wait for the current edit to finish checking.');
+        if (action === 'attention-open') {
+          const group = attentionData().find(g => g.key === el.dataset.groupKey);
+          if (!group) throw Error('This issue group changed. Choose a current group.');
+          attentionGroup = {
+            key: group.key,
+            message: group.message,
+            fields: group.fields.slice(),
+            field: group.field,
+            column: group.column,
+            rule: group.rule,
+            ruleId: group.ruleId,
+            severity: group.severity,
+          };
+          pinnedRows.clear();
+          issueSelection.clear();
+          issuePage = 0;
+          selectedIssue = null;
+          targetRow = -1;
+          page = 0;
+        }
+        if (action === 'attention-back') {
+          attentionGroup = null;
+          pinnedRows.clear();
+          issueSelection.clear();
+          issuePage = 0;
+          selectedIssue = null;
+          targetRow = -1;
+          filter = 'all';
+          page = 0;
+        }
+        if (action === 'attention-refresh') {
+          pinnedRows.clear();
+          page = 0;
+        }
+        if (action === 'attention-filter') {
+          attentionSeverity = el.dataset.filter;
+          attentionPage = 0;
+        }
+        if (action === 'attention-page') attentionPage += Number(el.dataset.delta);
+        patchResults();
+        if (action === 'attention-open') {
+          $('valResultsCard')?.scrollIntoView?.({ block: 'start', behavior: 'auto' });
+          const group = currentAttentionGroup(),
+            first = group?.indices[0];
+          const cell = [...document.querySelectorAll('#valResultsCard input[data-cell]')].find(
+            n => Number(n.dataset.cell) === first && group.fields.includes(n.dataset.field)
+          );
+          cell?.scrollIntoView?.({ block: 'nearest', inline: 'center', behavior: 'auto' });
+          $('valRecordsTitle')?.focus({ preventScroll: true });
+        }
+        if (action === 'attention-back') {
+          const heading = $('valAttentionTitle') || $('valRecordsTitle');
+          heading?.scrollIntoView?.({ block: 'start', behavior: 'auto' });
+          heading?.focus({ preventScroll: true });
+        }
         return;
       }
       if (action.startsWith('run-setup-')) {
@@ -3241,8 +3492,8 @@
       }
       if (action === 'select-issues') {
         if (livePending || !result) throw Error('Wait for validation to finish.');
-        const shown = result.issues
-            .filter(i => !i.ignored)
+        const shown = reviewEntries()
+            .map(x => x.issue)
             .slice(issuePage * 100, issuePage * 100 + 100),
           all = shown.every(i => issueSelection.has(E.issueKey(i)));
         shown.forEach(i =>
@@ -3495,6 +3746,9 @@
         return;
       }
       if (action === 'filter') {
+        attentionGroup = null;
+        issueSelection.clear();
+        issuePage = 0;
         pinnedRows.clear();
         filter = el.dataset.filter;
         page = 0;
@@ -3510,7 +3764,11 @@
         selectedIssue = E.copy(issue);
         targetRow = issue.index;
         filter = 'all';
-        page = Math.floor(targetRow / 25);
+        const group = currentAttentionGroup();
+        if (group && (!group.indices.includes(issue.index) || issue.ignored)) attentionGroup = null;
+        page = attentionGroup
+          ? Math.floor(currentAttentionGroup().indices.indexOf(targetRow) / 25)
+          : Math.floor(targetRow / 25);
       }
       if (action === 'download-template') {
         const t = activeSchema();
@@ -4184,6 +4442,12 @@
       }
     });
     document.addEventListener('input', event => {
+      if (event.target.id === 'valAttentionSearch') {
+        attentionSearch = event.target.value;
+        attentionPage = 0;
+        patchResults();
+        return;
+      }
       if (event.target.name === 'comparisonRow' && event.target.closest?.('#valComparison')) {
         const n = Number(event.target.value);
         comparisonRow = Number.isInteger(n) && n >= 1 && n <= sourceRows.length ? String(n) : '';
@@ -4651,6 +4915,7 @@
         runSelection: draft ? E.copy(setupChoices()) : null,
         runProfileId,
         livePending,
+        attentionGroup: attentionGroup?.key || '',
         owner,
       }),
       loadSample,
@@ -4659,5 +4924,5 @@
       undoPreparation,
     };
   }
-  root.WorkHubValidatorStudio = { install };
+  root.WorkHubValidatorStudio = { install, groupIssues };
 })(window);
