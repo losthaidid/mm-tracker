@@ -12,7 +12,38 @@ A General/SAP file validator in the existing WorkHub. All checks are determinist
 6. Download an Excel template or upload an existing XLSX, CSV or TSV.
 7. Choose a worksheet and header row, then confirm each column mapping.
 8. Validate, inspect field-level issues, then correct values. Corrections recheck automatically.
-9. Export the issue workbook or the rows without errors.
+9. Review **Original vs validated**, then export the comparison report, issue workbook or rows without errors.
+
+## Compare the original and validated data
+
+After a successful validation, **Original vs validated** compares every upload column
+using its exact text, including blanks, whitespace, case and leading zeros. It shows
+the original value, the value captured after the latest preparation, and the current
+validated value. Use **All fields**, the upload-column filter or a working-data row
+number to inspect individual records. The default view shows changes and listed
+validation issues; the display is paged independently of the editable result grid.
+
+Blue identifies preparation changes, including expected list explosions and SAP
+formatting. Amber identifies corrections or differences from the original. Red
+identifies unresolved validation errors. Text labels distinguish these states too.
+A difference is not automatically an error. Columns outside the template mapping
+remain visible and are labelled **Not checked**. The prepared snapshot includes any
+corrections made before the latest preparation.
+
+Every exploded record retains its original worksheet row and split part. All fields
+copied from the parent, including columns not mapped to the template, stay with that
+parent's record. Selected lists remain paired by position, including blank positions.
+Successive explosions retain a nested part number such as `2.1` rather than matching
+records by material code or another potentially repeated identifier.
+
+**Export comparison report** creates an Excel workbook with a summary, per-row
+comparison, field comparison and full original/prepared/validated upload sheets.
+The issue workbook also includes this comparison. Export includes every row and
+field regardless of the screen filters. Long original values are previewed in the
+field comparison with an exact cell locator; **Original upload** retains them in full.
+Accepted-row exports retain their existing scope and exclude the full original
+upload and comparison sheets. Comparison snapshots stay in browser memory and
+follow preparation undo/restore; they are cleared with the upload or account.
 
 ## Choose checks for a validation run
 

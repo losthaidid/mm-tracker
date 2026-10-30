@@ -4,7 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; worker-src 'self' blob:; font-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://aaotojqkiewbhtnrlcur.supabase.co; frame-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Validation Studio visual check</title>
-<link rel="stylesheet" href="../validator-studio.css?v=20261029-profiles-1">
+<link rel="stylesheet" href="../validator-studio.css?v=20261030-comparison-1">
 <link rel="stylesheet" href="../work-library.css?v=20261017-wishlist-1">
 <style>
 body{margin:0;padding:28px;background:#f0f2e7;font-family:system-ui,-apple-system,Segoe UI,sans-serif}
@@ -17,10 +17,12 @@ body{margin:0;padding:28px;background:#f0f2e7;font-family:system-ui,-apple-syste
 <body data-motion="calm">
 <p class="preview-note">Interactive visual check · example data only · nothing connects to your account</p>
 <div id="preview"></div><div id="previewStatus" role="status"></div>
+<dialog id="previewModal"><div id="previewModalBody"></div><button type="button" onclick="document.getElementById('previewModal').close()">Close</button></dialog>
 <script src="../vendor/jszip.min.js"></script>
 <script src="../validator-engine.js?v=20261029-profiles-1"></script>
-<script src="../validator-files.js?v=20261029-profiles-1"></script>
-<script src="../validator-studio.js?v=20261029-reference-toggle-2"></script>
+<script src="../validator-files.js?v=20261030-comparison-1"></script>
+<script src="../validator-transform.js?v=20261029-preparation-1"></script>
+<script src="../validator-studio.js?v=20261030-comparison-1"></script>
 <script>
 const E=WorkHubValidatorEngine;
 let memory={projects:[],projectCompanies:[],workhub:{validator:{templates:[E.example()],runs:[]}}},ui;
@@ -28,6 +30,8 @@ const render=()=>{if(!ui.patchRender())document.getElementById('preview').innerH
 ui=WorkHubValidatorStudio.install({
  state:()=>memory,ready:()=>true,owner:()=>'visual-check',
  render,tell:text=>document.getElementById('previewStatus').textContent=text,
+ openModal(title,body){document.getElementById('previewModalBody').innerHTML='<h2>'+title+'</h2>'+body;document.getElementById('previewModal').showModal();},
+ closeModal(){document.getElementById('previewModal').close();},
  mutate(fn){const next=E.copy(memory);fn(next);E.validateState(next);E.prepare(next,memory);memory=next;render();return true;},
  download(data,name,type){const url=URL.createObjectURL(new Blob([data],{type})),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);}
 });

@@ -47,6 +47,28 @@ Applying or undoing a transformation clears old issue counts and ignore decision
 
 SAP exports store internal values as literal Excel text, including codes whose General data type was previously numeric. The main **Validated data** or **Accepted data** sheet uses the template's mapped fields. When preparations have been applied, **Prepared upload** retains every original upload column and its current working values. Accepted exports include only accepted records in both sheets. **Row origins** links each working record to the original worksheet, Excel row and split part. Issues use the working row number shown in Studio; split records show their source row and part below it. All these sheets use values, not executable formulas.
 
+### Compare the complete record after exploding
+
+After **Run validation**, use **Original vs validated** to check each record's
+original, prepared and validated values. Every output row carries its own original
+worksheet row and split part, including nested parts after successive explosions.
+Copied fields (such as Material, Description or extra unmapped upload columns) come
+from that row's parent; selected Plant/Storage lists remain paired by position.
+Blank positions do not move the following values to a different record.
+
+Preparation changes appear in blue; later corrections and differences from the
+original appear in amber. Unresolved field errors appear in red. Use **All fields**
+to include unchanged copied information, or filter by an upload column and working
+row number. Unmapped upload columns are compared but labelled **Not checked**.
+
+Choose **Export comparison report** for complete row and field comparisons plus
+full original, prepared-baseline and validated-upload sheets. The issue workbook
+also includes these sheets. Screen filters never restrict the exported comparison.
+Long original cells are retained in full in **Original upload**, with a cell locator
+beside their preview in the field comparison. The prepared baseline is the snapshot
+after the latest preparation and includes earlier corrections. Correcting a value
+rechecks the upload and refreshes comparison results; downloads wait for that check.
+
 ## Undo and privacy
 
 **Undo last change** retains the last three transformation snapshots. **Restore original upload** returns to the uploaded values, even after several transformations. Both actions clear validation results and later cell corrections after confirmation. Changing worksheet, header row or template version also restores that source; Studio asks before discarding applied preparations.

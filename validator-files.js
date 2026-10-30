@@ -179,7 +179,7 @@
   const STYLES =
     '<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="' +
     NS +
-    '"><numFmts count="1"><numFmt numFmtId="164" formatCode="yyyy-mm-dd"/></numFmts><fonts count="3"><font><sz val="11"/><color rgb="FF314B4A"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><sz val="11"/><color rgb="FF8C3438"/><name val="Calibri"/></font></fonts><fills count="5"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF356C62"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFCE6E6"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF1D0"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="6"><xf numFmtId="49" applyNumberFormat="1" fontId="0" fillId="0" borderId="0" xfId="0"><alignment vertical="top" wrapText="1"/></xf><xf numFmtId="49" applyNumberFormat="1" fontId="1" fillId="2" borderId="0" xfId="0"><alignment vertical="center" wrapText="1"/></xf><xf numFmtId="49" applyNumberFormat="1" fontId="2" fillId="3" borderId="0" xfId="0"><alignment wrapText="1"/></xf><xf numFmtId="49" applyNumberFormat="1" fontId="0" fillId="4" borderId="0" xfId="0"><alignment wrapText="1"/></xf><xf numFmtId="0" applyNumberFormat="1" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="164" applyNumberFormat="1" fontId="0" fillId="0" borderId="0" xfId="0"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+    '"><numFmts count="1"><numFmt numFmtId="164" formatCode="yyyy-mm-dd"/></numFmts><fonts count="3"><font><sz val="11"/><color rgb="FF314B4A"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><sz val="11"/><color rgb="FF8C3438"/><name val="Calibri"/></font></fonts><fills count="6"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF356C62"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFCE6E6"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF1D0"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE3EFFA"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="7"><xf numFmtId="49" applyNumberFormat="1" fontId="0" fillId="0" borderId="0" xfId="0"><alignment vertical="top" wrapText="1"/></xf><xf numFmtId="49" applyNumberFormat="1" fontId="1" fillId="2" borderId="0" xfId="0"><alignment vertical="center" wrapText="1"/></xf><xf numFmtId="49" applyNumberFormat="1" fontId="2" fillId="3" borderId="0" xfId="0"><alignment wrapText="1"/></xf><xf numFmtId="49" applyNumberFormat="1" fontId="0" fillId="4" borderId="0" xfId="0"><alignment wrapText="1"/></xf><xf numFmtId="0" applyNumberFormat="1" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="164" applyNumberFormat="1" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="49" applyNumberFormat="1" fontId="0" fillId="5" borderId="0" xfId="0"><alignment wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
   async function workbook(sheets) {
     if (!root.JSZip) throw Error('The Excel writer is unavailable. Refresh the page.');
     const zip = new root.JSZip(),
@@ -253,8 +253,9 @@
     );
     zip.file('xl/styles.xml', STYLES);
     for (const [i, s] of sheets.entries()) {
-      const width = Math.max(1, ...s.rows.map(r => r.length)),
-        end = col(width - 1) + Math.max(1, s.rows.length);
+      const width = s.width || s.rows.reduce((max, row) => Math.max(max, row.length), 1),
+        rowCount = s.rowCount ?? s.rows.length,
+        end = col(width - 1) + Math.max(1, rowCount);
       zip.file(
         'xl/worksheets/sheet' + (i + 1) + '.xml',
         '<worksheet xmlns="' +
@@ -274,40 +275,39 @@
               '" customWidth="1" style="0"/>'
           ).join('') +
           '</cols><sheetData>' +
-          s.rows
-            .map(
-              (row, y) =>
-                '<row r="' +
-                (y + 1) +
-                '"' +
-                (!y ? ' ht="32" customHeight="1"' : '') +
-                '>' +
-                row
-                  .map((value, x) => {
-                    const data = value && typeof value === 'object' ? value : { value },
-                      v = data.value ?? '',
-                      style = y === 0 ? 1 : data.style || 0;
-                    return (
-                      '<c r="' +
-                      col(x) +
-                      (y + 1) +
-                      '" s="' +
-                      style +
-                      '"' +
-                      (typeof v === 'number' ? '' : ' t="inlineStr"') +
-                      '>' +
-                      (typeof v === 'number'
-                        ? '<v>' + v + '</v>'
-                        : '<is><t xml:space="preserve">' + xml(v) + '</t></is>') +
-                      '</c>'
-                    );
-                  })
-                  .join('') +
-                '</row>'
-            )
-            .join('') +
+          Array.from(
+            typeof s.rows === 'function' ? s.rows() : s.rows,
+            (row, y) =>
+              '<row r="' +
+              (y + 1) +
+              '"' +
+              (!y ? ' ht="32" customHeight="1"' : '') +
+              '>' +
+              row
+                .map((value, x) => {
+                  const data = value && typeof value === 'object' ? value : { value },
+                    v = data.value ?? '',
+                    style = y === 0 ? 1 : data.style || 0;
+                  return (
+                    '<c r="' +
+                    col(x) +
+                    (y + 1) +
+                    '" s="' +
+                    style +
+                    '"' +
+                    (typeof v === 'number' ? '' : ' t="inlineStr"') +
+                    '>' +
+                    (typeof v === 'number'
+                      ? '<v>' + v + '</v>'
+                      : '<is><t xml:space="preserve">' + xml(v) + '</t></is>') +
+                    '</c>'
+                  );
+                })
+                .join('') +
+              '</row>'
+          ).join('') +
           '</sheetData>' +
-          (s.rows.length > 1 ? '<autoFilter ref="A1:' + end + '"/>' : '') +
+          (rowCount > 1 ? '<autoFilter ref="A1:' + end + '"/>' : '') +
           '</worksheet>'
       );
     }
@@ -445,6 +445,304 @@
       ...g.groups.map(child => '(' + describeGroup(child, t) + ')'),
     ];
     return values.length ? values.join(g.join === 'all' ? ' AND ' : ' OR ') : 'Every row';
+  }
+  // Compare literal upload text. Validation normalization must not hide spaces,
+  // case, leading zeros or changes to columns outside the template mapping.
+  function comparison(t, upload, result) {
+    const { headers, originalRows, preparedRows, sourceRows, origins, mapping, headerRow } = upload;
+    if (
+      !headers?.length ||
+      !originalRows ||
+      !preparedRows ||
+      !sourceRows ||
+      preparedRows.length !== sourceRows.length ||
+      origins?.length !== sourceRows.length
+    )
+      throw Error('The original upload comparison is unavailable. Upload the file again.');
+    const fields = headers.map((header, index) => {
+      const column = t.columns.find(c => Number(mapping[c.key]) === index);
+      return { index, header, key: column?.key || '', label: column?.label || header };
+    });
+    const report = {
+      upload,
+      fields,
+      result,
+      rows: [],
+      changedRows: 0,
+      changedCells: 0,
+      preparedCells: 0,
+      correctedCells: 0,
+      splitRows: 0,
+      affectedRows: 0,
+      unmappedFields: t.columns.filter(c => !fields.some(f => f.key === c.key)).map(c => c.key),
+      issues: new Map(),
+    };
+    for (const issue of result.issues) {
+      const key = issue.index + ':' + issue.field;
+      if (!report.issues.has(key)) report.issues.set(key, []);
+      report.issues.get(key).push(issue);
+    }
+    sourceRows.forEach((row, index) => {
+      const origin = origins[index],
+        originalIndex = origin.row - headerRow - 1;
+      if (!Number.isInteger(originalIndex) || !originalRows[originalIndex])
+        throw Error('A working row has no original source row. Upload the file again.');
+      const summary = { index, originalIndex, origin, changed: 0, prepared: 0, corrected: 0 };
+      report.rows.push(summary);
+      for (const field of fields) {
+        const cell = comparisonCell(report, index, field.index);
+        if (cell.changed) summary.changed++;
+        if (cell.preparedChange) summary.prepared++;
+        if (cell.corrected) summary.corrected++;
+      }
+      report.changedCells += summary.changed;
+      report.preparedCells += summary.prepared;
+      report.correctedCells += summary.corrected;
+      if (summary.changed) report.changedRows++;
+      if (origin.part) report.splitRows++;
+      if (summary.prepared || summary.corrected) report.affectedRows++;
+    });
+    return report;
+  }
+  function comparisonCell(report, index, fieldIndex) {
+    const { upload, fields, rows } = report,
+      field = fields[fieldIndex],
+      row = rows[index];
+    const original = String(upload.originalRows[row.originalIndex][fieldIndex] ?? ''),
+      prepared = String(upload.preparedRows[index][fieldIndex] ?? ''),
+      current = String(upload.sourceRows[index][fieldIndex] ?? ''),
+      preparedChange = original !== prepared,
+      corrected = prepared !== current,
+      changed = original !== current,
+      issues = field.key ? report.issues.get(index + ':' + field.key) || [] : [],
+      errors = issues.filter(i => !i.ignored && i.severity === 'error').length,
+      warnings = issues.filter(i => !i.ignored && i.severity === 'warning').length,
+      ignored = issues.filter(i => i.ignored).length;
+    const kind =
+      !changed && (preparedChange || corrected)
+        ? 'restored'
+        : preparedChange && corrected
+          ? 'prepared-corrected'
+          : corrected
+            ? 'corrected'
+            : preparedChange
+              ? 'prepared'
+              : 'unchanged';
+    return {
+      original,
+      prepared,
+      current,
+      changed,
+      preparedChange,
+      corrected,
+      kind,
+      errors,
+      warnings,
+      ignored,
+      label: {
+        restored: 'Returned to original',
+        'prepared-corrected': 'Prepared + corrected',
+        corrected: 'Corrected',
+        prepared: 'Preparation change',
+        unchanged: 'Unchanged',
+      }[kind],
+      check: !field.key
+        ? 'Not checked · column not mapped'
+        : errors
+          ? errors + ' error(s)'
+          : warnings
+            ? warnings + ' warning(s)'
+            : ignored
+              ? ignored + ' ignored issue(s)'
+              : report.result.truncated &&
+                  (report.result.status[index].errors || report.result.status[index].warnings)
+                ? 'Row has issues · field listing incomplete'
+                : 'No listed issue',
+    };
+  }
+  function comparisonSheets(t, upload, result) {
+    const report = comparison(t, upload, result),
+      marked = (value, style) => ({ value, style }),
+      differences = [
+        [
+          'Working data row (1-based)',
+          'Working Excel row',
+          'Original worksheet',
+          'Original Excel row',
+          'Split part',
+          'Upload column',
+          'Technical field',
+          'Comparison',
+          'Original value',
+          'Prepared value',
+          'Validated value',
+          'Field check',
+        ],
+      ],
+      rowReport = [
+        [
+          'Working data row (1-based)',
+          'Working Excel row',
+          'Original worksheet',
+          'Original Excel row',
+          'Split part',
+          'Fields different from original',
+          'Preparation changes',
+          'Corrections since preparation',
+          'Validation status',
+          'Errors',
+          'Warnings',
+          'Ignored issues',
+        ],
+      ];
+    for (const row of report.rows) {
+      const status = result.status[row.index];
+      rowReport.push([
+        row.index + 1,
+        upload.headerRow + row.index + 1,
+        upload.sheet,
+        row.origin.row,
+        row.origin.part || 'Unsplit',
+        marked(row.changed, row.changed ? 3 : 0),
+        row.prepared,
+        marked(row.corrected, row.corrected ? 3 : 0),
+        status.errors
+          ? 'Needs correction'
+          : status.warnings
+            ? 'Review warnings'
+            : status.ignored
+              ? 'Accepted with ignored issues'
+              : 'Passed',
+        status.errors,
+        status.warnings,
+        status.ignored || 0,
+      ]);
+    }
+    function* fieldRows() {
+      yield differences[0];
+      for (const row of report.rows) {
+        for (const field of report.fields) {
+          const cell = comparisonCell(report, row.index, field.index);
+          // Large original list cells can be repeated thousands of times after an
+          // explosion. Keep their exact value once in Original upload, with a clear
+          // locator rather than expanding the report by hundreds of megabytes.
+          const original =
+            cell.original.length > 1000
+              ? cell.original.slice(0, 240) +
+                '… [Full value: Original upload!' +
+                col(field.index) +
+                (row.originalIndex + 2) +
+                ']'
+              : cell.original;
+          yield [
+            row.index + 1,
+            upload.headerRow + row.index + 1,
+            upload.sheet,
+            row.origin.row,
+            row.origin.part || 'Unsplit',
+            col(field.index) + ' · ' + field.header,
+            field.key || 'Not mapped',
+            cell.label,
+            marked(original, cell.changed ? 3 : 0),
+            marked(cell.prepared, cell.preparedChange ? 6 : 0),
+            marked(
+              cell.current,
+              cell.errors ? 2 : cell.corrected || cell.warnings ? 3 : cell.changed ? 6 : 0
+            ),
+            cell.check,
+          ];
+        }
+      }
+    }
+    const sheets = [
+      {
+        name: 'Comparison summary',
+        widths: [38, 105],
+        rows: [
+          ['Item', 'Value'],
+          ['File', upload.fileName || 'Uploaded data'],
+          ['Original worksheet', upload.sheet],
+          ['Original header row', upload.headerRow],
+          ['Original rows', upload.originalRows.length],
+          ['Validated working rows', upload.sourceRows.length],
+          ['Split output rows', report.splitRows],
+          ['Rows different from original', report.changedRows],
+          ['Fields different from original', report.changedCells],
+          ['Preparation changes', report.preparedCells],
+          ['Corrections since preparation', report.correctedCells],
+          ['Upload columns compared', report.fields.length],
+          ['Template fields not mapped', report.unmappedFields.join(', ') || 'None'],
+          [
+            'Comparison policy',
+            'Exact text: spaces, case, blanks and leading zeros are significant. Preparation changes are expected transformations; they are not validation failures.',
+          ],
+          [
+            'Prepared value',
+            'Snapshot after the latest preparation, including any earlier corrections. Without preparation this is the original upload.',
+          ],
+          [
+            'Highlight key',
+            'Blue = preparation change. Amber = correction or difference from original. Red = unresolved validation error. Labels also identify each change.',
+          ],
+          [
+            'Field comparison',
+            'Every upload field for every working row, including unchanged values and listed validation issues. Original cells longer than 1,000 characters are previewed here with their full-value location.',
+          ],
+          [
+            'Original upload',
+            'Full literal source values. Data row 2 here corresponds to the first row below the selected original header. Use Row comparison for the original worksheet row number.',
+          ],
+          [
+            'Validation issue listing',
+            result.truncated
+              ? 'Issue listing is truncated; comparison still covers every uploaded row and field.'
+              : 'Complete',
+          ],
+        ],
+      },
+      {
+        name: 'Row comparison',
+        rows: rowReport,
+        widths: [20, 20, 28, 20, 16, 24, 24, 28, 32, 12, 12, 16],
+      },
+      {
+        name: 'Field comparison',
+        rows: fieldRows,
+        width: 12,
+        rowCount: 1 + report.rows.length * report.fields.length,
+        widths: [20, 20, 28, 20, 16, 30, 26, 30, 48, 48, 48, 42],
+      },
+      {
+        name: 'Original upload',
+        rows: [upload.headers, ...upload.originalRows.map(row => row.map(String))],
+      },
+    ];
+    if (upload.steps.length)
+      sheets.push({
+        name: 'Prepared baseline',
+        rows: [
+          upload.headers,
+          ...upload.preparedRows.map((row, i) =>
+            row.map((v, j) => marked(v, comparisonCell(report, i, j).preparedChange ? 6 : 0))
+          ),
+        ],
+      });
+    sheets.push({
+      name: 'Validated upload',
+      rows: [
+        upload.headers,
+        ...upload.sourceRows.map((row, i) =>
+          row.map((v, j) => {
+            const cell = comparisonCell(report, i, j);
+            return marked(
+              v,
+              cell.errors ? 2 : cell.corrected || cell.warnings ? 3 : cell.changed ? 6 : 0
+            );
+          })
+        ),
+      ],
+    });
+    return sheets;
   }
   async function report(t, rows, result, acceptedOnly = false, preparation = null) {
     const data = [
@@ -683,6 +981,10 @@
             'First 10,000 matches shown. Split the file to export more.',
           ]);
     }
+    if (!acceptedOnly && preparation?.originalRows) {
+      const comparison = comparisonSheets(t, preparation, result);
+      preparation.comparisonFirst ? sheets.unshift(...comparison) : sheets.push(...comparison);
+    }
     return workbook(sheets);
   }
   root.WorkHubValidatorFiles = Object.freeze({
@@ -690,6 +992,8 @@
     workbook,
     template,
     report,
+    comparison,
+    comparisonCell,
     describeGroup,
     col,
     excelDate,

@@ -133,7 +133,13 @@
       headers = [],
       sourceRows = [],
       originalRows = [],
+      preparedRows = [],
       origins = [],
+      comparisonCache = null,
+      comparisonFilter = 'changes',
+      comparisonField = 'all',
+      comparisonRow = '',
+      comparisonPage = 0,
       preparation = null,
       preparationSteps = [],
       preparationUndo = [],
@@ -190,7 +196,13 @@
     function resetPreparation() {
       closePreparation();
       originalRows = [];
+      preparedRows = [];
       origins = [];
+      comparisonCache = null;
+      comparisonFilter = 'changes';
+      comparisonField = 'all';
+      comparisonRow = '';
+      comparisonPage = 0;
       preparationSteps = [];
       preparationUndo = [];
     }
@@ -304,7 +316,7 @@
       const sample =
         plan.kind === 'sap'
           ? `<table><thead><tr><th>Source row</th><th>Field</th><th>Before</th><th>After</th></tr></thead><tbody>${plan.sample.map(x => `<tr><td>${origins[x.index]?.row || headerRow + x.index + 1}</td><td>${esc(x.field)}</td><td>${previewValue(x.before)}</td><td><strong>${previewValue(x.after)}</strong></td></tr>`).join('')}</tbody></table>`
-          : `<table><thead><tr><th>Source row</th><th>Part</th>${(plan.columns || []).map(c => `<th>${esc(headers[c])}</th>`).join('')}</tr></thead><tbody>${plan.sample.map(x => `<tr><td>${origins[x.index]?.row || headerRow + x.index + 1}</td><td>${x.part}</td>${x.values.map(v => `<td>${previewValue(v || '(blank)')}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+          : `<table><thead><tr><th>Source row</th><th>Part</th>${headers.map((h, i) => `<th>${esc(h)}${plan.columns?.includes(i) ? ' · split' : ' · copied'}</th>`).join('')}</tr></thead><tbody>${plan.sample.map((x, n) => `<tr><td>${origins[x.index]?.row || headerRow + x.index + 1}</td><td>${[origins[x.index]?.part, plan.parents[n].part].filter(Boolean).join('.') || 'Unsplit'}</td>${plan.rows[n].map(v => `<td>${previewValue(v || '(blank)')}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
       $('valPreparationPreview').innerHTML =
         `<div class="val-prep-summary${plan.blocked ? ' is-blocked' : ''}"><strong>${plan.kind === 'sap' ? plan.changes + ' cell value(s) will change' : sourceRows.length + ' records → ' + plan.outputCount + ' records'}</strong><span>${plan.warningCount ? plan.warningCount + (plan.blocked ? ' pairing mismatch(es). Nothing will be applied.' : ' value(s) retained for review.') : 'Preview ready.'}</span></div>${plan.warnings.length ? `<ul class="val-prep-warnings">${plan.warnings.map(w => `<li>Source row ${origins[w.index]?.row || headerRow + w.index + 1} · ${esc(w.field)}: ${esc(w.message)}</li>`).join('')}</ul>` : ''}${plan.sample.length ? `<p class="val-help">First ${plan.sample.length} ${plan.kind === 'sap' ? 'changed values' : 'output records'} shown.</p><div class="val-table-scroll">${sample}</div>` : ''}${!plan.changes ? '<p>No values need changing with these options.</p>' : ''}`;
       document.querySelector('[data-val="prep-apply"]').disabled = plan.blocked || !plan.changes;
@@ -350,11 +362,13 @@
       if (schema.projectId && runCompanyId) E.runContext(a.state(), schema, runCompanyId);
       preparationUndo.push({
         rows: sourceRows.map(r => r.slice()),
+        preparedRows,
         origins: origins.map(o => ({ ...o })),
         steps: preparationSteps.slice(),
       });
       while (preparationUndo.length > 3) preparationUndo.shift();
       sourceRows = plan.rows;
+      preparedRows = sourceRows.map(r => r.slice());
       if (plan.kind === 'explode')
         origins = plan.parents.map(p => ({
           row: origins[p.index].row,
@@ -383,12 +397,14 @@
       closePreparation();
       if (restore) {
         sourceRows = originalRows.map(r => r.slice());
+        preparedRows = sourceRows.map(r => r.slice());
         origins = sourceRows.map((r, i) => ({ row: headerRow + i + 1, part: '' }));
         preparationSteps = [];
         preparationUndo = [];
       } else {
         const previous = preparationUndo.pop();
         sourceRows = previous.rows;
+        preparedRows = previous.preparedRows;
         origins = previous.origins;
         preparationSteps = previous.steps;
       }
@@ -2176,6 +2192,7 @@
         throw Error('Use up to 5,000 rows and 200,000 cells.');
       resetPreparation();
       originalRows = sourceRows.map(r => r.slice());
+      preparedRows = sourceRows.map(r => r.slice());
       origins = sourceRows.map((r, i) => ({ row: headerRow + i + 1, part: '' }));
       mapping = E.autoMap(headers, activeSchema());
       rows = [];
@@ -2457,10 +2474,15 @@
       if (focused?.dataset.cell !== undefined) pinnedRows.add(Number(focused.dataset.cell));
       livePending = true;
       liveCheck = { token: generation, owner, schema: resultSchema };
-      for (const el of document.querySelectorAll('[data-val="report"],[data-val="accepted"]'))
+      for (const el of document.querySelectorAll(
+        '[data-val="report"],[data-val="accepted"],[data-val="export-comparison"]'
+      ))
         el.disabled = true;
       const status = $('valLiveStatus');
       if (status) status.textContent = 'Checking your edit…';
+      const comparisonStatus = $('valComparisonStatus');
+      if (comparisonStatus)
+        comparisonStatus.textContent = 'Checking your edit before refreshing this comparison…';
       if (immediate) checkEdit();
       else liveTimer = root.setTimeout(checkEdit, 250);
     }
@@ -2508,6 +2530,105 @@
         btn('run', icon('check', 18) + ' Run validation', busy ? 'disabled' : '', 'val-primary') +
         '</div></section>'
       );
+    }
+    function comparisonUpload() {
+      return {
+        headers,
+        originalRows,
+        preparedRows,
+        sourceRows,
+        origins,
+        mapping,
+        headerRow,
+        fileName,
+        sheet: book.sheets[sheetIndex].name,
+        steps: preparationSteps,
+      };
+    }
+    function dataComparison() {
+      if (
+        !comparisonCache ||
+        comparisonCache.generation !== generation ||
+        comparisonCache.result !== result
+      )
+        comparisonCache = {
+          generation,
+          result,
+          report: F.comparison(resultSchema, comparisonUpload(), result),
+        };
+      return comparisonCache.report;
+    }
+    function comparisonValue(value) {
+      const full = '<pre>' + esc(value === '' ? '(blank)' : value) + '</pre>';
+      return value.length > 240
+        ? '<details><summary>Show full value · ' +
+            value.length +
+            ' characters</summary>' +
+            full +
+            '</details><p class="val-comparison-preview">' +
+            esc(value.slice(0, 160)) +
+            '…</p>'
+        : full;
+    }
+    function comparisonView() {
+      if (!result || !resultSchema || !book) return '';
+      // Never present old check status alongside a newly typed, unchecked value.
+      if (livePending)
+        return '<section id="valComparison" class="val-card"><h3>Original vs validated</h3><p role="status">Checking your edit before refreshing the comparison…</p></section>';
+      const report = dataComparison(),
+        matches = [];
+      for (const row of report.rows) {
+        if (comparisonRow && row.index + 1 !== Number(comparisonRow)) continue;
+        for (const field of report.fields) {
+          if (comparisonField !== 'all' && field.index !== Number(comparisonField)) continue;
+          const cell = F.comparisonCell(report, row.index, field.index);
+          if (
+            comparisonFilter === 'changes' &&
+            !cell.preparedChange &&
+            !cell.corrected &&
+            !cell.errors &&
+            !cell.warnings &&
+            !cell.ignored
+          )
+            continue;
+          if (comparisonFilter === 'corrected' && !cell.corrected) continue;
+          if (comparisonFilter === 'issues' && !cell.errors && !cell.warnings && !cell.ignored)
+            continue;
+          matches.push([row.index, field.index]);
+        }
+      }
+      comparisonPage = Math.max(0, Math.min(comparisonPage, Math.ceil(matches.length / 50) - 1));
+      const shown = matches.slice(comparisonPage * 50, comparisonPage * 50 + 50);
+      return `<section id="valComparison" class="val-card val-comparison" aria-label="Original and validated data comparison"><div class="val-panel-title"><div><span class="val-eyebrow">TRACE EVERY CHANGE</span><h3>Original vs validated</h3></div>${btn('export-comparison', 'Export comparison report', '', 'val-secondary')}</div>
+        <p id="valComparisonStatus" class="val-help" role="status">Compare exact values from the original upload, the latest preparation and the validated working data. Split parts stay linked to their original worksheet row. Spaces, case, leading zeros and blanks are compared exactly.</p>
+        <div class="val-comparison-counts"><span><strong>${originalRows.length}</strong> original rows</span><span><strong>${sourceRows.length}</strong> validated rows</span><span><strong>${report.changedRows}</strong> rows differ from original</span><span><strong>${report.changedCells}</strong> fields differ from original</span><span><strong>${report.correctedCells}</strong> corrections since preparation</span><span><strong>${report.splitRows}</strong> split output rows</span></div>
+        <p class="val-help">Blue marks preparation changes, including expected exploded values. Amber marks corrections or differences from the original. Red marks unresolved validation errors. A data change alone is not a validation failure. Prepared values are captured after the latest preparation and include any earlier corrections.</p>
+        ${report.unmappedFields.length ? `<p class="val-inline-note">Template fields not mapped: ${report.unmappedFields.map(esc).join(', ')}. Upload columns outside the mapping are compared and labelled Not checked.</p>` : ''}
+        <div class="val-fields val-comparison-filters">${select(
+          'comparisonFilter',
+          'Show',
+          [
+            ['changes', 'Changes & issues'],
+            ['all', 'All fields'],
+            ['corrected', 'Corrections since preparation'],
+            ['issues', 'Validation issues'],
+          ],
+          comparisonFilter
+        )}${select('comparisonField', 'Upload column', [['all', 'All columns'], ...report.fields.map(f => [f.index, F.col(f.index) + ' · ' + f.header])], comparisonField)}${input('comparisonRow', 'Working data row (1-based)', comparisonRow, 'number', `id="valComparisonRow" min="1" max="${sourceRows.length}" step="1" placeholder="All rows"`)}</div>
+        <p class="val-help">Showing ${shown.length ? comparisonPage * 50 + 1 : 0}–${comparisonPage * 50 + shown.length} of ${matches.length} fields. The exported report includes all rows and fields regardless of these filters.</p>
+        ${
+          shown.length
+            ? `<div class="val-table-scroll"><table class="val-grid val-comparison-grid"><thead><tr><th>Working row</th><th>Original source</th><th>Upload column / field</th><th>Original value</th><th>Prepared value</th><th>Validated value</th><th>Comparison</th><th>Field check</th></tr></thead><tbody>${shown
+                .map(([i, j]) => {
+                  const row = report.rows[i],
+                    field = report.fields[j],
+                    cell = F.comparisonCell(report, i, j);
+                  return `<tr data-compare-row="${i}" data-compare-field="${j}"><th>${i + 1}<small>Excel row ${headerRow + i + 1}</small></th><td>${esc(book.sheets[sheetIndex].name)}<small>Original row ${row.origin.row} · ${row.origin.part ? 'Part ' + esc(row.origin.part) : 'Unsplit'}</small></td><td>${esc(field.header)}<code>${esc(field.key || 'Not mapped to template')}</code></td><td class="${cell.changed ? 'val-difference' : ''}">${comparisonValue(cell.original)}</td><td class="${cell.preparedChange ? 'val-prepared-change' : ''}">${comparisonValue(cell.prepared)}</td><td class="${cell.errors ? 'error' : cell.corrected || cell.warnings ? 'val-difference' : cell.changed ? 'val-prepared-change' : ''}">${comparisonValue(cell.current)}</td><td><span class="val-comparison-label ${cell.kind}">${esc(cell.label)}</span></td><td>${esc(cell.check)}</td></tr>`;
+                })
+                .join('')}</tbody></table></div>`
+            : '<p class="val-inline-note">No fields match these filters. Choose All fields to review unchanged values.</p>'
+        }
+        <div class="val-pagination">${btn('comparison-page', '← Previous', 'data-delta="-1"' + (!comparisonPage ? ' disabled' : ''), 'val-quiet')}<span>Page ${comparisonPage + 1} of ${Math.max(1, Math.ceil(matches.length / 50))}</span>${btn('comparison-page', 'Next →', 'data-delta="1"' + ((comparisonPage + 1) * 50 >= matches.length ? ' disabled' : ''), 'val-quiet')}</div></section>`;
     }
     function resultsView() {
       if (!rows.length) return '';
@@ -2730,6 +2851,7 @@
           'val-quiet'
         ) +
         '</div></section>' +
+        comparisonView() +
         issueReviewView() +
         '</div>'
       );
@@ -2970,6 +3092,11 @@
       const action = el.dataset.val,
         id = el.dataset.id;
       message = '';
+      if (action === 'comparison-page') {
+        comparisonPage += Number(el.dataset.delta);
+        patchResults();
+        return;
+      }
       if (action.startsWith('run-setup-')) {
         setupAccess();
         commitCurrent();
@@ -3394,7 +3521,9 @@
         );
         return;
       }
-      if (action === 'report' || action === 'accepted') {
+      if (action === 'report' || action === 'accepted' || action === 'export-comparison') {
+        if (root.WorkHubCurrentAccess && !root.WorkHubCurrentAccess.can('validator', 'export'))
+          throw Error('Exporting validation data is disabled for this account.');
         if (!result || !resultSchema || livePending)
           throw Error('Wait for validation to finish before exporting.');
         const outcome = E.copy(result);
@@ -3406,13 +3535,10 @@
           rows,
           outcome,
           action === 'accepted',
-          preparationSteps.length
+          action !== 'accepted' || preparationSteps.length
             ? {
-                headers,
-                sourceRows,
-                origins,
-                sheet: book.sheets[sheetIndex].name,
-                steps: preparationSteps,
+                ...comparisonUpload(),
+                comparisonFirst: action === 'export-comparison',
               }
             : null
         );
@@ -3422,7 +3548,12 @@
           safeName(
             resultSchema.name +
               (result.context?.companyName ? '-' + result.context.companyName : '')
-          ) + (action === 'accepted' ? '-accepted.xlsx' : '-issues.xlsx'),
+          ) +
+            (action === 'accepted'
+              ? '-accepted.xlsx'
+              : action === 'export-comparison'
+                ? '-comparison.xlsx'
+                : '-issues.xlsx'),
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         );
         return;
@@ -4053,6 +4184,13 @@
       }
     });
     document.addEventListener('input', event => {
+      if (event.target.name === 'comparisonRow' && event.target.closest?.('#valComparison')) {
+        const n = Number(event.target.value);
+        comparisonRow = Number.isInteger(n) && n >= 1 && n <= sourceRows.length ? String(n) : '';
+        comparisonPage = 0;
+        patchResults();
+        return;
+      }
       if (['valSetupSearch', 'valSetupReferenceSearch'].includes(event.target.id)) {
         if (event.target.id === 'valSetupSearch') setupSearch = event.target.value;
         else setupReferenceSearch = event.target.value;
@@ -4327,6 +4465,19 @@
           paint();
           return;
         }
+        if (['comparisonFilter', 'comparisonField', 'comparisonRow'].includes(el.name)) {
+          if (el.name === 'comparisonFilter') comparisonFilter = el.value;
+          if (el.name === 'comparisonField') comparisonField = el.value;
+          if (el.name === 'comparisonRow') {
+            const n = Number(el.value);
+            comparisonRow =
+              Number.isInteger(n) && n >= 1 && n <= sourceRows.length ? String(n) : '';
+            el.value = comparisonRow;
+          }
+          comparisonPage = 0;
+          patchResults();
+          return;
+        }
         if (el.id === 'valSearch') {
           search = el.value;
           paint();
@@ -4489,6 +4640,8 @@
         mode,
         rows: E.copy(rows),
         sourceRows: E.copy(sourceRows),
+        originalRows: E.copy(originalRows),
+        preparedRows: E.copy(preparedRows),
         origins: E.copy(origins),
         preparations: E.copy(preparationSteps),
         undoCount: preparationUndo.length,
