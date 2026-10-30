@@ -115,7 +115,7 @@ test('Unit of Measurement works through existing independent reference selection
   const tpl = ui.snapshot().draft, blob = await x.F.template(tpl), book = await x.F.read({ name: 'template.xlsx', size: blob.size, arrayBuffer: () => blob.arrayBuffer() });
   const rows = book.sheets.find(s => s.name.startsWith('Ref ')).rows;
   assert.equal(rows.length, 292); const values = new Map(rows.slice(1)); assert.equal(values.get('000'), 'm/min'); assert.equal(values.get('001') || '', ''); assert.equal(values.get('"2'), 'Inch2'); assert.equal(values.get('µL'), 'µl'); assert.equal(values.get('btl'), 'Btu/lb');
-  await x.handle('report'); const report = x.downloads[0].blob, zip = await x.w.JSZip.loadAsync(new x.w.Uint8Array(await report.arrayBuffer()), { checkCRC32: true });
+  await x.handle('export-comparison'); const report = x.downloads[0].blob, zip = await x.w.JSZip.loadAsync(new x.w.Uint8Array(await report.arrayBuffer()), { checkCRC32: true });
   const sheets = (await Promise.all(Object.values(zip.files).filter(f => f.name.startsWith('xl/worksheets/')).map(f => f.async('string')))).join('');
   assert.match(sheets, /Btu\/lb/); assert.match(sheets, /Bottle/); assert.doesNotMatch(sheets, /<f>/);
 });

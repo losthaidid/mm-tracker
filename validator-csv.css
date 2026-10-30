@@ -1,0 +1,126 @@
+.vcsv {
+  --csv-border: var(--hub-border, #ccdad3);
+  --csv-soft: var(--hub-surface-soft, #f0f5ef);
+  color: var(--hub-text, #314b4a);
+}
+.vcsv .val-card {
+  margin: 0;
+  min-width: 0;
+}
+.vcsv .val-section-heading {
+  align-items: center;
+}
+.vcsv-message {
+  padding: 15px 18px;
+  border: 1px solid var(--csv-border);
+  border-radius: 12px;
+  background: var(--csv-soft);
+  margin: 18px 0;
+  line-height: 1.6;
+}
+.vcsv-error {
+  border-color: var(--hub-error, #b74b4b);
+  color: var(--hub-error, #8c3438);
+}
+.vcsv-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.7fr) minmax(0, 2fr);
+  gap: 18px;
+  margin: 20px 0;
+}
+.vcsv-sheets {
+  display: grid;
+  gap: 9px;
+  margin-top: 16px;
+  max-height: 420px;
+  overflow: auto;
+}
+.vcsv-sheet {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--csv-border);
+  border-radius: 10px;
+  align-items: flex-start;
+  cursor: pointer;
+}
+.vcsv-sheet input {
+  margin-top: 4px;
+  accent-color: var(--hub-accent, #356c62);
+}
+.vcsv-sheet strong,
+.vcsv-sheet small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.vcsv-sheet small {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--hub-muted, #64786d);
+}
+.vcsv-preview-toolbar,
+.vcsv-output {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.vcsv-preview-toolbar {
+  margin: 14px 0;
+  font-size: 12px;
+}
+.vcsv-preview-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+}
+.vcsv-preview-table th,
+.vcsv-preview-table td {
+  border: 1px solid var(--csv-border);
+  padding: 10px;
+  min-width: 85px;
+  max-width: 250px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+.vcsv-preview-table th {
+  background: var(--csv-soft);
+  font-weight: 600;
+}
+.vcsv-pages {
+  margin: 16px 0 8px;
+  font-size: 11px;
+}
+.vcsv-notes {
+  font-size: 12px;
+  line-height: 1.7;
+}
+.vcsv-output h3 {
+  margin-top: 0;
+}
+.vcsv-output p {
+  font-size: 12px;
+  line-height: 1.7;
+}
+.vcsv-progress {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0;
+  font-size: 12px;
+}
+.vcsv-progress progress {
+  width: 100%;
+  accent-color: var(--hub-accent, #356c62);
+}
+.vcsv-guidance {
+  margin-top: 18px;
+  font-size: 12px;
+  line-height: 1.8;
+}
+@media (max-width: 800px) {
+  .vcsv-layout {
+    grid-template-columns: 1fr;
+  }
+}

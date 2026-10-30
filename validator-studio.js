@@ -164,6 +164,7 @@
       store = () => a.state().workhub.validator;
     const runner = root.WorkHubValidatorRunner?.create();
     const fileCompare = root.WorkHubValidatorCompare?.install({ ...a, render: paint });
+    const csvConverter = root.WorkHubValidatorCSV?.install({ ...a, render: paint });
     let owner = '',
       generation = 0,
       draft = null,
@@ -1396,6 +1397,7 @@
     }
     function sync() {
       fileCompare?.sync();
+      csvConverter?.sync();
       const next = a.owner?.() || '';
       if (next !== owner) {
         resetQueue();
@@ -1968,6 +1970,7 @@
         btn('new', 'Create a template', '', 'val-primary') +
         btn('example', 'Explore an example', '', 'val-secondary') +
         btn('mode', 'Compare two files', 'data-mode="file-compare"', 'val-secondary') +
+        btn('mode', 'Excel to CSV', 'data-mode="excel-csv"', 'val-secondary') +
         '</div><div class="val-welcome-steps"><span>' +
         icon('columns') +
         'Design columns</span><span>' +
@@ -2010,6 +2013,7 @@
           ['references', 'References', 'reference'],
           ['check', 'Validate', 'check'],
           ['file-compare', 'Compare two files', 'columns'],
+          ['excel-csv', 'Excel to CSV', 'file'],
           ['history', 'Versions & runs', 'history'],
         ]
           .map(([key, label, art]) =>
@@ -3229,6 +3233,7 @@
         '</div><div class="val-run-bar"><p>Uploaded rows stay in this browser. Only the run summary is saved.</p>' +
         btn('run', icon('check', 18) + ' Run validation', busy ? 'disabled' : '', 'val-primary') +
         btn('mode', 'Compare two files', 'data-mode="file-compare"', 'val-secondary') +
+        btn('mode', 'Excel to CSV', 'data-mode="excel-csv"', 'val-secondary') +
         '</div></section>'
       );
     }
@@ -3485,7 +3490,8 @@
         btn(
           'report',
           'Export issue workbook',
-          !result || livePending ? 'disabled' : '',
+          'title="Validated data and Issues only · all validated records"' +
+            (!result || livePending ? ' disabled' : ''),
           'val-secondary'
         ) +
         btn(
@@ -4099,7 +4105,7 @@
       if (!draft && store().templates.length) pick(store().templates[0].id, true);
       return (
         '<section class="validation-studio' +
-        (mode === 'file-compare' ? ' val-compare-wide' : '') +
+        (['file-compare', 'excel-csv'].includes(mode) ? ' val-compare-wide' : '') +
         (roomyReview && mode === 'check' && rows.length ? ' val-review-wide' : '') +
         '" data-val-owner="' +
         esc(owner) +
@@ -4114,18 +4120,31 @@
         '<main class="val-main" data-val-section="' +
         esc(mode) +
         '">' +
-        (mode === 'file-compare'
+        (['file-compare', 'excel-csv'].includes(mode)
           ? '<nav class="val-tabs" aria-label="Validation workspace">' +
             btn('mode', icon('check', 17) + 'Validate', 'data-mode="check"', '') +
             btn(
               'mode',
               icon('columns', 17) + 'Compare two files',
-              'data-mode="file-compare" aria-current="page"',
-              'is-active'
+              'data-mode="file-compare" aria-current="' +
+                (mode === 'file-compare' ? 'page' : 'false') +
+                '"',
+              mode === 'file-compare' ? 'is-active' : ''
+            ) +
+            btn(
+              'mode',
+              icon('file', 17) + 'Excel to CSV',
+              'data-mode="excel-csv" aria-current="' +
+                (mode === 'excel-csv' ? 'page' : 'false') +
+                '"',
+              mode === 'excel-csv' ? 'is-active' : ''
             ) +
             '</nav>' +
-            (fileCompare?.render() ||
-              '<p>The file comparison tool is unavailable. Refresh the page.</p>')
+            (mode === 'file-compare'
+              ? fileCompare?.render() ||
+                '<p>The file comparison tool is unavailable. Refresh the page.</p>'
+              : csvConverter?.render() ||
+                '<p>The Excel-to-CSV tool is unavailable. Refresh the page.</p>')
           : draft
             ? header() +
               (message
@@ -4412,7 +4431,10 @@
         applyCorrection(Number(el.dataset.choice));
         return;
       }
-      if (action === 'mode' && (el.dataset.mode === 'file-compare' || !draft)) {
+      if (
+        action === 'mode' &&
+        (['file-compare', 'excel-csv'].includes(el.dataset.mode) || !draft)
+      ) {
         commitCurrent();
         mode = el.dataset.mode;
         paint();
@@ -4776,18 +4798,21 @@
         const exportToken = generation,
           exportOwner = owner;
         outcome.issues.forEach(i => (i.row = headerRow + i.index + 1));
-        const exported = await F.report(
-          resultSchema,
-          rows,
-          outcome,
-          action === 'accepted',
-          action !== 'accepted' || preparationSteps.length
-            ? {
-                ...comparisonUpload(),
-                comparisonFirst: action === 'export-comparison',
-              }
-            : null
-        );
+        const exported =
+          action === 'report'
+            ? await F.issueReport(resultSchema, rows, outcome)
+            : await F.report(
+                resultSchema,
+                rows,
+                outcome,
+                action === 'accepted',
+                action !== 'accepted' || preparationSteps.length
+                  ? {
+                      ...comparisonUpload(),
+                      comparisonFirst: action === 'export-comparison',
+                    }
+                  : null
+              );
         if (exportToken !== generation || exportOwner !== a.owner?.() || !a.ready()) return;
         a.download(
           exported,
@@ -5917,6 +5942,7 @@
       addLibraryField,
       referenceDetails,
       fileComparison: fileCompare,
+      csvConverter,
       snapshot: () => ({
         draft: E.copy(draft),
         dirty,

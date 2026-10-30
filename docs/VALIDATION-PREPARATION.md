@@ -62,8 +62,10 @@ to include unchanged copied information, or filter by an upload column and worki
 row number. Unmapped upload columns are compared but labelled **Not checked**.
 
 Choose **Export comparison report** for complete row and field comparisons plus
-full original, prepared-baseline and validated-upload sheets. The issue workbook
-also includes these sheets. Screen filters never restrict the exported comparison.
+full original, prepared-baseline and validated-upload sheets. **Export issue workbook**
+contains only **Validated data** and **Issues**, retaining all validated records and
+their issue highlights, including exploded rows. See [Issue workbook](VALIDATION-ISSUE-EXPORT.md).
+Screen filters never restrict either exported report.
 Long original cells are retained in full in **Original upload**, with a cell locator
 beside their preview in the field comparison. The prepared baseline is the snapshot
 after the latest preparation and includes earlier corrections. Correcting a value

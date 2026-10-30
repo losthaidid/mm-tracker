@@ -203,7 +203,7 @@ test('comparison snapshots follow undo, restore, new uploads and account cleanup
 test('comparison exports long original list values once in full and retains their cell locator in each discrepancy', async t => {
   const long = 'A'.repeat(1100) + ',B';
   const x = await fixture(t, [['000001','Long',long,'S1,S2','=1+1','z']]);
-  x.prepare('explode'); await x.ui.run(); await x.ui.handle({ dataset: { val: 'report' } });
+  x.prepare('explode'); await x.ui.run(); await x.ui.handle({ dataset: { val: 'export-comparison' } });
   const { blob, name } = x.downloads[0], book = await x.F.read({ name, size: blob.size, arrayBuffer: () => blob.arrayBuffer() });
   assert.equal(book.sheets.find(s => s.name === 'Original upload').rows[1][2], long);
   const diff = book.sheets.find(s => s.name === 'Field comparison').rows.find(row => row[6] === 'PLANT');
