@@ -42,6 +42,8 @@
     templates: 60,
     columns: 200,
     rules: 100,
+    requirements: 200,
+    additionalRequirements: 400,
     rows: 25000,
     cells: 5000000,
     fileBytes: 50000000,
@@ -345,6 +347,15 @@
       message: '',
     };
   }
+  // Keep the original single requirement compatible with saved definitions.
+  function requirements(r) {
+    return [r.assertion, ...(r.additionalAssertions || [])];
+  }
+  function describeRequirements(r, t) {
+    return requirements(r)
+      .map(c => describe(c, t))
+      .join(' AND ');
+  }
   function schema(t) {
     return copy({
       name: t.name,
@@ -382,7 +393,7 @@
     };
     t.rules.forEach(r => {
       walk(r.when);
-      clause(r.assertion);
+      requirements(r).forEach(clause);
     });
     return found;
   }
@@ -454,7 +465,9 @@
   }
   // Review decisions stay with the current in-memory upload; no source values are saved.
   function issueKey(issue) {
-    return JSON.stringify([issue.index, issue.field, issue.ruleId, issue.message, issue.severity]);
+    const key = [issue.index, issue.field, issue.ruleId, issue.message, issue.severity];
+    if (issue.requirementIndex !== undefined) key.push(issue.requirementIndex);
+    return JSON.stringify(key);
   }
   function reviewIssues(raw, rows, decisions = new Map()) {
     const result = copy(raw),
@@ -674,6 +687,7 @@
       for (const child of g.groups) checkGroup(child, depth + 1);
     }
     const ruleIds = new Set();
+    let requirementCount = 0;
     for (const r of t.rules) {
       if (
         !r ||
@@ -702,7 +716,15 @@
       )
         throw Error('Company conditions need a linked project and at least one selected company.');
       checkGroup(r.when);
-      checkCondition(r.assertion);
+      if (r.additionalAssertions !== undefined && !Array.isArray(r.additionalAssertions))
+        throw Error('THEN requirements must be a list of field checks.');
+      const checks = requirements(r);
+      if (checks.length > LIMITS.requirements)
+        throw Error('Use up to 200 THEN requirements per condition.');
+      requirementCount += checks.length - 1;
+      if (requirementCount > LIMITS.additionalRequirements)
+        throw Error('Use up to 400 additional THEN requirements per template.');
+      checks.forEach(checkCondition);
     }
     if (
       !Array.isArray(t.uniqueGroups) ||
@@ -795,7 +817,7 @@
       if (['lookup', 'lookupTuple'].includes(c.operator)) refs.push(c);
     };
     walk(r.when);
-    add(r.assertion);
+    requirements(r).forEach(add);
     return refs;
   }
   /** Compile a run-only schema. Definitions, published releases and base checks stay unchanged. */
@@ -1120,48 +1142,50 @@
       if (!candidates.has(key)) candidates.set(key, { value: String(value), source, detail });
     };
     for (const value of tokens(field.values)) add(value, 'Allowed values');
-    for (const rule of t.rules) {
-      const c = resolveCondition(rule.assertion, t);
-      if (
-        !ruleApplies(rule, context) ||
-        c.field !== fieldKey ||
-        !testGroup(rule.when, row, t, cache) ||
-        !['lookup', 'lookupTuple', 'in'].includes(c.operator)
-      )
-        continue;
-      if (c.operator === 'in') {
-        tokens(c.value).forEach(v => add(v, rule.name));
-        continue;
-      }
-      const list = t.lookups.find(l => l.id === c.lookupId);
-      const pairs =
-        c.operator === 'lookupTuple'
-          ? c.pairs
-          : [{ field: c.field, referenceColumn: c.lookupColumn }];
-      const target = pairs.find(p => p.field === fieldKey);
-      if (!list || !target) continue;
-      for (const reference of list.rows) {
+    for (const rule of t.rules)
+      for (const requirement of requirements(rule)) {
+        const c = resolveCondition(requirement, t);
         if (
-          !pairs
-            .filter(p => p.field !== fieldKey)
-            .every(p => {
-              const f = t.columns.find(f => f.key === p.field),
-                value = comparable(own(row, p.field), f, t.mode);
-              return (
-                value !== null &&
-                value === comparable(reference[list.headers.indexOf(p.referenceColumn)], f, t.mode)
-              );
-            })
+          !ruleApplies(rule, context) ||
+          c.field !== fieldKey ||
+          !testGroup(rule.when, row, t, cache) ||
+          !['lookup', 'lookupTuple', 'in'].includes(c.operator)
         )
           continue;
-        const detail = [list.nameColumn, ...(list.descriptionColumns || [])]
-          .filter(Boolean)
-          .map(h => reference[list.headers.indexOf(h)])
-          .filter(Boolean)
-          .join(' · ');
-        add(reference[list.headers.indexOf(target.referenceColumn)], list.name, detail);
+        if (c.operator === 'in') {
+          tokens(c.value).forEach(v => add(v, rule.name));
+          continue;
+        }
+        const list = t.lookups.find(l => l.id === c.lookupId);
+        const pairs =
+          c.operator === 'lookupTuple'
+            ? c.pairs
+            : [{ field: c.field, referenceColumn: c.lookupColumn }];
+        const target = pairs.find(p => p.field === fieldKey);
+        if (!list || !target) continue;
+        for (const reference of list.rows) {
+          if (
+            !pairs
+              .filter(p => p.field !== fieldKey)
+              .every(p => {
+                const f = t.columns.find(f => f.key === p.field),
+                  value = comparable(own(row, p.field), f, t.mode);
+                return (
+                  value !== null &&
+                  value ===
+                    comparable(reference[list.headers.indexOf(p.referenceColumn)], f, t.mode)
+                );
+              })
+          )
+            continue;
+          const detail = [list.nameColumn, ...(list.descriptionColumns || [])]
+            .filter(Boolean)
+            .map(h => reference[list.headers.indexOf(h)])
+            .filter(Boolean)
+            .join(' · ');
+          add(reference[list.headers.indexOf(target.referenceColumn)], list.name, detail);
+        }
       }
-    }
     const q = String(query).trim().toLocaleLowerCase(),
       current = String(own(row, fieldKey)).trim().toLocaleLowerCase();
     const valid = value => {
@@ -1196,9 +1220,8 @@
       return t.rules.every(
         r =>
           !ruleApplies(r, context) ||
-          r.assertion.field !== fieldKey ||
           !testGroup(r.when, trial, t, cache) ||
-          testCondition(r.assertion, trial, t, cache)
+          requirements(r).every(c => c.field !== fieldKey || testCondition(c, trial, t, cache))
       );
     };
     const choices = [...candidates.values()].filter(
@@ -1225,7 +1248,7 @@
     for (const r of t.rules)
       if (ruleApplies(r, context)) {
         walk(r.when);
-        conditions.push(r.assertion);
+        conditions.push(...requirements(r));
       }
     for (const c of conditions) {
       if (!['lookup', 'lookupTuple'].includes(c.operator)) continue;
@@ -1430,7 +1453,7 @@
       r.id = uid();
       assignCompanies(r, destination);
       walk(r.when);
-      clause(r.assertion);
+      requirements(r).forEach(clause);
     }
     next.rules.push(...rules);
     checkSchema(next, true);
@@ -1447,7 +1470,10 @@
       throw Error('Validate up to 25,000 rows and 5,000,000 cells at a time.');
     const issues = [],
       status = rows.map(() => ({ errors: 0, warnings: 0 })),
-      cache = new Map();
+      cache = new Map(),
+      activeRules = t.rules
+        .filter(r => ruleApplies(r, context))
+        .map(r => ({ rule: r, checks: requirements(r) }));
     let totalIssues = 0;
     function add(
       index,
@@ -1455,7 +1481,8 @@
       message,
       severity = 'error',
       ruleId = 'column',
-      name = 'Column check'
+      name = 'Column check',
+      requirementIndex
     ) {
       totalIssues++;
       status[index][severity === 'warning' ? 'warnings' : 'errors']++;
@@ -1470,6 +1497,7 @@
           severity,
           ruleId,
           rule: name,
+          ...(requirementIndex !== undefined ? { requirementIndex } : {}),
         });
     }
     for (let i = 0; i < rows.length; i++) {
@@ -1515,20 +1543,20 @@
         if (!sapMode(t) && c.format && !FORMATS[c.format].test(v))
           add(i, c.key, 'Use the ' + c.format + ' format.');
       }
-      for (const r of t.rules)
-        if (
-          ruleApplies(r, context) &&
-          testGroup(r.when, row, t, cache) &&
-          !testCondition(r.assertion, row, t, cache)
-        )
-          add(
-            i,
-            r.assertion.field,
-            r.message || describe(r.assertion, t) + '.',
-            r.severity,
-            r.id,
-            r.name
-          );
+      for (const { rule: r, checks } of activeRules)
+        if (testGroup(r.when, row, t, cache))
+          checks.forEach((c, index) => {
+            if (!testCondition(c, row, t, cache))
+              add(
+                i,
+                c.field,
+                r.message || describe(c, t) + '.',
+                r.severity,
+                r.id,
+                r.name,
+                checks.length > 1 ? index : undefined
+              );
+          });
     }
     const groups = [...t.columns.filter(c => c.unique).map(c => [c.key]), ...t.uniqueGroups];
     for (const keys of groups) {
@@ -1800,6 +1828,8 @@
     condition,
     group,
     rule,
+    requirements,
+    describeRequirements,
     schema,
     GROUP_OPS,
     resolveCondition,

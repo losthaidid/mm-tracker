@@ -1,6 +1,6 @@
 /* Same deterministic engine, isolated from the page. Uploaded values stay in worker memory. */
 self.window = self;
-importScripts('./validator-engine.js?v=20261030-queue-1');
+importScripts('./validator-engine.js?v=20261030-requirements-1');
 self.onmessage = event => {
   const { id, template, rows, context } = event.data;
   try {

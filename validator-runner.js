@@ -22,9 +22,12 @@
       return new Promise((resolve, reject) => {
         let worker;
         try {
-          worker = new root.Worker(new URL('./validator-worker.js?v=20261030-queue-1', base), {
-            name: 'WorkHub validation',
-          });
+          worker = new root.Worker(
+            new URL('./validator-worker.js?v=20261030-requirements-1', base),
+            {
+              name: 'WorkHub validation',
+            }
+          );
         } catch {
           resolve(local());
           return;

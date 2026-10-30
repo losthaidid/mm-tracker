@@ -35,12 +35,13 @@ test('validation worker uses the production engine with matching duplicate, form
   scoped.companyScope = 'selected';
   scoped.companies = [{ id: 'c', name: 'Company' }];
   scoped.assertion = { ...E.condition('OWNER'), operator: 'eq', value: 'Mira' };
+  scoped.additionalAssertions = [{ ...E.condition('AMOUNT'), operator: 'gte', value: '0' }];
   tpl.rules.push(scoped);
   const context = { projectId: 'project', companyId: 'c' };
   const sandbox = { Blob, console, postMessage: value => messages.push(value) };
   sandbox.self = sandbox;
   sandbox.importScripts = url => {
-    assert.equal(url, './validator-engine.js?v=20261030-queue-1');
+    assert.equal(url, './validator-engine.js?v=20261030-requirements-1');
     vm.runInContext(source('validator-engine.js'), scope);
   };
   const scope = vm.createContext(sandbox);

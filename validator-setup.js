@@ -312,10 +312,10 @@
           });
       }
       if (part === 'assert') {
-        if (entry.assertion) throw Error(r.at + ': each Rule ID needs exactly one assert row.');
         if (r.get('Group') || r.get('Join'))
           throw Error(r.at + ': Group and Join apply to when/group rows.');
-        entry.rule.assertion = clause;
+        if (entry.assertion) (entry.rule.additionalAssertions ||= []).push(clause);
+        else entry.rule.assertion = clause;
         entry.assertion = true;
       } else {
         const path = r.get('Group') || 'root',

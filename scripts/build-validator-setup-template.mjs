@@ -221,7 +221,7 @@ const guideRows = [
   ],
   [
     'Conditions',
-    'Use one Rule ID for each rule. Each rule needs exactly one assert row. Add when rows under the same ID for the trigger. With no when rows, the rule always applies.',
+    'Use one Rule ID per condition. Add one or more assert rows under that ID for THEN requirements; all must pass. Add when rows for the trigger. With no when rows, every record is checked.',
     'Name, Severity, Enabled and Message can be set on the first row.',
   ],
   [

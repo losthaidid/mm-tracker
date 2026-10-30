@@ -1,4 +1,15 @@
-# Column groups and issue review
+# Multiple THEN requirements, column groups and issue review
+
+## Require several fields in one condition
+
+Open **Conditions**, select a condition, then use **THEN REQUIRE → Add field requirement**. Each requirement has its own field, operator and value/reference controls. All requirements apply to the same record when the WHEN group matches, and **all must pass**. The WHEN group's AND/OR logic stays separate.
+
+For example: WHEN Request type equals Urgent, THEN require Owner is not empty **AND** Amount is greater than 0 **AND** End date is on/after Start date. Each failed requirement produces its own field issue with the condition's severity and validation message. With no custom message, the issue describes that specific failed check. What needs attention, suggestions, live corrections and comparison/issue reports include the additional requirements.
+
+Use **Remove** beside a requirement to remove that check; at least one must remain. Apply condition and Save draft as usual. Existing single-field conditions work unchanged. Drafts, frozen published versions, independent condition/template copies, JSON definitions/backups, validation profiles and queued file runs retain every requirement. Reference checks required by any of the requirements follow the existing Conditions/References selection behavior.
+
+The advanced Excel setup supports several `assert` rows with the same Rule ID. They become additional THEN requirements and all must pass. Keep Group and Join blank on assert rows; they apply to WHEN groups. The downloadable data template's Conditions guide lists all THEN checks. Up to 200 requirements per condition and 400 additional requirements across the template are supported.
+
 
 ## SAP column groups
 
