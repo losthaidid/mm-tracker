@@ -1468,9 +1468,18 @@
       rows.length * t.columns.length > LIMITS.cells
     )
       throw Error('Validate up to 25,000 rows and 5,000,000 cells at a time.');
-    const issues = [],
+    // Rebuild indexes for every run so template edits never reuse old values.
+    const isSAP = sapMode(t),
+      issues = [],
       status = rows.map(() => ({ errors: 0, warnings: 0 })),
       cache = new Map(),
+      fields = new Map(t.columns.map(c => [c.key, c])),
+      linkedFields = isSAP ? new Map(t.columns.map(c => [c, sapSettings(c).reference])) : null,
+      allowed = new Map(
+        t.columns
+          .filter(c => c.values)
+          .map(c => [c, new Set(tokens(c.values).map(value => comparable(value, c, t.mode)))])
+      ),
       activeRules = t.rules
         .filter(r => ruleApplies(r, context))
         .map(r => ({ rule: r, checks: requirements(r) }));
@@ -1491,7 +1500,7 @@
           row: index + 2,
           index,
           field: key,
-          column: t.columns.find(c => c.key === key)?.label || key,
+          column: fields.get(key)?.label || key,
           value: String(own(rows[index], key) ?? '').slice(0, 1000),
           message,
           severity,
@@ -1512,11 +1521,13 @@
           if (c.required) add(i, c.key, c.label + ' is required.');
           continue;
         }
-        const n = comparable(v, c, t.mode);
-        if (sapMode(t)) {
+        // SAP checks already validate the value. Its comparable form is only
+        // needed here for an allowed-value list, and later by rules/uniqueness.
+        const n = !isSAP || c.values ? comparable(v, c, t.mode) : null;
+        if (isSAP) {
           const issue = sapCheck(v, c);
           if (issue) add(i, c.key, issue);
-          const ref = sapSettings(c).reference;
+          const ref = linkedFields.get(c);
           if (ref && blank(own(row, ref)))
             add(i, c.key, 'Fill the linked currency/unit field ' + ref + '.');
         } else {
@@ -1538,9 +1549,9 @@
               add(i, c.key, 'Value must be at most ' + c.max + '.');
           }
         }
-        if (c.values && !tokens(c.values).some(x => comparable(x, c, t.mode) === n))
+        if (c.values && !allowed.get(c).has(n))
           add(i, c.key, 'Choose a value from the allowed list.');
-        if (!sapMode(t) && c.format && !FORMATS[c.format].test(v))
+        if (!isSAP && c.format && !FORMATS[c.format].test(v))
           add(i, c.key, 'Use the ' + c.format + ' format.');
       }
       for (const { rule: r, checks } of activeRules)
@@ -1560,17 +1571,12 @@
     }
     const groups = [...t.columns.filter(c => c.unique).map(c => [c.key]), ...t.uniqueGroups];
     for (const keys of groups) {
-      const seen = new Map();
+      const seen = new Map(),
+        columns = keys.map(key => fields.get(key));
       rows.forEach((row, i) => {
         if (keys.some(k => blank(own(row, k)))) return;
         const value = valueKey(
-          keys.map(k =>
-            comparable(
-              own(row, k),
-              t.columns.find(c => c.key === k),
-              t.mode
-            )
-          )
+          keys.map((k, index) => comparable(own(row, k), columns[index], t.mode))
         );
         if (!seen.has(value)) seen.set(value, []);
         seen.get(value).push(i);

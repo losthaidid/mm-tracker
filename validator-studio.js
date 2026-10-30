@@ -205,6 +205,7 @@
       attentionSeverity = 'all',
       attentionPage = 0,
       attentionCache = null,
+      resultCellCache = null,
       roomyReview = false,
       resultSchema = null,
       version = 'draft',
@@ -249,6 +250,7 @@
       attentionSeverity = 'all';
       attentionPage = 0;
       attentionCache = null;
+      resultCellCache = null;
       ignoredIssues.clear();
       issueSelection.clear();
     }
@@ -1533,6 +1535,8 @@
         fresh ||=
           node.dataset.valContext !== next.dataset.valContext ||
           (node.tagName === 'FORM' && node.dataset.set !== next.dataset.set);
+        // Identical markup already preserves live values, focus and local UI state.
+        if (!fresh && node.isEqualNode(next)) return;
         let control = null;
         if (node.tagName === 'SELECT') {
           const live = selected(node),
@@ -3236,73 +3240,115 @@
             '…</p>'
         : full;
     }
+    function comparisonWindow(report) {
+      // Reuse row counts within this exact comparison snapshot. Paging formats
+      // only the visible fields; it never stores a list of millions of cells.
+      const width = comparisonField === 'all' ? report.fields.length : 1;
+      if (comparisonFilter === 'all') {
+        const total = (comparisonRow ? 1 : report.rows.length) * width,
+          shown = [];
+        for (let n = comparisonPage * 50; n < Math.min(total, comparisonPage * 50 + 50); n++)
+          shown.push([
+            comparisonRow ? Number(comparisonRow) - 1 : Math.floor(n / width),
+            comparisonField === 'all' ? n % width : Number(comparisonField),
+          ]);
+        return { shown, total };
+      }
+      const key = JSON.stringify([comparisonFilter, comparisonField, comparisonRow]);
+      if (!comparisonCache.issueRows) {
+        const positions = new Map(report.fields.filter(f => f.key).map(f => [f.key, f.index])),
+          issueRows = new Map();
+        for (const issue of report.result.issues) {
+          const field = positions.get(issue.field);
+          if (
+            field === undefined ||
+            (!issue.ignored && !['error', 'warning'].includes(issue.severity))
+          )
+            continue;
+          if (!issueRows.has(issue.index)) issueRows.set(issue.index, new Set());
+          issueRows.get(issue.index).add(field);
+        }
+        comparisonCache.issueRows = issueRows;
+      }
+      const issueRows = comparisonCache.issueRows;
+      const changed = (row, field) => {
+        const prepared = String(report.upload.preparedRows[row.index][field] ?? ''),
+          current = String(report.upload.sourceRows[row.index][field] ?? '');
+        if (comparisonFilter === 'corrected') return prepared !== current;
+        return (
+          prepared !== current ||
+          String(report.upload.originalRows[row.originalIndex][field] ?? '') !== prepared
+        );
+      };
+      const matches = (row, field) =>
+        comparisonFilter === 'issues'
+          ? !!issueRows.get(row.index)?.has(field)
+          : comparisonFilter === 'corrected'
+            ? changed(row, field)
+            : comparisonFilter !== 'changes' ||
+              changed(row, field) ||
+              !!issueRows.get(row.index)?.has(field);
+      if (comparisonCache.window?.key !== key) {
+        const prefix = new Uint32Array(report.rows.length + 1);
+        for (const row of report.rows) {
+          let count = 0;
+          const status = result.status[row.index],
+            hasIssues = status.errors || status.warnings || status.ignored;
+          if (
+            (!comparisonRow || row.index + 1 === Number(comparisonRow)) &&
+            (comparisonFilter !== 'issues' || hasIssues) &&
+            (comparisonFilter !== 'changes' || row.prepared || row.corrected || hasIssues)
+          ) {
+            const fields = issueRows.get(row.index);
+            if (comparisonField !== 'all') count = Number(matches(row, Number(comparisonField)));
+            else if (comparisonFilter === 'issues') count = fields?.size || 0;
+            else if (comparisonFilter === 'corrected') count = row.corrected;
+            else if (comparisonFilter !== 'changes') count = report.fields.length;
+            else if (!row.prepared || !row.corrected) {
+              count = row.prepared + row.corrected;
+              for (const field of fields || []) if (!changed(row, field)) count++;
+            } else for (const field of report.fields) if (matches(row, field.index)) count++;
+          }
+          prefix[row.index + 1] = prefix[row.index] + count;
+        }
+        comparisonCache.window = { key, prefix };
+      }
+      const prefix = comparisonCache.window.prefix,
+        total = prefix[report.rows.length],
+        shown = [],
+        offset = comparisonPage * 50;
+      let low = 0,
+        high = report.rows.length;
+      while (low < high) {
+        const middle = (low + high) >>> 1;
+        if (prefix[middle + 1] <= offset) low = middle + 1;
+        else high = middle;
+      }
+      for (let index = low; index < report.rows.length && shown.length < 50; index++) {
+        if (prefix[index + 1] === prefix[index]) continue;
+        const row = report.rows[index];
+        let n = prefix[index];
+        for (const field of comparisonField === 'all'
+          ? report.fields
+          : [report.fields[Number(comparisonField)]]) {
+          if (!matches(row, field.index)) continue;
+          if (n++ >= offset) shown.push([row.index, field.index]);
+          if (shown.length === 50) break;
+        }
+      }
+      return { shown, total };
+    }
     function comparisonView() {
       if (!result || !resultSchema || !book) return '';
       // Never present old check status alongside a newly typed, unchecked value.
       if (livePending)
         return '<section id="valComparison" class="val-card"><h3>Original vs validated</h3><p role="status">Checking your edit before refreshing the comparison…</p></section>';
       const report = dataComparison();
-      function scan() {
-        const shown = [];
-        let total = 0;
-        if (comparisonFilter === 'all') {
-          const width = comparisonField === 'all' ? report.fields.length : 1,
-            count = comparisonRow ? 1 : report.rows.length;
-          total = count * width;
-          for (let n = comparisonPage * 50; n < Math.min(total, comparisonPage * 50 + 50); n++)
-            shown.push([
-              comparisonRow ? Number(comparisonRow) - 1 : Math.floor(n / width),
-              comparisonField === 'all' ? n % width : Number(comparisonField),
-            ]);
-          return { shown, total };
-        }
-        for (const row of report.rows) {
-          if (comparisonRow && row.index + 1 !== Number(comparisonRow)) continue;
-          const status = result.status[row.index];
-          if (comparisonFilter === 'corrected' && !row.corrected) continue;
-          if (
-            comparisonFilter === 'issues' &&
-            !status.errors &&
-            !status.warnings &&
-            !status.ignored
-          )
-            continue;
-          if (
-            comparisonFilter === 'changes' &&
-            !row.prepared &&
-            !row.corrected &&
-            !status.errors &&
-            !status.warnings &&
-            !status.ignored
-          )
-            continue;
-          for (const field of report.fields) {
-            if (comparisonField !== 'all' && field.index !== Number(comparisonField)) continue;
-            const cell = F.comparisonCell(report, row.index, field.index);
-            if (
-              comparisonFilter === 'changes' &&
-              !cell.preparedChange &&
-              !cell.corrected &&
-              !cell.errors &&
-              !cell.warnings &&
-              !cell.ignored
-            )
-              continue;
-            if (comparisonFilter === 'corrected' && !cell.corrected) continue;
-            if (comparisonFilter === 'issues' && !cell.errors && !cell.warnings && !cell.ignored)
-              continue;
-            if (total >= comparisonPage * 50 && shown.length < 50)
-              shown.push([row.index, field.index]);
-            total++;
-          }
-        }
-        return { shown, total };
-      }
-      let scanned = scan();
+      let scanned = comparisonWindow(report);
       const clamped = Math.max(0, Math.min(comparisonPage, Math.ceil(scanned.total / 50) - 1));
       if (clamped !== comparisonPage) {
         comparisonPage = clamped;
-        scanned = scan();
+        scanned = comparisonWindow(report);
       }
       const { shown, total } = scanned;
       return `<section id="valComparison" class="val-card val-comparison" aria-label="Original and validated data comparison"><div class="val-panel-title"><div><span class="val-eyebrow">TRACE EVERY CHANGE</span><h3>Original vs validated</h3></div>${btn('export-comparison', 'Export comparison report', '', 'val-secondary')}</div>
@@ -3356,18 +3402,12 @@
       page = Math.max(0, Math.min(page, Math.ceil(indices.length / 25) - 1));
       const shown = indices.slice(page * 25, page * 25 + 25),
         t = resultSchema || activeSchema(),
-        issues = (result?.issues || []).filter(i => !i.ignored),
-        byCell = new Map(),
+        byCell = resultCells(),
         extraColumns = group
           ? headers
               .map((label, index) => ({ label, index }))
               .filter(c => !t.columns.some(field => Number(mapping[field.key]) === c.index))
           : [];
-      for (const issue of issues) {
-        const key = issue.index + ':' + issue.field;
-        if (!byCell.has(key)) byCell.set(key, []);
-        byCell.get(key).push(issue);
-      }
       return (
         '<div id="valResultsArea"><p id="valLiveStatus" class="val-live-status" role="status" aria-live="polite">' +
         (livePending
@@ -3625,6 +3665,19 @@
       if (!attentionCache || attentionCache.result !== result)
         attentionCache = { result, groups: groupIssues(result?.issues || []) };
       return attentionCache.groups;
+    }
+    function resultCells() {
+      if (!resultCellCache || resultCellCache.result !== result) {
+        const cells = new Map();
+        for (const issue of result?.issues || []) {
+          if (issue.ignored) continue;
+          const key = issue.index + ':' + issue.field;
+          if (!cells.has(key)) cells.set(key, []);
+          cells.get(key).push(issue);
+        }
+        resultCellCache = { result, cells };
+      }
+      return resultCellCache.cells;
     }
     function currentAttentionGroup() {
       if (!attentionGroup || !result) return null;

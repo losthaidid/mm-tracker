@@ -11,6 +11,14 @@
   const E = () => root.WorkHubValidatorEngine;
   const NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main',
     REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+  const COMPARISON_LABELS = Object.freeze({
+    restored: 'Returned to original',
+    'prepared-corrected': 'Prepared + corrected',
+    corrected: 'Corrected',
+    prepared: 'Preparation change',
+    unchanged: 'Unchanged',
+  });
+  const NO_ISSUES = Object.freeze([]);
   const xml = s =>
     String(s ?? '').replace(
       /[&<>"']/g,
@@ -486,6 +494,7 @@
     for (const [i, s] of sheets.entries()) {
       const width = s.width || s.rows.reduce((max, row) => Math.max(max, row.length), 1),
         rowCount = s.rowCount ?? s.rows.length,
+        columnNames = Array.from({ length: width }, (_, index) => col(index)),
         end = col(width - 1) + Math.max(1, rowCount);
       await output.file(
         'xl/worksheets/sheet' + (i + 1) + '.xml',
@@ -516,12 +525,12 @@
               '>' +
               row
                 .map((value, x) => {
-                  const data = value && typeof value === 'object' ? value : { value },
-                    v = data.value ?? '',
-                    style = y === 0 ? 1 : data.style || 0;
+                  const data = value && typeof value === 'object' ? value : null,
+                    v = (data ? data.value : value) ?? '',
+                    style = y === 0 ? 1 : data?.style || 0;
                   return (
                     '<c r="' +
-                    col(x) +
+                    (columnNames[x] || col(x)) +
                     (y + 1) +
                     '" s="' +
                     style +
@@ -752,10 +761,15 @@
       preparedChange = original !== prepared,
       corrected = prepared !== current,
       changed = original !== current,
-      issues = field.key ? report.issues.get(index + ':' + field.key) || [] : [],
-      errors = issues.filter(i => !i.ignored && i.severity === 'error').length,
-      warnings = issues.filter(i => !i.ignored && i.severity === 'warning').length,
-      ignored = issues.filter(i => i.ignored).length;
+      issues = field.key ? report.issues.get(index + ':' + field.key) || NO_ISSUES : NO_ISSUES;
+    let errors = 0,
+      warnings = 0,
+      ignored = 0;
+    for (const issue of issues) {
+      if (issue.ignored) ignored++;
+      else if (issue.severity === 'error') errors++;
+      else if (issue.severity === 'warning') warnings++;
+    }
     const kind =
       !changed && (preparedChange || corrected)
         ? 'restored'
@@ -777,13 +791,7 @@
       errors,
       warnings,
       ignored,
-      label: {
-        restored: 'Returned to original',
-        'prepared-corrected': 'Prepared + corrected',
-        corrected: 'Corrected',
-        prepared: 'Preparation change',
-        unchanged: 'Unchanged',
-      }[kind],
+      label: COMPARISON_LABELS[kind],
       check: !field.key
         ? 'Not checked · column not mapped'
         : errors
