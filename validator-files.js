@@ -19,6 +19,13 @@
     unchanged: 'Unchanged',
   });
   const NO_ISSUES = Object.freeze([]);
+  const CSV_LIMITS = Object.freeze({
+    columns: 1000,
+    rows: 25001,
+    cells: 6000000,
+    text: 100000000,
+    fileBytes: 50000000,
+  });
   const xml = s =>
     String(s ?? '').replace(
       /[&<>"']/g,
@@ -57,7 +64,7 @@
   }
   // Inflate incrementally and parse bounded XML blocks, keeping millions of
   // spreadsheet cells out of a single DOM or uncompressed XML string.
-  async function blocks(zip, path, tag, consume) {
+  async function blocks(zip, path, tag, consume, metadata) {
     const entry = zip.file(path);
     if (!entry) throw Error('Missing workbook part: ' + path);
     if (Number(entry._data?.uncompressedSize) > 600000000)
@@ -71,6 +78,7 @@
       depth = 0,
       batchCount = 0,
       expanded = 0;
+    let metadataReady = false;
     const ancestors = [];
     const flush = () => {
       if (!batchCount) return;
@@ -138,6 +146,10 @@
                 .map(n => '</' + n.name + '>')
                 .join('');
             }
+            if (!closing && metadata && !metadataReady) {
+              metadata(parse(outline + closer));
+              metadataReady = true;
+            }
             if (!closing) depth++;
             block += token;
             if (closing || selfClosing) depth--;
@@ -163,7 +175,7 @@
       buffer = buffer.slice(cursor);
       if (buffer.length > 8000000) throw Error('A workbook XML token is too large.');
     };
-    await new Promise((resolve, reject) => {
+    return await new Promise((resolve, reject) => {
       let failed = false;
       const stream = entry.internalStream('string');
       stream.on('data', chunk => {
@@ -186,7 +198,7 @@
           const skeleton = parse(outline);
           if (nodes(skeleton, tag).length || (tag === 'row' && nodes(skeleton, 'c').length))
             throw Error('The workbook contains cells outside readable rows.');
-          resolve();
+          resolve(skeleton);
         } catch (error) {
           reject(error);
         }
@@ -213,7 +225,103 @@
     if (!Number.isFinite(d.getTime())) throw Error('Invalid workbook date.');
     return d.toISOString().slice(0, 10);
   }
-  async function read(file, { valuesOnly = false } = {}) {
+  function displayedText(el) {
+    return nodes(el, 't')
+      .filter(t => {
+        for (let p = t.parentElement; p && p !== el; p = p.parentElement)
+          if (p.localName === 'rPh') return false;
+        return true;
+      })
+      .map(t => t.textContent)
+      .join('')
+      .replace(/_x([0-9a-f]{4})_/gi, (_, code) => String.fromCharCode(parseInt(code, 16)));
+  }
+  function displayedValue(raw, type, value, fmtId, fmt, date1904, location, notes) {
+    if (type === 'e') {
+      notes.errors++;
+      return raw;
+    }
+    if (type === 'b') {
+      if (!['0', '1'].includes(raw)) throw Error(location + ' contains an invalid boolean value.');
+      return raw === '1' ? 'TRUE' : 'FALSE';
+    }
+    if (value === '') return '';
+    if (/[\u0000]/.test(value))
+      throw Error(location + ' contains a null character that cannot be safely converted to CSV.');
+    const builtin = root.SSF.get_table();
+    const numberFormat = fmt.replace(/"[^"]*"|\\./g, '');
+    for (const locale of numberFormat.matchAll(/\[\$[^\]]*-[^\]]+\]/g))
+      if (!/^\[\$[^\]]*-(?:409|809|en-US|en-GB)\]$/i.test(locale[0]))
+        throw Error(
+          location +
+            ' uses a locale-dependent number format that cannot be reproduced safely. Use an explicit number/date format in Excel and retry.'
+        );
+    for (const bracket of numberFormat.matchAll(/\[([^\]]*)\]/g))
+      if (
+        !/^(?:h{1,2}|m{1,2}|s{1,2}|Black|Blue|Cyan|Green|Magenta|Red|White|Yellow|Color\d+|[<>=]{1,2}[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|\$[^\]]*)$/i.test(
+          bracket[1]
+        )
+      )
+        throw Error(
+          location +
+            ' has a number format that cannot be converted safely. Check its format in Excel and retry.'
+        );
+    if (!fmt && builtin[fmtId] === undefined && ![5, 6, 7, 8, 41, 42, 43, 44].includes(fmtId))
+      throw Error(
+        location +
+          ' uses an unsupported number format (' +
+          fmtId +
+          '). Use an explicit number/date format in Excel, save, and retry.'
+      );
+    let input = value;
+    if (!type || type === 'n') {
+      if (
+        !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(raw) ||
+        !Number.isFinite(Number(raw))
+      )
+        throw Error(location + ' contains an invalid numeric value.');
+      input = Number(raw);
+    } else if (type === 'd') {
+      const timestamp = Date.parse(raw);
+      if (!Number.isFinite(timestamp)) throw Error(location + ' contains an invalid date value.');
+      if (!fmtId && !fmt) return raw;
+      input =
+        (timestamp - Date.UTC(date1904 ? 1904 : 1899, date1904 ? 0 : 11, date1904 ? 1 : 31)) /
+        86400000;
+      if (!date1904 && input >= 60) input++;
+    }
+    let rendered;
+    try {
+      rendered = String(root.SSF.format(fmt || fmtId, input, { date1904 }));
+    } catch {
+      throw Error(
+        location +
+          ' has a number format that cannot be converted safely. Check its format in Excel and retry.'
+      );
+    }
+    if (rendered === '' && value !== '')
+      throw Error(
+        location +
+          ' has a nonblank value hidden by its number format. Change the format in Excel before converting.'
+      );
+    if (!fmt && [14, 15, 16, 17, 18, 19, 20, 21, 22, 45, 46, 47, 56].includes(fmtId))
+      notes.localeFormats = true;
+    return rendered;
+  }
+  async function read(file, { valuesOnly = false, displayValues = false, signal } = {}) {
+    const limits = displayValues ? { ...CSV_LIMITS, rows: CSV_LIMITS.rows - 1 } : E().LIMITS;
+    if (displayValues) {
+      valuesOnly = true;
+      if (!root.SSF) throw Error('Refresh the page to load Excel display formatting.');
+    }
+    const active = () => {
+      if (signal?.aborted) {
+        const error = Error('Excel reading cancelled.');
+        error.name = 'AbortError';
+        throw error;
+      }
+    };
+    active();
     if (!file || file.size > E().LIMITS.fileBytes) throw Error('Choose a file below 50 MB.');
     if (/\.(csv|tsv)$/i.test(file.name)) {
       return {
@@ -230,6 +338,7 @@
     if (!root.JSZip) throw Error('The Excel reader is unavailable. Refresh the page.');
     const zip = await root.JSZip.loadAsync(new root.Uint8Array(await file.arrayBuffer())),
       entries = Object.values(zip.files);
+    active();
     if (
       entries.length > 1000 ||
       entries.reduce((n, e) => n + (Number(e._data?.uncompressedSize) || 0), 0) > 700000000
@@ -244,17 +353,21 @@
       );
     const shared = [];
     let sharedText = 0,
-      uploadText = 0;
+      uploadText = 0,
+      gridCells = 0;
     if (zip.file('xl/sharedStrings.xml'))
       await blocks(zip, 'xl/sharedStrings.xml', 'si', si => {
-        const value = nodes(si, 't')
-          .map(t => t.textContent)
-          .join('');
+        active();
+        const value = displayValues
+          ? displayedText(si)
+          : nodes(si, 't')
+              .map(t => t.textContent)
+              .join('');
         sharedText += value.length;
         if (
           value.length > 32000 ||
-          shared.length >= E().LIMITS.cells + E().LIMITS.columns ||
-          sharedText > E().LIMITS.text
+          shared.length >= limits.cells + limits.columns ||
+          sharedText > limits.text
         )
           throw Error('Shared strings exceed the upload limits.');
         shared.push(value);
@@ -262,98 +375,330 @@
     const styles = zip.file('xl/styles.xml') ? await part(zip, 'xl/styles.xml') : null;
     const formats = new Map(
       styles
-        ? nodes(styles, 'numFmt').map(f => [
-            +f.getAttribute('numFmtId'),
-            f.getAttribute('formatCode'),
-          ])
+        ? (displayValues
+            ? Array.from(first(styles, 'numFmts')?.children || [])
+            : nodes(styles, 'numFmt')
+          ).map(f => [+f.getAttribute('numFmtId'), f.getAttribute('formatCode')])
         : []
     );
     const styleIds = styles
       ? Array.from(first(styles, 'cellXfs')?.children || []).map(n => +n.getAttribute('numFmtId'))
       : [];
+    const displayStyles =
+      displayValues && styles
+        ? Array.from(first(styles, 'cellXfs')?.children || []).map(xf => {
+            const base = Array.from(first(styles, 'cellStyleXfs')?.children || [])[
+              +(xf.getAttribute('xfId') || 0)
+            ];
+            return xf.getAttribute('applyNumberFormat') === '0' || !xf.hasAttribute('numFmtId')
+              ? +(base?.getAttribute('numFmtId') || 0)
+              : +xf.getAttribute('numFmtId');
+          })
+        : styleIds;
+    const conditionalFormats =
+      displayValues && styles
+        ? new Set(
+            Array.from(first(styles, 'dxfs')?.children || []).flatMap((dxf, i) =>
+              first(dxf, 'numFmt') ? [String(i)] : []
+            )
+          )
+        : new Set();
     const is1904 = ['1', 'true'].includes(first(book, 'workbookPr')?.getAttribute('date1904')),
       sheets = [];
+    const dateSystem = first(book, 'workbookPr')?.getAttribute('date1904');
+    if (displayValues && dateSystem && !['0', '1', 'true', 'false'].includes(dateSystem))
+      throw Error('The workbook has an invalid date system.');
     for (const sheet of nodes(book, 'sheet')) {
+      active();
       const target = links.get(sheet.getAttributeNS(REL, 'id') || sheet.getAttribute('r:id'));
-      if (!target || !zip.file(target)) continue;
-      const rows = [];
+      if (!target || !zip.file(target)) {
+        if (displayValues)
+          throw Error(
+            'The worksheet “' +
+              sheet.getAttribute('name') +
+              '” is missing or unsupported. No worksheet was skipped.'
+          );
+        continue;
+      }
+      const rows = [],
+        cacheFlags = [],
+        formulaRanges = [],
+        columnStyles = [],
+        notes = {
+          formulas: 0,
+          errors: 0,
+          localeFormats: false,
+          hiddenRows: 0,
+          hiddenColumns: 0,
+          mergedRanges: 0,
+        };
       let cells = 0,
-        last = -1;
-      await blocks(zip, target, 'row', row => {
-        for (const c of nodes(row, 'c')) {
-          const ref = c.getAttribute('r') || '',
-            match = ref.match(/^([A-Z]+)(\d+)$/i);
-          if (!match) throw Error('A workbook cell has an invalid row or column address.');
-          const x = index(match[1]),
-            y = +match[2] - 1;
-          if (x >= E().LIMITS.columns || !Number.isSafeInteger(y) || y < 0 || y > E().LIMITS.rows)
-            throw Error('Use up to 200 columns and 25,000 data rows.');
-          if (++cells > E().LIMITS.cells + E().LIMITS.columns)
-            throw Error('Use up to 5,000,000 data cells.');
-          const formula = first(c, 'f');
-          if (formula && !valuesOnly)
-            throw Error(
+        last = -1,
+        gridHeight = 0,
+        gridWidth = 0,
+        previousRow = -1,
+        formulaArea = 0;
+      const outline = await blocks(
+        zip,
+        target,
+        'row',
+        row => {
+          active();
+          let rowIndex = null;
+          if (displayValues) {
+            const firstCell = nodes(row, 'c')[0]
+                ?.getAttribute('r')
+                ?.match(/(\d+)$/),
+              declared = row.getAttribute('r'),
+              y = declared
+                ? Number(declared) - 1
+                : firstCell
+                  ? Number(firstCell[1]) - 1
+                  : previousRow + 1;
+            if (!Number.isSafeInteger(y) || y < 0 || y > limits.rows)
+              throw Error('Keep up to ' + CSV_LIMITS.rows.toLocaleString() + ' worksheet rows.');
+            previousRow = y;
+            rowIndex = y;
+            gridHeight = Math.max(gridHeight, y + 1);
+            if (['1', 'true'].includes(row.getAttribute('hidden'))) notes.hiddenRows++;
+          }
+          for (const c of nodes(row, 'c')) {
+            const ref = c.getAttribute('r') || '',
+              match = ref.match(/^([A-Z]+)(\d+)$/i);
+            if (!match) throw Error('A workbook cell has an invalid row or column address.');
+            const x = index(match[1]),
+              y = +match[2] - 1;
+            if (displayValues && y !== rowIndex)
+              throw Error('A workbook cell is outside its declared worksheet row.');
+            if (x >= limits.columns || !Number.isSafeInteger(y) || y < 0 || y > limits.rows)
+              throw Error(
+                displayValues
+                  ? 'Keep up to 1,000 columns and 25,001 worksheet rows.'
+                  : 'Use up to 200 columns and 25,000 data rows.'
+              );
+            if (++cells > limits.cells + limits.columns)
+              throw Error(
+                displayValues
+                  ? 'The workbook exceeds 6,000,000 conversion cells.'
+                  : 'Use up to 5,000,000 data cells.'
+              );
+            const formula = first(c, 'f');
+            if (displayValues && formula) {
+              notes.formulas++;
+              const range = formula.getAttribute('ref');
+              if (range) {
+                const bounds = range.match(/^([A-Z]+)(\d+)(?::([A-Z]+)(\d+))?$/i);
+                if (!bounds)
+                  throw Error(
+                    sheet.getAttribute('name') + '!' + ref + ' has an unsupported formula range.'
+                  );
+                const x1 = index(bounds[1]),
+                  y1 = Number(bounds[2]) - 1,
+                  x2 = index(bounds[3] || bounds[1]),
+                  y2 = Number(bounds[4] || bounds[2]) - 1;
+                formulaArea += (x2 - x1 + 1) * (y2 - y1 + 1);
+                if (
+                  x2 < x1 ||
+                  y2 < y1 ||
+                  x2 >= limits.columns ||
+                  y1 < 0 ||
+                  y2 > limits.rows ||
+                  formulaArea > limits.cells
+                )
+                  throw Error('Formula result ranges exceed the conversion limits.');
+                formulaRanges.push({ x1, y1, x2, y2 });
+              }
+            }
+            if (formula && !valuesOnly)
+              throw Error(
+                sheet.getAttribute('name') +
+                  '!' +
+                  ref +
+                  ' contains a formula. Paste formulas as values before uploading.'
+              );
+            const type = c.getAttribute('t'),
+              raw = content(c, 'v');
+            if (
+              displayValues &&
+              type &&
+              !['n', 's', 'str', 'inlineStr', 'b', 'e', 'd'].includes(type)
+            )
+              throw Error(
+                sheet.getAttribute('name') + '!' + ref + ' uses an unsupported cell type.'
+              );
+            if (displayValues) {
+              gridWidth = Math.max(gridWidth, x + 1);
+              gridHeight = Math.max(gridHeight, y + 1);
+              if (!cacheFlags[y]) cacheFlags[y] = new Uint8Array(limits.columns);
+              cacheFlags[y][x] =
+                !!first(c, type === 'inlineStr' ? 'is' : 'v') &&
+                (raw !== '' || ['str', 'inlineStr'].includes(type))
+                  ? 1
+                  : 0;
+            }
+            // Standalone comparison consumes Excel's saved result, never formula
+            // source. An absent cache must not silently become a matching blank.
+            if (
+              formula &&
+              valuesOnly &&
+              (!first(c, type === 'inlineStr' ? 'is' : 'v') ||
+                (raw === '' && !['str', 'inlineStr'].includes(type)))
+            )
+              throw Error(
+                sheet.getAttribute('name') +
+                  '!' +
+                  ref +
+                  ' contains a formula without a saved result. Recalculate and save the workbook in Excel, then upload it again.'
+              );
+            if (type === 's' && (!/^\d+$/.test(raw) || Number(raw) >= shared.length))
+              throw Error('A workbook cell points to an invalid shared string.');
+            let value =
+              type === 'inlineStr'
+                ? displayValues
+                  ? displayedText(c)
+                  : nodes(c, 't')
+                      .map(t => t.textContent)
+                      .join('')
+                : type === 's'
+                  ? (shared[Number(raw)] ?? '')
+                  : type === 'b'
+                    ? raw === '1'
+                      ? 'true'
+                      : 'false'
+                    : raw;
+            if (displayValues && type === 'str')
+              value = value.replace(/_x([0-9a-f]{4})_/gi, (_, code) =>
+                String.fromCharCode(parseInt(code, 16))
+              );
+            if (type === 'e' && !valuesOnly)
+              throw Error(sheet.getAttribute('name') + '!' + ref + ' contains an Excel error.');
+            const inheritedStyle =
+                row.getAttribute('customFormat') === '1' ||
+                row.getAttribute('customFormat') === 'true'
+                  ? row.getAttribute('s')
+                  : null,
+              style = displayValues
+                ? Number(c.getAttribute('s') ?? inheritedStyle ?? columnStyles[x] ?? 0)
+                : +(c.getAttribute('s') || 0);
+            if (
+              displayValues &&
+              (!Number.isSafeInteger(style) ||
+                style < 0 ||
+                (style !== 0 && style >= displayStyles.length))
+            )
+              throw Error(sheet.getAttribute('name') + '!' + ref + ' uses an invalid cell style.');
+            const storedFormat = (displayValues ? displayStyles[style] : styleIds[style]) ?? 0;
+            if (displayValues && (!Number.isSafeInteger(storedFormat) || storedFormat < 0))
+              throw Error(
+                sheet.getAttribute('name') + '!' + ref + ' uses an invalid number format.'
+              );
+            const fmtId = storedFormat || 0,
+              fmt = formats.get(fmtId) || '';
+            if (displayValues && fmt.length > 2048)
+              throw Error(
+                sheet.getAttribute('name') + '!' + ref + ' has an excessively long number format.'
+              );
+            if (displayValues)
+              value = displayedValue(
+                raw,
+                type,
+                String(value),
+                fmtId,
+                fmt,
+                is1904,
+                sheet.getAttribute('name') + '!' + ref,
+                notes
+              );
+            else if (
+              !type &&
+              raw !== '' &&
+              ([14, 15, 16, 17, 22, 27, 30, 36, 50, 57].includes(fmtId) ||
+                /[dy]/i.test(fmt.replace(/"[^"]*"|\[[^\]]*\]|\\./g, '')))
+            )
+              value = excelDate(raw, is1904);
+            else if (!type && /^0{2,}$/.test(fmt) && /^\d+$/.test(raw))
+              value = raw.padStart(fmt.length, '0');
+            if (String(value).length > 32000) throw Error('A cell exceeds 32,000 characters.');
+            uploadText += String(value).length;
+            if (uploadText > limits.text)
+              throw Error(
+                displayValues
+                  ? 'Displayed values exceed 100 million text characters.'
+                  : 'Upload values exceed 50 million text characters.'
+              );
+            if (!rows[y]) rows[y] = [];
+            if (Object.hasOwn(rows[y], x))
+              throw Error('The workbook contains a duplicate cell address.');
+            rows[y][x] = String(value);
+            if (value !== '') last = Math.max(last, y);
+          }
+        },
+        displayValues
+          ? metadata => {
+              for (const c of nodes(metadata, 'col')) {
+                const low = Number(c.getAttribute('min')) - 1,
+                  high = Number(c.getAttribute('max')) - 1;
+                if (
+                  !Number.isSafeInteger(low) ||
+                  !Number.isSafeInteger(high) ||
+                  low < 0 ||
+                  high < low
+                )
+                  throw Error('The workbook has invalid column metadata.');
+                for (let x = low; x <= Math.min(high, limits.columns - 1); x++) {
+                  if (c.hasAttribute('style')) columnStyles[x] = c.getAttribute('style');
+                  if (['1', 'true'].includes(c.getAttribute('hidden'))) notes.hiddenColumns++;
+                }
+              }
+            }
+          : null
+      );
+      if (displayValues) {
+        active();
+        if (
+          nodes(outline, 'cfRule').some(rule => conditionalFormats.has(rule.getAttribute('dxfId')))
+        )
+          throw Error(
+            'The worksheet “' +
               sheet.getAttribute('name') +
-                '!' +
-                ref +
-                ' contains a formula. Paste formulas as values before uploading.'
-            );
-          const type = c.getAttribute('t'),
-            raw = content(c, 'v');
-          // Standalone comparison consumes Excel's saved result, never formula
-          // source. An absent cache must not silently become a matching blank.
-          if (
-            formula &&
-            valuesOnly &&
-            (!first(c, type === 'inlineStr' ? 'is' : 'v') ||
-              (raw === '' && !['str', 'inlineStr'].includes(type)))
-          )
-            throw Error(
-              sheet.getAttribute('name') +
-                '!' +
-                ref +
-                ' contains a formula without a saved result. Recalculate and save the workbook in Excel, then upload it again.'
-            );
-          if (type === 's' && (!/^\d+$/.test(raw) || Number(raw) >= shared.length))
-            throw Error('A workbook cell points to an invalid shared string.');
-          let value =
-            type === 'inlineStr'
-              ? nodes(c, 't')
-                  .map(t => t.textContent)
-                  .join('')
-              : type === 's'
-                ? (shared[Number(raw)] ?? '')
-                : type === 'b'
-                  ? raw === '1'
-                    ? 'true'
-                    : 'false'
-                  : raw;
-          if (type === 'e' && !valuesOnly)
-            throw Error(sheet.getAttribute('name') + '!' + ref + ' contains an Excel error.');
-          const fmtId = styleIds[+(c.getAttribute('s') || 0)] || 0,
-            fmt = formats.get(fmtId) || '';
-          if (
-            !type &&
-            raw !== '' &&
-            ([14, 15, 16, 17, 22, 27, 30, 36, 50, 57].includes(fmtId) ||
-              /[dy]/i.test(fmt.replace(/"[^"]*"|\[[^\]]*\]|\\./g, '')))
-          )
-            value = excelDate(raw, is1904);
-          else if (!type && /^0{2,}$/.test(fmt) && /^\d+$/.test(raw))
-            value = raw.padStart(fmt.length, '0');
-          if (String(value).length > 32000) throw Error('A cell exceeds 32,000 characters.');
-          uploadText += String(value).length;
-          if (uploadText > E().LIMITS.text)
-            throw Error('Upload values exceed 50 million text characters.');
-          if (!rows[y]) rows[y] = [];
-          if (Object.hasOwn(rows[y], x))
-            throw Error('The workbook contains a duplicate cell address.');
-          rows[y][x] = String(value);
-          if (value !== '') last = Math.max(last, y);
-        }
+              '” uses conditional number formats. Use regular number formats in Excel before converting.'
+          );
+        notes.mergedRanges = nodes(outline, 'mergeCell').length;
+        for (const range of formulaRanges)
+          for (let y = range.y1; y <= range.y2; y++)
+            for (let x = range.x1; x <= range.x2; x++)
+              if (!cacheFlags[y]?.[x])
+                throw Error(
+                  sheet.getAttribute('name') +
+                    '!' +
+                    col(x) +
+                    (y + 1) +
+                    ' is in a formula range without a saved result. Recalculate and save the workbook in Excel, then upload it again.'
+                );
+        if (gridHeight && !gridWidth) gridWidth = 1;
+        gridCells += gridHeight * gridWidth;
+        if (gridCells > limits.cells)
+          throw Error(
+            'The workbook used ranges exceed 6,000,000 conversion cells. No rows or columns were removed.'
+          );
+      }
+      const filled = Array.from({ length: displayValues ? gridHeight : last + 1 }, (_, i) =>
+        displayValues
+          ? Array.from({ length: gridWidth }, (_, x) => rows[i]?.[x] ?? '')
+          : rows[i] || []
+      );
+      sheets.push({
+        name: sheet.getAttribute('name') || 'Sheet',
+        rows: filled,
+        ...(displayValues
+          ? {
+              width: gridWidth,
+              rowCount: gridHeight,
+              state: sheet.getAttribute('state') || 'visible',
+              notes,
+            }
+          : {}),
       });
-      const filled = Array.from({ length: last + 1 }, (_, i) => rows[i] || []);
-      sheets.push({ name: sheet.getAttribute('name') || 'Sheet', rows: filled });
     }
     if (!sheets.length) throw Error('No readable worksheets were found.');
     return { sheets };
@@ -368,7 +713,7 @@
       const width = s.width || s.rows.reduce((n, r) => Math.max(n, r.length), 1),
         count = s.rowCount ?? s.rows.length,
         per = Math.max(1, Math.floor(SHEET_CELLS / width));
-      if (count <= per + 1) return [{ ...s, width }];
+      if (s.keepTogether || count <= per + 1) return [{ ...s, width }];
       let iterator, header;
       return Array.from({ length: Math.ceil((count - 1) / per) }, (_, part) => ({
         ...s,
@@ -397,8 +742,104 @@
     const local = [],
       central = [];
     let offset = 0;
+    const crcTable = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) {
+      let crc = n;
+      for (let bit = 0; bit < 8; bit++) crc = crc & 1 ? 0xedb88320 ^ (crc >>> 1) : crc >>> 1;
+      crcTable[n] = crc >>> 0;
+    }
+    // One worksheet can contain the whole validated dataset. Compress its XML in
+    // batches rather than retaining millions of cell strings or adding more tabs.
+    async function streamFile(name, source) {
+      if (!root.CompressionStream || !root.TextEncoder) return false;
+      let compression;
+      try {
+        compression = new root.CompressionStream('deflate-raw');
+      } catch {
+        return false;
+      }
+      const encoder = new root.TextEncoder(),
+        writer = compression.writable.getWriter(),
+        reader = compression.readable.getReader(),
+        compressed = [];
+      let crc = 0xffffffff,
+        inputSize = 0,
+        compressedSize = 0;
+      try {
+        await Promise.all([
+          (async () => {
+            for await (const text of source) {
+              const bytes = encoder.encode(text);
+              inputSize += bytes.length;
+              if (inputSize > 0xffffffff) throw Error('The report worksheet is too large.');
+              for (const value of bytes) crc = crcTable[(crc ^ value) & 255] ^ (crc >>> 8);
+              await writer.write(bytes);
+            }
+            await writer.close();
+          })(),
+          (async () => {
+            while (true) {
+              const { value, done } = await reader.read();
+              if (done) break;
+              compressedSize += value.length;
+              if (offset + compressedSize > 500000000)
+                throw Error('The report archive is too large. Export fewer files together.');
+              compressed.push(value);
+            }
+          })(),
+        ]);
+      } catch (error) {
+        await Promise.allSettled([writer.abort(error), reader.cancel(error)]);
+        throw error;
+      } finally {
+        writer.releaseLock();
+        reader.releaseLock();
+      }
+      crc = (crc ^ 0xffffffff) >>> 0;
+      const filename = encoder.encode(name),
+        header = new Uint8Array(30 + filename.length),
+        h = new DataView(header.buffer),
+        directory = new Uint8Array(46 + filename.length),
+        d = new DataView(directory.buffer);
+      h.setUint32(0, 0x04034b50, true);
+      h.setUint16(4, 20, true);
+      h.setUint16(6, 0x0800, true);
+      h.setUint16(8, 8, true);
+      h.setUint16(12, 33, true);
+      h.setUint32(14, crc, true);
+      h.setUint32(18, compressedSize, true);
+      h.setUint32(22, inputSize, true);
+      h.setUint16(26, filename.length, true);
+      header.set(filename, 30);
+      d.setUint32(0, 0x02014b50, true);
+      d.setUint16(4, 20, true);
+      d.setUint16(6, 20, true);
+      d.setUint16(8, 0x0800, true);
+      d.setUint16(10, 8, true);
+      d.setUint16(14, 33, true);
+      d.setUint32(16, crc, true);
+      d.setUint32(20, compressedSize, true);
+      d.setUint32(24, inputSize, true);
+      d.setUint16(28, filename.length, true);
+      d.setUint32(42, offset, true);
+      directory.set(filename, 46);
+      local.push(header);
+      for (const chunk of compressed) local.push(chunk);
+      central.push(directory);
+      offset += header.length + compressedSize;
+      if (offset > 500000000 || central.length > 60000)
+        throw Error('The report archive is too large. Export fewer files together.');
+      return true;
+    }
     return {
       async file(name, data) {
+        if (data?.[Symbol.asyncIterator]) {
+          if (await streamFile(name, data)) return;
+          // Compatibility for browsers without raw streaming compression.
+          const chunks = [];
+          for await (const chunk of data) chunks.push(chunk);
+          data = chunks.join('');
+        }
         const one = new root.JSZip();
         one.file(name, data, { createFolders: false });
         const bytes = await one.generateAsync({ type: 'uint8array', compression: 'DEFLATE' }),
@@ -430,6 +871,83 @@
         return new root.Blob([...local, ...central, end], { type: 'application/zip' });
       },
     };
+  }
+  function worksheetStart(width, widths, end) {
+    return (
+      '<worksheet xmlns="' +
+      NS +
+      '"><dimension ref="A1:' +
+      end +
+      '"/><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="20"/><cols>' +
+      Array.from(
+        { length: width },
+        (_, n) =>
+          '<col min="' +
+          (n + 1) +
+          '" max="' +
+          (n + 1) +
+          '" width="' +
+          (widths?.[n] || 24) +
+          '" customWidth="1" style="0"/>'
+      ).join('') +
+      '</cols><sheetData>'
+    );
+  }
+  function worksheetRow(row, y, columnNames) {
+    return (
+      '<row r="' +
+      (y + 1) +
+      '"' +
+      (!y ? ' ht="32" customHeight="1"' : '') +
+      '>' +
+      row
+        .map((value, x) => {
+          const data = value && typeof value === 'object' ? value : null,
+            v = (data ? data.value : value) ?? '',
+            style = y === 0 ? 1 : data?.style || 0;
+          return (
+            '<c r="' +
+            (columnNames[x] || col(x)) +
+            (y + 1) +
+            '" s="' +
+            style +
+            '"' +
+            (typeof v === 'number' ? '' : ' t="inlineStr"') +
+            '>' +
+            (typeof v === 'number'
+              ? '<v>' + v + '</v>'
+              : '<is><t xml:space="preserve">' + xml(v) + '</t></is>') +
+            '</c>'
+          );
+        })
+        .join('') +
+      '</row>'
+    );
+  }
+  function worksheetEnd(rowCount, end) {
+    return (
+      '</sheetData>' + (rowCount > 1 ? '<autoFilter ref="A1:' + end + '"/>' : '') + '</worksheet>'
+    );
+  }
+  async function* worksheetChunks(s, width, rowCount, columnNames, end) {
+    yield worksheetStart(width, s.widths, end);
+    let batch = [],
+      size = 0,
+      y = 0;
+    for (const row of typeof s.rows === 'function' ? s.rows() : s.rows) {
+      const text = worksheetRow(row, y++, columnNames);
+      batch.push(text);
+      size += text.length;
+      if (size >= 262144) {
+        yield batch.join('');
+        batch = [];
+        size = 0;
+        await new Promise(resolve => root.setTimeout(resolve, 0));
+      }
+    }
+    if (y !== rowCount) throw Error('Report rows are incomplete.');
+    if (batch.length) yield batch.join('');
+    yield worksheetEnd(rowCount, end);
   }
   async function workbook(sheets) {
     if (!root.JSZip) throw Error('The Excel writer is unavailable. Refresh the page.');
@@ -511,6 +1029,15 @@
         rowCount = s.rowCount ?? s.rows.length,
         columnNames = Array.from({ length: width }, (_, index) => col(index)),
         end = col(width - 1) + Math.max(1, rowCount);
+      if (s.keepTogether) {
+        if (width > 16384 || rowCount > 1048576)
+          throw Error('This report exceeds Excel worksheet limits.');
+        await output.file(
+          'xl/worksheets/sheet' + (i + 1) + '.xml',
+          worksheetChunks(s, width, rowCount, columnNames, end)
+        );
+        continue;
+      }
       await output.file(
         'xl/worksheets/sheet' + (i + 1) + '.xml',
         '<worksheet xmlns="' +
@@ -1071,7 +1598,14 @@
     });
     return sheets;
   }
-  async function report(t, rows, result, acceptedOnly = false, preparation = null) {
+  async function report(
+    t,
+    rows,
+    result,
+    acceptedOnly = false,
+    preparation = null,
+    issuesOnly = false
+  ) {
     const header = t.columns
         .map(c => c.label)
         .concat(acceptedOnly ? [] : ['Validation status', 'Errors', 'Warnings', 'Ignored issues']),
@@ -1119,6 +1653,52 @@
         rowCount: (acceptedOnly ? result.passed : rows.length) + 1,
       },
     ];
+    function issueSheet() {
+      const values = [
+        [
+          preparation || issuesOnly ? 'Working Excel row' : 'Excel row',
+          'Column',
+          'Technical field',
+          'Severity',
+          'Rule',
+          'Value',
+          'Message',
+          'Review status',
+          'Ignore reason',
+        ],
+        ...result.issues.map(x => [
+          x.row,
+          x.column,
+          x.field,
+          x.severity,
+          x.rule,
+          x.value,
+          x.message,
+          x.ignored ? 'Ignored' : 'Unresolved',
+          x.ignoreReason || '',
+        ]),
+      ];
+      if (issuesOnly && result.truncated)
+        values.push([
+          '',
+          '',
+          '',
+          'Information',
+          'Issue listing limit',
+          '',
+          'The issue list is limited to ' +
+            result.issues.length +
+            ' entries. Validated data includes every record with its complete error and warning counts.',
+          'Information',
+          '',
+        ]);
+      return { name: 'Issues', rows: values, widths: [13, 24, 24, 14, 35, 35, 70, 20, 50] };
+    }
+    if (issuesOnly) {
+      sheets[0].keepTogether = true;
+      sheets.push({ ...issueSheet(), keepTogether: true });
+      return workbook(sheets);
+    }
     if (result.setup) {
       sheets.push({
         name: 'Validation setup',
@@ -1170,35 +1750,7 @@
         ],
       });
     }
-    if (!acceptedOnly)
-      sheets.push({
-        name: 'Issues',
-        rows: [
-          [
-            preparation ? 'Working Excel row' : 'Excel row',
-            'Column',
-            'Technical field',
-            'Severity',
-            'Rule',
-            'Value',
-            'Message',
-            'Review status',
-            'Ignore reason',
-          ],
-          ...result.issues.map(x => [
-            x.row,
-            x.column,
-            x.field,
-            x.severity,
-            x.rule,
-            x.value,
-            x.message,
-            x.ignored ? 'Ignored' : 'Unresolved',
-            x.ignoreReason || '',
-          ]),
-        ],
-        widths: [13, 24, 24, 14, 35, 35, 70, 20, 50],
-      });
+    if (!acceptedOnly) sheets.push(issueSheet());
     sheets.push({
       name: 'Run details',
       rows: [
@@ -1328,9 +1880,11 @@
   }
   root.WorkHubValidatorFiles = Object.freeze({
     read,
+    CSV_LIMITS,
     workbook,
     template,
     report,
+    issueReport: (t, rows, result) => report(t, rows, result, false, null, true),
     comparison,
     comparisonCell,
     describeGroup,
