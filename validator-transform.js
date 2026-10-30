@@ -2,7 +2,7 @@
 (function (root) {
   'use strict';
   const E = root.WorkHubValidatorEngine;
-  const MAX_TEXT = 12000000,
+  const MAX_TEXT = E.LIMITS.text,
     SAMPLE_LIMIT = 12;
   function inspect(headers, rows) {
     if (
@@ -13,7 +13,7 @@
       rows.length > E.LIMITS.rows ||
       rows.length * headers.length > E.LIMITS.cells
     )
-      throw Error('Preparation supports up to 200 columns, 5,000 rows and 200,000 cells.');
+      throw Error('Preparation supports up to 200 columns, 25,000 rows and 5,000,000 cells.');
     let size = 0;
     for (const row of rows) {
       if (!Array.isArray(row)) throw Error('Choose a readable upload.');
@@ -24,7 +24,7 @@
       }
     }
     if (size > MAX_TEXT)
-      throw Error('Prepared data exceeds 12 million text characters. Split the upload.');
+      throw Error('Prepared data exceeds 50 million text characters. Split the upload.');
     return size;
   }
   function convert(value, column, mode = 'auto') {
@@ -77,7 +77,7 @@
         if (next.value !== before) {
           size += next.value.length - before.length;
           if (size > MAX_TEXT)
-            throw Error('Prepared data exceeds 12 million text characters. Split the upload.');
+            throw Error('Prepared data exceeds 50 million text characters. Split the upload.');
           output[i][index] = next.value;
           changes++;
           if (sample.length < SAMPLE_LIMIT)
@@ -125,7 +125,7 @@
       count += n;
       if (count > E.LIMITS.rows || count * headers.length > E.LIMITS.cells)
         throw Error(
-          'Expansion exceeds 5,000 rows or 200,000 cells. Split the upload or choose fewer values.'
+          'Expansion exceeds 25,000 rows or 5,000,000 cells. Split the upload or choose fewer values.'
         );
       for (let j = 1; j < counts.length; j++) {
         if (counts[j] !== n && !(repeatSingle && counts[j] === 1)) {
@@ -170,7 +170,7 @@
         });
         size += next.reduce((sum, v) => sum + v.length, 0);
         if (size > MAX_TEXT)
-          throw Error('Prepared data exceeds 12 million text characters. Split the upload.');
+          throw Error('Prepared data exceeds 50 million text characters. Split the upload.');
         output.push(next);
         parents.push({ index: i, part: n > 1 ? String(part + 1) : '' });
         if (sample.length < SAMPLE_LIMIT)

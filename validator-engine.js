@@ -42,8 +42,10 @@
     templates: 60,
     columns: 200,
     rules: 100,
-    rows: 5000,
-    cells: 200000,
+    rows: 25000,
+    cells: 5000000,
+    fileBytes: 50000000,
+    text: 50000000,
     lookups: 20,
     referenceRows: 2000,
     versions: 15,
@@ -927,7 +929,7 @@
         !Number.isInteger(r.version) ||
         r.version < 0 ||
         ['rows', 'passed', 'errors', 'warnings'].some(
-          k => !Number.isInteger(r[k]) || r[k] < 0 || r[k] > 10000000
+          k => !Number.isInteger(r[k]) || r[k] < 0 || r[k] > 100000000
         )
       )
         throw Error('Check validation run summaries.');
@@ -941,7 +943,7 @@
           'reviewedErrors',
           'reviewedWarnings',
         ].some(
-          k => r[k] !== undefined && (!Number.isInteger(r[k]) || r[k] < 0 || r[k] > 10000000)
+          k => r[k] !== undefined && (!Number.isInteger(r[k]) || r[k] < 0 || r[k] > 100000000)
         ) ||
         (r.reviewedAt !== undefined && !text(r.reviewedAt, 50))
       )
@@ -1442,7 +1444,7 @@
       rows.length > LIMITS.rows ||
       rows.length * t.columns.length > LIMITS.cells
     )
-      throw Error('Validate up to 5,000 rows and 200,000 cells at a time.');
+      throw Error('Validate up to 25,000 rows and 5,000,000 cells at a time.');
     const issues = [],
       status = rows.map(() => ({ errors: 0, warnings: 0 })),
       cache = new Map();
@@ -1625,7 +1627,7 @@
   }
   function parseCSV(input, delimiter = '') {
     const textValue = String(input).replace(/^\uFEFF/, '');
-    if (textValue.length > 10000000) throw Error('Use a file below 10 MB.');
+    if (textValue.length > LIMITS.fileBytes) throw Error('Use a file below 50 MB.');
     if (!delimiter) {
       const count = { ',': 0, ';': 0, '\t': 0 };
       let q = false;
@@ -1654,13 +1656,13 @@
       closed = false;
       if (row.length > LIMITS.columns) throw Error('Use up to 200 upload columns.');
       if (++cells > LIMITS.cells + LIMITS.columns)
-        throw Error('Use up to 200,000 data cells (1,000 rows at 200 columns).');
+        throw Error('Use up to 5,000,000 data cells (25,000 rows at 200 columns).');
     };
     const endRow = () => {
       endCell();
       rows.push(row);
       row = [];
-      if (rows.length > LIMITS.rows + 1) throw Error('Use up to 5,000 data rows.');
+      if (rows.length > LIMITS.rows + 1) throw Error('Use up to 25,000 data rows.');
     };
     for (let i = 0; i < textValue.length; i++) {
       const c = textValue[i];

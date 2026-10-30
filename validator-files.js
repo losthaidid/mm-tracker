@@ -36,14 +36,155 @@
     for (const c of ref.toUpperCase()) n = n * 26 + c.charCodeAt(0) - 64;
     return n - 1;
   }
-  async function part(zip, path) {
+  async function partText(zip, path, limit = 2000000) {
     const e = zip.file(path);
     if (!e) throw Error('Missing workbook part: ' + path);
-    if (Number(e._data?.uncompressedSize) > 12000000)
-      throw Error('A workbook section is too large.');
+    if (Number(e._data?.uncompressedSize) > limit) throw Error('A workbook section is too large.');
     const s = await e.async('string');
-    if (s.length > 12000000) throw Error('A workbook section is too large.');
-    return parse(s);
+    if (s.length > limit) throw Error('A workbook section is too large.');
+    return s;
+  }
+  async function part(zip, path) {
+    return parse(await partText(zip, path));
+  }
+  // Inflate incrementally and parse bounded XML blocks, keeping millions of
+  // spreadsheet cells out of a single DOM or uncompressed XML string.
+  async function blocks(zip, path, tag, consume) {
+    const entry = zip.file(path);
+    if (!entry) throw Error('Missing workbook part: ' + path);
+    if (Number(entry._data?.uncompressedSize) > 600000000)
+      throw Error('A workbook section is too large.');
+    let buffer = '',
+      outline = '',
+      block = '',
+      batch = '',
+      opener = '',
+      closer = '',
+      depth = 0,
+      batchCount = 0,
+      expanded = 0;
+    const ancestors = [];
+    const flush = () => {
+      if (!batchCount) return;
+      const doc = parse(opener + batch + closer);
+      for (const node of nodes(doc, tag)) consume(node);
+      batch = '';
+      batchCount = 0;
+    };
+    const append = text => {
+      if (depth) {
+        block += text;
+        if (block.length > 8000000) throw Error('A workbook row is too large.');
+      } else {
+        outline += text;
+        if (outline.length > 2000000) throw Error('Workbook metadata is too large.');
+      }
+    };
+    const feed = chunk => {
+      expanded += chunk.length;
+      if (expanded > 600000000) throw Error('A workbook section is too large.');
+      buffer += chunk;
+      let cursor = 0;
+      while (cursor < buffer.length) {
+        const start = buffer.indexOf('<', cursor);
+        if (start < 0) {
+          append(buffer.slice(cursor));
+          cursor = buffer.length;
+          break;
+        }
+        append(buffer.slice(cursor, start));
+        cursor = start;
+        const rest = buffer.slice(start);
+        let length;
+        if ('<!--'.startsWith(rest) || '<![CDATA['.startsWith(rest)) break;
+        if (rest.startsWith('<!--')) {
+          const end = rest.indexOf('-->');
+          if (end < 0) break;
+          length = end + 3;
+        } else if (rest.startsWith('<![CDATA[')) {
+          const end = rest.indexOf(']]>');
+          if (end < 0) break;
+          length = end + 3;
+        } else {
+          const token = rest.match(/^<(?:[^>"']|"[^"]*"|'[^']*')*>/);
+          if (!token) break;
+          length = token[0].length;
+        }
+        const token = rest.slice(0, length);
+        if (/^<!DOCTYPE|^<!ENTITY/i.test(token))
+          throw Error('Workbook entity declarations are not supported.');
+        const match = token.match(/^<(\/?)([\w.:-]+)(?:\s|\/?>)/);
+        if (match) {
+          const closing = !!match[1],
+            name = match[2],
+            local = name.split(':').at(-1),
+            selfClosing = /\/\s*>$/.test(token);
+          if (local === tag) {
+            if (closing && !depth) throw Error('The workbook contains invalid XML.');
+            if (!closing && depth) throw Error('The workbook contains nested data blocks.');
+            if (!closing && !batchCount) {
+              opener = ancestors.map(n => n.token).join('');
+              closer = ancestors
+                .slice()
+                .reverse()
+                .map(n => '</' + n.name + '>')
+                .join('');
+            }
+            if (!closing) depth++;
+            block += token;
+            if (closing || selfClosing) depth--;
+            if (!depth) {
+              batch += block;
+              block = '';
+              batchCount++;
+              if (batchCount >= 64 || batch.length > 1000000) flush();
+            }
+          } else {
+            if (!depth) {
+              flush();
+              if (closing) {
+                if (ancestors.pop()?.name !== name)
+                  throw Error('The workbook contains invalid XML.');
+              } else if (!selfClosing) ancestors.push({ name, token });
+            }
+            append(token);
+          }
+        } else append(token);
+        cursor += length;
+      }
+      buffer = buffer.slice(cursor);
+      if (buffer.length > 8000000) throw Error('A workbook XML token is too large.');
+    };
+    await new Promise((resolve, reject) => {
+      let failed = false;
+      const stream = entry.internalStream('string');
+      stream.on('data', chunk => {
+        if (failed) return;
+        try {
+          feed(chunk);
+        } catch (error) {
+          failed = true;
+          stream.pause();
+          reject(error);
+        }
+      });
+      stream.on('error', reject);
+      stream.on('end', () => {
+        if (failed) return;
+        try {
+          if (depth || buffer || ancestors.length)
+            throw Error('The workbook contains invalid XML.');
+          flush();
+          const skeleton = parse(outline);
+          if (nodes(skeleton, tag).length || (tag === 'row' && nodes(skeleton, 'c').length))
+            throw Error('The workbook contains cells outside readable rows.');
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      });
+      stream.resume();
+    });
   }
   function path(target) {
     if (/^[a-z]+:/i.test(target)) return '';
@@ -65,7 +206,7 @@
     return d.toISOString().slice(0, 10);
   }
   async function read(file) {
-    if (!file || file.size > 10000000) throw Error('Choose a file below 10 MB.');
+    if (!file || file.size > E().LIMITS.fileBytes) throw Error('Choose a file below 50 MB.');
     if (/\.(csv|tsv)$/i.test(file.name)) {
       return {
         sheets: [
@@ -83,7 +224,7 @@
       entries = Object.values(zip.files);
     if (
       entries.length > 1000 ||
-      entries.reduce((n, e) => n + (Number(e._data?.uncompressedSize) || 0), 0) > 40000000
+      entries.reduce((n, e) => n + (Number(e._data?.uncompressedSize) || 0), 0) > 700000000
     )
       throw Error('The workbook expands beyond the supported size.');
     const book = await part(zip, 'xl/workbook.xml'),
@@ -93,13 +234,23 @@
           .filter(r => r.getAttribute('TargetMode') !== 'External')
           .map(r => [r.getAttribute('Id'), path(r.getAttribute('Target') || '')])
       );
-    const shared = zip.file('xl/sharedStrings.xml')
-      ? nodes(await part(zip, 'xl/sharedStrings.xml'), 'si').map(si =>
-          nodes(si, 't')
-            .map(t => t.textContent)
-            .join('')
+    const shared = [];
+    let sharedText = 0,
+      uploadText = 0;
+    if (zip.file('xl/sharedStrings.xml'))
+      await blocks(zip, 'xl/sharedStrings.xml', 'si', si => {
+        const value = nodes(si, 't')
+          .map(t => t.textContent)
+          .join('');
+        sharedText += value.length;
+        if (
+          value.length > 32000 ||
+          shared.length >= E().LIMITS.cells + E().LIMITS.columns ||
+          sharedText > E().LIMITS.text
         )
-      : [];
+          throw Error('Shared strings exceed the upload limits.');
+        shared.push(value);
+      });
     const styles = zip.file('xl/styles.xml') ? await part(zip, 'xl/styles.xml') : null;
     const formats = new Map(
       styles
@@ -117,59 +268,67 @@
     for (const sheet of nodes(book, 'sheet')) {
       const target = links.get(sheet.getAttributeNS(REL, 'id') || sheet.getAttribute('r:id'));
       if (!target || !zip.file(target)) continue;
-      const doc = await part(zip, target),
-        rows = [];
+      const rows = [];
       let cells = 0,
         last = -1;
-      for (const c of nodes(doc, 'c')) {
-        const ref = c.getAttribute('r') || '',
-          match = ref.match(/^([A-Z]+)(\d+)$/i);
-        if (!match) continue;
-        const x = index(match[1]),
-          y = +match[2] - 1;
-        if (x >= E().LIMITS.columns || y > 5000)
-          throw Error('Use up to 200 columns and 5,000 data rows.');
-        if (++cells > E().LIMITS.cells + E().LIMITS.columns)
-          throw Error('Use up to 200,000 data cells.');
-        if (first(c, 'f'))
-          throw Error(
-            sheet.getAttribute('name') +
-              '!' +
-              ref +
-              ' contains a formula. Paste formulas as values before uploading.'
-          );
-        const type = c.getAttribute('t'),
-          raw = content(c, 'v');
-        let value =
-          type === 'inlineStr'
-            ? nodes(c, 't')
-                .map(t => t.textContent)
-                .join('')
-            : type === 's'
-              ? (shared[Number(raw)] ?? '')
-              : type === 'b'
-                ? raw === '1'
-                  ? 'true'
-                  : 'false'
-                : raw;
-        if (type === 'e')
-          throw Error(sheet.getAttribute('name') + '!' + ref + ' contains an Excel error.');
-        const fmtId = styleIds[+(c.getAttribute('s') || 0)] || 0,
-          fmt = formats.get(fmtId) || '';
-        if (
-          !type &&
-          raw !== '' &&
-          ([14, 15, 16, 17, 22, 27, 30, 36, 50, 57].includes(fmtId) ||
-            /[dy]/i.test(fmt.replace(/"[^"]*"|\[[^\]]*\]|\\./g, '')))
-        )
-          value = excelDate(raw, is1904);
-        else if (!type && /^0{2,}$/.test(fmt) && /^\d+$/.test(raw))
-          value = raw.padStart(fmt.length, '0');
-        if (String(value).length > 32000) throw Error('A cell exceeds 32,000 characters.');
-        if (!rows[y]) rows[y] = [];
-        rows[y][x] = String(value);
-        if (value !== '') last = Math.max(last, y);
-      }
+      await blocks(zip, target, 'row', row => {
+        for (const c of nodes(row, 'c')) {
+          const ref = c.getAttribute('r') || '',
+            match = ref.match(/^([A-Z]+)(\d+)$/i);
+          if (!match) throw Error('A workbook cell has an invalid row or column address.');
+          const x = index(match[1]),
+            y = +match[2] - 1;
+          if (x >= E().LIMITS.columns || !Number.isSafeInteger(y) || y < 0 || y > E().LIMITS.rows)
+            throw Error('Use up to 200 columns and 25,000 data rows.');
+          if (++cells > E().LIMITS.cells + E().LIMITS.columns)
+            throw Error('Use up to 5,000,000 data cells.');
+          if (first(c, 'f'))
+            throw Error(
+              sheet.getAttribute('name') +
+                '!' +
+                ref +
+                ' contains a formula. Paste formulas as values before uploading.'
+            );
+          const type = c.getAttribute('t'),
+            raw = content(c, 'v');
+          if (type === 's' && (!/^\d+$/.test(raw) || Number(raw) >= shared.length))
+            throw Error('A workbook cell points to an invalid shared string.');
+          let value =
+            type === 'inlineStr'
+              ? nodes(c, 't')
+                  .map(t => t.textContent)
+                  .join('')
+              : type === 's'
+                ? (shared[Number(raw)] ?? '')
+                : type === 'b'
+                  ? raw === '1'
+                    ? 'true'
+                    : 'false'
+                  : raw;
+          if (type === 'e')
+            throw Error(sheet.getAttribute('name') + '!' + ref + ' contains an Excel error.');
+          const fmtId = styleIds[+(c.getAttribute('s') || 0)] || 0,
+            fmt = formats.get(fmtId) || '';
+          if (
+            !type &&
+            raw !== '' &&
+            ([14, 15, 16, 17, 22, 27, 30, 36, 50, 57].includes(fmtId) ||
+              /[dy]/i.test(fmt.replace(/"[^"]*"|\[[^\]]*\]|\\./g, '')))
+          )
+            value = excelDate(raw, is1904);
+          else if (!type && /^0{2,}$/.test(fmt) && /^\d+$/.test(raw))
+            value = raw.padStart(fmt.length, '0');
+          if (String(value).length > 32000) throw Error('A cell exceeds 32,000 characters.');
+          uploadText += String(value).length;
+          if (uploadText > E().LIMITS.text)
+            throw Error('Upload values exceed 50 million text characters.');
+          if (!rows[y]) rows[y] = [];
+          if (Object.hasOwn(rows[y], x))
+            throw Error('The workbook contains a duplicate cell address.');
+          rows[y][x] = String(value);
+          if (value !== '') last = Math.max(last, y);
+        }
+      });
       const filled = Array.from({ length: last + 1 }, (_, i) => rows[i] || []);
       sheets.push({ name: sheet.getAttribute('name') || 'Sheet', rows: filled });
     }
@@ -180,11 +339,82 @@
     '<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="' +
     NS +
     '"><numFmts count="1"><numFmt numFmtId="164" formatCode="yyyy-mm-dd"/></numFmts><fonts count="3"><font><sz val="11"/><color rgb="FF314B4A"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><sz val="11"/><color rgb="FF8C3438"/><name val="Calibri"/></font></fonts><fills count="6"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF356C62"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFCE6E6"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF1D0"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE3EFFA"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="7"><xf numFmtId="49" applyNumberFormat="1" fontId="0" fillId="0" borderId="0" xfId="0"><alignment vertical="top" wrapText="1"/></xf><xf numFmtId="49" applyNumberFormat="1" fontId="1" fillId="2" borderId="0" xfId="0"><alignment vertical="center" wrapText="1"/></xf><xf numFmtId="49" applyNumberFormat="1" fontId="2" fillId="3" borderId="0" xfId="0"><alignment wrapText="1"/></xf><xf numFmtId="49" applyNumberFormat="1" fontId="0" fillId="4" borderId="0" xfId="0"><alignment wrapText="1"/></xf><xf numFmtId="0" applyNumberFormat="1" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="164" applyNumberFormat="1" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="49" applyNumberFormat="1" fontId="0" fillId="5" borderId="0" xfId="0"><alignment wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+  const SHEET_CELLS = 1000000;
+  function splitSheets(sheets) {
+    return sheets.flatMap(s => {
+      const width = s.width || s.rows.reduce((n, r) => Math.max(n, r.length), 1),
+        count = s.rowCount ?? s.rows.length,
+        per = Math.max(1, Math.floor(SHEET_CELLS / width));
+      if (count <= per + 1) return [{ ...s, width }];
+      let iterator, header;
+      return Array.from({ length: Math.ceil((count - 1) / per) }, (_, part) => ({
+        ...s,
+        name: s.name + (part ? ' ' + (part + 1) : ''),
+        width,
+        rowCount: Math.min(per, count - 1 - part * per) + 1,
+        rows: function* () {
+          if (!iterator) {
+            iterator = (typeof s.rows === 'function' ? s.rows() : s.rows)[Symbol.iterator]();
+            header = iterator.next().value;
+          }
+          yield header;
+          for (let i = 0; i < Math.min(per, count - 1 - part * per); i++) {
+            const next = iterator.next();
+            if (next.done) throw Error('Report rows are incomplete.');
+            yield next.value;
+          }
+        },
+      }));
+    });
+  }
+  // Compress each worksheet before generating the next. Join ordinary ZIP
+  // members by relocating their central-directory offsets (PKWARE APPNOTE 4.3).
+  // This avoids retaining every worksheet's uncompressed XML at once.
+  function archive() {
+    const local = [],
+      central = [];
+    let offset = 0;
+    return {
+      async file(name, data) {
+        const one = new root.JSZip();
+        one.file(name, data, { createFolders: false });
+        const bytes = await one.generateAsync({ type: 'uint8array', compression: 'DEFLATE' }),
+          view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength),
+          end = bytes.length - 22;
+        if (view.getUint32(end, true) !== 0x06054b50 || view.getUint16(end + 10, true) !== 1)
+          throw Error('Could not assemble the report archive.');
+        const start = view.getUint32(end + 16, true),
+          size = view.getUint32(end + 12, true),
+          directory = bytes.slice(start, start + size);
+        if (new DataView(directory.buffer).getUint32(0, true) !== 0x02014b50)
+          throw Error('Invalid report archive directory.');
+        new DataView(directory.buffer).setUint32(42, offset, true);
+        local.push(bytes.subarray(0, start));
+        central.push(directory);
+        offset += start;
+        if (offset > 500000000 || central.length > 60000)
+          throw Error('The report archive is too large. Export fewer files together.');
+      },
+      finish() {
+        const size = central.reduce((n, b) => n + b.length, 0),
+          end = new Uint8Array(22),
+          view = new DataView(end.buffer);
+        view.setUint32(0, 0x06054b50, true);
+        view.setUint16(8, central.length, true);
+        view.setUint16(10, central.length, true);
+        view.setUint32(12, size, true);
+        view.setUint32(16, offset, true);
+        return new root.Blob([...local, ...central, end], { type: 'application/zip' });
+      },
+    };
+  }
   async function workbook(sheets) {
     if (!root.JSZip) throw Error('The Excel writer is unavailable. Refresh the page.');
-    const zip = new root.JSZip(),
+    const metadata = [],
+      zip = { file: (name, data) => metadata.push([name, data]) },
+      output = archive(),
       names = new Set();
-    sheets = sheets.map((s, i) => {
+    sheets = splitSheets(sheets).map((s, i) => {
       let name = String(s.name || 'Sheet ' + (i + 1))
         .replace(/[\\/?*:[\]]/g, ' ')
         .slice(0, 31);
@@ -252,11 +482,12 @@
         '/styles" Target="styles.xml"/></Relationships>'
     );
     zip.file('xl/styles.xml', STYLES);
+    for (const [name, data] of metadata) await output.file(name, data);
     for (const [i, s] of sheets.entries()) {
       const width = s.width || s.rows.reduce((max, row) => Math.max(max, row.length), 1),
         rowCount = s.rowCount ?? s.rows.length,
         end = col(width - 1) + Math.max(1, rowCount);
-      zip.file(
+      await output.file(
         'xl/worksheets/sheet' + (i + 1) + '.xml',
         '<worksheet xmlns="' +
           NS +
@@ -311,7 +542,7 @@
           '</worksheet>'
       );
     }
-    return zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+    return output.finish();
   }
   function typed(value, c, style = 0) {
     if (style) return { value: String(value ?? ''), style };
@@ -490,10 +721,12 @@
       const summary = { index, originalIndex, origin, changed: 0, prepared: 0, corrected: 0 };
       report.rows.push(summary);
       for (const field of fields) {
-        const cell = comparisonCell(report, index, field.index);
-        if (cell.changed) summary.changed++;
-        if (cell.preparedChange) summary.prepared++;
-        if (cell.corrected) summary.corrected++;
+        const before = String(originalRows[originalIndex][field.index] ?? ''),
+          prepared = String(preparedRows[index][field.index] ?? ''),
+          current = String(row[field.index] ?? '');
+        if (before !== current) summary.changed++;
+        if (before !== prepared) summary.prepared++;
+        if (prepared !== current) summary.corrected++;
       }
       report.changedCells += summary.changed;
       report.preparedCells += summary.prepared;
@@ -562,6 +795,7 @@
   }
   function comparisonSheets(t, upload, result) {
     const report = comparison(t, upload, result),
+      wide = report.rows.length * report.fields.length > 50000,
       marked = (value, style) => ({ value, style }),
       differences = [
         [
@@ -629,9 +863,8 @@
           const original =
             cell.original.length > 1000
               ? cell.original.slice(0, 240) +
-                '… [Full value: Original upload!' +
-                col(field.index) +
-                (row.originalIndex + 2) +
+                '… [Full value: ' +
+                originalLocation(row.originalIndex, field.index) +
                 ']'
               : cell.original;
           yield [
@@ -654,6 +887,57 @@
         }
       }
     }
+    function originalLocation(index, field) {
+      const per = Math.max(1, Math.floor(SHEET_CELLS / upload.headers.length)),
+        part = Math.floor(index / per);
+      return (
+        'Original upload' + (part ? ' ' + (part + 1) : '') + '!' + col(field) + ((index % per) + 2)
+      );
+    }
+    function* wideFields() {
+      yield [
+        'Working data row (1-based)',
+        'Working Excel row',
+        'Original worksheet',
+        'Original Excel row',
+        'Split part',
+        ...report.fields.flatMap(f =>
+          ['Original', 'Prepared', 'Validated', 'Change', 'Field check'].map(
+            label => (f.key || f.header) + ' · ' + label
+          )
+        ),
+      ];
+      for (const row of report.rows) {
+        const values = [
+          row.index + 1,
+          upload.headerRow + row.index + 1,
+          upload.sheet,
+          row.origin.row,
+          row.origin.part || 'Unsplit',
+        ];
+        for (const field of report.fields) {
+          const cell = comparisonCell(report, row.index, field.index),
+            original =
+              cell.original.length > 1000
+                ? cell.original.slice(0, 240) +
+                  '… [Full value: ' +
+                  originalLocation(row.originalIndex, field.index) +
+                  ']'
+                : cell.original;
+          values.push(
+            marked(original, cell.changed ? 3 : 0),
+            marked(cell.prepared, cell.preparedChange ? 6 : 0),
+            marked(
+              cell.current,
+              cell.errors ? 2 : cell.corrected || cell.warnings ? 3 : cell.changed ? 6 : 0
+            ),
+            cell.label,
+            cell.check
+          );
+        }
+        yield values;
+      }
+    }
     const sheets = [
       {
         name: 'Comparison summary',
@@ -671,6 +955,12 @@
           ['Preparation changes', report.preparedCells],
           ['Corrections since preparation', report.correctedCells],
           ['Upload columns compared', report.fields.length],
+          [
+            'Comparison layout',
+            wide
+              ? 'Side-by-side field groups; numbered worksheets continue the complete data.'
+              : 'One row per field',
+          ],
           ['Template fields not mapped', report.unmappedFields.join(', ') || 'None'],
           [
             'Comparison policy',
@@ -707,51 +997,56 @@
       },
       {
         name: 'Field comparison',
-        rows: fieldRows,
-        width: 12,
-        rowCount: 1 + report.rows.length * report.fields.length,
-        widths: [20, 20, 28, 20, 16, 30, 26, 30, 48, 48, 48, 42],
+        rows: wide ? wideFields : fieldRows,
+        width: wide ? 5 + report.fields.length * 5 : 12,
+        rowCount: wide ? report.rows.length + 1 : 1 + report.rows.length * report.fields.length,
+        widths: wide ? [] : [20, 20, 28, 20, 16, 30, 26, 30, 48, 48, 48, 42],
       },
       {
         name: 'Original upload',
-        rows: [upload.headers, ...upload.originalRows.map(row => row.map(String))],
+        width: upload.headers.length,
+        rowCount: upload.originalRows.length + 1,
+        rows: function* () {
+          yield upload.headers;
+          for (const row of upload.originalRows) yield row.map(String);
+        },
       },
     ];
     if (upload.steps.length)
       sheets.push({
         name: 'Prepared baseline',
-        rows: [
-          upload.headers,
-          ...upload.preparedRows.map((row, i) =>
-            row.map((v, j) => marked(v, comparisonCell(report, i, j).preparedChange ? 6 : 0))
-          ),
-        ],
+        width: upload.headers.length,
+        rowCount: upload.preparedRows.length + 1,
+        rows: function* () {
+          yield upload.headers;
+          for (let i = 0; i < upload.preparedRows.length; i++)
+            yield upload.preparedRows[i].map((v, j) =>
+              marked(v, comparisonCell(report, i, j).preparedChange ? 6 : 0)
+            );
+        },
       });
     sheets.push({
       name: 'Validated upload',
-      rows: [
-        upload.headers,
-        ...upload.sourceRows.map((row, i) =>
-          row.map((v, j) => {
+      width: upload.headers.length,
+      rowCount: upload.sourceRows.length + 1,
+      rows: function* () {
+        yield upload.headers;
+        for (let i = 0; i < upload.sourceRows.length; i++)
+          yield upload.sourceRows[i].map((v, j) => {
             const cell = comparisonCell(report, i, j);
             return marked(
               v,
               cell.errors ? 2 : cell.corrected || cell.warnings ? 3 : cell.changed ? 6 : 0
             );
-          })
-        ),
-      ],
+          });
+      },
     });
     return sheets;
   }
   async function report(t, rows, result, acceptedOnly = false, preparation = null) {
-    const data = [
-        t.columns
-          .map(c => c.label)
-          .concat(
-            acceptedOnly ? [] : ['Validation status', 'Errors', 'Warnings', 'Ignored issues']
-          ),
-      ],
+    const header = t.columns
+        .map(c => c.label)
+        .concat(acceptedOnly ? [] : ['Validation status', 'Errors', 'Warnings', 'Ignored issues']),
       styles = new Map();
     for (const x of result.issues) {
       if (x.ignored) continue;
@@ -759,32 +1054,43 @@
       if (x.severity === 'error' || !styles.has(key))
         styles.set(key, x.severity === 'error' ? 2 : 3);
     }
-    rows.forEach((r, i) => {
-      if (acceptedOnly && result.status[i].errors) return;
-      const values = t.columns.map(c =>
-        t.mode === 'sap'
-          ? {
-              value: String(r[c.key] ?? ''),
-              style: acceptedOnly ? 0 : styles.get(i + '\0' + c.key) || 0,
-            }
-          : typed(r[c.key], c, acceptedOnly ? 0 : styles.get(i + '\0' + c.key) || 0)
-      );
-      if (!acceptedOnly)
-        values.push(
-          result.status[i].errors
-            ? 'Needs correction'
-            : result.status[i].warnings
-              ? 'Review warnings'
-              : result.status[i].ignored
-                ? 'Accepted with ignored issues'
-                : 'Passed',
-          result.status[i].errors,
-          result.status[i].warnings,
-          result.status[i].ignored || 0
+    function* dataRows() {
+      yield header;
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i];
+        if (acceptedOnly && result.status[i].errors) continue;
+        const values = t.columns.map(c =>
+          t.mode === 'sap'
+            ? {
+                value: String(r[c.key] ?? ''),
+                style: acceptedOnly ? 0 : styles.get(i + '\0' + c.key) || 0,
+              }
+            : typed(r[c.key], c, acceptedOnly ? 0 : styles.get(i + '\0' + c.key) || 0)
         );
-      data.push(values);
-    });
-    const sheets = [{ name: acceptedOnly ? 'Accepted data' : 'Validated data', rows: data }];
+        if (!acceptedOnly)
+          values.push(
+            result.status[i].errors
+              ? 'Needs correction'
+              : result.status[i].warnings
+                ? 'Review warnings'
+                : result.status[i].ignored
+                  ? 'Accepted with ignored issues'
+                  : 'Passed',
+            result.status[i].errors,
+            result.status[i].warnings,
+            result.status[i].ignored || 0
+          );
+        yield values;
+      }
+    }
+    const sheets = [
+      {
+        name: acceptedOnly ? 'Accepted data' : 'Validated data',
+        rows: dataRows,
+        width: header.length,
+        rowCount: (acceptedOnly ? result.passed : rows.length) + 1,
+      },
+    ];
     if (result.setup) {
       sheets.push({
         name: 'Validation setup',
@@ -809,7 +1115,12 @@
       const indices = rows.map((r, i) => i).filter(i => !acceptedOnly || !result.status[i].errors);
       sheets.push({
         name: 'Prepared upload',
-        rows: [preparation.headers, ...indices.map(i => preparation.sourceRows[i].map(String))],
+        width: preparation.headers.length,
+        rowCount: indices.length + 1,
+        rows: function* () {
+          yield preparation.headers;
+          for (const i of indices) yield preparation.sourceRows[i].map(String);
+        },
       });
       sheets.push({
         name: 'Row origins',
@@ -894,7 +1205,7 @@
                 'Data preparation',
                 preparation.steps
                   .map(s => (s.kind === 'sap' ? 'SAP formatting' : 'Explode & map'))
-                  .join(' → '),
+                  .join(' → ') || 'None',
               ],
               [
                 'Prepared upload',

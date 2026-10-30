@@ -226,6 +226,13 @@
       liveTimer = null,
       livePending = false,
       liveCheck = null,
+      fileQueue = [],
+      queueActiveId = '',
+      queueEpoch = 0,
+      queueBusy = false,
+      queueIO = false,
+      queueInternal = false,
+      queueStop = false,
       pinnedRows = new Set(),
       ignoredIssues = new Map(),
       issueSelection = new Set();
@@ -242,6 +249,506 @@
       attentionCache = null;
       ignoredIssues.clear();
       issueSelection.clear();
+    }
+    function resetQueue() {
+      queueEpoch++;
+      fileQueue = [];
+      queueActiveId = '';
+      queueBusy = false;
+      queueIO = false;
+      queueStop = true;
+      queueInternal = false;
+    }
+    function queueAccess(action = 'run') {
+      ensure();
+      if (root.WorkHubCurrentAccess && !root.WorkHubCurrentAccess.can('validator', action))
+        throw Error('Your account cannot ' + action + ' validation files.');
+    }
+    function queueStamp() {
+      return JSON.stringify({ version, schema: activeSchema() });
+    }
+    function queueConfig() {
+      return JSON.stringify({
+        sheetIndex,
+        headerRow,
+        mapping,
+        runCompanyId,
+        runSelection: setupChoices(),
+        steps: preparationSteps,
+      });
+    }
+    function activeQueueJob() {
+      return fileQueue.find(j => j.id === queueActiveId);
+    }
+    function queueStatus(job) {
+      if (job.status === 'running' || job.status === 'failed') return job.status;
+      if (job.id === queueActiveId && book) {
+        if (job.schema !== queueStamp() || job.config !== queueConfig()) return 'needs-review';
+        if (job.error) return 'failed';
+        return result && !livePending ? 'completed' : 'ready';
+      }
+      if (job.schema !== queueStamp()) return 'needs-review';
+      return job.status;
+    }
+    function queueGuard(epoch, account) {
+      if (epoch !== queueEpoch || account !== a.owner?.() || !a.ready()) {
+        const error = Error('The queue or account changed.');
+        error.name = 'AbortError';
+        throw error;
+      }
+    }
+    function queueCapture() {
+      const baseline = preparationSteps.length ? preparedRows : originalRows,
+        diffs = [];
+      sourceRows.forEach((row, i) =>
+        row.forEach((value, j) => {
+          if (value !== baseline[i]?.[j]) diffs.push([i, j, value]);
+        })
+      );
+      return {
+        book,
+        sheetIndex,
+        headerRow,
+        headers,
+        mapping,
+        preparedRows: preparationSteps.length ? preparedRows : null,
+        diffs,
+        origins,
+        preparationSteps,
+        preparationUndo,
+        runCompanyId,
+        runSelection,
+        runProfileId,
+        extraReferenceChoices,
+        rawResult,
+        resultSchema,
+        currentRunId,
+        ignored: [...ignoredIssues],
+        schemaStamp: queueStamp(),
+      };
+    }
+    async function queueSaveCurrent() {
+      const job = activeQueueJob();
+      if (!job || !book) return;
+      const epoch = queueEpoch,
+        account = owner;
+      if (livePending) await checkEdit();
+      queueGuard(epoch, account);
+      if (livePending) throw Error('Wait for the current edit to finish checking.');
+      const config = queueConfig();
+      if (
+        job.savedGeneration === generation &&
+        job.savedResult === result &&
+        job.savedConfig === config
+      )
+        return;
+      const serialized = JSON.stringify(queueCapture());
+      if (serialized.length > 300000000)
+        throw Error(
+          'This prepared session is too large to park in the queue. Export it before switching files.'
+        );
+      if (!root.JSZip) throw Error('Refresh the page to load queue storage.');
+      const archive = new root.JSZip();
+      archive.file('session.json', serialized);
+      const packed = await archive.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+      queueGuard(epoch, account);
+      if (
+        fileQueue.reduce((n, j) => n + (j.id === job.id ? 0 : j.packed?.size || 0), packed.size) >
+        100000000
+      )
+        throw Error(
+          'The queue has reached 100 MB of compressed working data. Download and remove completed files before adding more work.'
+        );
+      job.packed = packed;
+      job.status = queueStatus(job);
+      job.savedGeneration = generation;
+      job.savedResult = result;
+      job.savedConfig = config;
+      job.setupSummary = {
+        rows: sourceRows.length,
+        company: a.state().projectCompanies.find(c => c.id === runCompanyId)?.name || 'Standalone',
+        errors: '—',
+        warnings: '—',
+      };
+      job.summary = result
+        ? {
+            rows: result.rows,
+            passed: result.passed,
+            errors: result.errors,
+            warnings: result.warnings,
+            ignored: result.ignored || 0,
+            company: result.context?.companyName || 'Standalone',
+          }
+        : null;
+    }
+    function restoreQueueSession(session, job) {
+      cancelLive();
+      runner?.cancel();
+      generation++;
+      closePreparation();
+      pinnedRows.clear();
+      resetReview();
+      comparisonCache = null;
+      book = session.book;
+      sheetIndex = session.sheetIndex;
+      headerRow = session.headerRow;
+      headers = session.headers;
+      mapping = session.mapping;
+      originalRows = book.sheets[sheetIndex].rows
+        .slice(headerRow)
+        .map(r => Array.from({ length: headers.length }, (_, i) => String(r[i] ?? '')));
+      while (originalRows.length && originalRows.at(-1).every(E.blank)) originalRows.pop();
+      preparationSteps = session.preparationSteps;
+      preparationUndo = session.preparationUndo;
+      preparedRows = session.preparedRows || originalRows.map(r => r.slice());
+      sourceRows = preparedRows.map(r => r.slice());
+      for (const [i, j, value] of session.diffs) sourceRows[i][j] = value;
+      origins = session.origins;
+      runCompanyId = session.runCompanyId;
+      runSelection = session.runSelection;
+      runProfileId = session.runProfileId;
+      extraReferenceChoices = session.extraReferenceChoices;
+      rawResult = session.rawResult;
+      resultSchema = session.resultSchema;
+      currentRunId = session.currentRunId;
+      for (const [key, value] of session.ignored) ignoredIssues.set(key, value);
+      const fresh = session.schemaStamp === queueStamp();
+      if (!fresh) {
+        rawResult = null;
+        resultSchema = null;
+        currentRunId = '';
+        runSelection = null;
+        runProfileId = '';
+        ignoredIssues.clear();
+        job.config = '';
+        job.schema = '';
+      }
+      try {
+        rows = E.mapRows(headers, sourceRows, resultSchema || activeSchema(), mapping);
+        if (resultSchema) E.runContext(a.state(), resultSchema, runCompanyId);
+        result = rawResult ? reviewed(rawResult) : null;
+      } catch {
+        rows = [];
+        result = null;
+        rawResult = null;
+        resultSchema = null;
+        job.config = '';
+      }
+      fileName = job.file.name;
+      filter = 'all';
+      page = 0;
+      selectedIssue = null;
+      targetRow = -1;
+      mode = 'check';
+      busy = false;
+      job.savedGeneration = generation;
+      job.savedResult = result;
+      job.savedConfig = queueConfig();
+    }
+    async function addQueueFiles(files) {
+      queueAccess();
+      if (queueBusy || queueIO || busy || livePending)
+        throw Error('Finish the current operation before adding files.');
+      const list = Array.from(files || []);
+      if (!list.length) return;
+      if (fileQueue.length + list.length > 10) throw Error('Add up to 10 files per queue.');
+      if (
+        fileQueue.reduce((n, j) => n + j.file.size, 0) + list.reduce((n, f) => n + f.size, 0) >
+        150000000
+      )
+        throw Error('A queue supports up to 150 MB of original files.');
+      for (const f of list)
+        if (!/\.(xlsx|csv|tsv)$/i.test(f.name) || f.size > E.LIMITS.fileBytes)
+          throw Error('Choose XLSX, CSV or TSV files up to 50 MB each.');
+      if (
+        !fileQueue.length &&
+        book &&
+        !root.confirm(
+          'Start a file queue? Download the current single-file results first if you need them.'
+        )
+      )
+        return;
+      const empty = !fileQueue.length;
+      for (const file of list)
+        fileQueue.push({
+          id: E.uid(),
+          file,
+          status: 'needs-review',
+          schema: '',
+          config: '',
+          error: '',
+          packed: null,
+          summary: null,
+        });
+      if (empty) await openQueueJob(fileQueue[0].id);
+      else paint();
+    }
+    async function openQueueJob(id, internal = false) {
+      queueAccess();
+      if ((queueBusy || queueIO || busy) && !internal)
+        throw Error('Wait for the current queue operation.');
+      const job = fileQueue.find(j => j.id === id);
+      if (!job) throw Error('Choose a current queue file.');
+      if (!internal && id === queueActiveId && book) {
+        $('valDropzone')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+        return;
+      }
+      const epoch = queueEpoch,
+        account = owner,
+        wasIO = queueIO,
+        previous = activeQueueJob();
+      queueIO = true;
+      paint();
+      try {
+        await queueSaveCurrent();
+        queueGuard(epoch, account);
+        if (job.packed) {
+          const archive = await root.JSZip.loadAsync(
+            new root.Uint8Array(await job.packed.arrayBuffer())
+          );
+          const session = JSON.parse(await archive.file('session.json').async('string'));
+          queueGuard(epoch, account);
+          restoreQueueSession(session, job);
+          queueActiveId = id;
+        } else {
+          queueInternal = true;
+          try {
+            await loadFile(job.file);
+          } finally {
+            queueInternal = false;
+          }
+          queueGuard(epoch, account);
+          queueActiveId = id;
+          runCompanyId = '';
+          runSelection = null;
+          runProfileId = '';
+          job.status = 'needs-review';
+          job.error = '';
+        }
+        if (previous && previous !== job) previous.savedResult = null;
+        say(
+          'Review ' +
+            job.file.name +
+            ': company, worksheet, mapping and preparation, then Confirm file setup.'
+        );
+      } catch (error) {
+        if (epoch === queueEpoch && account === a.owner?.()) {
+          job.error = error.message;
+          job.status = 'failed';
+        }
+        throw error;
+      } finally {
+        if (epoch === queueEpoch && account === a.owner?.()) {
+          queueIO = wasIO;
+          paint();
+        }
+      }
+    }
+    function confirmQueueJob() {
+      queueAccess();
+      if (queueBusy || queueIO || busy || livePending)
+        throw Error('Wait for the current operation.');
+      const job = activeQueueJob();
+      if (!job || !book) throw Error('Open a queue file first.');
+      const schema = activeSchema();
+      E.checkSchema(schema);
+      E.runContext(a.state(), schema, runCompanyId);
+      setupPlan(schema);
+      if (!E.mapRows(headers, sourceRows, schema, mapping).length)
+        throw Error('Choose a file with at least one data record.');
+      job.schema = queueStamp();
+      job.config = queueConfig();
+      job.error = '';
+      job.status = result ? 'completed' : 'ready';
+      say('File setup confirmed. Configure the next file or Start queue.');
+      paint();
+    }
+    function cancelQueue() {
+      if (!queueBusy && !queueIO) return;
+      queueStop = true;
+      queueEpoch++;
+      generation++;
+      runner?.cancel();
+      cancelLive();
+      busy = false;
+      const job = activeQueueJob();
+      if (job?.status === 'running') {
+        job.status = 'ready';
+        job.error = '';
+      }
+      queueBusy = false;
+      queueIO = false;
+      say('Queue stopped. Completed results and remaining file setups are retained.');
+      paint();
+    }
+    async function startQueue() {
+      queueAccess();
+      if (queueBusy || queueIO || busy) throw Error('Wait for the current operation.');
+      if (!fileQueue.length) throw Error('Add files to the queue first.');
+      if (fileQueue.some(j => !['ready', 'completed'].includes(queueStatus(j))))
+        throw Error('Open and confirm every file setup before starting the queue.');
+      const pending = fileQueue.filter(j => queueStatus(j) === 'ready');
+      if (!pending.length) throw Error('All configured files already have current results.');
+      queueBusy = true;
+      queueStop = false;
+      const account = owner,
+        epoch = queueEpoch;
+      paint();
+      try {
+        await queueSaveCurrent();
+        queueGuard(epoch, account);
+        for (const job of pending) {
+          if (queueStop || epoch !== queueEpoch || account !== a.owner?.() || !a.ready()) break;
+          try {
+            await openQueueJob(job.id, true);
+            if (queueStop) break;
+            job.status = 'running';
+            paint();
+            await run();
+            if (queueStop || epoch !== queueEpoch || account !== a.owner?.() || !a.ready()) break;
+            if (!result) throw Error('Validation did not finish. Review this file and try again.');
+            job.status = 'completed';
+            await queueSaveCurrent();
+          } catch (error) {
+            if (queueStop || epoch !== queueEpoch || account !== a.owner?.() || !a.ready()) break;
+            job.status = 'failed';
+            job.error = error.message;
+            job.summary = null;
+          }
+          paint();
+        }
+      } finally {
+        if (epoch === queueEpoch && account === a.owner?.()) {
+          queueBusy = false;
+          queueIO = false;
+          if (!queueStop)
+            say(
+              'Queue finished. Open any file to review its records or download completed reports.'
+            );
+          paint();
+        }
+      }
+    }
+    async function exportQueue() {
+      queueAccess('export');
+      if (queueBusy || queueIO || busy) throw Error('Wait for the current operation.');
+      const epoch = queueEpoch,
+        account = owner;
+      queueIO = true;
+      paint();
+      try {
+        await queueSaveCurrent();
+        queueGuard(epoch, account);
+        const completed = fileQueue.filter(j => queueStatus(j) === 'completed');
+        if (!completed.length) throw Error('There are no current completed reports to download.');
+        const archive = new root.JSZip(),
+          summary = [
+            [
+              'File',
+              'Status',
+              'Company',
+              'Rows',
+              'Rows without errors',
+              'Errors',
+              'Warnings',
+              'Report',
+            ],
+          ];
+        for (const [i, job] of fileQueue.entries()) {
+          let name = '';
+          if (completed.includes(job)) {
+            await openQueueJob(job.id, true);
+            queueGuard(epoch, account);
+            if (!result || livePending)
+              throw Error('Review ' + job.file.name + ' before exporting.');
+            E.runContext(a.state(), resultSchema, runCompanyId);
+            const outcome = E.copy(result);
+            outcome.issues.forEach(x => (x.row = headerRow + x.index + 1));
+            const blob = await F.report(resultSchema, rows, outcome, false, {
+              ...comparisonUpload(),
+              comparisonFirst: true,
+            });
+            queueGuard(epoch, account);
+            name =
+              String(i + 1).padStart(2, '0') +
+              '-' +
+              safeName(job.file.name.replace(/\.[^.]+$/, '')) +
+              '-comparison.xlsx';
+            archive.file(name, new root.Uint8Array(await blob.arrayBuffer()), {
+              compression: 'STORE',
+            });
+          }
+          const s = job.summary;
+          summary.push([
+            job.file.name,
+            queueStatus(job),
+            s?.company || '',
+            s?.rows || '',
+            s?.passed ?? '',
+            s?.errors ?? '',
+            s?.warnings ?? '',
+            name || job.error || '',
+          ]);
+        }
+        const overview = await F.workbook([{ name: 'Queue summary', rows: summary }]);
+        archive.file('Queue-summary.xlsx', new root.Uint8Array(await overview.arrayBuffer()), {
+          compression: 'STORE',
+        });
+        const output = await archive.generateAsync({ type: 'blob', compression: 'STORE' });
+        queueGuard(epoch, account);
+        a.download(
+          output,
+          safeName(activeSchema().name) + '-validation-queue.zip',
+          'application/zip'
+        );
+        say(completed.length + ' completed report(s) downloaded, with the queue summary.');
+      } finally {
+        if (epoch === queueEpoch && account === a.owner?.()) {
+          queueIO = false;
+          paint();
+        }
+      }
+    }
+    function queueView() {
+      const labels = {
+        'needs-review': 'Review setup',
+        ready: 'Ready',
+        running: 'Validating',
+        completed: 'Completed',
+        failed: 'Needs review',
+      };
+      const locked = queueBusy || queueIO,
+        statuses = fileQueue.map(queueStatus),
+        done = statuses.filter(status => status === 'completed').length,
+        review = statuses.filter(
+          status => !['ready', 'completed', 'running'].includes(status)
+        ).length,
+        canStart = !locked && !review && statuses.includes('ready');
+      return `<section id="valFileQueue" class="val-card val-file-queue"><div class="val-panel-title"><div><span class="val-eyebrow">MULTIPLE FILES · ONE TEMPLATE</span><h3>File validation queue</h3><p class="val-help">Review each file’s company, mapping and preparation. Files run one at a time; their records and results stay separate.</p></div>${btn('queue-add', 'Add files', locked ? 'disabled' : '', 'val-secondary')}</div>
+      ${
+        fileQueue.length
+          ? `<div class="val-queue-progress"><strong>${done} / ${fileQueue.length} files complete</strong><progress value="${done}" max="${fileQueue.length}" aria-label="Files completed"></progress><span>${queueBusy ? 'Processing queue…' : queueIO ? 'Preparing file data…' : review ? 'Confirm setup for ' + review + ' file(s) before starting' : 'Up to 10 files · 25,000 records per file'}</span></div><div class="val-table-scroll"><table class="val-queue-table"><thead><tr><th>File</th><th>Company</th><th>Status</th><th>Rows</th><th>Errors / warnings</th><th>Review</th></tr></thead><tbody>${fileQueue
+              .map(job => {
+                const status = queueStatus(job),
+                  current = job.id === queueActiveId,
+                  s =
+                    current && book
+                      ? {
+                          rows: sourceRows.length,
+                          errors: result?.errors ?? '—',
+                          warnings: result?.warnings ?? '—',
+                          company:
+                            a.state().projectCompanies.find(c => c.id === runCompanyId)?.name ||
+                            (activeSchema().projectId ? 'Choose in file setup' : 'Standalone'),
+                        }
+                      : job.summary || job.setupSummary;
+                return `<tr class="${current ? 'is-current' : ''}" data-queue-row="${esc(job.id)}"><th>${esc(job.file.name)}${current ? '<small>Currently open</small>' : ''}${job.error ? '<small class="val-queue-error">' + esc(job.error) + '</small>' : ''}</th><td>${esc(s?.company || 'Choose in file setup')}</td><td><span class="val-queue-state ${status}">${labels[status]}</span></td><td>${s?.rows ?? '—'}</td><td>${s ? s.errors + ' / ' + s.warnings : '—'}</td><td>${btn('queue-open', current ? 'Open file' : status === 'completed' ? 'Review results' : 'Configure / review', 'data-id="' + esc(job.id) + '"' + (locked ? ' disabled' : ''), 'val-quiet')}${btn('queue-remove', 'Remove', 'data-id="' + esc(job.id) + '"' + (locked ? ' disabled' : ''), 'val-quiet')}</td></tr>`;
+              })
+              .join(
+                ''
+              )}</tbody></table></div><div class="val-actions val-queue-actions">${btn('queue-confirm', 'Confirm file setup', locked || !activeQueueJob() ? 'disabled' : '', 'val-secondary')}${btn('queue-start', 'Start queue', canStart ? '' : 'disabled', 'val-primary')}${btn('queue-export', 'Download completed reports', locked || !done ? 'disabled' : '', 'val-secondary')}${locked ? btn('queue-cancel', 'Stop queue', '', 'val-secondary') : btn('queue-clear', 'Clear queue', '', 'val-quiet')}</div><p class="val-help">Completed reports include original, prepared and validated values. Queue files and compressed working sessions stay in this browser’s memory and clear on reload or account change.</p>`
+          : '<p class="val-help">Add up to 10 XLSX, CSV or TSV files. Each file can contain up to 25,000 records and 200 columns. Start by reviewing the first file.</p>'
+      }</section>`;
     }
     function closePreparation() {
       preparation = null;
@@ -293,6 +800,7 @@
     function openPreparation(kind) {
       prepareAccess();
       if (livePending) checkEdit();
+      if (livePending) throw Error('Wait for the current edit to finish checking.');
       commitCurrent();
       const schema = activeSchema();
       E.checkSchema(schema);
@@ -433,7 +941,12 @@
           row: origins[p.index].row,
           part: [origins[p.index].part, p.part].filter(Boolean).join('.'),
         }));
-      preparationSteps.push({ kind: plan.kind, changes: plan.changes, rows: sourceRows.length });
+      preparationSteps.push({
+        kind: plan.kind,
+        changes: plan.changes,
+        rows: sourceRows.length,
+        options: JSON.parse(p.options),
+      });
       closePreparation();
       resetPreparedResults();
       say(
@@ -817,6 +1330,7 @@
     }
     function applyIssueReview(action, el) {
       if (livePending) checkEdit();
+      if (livePending) throw Error('Wait for the current edit to finish checking.');
       if (!rawResult || !result || !resultSchema)
         throw Error('Run validation before reviewing issues.');
       const before = new Map(ignoredIssues),
@@ -876,6 +1390,7 @@
     function sync() {
       const next = a.owner?.() || '';
       if (next !== owner) {
+        resetQueue();
         resetPreparation();
         cancelLive();
         pinnedRows.clear();
@@ -1150,7 +1665,8 @@
       clearFile();
       message = '';
     }
-    function clearFile() {
+    function clearFile(preserveQueue = false) {
+      if (!preserveQueue) resetQueue();
       resetPreparation();
       cancelLive();
       pinnedRows.clear();
@@ -2249,8 +2765,8 @@
         .map(row => Array.from({ length: headers.length }, (_, i) => String(row[i] ?? '')));
       while (sourceRows.length && sourceRows.at(-1).every(E.blank)) sourceRows.pop();
       if (!headers.length) throw Error('The selected header row is empty.');
-      if (sourceRows.length > 5000 || sourceRows.length * headers.length > E.LIMITS.cells)
-        throw Error('Use up to 5,000 rows and 200,000 cells.');
+      if (sourceRows.length > E.LIMITS.rows || sourceRows.length * headers.length > E.LIMITS.cells)
+        throw Error('Use up to 25,000 rows and 5,000,000 cells.');
       resetPreparation();
       originalRows = sourceRows.map(r => r.slice());
       preparedRows = sourceRows.map(r => r.slice());
@@ -2264,6 +2780,10 @@
     }
     async function loadFile(file, kind = 'data') {
       ensure();
+      if (!queueInternal && (queueBusy || queueIO))
+        throw Error('Wait for the queue operation to finish.');
+      if (!queueInternal && kind === 'data' && fileQueue.length)
+        throw Error('Use Add files to extend the queue, or Clear queue to start a single file.');
       commitCurrent();
       if (!draft) throw Error('Create a template first.');
       const token = ++generation,
@@ -2320,6 +2840,7 @@
       return 'Example'.slice(0, s.length);
     }
     function loadSample() {
+      if (fileQueue.length) throw Error('Clear the queue before loading example data.');
       commitCurrent();
       generation++;
       runner?.cancel();
@@ -2466,12 +2987,15 @@
     function patchResults() {
       const current = $('valResultsArea');
       if (current) patchSurface(current, resultsView());
+      const queue = $('valFileQueue');
+      if (queue) patchSurface(queue, queueView());
       const status = document.querySelector('.validation-studio .val-message');
       if (status) status.textContent = message;
     }
     function checkEdit() {
       const check = liveCheck;
       if (!check) return;
+      if (check.promise) return check.promise;
       root.clearTimeout(liveTimer);
       liveTimer = null;
       if (
@@ -2483,10 +3007,18 @@
         cancelLive();
         return;
       }
-      try {
-        const context = E.runContext(a.state(), check.schema, runCompanyId);
+      const apply = checked => {
+        if (
+          check !== liveCheck ||
+          check.token !== generation ||
+          check.owner !== a.owner?.() ||
+          !a.ready() ||
+          resultSchema !== check.schema
+        )
+          return;
+        E.runContext(a.state(), check.schema, runCompanyId);
         const setup = rawResult?.setup;
-        rawResult = E.validateRows(check.schema, rows, context);
+        rawResult = checked;
         if (setup) rawResult.setup = E.copy(setup);
         result = reviewed(rawResult);
         if (selectedIssue)
@@ -2500,16 +3032,38 @@
           ' errors · ' +
           result.warnings +
           ' warnings.';
-      } catch (error) {
+      };
+      const failed = error => {
+        if (check !== liveCheck || check.token !== generation || check.owner !== a.owner?.())
+          return;
         result = null;
         resetReview();
         resultSchema = null;
         selectedIssue = null;
         message = 'Automatic check could not finish. ' + error.message;
         a.tell?.(message, true);
+      };
+      const finish = () => {
+        if (check === liveCheck) {
+          cancelLive();
+          patchResults();
+        }
+      };
+      try {
+        const context = E.runContext(a.state(), check.schema, runCompanyId);
+        if (runner && rows.length * check.schema.columns.length >= 20000) {
+          check.promise = runner
+            .run(check.schema, rows, context)
+            .then(apply)
+            .catch(failed)
+            .finally(finish);
+          return check.promise;
+        }
+        apply(E.validateRows(check.schema, rows, context));
+      } catch (error) {
+        failed(error);
       }
-      cancelLive();
-      patchResults();
+      finish();
     }
     function editCell(index, field, value, immediate = false) {
       if (!rows[index] || !activeSchema().columns.some(c => c.key === field)) return;
@@ -2636,30 +3190,70 @@
       // Never present old check status alongside a newly typed, unchecked value.
       if (livePending)
         return '<section id="valComparison" class="val-card"><h3>Original vs validated</h3><p role="status">Checking your edit before refreshing the comparison…</p></section>';
-      const report = dataComparison(),
-        matches = [];
-      for (const row of report.rows) {
-        if (comparisonRow && row.index + 1 !== Number(comparisonRow)) continue;
-        for (const field of report.fields) {
-          if (comparisonField !== 'all' && field.index !== Number(comparisonField)) continue;
-          const cell = F.comparisonCell(report, row.index, field.index);
+      const report = dataComparison();
+      function scan() {
+        const shown = [];
+        let total = 0;
+        if (comparisonFilter === 'all') {
+          const width = comparisonField === 'all' ? report.fields.length : 1,
+            count = comparisonRow ? 1 : report.rows.length;
+          total = count * width;
+          for (let n = comparisonPage * 50; n < Math.min(total, comparisonPage * 50 + 50); n++)
+            shown.push([
+              comparisonRow ? Number(comparisonRow) - 1 : Math.floor(n / width),
+              comparisonField === 'all' ? n % width : Number(comparisonField),
+            ]);
+          return { shown, total };
+        }
+        for (const row of report.rows) {
+          if (comparisonRow && row.index + 1 !== Number(comparisonRow)) continue;
+          const status = result.status[row.index];
+          if (comparisonFilter === 'corrected' && !row.corrected) continue;
           if (
-            comparisonFilter === 'changes' &&
-            !cell.preparedChange &&
-            !cell.corrected &&
-            !cell.errors &&
-            !cell.warnings &&
-            !cell.ignored
+            comparisonFilter === 'issues' &&
+            !status.errors &&
+            !status.warnings &&
+            !status.ignored
           )
             continue;
-          if (comparisonFilter === 'corrected' && !cell.corrected) continue;
-          if (comparisonFilter === 'issues' && !cell.errors && !cell.warnings && !cell.ignored)
+          if (
+            comparisonFilter === 'changes' &&
+            !row.prepared &&
+            !row.corrected &&
+            !status.errors &&
+            !status.warnings &&
+            !status.ignored
+          )
             continue;
-          matches.push([row.index, field.index]);
+          for (const field of report.fields) {
+            if (comparisonField !== 'all' && field.index !== Number(comparisonField)) continue;
+            const cell = F.comparisonCell(report, row.index, field.index);
+            if (
+              comparisonFilter === 'changes' &&
+              !cell.preparedChange &&
+              !cell.corrected &&
+              !cell.errors &&
+              !cell.warnings &&
+              !cell.ignored
+            )
+              continue;
+            if (comparisonFilter === 'corrected' && !cell.corrected) continue;
+            if (comparisonFilter === 'issues' && !cell.errors && !cell.warnings && !cell.ignored)
+              continue;
+            if (total >= comparisonPage * 50 && shown.length < 50)
+              shown.push([row.index, field.index]);
+            total++;
+          }
         }
+        return { shown, total };
       }
-      comparisonPage = Math.max(0, Math.min(comparisonPage, Math.ceil(matches.length / 50) - 1));
-      const shown = matches.slice(comparisonPage * 50, comparisonPage * 50 + 50);
+      let scanned = scan();
+      const clamped = Math.max(0, Math.min(comparisonPage, Math.ceil(scanned.total / 50) - 1));
+      if (clamped !== comparisonPage) {
+        comparisonPage = clamped;
+        scanned = scan();
+      }
+      const { shown, total } = scanned;
       return `<section id="valComparison" class="val-card val-comparison" aria-label="Original and validated data comparison"><div class="val-panel-title"><div><span class="val-eyebrow">TRACE EVERY CHANGE</span><h3>Original vs validated</h3></div>${btn('export-comparison', 'Export comparison report', '', 'val-secondary')}</div>
         <p id="valComparisonStatus" class="val-help" role="status">Compare exact values from the original upload, the latest preparation and the validated working data. Split parts stay linked to their original worksheet row. Spaces, case, leading zeros and blanks are compared exactly.</p>
         <div class="val-comparison-counts"><span><strong>${originalRows.length}</strong> original rows</span><span><strong>${sourceRows.length}</strong> validated rows</span><span><strong>${report.changedRows}</strong> rows differ from original</span><span><strong>${report.changedCells}</strong> fields differ from original</span><span><strong>${report.correctedCells}</strong> corrections since preparation</span><span><strong>${report.splitRows}</strong> split output rows</span></div>
@@ -2676,7 +3270,7 @@
           ],
           comparisonFilter
         )}${select('comparisonField', 'Upload column', [['all', 'All columns'], ...report.fields.map(f => [f.index, F.col(f.index) + ' · ' + f.header])], comparisonField)}${input('comparisonRow', 'Working data row (1-based)', comparisonRow, 'number', `id="valComparisonRow" min="1" max="${sourceRows.length}" step="1" placeholder="All rows"`)}</div>
-        <p class="val-help">Showing ${shown.length ? comparisonPage * 50 + 1 : 0}–${comparisonPage * 50 + shown.length} of ${matches.length} fields. The exported report includes all rows and fields regardless of these filters.</p>
+        <p class="val-help">Showing ${shown.length ? comparisonPage * 50 + 1 : 0}–${comparisonPage * 50 + shown.length} of ${total} fields. The exported report includes all rows and fields regardless of these filters.${report.rows.length * report.fields.length > 50000 ? ' Large reports use side-by-side field comparisons and numbered continuation sheets.' : ''}</p>
         ${
           shown.length
             ? `<div class="val-table-scroll"><table class="val-grid val-comparison-grid"><thead><tr><th>Working row</th><th>Original source</th><th>Upload column / field</th><th>Original value</th><th>Prepared value</th><th>Validated value</th><th>Comparison</th><th>Field check</th></tr></thead><tbody>${shown
@@ -2689,7 +3283,7 @@
                 .join('')}</tbody></table></div>`
             : '<p class="val-inline-note">No fields match these filters. Choose All fields to review unchanged values.</p>'
         }
-        <div class="val-pagination">${btn('comparison-page', '← Previous', 'data-delta="-1"' + (!comparisonPage ? ' disabled' : ''), 'val-quiet')}<span>Page ${comparisonPage + 1} of ${Math.max(1, Math.ceil(matches.length / 50))}</span>${btn('comparison-page', 'Next →', 'data-delta="1"' + ((comparisonPage + 1) * 50 >= matches.length ? ' disabled' : ''), 'val-quiet')}</div></section>`;
+        <div class="val-pagination">${btn('comparison-page', '← Previous', 'data-delta="-1"' + (!comparisonPage ? ' disabled' : ''), 'val-quiet')}<span>Page ${comparisonPage + 1} of ${Math.max(1, Math.ceil(total / 50))}</span>${btn('comparison-page', 'Next →', 'data-delta="1"' + ((comparisonPage + 1) * 50 >= total ? ' disabled' : ''), 'val-quiet')}</div></section>`;
     }
     function resultsView() {
       if (!rows.length) return '';
@@ -3079,7 +3673,10 @@
           .map(r => [r.version, 'Published version ' + r.version]),
       ];
       return (
-        '<div class="val-section-heading"><div><h3>Let’s give your file a check.</h3><p>Choose a version, connect your columns, then correct issues in place.</p></div><div class="val-version-picker">' +
+        queueView() +
+        '<fieldset class="val-queue-session"' +
+        (queueBusy || queueIO ? ' disabled' : '') +
+        '><div class="val-section-heading"><div><h3>Let’s give your file a check.</h3><p>Choose a version, connect your columns, then correct issues in place.</p></div><div class="val-version-picker">' +
         select('version', 'Validate against', versions, version) +
         '</div></div>' +
         validationScopeView() +
@@ -3095,12 +3692,26 @@
         icon('upload', 30) +
         '</span><h3>' +
         esc(fileName || 'Drop a file. Find your clarity.') +
-        '</h3><p>XLSX, CSV or TSV · Up to 200 columns, 5,000 rows and 200,000 cells total (1,000 rows at 200 columns)</p><div class="val-actions">' +
-        btn('browse', fileName ? 'Choose another file' : 'Browse files', '', 'val-primary') +
+        '</h3><p>XLSX, CSV or TSV · Up to 200 columns, 25,000 rows and 5,000,000 cells per file · 50 MB</p><div class="val-actions">' +
+        btn(
+          fileQueue.length ? 'queue-add' : 'browse',
+          fileQueue.length ? 'Add more files' : fileName ? 'Choose another file' : 'Browse files',
+          '',
+          'val-primary'
+        ) +
         btn('download-template', 'Download Excel template', '', 'val-secondary') +
         '</div><div class="val-upload-foot">' +
-        btn('sample', 'Try example data', '', 'val-quiet') +
-        (book ? btn('clear-file', 'Clear file', '', 'val-quiet') : '') +
+        (fileQueue.length ? '' : btn('sample', 'Try example data', '', 'val-quiet')) +
+        (book
+          ? fileQueue.length
+            ? btn(
+                'queue-remove',
+                'Remove this file',
+                'data-id="' + esc(queueActiveId) + '"',
+                'val-quiet'
+              )
+            : btn('clear-file', 'Clear file', '', 'val-quiet')
+          : '') +
         '</div></section><details class="val-card val-paste"><summary>Or paste a table</summary><form id="valPasteForm">' +
         area(
           'data',
@@ -3110,7 +3721,8 @@
         ) +
         '<button type="submit" class="val-btn val-secondary">Use pasted data</button></form><p class="val-help">Values only. Excel formulas must be pasted as values before upload.</p></details></div>' +
         (book ? preparationView() + mappingView() : '') +
-        resultsView()
+        resultsView() +
+        '</fieldset>'
       );
     }
     function validationScopeView() {
@@ -3270,7 +3882,7 @@
               }[mode] || columnEditor
             )()
           : empty()) +
-        '</main></div><input id="valFile" type="file" accept=".xlsx,.csv,.tsv" hidden><input id="valSetupFile" type="file" accept=".xlsx" hidden><input id="valDefinitionFile" type="file" accept=".json" hidden><input id="valReferenceFile" type="file" accept=".xlsx,.csv,.tsv" hidden></section>'
+        '</main></div><input id="valFile" type="file" accept=".xlsx,.csv,.tsv" hidden><input id="valQueueFiles" type="file" multiple accept=".xlsx,.csv,.tsv" hidden><input id="valSetupFile" type="file" accept=".xlsx" hidden><input id="valDefinitionFile" type="file" accept=".json" hidden><input id="valReferenceFile" type="file" accept=".xlsx,.csv,.tsv" hidden></section>'
       );
     }
     async function handle(el) {
@@ -3278,6 +3890,60 @@
       const action = el.dataset.val,
         id = el.dataset.id;
       message = '';
+      if (action === 'queue-cancel') {
+        cancelQueue();
+        return;
+      }
+      if (queueBusy || queueIO)
+        throw Error('Wait for the current queue operation, or use Stop queue.');
+      if (action === 'queue-add') {
+        queueAccess();
+        $('valQueueFiles').click();
+        return;
+      }
+      if (action === 'queue-open') {
+        await openQueueJob(id);
+        return;
+      }
+      if (action === 'queue-confirm') {
+        confirmQueueJob();
+        return;
+      }
+      if (action === 'queue-start') {
+        await startQueue();
+        return;
+      }
+      if (action === 'queue-export') {
+        await exportQueue();
+        return;
+      }
+      if (action === 'queue-clear') {
+        queueAccess();
+        if (
+          root.confirm(
+            'Clear all queue files and working results? Download any reports you need first.'
+          )
+        ) {
+          clearFile();
+          paint();
+        }
+        return;
+      }
+      if (action === 'queue-remove') {
+        queueAccess();
+        const job = fileQueue.find(j => j.id === id);
+        if (!job) return;
+        if (!root.confirm('Remove ' + job.file.name + ' and its working results?')) return;
+        const current = id === queueActiveId;
+        fileQueue = fileQueue.filter(j => j.id !== id);
+        if (current) {
+          queueActiveId = '';
+          clearFile(true);
+          if (fileQueue.length) await openQueueJob(fileQueue[0].id);
+        }
+        paint();
+        return;
+      }
       if (action === 'comparison-page') {
         comparisonPage += Number(el.dataset.delta);
         patchResults();
@@ -3418,7 +4084,7 @@
       if (action === 'setup-help') {
         a.openModal(
           'Fill your setup in 3 steps',
-          `<section class="val-setup-guide"><p>Use <strong>simple General setup</strong> for everyday files, or <strong>simple SAP setup</strong> for DDIC field formats. Each file has just one <strong>Setup</strong> sheet.</p><ol><li><strong>Name it.</strong> Fill the name in B2 and choose General or SAP in B3.</li><li><strong>Replace the examples from row 9.</strong> One row creates one upload column. Keep the row 8 headers. Delete example rows you do not need. You can define up to 200 fields.</li><li><strong>Import and review.</strong> Choose Import Excel setup → your file → Create new draft → Save draft. Then use Validate to upload the records you want to check.</li></ol><div class="val-setup-table"><table><thead><tr><th>Fill this</th><th>What to enter</th></tr></thead><tbody><tr><td>Field</td><td>A unique key, e.g. VENDOR_CODE. Use letters and underscores; no spaces.</td></tr><tr><td>Label</td><td>Your data upload header, e.g. Vendor code. Optional: defaults to Field.</td></tr><tr><td>Data type</td><td>Choose from the dropdown. General: text, integer, decimal, date or boolean. SAP: choose the actual DDIC type.</td></tr><tr><td>Length / Decimals</td><td>General: Length is an optional maximum character count; leave Decimals blank. SAP: use SE11/DDIC length and decimal places, or leave blank for the displayed type defaults.</td></tr><tr><td>Required / Allowed values</td><td>Required defaults to No. Use X in Allowed values and Required = No to allow X or blank. A trailing comma is unnecessary.</td></tr><tr><td>Format / Reference field</td><td>Optional. General formats: digits, alphanumeric, email, url or identifier. SAP format is automatic; CURR can point to a CUKY field and QUAN to a UNIT field using its Field key.</td></tr><tr><td>Notes</td><td>Optional instructions for the person uploading data.</td></tr></tbody></table></div><p>Keep codes and long numbers as Excel <strong>Text</strong>. Enter values, not formulas. You can add Conditions and References inside Studio after import; the advanced workbook is only needed to maintain them in Excel.</p><p class="hint">Data uploads support 5,000 rows and 200,000 cells: at 200 columns, upload up to 1,000 rows per file. SAP mode checks the supported DDIC field formats; maintain your system's domain values and conversion rules separately.</p></section>`
+          `<section class="val-setup-guide"><p>Use <strong>simple General setup</strong> for everyday files, or <strong>simple SAP setup</strong> for DDIC field formats. Each file has just one <strong>Setup</strong> sheet.</p><ol><li><strong>Name it.</strong> Fill the name in B2 and choose General or SAP in B3.</li><li><strong>Replace the examples from row 9.</strong> One row creates one upload column. Keep the row 8 headers. Delete example rows you do not need. You can define up to 200 fields.</li><li><strong>Import and review.</strong> Choose Import Excel setup → your file → Create new draft → Save draft. Then use Validate to upload the records you want to check.</li></ol><div class="val-setup-table"><table><thead><tr><th>Fill this</th><th>What to enter</th></tr></thead><tbody><tr><td>Field</td><td>A unique key, e.g. VENDOR_CODE. Use letters and underscores; no spaces.</td></tr><tr><td>Label</td><td>Your data upload header, e.g. Vendor code. Optional: defaults to Field.</td></tr><tr><td>Data type</td><td>Choose from the dropdown. General: text, integer, decimal, date or boolean. SAP: choose the actual DDIC type.</td></tr><tr><td>Length / Decimals</td><td>General: Length is an optional maximum character count; leave Decimals blank. SAP: use SE11/DDIC length and decimal places, or leave blank for the displayed type defaults.</td></tr><tr><td>Required / Allowed values</td><td>Required defaults to No. Use X in Allowed values and Required = No to allow X or blank. A trailing comma is unnecessary.</td></tr><tr><td>Format / Reference field</td><td>Optional. General formats: digits, alphanumeric, email, url or identifier. SAP format is automatic; CURR can point to a CUKY field and QUAN to a UNIT field using its Field key.</td></tr><tr><td>Notes</td><td>Optional instructions for the person uploading data.</td></tr></tbody></table></div><p>Keep codes and long numbers as Excel <strong>Text</strong>. Enter values, not formulas. You can add Conditions and References inside Studio after import; the advanced workbook is only needed to maintain them in Excel.</p><p class="hint">Data uploads support 25,000 rows and 5,000,000 cells, including up to 25,000 rows at 200 columns. SAP mode checks the supported DDIC field formats; maintain your system's domain values and conversion rules separately.</p></section>`
         );
         return;
       }
@@ -4218,6 +4884,7 @@
     }
     function openCorrections(index, field) {
       if (livePending) checkEdit();
+      if (livePending) throw Error('Wait for the current edit to finish checking.');
       if (!result || !rows[index] || !resultSchema)
         throw Error('Run validation before choosing a correction.');
       if (!Number.isInteger(Number(mapping[field])) || Number(mapping[field]) < 0)
@@ -4322,6 +4989,7 @@
     }
     function formSubmit(form) {
       ensure();
+      if (queueBusy || queueIO) throw Error('Wait for the current queue operation.');
       if (form.id === 'valProfileForm') {
         saveProfileForm(form);
         return;
@@ -4339,6 +5007,7 @@
         return;
       }
       if (form.id === 'valPasteForm') {
+        if (fileQueue.length) throw Error('Clear the queue before using pasted data.');
         commitCurrent();
         generation++;
         runner?.cancel();
@@ -4442,6 +5111,7 @@
       }
     });
     document.addEventListener('input', event => {
+      if (queueBusy || queueIO) return;
       if (event.target.id === 'valAttentionSearch') {
         attentionSearch = event.target.value;
         attentionPage = 0;
@@ -4488,6 +5158,7 @@
     });
     document.addEventListener('change', event => {
       const el = event.target;
+      if (queueBusy || queueIO) return;
       if (el.form?.id === 'valPreparationForm') {
         if (el.name === 'delimiter')
           el.form.elements.customDelimiter.closest('label').hidden = el.value !== 'custom';
@@ -4681,6 +5352,12 @@
           paint();
           return;
         }
+        if (el.id === 'valQueueFiles') {
+          const files = Array.from(el.files);
+          el.value = '';
+          await addQueueFiles(files);
+          return;
+        }
         if (el.id === 'valFile') {
           const file = el.files[0];
           el.value = '';
@@ -4866,8 +5543,12 @@
         .forEach(el => el.classList.remove('val-drag-over'));
       try {
         ensure();
+        if (queueBusy || queueIO) throw Error('Wait for the current queue operation.');
         if (drop && event.dataTransfer?.files[0]) {
-          void loadFile(event.dataTransfer.files[0]).catch(err => say(err.message, true));
+          const files = event.dataTransfer.files;
+          void (
+            files.length > 1 || fileQueue.length ? addQueueFiles(files) : loadFile(files[0])
+          ).catch(err => say(err.message, true));
           return;
         }
         if (target && dragging) {
@@ -4894,6 +5575,12 @@
       openCorrections,
       applyCorrection,
       run,
+      addQueueFiles,
+      openQueueJob,
+      confirmQueueJob,
+      startQueue,
+      cancelQueue,
+      exportQueue,
       saveDraft,
       publish,
       addLibraryField,
@@ -4915,6 +5602,14 @@
         runSelection: draft ? E.copy(setupChoices()) : null,
         runProfileId,
         livePending,
+        queue: fileQueue.map(job => ({
+          id: job.id,
+          name: job.file.name,
+          status: queueStatus(job),
+          summary: job.summary,
+        })),
+        queueActiveId,
+        queueBusy: queueBusy || queueIO,
         attentionGroup: attentionGroup?.key || '',
         owner,
       }),

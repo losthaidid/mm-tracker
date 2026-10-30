@@ -35,9 +35,9 @@ test('Explode retains blank positions and requires explicit single-value repetit
 test('Explode supports literal delimiters, multiple mapped columns and preflights size limits',()=>{
  const p=T.explode(['A','B','C'],[['a||b','x||y','1||2']],{primary:0,mapped:[1,2],delimiter:'||'});assert.deepEqual(copy(p.rows),[['a','x','1'],['b','y','2']]);
  assert.throws(()=>T.explode(['A'],[['a,b']],{primary:0,mapped:[0]}),/distinct/);assert.throws(()=>T.explode(['A'],[['a,b']],{primary:0,delimiter:''}),/delimiter/);
- assert.throws(()=>T.explode(['A'],Array.from({length:2501},()=>['a,b']),{primary:0}),/5,000 rows/);
- const headers=Array.from({length:200},(_,i)=>'C'+i),rows=Array.from({length:501},()=>headers.map((h,i)=>i?'x':'a,b'));
- assert.throws(()=>T.explode(headers,rows,{primary:0}),/200,000 cells/);
+ assert.throws(()=>T.explode(['A'],Array.from({length:12501},()=>['a,b']),{primary:0}),/25,000 rows/);
+ const headers=Array.from({length:200},(_,i)=>'C'+i),rows=Array.from({length:12501},()=>headers.map((h,i)=>i?'x':'a,b'));
+ assert.throws(()=>T.explode(headers,rows,{primary:0}),/5,000,000 cells/);
 });
 
 async function fixture(t, csv='Availability Check,Plant,Storage Location,Extra\n2,"FF01, FF02, FF03","ST00, WH00, WH01",=1+1') {
