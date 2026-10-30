@@ -3360,6 +3360,65 @@ body[data-motion='off'] .val-prep-summary {
 .vfc-privacy {
   text-align: center;
 }
+.vfc-queue h3 {
+  font-size: 18px;
+}
+.vfc-queue > .val-actions {
+  margin-bottom: 16px;
+}
+#valStandaloneCompare .vfc-queue-table {
+  min-width: 1000px;
+}
+#valStandaloneCompare .vfc-queue-table .val-actions {
+  gap: 5px;
+  flex-wrap: wrap;
+}
+#valStandaloneCompare .vfc-queue-table .val-btn {
+  font-size: 11px;
+  padding: 6px 8px;
+  min-height: 30px;
+}
+#valStandaloneCompare .vfc-queue-table td {
+  max-width: 260px;
+  overflow-wrap: anywhere;
+}
+#valStandaloneCompare .vfc-queue-table th small {
+  display: block;
+  margin-top: 6px;
+  color: var(--hub-muted, #617770);
+  font-weight: 400;
+}
+#valStandaloneCompare .val-grid .vfc-current-pair > td,
+#valStandaloneCompare .val-grid .vfc-current-pair > th {
+  background: var(--hub-accent-soft, #e7f1e9);
+}
+.vfc-queue-error {
+  display: block;
+  margin-top: 8px;
+  line-height: 1.5;
+  color: var(--vfc-bad);
+}
+.vfc-queue-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 18px 0;
+}
+.vfc-queue-footer > span {
+  color: var(--hub-muted, #617770);
+  font-size: 12px;
+}
+.vfc-open-pair {
+  margin: 12px 0 20px;
+  font-size: 20px;
+}
+.vfc-run .val-actions {
+  flex-wrap: wrap;
+  max-width: 450px;
+  justify-content: flex-end;
+}
 @media (max-width: 850px) {
   .vfc-run {
     align-items: stretch;

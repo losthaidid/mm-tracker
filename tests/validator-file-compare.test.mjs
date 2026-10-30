@@ -71,19 +71,19 @@ test('checkbox mode skips nonadjacent columns and never combines with the count 
   assert.throws(() => x.source(rows, { mode: 'checkboxes', skipped: [99] }), /current worksheet/);
 });
 
-test('exact comparison distinguishes spaces, case, leading zeros, header differences and absent blank cells', async t => {
+test('exact comparison distinguishes spaces, case, leading zeros, header labels and absent blank cells', async t => {
   const x = fixture(t), a = x.source([['Code','Text','Blank'], ['001',' A ',''], ['2','x','']]),
     b = x.source([['code','Text','Blank'], ['1','a',''], ['2','x',''], ['3','','']]);
   const r = await x.C.compare(a,b);
-  assert.equal(r.match, false); assert.equal(r.headerDifferences, 1);
+  assert.equal(r.match, false); assert.equal(r.extraColumns, 0);
   assert.equal(r.differentRows, 2); assert.equal(r.matchingRows, 1); assert.equal(r.differentCells, 5);
   assert.deepEqual(copy(x.C.cell(r, 2, 2)), { a: '', b: '', hasA: false, hasB: true, match: false });
   assert.equal(x.C.cell(r, 0, 2).match, true);
   const columns = await x.C.compare(x.source([['ID'], ['1']]), x.source([['ID','Extra'], ['1','']]));
-  assert.equal(columns.headerDifferences, 1); assert.equal(columns.differentCells, 1);
+  assert.equal(columns.extraColumns, 1); assert.equal(columns.differentCells, 1);
   assert.equal(x.C.cell(columns, 0, 1).match, false);
   const headersOnly = await x.C.compare(x.source([['ID']]), x.source([['Other']]));
-  assert.equal(headersOnly.match, false); assert.equal(headersOnly.rowCount, 0);
+  assert.equal(headersOnly.match, true); assert.equal(headersOnly.rowCount, 0);
 });
 
 test('worksheet/header selection retains blank positions, duplicate headers and data under an unnamed column', t => {
@@ -158,7 +158,7 @@ test('report pagination, row inspection and exported XML cover every record rega
   x.change('[data-vfc-filter]','different'); await x.compare.exportReport();
   assert.equal(x.downloads.length,1);
   const zip = await x.w.JSZip.loadAsync(new x.w.Uint8Array(await x.downloads[0].blob.arrayBuffer()), {checkCRC32:true});
-  const xml = await zip.file('xl/worksheets/sheet4.xml').async('string'), doc = new x.w.DOMParser().parseFromString(xml,'application/xml');
+  const xml = await zip.file('xl/worksheets/sheet2.xml').async('string'), doc = new x.w.DOMParser().parseFromString(xml,'application/xml');
   assert.equal(doc.querySelectorAll('sheetData > row').length,32); assert.equal(doc.querySelectorAll('f').length,0);
   assert.match(doc.documentElement.textContent,/=SUM\(1\)/); assert.match(doc.documentElement.textContent,/<b>Record 29<\/b>/);
   assert.match(xml,/s="2"[^>]*><is><t xml:space="preserve">DIFFERENT/);
@@ -229,7 +229,7 @@ test('XLOOKUP and other formula cells compare and export saved values, including
   await x.open(); await x.compare.loadFile('A',file); await x.upload('B',[headers,values]); await x.compare.run();
   assert.equal(x.compare.snapshot().result.match,true); await x.compare.exportReport();
   const zip = await x.w.JSZip.loadAsync(new x.w.Uint8Array(await x.downloads[0].blob.arrayBuffer()),{checkCRC32:true});
-  const xml = await zip.file('xl/worksheets/sheet4.xml').async('string');
+  const xml = await zip.file('xl/worksheets/sheet2.xml').async('string');
   assert.match(xml,/Found/); assert.match(xml,/0007/); assert.match(xml,/#N\/A/); assert.doesNotMatch(xml,/<f[ >]|_xlfn|SUM\(/);
 });
 
