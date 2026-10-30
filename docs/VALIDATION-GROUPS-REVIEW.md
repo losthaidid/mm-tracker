@@ -17,7 +17,26 @@ Removing a group/set or grouped field used by a condition is blocked until that 
 
 ## Ignore selected issues
 
-After validation, select issue checkboxes in What needs attention, optionally enter a reason, and choose Ignore selected. Select this page selects up to 100 listed issues; paging preserves selections. All issues shown by the engine remain selectable up to its existing 15,000-issue display cap. Unlisted/truncated errors still count and cannot be silently ignored.
+After validation, **What needs attention** groups repeated issues into cards by
+field, check and severity. Each card shows the number of distinct affected records.
+Use the severity filters or search, then select a card to open its affected records
+in the larger editable grid. The problematic fields are highlighted; original
+worksheet rows and split parts identify exploded records. Extra upload columns
+remain visible read-only, and **Roomy view** hides the template sidebar.
+
+Live corrections update the cards and counts without replacing focused inputs.
+Resolved records remain visible while editing; **Refresh record list** clears
+them, and **Back to error groups** returns to the summary. Grouping is for review:
+validation rules, accepted-row decisions and the scope of Excel exports are unchanged.
+
+Expand **Individual issues & ignore review**, select issue checkboxes, optionally
+enter a reason, and choose **Ignore selected**. With a group selected, this list and
+**Select this page** apply only to that group. Without a group, they apply to the
+unresolved listed issues. Select this page selects up to 100 issues; paging preserves
+selections within that scope. Choosing another group clears the selection. All
+issues shown by the engine remain selectable up to its 15,000-issue display cap.
+When capped, cards explicitly identify listed counts, and unlisted errors still
+count toward validation totals and cannot be silently ignored.
 
 Ignored issues move to Ignored issues and stop contributing to unresolved error/warning totals. Restore an individual issue or Restore all to undo the review. An otherwise acceptable row with ignored issues is labelled Accepted · ignored issues rather than Passed. Accepted Excel exports include those rows plus a separate Ignored issues sheet with their reason; issue reports retain both unresolved and ignored issues. Source values and rule definitions never change when ignoring.
 

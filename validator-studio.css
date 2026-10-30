@@ -2563,3 +2563,335 @@ body[data-motion='off'] .val-prep-summary {
     flex: 1 1 140px;
   }
 }
+
+/* Grouped attention and a roomier correction workspace. */
+.val-metrics {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 155px), 1fr));
+}
+.validation-studio.val-review-wide .val-shell {
+  grid-template-columns: minmax(0, 1fr);
+}
+.validation-studio.val-review-wide .val-library {
+  display: none;
+}
+.val-attention {
+  padding: 0;
+  overflow: hidden;
+  border-color: #cbd8c0;
+  box-shadow: 0 8px 28px #304c3210;
+}
+.val-attention-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 18px;
+  padding: 24px;
+  background: linear-gradient(110deg, #f0f4e6, #fbf8ef);
+  border-bottom: 1px solid #dfe6d5;
+}
+.val-attention-heading h3 {
+  font-size: 23px;
+  letter-spacing: -0.6px;
+  margin: 5px 0;
+  color: var(--val-ink, #334d37);
+}
+.val-attention-heading p {
+  margin: 5px 0 0;
+  font-size: 13px;
+  color: var(--val-muted, #596951);
+}
+.val-attention-totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 22px;
+  font-size: 11px;
+  color: #536347;
+}
+.val-attention-totals strong {
+  display: block;
+  font-size: 25px;
+  font-weight: 650;
+  letter-spacing: -0.7px;
+  color: #3d5637;
+}
+.val-attention-filters {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 20px 24px;
+}
+.val-attention-filters > label {
+  flex: 1 1 230px;
+  max-width: 380px;
+}
+.val-attention .val-segments {
+  flex-wrap: wrap;
+}
+.val-attention-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 14px;
+  padding: 0 24px 22px;
+}
+.validation-studio .val-btn.val-attention-group {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  text-align: left;
+  white-space: normal;
+  min-width: 0;
+  gap: 13px;
+  padding: 18px;
+  border: 1px solid #e4d8cf;
+  border-radius: 13px;
+  background: #fffcf8;
+  color: #3d4938;
+  box-shadow: inset 0 3px 0 #c79984;
+  transition:
+    border-color 150ms,
+    box-shadow 150ms;
+}
+.validation-studio .val-btn.val-attention-group.warning {
+  border-color: #e4debc;
+  background: #fffdf4;
+  box-shadow: inset 0 3px 0 #d2b861;
+}
+.validation-studio .val-btn.val-attention-group:hover,
+.validation-studio .val-btn.val-attention-group.is-selected {
+  border-color: #6b8c60;
+  box-shadow:
+    inset 0 3px 0 #6b8c60,
+    0 4px 14px #4d684016;
+  transform: none;
+}
+.val-attention-group:focus-visible {
+  outline: 3px solid #426c62;
+  outline-offset: 3px;
+}
+.val-attention-group-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 7px;
+  font-size: 11px;
+  color: #5d6a56;
+}
+.val-attention-kind {
+  padding: 4px 8px;
+  border-radius: 6px;
+  color: #934b38;
+  background: #f8e7df;
+  font-size: 10px;
+  font-weight: 650;
+}
+.val-attention-kind.warning {
+  color: #7f6417;
+  background: #f6edcb;
+}
+.val-attention-group > strong {
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.val-attention-rule {
+  font-size: 11px;
+  line-height: 1.5;
+  color: #687560;
+  overflow-wrap: anywhere;
+}
+.val-attention-group-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid #e8e6da;
+  font-size: 11px;
+}
+.val-attention-group-foot b {
+  font-size: 21px;
+  letter-spacing: -0.6px;
+}
+.val-attention-group-foot small {
+  font-size: 10px;
+  color: #64715c;
+}
+.val-attention-group-foot > span:last-child {
+  color: #486440;
+  font-weight: 650;
+}
+.val-attention > .val-pagination {
+  padding: 0 24px 18px;
+}
+.val-attention-empty,
+.val-attention-cap {
+  margin: 0 24px 18px;
+  padding: 14px;
+  font-size: 13px;
+  border-radius: 8px;
+  background: #f2f4eb;
+}
+.val-attention-cap {
+  margin-top: 18px;
+  background: #fff2ce;
+  color: #745319;
+}
+.val-individual-review {
+  border-top: 1px solid #dfe6d5;
+  padding: 16px 24px;
+}
+.val-individual-review > summary {
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 5px 0;
+}
+.val-individual-review .val-issue-list {
+  max-height: 330px;
+}
+.val-group-context {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 18px 0;
+  padding: 18px 20px;
+  background: #f3eee8;
+  border: 1px solid #e3d3c6;
+  border-left: 4px solid #b27c64;
+  border-radius: 10px;
+}
+.val-group-context.warning {
+  background: #faf4df;
+  border-color: #e4d6a5;
+  border-left-color: #b6983b;
+}
+.val-group-context > div:first-child {
+  flex: 1 1 250px;
+}
+.val-group-context strong {
+  display: block;
+  font-size: 16px;
+  line-height: 1.5;
+  margin: 5px 0;
+  overflow-wrap: anywhere;
+}
+.val-group-context p {
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+.val-group-context .val-group-resolved {
+  flex: 1 1 100%;
+  padding-top: 10px;
+  border-top: 1px solid #d6dec9;
+  color: #48643c;
+}
+#valResultsCard {
+  scroll-margin-top: 22px;
+}
+#valResultsCard .val-grid {
+  font-size: 13px;
+}
+#valResultsCard .val-grid th code {
+  font-size: 10px;
+}
+#valResultsCard .val-grid thead th {
+  font-size: 12px;
+  padding: 14px 12px;
+  min-width: 175px;
+}
+#valResultsCard .val-grid thead th:first-child {
+  min-width: 110px;
+}
+#valResultsCard .val-grid tbody th {
+  min-width: 110px;
+  max-width: 180px;
+  padding: 10px;
+  font-size: 12px;
+  white-space: normal;
+  text-align: left;
+}
+#valResultsCard .val-grid td input {
+  font-size: 13px !important;
+  min-width: 150px;
+  min-height: 44px !important;
+  padding: 10px !important;
+  border-radius: 6px;
+}
+#valResultsCard .val-grid td input:focus {
+  outline: 2px solid #547e6a;
+  outline-offset: -2px;
+  background: #ffffffb8 !important;
+}
+#valResultsCard .val-grid tr:focus-within > th {
+  background: #e7efdf;
+}
+#valResultsCard .val-row-origin {
+  display: block;
+  font-size: 10px;
+  line-height: 1.6;
+  margin-top: 5px;
+}
+#valResultsCard .val-grid th.val-group-column {
+  box-shadow: inset 0 3px 0 #a67159;
+  background: #f5ece4;
+}
+#valResultsCard .val-grid td.val-group-cell {
+  border-left: 3px solid #b17c64;
+}
+.val-row-resolved {
+  display: block;
+  font-size: 10px;
+  margin-top: 8px;
+  color: #466a3d;
+}
+.val-unmapped-record small {
+  font-size: 10px;
+  color: #64725b;
+}
+.val-read-only {
+  min-width: 150px;
+  max-width: 320px;
+  max-height: 140px;
+  overflow: auto;
+  padding: 10px 6px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+@media (max-width: 700px) {
+  .val-attention-heading,
+  .val-attention-filters {
+    padding: 18px;
+  }
+  .val-attention-totals {
+    width: 100%;
+  }
+  .val-attention-groups {
+    grid-template-columns: 1fr;
+    padding: 0 18px 18px;
+  }
+  .val-attention-filters > label {
+    max-width: none;
+  }
+  .val-individual-review {
+    padding: 14px 18px;
+  }
+  .val-group-context {
+    padding: 15px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .validation-studio .val-btn.val-attention-group {
+    transition: none;
+  }
+}

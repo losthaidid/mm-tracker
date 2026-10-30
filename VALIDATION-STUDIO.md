@@ -172,11 +172,33 @@ destination conditions are kept. Copies do not stay synchronized with their sour
 
 ### Open an issue's value
 
-After validation, click an entry in **What needs attention**. Studio switches to
-the row's page, scrolls to the exact column and selects the editable value. A
-**Current value** panel shows the full value and message (including blank values).
-The issue list also previews each value. Correct the cell; errors, warnings and exports update automatically. Uploaded values
-remain in memory.
+After validation, **What needs attention** appears above the editable records.
+Repeated issues are grouped by the same field, check and severity. Each card shows
+its distinct affected-record count; errors and warnings have separate labels and
+filters. Search by message, field or check. Duplicate-check row pointers are grouped
+together, while different conditions and unique combinations remain separate.
+
+Choose **Review records** on a group to show its complete affected records. The
+participating fields are highlighted, and exploded records retain their original
+worksheet row and split part. Extra upload columns are visible read-only. Use
+**Roomy view** to hide the template sidebar and gain more horizontal editing space;
+**Exit roomy view** restores it. Larger inputs, sticky headers and source-row labels
+make wide records easier to review.
+
+Corrections recheck automatically and update group counts. Edited records stay
+visible with **Resolved in this group** so the caret is not removed while typing.
+Choose **Refresh record list** to remove them, another group to change focus, or
+**Back to error groups** to return to the summary. All-rows/error/warning filters also
+leave the selected group. Exports retain their full run scope rather than following
+the selected group.
+
+Expand **Individual issues & ignore review** to inspect individual messages and
+values or select issues to ignore. With a group open, selection applies only to
+that group's listed issues. Clicking an individual issue still switches to its
+record page, scrolls to the field and selects the editable value. The **Current
+value** panel retains the complete value, including blanks. Ignored issues remain
+separate and can be restored. If the 15,000-issue cap is reached, group counts are
+explicitly labelled as listed records; unlisted issues still count toward totals.
 
 ## SAP mode
 
