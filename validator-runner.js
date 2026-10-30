@@ -23,7 +23,7 @@
         let worker;
         try {
           worker = new root.Worker(
-            new URL('./validator-worker.js?v=20261030-requirements-1', base),
+            new URL('./validator-worker.js?v=20261030-performance-1', base),
             {
               name: 'WorkHub validation',
             }

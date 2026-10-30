@@ -122,6 +122,14 @@ Batch C: [batch-c-engine.js](../batch-c-engine.js) handles deterministic ticket 
 | [supabase/migrations/](../supabase/migrations/) | Existing database format updates: version 5–7 support; precise schedules/subtask notes; workspace document version support. Ordinary wording/CSS edits need no SQL migration. |
 | [THIRD-PARTY-LICENSES.txt](../THIRD-PARTY-LICENSES.txt) | Supplied library licence notices. JSZip also retains its original licence header. |
 
+## Validation Studio performance checks
+
+Validation indexes allowed values and field metadata once per run. SAP base checks avoid constructing unused comparison values. Comparison paging reuses a bounded count index for the current result and filters; edits and context changes build a fresh index. Unchanged editor markup is retained during updates, and Excel export reuses column addresses while keeping the same worksheet XML.
+
+`tests/validator-performance.test.mjs` compares complete validation results with hashes captured from deployment `e33b54c`, including General/SAP checks, allowed-value boundaries, every operator, nested WHEN groups, multiple THEN requirements, company scope, duplicates and truncation. It also compares every XML member in seven exported workbooks and checks comparison filters/pages against the cell-level comparison results. Fixed synthetic inputs and expected outputs are under `tests/fixtures/`.
+
+Use `node scripts/benchmark-validator.mjs` for the synthetic 12,000-record / 100-column validation benchmark. An optional first argument selects an earlier engine source file; an optional second argument selects `general`, `sap` or `sap-plain`. Compare result hashes as well as timings. Each case warms up on 100 records and reports the median of three full runs. Timings depend on the device, data and rules; this benchmark is not a minimum-speed guarantee.
+
 ## Tests, documentation and project support
 
 | Files | Responsibility |
