@@ -1395,6 +1395,77 @@
   border: 1px solid #e5eadb;
   border-radius: 11px;
 }
+.val-comparison {
+  margin-top: 20px;
+}
+.val-comparison-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+  padding: 16px 0;
+  font-size: 12px;
+}
+.val-comparison-counts strong {
+  font-size: 18px;
+  margin-right: 4px;
+}
+.val-comparison-filters {
+  margin: 16px 0 8px;
+}
+.validation-studio .val-comparison-grid {
+  min-width: 1300px;
+}
+.val-comparison-grid td,
+.val-comparison-grid th {
+  vertical-align: top;
+}
+.val-comparison-grid small,
+.val-comparison-grid td code {
+  display: block;
+  margin-top: 6px;
+  font-size: 10px;
+}
+.val-comparison-grid pre,
+.val-comparison-preview {
+  margin: 0;
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  min-width: 150px;
+  max-width: 320px;
+  padding: 5px;
+}
+.val-comparison-grid summary {
+  cursor: pointer;
+}
+.val-comparison-grid td.val-difference {
+  background: #fff1d0;
+  color: #68460d;
+  box-shadow: inset 0 -2px 0 #d6ad4b;
+}
+.val-comparison-grid td.val-prepared-change {
+  background: #e3effa;
+  color: #234e6d;
+  box-shadow: inset 0 -2px 0 #83afce;
+}
+.val-comparison-label {
+  display: inline-block;
+  padding: 5px 7px;
+  border-radius: 6px;
+  font-size: 10px;
+}
+.val-comparison-label.prepared {
+  background: #e3effa;
+  color: #234e6d;
+}
+.val-comparison-label.corrected,
+.val-comparison-label.prepared-corrected,
+.val-comparison-label.restored {
+  background: #fff1d0;
+  color: #68460d;
+}
 .validation-studio .val-grid {
   width: 100%;
   min-width: 650px;
