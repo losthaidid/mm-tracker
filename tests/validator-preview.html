@@ -4,7 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; worker-src 'self' blob:; font-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://aaotojqkiewbhtnrlcur.supabase.co; frame-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Validation Studio visual check</title>
-<link rel="stylesheet" href="../validator-studio.css?v=20261030-compare-queue-1">
+<link rel="stylesheet" href="../validator-studio.css?v=20261030-uom-versions-1">
 <link rel="stylesheet" href="../work-library.css?v=20261017-wishlist-1">
 <style>
 body{margin:0;padding:28px;background:#f0f2e7;font-family:system-ui,-apple-system,Segoe UI,sans-serif}
@@ -19,12 +19,13 @@ body{margin:0;padding:28px;background:#f0f2e7;font-family:system-ui,-apple-syste
 <div id="preview"></div><div id="previewStatus" role="status"></div>
 <dialog id="previewModal"><div id="previewModalBody"></div><button type="button" onclick="document.getElementById('previewModal').close()">Close</button></dialog>
 <script src="../vendor/jszip.min.js"></script>
-<script src="../validator-engine.js?v=20261030-performance-1"></script>
+<script src="../validator-engine.js?v=20261030-uom-versions-1"></script>
+<script src="../validator-reference-data.js?v=20261030-uom-versions-1"></script>
 <script src="../validator-files.js?v=20261030-file-compare-1"></script>
 <script src="../validator-transform.js?v=20261030-requirements-1"></script>
 <script src="../validator-compare-engine.js?v=20261030-compare-queue-1"></script>
 <script src="../validator-compare.js?v=20261030-compare-queue-1"></script>
-<script src="../validator-studio.js?v=20261030-file-compare-1"></script>
+<script src="../validator-studio.js?v=20261030-uom-versions-1"></script>
 <script>
 const E=WorkHubValidatorEngine;
 let memory={projects:[],projectCompanies:[],workhub:{validator:{templates:[E.example()],runs:[]}}},ui;

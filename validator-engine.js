@@ -605,6 +605,8 @@
           l.descriptionColumns.some(k => !l.headers.includes(k)))
       )
         throw Error('Choose up to five existing reference description columns.');
+      if (l.caseSensitive !== undefined && typeof l.caseSensitive !== 'boolean')
+        throw Error('Choose a valid reference case-sensitivity setting.');
       references.set(l.id, l);
     }
     if (!Array.isArray(t.rules) || t.rules.length > LIMITS.rules)
@@ -931,11 +933,16 @@
         throw Error('Keep up to 15 published versions per template.');
       let last = 0;
       for (const r of t.releases) {
-        if (!Number.isInteger(r.version) || r.version <= last || !text(r.publishedAt, 50))
+        if (!Number.isSafeInteger(r.version) || r.version <= last || !text(r.publishedAt, 50))
           throw Error('Check published template versions.');
         last = r.version;
         checkSchema(r.schema);
       }
+      if (
+        t.lastPublishedVersion !== undefined &&
+        (!Number.isSafeInteger(t.lastPublishedVersion) || t.lastPublishedVersion < last)
+      )
+        throw Error('Keep the last published version number for this template.');
     }
     const runIds = new Set();
     for (const r of v.runs) {
@@ -1017,6 +1024,12 @@
     }
     return c?.caseSensitive ? s : s.toLowerCase();
   }
+  // A maintained reference can require exact case without changing the field's other checks.
+  function referenceField(list, field) {
+    return list?.caseSensitive && field && !field.caseSensitive
+      ? { ...field, caseSensitive: true }
+      : field;
+  }
   function testCondition(c, row, t, cache) {
     c = resolveCondition(c, t);
     const field = t.columns.find(f => f.key === c.field),
@@ -1073,11 +1086,13 @@
         const l = t.lookups.find(x => x.id === c.lookupId),
           i = l?.headers.indexOf(c.lookupColumn);
         if (!l || i < 0) return false;
-        if (!cache) return l.rows.some(r => comparable(r[i], field, t.mode) === a);
+        const matchField = referenceField(l, field),
+          matchValue = comparable(raw, matchField, t.mode);
+        if (!cache) return l.rows.some(r => comparable(r[i], matchField, t.mode) === matchValue);
         const key = JSON.stringify([l.id, i, field.key]);
         if (!cache.has(key))
-          cache.set(key, new Set(l.rows.map(r => valueKey(comparable(r[i], field, t.mode)))));
-        return cache.get(key).has(valueKey(a));
+          cache.set(key, new Set(l.rows.map(r => valueKey(comparable(r[i], matchField, t.mode)))));
+        return cache.get(key).has(valueKey(matchValue));
       }
       case 'lookupTuple':
         return referenceRows(c, row, t, cache).count > 0;
@@ -1102,7 +1117,10 @@
         : [{ field: c.field, referenceColumn: c.lookupColumn }];
     if (!Array.isArray(pairs) || !pairs.length) return { rows: [], count: 0 };
     const mapping = pairs.map(p => ({
-      field: t.columns.find(f => f.key === p.field),
+      field: referenceField(
+        l,
+        t.columns.find(f => f.key === p.field)
+      ),
       index: l.headers.indexOf(p.referenceColumn),
     }));
     if (mapping.some(m => !m.field || m.index < 0)) return { rows: [], count: 0 };
@@ -1132,13 +1150,29 @@
     if (!field) throw Error('Choose an existing field.');
     const candidates = new Map(),
       cache = new Map();
+    const exactReference =
+      t.lookups.some(l => l.caseSensitive) &&
+      t.rules.some(
+        rule =>
+          ruleApplies(rule, context) &&
+          testGroup(rule.when, row, t, cache) &&
+          requirements(rule).some(requirement => {
+            const c = resolveCondition(requirement, t);
+            return (
+              c.field === fieldKey &&
+              ['lookup', 'lookupTuple'].includes(c.operator) &&
+              t.lookups.find(l => l.id === c.lookupId)?.caseSensitive
+            );
+          })
+      );
+    const matchField = exactReference ? { ...field, caseSensitive: true } : field;
     const add = (value, source, detail = '') => {
       if (
         blank(value) ||
-        comparable(value, field, t.mode) === comparable(own(row, fieldKey), field, t.mode)
+        comparable(value, matchField, t.mode) === comparable(own(row, fieldKey), matchField, t.mode)
       )
         return;
-      const key = valueKey(comparable(value, field, t.mode));
+      const key = valueKey(comparable(value, matchField, t.mode));
       if (!candidates.has(key)) candidates.set(key, { value: String(value), source, detail });
     };
     for (const value of tokens(field.values)) add(value, 'Allowed values');
@@ -1168,7 +1202,10 @@
             !pairs
               .filter(p => p.field !== fieldKey)
               .every(p => {
-                const f = t.columns.find(f => f.key === p.field),
+                const f = referenceField(
+                    list,
+                    t.columns.find(f => f.key === p.field)
+                  ),
                   value = comparable(own(row, p.field), f, t.mode);
                 return (
                   value !== null &&
@@ -1781,6 +1818,18 @@
     t.rules = [r, dates, review];
     return t;
   }
+  function publishedVersion(t, runs = []) {
+    return Math.max(
+      t.lastPublishedVersion || 0,
+      ...t.releases.map(r => r.version),
+      ...runs.filter(r => r.templateId === t.id).map(r => r.version)
+    );
+  }
+  function versionRuns(d, templateId, version) {
+    return (d?.workhub?.validator?.runs || []).filter(
+      r => r.templateId === templateId && r.version === version
+    );
+  }
   function prepare(next, previous, restoring = false) {
     if (restoring) return;
     for (const t of next.workhub?.validator?.templates || []) {
@@ -1810,13 +1859,35 @@
           }
       }
       if (!old) continue;
+      const lastVersion = publishedVersion(old, previous?.workhub?.validator?.runs);
+      if (
+        old.lastPublishedVersion !== undefined &&
+        !(t.lastPublishedVersion >= old.lastPublishedVersion)
+      )
+        throw Error('Published version numbers cannot be reset or reused.');
       for (const release of old.releases) {
         const retained = t.releases.find(r => r.version === release.version);
-        if (!retained || JSON.stringify(retained) !== JSON.stringify(release))
+        if (!retained) {
+          if (
+            versionRuns(previous, old.id, release.version).length ||
+            versionRuns(next, old.id, release.version).length
+          )
+            throw Error(
+              'This published version is used by saved validation runs and cannot be deleted.'
+            );
+          if (!(t.lastPublishedVersion >= lastVersion))
+            throw Error('Keep the last published version number when deleting a version.');
+        } else if (JSON.stringify(retained) !== JSON.stringify(release))
           throw Error(
             'Published versions are frozen. Copy a version into the draft to make changes.'
           );
       }
+      if (
+        t.releases.some(
+          r => !old.releases.some(p => p.version === r.version) && r.version <= lastVersion
+        )
+      )
+        throw Error('Published version numbers cannot be reset or reused.');
     }
   }
   root.WorkHubValidatorEngine = Object.freeze({
@@ -1856,6 +1927,8 @@
     upgrade,
     validateState,
     prepare,
+    publishedVersion,
+    versionRuns,
     validateRows,
     testCondition,
     testGroup,
