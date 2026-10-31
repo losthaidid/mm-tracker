@@ -31,6 +31,13 @@
       /[&<>"']/g,
       c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[c]
     );
+  const excelString = value =>
+    String(value ?? '')
+      .replace(/_x[0-9a-f]{4}_/gi, code => '_x005F_' + code.slice(1))
+      .replace(
+        /[\u0000-\u0008\u000B-\u001F\uFFFE\uFFFF]/g,
+        c => '_x' + c.charCodeAt(0).toString(16).padStart(4, '0') + '_'
+      );
   const nodes = (el, name) => Array.from(el.getElementsByTagNameNS('*', name));
   const first = (el, name) => nodes(el, name)[0];
   const content = (el, name) => first(el, name)?.textContent || '';
@@ -308,6 +315,19 @@
       notes.localeFormats = true;
     return rendered;
   }
+  // Shared by the existing XLSX reader and the XLS comparison adapter. Keep
+  // comparison's saved-value rules separate from CSV display formatting.
+  function plainExcelValue(value, type, fmtId, fmt, is1904) {
+    if (
+      !type &&
+      value !== '' &&
+      ([14, 15, 16, 17, 22, 27, 30, 36, 50, 57].includes(fmtId) ||
+        /[dy]/i.test(fmt.replace(/"[^"]*"|\[[^\]]*\]|\\./g, '')))
+    )
+      return excelDate(value, is1904);
+    if (!type && /^0{2,}$/.test(fmt) && /^\d+$/.test(value)) return value.padStart(fmt.length, '0');
+    return value;
+  }
   async function read(file, { valuesOnly = false, displayValues = false, signal } = {}) {
     const limits = displayValues ? { ...CSV_LIMITS, rows: CSV_LIMITS.rows - 1 } : E().LIMITS;
     if (displayValues) {
@@ -358,7 +378,7 @@
     if (zip.file('xl/sharedStrings.xml'))
       await blocks(zip, 'xl/sharedStrings.xml', 'si', si => {
         active();
-        const value = displayValues
+        const value = valuesOnly
           ? displayedText(si)
           : nodes(si, 't')
               .map(t => t.textContent)
@@ -554,7 +574,7 @@
               throw Error('A workbook cell points to an invalid shared string.');
             let value =
               type === 'inlineStr'
-                ? displayValues
+                ? valuesOnly
                   ? displayedText(c)
                   : nodes(c, 't')
                       .map(t => t.textContent)
@@ -566,7 +586,7 @@
                       ? 'true'
                       : 'false'
                     : raw;
-            if (displayValues && type === 'str')
+            if (valuesOnly && type === 'str')
               value = value.replace(/_x([0-9a-f]{4})_/gi, (_, code) =>
                 String.fromCharCode(parseInt(code, 16))
               );
@@ -609,15 +629,7 @@
                 sheet.getAttribute('name') + '!' + ref,
                 notes
               );
-            else if (
-              !type &&
-              raw !== '' &&
-              ([14, 15, 16, 17, 22, 27, 30, 36, 50, 57].includes(fmtId) ||
-                /[dy]/i.test(fmt.replace(/"[^"]*"|\[[^\]]*\]|\\./g, '')))
-            )
-              value = excelDate(raw, is1904);
-            else if (!type && /^0{2,}$/.test(fmt) && /^\d+$/.test(raw))
-              value = raw.padStart(fmt.length, '0');
+            else value = plainExcelValue(value, type, fmtId, fmt, is1904);
             if (String(value).length > 32000) throw Error('A cell exceeds 32,000 characters.');
             uploadText += String(value).length;
             if (uploadText > limits.text)
@@ -893,7 +905,7 @@
       '</cols><sheetData>'
     );
   }
-  function worksheetRow(row, y, columnNames) {
+  function worksheetRow(row, y, columnNames, escapeText = false) {
     return (
       '<row r="' +
       (y + 1) +
@@ -916,7 +928,9 @@
             '>' +
             (typeof v === 'number'
               ? '<v>' + v + '</v>'
-              : '<is><t xml:space="preserve">' + xml(v) + '</t></is>') +
+              : '<is><t xml:space="preserve">' +
+                xml(escapeText ? excelString(v) : v) +
+                '</t></is>') +
             '</c>'
           );
         })
@@ -935,7 +949,7 @@
       size = 0,
       y = 0;
     for (const row of typeof s.rows === 'function' ? s.rows() : s.rows) {
-      const text = worksheetRow(row, y++, columnNames);
+      const text = worksheetRow(row, y++, columnNames, s.escapeText);
       batch.push(text);
       size += text.length;
       if (size >= 262144) {
@@ -1081,7 +1095,9 @@
                     '>' +
                     (typeof v === 'number'
                       ? '<v>' + v + '</v>'
-                      : '<is><t xml:space="preserve">' + xml(v) + '</t></is>') +
+                      : '<is><t xml:space="preserve">' +
+                        xml(s.escapeText ? excelString(v) : v) +
+                        '</t></is>') +
                     '</c>'
                   );
                 })
@@ -1882,6 +1898,7 @@
     read,
     CSV_LIMITS,
     formatDisplayedValue: displayedValue,
+    plainExcelValue,
     workbook,
     template,
     report,

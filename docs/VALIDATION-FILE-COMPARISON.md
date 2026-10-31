@@ -8,7 +8,7 @@ validation workspace.
 
 ## Compare one pair
 
-1. Open **Compare two files** and upload **Template A** and **Template B** (.xlsx,
+1. Open **Compare two files** and upload **Template A** and **Template B** (.xls, .xlsx,
    .csv or .tsv).
 2. Select each file's worksheet and header row.
 3. Choose one skip method for each file. **Enter a skip count** excludes that many
@@ -26,6 +26,9 @@ validation workspace.
 
 The comparison queue uses **A1 ↔ B1, A2 ↔ B2, A3 ↔ B3**. Each pair has its own two
 files, worksheets, header rows and skip settings.
+Both individual uploads and bulk A/B queues accept XLS, XLSX, CSV and TSV. Formats
+can be mixed in one pair and across the queue; for example, A1.xls ↔ B1.xlsx and
+A2.xlsx ↔ B2.xls.
 
 1. Use **Add file pair** for individual pairs, or select several files through
    **Add A files** and **Add B files**. Bulk uploads fill the next empty A/B slots
@@ -56,6 +59,8 @@ pairs are added. No comparison data or summaries are written to Supabase or
 validation run history.
 
 ![Separate A/B comparison pairs and results](images/validation-comparison-queue.jpg)
+
+![Mixed XLS/XLSX pairs with independent comparison results](images/validation-compare-xls.jpg)
 
 ## Excel report
 
@@ -94,6 +99,21 @@ than silently becoming blank. Saved empty strings, zero, booleans and Excel erro
 such as `#N/A` remain literal comparison values. Reports contain values, not
 executable formulas. The normal validation/reference/setup readers retain their
 existing formula rules.
+
+Binary Excel 97–2003 XLS (BIFF8) and Excel 5/95 XLS (BIFF5) use the same local,
+cancellable reader as Excel to CSV, with a separate saved-value mode. It follows
+the existing XLSX comparison rules: plain numbers and percentages retain their
+saved numeric values, booleans use `true`/`false`, supported dates use ISO dates,
+and integer codes with all-zero number formats keep their leading zeros. CSV
+display formatting is not applied to comparisons. Missing formula caches,
+incomplete files and unsupported worksheet structures stop with a clear error.
+XLSX text escapes are decoded to their literal values, including CR/LF and
+literal `_xNNNN_` text; comparison reports encode them safely on export.
+
+The XLS worker loads only for an XLS upload and is terminated on replacement,
+clearing or account changes. Its controller is kept outside compressed queue
+snapshots. CSV conversion retains its existing displayed-value mode, and normal
+validation/reference/setup uploads retain their existing supported formats.
 
 ## Capacity and session handling
 

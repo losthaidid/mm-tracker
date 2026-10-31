@@ -19,4 +19,9 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install independent XLS test reader
+        run: python3 -m pip install xlrd==2.0.2
       - run: npm test

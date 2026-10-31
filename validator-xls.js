@@ -1,4 +1,4 @@
-/** Excel-to-CSV legacy upload bridge. XLS parser loads only in a cancellable worker. */
+/** Local XLS upload bridge. Parser loads only in a cancellable worker. */
 (function (root) {
   'use strict';
   const base = document.currentScript?.src || root.location.href,
@@ -8,7 +8,7 @@
     e.name = 'AbortError';
     return e;
   };
-  async function read(file, { signal } = {}) {
+  async function read(file, { signal, valuesOnly = false } = {}) {
     if (signal?.aborted) throw cancelled();
     if (
       !file ||
@@ -39,9 +39,12 @@
       signal?.addEventListener('abort', abort, { once: true });
       if (signal?.aborted) return abort();
       try {
-        worker = new root.Worker(new URL('./validator-xls-worker.js?v=20261031-csv-xls-1', base), {
-          name: 'WorkHub XLS values',
-        });
+        worker = new root.Worker(
+          new URL('./validator-xls-worker.js?v=20261031-compare-xls-1', base),
+          {
+            name: 'WorkHub XLS values',
+          }
+        );
         worker.onmessage = event => {
           if (event.data?.error) finish(Error(event.data.error));
           else if (Array.isArray(event.data?.result?.sheets)) finish(null, event.data.result);
@@ -52,7 +55,7 @@
           finish(Error('The background XLS reader could not start or finish. Refresh and retry.'));
         };
         worker.onmessageerror = worker.onerror;
-        worker.postMessage({ buffer }, [buffer]);
+        worker.postMessage({ buffer, valuesOnly: !!valuesOnly }, [buffer]);
       } catch {
         finish(Error('The background XLS reader is unavailable. Refresh and retry.'));
       }

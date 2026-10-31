@@ -30,6 +30,14 @@
         ? '<em>(blank)</em>'
         : `<pre class="vfc-value">${esc(text)}</pre>`;
   function install(a) {
+    const readers = new Map();
+    function abortReads(side) {
+      for (const [key, controller] of readers) {
+        if (side && key !== side) continue;
+        controller.abort();
+        readers.delete(key);
+      }
+    }
     const empty = () => ({
       book: null,
       original: null,
@@ -67,6 +75,7 @@
     function sync() {
       const next = a.owner?.() || '';
       if (next !== owner || !a.ready()) {
+        abortReads();
         epoch++;
         queueEpoch++;
         owner = next;
@@ -241,6 +250,7 @@
         epoch++;
         result = null;
         busy = exporting = false;
+        abortReads();
         files = { A: empty(), B: empty() };
         activeId = id;
         filter = job.view?.filter || saved?.filter || 'different';
@@ -314,13 +324,13 @@
       if (
         list.some(
           file =>
-            !/\.(xlsx|csv|tsv)$/i.test(file.name) ||
+            !/\.(xls|xlsx|csv|tsv)$/i.test(file.name) ||
             !Number.isFinite(file.size) ||
             file.size < 0 ||
             file.size > root.WorkHubValidatorEngine.LIMITS.fileBytes
         )
       )
-        throw Error('Choose XLSX, CSV or TSV files below 50 MB each.');
+        throw Error('Choose XLS, XLSX, CSV or TSV files below 50 MB each.');
       if (
         [...originals, ...list].reduce((n, file) => n + (file?.size || 0), 0) >
         QUEUE_LIMITS.inputBytes
@@ -441,6 +451,7 @@
       ensure();
       if (!queueBusy) return;
       queueStopping = true;
+      abortReads();
       epoch++;
       busy = false;
       tell('Stopping queue…');
@@ -454,6 +465,7 @@
       if (current) {
         epoch++;
         activeId = '';
+        abortReads();
         files = { A: empty(), B: empty() };
         result = null;
         page = selectedRow = 0;
@@ -470,6 +482,7 @@
       pairs = [];
       activeId = '';
       nextPair = 0;
+      abortReads();
       files = { A: empty(), B: empty() };
       result = null;
       page = selectedRow = 0;
@@ -576,7 +589,7 @@
         <div class="vfc-queue-footer"><span role="status">${completed} / ${pairs.length} pairs complete${queueBusy ? (queueStopping ? ' · Stopping…' : ' · Comparing…') : queueIO ? ' · Preparing pair data…' : ''}</span><div class="val-actions">${button('queue-start', 'Start queue', disabled || !ready ? 'disabled' : '', 'val-primary')}${queueBusy ? button('queue-stop', 'Stop queue', queueStopping ? 'disabled' : '') : button('queue-clear', 'Clear queue', disabled, 'val-quiet')}${button('queue-export', 'Download all reports', locked || !completed || !can('export') ? 'disabled' : '')}</div></div>`
             : ''
         }
-        <p class="val-help">Up to 10 pairs · 150 MB of original files combined. Only the open pair is fully loaded; other configured pairs are compressed in this browser session.</p><input id="vfcQueueA" type="file" multiple accept=".xlsx,.csv,.tsv" data-vfc-queue-file="A" hidden><input id="vfcQueueB" type="file" multiple accept=".xlsx,.csv,.tsv" data-vfc-queue-file="B" hidden></section>`;
+        <p class="val-help">Up to 10 pairs · 150 MB of original files combined. Only the open pair is fully loaded; other configured pairs are compressed in this browser session.</p><input id="vfcQueueA" type="file" multiple accept=".xls,.xlsx,.csv,.tsv" data-vfc-queue-file="A" hidden><input id="vfcQueueB" type="file" multiple accept=".xls,.xlsx,.csv,.tsv" data-vfc-queue-file="B" hidden></section>`;
     }
     function chosen(side) {
       const file = files[side];
@@ -630,10 +643,13 @@
           job.versions[side]++;
         }
       }
+      abortReads(side);
       invalidate();
       const slot = files[side],
         token = ++slot.token,
-        account = owner;
+        account = owner,
+        controller = new root.AbortController();
+      readers.set(side, controller);
       Object.assign(slot, {
         name: file.name,
         original: file,
@@ -647,8 +663,16 @@
       const current = () =>
         files[side] === slot && token === slot.token && account === a.owner?.() && a.ready();
       try {
-        const book = await F.read(file, { valuesOnly: true });
-        if (!current()) return;
+        const legacy = /\.xls$/i.test(file.name);
+        if (legacy && !root.WorkHubValidatorXLS)
+          throw Error('Refresh the page to load XLS comparison support.');
+        const book = legacy
+          ? await root.WorkHubValidatorXLS.read(file, {
+              valuesOnly: true,
+              signal: controller.signal,
+            })
+          : await F.read(file, { valuesOnly: true, signal: controller.signal });
+        if (!current() || controller.signal.aborted) return;
         Object.assign(slot, {
           book,
           sheetIndex: 0,
@@ -663,11 +687,12 @@
           !!slot.error
         );
       } catch (error) {
-        if (current()) {
+        if (current() && error.name !== 'AbortError') {
           slot.error = error.message;
           tell(error.message, true);
         }
       } finally {
+        if (readers.get(side) === controller) readers.delete(side);
         if (current()) {
           slot.reading = false;
           const failure = files.A.error || files.B.error;
@@ -692,8 +717,8 @@
         } catch {}
       return `<section class="val-card vfc-file" data-vfc-side="${side}" data-val-context="${activeId}:${side}:${file.token}:${file.sheetIndex}:${file.headerRow}">
         <div class="val-panel-title"><div><span class="val-eyebrow">UPLOAD ${side}</span><h3>Template ${side}</h3></div><span class="vfc-file-letter" aria-hidden="true">${side}</span></div>
-        <label class="val-label">${file.name ? 'Replace' : 'Choose'} Template ${side}<input id="vfcFile${side}" type="file" accept=".xlsx,.csv,.tsv" data-vfc-file="${side}"${disabled}></label>
-        ${file.name ? `<p class="vfc-file-name"><strong>${esc(file.name)}</strong>${file.reading ? '<small>Reading file…</small>' : data ? `<small>${data.rows.length.toLocaleString()} data rows · ${count} columns</small>` : ''}</p>` : '<p class="val-help">Excel (.xlsx), CSV or TSV · up to 50 MB</p>'}
+        <label class="val-label">${file.name ? 'Replace' : 'Choose'} Template ${side}<input id="vfcFile${side}" type="file" accept=".xls,.xlsx,.csv,.tsv" data-vfc-file="${side}"${disabled}></label>
+        ${file.name ? `<p class="vfc-file-name"><strong>${esc(file.name)}</strong>${file.reading ? '<small>Reading file…</small>' : data ? `<small>${data.rows.length.toLocaleString()} data rows · ${count} columns</small>` : ''}</p>` : '<p class="val-help">Excel (.xls or .xlsx), CSV or TSV · up to 50 MB</p>'}
         ${file.book ? `<div class="val-fields vfc-sheet-options"><label class="val-label">Worksheet<select name="vfcSheet${side}" data-vfc-setting="sheetIndex" data-side="${side}"${disabled}>${file.book.sheets.map((sheet, i) => `<option value="${i}"${i === file.sheetIndex ? ' selected' : ''}>${esc(sheet.name)}</option>`).join('')}</select></label><label class="val-label">Header row<input name="vfcHeader${side}" type="number" min="1" max="${file.book.sheets[file.sheetIndex]?.rows.length || 1}" value="${esc(file.headerRow)}" data-vfc-setting="headerRow" data-side="${side}"${disabled}></label></div>` : ''}
         ${
           data
@@ -844,6 +869,7 @@
       return [
         {
           name: 'Summary',
+          escapeText: true,
           width: 13,
           rowCount: summaryCount + 2,
           widths: [22, 14, 30, 20, 16, 32, 42, 30, 20, 16, 32, 42, 70],
@@ -949,6 +975,7 @@
         },
         {
           name: 'Field Comparison',
+          escapeText: true,
           width: 4 + r.columns.length * 3,
           rowCount: r.rowCount + 1,
           rows: function* () {
@@ -1042,6 +1069,7 @@
         if (queueBusy || queueIO)
           throw Error('Wait for the current queue operation, or stop the queue.');
         invalidate();
+        abortReads();
         files = { A: empty(), B: empty() };
         const job = activePair();
         if (job) {
