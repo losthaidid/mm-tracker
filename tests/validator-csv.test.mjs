@@ -219,7 +219,7 @@ test('new files, failed reads, account changes and permission changes cannot exp
   const x = await studio(t); await x.mode('excel-csv');
   const file = await x.workbook([{ data: row(1, textCell('A1', 'private')) }]);
   await x.ui.csvConverter.loadFile(file); await x.ui.csvConverter.convert();
-  await assert.rejects(x.ui.csvConverter.loadFile({ name: 'bad.xls' }), /legacy/); assert.equal(x.ui.csvConverter.snapshot().ready, null); assert.deepEqual(plain(x.ui.csvConverter.snapshot().sheets), []);
+  await assert.rejects(x.ui.csvConverter.loadFile({ name: 'bad.xlsm' }), /\.xls or \.xlsx/); assert.equal(x.ui.csvConverter.snapshot().ready, null); assert.deepEqual(plain(x.ui.csvConverter.snapshot().sheets), []);
   await x.ui.csvConverter.loadFile(file); await x.ui.csvConverter.convert();
   x.w.WorkHubCurrentAccess = { can: (feature, action) => action !== 'export' };
   assert.throws(() => x.ui.csvConverter.download(), /cannot export/); assert.equal(x.downloads.length, 0);

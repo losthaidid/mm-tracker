@@ -2,12 +2,12 @@
 
 In **Validation Studio**, choose **Excel to CSV** immediately beside **Compare
 two files**. It is an independent workspace and does not require a validation
-template. Upload a workbook, choose its worksheets, review the preview, then use
+template. Upload an **XLS or XLSX** workbook, choose its worksheets, review the preview, then use
 **Convert & verify** followed by **Download CSV**. Selecting several worksheets
 produces one ZIP with a separate CSV for each worksheet in workbook order.
 **Download again** reuses the verified result without repeating the conversion.
 
-![Excel to CSV with separate original and exploded worksheets](images/validation-excel-csv.jpg)
+![XLS workbook converted with leading zeros and saved formula values](images/validation-xls-csv.jpg)
 
 ## Values and positions
 
@@ -63,10 +63,23 @@ Changing the source/worksheet selection invalidates the cached download. Reading
 and conversion can be cancelled, and account/permission guards apply to upload,
 conversion and download. No saved account records are written.
 
-Limits are 50 MB per XLSX, 25,001 total worksheet rows per sheet, 1,000 columns,
+Limits are 50 MB per Excel workbook, 25,001 total worksheet rows per sheet, 1,000 columns,
 6 million rectangular cells across the workbook, 32,000 characters per cell,
 100 million formatted text characters and 250 MB combined CSV output. Limits
-reject the file instead of truncating it. Legacy XLS must first be saved as XLSX.
+reject the file instead of truncating it. Binary Excel 97–2003 XLS (BIFF8) and
+Excel 5/95 XLS (BIFF5) are supported directly. HTML/text files merely named `.xls`,
+older BIFF versions, encrypted workbooks, chart/macro tabs and XLS conditional
+formatting stop with instructions to save a suitable Excel copy. These cases
+never fall back to guessed text parsing or silently skip sheets or records.
+
+The XLS parser is loaded only when needed, in a fresh same-origin worker for
+each upload. Cancel, account changes and page exit terminate the worker. The
+original binary records are checked for complete worksheet streams, duplicate
+addresses, supported formats, explicit blank positions and formula caches before
+normalization. Tab order follows the workbook directory even if its physical
+sheet streams use a different order. The same displayed-value formatter and CSV
+verification apply to both XLS and XLSX. Validation and file comparison keep
+their existing supported upload formats.
 
 `validator-files.js` implements an opt-in `displayValues` reader; the validation
 and comparison defaults remain unchanged. `validator-csv.js` supplies encoding,
@@ -80,3 +93,11 @@ format, cache, ZIP, cancellation, permission and workspace-isolation checks.
 retrieved 2026-10-31, with its Apache 2.0 license in `vendor/ssf.LICENSE`.
 It formats numeric Excel serials locally; it does not run formulas or contact a
 network service. It is loaded before the file reader and CSV workspace.
+
+`vendor/sheetjs/xlsx.full.min.js` is the unmodified **SheetJS CE 0.20.3** full
+browser build from the [official CDN](https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js),
+retrieved 2026-10-31, with its Apache 2.0 license in `vendor/sheetjs/LICENSE`.
+The full build includes legacy codepage decoding. `validator-xls.js` starts the
+worker; `validator-xls-worker.js` loads the local vendor and
+`validator-xls-engine.js` checks and normalizes the BIFF workbook. No parser
+code or uploaded file is sent to an external service.

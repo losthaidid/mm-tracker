@@ -1881,6 +1881,7 @@
   root.WorkHubValidatorFiles = Object.freeze({
     read,
     CSV_LIMITS,
+    formatDisplayedValue: displayedValue,
     workbook,
     template,
     report,

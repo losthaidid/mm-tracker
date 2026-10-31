@@ -285,8 +285,8 @@
       filename = file?.name || '';
       selected = [];
       preview = rowPage = columnPage = 0;
-      if (!file || !/\.xlsx$/i.test(file.name))
-        throw Error('Choose an .xlsx workbook. Save legacy .xls files as .xlsx in Excel first.');
+      if (!file || !/\.xlsx?$/i.test(file.name))
+        throw Error('Choose an .xls or .xlsx Excel workbook.');
       const token = epoch,
         account = owner;
       controller = new root.AbortController();
@@ -294,7 +294,12 @@
       tell('Reading saved Excel values and number formats…');
       paint();
       try {
-        const loaded = await F.read(file, { displayValues: true, signal: controller.signal });
+        const legacy = /\.xls$/i.test(file.name);
+        if (legacy && !root.WorkHubValidatorXLS)
+          throw Error('Refresh the page to load XLS conversion support.');
+        const loaded = legacy
+          ? await root.WorkHubValidatorXLS.read(file, { signal: controller.signal })
+          : await F.read(file, { displayValues: true, signal: controller.signal });
         guard(token, account);
         book = loaded;
         preview = Math.max(
@@ -496,7 +501,7 @@
         (filename
           ? button('clear', busy ? 'Cancel' : 'Clear file', !can('run'), 'val-quiet')
           : '') +
-        '</div></div><p class="val-help">Convert one .xlsx workbook locally. Select one worksheet for a CSV, or several for a ZIP of separate CSV files. The source workbook stays unchanged.</p><input id="valCSVFile" type="file" accept=".xlsx" hidden>' +
+        '</div></div><p class="val-help">Convert one .xls or .xlsx workbook locally. Select one worksheet for a CSV, or several for a ZIP of separate CSV files. The source workbook stays unchanged.</p><input id="valCSVFile" type="file" accept=".xls,.xlsx" hidden>' +
         '<div class="vcsv-message' +
         (problem ? ' vcsv-error' : '') +
         '" role="status">' +
