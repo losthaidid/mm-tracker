@@ -78,8 +78,9 @@ original binary records are checked for complete worksheet streams, duplicate
 addresses, supported formats, explicit blank positions and formula caches before
 normalization. Tab order follows the workbook directory even if its physical
 sheet streams use a different order. The same displayed-value formatter and CSV
-verification apply to both XLS and XLSX. Validation and file comparison keep
-their existing supported upload formats.
+verification apply to both XLS and XLSX. File comparison also supports XLS with
+its existing saved-value rules; normal validation uploads keep their existing
+supported formats.
 
 `validator-files.js` implements an opt-in `displayValues` reader; the validation
 and comparison defaults remain unchanged. `validator-csv.js` supplies encoding,

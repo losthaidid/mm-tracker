@@ -1,8 +1,7 @@
-/** Strict BIFF5/BIFF8 value adapter. Runs only inside the Excel-to-CSV worker. */
+/** Strict BIFF5/BIFF8 value adapter for CSV conversion and independent comparison. */
 (function (root) {
   'use strict';
-  const F = root.WorkHubValidatorFiles,
-    L = F.CSV_LIMITS;
+  const F = root.WorkHubValidatorFiles;
   const errors = Object.freeze({
     0: '#NULL!',
     7: '#DIV/0!',
@@ -21,7 +20,7 @@
 
   // Check the original BIFF records before asking the library for cell objects.
   // This catches records that a value-oriented parser could otherwise skip.
-  function audit(stream) {
+  function audit(stream, L, valuesOnly) {
     const bytes = new Uint8Array(stream),
       view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength),
       bounds = [],
@@ -39,7 +38,9 @@
     function point(r, c, style, flag = 1) {
       need(
         r < L.rows && c < L.columns,
-        'Keep up to 25,001 worksheet rows and 1,000 columns. No data was removed.'
+        'Keep up to 25,001 worksheet rows and ' +
+          L.columns.toLocaleString() +
+          ' columns. No data was removed.'
       );
       need(Number.isInteger(style) && style >= 0, invalid);
       const s = current;
@@ -55,7 +56,10 @@
       s.styles[r][c] = style;
       s.height = Math.max(s.height, r + 1);
       s.width = Math.max(s.width, c + 1);
-      need(++s.cells <= L.cells, 'The XLS workbook exceeds 6,000,000 cells. No data was removed.');
+      need(
+        ++s.cells <= L.cells + (valuesOnly ? L.columns : 0),
+        'The XLS workbook exceeds its cell limit. No data was removed.'
+      );
     }
     while (p < bytes.length) {
       if (!stack.length && bytes[p] === 0 && bytes[p + 1] === 0) {
@@ -109,7 +113,7 @@
           throw Error(
             'The XLS workbook is password-protected. Save an unencrypted copy in Excel before converting.'
           );
-        if ([0x01b0, 0x01b1, 0x0879, 0x087a, 0x087b, 0x08c4].includes(type))
+        if (!valuesOnly && [0x01b0, 0x01b1, 0x0879, 0x087a, 0x087b, 0x08c4].includes(type))
           throw Error(
             'The XLS workbook uses conditional formatting that may change displayed values. Use regular number formats in an Excel copy before converting.'
           );
@@ -129,7 +133,7 @@
           custom.add(u16(p));
         }
         if (current && stack.length === 1) {
-          if (type === 0x0208) {
+          if (type === 0x0208 && !valuesOnly) {
             need(
               size >= 2 && u16(p) < L.rows,
               'Keep up to 25,001 worksheet rows. No rows were removed.'
@@ -200,15 +204,21 @@
       if (s.height && !s.width) s.width = 1;
       gridCells += s.height * s.width;
       need(
-        gridCells <= L.cells,
+        valuesOnly || gridCells <= L.cells,
         'The workbook used ranges exceed 6,000,000 conversion cells. No data was removed.'
       );
     }
     return { bounds, sheets, xfs, custom };
   }
 
-  function read(buffer) {
-    const X = root.XLSX;
+  function read(buffer, { valuesOnly = false } = {}) {
+    const X = root.XLSX,
+      L = valuesOnly
+        ? {
+            ...root.WorkHubValidatorEngine.LIMITS,
+            rows: root.WorkHubValidatorEngine.LIMITS.rows + 1,
+          }
+        : F.CSV_LIMITS;
     need(X?.version === '0.20.3', 'Refresh the page to load the XLS reader.');
     const bytes = new Uint8Array(buffer);
     need(bytes.length && bytes.length <= L.fileBytes, 'Choose an Excel workbook below 50 MB.');
@@ -227,7 +237,7 @@
         bytes[0] === 0x09 && bytes[1] === 0x08,
         'This .xls file is not a binary Excel workbook. Open it in Excel and save as Excel 97–2003 XLS or XLSX, then retry.'
       );
-    const checked = audit(stream);
+    const checked = audit(stream, L, valuesOnly);
     const wb = X.read(bytes, {
       type: 'array',
       dense: true,
@@ -305,6 +315,7 @@
                 '.'
             );
         }
+      let last = -1;
       const rows = Array.from({ length: info.height }, (_, r) =>
         Array.from({ length: info.width }, (_, c) => {
           if (!info.flags[r]?.[c]) return '';
@@ -342,30 +353,43 @@
             raw !== undefined && (cell.t !== 'n' || Number.isFinite(cell.v)),
             location + ' has an invalid saved value.'
           );
-          const value = F.formatDisplayedValue(
-            raw,
-            cell.t === 's' ? 'str' : cell.t,
-            raw,
-            fmtId,
-            format || '',
-            !!wb.Workbook?.WBProps?.date1904,
-            location,
-            notes
-          );
+          const value = valuesOnly
+            ? F.plainExcelValue(
+                cell.t === 'b' ? String(cell.v) : raw,
+                cell.t === 'n' ? '' : cell.t,
+                fmtId,
+                format || '',
+                !!wb.Workbook?.WBProps?.date1904
+              )
+            : F.formatDisplayedValue(
+                raw,
+                cell.t === 's' ? 'str' : cell.t,
+                raw,
+                fmtId,
+                format || '',
+                !!wb.Workbook?.WBProps?.date1904,
+                location,
+                notes
+              );
           need(
             value.length <= 32000 && (totalText += value.length) <= L.text,
-            'XLS displayed values exceed the text conversion limits. No data was removed.'
+            'XLS values exceed the text limits. No data was removed.'
           );
+          if (value !== '') last = Math.max(last, r);
           return value;
         })
       );
       output.push({
         name,
-        rows,
-        width: info.width,
-        rowCount: info.height,
-        state: bound.hidden === 2 ? 'veryHidden' : bound.hidden ? 'hidden' : 'visible',
-        notes,
+        rows: valuesOnly ? rows.slice(0, last + 1) : rows,
+        ...(!valuesOnly
+          ? {
+              width: info.width,
+              rowCount: info.height,
+              state: bound.hidden === 2 ? 'veryHidden' : bound.hidden ? 'hidden' : 'visible',
+              notes,
+            }
+          : {}),
       });
     }
     return { sheets: output };

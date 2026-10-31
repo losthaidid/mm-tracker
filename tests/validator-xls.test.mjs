@@ -37,7 +37,7 @@ function fixture(t, studio = false) {
   };
   const local = { console, Uint8Array, DataView }; local.self = local; local.window = local;
   const scope = vm.createContext(local);
-  for (const file of ['vendor/sheetjs/xlsx.full.min.js','vendor/ssf.js','validator-files.js','validator-xls-engine.js']) vm.runInContext(source(file), scope);
+  for (const file of ['vendor/sheetjs/xlsx.full.min.js','vendor/ssf.js','validator-engine.js','validator-files.js','validator-xls-engine.js']) vm.runInContext(source(file), scope);
   const X = local.XLSX, F = w.WorkHubValidatorFiles, C = w.WorkHubValidatorCSV;
   function workbook(sheets, options = {}) {
     const book = X.utils.book_new();
@@ -46,7 +46,7 @@ function fixture(t, studio = false) {
     return Buffer.from(X.write(book, { bookType: options.bookType || 'biff8', type: 'array', bookSST: options.bookType !== 'biff5' }));
   }
   const file = bytes => ({ name: 'legacy.xls', size: bytes.length, arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) });
-  const read = bytes => w.WorkHubValidatorXLS.read(file(bytes));
+  const read = (bytes, options) => w.WorkHubValidatorXLS.read(file(bytes), options);
   function rewrite(bytes, change) {
     const cfb = X.CFB.read(bytes, { type: 'array' }), entry = X.CFB.find(cfb, '/Workbook') || X.CFB.find(cfb, '/Book');
     const replaced = Buffer.from(change(Buffer.from(entry.content)));
@@ -161,4 +161,71 @@ test('the existing CSV workspace routes XLS through the worker and XLSX through 
   assert.equal(writes,0);owner='two';ui.sync();assert.equal(ui.snapshot().ready,null);assert.deepEqual(copy(ui.snapshot().sheets),[]);
   x.w.WorkHubCurrentAccess={can:(feature,action)=>action!=='run'};await assert.rejects(ui.loadFile(x.file(bytes)),/cannot run/);
   assert.equal(vendor.includes('0.20.3'),true);
+});
+
+async function comparison(t) {
+  const x=fixture(t);for(const name of ['validator-compare-engine.js','validator-compare.js'])x.w.eval(source(name));
+  let owner='owner',ready=true,q,writes=0;const downloads=[],render=()=>{x.d.getElementById('view').innerHTML=q.render();};
+  q=x.w.WorkHubValidatorCompare.install({owner:()=>owner,ready:()=>ready,render,mutate(){writes++;},download(blob,name){downloads.push({blob,name});}});render();
+  const change=(selector,value)=>{const el=x.d.querySelector(selector);assert.ok(el,selector);if(el.type==='checkbox'||el.type==='radio')el.checked=value;else el.value=value;el.dispatchEvent(new x.w.Event('change',{bubbles:true}));};
+  const upload=(side,bytes,name)=>q.loadFile(side,{...x.file(bytes),name});
+  return {...x,q,downloads,render,change,upload,writes:()=>writes,account(name,active=true){owner=name;ready=active;q.sync();render();}};
+}
+
+test('XLS comparison uses the existing saved-value rules and agrees with equivalent XLSX cells',async t=>{
+  const x=fixture(t),sheet=representative(x),xls=x.workbook([{name:'Data',sheet}]),xlsx=x.workbook([{name:'Data',sheet}],{bookType:'xlsx'});
+  const a=await x.read(xls,{valuesOnly:true}),b=await x.F.read({...x.file(xlsx),name:'same.xlsx'},{valuesOnly:true});
+  assert.deepEqual(copy(a.sheets),copy(b.sheets));
+  assert.deepEqual(copy(a.sheets[0].rows[1]),['000007','  µL 界 😀, "quoted"\r\nnext  ','0.125','2024-01-01','false','000002','']);
+  assert.equal(x.workers[0].packet.valuesOnly,true);
+  assert.equal((await x.read(xls)).sheets[0].rows[1][2],'12.50%','CSV display mode stays unchanged');
+});
+
+test('both comparison uploads accept XLS, mixed formats retain exclusions and reports keep exact values',async t=>{
+  const x=await comparison(t),a=x.aoa([['Skip','Code','Value','Note'],['left','001','7','  µL  '],['left','002','8','same']]),b=x.aoa([['Metadata','Other','ID','Amount','Description'],['right','meta','001','7','  µL  '],['right','meta','002','8','same']]);
+  const ax=x.workbook([{name:'Data',sheet:a}]),bx=x.workbook([{name:'Data',sheet:b}],{bookType:'xlsx'});
+  for(const id of ['vfcFileA','vfcFileB','vfcQueueA','vfcQueueB'])assert.match(x.d.getElementById(id).accept,/\.xls,/);
+  await x.upload('A',ax,'original.xls');await x.upload('B',bx,'output.xlsx');x.change('[name="vfcCountA"]','1');x.change('[name="vfcCountB"]','2');await x.q.run();assert.equal(x.q.snapshot().result.match,true);
+  x.change('[data-vfc-setting="mode"][data-side="A"][value="checkboxes"]',true);x.change('[data-vfc-skip="0"][data-side="A"]',true);
+  b.D3={t:'s',v:'9'};await x.upload('B',x.workbook([{name:'Data',sheet:b}]),'changed.xls');x.change('[name="vfcCountB"]','2');await x.q.run();
+  const r=x.q.snapshot().result;assert.equal(r.differentCells,1);assert.equal(r.differentRows,1);assert.deepEqual(copy(x.w.WorkHubValidatorCompareEngine.cell(r,1,1)),{a:'8',b:'9',hasA:true,hasB:true,match:false});
+  await x.q.exportReport();const report=await x.F.read({...x.file(Buffer.from(await x.downloads[0].blob.arrayBuffer())),name:'report.xlsx'},{valuesOnly:true});
+  assert.deepEqual(copy(report.sheets.map(s=>s.name)),['Summary','Field Comparison']);assert.equal(report.sheets[0].rows[2][6],'8');assert.equal(report.sheets[0].rows[2][11],'9');assert.equal(report.sheets[1].rows[1][4],'001');
+  assert.equal(x.writes(),0);assert.equal(x.w.XLSX,undefined);
+});
+
+test('mixed XLS/XLSX comparison queues keep each pair, compressed setups and two-sheet reports independent',async t=>{
+  const x=await comparison(t);
+  const make=(i,side,type)=>{const data=side==='A'?[['Skip','ID'],['meta','00'+i]]:[['Code'],[i===2?'DIFFERENT':'00'+i]];return {...x.file(x.workbook([{name:'Data',sheet:x.aoa(data)}],{bookType:type==='xls'?'biff8':'xlsx'})),name:side+i+'.'+type};};
+  await x.q.addFiles('A',[make(1,'A','xls'),make(2,'A','xlsx'),make(3,'A','xls')]);await x.q.addFiles('B',[make(1,'B','xlsx'),make(2,'B','xls'),make(3,'B','xls')]);
+  const ids=x.q.snapshot().queue.map(p=>p.id);for(const id of ids){await x.q.openPair(id);x.change('[name="vfcCountA"]','1');x.q.confirmPair();}
+  await x.q.startQueue();assert.deepEqual(copy(x.q.snapshot().queue.map(p=>p.summary.match)),[true,false,true]);
+  await x.q.openPair(ids[0]);assert.equal(x.d.querySelector('[name="vfcCountA"]').value,'1');assert.equal(x.q.snapshot().result.a.fileName,'A1.xls');await x.q.exportAll();
+  const zip=await x.w.JSZip.loadAsync(new x.w.Uint8Array(await x.downloads[0].blob.arrayBuffer()),{checkCRC32:true});assert.equal(Object.keys(zip.files).length,3);
+  for(const [i,entry] of Object.values(zip.files).entries()){const bytes=await entry.async('uint8array'),book=await x.F.read({...x.file(bytes),name:'pair.xlsx'},{valuesOnly:true});assert.deepEqual(copy(book.sheets.map(s=>s.name)),['Summary','Field Comparison']);assert.equal(book.sheets[0].rows[1][0],i===1?'Not match':'Match');}
+  assert.equal(x.q.snapshot().activePairId,ids[0]);assert.equal(x.writes(),0);
+});
+
+test('XLS reads terminate on replacement, clearing and account changes, and late results stay discarded',async t=>{
+  const x=await comparison(t),bytes=x.workbook([{name:'Data',sheet:x.aoa([['ID'],['PRIVATE']])}]),held=[];
+  x.w.Worker=class{constructor(){held.push(this);}postMessage(packet){this.packet=packet;}terminate(){this.stopped=true;}};
+  const first=x.upload('A',bytes,'private.xls');await new Promise(r=>setImmediate(r));
+  await x.q.loadFile('A',{name:'current.csv',size:10,text:async()=> 'ID\n001'});assert.equal(held[0].stopped,true);held[0].onmessage({data:{result:{sheets:[{name:'Late',rows:[['ID'],['PRIVATE']]}]}}});await first;assert.equal(x.q.snapshot().files.A.name,'current.csv');
+  const pending=x.upload('B',bytes,'clear.xls');await new Promise(r=>setImmediate(r));await x.q.handle({dataset:{vfc:'clear'}});await pending;assert.equal(held[1].stopped,true);assert.equal(x.q.snapshot().files.B.name,'');
+  const other=x.upload('A',bytes,'account.xls');await new Promise(r=>setImmediate(r));x.account('other');await other;assert.equal(held[2].stopped,true);assert.doesNotMatch(x.d.body.textContent,/PRIVATE|account.xls/);
+  const count=held.length;x.w.WorkHubCurrentAccess={can:(feature,action)=>action!=='run'};await assert.rejects(x.upload('A',bytes,'denied.xls'),/permission/);assert.equal(held.length,count);
+});
+
+test('XLS comparison retains raw hidden values and enforces comparison capacity while CSV display checks stay strict',async t=>{
+  const x=fixture(t),hidden=x.aoa([['Value'],[7]]);hidden.A2.z=';;;';const bytes=x.workbook([{name:'Data',sheet:hidden}]);
+  assert.equal((await x.read(bytes,{valuesOnly:true})).sheets[0].rows[1][0],'7');await assert.rejects(x.read(bytes),/nonblank value hidden/);
+  const wide=x.aoa([Array.from({length:201},(_,i)=>'F'+i),Array.from({length:201},()=> '001')]),w=x.workbook([{name:'Data',sheet:wide}]);
+  await assert.rejects(x.read(w,{valuesOnly:true}),/200 columns/);assert.equal((await x.read(w)).sheets[0].width,201);
+});
+
+test('mixed comparisons and both report sheets preserve escaped line breaks and literal OOXML-like text',async t=>{
+  const x=await comparison(t),value='001\r\nµL _x0041_\u000Btail',a=x.aoa([['Value'],[value]]),b=x.aoa([['Label'],['different']]);
+  await x.upload('A',x.workbook([{name:'Data',sheet:a}]),'source.xls');await x.upload('B',x.workbook([{name:'Data',sheet:b}],{bookType:'xlsx'}),'target.xlsx');await x.q.run();await x.q.exportReport();
+  const bytes=Buffer.from(await x.downloads[0].blob.arrayBuffer()),book=await x.F.read({...x.file(bytes),name:'report.xlsx'},{valuesOnly:true});
+  assert.equal(book.sheets[0].rows[2][6],value);assert.equal(book.sheets[1].rows[1][4],value);
 });
