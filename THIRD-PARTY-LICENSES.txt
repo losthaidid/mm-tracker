@@ -1,3 +1,16 @@
+Excel-to-CSV tools (unmodified official distributions)
+
+SheetJS CE 0.20.3 — Apache License 2.0.
+Source: https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js
+File: vendor/sheetjs/xlsx.full.min.js (includes legacy codepage tables).
+SHA-256: cc015130aa8521e7f088f88898eba949ccdcbfb38df0bd129b44b7273c3a6f41
+Full licence: vendor/sheetjs/LICENSE.
+Loaded locally, on demand, inside the XLS conversion worker.
+
+SheetJS SSF 0.11.2 — Apache License 2.0.
+Source: https://github.com/SheetJS/sheetjs/tree/master/packages/ssf
+File: vendor/ssf.js. Full licence: vendor/ssf.LICENSE.
+
 TNG evidence tools (unmodified npm distribution files)
 
 PDF.js / pdfjs-dist 6.4.299 — Apache License 2.0.
