@@ -59,14 +59,39 @@
       dependent = find(/^(storage|storagelocation|sloc|lgort)$/);
     return { enabled: parent >= 0 && dependent >= 0, parent, dependent };
   }
+  function columnRange(a, b, starts = {}) {
+    const range = {};
+    for (const [side, source] of [
+      ['A', a],
+      ['B', b],
+    ]) {
+      const raw = starts[side] === undefined ? 0 : starts[side],
+        index = Number(raw);
+      if (
+        raw === '' ||
+        raw === null ||
+        typeof raw === 'boolean' ||
+        !Number.isInteger(index) ||
+        index < 0 ||
+        index >= source.headers.length
+      )
+        throw Error('Choose a starting column from File ' + side + '’s current headers.');
+      range[side] = index;
+    }
+    return range;
+  }
+  function eligible(field, starts = { A: 0, B: 0 }) {
+    return field.a >= starts.A && (field.b < 0 || field.b >= starts.B);
+  }
   function configure(a, b, settings) {
-    const fields = (settings.fields || [])
-      .filter(f => f.include || f.key)
-      .map(f => ({ ...f, include: true }));
-    if (!fields.length || fields.length > E.LIMITS.columns)
+    const starts = columnRange(a, b, settings.starts),
+      candidates = (settings.fields || [])
+        .filter(f => f.include || f.key)
+        .map(f => ({ ...f, include: true }));
+    if (!candidates.length || candidates.length > E.LIMITS.columns)
       throw Error('Select at least one field to compare.');
     if (
-      fields.some(
+      candidates.some(
         f =>
           !Number.isInteger(f.a) ||
           f.a < 0 ||
@@ -78,6 +103,7 @@
       )
     )
       throw Error('Map fields from the currently selected worksheets.');
+    const fields = candidates.filter(f => f.key || eligible(f, starts));
     if (
       new Set(fields.map(f => f.a)).size !== fields.length ||
       new Set(fields.filter(f => f.b >= 0).map(f => f.b)).size !==
@@ -90,13 +116,20 @@
     const relationship = { ...settings.relationship };
     if (
       relationship.enabled &&
+      [relationship.parent, relationship.dependent].some(c =>
+        candidates.some(f => f.a === c && !f.key && !eligible(f, starts))
+      )
+    )
+      relationship.enabled = false;
+    if (
+      relationship.enabled &&
       (relationship.parent === relationship.dependent ||
         ![relationship.parent, relationship.dependent].every(c =>
           fields.some(f => f.a === c && f.b >= 0)
         ))
     )
       throw Error('Choose two different mapped comparison fields for the parent/dependent check.');
-    return { fields, keys, relationship };
+    return { fields, keys, relationship, starts };
   }
   function sourceValue(source, index, field, side) {
     const c = field[side.toLowerCase()],
@@ -162,7 +195,7 @@
     settings,
     { pause = () => Promise.resolve(), cancelled = () => false } = {}
   ) {
-    const { fields, keys, relationship } = configure(a, b, settings),
+    const { fields, keys, relationship, starts } = configure(a, b, settings),
       indexA = new Map(),
       indexB = new Map(),
       blankB = [];
@@ -202,6 +235,7 @@
       fields,
       keys,
       relationship,
+      starts,
       rows: [],
       matched: 0,
       different: 0,
@@ -444,7 +478,7 @@
           '',
           '',
           '',
-          `${report.a.fileName} (${report.a.rows.length} original rows) / ${report.b.fileName} (${report.b.rows.length} exploded rows); ${report.bGroups} recombined B keys; ${report.matched} matching records; ${report.different} different records; ${report.ambiguous} ambiguous original records. Distinct comma-list values compare without order; matching keys and Exact text fields compare literally. Formula cells use saved values.`,
+          `${report.a.fileName} (${report.a.rows.length} original rows) / ${report.b.fileName} (${report.b.rows.length} exploded rows); ${report.bGroups} recombined B keys; ${report.matched} matching records; ${report.different} different records; ${report.ambiguous} ambiguous original records. Comparison starts: A ${F.col(report.starts?.A ?? 0)}, B ${F.col(report.starts?.B ?? 0)}; matching keys are kept before the starts. Distinct comma-list values compare without order; matching keys and Exact text fields compare literally. Formula cells use saved values.`,
         ];
       for (let i = 0; i < report.rows.length; i++) {
         const r = report.rows[i],
@@ -505,6 +539,8 @@
     sheet,
     autoFields,
     autoRelationship,
+    columnRange,
+    eligible,
     configure,
     compare,
     cell,

@@ -7,13 +7,24 @@ Open **Validation Studio → Original vs Recombined**. This workspace compares a
 1. Upload **Original file A** — normally one line per original record.
 2. Upload **Exploded file B** — the separate file containing its expanded records.
 3. Choose the worksheet and header row independently for each file.
-4. Review **Columns and matching keys**. Map each File A field to the corresponding File B field. Check the unchanged columns that identify a record, such as Material or Material + Original Record ID. A recognised, uniquely mapped Material/ID field is selected initially when there is exactly one clear candidate.
-5. Choose **Recombine & compare**. File B is grouped by those exact keys, and distinct field values are joined with commas. There is no prerequisite to run validation.
-6. Review the highlighted fields or choose **Review record** for assignment details and source File B rows. **Download comparison report** exports the whole comparison, regardless of the current screen filter or page.
+4. Optionally choose **File A start from column** and **File B start from column**. Each dropdown uses that file's actual column letters and headers. Choosing D skips A–C from comparison. Matching keys remain available before either start.
+5. Review **Columns and matching keys**. Map each File A field to the corresponding File B field. Check the unchanged columns that identify a record, such as Material or Material + Original Record ID. A recognised, uniquely mapped Material/ID field is selected initially when there is exactly one clear candidate. Use **All** under Compare to select or clear the eligible non-key fields together; matching keys stay separately selected.
+6. Choose **Recombine & compare**. File B is grouped by those exact keys, and distinct field values are joined with commas. There is no prerequisite to run validation.
+7. Review the highlighted fields or choose **Review record** for assignment details and source File B rows. **Download comparison report** exports the whole comparison, regardless of the current screen filter or page.
 
 Matching key fields stay included and compare as exact text. Uncheck a key before excluding its field. Use keys that do not change when the record is exploded. If the same Material appears on two different original lines, choose an additional unchanged identifier; otherwise both original records show **Ambiguous key**, and their File B values remain unassigned. The program does not choose one description or merge two original rows by guessing.
 
-Blank keys, missing File B records and extra File B keys are displayed separately. Matching uses keys rather than worksheet order. Changes to uploads, worksheets, mappings or comparison settings clear the old result and require another comparison. Headers are labels rather than discrepancies. An unmapped File A field is reported as a missing File B column unless its Compare checkbox is unchecked. File B columns not mapped for comparison are listed in the setup.
+Blank keys, missing File B records and extra File B keys are displayed separately. Matching uses keys rather than worksheet order. Changes to uploads, worksheets, mappings or comparison settings clear the old result and require another comparison. Headers are labels rather than discrepancies. An eligible, selected File A field without a File B mapping is reported as a missing File B column. File B columns not mapped for comparison are listed in the setup.
+
+## Comparison ranges and bulk selection
+
+A non-key field is eligible when its File A column is at or after File A's start and its mapped File B column is at or after File B's start. An unmapped File A field within the range stays available so that a missing mapping is reported. Fields before either start show **Skipped before starting column** with an unchecked, disabled Compare box. A selected matching key before either start shows **Matching key kept before start** and continues to identify records and compare exactly.
+
+The **All** checkbox is checked when every eligible non-key field is selected, shows a partial mark when only some are selected, and is disabled when no non-key fields are eligible. It preserves matching keys, mappings, and manual choices outside the range. Widening the range restores those previous field choices. Changing a start does not remap columns or change the selected matching keys. Replacing a file or changing its worksheet/header resets that file's start to A; clearing files or changing account resets both.
+
+For example, File A can have Material in A and Plant in C, while File B has Material in B and Plant in D. Start File A at C and File B at D to compare Plant and subsequent mapped fields, while Material remains the exact matching key.
+
+![Independent starting columns and Select all comparison fields, with a matching key retained before the starts](images/validation-recombined-columns.jpg)
 
 ## Comma values and exact text
 
@@ -29,7 +40,7 @@ If File A says `Water Pump` and File B contains both `Water Pump` and `Water Pum
 
 ## Parent / dependent assignments
 
-The optional assignment check compares distinct relationships as well as the individual field values. It is initially selected when Plant/WERKS and Storage Location/LGORT are clearly mapped. You can select other mapped parent/dependent fields, or switch the check off. Excluding or unmapping one of the assignment fields switches that check off; recognised grouped values can still be compared as lists.
+The optional assignment check compares distinct relationships as well as the individual field values. It is initially selected when Plant/WERKS and Storage Location/LGORT are clearly mapped. You can select other mapped parent/dependent fields, or switch the check off. Excluding or unmapping one of the assignment fields, including moving it before a starting column or clearing it with All, switches that check off and displays a status message. After restoring both fields, enable the check again if required. Recognised grouped values can still be compared as lists.
 
 File A supports the current grouped notation and positional lists, detected per row:
 
@@ -51,6 +62,8 @@ The workbook contains exactly two sheets:
 | **Summary** | Overall counts and every non-matching/review record, with original and recombined field values, source row references, and missing/extra assignment details |
 | **Field Comparison** | Every comparison record and mapped field, showing File A, recombined File B, and the field result side by side |
 
+The report includes the effective selected fields and all matching keys. Skipped prefix fields are excluded. Summary records the starting column for each file so the comparison range is clear.
+
 Values are literal Excel text, including identifiers and formula-like strings. Formula source is not executed or exported as an Excel formula. A recombined value longer than 32,000 characters continues on additional rows in the same two sheets, labelled with the comparison record and Part number. Joining those parts reconstructs the full value. Unicode characters, including surrogate pairs at continuation boundaries, remain intact. Screen previews shorten long values; the report retains the complete contents. Repeated downloads reuse the generated workbook until inputs or settings change.
 
 ## Input values, limits and privacy
@@ -67,8 +80,10 @@ Each input supports 50 MB, 25,000 data records, 200 columns and 5,000,000 cells,
 
 ## Verification
 
-`tests/validator-reconcile.test.mjs` covers operation without a template or validation run; separate file uploads; distinct comma lists; literal text and identifiers; crossed parent/dependent pairs; repeated and blank keys; missing/extra records; mapping exclusions; source row order; independent worksheets/headers; cached formulas; XLS worker routing; cancellation; account isolation; complete two-sheet exports; long/Unicode continuation values; and 12,000 originals compared with 24,000 separate exploded records. The existing validation session is checked for unchanged upload, mapping, results and history.
+`tests/validator-reconcile.test.mjs` covers operation without a template or validation run; separate file uploads; distinct comma lists; literal text and identifiers; crossed parent/dependent pairs; repeated and blank keys; missing/extra records; mapping exclusions; source row order; independent worksheets/headers; cached formulas; XLS worker routing; cancellation; account isolation; complete two-sheet exports; long/Unicode continuation values; and 12,000 originals compared with 24,000 separate exploded records. The existing validation session is checked for unchanged upload, mapping, results and history. Range/bulk checks cover checked/partial/clear states; preservation of keys and mappings; independent starts and reordered source rows; report invalidation and effective field export; assignment exclusion; choices restored when ranges widen; invalid starts and columns after Z; and file/worksheet/account reset behavior.
 
-Final local checks: 280 validator/source checks and 25 focused application integration checks passed (305 total). A synthetic 12,000-original / 24,000-exploded-record comparison and its two-sheet workbook completed in 1.48 seconds (1,252,804 bytes) locally. An independent Python ZIP/XML reader verified exactly Summary and Field Comparison, every record, the final literal material ID, discrepancy values, highlights, Unicode and absence of formulas. This is a local check, not a timing guarantee for every browser or workbook.
+Current local checks: 286 validator/source checks and 25 focused application integration checks passed (311 total). Formatting and diff checks passed. Browser QA for the column controls uploaded two independent CSVs without a template or validation run, selected C for File A and D for File B, verified partial/clear/restore bulk selection with the Material key retained, and produced one Match from two exploded rows. The ignored prefix was absent from the result, Material `000001` retained its zeros, and changing a start cleared the report and affected assignment check.
 
-Browser QA used two separately uploaded CSV files with no saved template and no validation run. It confirmed six exploded rows recombined into two records, one Match and one Not match, comma-joined descriptions/storage values, correct material IDs, and missing/extra plant/storage details. Browser download-event confirmation timed out; generated workbook bytes and all report rows were verified independently.
+Earlier standalone-comparison verification also timed a synthetic 12,000-original / 24,000-exploded-record comparison and its two-sheet workbook at 1.48 seconds (1,252,804 bytes) locally. An independent Python ZIP/XML reader verified exactly Summary and Field Comparison, every record, the final literal material ID, discrepancy values, highlights, Unicode and absence of formulas. This is a local check, not a timing guarantee for every browser or workbook.
+
+Earlier browser QA used two separately uploaded CSV files with no saved template and no validation run. It confirmed six exploded rows recombined into two records, one Match and one Not match, comma-joined descriptions/storage values, correct material IDs, and missing/extra plant/storage details. Browser download-event confirmation timed out; generated workbook bytes and all report rows were verified independently.

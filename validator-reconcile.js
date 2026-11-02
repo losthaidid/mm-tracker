@@ -25,6 +25,7 @@
       data: null,
       sheetIndex: 0,
       headerRow: 1,
+      startColumn: 0,
       reading: false,
       error: '',
       token: 0,
@@ -105,10 +106,46 @@
       page = 0;
       closeDetail();
     }
+    const starts = () => ({ A: files.A.startColumn, B: files.B.startColumn });
+    const allowed = field => C.eligible(field, starts());
+    const selected = field => field.key || (field.include && allowed(field));
+    function updateRelationship() {
+      if (
+        relationship.enabled &&
+        fields.some(
+          f =>
+            [relationship.parent, relationship.dependent].includes(f.a) && (!selected(f) || f.b < 0)
+        )
+      ) {
+        relationship.enabled = false;
+        return true;
+      }
+      return false;
+    }
+    function bulkState() {
+      const free = fields.filter(f => !f.key && allowed(f)),
+        count = free.filter(f => f.include).length;
+      return {
+        free,
+        checked: free.length > 0 && count === free.length,
+        mixed: count > 0 && count < free.length,
+      };
+    }
+    function patchBulkState() {
+      root.queueMicrotask(() => {
+        if (owner !== a.owner?.() || !a.ready()) return;
+        const checkbox = root.document?.querySelector('#valStandaloneRecombined [data-vrc-all]');
+        if (checkbox) {
+          const state = bulkState();
+          checkbox.checked = state.checked;
+          checkbox.indeterminate = state.mixed;
+        }
+      });
+    }
     function resetMapping() {
       fields = files.A.data && files.B.data ? C.autoFields(files.A.data, files.B.data) : [];
       relationship = files.A.data
-        ? C.autoRelationship(files.A.data, fields)
+        ? C.autoRelationship(files.A.data, fields.filter(selected))
         : { enabled: false, parent: -1, dependent: -1 };
     }
     function refresh(side) {
@@ -174,7 +211,11 @@
       }
     }
     function settings() {
-      return { fields: fields.map(f => ({ ...f })), relationship: { ...relationship } };
+      return {
+        fields: fields.map(f => ({ ...f })),
+        relationship: { ...relationship },
+        starts: starts(),
+      };
     }
     function problem() {
       try {
@@ -188,9 +229,17 @@
     function configure(next) {
       ensure();
       if (busy || exporting) throw Error('Wait for the current operation.');
+      let range;
+      if (next.starts) {
+        if (!files.A.data || !files.B.data)
+          throw Error('Upload both files before choosing starting columns.');
+        range = C.columnRange(files.A.data, files.B.data, { ...starts(), ...next.starts });
+      }
       invalidate();
+      if (range) for (const side of ['A', 'B']) files[side].startColumn = range[side];
       if (next.fields) fields = next.fields.map(f => ({ ...f }));
       if (next.relationship) relationship = { ...next.relationship };
+      updateRelationship();
       tell('Settings changed. Recombine and compare again.');
       a.render();
     }
@@ -276,16 +325,17 @@
     function sideView(side) {
       const slot = files[side],
         disabled = busy || exporting || !can('run') ? ' disabled' : '';
-      return `<section class="val-card vrc-file" data-val-context="${esc(owner)}:${side}:${slot.token}:${slot.sheetIndex}:${slot.headerRow}"><div class="val-panel-title"><div><span class="val-eyebrow">FILE ${side}</span><h3>${side === 'A' ? 'Original · one row per record' : 'Exploded / validated · multiple rows per record'}</h3></div><span class="vfc-file-letter">${side}</span></div><label class="val-label">${side === 'A' ? 'Original file A' : 'Exploded file B'}<input id="vrcFile${side}" type="file" accept=".xls,.xlsx,.csv,.tsv" data-vrc-file="${side}"${disabled}></label><p class="val-help">${esc(slot.name || 'XLS, XLSX, CSV or TSV · up to 50 MB')}${slot.reading ? ' · Reading…' : slot.data ? ' · ' + slot.data.rows.length + ' rows · ' + slot.data.headers.length + ' columns' : ''}</p>${slot.book ? `<div class="val-fields"><label class="val-label">File ${side} worksheet<select data-vrc-setting="sheetIndex" data-side="${side}"${disabled}>${slot.book.sheets.map((s, i) => option(i, s.name, slot.sheetIndex)).join('')}</select></label><label class="val-label">File ${side} header row<input type="number" min="1" max="${slot.book.sheets[slot.sheetIndex]?.rows.length || 1}" value="${esc(slot.headerRow)}" data-vrc-setting="headerRow" data-side="${side}"${disabled}></label></div>` : ''}${slot.error ? `<p class="vrc-error" role="alert">${esc(slot.error)}</p>` : ''}</section>`;
+      return `<section class="val-card vrc-file" data-val-context="${esc(owner)}:${side}:${slot.token}:${slot.sheetIndex}:${slot.headerRow}"><div class="val-panel-title"><div><span class="val-eyebrow">FILE ${side}</span><h3>${side === 'A' ? 'Original · one row per record' : 'Exploded / validated · multiple rows per record'}</h3></div><span class="vfc-file-letter">${side}</span></div><label class="val-label">${side === 'A' ? 'Original file A' : 'Exploded file B'}<input id="vrcFile${side}" type="file" accept=".xls,.xlsx,.csv,.tsv" data-vrc-file="${side}"${disabled}></label><p class="val-help">${esc(slot.name || 'XLS, XLSX, CSV or TSV · up to 50 MB')}${slot.reading ? ' · Reading…' : slot.data ? ' · ' + slot.data.rows.length + ' rows · ' + slot.data.headers.length + ' columns' : ''}</p>${slot.book ? `<div class="val-fields"><label class="val-label">File ${side} worksheet<select data-vrc-setting="sheetIndex" data-side="${side}"${disabled}>${slot.book.sheets.map((s, i) => option(i, s.name, slot.sheetIndex)).join('')}</select></label><label class="val-label">File ${side} header row<input type="number" min="1" max="${slot.book.sheets[slot.sheetIndex]?.rows.length || 1}" value="${esc(slot.headerRow)}" data-vrc-setting="headerRow" data-side="${side}"${disabled}></label></div>` : ''}${slot.data ? `<label class="val-label vrc-start-column">File ${side} start from column<select data-vrc-setting="startColumn" data-side="${side}"${disabled}>${slot.data.headers.map((h, i) => option(i, F.col(i) + ' · ' + (h || '(blank header)'), slot.startColumn)).join('')}</select></label><p class="val-help">Columns to the left are skipped for comparison. Matching keys remain available.</p>` : ''}${slot.error ? `<p class="vrc-error" role="alert">${esc(slot.error)}</p>` : ''}</section>`;
     }
     function mappingView() {
       if (!files.A.data || !files.B.data) return '';
       const locked = busy || exporting || !can('run'),
         disabled = locked ? ' disabled' : '',
-        available = fields.filter(f => (f.include || f.key) && f.b >= 0),
+        available = fields.filter(f => selected(f) && f.b >= 0),
+        bulk = bulkState(),
         mappedB = new Set(available.map(f => f.b)),
         unmapped = files.B.data.headers.filter((_, i) => !mappedB.has(i));
-      return `<section class="val-card vrc-mapping" data-val-context="${revision}"><div class="val-panel-title"><div><span class="val-eyebrow">CONNECT THE TWO FILES</span><h3>Match records, then compare their values.</h3></div><span class="val-chip">${fields.filter(f => f.key).length} matching key(s)</span></div><p class="val-help">Choose keys that stay unchanged when records are exploded. Material can be a key; add an original record ID if the same Material occurs on several original rows. Matching keys stay included and compare as exact text. Uncheck a key before excluding its field. Repeated keys in File A are flagged as ambiguous. Values keep their case and leading zeros.</p><details class="vrc-columns" open><summary>Columns and matching keys</summary><div class="val-table-scroll"><table class="val-grid"><thead><tr><th>Compare</th><th>Matching key</th><th>File A field</th><th>File B field</th><th>Compare values as</th></tr></thead><tbody>${fields.map((f, i) => `<tr data-vrc-map-row="${i}"><td><input type="checkbox" data-vrc-field="include" data-index="${i}" aria-label="Compare ${esc(short(files.A.data.headers[f.a]))}"${f.include || f.key ? ' checked' : ''}${f.key || locked ? ' disabled' : ''}></td><td><input type="checkbox" data-vrc-field="key" data-index="${i}" aria-label="Matching key ${esc(short(files.A.data.headers[f.a]))}"${f.key ? ' checked' : ''}${disabled}></td><th>${esc(F.col(f.a) + ' · ' + (files.A.data.headers[f.a] || '(blank header)'))}</th><td><select data-vrc-field="b" data-index="${i}" aria-label="File B mapping for ${esc(short(files.A.data.headers[f.a]))}"${disabled}>${option(-1, 'Missing / choose a column', f.b)}${files.B.data.headers.map((h, j) => option(j, F.col(j) + ' · ' + (h || '(blank header)'), f.b)).join('')}</select></td><td><select data-vrc-field="mode" data-index="${i}" aria-label="Compare ${esc(short(files.A.data.headers[f.a]))} values as"${f.key || locked ? ' disabled' : ''}>${option('text', 'Exact text', f.key ? 'text' : f.mode)}${option('values', 'Comma-separated values', f.key ? 'text' : f.mode)}</select></td></tr>`).join('')}</tbody></table></div></details><p class="val-help">Distinct File B values are joined with commas. Comma-list comparisons ignore list order and spaces around each item; Exact text compares the whole resulting text. Header names are labels. ${unmapped.length ? 'File B columns not compared: ' + esc(unmapped.map(short).join(', ')) + '.' : ''}</p><fieldset class="vrc-pair-options"><legend>Parent / dependent assignments</legend><label class="val-toggle"><input type="checkbox" data-vrc-pair="enabled"${relationship.enabled ? ' checked' : ''}${disabled}><span>Also compare which dependent values belong to each parent</span></label><div class="val-fields"><label class="val-label">Parent field<select data-vrc-pair="parent"${disabled}>${option(-1, 'Choose a parent field', relationship.parent)}${available.map(f => option(f.a, files.A.data.headers[f.a], relationship.parent)).join('')}</select></label><label class="val-label">Dependent field<select data-vrc-pair="dependent"${disabled}>${option(-1, 'Choose a dependent field', relationship.dependent)}${available.map(f => option(f.a, files.A.data.headers[f.a], relationship.dependent)).join('')}</select></label></div><p class="val-help">For Plant / Storage Location: File A can contain explicit (plant) groups or lists paired by position. File B should have one plant and storage location per row. Details show missing and extra distinct pairings. Other formats are flagged for review.</p></fieldset></section>`;
+      return `<section class="val-card vrc-mapping" data-val-context="${revision}"><div class="val-panel-title"><div><span class="val-eyebrow">CONNECT THE TWO FILES</span><h3>Match records, then compare their values.</h3></div><span class="val-chip">${fields.filter(f => f.key).length} matching key(s)</span></div><p class="val-help">Choose keys that stay unchanged when records are exploded. Material can be a key; add an original record ID if the same Material occurs on several original rows. Matching keys stay included and compare as exact text. Uncheck a key before excluding its field. Repeated keys in File A are flagged as ambiguous. Values keep their case and leading zeros.</p><details class="vrc-columns" open><summary>Columns and matching keys</summary><div class="val-table-scroll"><table class="val-grid"><thead><tr><th>Compare<label class="vrc-select-all"><input type="checkbox" data-vrc-all aria-label="Select all comparison columns" aria-checked="${bulk.mixed ? 'mixed' : String(bulk.checked)}"${bulk.checked ? ' checked' : ''}${locked || !bulk.free.length ? ' disabled' : ''} title="${bulk.free.length ? 'Select or clear the eligible comparison fields. Matching keys stay included.' : 'No non-key fields in the comparison range. Matching keys stay included.'}"><span>All</span></label></th><th>Matching key</th><th>File A field</th><th>File B field</th><th>Compare values as</th></tr></thead><tbody>${fields.map((f, i) => `<tr data-vrc-map-row="${i}"><td><input type="checkbox" data-vrc-field="include" data-index="${i}" aria-label="Compare ${esc(short(files.A.data.headers[f.a]))}"${selected(f) ? ' checked' : ''}${f.key || !allowed(f) || locked ? ' disabled' : ''}></td><td><input type="checkbox" data-vrc-field="key" data-index="${i}" aria-label="Matching key ${esc(short(files.A.data.headers[f.a]))}"${f.key ? ' checked' : ''}${disabled}></td><th>${esc(F.col(f.a) + ' · ' + (files.A.data.headers[f.a] || '(blank header)'))}${!allowed(f) ? '<small class="vrc-range-note">' + (f.key ? 'Matching key kept before start' : 'Skipped before starting column') + '</small>' : ''}</th><td><select data-vrc-field="b" data-index="${i}" aria-label="File B mapping for ${esc(short(files.A.data.headers[f.a]))}"${disabled}>${option(-1, 'Missing / choose a column', f.b)}${files.B.data.headers.map((h, j) => option(j, F.col(j) + ' · ' + (h || '(blank header)'), f.b)).join('')}</select></td><td><select data-vrc-field="mode" data-index="${i}" aria-label="Compare ${esc(short(files.A.data.headers[f.a]))} values as"${f.key || locked ? ' disabled' : ''}>${option('text', 'Exact text', f.key ? 'text' : f.mode)}${option('values', 'Comma-separated values', f.key ? 'text' : f.mode)}</select></td></tr>`).join('')}</tbody></table></div></details><p class="val-help">Select all affects the non-key fields within both starting-column ranges. Matching keys stay separately selected, including keys before the starts. Distinct File B values are joined with commas. Comma-list comparisons ignore list order and spaces around each item; Exact text compares the whole resulting text. Header names are labels. ${unmapped.length ? 'File B columns not compared: ' + esc(unmapped.map(short).join(', ')) + '.' : ''}</p><fieldset class="vrc-pair-options"><legend>Parent / dependent assignments</legend><label class="val-toggle"><input type="checkbox" data-vrc-pair="enabled"${relationship.enabled ? ' checked' : ''}${disabled}><span>Also compare which dependent values belong to each parent</span></label><div class="val-fields"><label class="val-label">Parent field<select data-vrc-pair="parent"${disabled}>${option(-1, 'Choose a parent field', relationship.parent)}${available.map(f => option(f.a, files.A.data.headers[f.a], relationship.parent)).join('')}</select></label><label class="val-label">Dependent field<select data-vrc-pair="dependent"${disabled}>${option(-1, 'Choose a dependent field', relationship.dependent)}${available.map(f => option(f.a, files.A.data.headers[f.a], relationship.dependent)).join('')}</select></label></div><p class="val-help">For Plant / Storage Location: File A can contain explicit (plant) groups or lists paired by position. File B should have one plant and storage location per row. Details show missing and extra distinct pairings. Other formats are flagged for review.</p></fieldset></section>`;
     }
     function reportView() {
       if (!result) return '';
@@ -366,6 +416,7 @@
     }
     function render() {
       sync();
+      patchBulkState();
       const blocked =
         busy || exporting || files.A.reading || files.B.reading || !can('run') || problem();
       return `<div id="valStandaloneRecombined" data-access-feature="validator"><section class="val-card val-recombined-intro"><div><span class="val-eyebrow">ORIGINAL VS RECOMBINED · TWO FILES</span><h2>Two files. One clear comparison.</h2><p>Upload the original file as A and the exploded or validated file as B. Recombine B using matching keys, join distinct field values with commas, and compare against A.</p><p class="val-help">This tool works independently. Upload both files here; a validation run is not required.</p></div></section><div class="vrc-file-grid">${sideView('A')}${sideView('B')}</div>${mappingView()}<section class="val-card vrc-run"><div><strong>${busy ? 'Recombining and comparing…' : exporting ? 'Preparing report…' : 'Ready to bring the records back together.'}</strong><p class="val-help">${esc(problem() || 'Formula cells use their saved values. Only comparison results are produced; the source files stay as uploaded.')}</p></div><div class="val-actions">${button('run', 'Recombine & compare', blocked ? 'disabled' : '', 'val-primary')}${busy ? button('cancel', 'Cancel comparison') : button('clear', 'Clear files', exporting || !can('run') ? 'disabled' : '', 'val-quiet')}</div></section>${message ? `<p class="vrc-message${errorMessage ? ' vrc-error' : ''}" role="status">${esc(message)}</p>` : ''}${reportView()}</div>`;
@@ -427,14 +478,54 @@
           return;
         }
         if (busy || exporting) return;
+        if (el.hasAttribute('data-vrc-all')) {
+          invalidate();
+          for (const f of bulkState().free) f.include = el.checked;
+          const pairOff = updateRelationship();
+          tell(
+            'Comparison columns ' +
+              (el.checked ? 'selected' : 'cleared') +
+              '. Matching keys are kept.' +
+              (pairOff
+                ? ' The assignment check is off because one of its fields is excluded.'
+                : '') +
+              ' Recombine and compare again.'
+          );
+          a.render();
+          return;
+        }
         if (el.dataset.vrcSetting) {
           const side = el.dataset.side,
             slot = files[side],
             name = el.dataset.vrcSetting;
           if (String(slot[name]) === el.value) return;
+          if (name === 'startColumn') {
+            const index = Number(el.value);
+            if (
+              el.value === '' ||
+              !slot.data ||
+              !Number.isInteger(index) ||
+              index < 0 ||
+              index >= slot.data.headers.length
+            )
+              throw Error('Choose a starting column from this file’s headers.');
+            invalidate();
+            slot.startColumn = index;
+            const pairOff = updateRelationship();
+            tell(
+              'Starting column changed. Matching keys and column mappings are kept.' +
+                (pairOff
+                  ? ' The assignment check is off because one of its fields is outside the range.'
+                  : '') +
+                ' Recombine and compare again.'
+            );
+            a.render();
+            return;
+          }
           invalidate();
           slot[name] = name === 'sheetIndex' ? Number(el.value) : el.value;
           if (name === 'sheetIndex') slot.headerRow = 1;
+          slot.startColumn = 0;
           refresh(side);
           tell('Worksheet selection changed. Review matching keys again.');
           a.render();
@@ -451,11 +542,7 @@
               ? Number(el.value)
               : el.value;
           if (f.key) f.include = true;
-          if (
-            (!f.include || f.b < 0) &&
-            [relationship.parent, relationship.dependent].includes(f.a)
-          )
-            relationship.enabled = false;
+          updateRelationship();
           tell('Mapping changed. Recombine and compare again.');
           a.render();
           return;
