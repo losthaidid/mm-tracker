@@ -183,3 +183,70 @@ test('12,000 originals and 24,000 separate exploded rows compare completely with
  const x=fixture(t),a=x.source(Array.from({length:12000},(_,i)=>['000'+i,'Description '+i,'P1,P2','S1,S2',''])),b=x.source(Array.from({length:24000},(_,i)=>['000'+Math.floor(i/2),'Description '+Math.floor(i/2),i%2?'P2':'P1',i===23999?'DIFFERENT':i%2?'S2':'S1','']));
  const r=await x.C.compare(a,b,x.settings(a,b));assert.equal(r.rows.length,12000);assert.equal(r.matched,11999);assert.equal(r.different,1);assert.equal(x.C.cell(r,11999,1).b,'Description 11999');assert.equal(x.C.cell(r,11999,3).b,'S1, DIFFERENT');
 });
+
+test('Select all changes comparison fields together, shows partial selection and keeps matching keys unchanged',async t=>{
+ const x=fixture(t);await x.open();await x.upload('A',originals);await x.upload('B',exploded);await Promise.resolve();
+ const all=()=>x.d.querySelector('[data-vrc-all]'),keyFlags=copy(x.tool.snapshot().settings.fields.map(f=>f.key));
+ assert.equal(all().checked,true);assert.equal(all().indeterminate,false);
+ x.change('[data-vrc-field="include"][data-index="4"]',false);await Promise.resolve();
+ assert.equal(all().getAttribute('aria-checked'),'mixed');assert.equal(all().indeterminate,true);
+ await x.tool.run();assert.ok(x.tool.snapshot().result);
+ x.change(all(),false);await Promise.resolve();assert.equal(x.tool.snapshot().result,null);
+ assert.equal(all().checked,false);assert.equal(all().indeterminate,false);
+ assert.deepEqual(copy(x.tool.snapshot().settings.fields.map(f=>f.key)),keyFlags);
+ assert.ok(x.tool.snapshot().settings.fields.filter(f=>!f.key).every(f=>!f.include));
+ const keysOnly=await x.tool.run();assert.deepEqual(copy(keysOnly.fields.map(f=>f.a)),[0]);assert.equal(keysOnly.match,true);
+ x.change(all(),true);await Promise.resolve();const full=await x.tool.run();assert.equal(full.fields.length,5);assert.equal(full.match,true);assert.equal(x.writes(),0);
+});
+
+test('independent starting columns skip both file prefixes while keys still match the correct records',async t=>{
+ const x=fixture(t),ha=['Material','Ignore A','Value','Plant'],hb=['B metadata','Material','B note','Value','Plant'];
+ const a=x.source([['001','private A','10','P1'],['002','other A','20','P2']],ha),b=x.source([['meta','002','different','20','P2'],['meta','001','different','10','P1']],hb),setup=x.settings(a,b);setup.starts={A:2,B:3};
+ const before=copy([a.rows,b.rows]),r=await x.C.compare(a,b,setup);
+ assert.equal(r.match,true);assert.deepEqual(copy(r.fields.map(f=>[f.a,f.b])),[[0,1],[2,3],[3,4]]);assert.deepEqual(copy(r.starts),{A:2,B:3});
+ assert.equal(x.C.cell(r,0,0).b,'001');assert.equal(x.C.cell(r,1,1).b,'20');assert.deepEqual(copy([a.rows,b.rows]),before);
+ setup.starts.B=4;const later=await x.C.compare(a,b,setup);assert.deepEqual(copy(later.fields.map(f=>f.a)),[0,3]);assert.equal(later.match,true);
+});
+
+test('starting-column controls preserve mappings and invalidate old results and exports',async t=>{
+ const x=fixture(t),b=copy(exploded);b[0][1]='Description difference';await x.open();await x.upload('A',originals);await x.upload('B',b);await x.tool.run();assert.equal(x.tool.snapshot().result.match,false);
+ const mappings=x.tool.snapshot().settings.fields.map(f=>f.b),keys=x.tool.snapshot().settings.fields.map(f=>f.key);
+ x.change('[data-vrc-setting="startColumn"][data-side="A"]','3');x.change('[data-vrc-setting="startColumn"][data-side="B"]','3');
+ assert.equal(x.tool.snapshot().result,null);await assert.rejects(x.tool.exportReport(),/before exporting/);
+ assert.deepEqual(copy(x.tool.snapshot().settings.starts),{A:3,B:3});assert.deepEqual(x.tool.snapshot().settings.fields.map(f=>f.b),mappings);assert.deepEqual(x.tool.snapshot().settings.fields.map(f=>f.key),keys);
+ assert.equal(x.d.querySelector('[data-vrc-field="include"][data-index="1"]').checked,false);assert.equal(x.d.querySelector('[data-vrc-field="include"][data-index="1"]').disabled,true);
+ assert.equal(x.d.querySelector('[data-vrc-field="include"][data-index="0"]').checked,true);assert.match(x.d.querySelector('[data-vrc-map-row="0"]').textContent,/Matching key kept before start/);
+ assert.equal(x.tool.snapshot().settings.relationship.enabled,false);
+ const r=await x.tool.run();assert.equal(r.match,true);assert.deepEqual(copy(r.fields.map(f=>f.a)),[0,3,4]);
+ await x.tool.exportReport();const {blob,name}=x.downloads[0],book=await x.F.read({name,size:blob.size,arrayBuffer:()=>blob.arrayBuffer()},{valuesOnly:true});
+ assert.deepEqual(copy(book.sheets.map(s=>s.name)),['Summary','Field Comparison']);assert.match(book.sheets[0].rows[1][8],/Comparison starts: A D, B D/);
+ assert.ok(book.sheets[1].rows[0].includes('A · Material'));assert.equal(book.sheets[1].rows[0].includes('A · Description'),false);assert.equal(book.sheets[1].rows[1][9],'6.00007');
+});
+
+test('Select all respects the eligible range and preserves manual choices when that range changes',async t=>{
+ const x=fixture(t);await x.open();await x.upload('A',originals);await x.upload('B',exploded);
+ x.change('[data-vrc-field="include"][data-index="1"]',false);
+ x.change('[data-vrc-setting="startColumn"][data-side="A"]','3');x.change('[data-vrc-setting="startColumn"][data-side="B"]','3');
+ x.change('[data-vrc-all]',false);x.change('[data-vrc-all]',true);await Promise.resolve();
+ const fields=x.tool.snapshot().settings.fields;assert.equal(fields[1].include,false);assert.equal(fields[0].key,true);assert.ok(fields.slice(3).every(f=>f.include));
+ x.change('[data-vrc-setting="startColumn"][data-side="A"]','0');x.change('[data-vrc-setting="startColumn"][data-side="B"]','0');await Promise.resolve();
+ assert.equal(x.d.querySelector('[data-vrc-all]').indeterminate,true);assert.equal(x.d.querySelector('[data-vrc-field="include"][data-index="1"]').checked,false);
+});
+
+test('starting columns validate current headers and support columns after Z',async t=>{
+ const x=fixture(t),h=['Material',...Array.from({length:29},(_,i)=>'Field '+(i+1))],values=[h.map((_,i)=>i?'value '+i:'0001')],a=x.source(values,h),b=x.source(values,h),setup=x.settings(a,b);
+ for(const bad of [-1,30,1.5,'',null,true,'AA']) assert.throws(()=>x.C.configure(a,b,{...setup,starts:{A:bad,B:0}}),/starting column/);
+ const r=await x.C.compare(a,b,{...setup,starts:{A:26,B:27}});assert.equal(r.match,true);assert.deepEqual(copy(r.fields.map(f=>f.a)),[0,27,28,29]);
+ await x.open();await x.upload('A',values,h);await x.upload('B',values,h);const picker=x.d.querySelector('[data-vrc-setting="startColumn"][data-side="A"]');assert.match(picker.querySelector('[value="26"]').textContent,/^AA ·/);
+ x.change(picker,'26');assert.equal(x.tool.snapshot().settings.starts.A,26);
+});
+
+test('file replacement, worksheet/header changes and account cleanup reset starts for the relevant file',async t=>{
+ const x=fixture(t);await x.open();await x.upload('A',originals);await x.upload('B',exploded);
+ x.change('[data-vrc-setting="startColumn"][data-side="A"]','3');x.change('[data-vrc-setting="startColumn"][data-side="B"]','4');
+ await x.upload('B',exploded);assert.deepEqual(copy(x.tool.snapshot().settings.starts),{A:3,B:0});
+ const blob=await x.F.workbook([{name:'First',rows:[headers,...originals]},{name:'Second',rows:[headers,...originals]}]);
+ await x.tool.loadFile('A',{name:'sheets.xlsx',size:blob.size,arrayBuffer:()=>blob.arrayBuffer()});
+ x.change('[data-vrc-setting="startColumn"][data-side="A"]','3');x.change('[data-vrc-setting="sheetIndex"][data-side="A"]','1');assert.equal(x.tool.snapshot().settings.starts.A,0);
+ x.change('[data-vrc-setting="startColumn"][data-side="A"]','4');x.account('other');await Promise.resolve();assert.deepEqual(copy(x.tool.snapshot().settings.starts),{A:0,B:0});assert.equal(x.tool.snapshot().files.A.name,'');
+});
