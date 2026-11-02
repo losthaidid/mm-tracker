@@ -53,7 +53,7 @@ After **Run validation**, use **Original vs validated** to check each record's
 original, prepared and validated values. Every output row carries its own original
 worksheet row and split part, including nested parts after successive explosions.
 Copied fields (such as Material, Description or extra unmapped upload columns) come
-from that row's parent; selected Plant/Storage lists remain paired by position.
+from that row's parent; selected Plant/Storage lists remain paired by position, or by explicit parent groups in Parent + dependent mode. See [Mixed formats and recombined comparison](VALIDATION-RECOMBINED.md).
 Blank positions do not move the following values to a different record.
 
 Preparation changes appear in blue; later corrections and differences from the

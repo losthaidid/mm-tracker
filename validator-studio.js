@@ -186,7 +186,12 @@
       originalRows = [],
       preparedRows = [],
       origins = [],
+      dataRevision = 0,
       comparisonCache = null,
+      recombinedCache = null,
+      recombinedFilter = 'all',
+      recombinedPage = 0,
+      recombinedDialog = null,
       comparisonFilter = 'changes',
       comparisonField = 'all',
       comparisonRow = '',
@@ -393,17 +398,18 @@
       runner?.cancel();
       generation++;
       closePreparation();
+      closeRecombinedDetail();
       pinnedRows.clear();
       resetReview();
       comparisonCache = null;
+      recombinedCache = null;
+      dataRevision++;
       book = session.book;
       sheetIndex = session.sheetIndex;
       headerRow = session.headerRow;
       headers = session.headers;
       mapping = session.mapping;
-      originalRows = book.sheets[sheetIndex].rows
-        .slice(headerRow)
-        .map(r => Array.from({ length: headers.length }, (_, i) => String(r[i] ?? '')));
+      originalRows = sourceSheetRows();
       while (originalRows.length && originalRows.at(-1).every(E.blank)) originalRows.pop();
       preparationSteps = session.preparationSteps;
       preparationUndo = session.preparationUndo;
@@ -768,10 +774,15 @@
     }
     function resetPreparation() {
       closePreparation();
+      closeRecombinedDetail();
       originalRows = [];
       preparedRows = [];
       origins = [];
       comparisonCache = null;
+      recombinedCache = null;
+      recombinedFilter = 'all';
+      recombinedPage = 0;
+      dataRevision++;
       comparisonFilter = 'changes';
       comparisonField = 'all';
       comparisonRow = '';
@@ -795,6 +806,7 @@
           [...form.querySelectorAll('[data-prep-mode]')].map(el => [el.dataset.prepMode, el.value])
         );
       return {
+        mode: form.elements.explodeMode.value,
         primary: Number(form.elements.primary.value),
         mapped: [...form.querySelectorAll('[name="mapped"]:checked')].map(el => Number(el.value)),
         delimiter:
@@ -834,7 +846,15 @@
                 return `<label class="val-prep-field"><span><strong>${esc(c.label)}</strong><small>${esc(c.key)} · ${s.type} (${s.length})${mapped ? '' : ' · not mapped'}</small></span><select data-prep-mode="${esc(c.key)}" aria-label="Formatting for ${esc(c.label)}"${mapped ? '' : ' disabled'}>${options([['auto', 'SAP type format'], ...(['CHAR', 'NUMC', 'CLNT'].includes(s.type) ? [['zero', 'Zero-pad code']] : []), ['keep', 'Keep unchanged']], mapped ? 'auto' : 'keep')}</select></label>`;
               })
               .join('')}</div>`
-          : `<p>Choose the column that determines the number of records, then map other lists by position. Every other upload column is copied. Empty positions are retained; no combinations are generated.</p><div class="val-fields">${select(
+          : `<p>Choose how your lists relate. Every other field, including Material and Description, is copied from the same original record.</p>${select(
+              'explodeMode',
+              'How to combine the values',
+              [
+                ['position', 'Pair lists by position'],
+                ['dependent', 'Parent + dependent · grouped or plain per row'],
+              ],
+              'position'
+            )}<p class="val-help" id="valExplodeModeHelp">Positional mode pairs the first values, then the second values. Dependent mode also recognises (FF01) QA00, QA01, (FF02,FF03) QA00 in individual rows. Plain lists always pair by position.</p><div class="val-fields">${select(
               'primary',
               'Column to explode',
               headers.map((h, i) => [i, F.col(i) + ' · ' + h]),
@@ -850,7 +870,7 @@
                 ['custom', 'Custom delimiter'],
               ],
               ','
-            )}${input('customDelimiter', 'Custom delimiter', '', 'text', 'maxlength="5" placeholder="Used only when Custom is selected"')}</div><fieldset class="val-prep-mapped"><legend>Map these columns in the same sequence</legend>${headers.map((h, i) => `<label class="val-toggle"><input type="checkbox" name="mapped" value="${i}"${i === 0 ? ' disabled' : ''}><span>${esc(F.col(i) + ' · ' + h)}</span></label>`).join('')}</fieldset>${toggle('trim', 'Trim spaces around each split value', true)}${toggle('repeatSingle', 'Repeat a single mapped value across all primary values (including blanks)', false)}<p class="val-help">Example: FF01, FF02, FF03 with ST00, WH00, WH01 creates three paired records. Unequal list counts block Apply. Delimiters are literal characters inside each cell.</p>`;
+            )}${input('customDelimiter', 'Custom delimiter', '', 'text', 'maxlength="5" placeholder="Used only when Custom is selected"')}</div><fieldset class="val-prep-mapped"><legend>Mapped columns · choose exactly one dependent column in Parent + dependent mode</legend>${headers.map((h, i) => `<label class="val-toggle"><input type="checkbox" name="mapped" value="${i}"${i === 0 ? ' disabled' : ''}><span>${esc(F.col(i) + ' · ' + h)}</span></label>`).join('')}</fieldset>${toggle('trim', 'Trim spaces around each split value', true)}${toggle('repeatSingle', 'Repeat a single mapped value across all primary values (including blanks)', false)}<p class="val-help">Plain example: FF01, FF02 with QA00, QA01 creates two paired records. Grouped example: FF01, FF02, FF03 with (FF01) QA00, QA01, (FF02,FF03) QA00 creates four records in dependent mode. Unequal plain lists or incomplete groups block Apply. Extra formats can be added in a later batch.</p>`;
       a.openModal(
         kind === 'sap' ? 'Apply SAP formatting' : 'Explode & map rows',
         `<section class="val-preparation-room" data-access-feature="validator"><span class="val-eyebrow">PREPARE YOUR UPLOAD</span><form id="valPreparationForm">${fields}<button type="submit" class="val-btn val-secondary">Preview changes</button></form><div id="valPreparationPreview" aria-live="polite"><p class="val-help">Your data stays unchanged until you preview and apply.</p></div><div class="val-actions">${btn('prep-cancel', 'Cancel', '', 'val-quiet')}${btn('prep-apply', 'Apply to working data', 'disabled', 'val-primary')}</div><p class="val-help">The original file and saved template are unchanged. Uploaded values, previews and undo remain in this browser only.</p></section>`
@@ -891,9 +911,9 @@
       const sample =
         plan.kind === 'sap'
           ? `<table><thead><tr><th>Source row</th><th>Field</th><th>Before</th><th>After</th></tr></thead><tbody>${plan.sample.map(x => `<tr><td>${origins[x.index]?.row || headerRow + x.index + 1}</td><td>${esc(x.field)}</td><td>${previewValue(x.before)}</td><td><strong>${previewValue(x.after)}</strong></td></tr>`).join('')}</tbody></table>`
-          : `<table><thead><tr><th>Source row</th><th>Part</th>${headers.map((h, i) => `<th>${esc(h)}${plan.columns?.includes(i) ? ' · split' : ' · copied'}</th>`).join('')}</tr></thead><tbody>${plan.sample.map((x, n) => `<tr><td>${origins[x.index]?.row || headerRow + x.index + 1}</td><td>${[origins[x.index]?.part, plan.parents[n].part].filter(Boolean).join('.') || 'Unsplit'}</td>${plan.rows[n].map(v => `<td>${previewValue(v || '(blank)')}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+          : `<table><thead><tr><th>Source row</th><th>Part</th>${headers.map((h, i) => `<th>${esc(h)}${plan.columns?.includes(i) ? ' · split' : ' · copied'}</th>`).join('')}</tr></thead><tbody>${plan.sample.map((x, n) => `<tr><td>${origins[x.index]?.row || headerRow + x.index + 1}</td><td>${[origins[x.index]?.part, plan.parents[n].part].filter(Boolean).join('.') || 'Unsplit'}${x.format ? '<small>' + esc(x.format) + '</small>' : ''}</td>${plan.rows[n].map(v => `<td>${previewValue(v || '(blank)')}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
       $('valPreparationPreview').innerHTML =
-        `<div class="val-prep-summary${plan.blocked ? ' is-blocked' : ''}"><strong>${plan.kind === 'sap' ? plan.changes + ' cell value(s) will change' : sourceRows.length + ' records → ' + plan.outputCount + ' records'}</strong><span>${plan.warningCount ? plan.warningCount + (plan.blocked ? ' pairing mismatch(es). Nothing will be applied.' : ' value(s) retained for review.') : 'Preview ready.'}</span></div>${plan.warnings.length ? `<ul class="val-prep-warnings">${plan.warnings.map(w => `<li>Source row ${origins[w.index]?.row || headerRow + w.index + 1} · ${esc(w.field)}: ${esc(w.message)}</li>`).join('')}</ul>` : ''}${plan.sample.length ? `<p class="val-help">First ${plan.sample.length} ${plan.kind === 'sap' ? 'changed values' : 'output records'} shown.</p><div class="val-table-scroll">${sample}</div>` : ''}${!plan.changes ? '<p>No values need changing with these options.</p>' : ''}`;
+        `<div class="val-prep-summary${plan.blocked ? ' is-blocked' : ''}"><strong>${plan.kind === 'sap' ? plan.changes + ' cell value(s) will change' : sourceRows.length + ' records → ' + plan.outputCount + ' records'}</strong><span>${plan.warningCount ? plan.warningCount + (plan.blocked ? ' pairing mismatch(es). Nothing will be applied.' : ' value(s) retained for review.') : 'Preview ready.'}${plan.formats ? ' ' + plan.formats.Grouped + ' grouped row(s) · ' + plan.formats['Paired list'] + ' paired-list row(s).' : ''}</span></div>${plan.warnings.length ? `<ul class="val-prep-warnings">${plan.warnings.map(w => `<li>Source row ${origins[w.index]?.row || headerRow + w.index + 1} · ${esc(w.field)}: ${esc(w.message)}</li>`).join('')}</ul>` : ''}${plan.sample.length ? `<p class="val-help">First ${plan.sample.length} ${plan.kind === 'sap' ? 'changed values' : 'output records'} shown.</p><div class="val-table-scroll">${sample}</div>` : ''}${!plan.changes ? '<p>No values need changing with these options.</p>' : ''}`;
       document.querySelector('[data-val="prep-apply"]').disabled = plan.blocked || !plan.changes;
       if (plan.sample.length)
         $('valPreparationPreview').insertAdjacentHTML(
@@ -903,6 +923,8 @@
     }
     function resetPreparedResults() {
       cancelLive();
+      closeRecombinedDetail();
+      dataRevision++;
       pinnedRows.clear();
       generation++;
       runner?.cancel();
@@ -1969,6 +1991,7 @@
         '</span></div><span class="val-eyebrow">A HOME FOR YOUR DATA RULES</span><h2>Any file. Your rules.</h2><p>Give your columns a name, shape the conditions and let your data tell you what needs attention.</p><div class="val-actions">' +
         btn('new', 'Create a template', '', 'val-primary') +
         btn('example', 'Explore an example', '', 'val-secondary') +
+        btn('mode', 'Original vs Recombined', 'data-mode="recombined"', 'val-secondary') +
         btn('mode', 'Compare two files', 'data-mode="file-compare"', 'val-secondary') +
         btn('mode', 'Excel to CSV', 'data-mode="excel-csv"', 'val-secondary') +
         '</div><div class="val-welcome-steps"><span>' +
@@ -2012,6 +2035,7 @@
             : []),
           ['references', 'References', 'reference'],
           ['check', 'Validate', 'check'],
+          ['recombined', 'Original vs Recombined', 'columns'],
           ['file-compare', 'Compare two files', 'columns'],
           ['excel-csv', 'Excel to CSV', 'file'],
           ['history', 'Versions & runs', 'history'],
@@ -2842,6 +2866,46 @@
         '</button></form></section>'
       );
     }
+    function sourceSheetRows() {
+      const sheet = book.sheets[sheetIndex],
+        schema = activeSchema(),
+        text = new Set(
+          schema.columns.filter(c => F.identifierColumn(c, schema)).map(c => Number(mapping[c.key]))
+        );
+      return sheet.rows
+        .slice(headerRow)
+        .map((row, n) =>
+          Array.from({ length: headers.length }, (_, i) =>
+            String(
+              (text.has(i) ? sheet.numericText?.[i]?.[headerRow + n] : undefined) ?? row[i] ?? ''
+            )
+          )
+        );
+    }
+    function applyIdentifierMapping() {
+      const sheet = book?.sheets[sheetIndex],
+        schema = activeSchema();
+      if (!sheet?.numericText) return;
+      const columns = new Set(
+          schema.columns.filter(c => F.identifierColumn(c, schema)).map(c => Number(mapping[c.key]))
+        ),
+        children = new Map();
+      origins.forEach((origin, i) => {
+        if (!children.has(origin.row)) children.set(origin.row, []);
+        children.get(origin.row).push(i);
+      });
+      for (const c of columns)
+        for (const [row, value] of Object.entries(sheet.numericText[c] || {})) {
+          const parent = Number(row) - headerRow,
+            raw = String(sheet.rows[row]?.[c] ?? '');
+          if (originalRows[parent]?.[c] === raw) originalRows[parent][c] = value;
+          for (const i of children.get(Number(row) + 1) || []) {
+            const record = sourceRows[i];
+            if (record[c] === raw) record[c] = value;
+            if (preparedRows[i]?.[c] === raw) preparedRows[i][c] = value;
+          }
+        }
+    }
     function getDataFromSheet() {
       if (!book) return;
       const sheet = book.sheets[sheetIndex];
@@ -2849,9 +2913,8 @@
       const start = headerRow - 1;
       headers = (sheet.rows[start] || []).map(v => String(v ?? '').trim());
       while (headers.length && !headers.at(-1)) headers.pop();
-      sourceRows = sheet.rows
-        .slice(start + 1)
-        .map(row => Array.from({ length: headers.length }, (_, i) => String(row[i] ?? '')));
+      mapping = E.autoMap(headers, activeSchema());
+      sourceRows = sourceSheetRows();
       while (sourceRows.length && sourceRows.at(-1).every(E.blank)) sourceRows.pop();
       if (!headers.length) throw Error('The selected header row is empty.');
       if (sourceRows.length > E.LIMITS.rows || sourceRows.length * headers.length > E.LIMITS.cells)
@@ -2860,7 +2923,6 @@
       originalRows = sourceRows.map(r => r.slice());
       preparedRows = sourceRows.map(r => r.slice());
       origins = sourceRows.map((r, i) => ({ row: headerRow + i + 1, part: '' }));
-      mapping = E.autoMap(headers, activeSchema());
       rows = [];
       result = null;
       resetReview();
@@ -2882,7 +2944,7 @@
       say('Reading ' + file.name + '…');
       paint();
       try {
-        const value = await F.read(file);
+        const value = await F.read(file, { identifierValues: kind === 'data' });
         if (token !== generation || account !== a.owner?.() || !a.ready()) return;
         if (kind === 'reference') {
           busy = false;
@@ -3074,6 +3136,10 @@
     // Reconcile only result nodes. Keep keyed cells/buttons in place so blur does not
     // swallow the next click, and editing never rebuilds the surrounding workspace.
     function patchResults() {
+      if (mode === 'recombined') {
+        paint();
+        return;
+      }
       const current = $('valResultsArea');
       if (current) patchSurface(current, resultsView());
       const queue = $('valFileQueue');
@@ -3232,6 +3298,7 @@
           .join('') +
         '</div><div class="val-run-bar"><p>Uploaded rows stay in this browser. Only the run summary is saved.</p>' +
         btn('run', icon('check', 18) + ' Run validation', busy ? 'disabled' : '', 'val-primary') +
+        btn('mode', 'Original vs Recombined', 'data-mode="recombined"', 'val-secondary') +
         btn('mode', 'Compare two files', 'data-mode="file-compare"', 'val-secondary') +
         btn('mode', 'Excel to CSV', 'data-mode="excel-csv"', 'val-secondary') +
         '</div></section>'
@@ -3263,6 +3330,109 @@
           report: F.comparison(resultSchema, comparisonUpload(), result),
         };
       return comparisonCache.report;
+    }
+    function recombinedData() {
+      if (!result || !resultSchema || livePending || busy)
+        throw Error('Run validation and wait for current edits to finish before comparing.');
+      if (
+        !recombinedCache ||
+        recombinedCache.generation !== generation ||
+        recombinedCache.result !== result ||
+        recombinedCache.revision !== dataRevision
+      )
+        recombinedCache = {
+          generation,
+          result,
+          revision: dataRevision,
+          report: root.WorkHubValidatorTransform.recombine(
+            headers,
+            originalRows,
+            sourceRows,
+            origins,
+            preparationSteps,
+            headerRow
+          ),
+        };
+      return recombinedCache.report;
+    }
+    function recombinedValue(value) {
+      return comparisonValue(
+        value.length <= 32000
+          ? value
+          : value.slice(0, 32000) +
+              '… Full individual values are in the report’s Validated records sheet.'
+      );
+    }
+    function recombinedView() {
+      const intro = `<section class="val-card val-recombined-intro"><div><span class="val-eyebrow">ORIGINAL VS RECOMBINED</span><h2>Every record, back with its original.</h2><p>Compare your original upload with the current validated records brought back to one line per original source row. Plant and storage-location combinations stay linked.</p></div>${btn('mode', '← Validate / edit records', 'data-mode="check"', 'val-secondary')}</section>`;
+      if (!book || !result || !resultSchema || livePending || busy)
+        return (
+          intro +
+          `<section id="valRecombined" class="val-card"><p role="status">${livePending ? 'Checking your edit. The comparison will refresh when validation finishes.' : book ? 'Run validation on your working data, then open this tab.' : 'Upload your original file in Validate, prepare it if needed, and run validation.'}</p></section>`
+        );
+      let report;
+      try {
+        report = recombinedData();
+      } catch (error) {
+        return (
+          intro +
+          `<section id="valRecombined" class="val-card"><p class="val-setup-problem" role="alert">${esc(error.message)}</p></section>`
+        );
+      }
+      const filtered = report.rows.filter(
+        r =>
+          recombinedFilter === 'all' ||
+          (recombinedFilter === 'conflicts' ? r.conflicts.length : r.status !== 'Match')
+      );
+      recombinedPage = Math.max(0, Math.min(recombinedPage, Math.ceil(filtered.length / 20) - 1));
+      const shown = filtered.slice(recombinedPage * 20, recombinedPage * 20 + 20);
+      return (
+        intro +
+        `<section id="valRecombined" class="val-card"><div class="val-panel-title"><div><span class="val-eyebrow">${esc(fileName)}</span><h3>${esc(book.sheets[sheetIndex].name)} · comparison report</h3></div>${btn('export-recombined', 'Download comparison report', '', 'val-primary')}</div><div class="val-recombined-metrics"><div><span>Original rows</span><strong>${report.originalCount}</strong><small>${report.workingCount} validated records</small></div><div class="passed"><span>Match</span><strong>${report.matched}</strong><small>Values and combinations agree</small></div><div class="warning"><span>Not match</span><strong>${report.different}</strong><small>Includes conflicts / missing records</small></div><div class="error"><span>Conflicts</span><strong>${report.conflicts}</strong><small>Copied values differ among children</small></div></div><p class="val-help">Rows are linked by their original worksheet row, including repeated Material numbers. Copied fields are compared exactly. Combination order and grouping notation may differ; the values, pairings and duplicate counts must match. Differences appear in amber and conflicts in red. A data match is separate from passing validation.</p><div class="val-recombined-tools">${select(
+          'recombinedFilter',
+          'Show original rows',
+          [
+            ['all', 'All rows'],
+            ['changes', 'Not match / conflicts'],
+            ['conflicts', 'Conflicts only'],
+          ],
+          recombinedFilter
+        )}<span>${filtered.length} original row(s) · all rows and fields are included in the download</span></div><div class="val-table-scroll"><table class="val-grid val-recombined-grid"><thead><tr><th>Original source row</th><th>Comparison</th>${headers.map(h => '<th>' + esc(h) + '</th>').join('')}</tr></thead><tbody>${shown.map(r => `<tr data-recombined-row="${r.index}"><th><strong>Row ${r.sourceRow}</strong><small>${r.indices.length} validated record(s)</small></th><td><span class="val-recombined-status ${r.status === 'Match' ? 'passed' : r.conflicts.length ? 'error' : 'warning'}">${esc(r.status)}</span>${btn('recombined-detail', 'Review row', 'data-index="' + r.index + '"', 'val-quiet')}<small>${r.missing.reduce((n, x) => n + x.count, 0)} missing · ${r.extra.reduce((n, x) => n + x.count, 0)} extra combination(s)</small></td>${headers.map((_, c) => `<td data-recombined-field="${c}" class="${r.conflicts.includes(c) ? 'error' : r.changed.includes(c) || r.status === 'Missing records' ? 'val-difference' : ''}"><small>ORIGINAL</small>${recombinedValue(r.original[c])}<small>RECOMBINED${r.conflicts.includes(c) ? ' · CONFLICT' : ''}</small>${recombinedValue(r.values[c])}</td>`).join('')}</tr>`).join('') || '<tr><td colspan="' + (headers.length + 2) + '">No rows match this filter.</td></tr>'}</tbody></table></div><div class="val-pagination">${btn('recombined-page', '← Previous', 'data-delta="-1"' + (!recombinedPage ? ' disabled' : ''), 'val-quiet')}<span>Page ${recombinedPage + 1} of ${Math.max(1, Math.ceil(filtered.length / 20))}</span>${btn('recombined-page', 'Next →', 'data-delta="1"' + ((recombinedPage + 1) * 20 >= filtered.length ? ' disabled' : ''), 'val-quiet')}</div></section>`
+      );
+    }
+    function recombinedDetail(index) {
+      const report = recombinedData(),
+        row = report.rows[index];
+      if (!row) throw Error('Reopen a current original row.');
+      recombinedDialog = { index, generation, owner, dataRevision };
+      const list = (label, items) =>
+        `<h4>${label}</h4>${items.length ? '<div class="val-table-scroll"><table><thead><tr><th>Count</th>' + report.columns.map(c => '<th>' + esc(headers[c]) + '</th>').join('') + '</tr></thead><tbody>' + items.map(x => '<tr><td>' + x.count + '</td>' + x.values.map(v => '<td>' + comparisonValue(v) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>' : '<p>None.</p>'}`;
+      a.openModal(
+        'Original row ' + row.sourceRow + ' · ' + row.status,
+        `<section class="val-recombined-detail"><p>${esc(book.sheets[sheetIndex].name)} · ${row.indices.length} current validated record(s). Conflicting copied fields are shown in full for each child below.</p><div class="val-table-scroll"><table><thead><tr><th>Field</th><th>Original value</th><th>Recombined value</th><th>Comparison</th></tr></thead><tbody>${headers.map((h, c) => `<tr class="${row.conflicts.includes(c) ? 'error' : row.changed.includes(c) ? 'val-difference' : ''}"><th>${esc(h)}</th><td>${recombinedValue(row.original[c])}</td><td>${recombinedValue(row.values[c])}</td><td>${row.conflicts.includes(c) ? 'Conflict' : row.changed.includes(c) || row.status === 'Missing records' ? 'Not match' : 'Match'}</td></tr>`).join('')}</tbody></table></div>${list('Missing combinations', row.missing)}${list('Extra combinations', row.extra)}<h4>Current validated records · exact values</h4><div class="val-table-scroll"><table><thead><tr><th>Working record</th>${headers.map(h => '<th>' + esc(h) + '</th>').join('')}</tr></thead><tbody>${row.indices
+          .slice(0, 50)
+          .map(
+            i =>
+              '<tr><th>' +
+              (i + 1) +
+              ' · part ' +
+              esc(origins[i].part || 'unsplit') +
+              '</th>' +
+              sourceRows[i].map(v => '<td>' + comparisonValue(v) + '</td>').join('') +
+              '</tr>'
+          )
+          .join(
+            ''
+          )}</tbody></table></div>${row.indices.length > 50 ? '<p>First 50 records shown. The report includes all current validated records.</p>' : ''}${btn('recombined-records', 'Open these records in Validate', 'data-index="' + index + '"', 'val-primary')}</section>`
+      );
+    }
+    function closeRecombinedDetail() {
+      recombinedDialog = null;
+      const detail = document.querySelector('.val-recombined-detail');
+      if (detail) {
+        detail.replaceChildren();
+        a.closeModal?.();
+      }
     }
     function comparisonValue(value) {
       const full = '<pre>' + esc(value === '' ? '(blank)' : value) + '</pre>';
@@ -3445,7 +3615,9 @@
               .filter(c => !t.columns.some(field => Number(mapping[field.key]) === c.index))
           : [];
       return (
-        '<div id="valResultsArea"><p id="valLiveStatus" class="val-live-status" role="status" aria-live="polite">' +
+        '<div id="valResultsArea" data-val-context="' +
+        dataRevision +
+        '"><p id="valLiveStatus" class="val-live-status" role="status" aria-live="polite">' +
         (livePending
           ? 'Checking your edit…'
           : result
@@ -4105,7 +4277,7 @@
       if (!draft && store().templates.length) pick(store().templates[0].id, true);
       return (
         '<section class="validation-studio' +
-        (['file-compare', 'excel-csv'].includes(mode) ? ' val-compare-wide' : '') +
+        (['file-compare', 'excel-csv', 'recombined'].includes(mode) ? ' val-compare-wide' : '') +
         (roomyReview && mode === 'check' && rows.length ? ' val-review-wide' : '') +
         '" data-val-owner="' +
         esc(owner) +
@@ -4120,9 +4292,17 @@
         '<main class="val-main" data-val-section="' +
         esc(mode) +
         '">' +
-        (['file-compare', 'excel-csv'].includes(mode)
+        (['file-compare', 'excel-csv', 'recombined'].includes(mode)
           ? '<nav class="val-tabs" aria-label="Validation workspace">' +
             btn('mode', icon('check', 17) + 'Validate', 'data-mode="check"', '') +
+            btn(
+              'mode',
+              icon('columns', 17) + 'Original vs Recombined',
+              'data-mode="recombined" aria-current="' +
+                (mode === 'recombined' ? 'page' : 'false') +
+                '"',
+              mode === 'recombined' ? 'is-active' : ''
+            ) +
             btn(
               'mode',
               icon('columns', 17) + 'Compare two files',
@@ -4140,11 +4320,13 @@
               mode === 'excel-csv' ? 'is-active' : ''
             ) +
             '</nav>' +
-            (mode === 'file-compare'
-              ? fileCompare?.render() ||
-                '<p>The file comparison tool is unavailable. Refresh the page.</p>'
-              : csvConverter?.render() ||
-                '<p>The Excel-to-CSV tool is unavailable. Refresh the page.</p>')
+            (mode === 'recombined'
+              ? recombinedView()
+              : mode === 'file-compare'
+                ? fileCompare?.render() ||
+                  '<p>The file comparison tool is unavailable. Refresh the page.</p>'
+                : csvConverter?.render() ||
+                  '<p>The Excel-to-CSV tool is unavailable. Refresh the page.</p>')
           : draft
             ? header() +
               (message
@@ -4177,6 +4359,51 @@
       }
       if (queueBusy || queueIO)
         throw Error('Wait for the current queue operation, or use Stop queue.');
+      if (action === 'recombined-page') {
+        recombinedPage += Number(el.dataset.delta);
+        paint();
+        return;
+      }
+      if (action === 'recombined-detail') {
+        recombinedDetail(Number(el.dataset.index));
+        return;
+      }
+      if (action === 'recombined-records') {
+        const current = recombinedDialog;
+        if (
+          !current ||
+          current.index !== Number(el.dataset.index) ||
+          current.generation !== generation ||
+          current.owner !== owner ||
+          current.dataRevision !== dataRevision
+        )
+          throw Error('The data changed. Reopen the comparison row.');
+        const row = recombinedData().rows[current.index];
+        closeRecombinedDetail();
+        mode = 'check';
+        filter = 'all';
+        attentionGroup = null;
+        page = Math.floor((row.indices[0] || 0) / 25);
+        targetRow = row.indices[0] ?? -1;
+        paint();
+        $('valResultsCard')?.scrollIntoView?.({ block: 'start' });
+        return;
+      }
+      if (action === 'export-recombined') {
+        if (root.WorkHubCurrentAccess && !root.WorkHubCurrentAccess.can('validator', 'export'))
+          throw Error('Exporting validation data is disabled for this account.');
+        const report = recombinedData(),
+          token = generation,
+          account = owner,
+          exported = await F.recombinedReport(report, comparisonUpload());
+        if (token !== generation || account !== a.owner?.() || !a.ready()) return;
+        a.download(
+          exported,
+          safeName(fileName.replace(/\.[^.]+$/, '')) + '-recombined-comparison.xlsx',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        );
+        return;
+      }
       if (action === 'queue-add') {
         queueAccess();
         $('valQueueFiles').click();
@@ -4433,7 +4660,7 @@
       }
       if (
         action === 'mode' &&
-        (['file-compare', 'excel-csv'].includes(el.dataset.mode) || !draft)
+        (['file-compare', 'excel-csv', 'recombined'].includes(el.dataset.mode) || !draft)
       ) {
         commitCurrent();
         mode = el.dataset.mode;
@@ -5515,6 +5742,12 @@
     document.addEventListener('change', event => {
       const el = event.target;
       if (queueBusy || queueIO) return;
+      if (el.name === 'recombinedFilter') {
+        recombinedFilter = el.value;
+        recombinedPage = 0;
+        paint();
+        return;
+      }
       if (el.form?.id === 'valPreparationForm') {
         if (el.name === 'delimiter')
           el.form.elements.customDelimiter.closest('label').hidden = el.value !== 'custom';
@@ -5839,6 +6072,7 @@
           runner?.cancel();
           busy = false;
           mapping[el.dataset.map] = Number(el.value);
+          applyIdentifierMapping();
           rows = [];
           result = null;
           resetReview();

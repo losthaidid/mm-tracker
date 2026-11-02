@@ -328,7 +328,44 @@
     if (!type && /^0{2,}$/.test(fmt) && /^\d+$/.test(value)) return value.padStart(fmt.length, '0');
     return value;
   }
-  async function read(file, { valuesOnly = false, displayValues = false, signal } = {}) {
+  function identifierColumn(column, schema) {
+    if (schema.mode === 'sap')
+      return ['CHAR', 'NUMC', 'CLNT', 'UNIT', 'CUKY', 'LANG', 'RAW'].includes(
+        E().sapSettings(column).type
+      );
+    return (
+      column.type === 'text' ||
+      /^(?:MAT|MATNR|MATERIAL|MATERIAL_?(?:NUMBER|NO|ID))$/i.test(column.key) ||
+      /^material(?: number| no\.?| id)?$/i.test(column.label.trim())
+    );
+  }
+  function identifierNumber(raw, fmtId, fmt) {
+    if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(raw)) return raw;
+    const n = Number(raw),
+      canonical = String(n);
+    // Excel text cells never reach this function. Retain long numeric IDs and
+    // any significant precision that cannot be safely represented as a number.
+    if (
+      !Number.isFinite(n) ||
+      /^(?:[+-]?0\d+)$/.test(raw) ||
+      Object.is(n, -0) ||
+      (Number.isInteger(n) && !Number.isSafeInteger(n)) ||
+      canonical.split(/[eE]/)[0].replace(/\D/g, '').replace(/^0+/, '').length > 15
+    )
+      return raw;
+    if (/^0{2,}$/.test(fmt) && /^\d+$/.test(raw)) return raw.padStart(fmt.length, '0');
+    if (/^0+(?:\.0+)?$/.test(fmt) || [1, 2].includes(fmtId)) {
+      if (!root.SSF) throw Error('Refresh the page to load Excel identifier formatting.');
+      return String(root.SSF.format(fmt || fmtId, n));
+    }
+    // Canonicalize only the encoding of the same IEEE value. No fixed-precision
+    // rounding is used for General numbers or for already literal text.
+    return !fmt || ['General', '@'].includes(fmt) ? canonical : raw;
+  }
+  async function read(
+    file,
+    { valuesOnly = false, displayValues = false, identifierValues = false, signal } = {}
+  ) {
     const limits = displayValues ? { ...CSV_LIMITS, rows: CSV_LIMITS.rows - 1 } : E().LIMITS;
     if (displayValues) {
       valuesOnly = true;
@@ -441,6 +478,7 @@
         continue;
       }
       const rows = [],
+        numericText = {},
         cacheFlags = [],
         formulaRanges = [],
         columnStyles = [],
@@ -630,6 +668,13 @@
                 notes
               );
             else value = plainExcelValue(value, type, fmtId, fmt, is1904);
+            if (identifierValues && !displayValues && (!type || type === 'n') && value === raw) {
+              const text = identifierNumber(raw, fmtId, fmt);
+              if (text !== value) {
+                numericText[x] ||= {};
+                numericText[x][y] = text;
+              }
+            }
             if (String(value).length > 32000) throw Error('A cell exceeds 32,000 characters.');
             uploadText += String(value).length;
             if (uploadText > limits.text)
@@ -702,6 +747,7 @@
       sheets.push({
         name: sheet.getAttribute('name') || 'Sheet',
         rows: filled,
+        ...(identifierValues ? { numericText } : {}),
         ...(displayValues
           ? {
               width: gridWidth,
@@ -1112,7 +1158,8 @@
     return output.finish();
   }
   function typed(value, c, style = 0) {
-    if (style) return { value: String(value ?? ''), style };
+    if (style || identifierColumn(c, { mode: 'general' }))
+      return { value: String(value ?? ''), style };
     if (
       !E().blank(value) &&
       ['integer', 'decimal'].includes(c.type) &&
@@ -1894,11 +1941,144 @@
     }
     return workbook(sheets);
   }
+  async function recombinedReport(report, upload) {
+    const mark = (value, changed, conflict = false) => ({
+      value: String(value),
+      style: conflict ? 2 : changed ? 3 : 0,
+    });
+    const full = value =>
+      value.length <= 32000
+        ? value
+        : value.slice(0, 240) + '… [Full values: Validated records, original row links]';
+    const differences = report.rows.reduce(
+      (n, row) => n + row.missing.length + row.extra.length,
+      0
+    );
+    return workbook([
+      {
+        name: 'Summary',
+        escapeText: true,
+        rows: [
+          ['Original vs Recombined', upload.fileName],
+          ['Worksheet', upload.sheet],
+          ['Original rows', report.originalCount],
+          ['Validated records', report.workingCount],
+          ['Match', report.matched],
+          ['Not match / conflict', report.different],
+          ['Conflicting original rows', report.conflicts],
+          [
+            'Comparison rule',
+            'Original source row lineage; exact copied text; combination counts including duplicates. Combination order alone is ignored.',
+          ],
+          [
+            'Original Excel row',
+            'Comparison',
+            'Validated records',
+            'Changed fields',
+            'Conflicting fields',
+            'Missing combinations',
+            'Extra combinations',
+          ],
+          ...report.rows.map(r => [
+            r.sourceRow,
+            r.status,
+            r.indices.length,
+            r.changed.map(c => report.headers[c]).join(', '),
+            r.conflicts.map(c => report.headers[c]).join(', '),
+            r.missing.reduce((n, x) => n + x.count, 0),
+            r.extra.reduce((n, x) => n + x.count, 0),
+          ]),
+        ],
+      },
+      {
+        name: 'Recombined data',
+        escapeText: true,
+        width: report.headers.length + 2,
+        rowCount: report.rows.length + 1,
+        rows: function* () {
+          yield ['Original Excel row', 'Comparison', ...report.headers];
+          for (const r of report.rows)
+            yield [
+              r.sourceRow,
+              r.status,
+              ...r.values.map((v, c) =>
+                mark(full(v), r.changed.includes(c), r.conflicts.includes(c))
+              ),
+            ];
+        },
+      },
+      {
+        name: 'Field comparison',
+        escapeText: true,
+        width: report.headers.length * 3 + 2,
+        rowCount: report.rows.length + 1,
+        rows: function* () {
+          yield [
+            'Original Excel row',
+            'Comparison',
+            ...report.headers.flatMap(h => [
+              h + ' · Original',
+              h + ' · Recombined',
+              h + ' · Comparison',
+            ]),
+          ];
+          for (const r of report.rows)
+            yield [
+              r.sourceRow,
+              r.status,
+              ...report.headers.flatMap((_, c) => [
+                mark(r.original[c], r.changed.includes(c)),
+                mark(full(r.values[c]), r.changed.includes(c), r.conflicts.includes(c)),
+                r.conflicts.includes(c)
+                  ? 'Conflict'
+                  : r.changed.includes(c) || r.status === 'Missing records'
+                    ? 'Not match'
+                    : 'Match',
+              ]),
+            ];
+        },
+      },
+      {
+        name: 'Combination differences',
+        escapeText: true,
+        width: report.columns.length + 3,
+        rowCount: differences + 1,
+        rows: function* () {
+          yield [
+            'Original Excel row',
+            'Difference',
+            'Count',
+            ...report.columns.map(c => report.headers[c]),
+          ];
+          for (const r of report.rows)
+            for (const [kind, items] of [
+              ['Missing', r.missing],
+              ['Extra', r.extra],
+            ])
+              for (const item of items)
+                yield [r.sourceRow, kind, item.count, ...item.values.map(v => mark(v, true))];
+        },
+      },
+      {
+        name: 'Validated records',
+        escapeText: true,
+        width: report.headers.length + 2,
+        rowCount: upload.sourceRows.length + 1,
+        rows: function* () {
+          yield ['Original Excel row', 'Split part', ...report.headers];
+          for (let i = 0; i < upload.sourceRows.length; i++)
+            yield [upload.origins[i].row, upload.origins[i].part, ...upload.sourceRows[i]];
+        },
+      },
+    ]);
+  }
   root.WorkHubValidatorFiles = Object.freeze({
     read,
     CSV_LIMITS,
     formatDisplayedValue: displayedValue,
     plainExcelValue,
+    identifierColumn,
+    recombinedReport,
     workbook,
     template,
     report,

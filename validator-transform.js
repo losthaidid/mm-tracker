@@ -88,6 +88,9 @@
     return { kind: 'sap', rows: output, changes, warningCount, warnings, sample, blocked: false };
   }
   function explode(headers, rows, options) {
+    if (options.mode && !['position', 'dependent'].includes(options.mode))
+      throw Error('Choose positional lists or parent + dependent mapping.');
+    if (options.mode === 'dependent') return dependent(headers, rows, options);
     inspect(headers, rows);
     const { primary, mapped = [], delimiter = ',', trim = true, repeatSingle = false } = options;
     const columns = [primary, ...mapped];
@@ -190,5 +193,286 @@
       columns,
     };
   }
-  root.WorkHubValidatorTransform = Object.freeze({ sap, explode, convert, inspect, MAX_TEXT });
+  // A grouped cell names its parents explicitly. Plain cells keep positional
+  // pairing; there is deliberately no implicit Cartesian product or fallback.
+  function dependentParts(parent, child, { delimiter = ',', trim = true, repeatSingle = false }) {
+    const split = text => text.split(delimiter).map(v => (trim ? v.trim() : v));
+    const parents = split(parent);
+    if (
+      parents.some(v => !v || /[()\[\]{}\r\n]/.test(v)) ||
+      new Set(parents).size !== parents.length
+    )
+      throw Error('Dependent mapping needs distinct, nonblank parent values.');
+    if (/[\[\]{}\r\n]/.test(child))
+      throw Error(
+        'Unsupported dependent format. Use (parent) values or a plain list paired by position.'
+      );
+    if (!/[()]/.test(child)) {
+      const children = split(child);
+      if (children.length !== parents.length && !(repeatSingle && children.length === 1))
+        throw Error(
+          parents.length +
+            ' parent values, but ' +
+            children.length +
+            ' dependent values. Plain lists pair by position; use explicit groups for one-to-many values.'
+        );
+      return {
+        format: 'Paired list',
+        pairs: parents.map((p, i) => [p, children[children.length === 1 ? 0 : i]]),
+      };
+    }
+    const groups = [...child.matchAll(/\(([^()]*)\)/g)],
+      assignments = new Map(parents.map(p => [p, []]));
+    if (!groups.length || child.slice(0, groups[0].index).trim())
+      throw Error('Every grouped value must follow a (parent) marker.');
+    let count = 0;
+    for (let i = 0; i < groups.length; i++) {
+      const group = groups[i],
+        keys = split(group[1]);
+      if (keys.some(k => !assignments.has(k)) || new Set(keys).size !== keys.length)
+        throw Error(
+          'A group names an unknown, blank or repeated parent. Match the parent list exactly.'
+        );
+      let text = child.slice(group.index + group[0].length, groups[i + 1]?.index ?? child.length);
+      if (trim) text = text.trim();
+      if (i < groups.length - 1 && text.trimEnd().endsWith(delimiter))
+        text = text.trimEnd().slice(0, -delimiter.length);
+      if (/[()]/.test(text)) throw Error('Unbalanced or nested parentheses in a dependent group.');
+      const values = split(text);
+      if (values.some(v => !v.trim()))
+        throw Error('A grouped parent has an empty dependent value. Review this row.');
+      count += values.length * keys.length;
+      if (count > E.LIMITS.rows) throw Error('Expansion exceeds 25,000 rows. Split the upload.');
+      for (const key of keys) assignments.get(key).push(...values);
+    }
+    if (parents.some(p => !assignments.get(p).length))
+      throw Error('Every parent must have a dependent group. No parent will be silently dropped.');
+    return { format: 'Grouped', pairs: parents.flatMap(p => assignments.get(p).map(v => [p, v])) };
+  }
+  function dependent(headers, rows, options) {
+    inspect(headers, rows);
+    const { primary, mapped = [], delimiter = ',' } = options;
+    if (
+      mapped.length !== 1 ||
+      ![primary, mapped[0]].every(i => Number.isInteger(i) && i >= 0 && i < headers.length) ||
+      mapped[0] === primary
+    )
+      throw Error('Choose one parent column and exactly one different dependent column.');
+    if (
+      typeof delimiter !== 'string' ||
+      !delimiter.length ||
+      delimiter.length > 5 ||
+      /[()\r\n]/.test(delimiter)
+    )
+      throw Error(
+        'Choose a literal delimiter of 1–5 characters without parentheses or line breaks.'
+      );
+    const plans = [],
+      warnings = [],
+      formats = { Grouped: 0, 'Paired list': 0 };
+    let count = 0,
+      changes = 0,
+      warningCount = 0;
+    rows.forEach((row, index) => {
+      try {
+        const plan = dependentParts(row[primary], row[mapped[0]], options);
+        count += plan.pairs.length;
+        if (count > E.LIMITS.rows || count * headers.length > E.LIMITS.cells)
+          throw Error('Expansion exceeds 25,000 rows or 5,000,000 cells. Split the upload.');
+        plans.push(plan);
+        formats[plan.format]++;
+        if (
+          plan.pairs.length !== 1 ||
+          plan.pairs[0][0] !== row[primary] ||
+          plan.pairs[0][1] !== row[mapped[0]]
+        )
+          changes++;
+      } catch (error) {
+        if (/Expansion exceeds/.test(error.message)) throw error;
+        warningCount++;
+        if (warnings.length < SAMPLE_LIMIT)
+          warnings.push({ index, field: headers[mapped[0]], message: error.message });
+      }
+    });
+    if (warningCount)
+      return {
+        kind: 'explode',
+        rows: [],
+        parents: [],
+        sample: [],
+        columns: [primary, ...mapped],
+        changes,
+        outputCount: count,
+        warningCount,
+        warnings,
+        blocked: true,
+        formats,
+      };
+    const output = [],
+      parents = [],
+      sample = [];
+    let size = 0;
+    plans.forEach((plan, index) =>
+      plan.pairs.forEach((pair, part) => {
+        const next = rows[index].slice();
+        next[primary] = pair[0];
+        next[mapped[0]] = pair[1];
+        size += next.reduce((n, value) => n + value.length, 0);
+        if (size > MAX_TEXT)
+          throw Error('Prepared data exceeds 50 million text characters. Split the upload.');
+        output.push(next);
+        parents.push({ index, part: plan.pairs.length > 1 ? String(part + 1) : '' });
+        if (sample.length < SAMPLE_LIMIT)
+          sample.push({ index, part: part + 1, format: plan.format, values: pair });
+      })
+    );
+    return {
+      kind: 'explode',
+      rows: output,
+      parents,
+      sample,
+      columns: [primary, ...mapped],
+      changes,
+      outputCount: count,
+      warningCount: 0,
+      warnings,
+      blocked: false,
+      formats,
+    };
+  }
+  // Reconstruct the original combinations independently of current corrections.
+  // Source row lineage, rather than a Material lookup, owns every child record.
+  function recombine(headers, originalRows, sourceRows, origins, steps = [], headerRow = 1) {
+    inspect(headers, originalRows);
+    inspect(headers, sourceRows);
+    if (!Array.isArray(origins) || origins.length !== sourceRows.length)
+      throw Error('Original source row links are unavailable. Upload and prepare the file again.');
+    let expected = originalRows,
+      expectedOrigins = originalRows.map((_, i) => i);
+    const splitColumns = new Set(),
+      explosions = steps.filter(s => s.kind === 'explode');
+    for (const step of explosions) {
+      const plan = explode(headers, expected, step.options);
+      if (plan.blocked)
+        throw Error(
+          'The original values cannot be paired with this preparation: ' + plan.warnings[0].message
+        );
+      expectedOrigins = plan.parents.map(p => expectedOrigins[p.index]);
+      expected = plan.rows;
+      for (const c of plan.columns) splitColumns.add(c);
+    }
+    const columns = [...splitColumns].sort((a, b) => a - b),
+      groups = originalRows.map((original, index) => ({
+        index,
+        sourceRow: headerRow + index + 1,
+        original,
+        indices: [],
+        expected: [],
+        changed: [],
+        conflicts: [],
+        missing: [],
+        extra: [],
+        values: [],
+        status: 'Match',
+      }));
+    expected.forEach((row, i) => groups[expectedOrigins[i]].expected.push(row));
+    sourceRows.forEach((row, index) => {
+      const parent = origins[index]?.row - headerRow - 1;
+      if (!Number.isInteger(parent) || !groups[parent])
+        throw Error('A working row has no original source row. Upload the file again.');
+      groups[parent].indices.push(index);
+    });
+    const bag = records => {
+      const result = new Map();
+      for (const row of records) {
+        const values = columns.map(c => row[c]),
+          key = JSON.stringify(values);
+        if (!result.has(key)) result.set(key, { values, count: 0 });
+        result.get(key).count++;
+      }
+      return result;
+    };
+    for (const group of groups) {
+      const current = group.indices.map(i => sourceRows[i]),
+        before = bag(group.expected),
+        after = bag(current);
+      for (const [key, item] of before)
+        if (item.count > (after.get(key)?.count || 0))
+          group.missing.push({
+            values: item.values,
+            count: item.count - (after.get(key)?.count || 0),
+          });
+      for (const [key, item] of after)
+        if (item.count > (before.get(key)?.count || 0))
+          group.extra.push({
+            values: item.values,
+            count: item.count - (before.get(key)?.count || 0),
+          });
+      // Keep one list value for each split output row, preserving blanks and
+      // duplicates. The complete tuples below retain relationships between fields.
+      group.values = headers.map((_, c) => {
+        const values = [...new Set(current.map(row => row[c]))];
+        if (splitColumns.has(c)) return current.map(row => row[c]).join(', ');
+        if (values.length > 1) group.conflicts.push(c);
+        if (values.length !== 1 || values[0] !== group.original[c]) group.changed.push(c);
+        return values.length > 1
+          ? values.map(v => JSON.stringify(v)).join(' | ')
+          : (values[0] ?? '');
+      });
+      // Display the common Plant / dependent case in its original group notation.
+      if (explosions.length === 1 && explosions[0].options.mode === 'dependent') {
+        const { primary, mapped } = explosions[0].options,
+          paired = new Map();
+        for (const row of current) {
+          if (!paired.has(row[primary])) paired.set(row[primary], []);
+          paired.get(row[primary]).push(row[mapped[0]]);
+        }
+        group.values[primary] = [...paired.keys()].join(', ');
+        group.values[mapped[0]] = [...paired]
+          .map(([parent, values]) => '(' + parent + ') ' + values.join(', '))
+          .join(', ');
+      }
+      group.tuples = [...after.values()];
+      // Highlight only the split fields whose value multiset differs. When
+      // marginals match but pairings differ, highlight all combination fields.
+      const changedSplit = columns.filter(c => {
+        const counts = list => {
+          const map = new Map();
+          for (const row of list) map.set(row[c], (map.get(row[c]) || 0) + 1);
+          return map;
+        };
+        const a = counts(group.expected),
+          b = counts(current);
+        return a.size !== b.size || [...a].some(([v, n]) => b.get(v) !== n);
+      });
+      if (group.missing.length || group.extra.length)
+        group.changed.push(...(changedSplit.length ? changedSplit : columns));
+      group.changed.sort((a, b) => a - b);
+      group.status = !current.length
+        ? 'Missing records'
+        : group.conflicts.length
+          ? 'Conflict'
+          : group.changed.length || group.missing.length || group.extra.length
+            ? 'Not match'
+            : 'Match';
+    }
+    return {
+      rows: groups,
+      columns,
+      headers,
+      originalCount: originalRows.length,
+      workingCount: sourceRows.length,
+      matched: groups.filter(g => g.status === 'Match').length,
+      different: groups.filter(g => g.status !== 'Match').length,
+      conflicts: groups.filter(g => g.conflicts.length).length,
+    };
+  }
+  root.WorkHubValidatorTransform = Object.freeze({
+    sap,
+    explode,
+    convert,
+    inspect,
+    MAX_TEXT,
+    recombine,
+  });
 })(typeof window === 'undefined' ? globalThis : window);
