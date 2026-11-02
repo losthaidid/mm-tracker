@@ -83,6 +83,32 @@
   function eligible(field, starts = { A: 0, B: 0 }) {
     return field.a >= starts.A && (field.b < 0 || field.b >= starts.B);
   }
+  function mapByPosition(a, b, current, starts) {
+    const range = columnRange(a, b, starts),
+      reserved = new Set(current.filter(f => f.key && f.b >= 0).map(f => f.b));
+    let mapped = 0,
+      missing = 0,
+      conflicts = 0;
+    const fields = current.map(field => {
+      if (field.key || field.a < range.A) return { ...field };
+      const target = range.B + field.a - range.A;
+      if (target >= b.headers.length) {
+        missing++;
+        return { ...field, b: -1 };
+      }
+      if (reserved.has(target)) {
+        conflicts++;
+        return { ...field, b: -1 };
+      }
+      mapped++;
+      return { ...field, b: target };
+    });
+    const used = new Set(
+        fields.filter(f => f.b >= 0 && (f.key || eligible(f, range))).map(f => f.b)
+      ),
+      unused = b.headers.filter((_, i) => i >= range.B && !used.has(i)).length;
+    return { fields, mapped, missing, conflicts, unused };
+  }
   function configure(a, b, settings) {
     const starts = columnRange(a, b, settings.starts),
       candidates = (settings.fields || [])
@@ -541,6 +567,7 @@
     autoRelationship,
     columnRange,
     eligible,
+    mapByPosition,
     configure,
     compare,
     cell,

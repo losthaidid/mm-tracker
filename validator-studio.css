@@ -3726,3 +3726,23 @@ body[data-motion='off'] .val-prep-summary {
 .vrc-start-column {
   margin-top: 14px;
 }
+.vrc-bulk-map {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 18px 0;
+  padding: 14px;
+  border: 1px solid var(--hub-border, #d9e3db);
+  border-radius: 12px;
+}
+.vrc-bulk-map .val-help {
+  margin-bottom: 0;
+}
+.vrc-map-page > .val-help {
+  padding: 0 8px;
+}
+.vrc-skipped-tools {
+  margin-top: 10px;
+}
