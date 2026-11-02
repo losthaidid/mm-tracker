@@ -3613,3 +3613,99 @@ body[data-motion='off'] .val-prep-summary {
     flex-direction: column;
   }
 }
+
+/* Independent A/B recombination workspace. */
+.vrc-file-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 18px;
+}
+.vrc-file-grid .val-card {
+  margin-top: 16px;
+}
+.vrc-file h3 {
+  max-width: 400px;
+  line-height: 1.4;
+}
+.vrc-file .val-label input[type='file'] {
+  max-width: 100%;
+  font-size: 12px;
+}
+.vrc-columns {
+  margin-top: 18px;
+  border: 1px solid var(--hub-border, #d5dfce);
+  border-radius: 12px;
+  padding: 12px;
+}
+.vrc-columns > summary {
+  cursor: pointer;
+  font-weight: 650;
+  padding: 4px;
+}
+.vrc-columns .val-table-scroll {
+  max-height: 340px;
+  overflow: auto;
+  margin-top: 12px;
+}
+.vrc-columns select {
+  min-width: 180px;
+  max-width: 350px;
+}
+.vrc-columns input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--hub-accent, #356c62);
+}
+.vrc-pair-options {
+  padding: 16px;
+  margin: 20px 0 0;
+  border: 1px solid var(--hub-border, #d5dfce);
+  border-radius: 12px;
+}
+.vrc-pair-options .val-fields {
+  margin-top: 14px;
+}
+.vrc-run {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.vrc-run .val-help {
+  margin: 6px 0;
+}
+.vrc-message {
+  padding: 14px 20px;
+  line-height: 1.6;
+  color: var(--hub-text, #314b4a);
+  background: var(--hub-surface-soft, #f2f6eb);
+  border-radius: 12px;
+}
+.vrc-error {
+  color: #9a3c3c;
+}
+#valStandaloneRecombined .val-recombined-grid th:first-child {
+  min-width: 200px;
+  max-width: 280px;
+}
+#valStandaloneRecombined .val-recombined-grid td {
+  min-width: 220px;
+}
+#valStandaloneRecombined .val-recombined-grid th strong {
+  display: block;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.vrc-detail pre {
+  max-height: 240px;
+  overflow: auto;
+}
+@media (max-width: 800px) {
+  .vrc-file-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .vrc-run {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
