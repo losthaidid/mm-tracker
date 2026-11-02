@@ -2902,23 +2902,28 @@
       const sheet = book.sheets[sheetIndex];
       if (!sheet) throw Error('Choose a worksheet.');
       const start = headerRow - 1;
-      headers = (sheet.rows[start] || []).map(v => String(v ?? '').trim());
+      // Excel omits empty cells. Keep their positions without sparse array holes
+      // reaching the mapping dropdown's [value, label] entries.
+      headers = Array.from(sheet.rows[start] || [], v => String(v ?? '').trim());
       while (headers.length && !headers.at(-1)) headers.pop();
       mapping = E.autoMap(headers, activeSchema());
       sourceRows = sourceSheetRows();
       while (sourceRows.length && sourceRows.at(-1).every(E.blank)) sourceRows.pop();
-      if (!headers.length) throw Error('The selected header row is empty.');
-      if (sourceRows.length > E.LIMITS.rows || sourceRows.length * headers.length > E.LIMITS.cells)
-        throw Error('Use up to 25,000 rows and 5,000,000 cells.');
       resetPreparation();
-      originalRows = sourceRows.map(r => r.slice());
-      preparedRows = sourceRows.map(r => r.slice());
-      origins = sourceRows.map((r, i) => ({ row: headerRow + i + 1, part: '' }));
       rows = [];
       result = null;
       resetReview();
       resultSchema = null;
       page = 0;
+      if (!headers.length)
+        throw Error(
+          'The selected header row is empty. Choose the row containing your column headers.'
+        );
+      if (sourceRows.length > E.LIMITS.rows || sourceRows.length * headers.length > E.LIMITS.cells)
+        throw Error('Use up to 25,000 rows and 5,000,000 cells.');
+      originalRows = sourceRows.map(r => r.slice());
+      preparedRows = sourceRows.map(r => r.slice());
+      origins = sourceRows.map((r, i) => ({ row: headerRow + i + 1, part: '' }));
     }
     async function loadFile(file, kind = 'data') {
       ensure();
@@ -2929,14 +2934,15 @@
       commitCurrent();
       if (!draft) throw Error('Create a template first.');
       const token = ++generation,
-        account = owner;
+        account = owner,
+        current = () => token === generation && account === a.owner?.() && a.ready();
       runner?.cancel();
       busy = true;
       say('Reading ' + file.name + '…');
-      paint();
       try {
+        paint();
         const value = await F.read(file, { identifierValues: kind === 'data' });
-        if (token !== generation || account !== a.owner?.() || !a.ready()) return;
+        if (!current()) return;
         if (kind === 'reference') {
           busy = false;
           mode = 'references';
@@ -2954,11 +2960,20 @@
         sheetIndex = 0;
         headerRow = 1;
         fileName = file.name;
-        getDataFromSheet();
         mode = 'check';
+        getDataFromSheet();
         say('File ready. Check the column mapping before validating.');
+      } catch (error) {
+        // A late failure belongs to the old upload/account, not the active one.
+        if (!current()) return;
+        if (/central directory|corrupted zip|end of data reached/i.test(error.message))
+          error = Error(
+            'This Excel workbook could not be read. Open it in Excel and save a new .xlsx copy, then try again.'
+          );
+        say('Could not load ' + file.name + ': ' + error.message, true);
+        throw error;
       } finally {
-        if (token === generation && account === a.owner?.()) {
+        if (current()) {
           busy = false;
           paint();
         }
@@ -3276,7 +3291,7 @@
               options(
                 [
                   [-1, c.required ? 'Choose a column' : 'Skip this field'],
-                  ...headers.map((h, i) => [i, F.col(i) + ' · ' + h]),
+                  ...headers.map((h, i) => [i, F.col(i) + ' · ' + (h || '(blank header)')]),
                 ],
                 mapping[c.key]
               ) +
@@ -5931,6 +5946,8 @@
         say(error.message, true);
         if (
           el.name === 'validationProfile' ||
+          el.name === 'sheet' ||
+          el.name === 'headerRow' ||
           el.dataset.setupRule !== undefined ||
           el.dataset.setupReference !== undefined
         )

@@ -2,6 +2,12 @@
 
 Open your template → **Validate** → upload or paste your records. Confirm the column mapping, then use the **Prepare before you check** buttons above it.
 
+## Excel worksheets with introductory rows
+
+Validate initially reads worksheet row 1 as the header. If your file has instructions above the data, choose the correct **Worksheet** and **Header row** in the mapping panel; for example, enter 4 when your actual column names are on row 4. Blank cells before or between populated headers retain their Excel column positions and show **(blank header)** in the dropdown. They do not shift material numbers, descriptions or other fields to another column. Choose a nonblank, unique header row before running validation.
+
+Failed uploads stop the **Making sense of your data…** banner and show an error so you can retry. If reading the new file fails, the previous successfully loaded session remains available. If the workbook loads but the chosen header row is empty, old results are cleared and the worksheet/header controls remain available to correct the selection. A late failure from an older upload or another account cannot stop a newer upload or replace its status.
+
 ## Apply SAP formatting
 
 Use a **SAP** template with the correct SAP types and lengths maintained in Columns. Select the template version you want to validate against.

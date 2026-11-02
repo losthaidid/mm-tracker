@@ -214,6 +214,7 @@ test('starting-column controls preserve mappings and invalidate old results and 
  x.change('[data-vrc-setting="startColumn"][data-side="A"]','3');x.change('[data-vrc-setting="startColumn"][data-side="B"]','3');
  assert.equal(x.tool.snapshot().result,null);await assert.rejects(x.tool.exportReport(),/before exporting/);
  assert.deepEqual(copy(x.tool.snapshot().settings.starts),{A:3,B:3});assert.deepEqual(x.tool.snapshot().settings.fields.map(f=>f.b),mappings);assert.deepEqual(x.tool.snapshot().settings.fields.map(f=>f.key),keys);
+ assert.equal(x.d.querySelector('[data-vrc-map-row="1"]'),null);await x.tool.handle({dataset:{vrc:'skipped'}});
  assert.equal(x.d.querySelector('[data-vrc-field="include"][data-index="1"]').checked,false);assert.equal(x.d.querySelector('[data-vrc-field="include"][data-index="1"]').disabled,true);
  assert.equal(x.d.querySelector('[data-vrc-field="include"][data-index="0"]').checked,true);assert.match(x.d.querySelector('[data-vrc-map-row="0"]').textContent,/Matching key kept before start/);
  assert.equal(x.tool.snapshot().settings.relationship.enabled,false);
@@ -249,4 +250,54 @@ test('file replacement, worksheet/header changes and account cleanup reset start
  await x.tool.loadFile('A',{name:'sheets.xlsx',size:blob.size,arrayBuffer:()=>blob.arrayBuffer()});
  x.change('[data-vrc-setting="startColumn"][data-side="A"]','3');x.change('[data-vrc-setting="sheetIndex"][data-side="A"]','1');assert.equal(x.tool.snapshot().settings.starts.A,0);
  x.change('[data-vrc-setting="startColumn"][data-side="A"]','4');x.account('other');await Promise.resolve();assert.deepEqual(copy(x.tool.snapshot().settings.starts),{A:0,B:0});assert.equal(x.tool.snapshot().files.A.name,'');
+});
+
+test('positional mapping pairs 111 original columns from P with 96 differently named output columns in one action',async t=>{
+ const x=fixture(t),ha=Array.from({length:111},(_,i)=>i<15?'Metadata '+i:i===15?'Combined Setup: Material Code':'Original field '+i),hb=Array.from({length:96},(_,i)=>i?'Output field '+i:'Material Number');
+ const a=ha.map((_,i)=>i<15?'skip '+i:i===15?'000001':'value '+(i-15)),b=a.slice(15);
+ await x.open();await x.upload('A',[a],ha);await x.upload('B',[b,b],hb);
+ x.change('[data-vrc-setting="startColumn"][data-side="A"]','15');
+ assert.equal(x.d.querySelector('[data-vrc-map-row]').dataset.vrcMapRow,'15');assert.equal(x.d.querySelector('[data-vrc-map-row="0"]'),null);
+ await x.tool.handle({dataset:{vrc:'map-position'}});const mapped=x.tool.snapshot().settings.fields;
+ assert.deepEqual(copy(mapped.slice(15).map(f=>f.b)),Array.from({length:96},(_,i)=>i));assert.match(x.d.body.textContent,/96 non-key columns mapped by position/);
+ assert.equal(mapped.some(f=>f.key),false);x.change('[data-vrc-field="key"][data-index="15"]',true);
+ const r=await x.tool.run();assert.equal(r.match,true);assert.equal(r.fields.length,96);assert.equal(x.C.cell(r,0,0).a,'000001');assert.equal(x.C.cell(r,0,95).b,'value 95');assert.equal(x.writes(),0);
+ await x.tool.handle({dataset:{vrc:'map-position'}});assert.equal(x.tool.snapshot().result,null);assert.equal(x.tool.snapshot().settings.fields[15].key,true);await assert.rejects(x.tool.exportReport(),/before exporting/);
+});
+
+test('positional mapping preserves selected keys and exclusions and reports missing, extra and conflicting columns',async t=>{
+ const x=fixture(t),a=x.source([['001','unchanged','missing','extra']],['Material','Name','Value','Last']),b=x.source([['unchanged','001']],['Name B','ID B']),fields=x.C.autoFields(a,b);
+ fields[0].key=true;fields[0].b=1;fields[1].include=false;const before=copy(fields),next=x.C.mapByPosition(a,b,fields,{A:1,B:0});
+ assert.deepEqual(copy(fields),before);assert.equal(next.fields[0].b,1);assert.equal(next.fields[0].key,true);assert.equal(next.fields[1].include,false);assert.equal(next.fields[1].b,0);assert.equal(next.fields[2].b,-1);assert.equal(next.fields[3].b,-1);
+ assert.deepEqual([next.mapped,next.missing,next.conflicts,next.unused],[1,1,1,0]);
+ const r=await x.C.compare(a,b,{fields:next.fields,starts:{A:1,B:0},relationship:{enabled:false}});assert.equal(r.match,false);assert.equal(x.C.cell(r,0,1).hasB,false);assert.equal(x.C.cell(r,0,0).b,'001');
+ const short=x.source([['001']],['Material']),wide=x.source([['001','extra','extra']],['Material','Extra1','Extra2']),more=x.C.mapByPosition(short,wide,x.C.autoFields(short,wide),{A:0,B:0});assert.equal(more.unused,2);
+});
+
+test('skipped columns are collapsed, can supply a matching key and do not alter a completed comparison when opened',async t=>{
+ const x=fixture(t);await x.open();await x.upload('A',originals);await x.upload('B',exploded);
+ x.change('[data-vrc-field="key"][data-index="0"]',false);x.change('[data-vrc-setting="startColumn"][data-side="A"]','2');
+ assert.equal(x.d.querySelector('[data-vrc-map-row="0"]'),null);assert.equal(x.d.querySelector('[data-vrc="skipped"]').getAttribute('aria-expanded'),'false');
+ await x.tool.handle({dataset:{vrc:'skipped'}});assert.ok(x.d.querySelector('#vrcSkippedColumns [data-vrc-map-row="0"]'));
+ x.change('[data-vrc-field="key"][data-index="0"]',true);assert.ok(x.d.querySelector('[data-vrc-map-scope="mapping"] [data-vrc-map-row="0"]'));assert.equal(x.d.querySelector('#vrcSkippedColumns [data-vrc-map-row="0"]'),null);
+ const r=await x.tool.run();await x.tool.handle({dataset:{vrc:'skipped'}});assert.equal(x.tool.snapshot().result,r);assert.equal(x.d.querySelector('#vrcSkippedColumns'),null);
+});
+
+test('200-column mapping is paged without losing edits, bulk choices, source positions or final report fields',async t=>{
+ const x=fixture(t),ha=Array.from({length:200},(_,i)=>i?'Original '+i:'Material'),hb=Array.from({length:200},(_,i)=>i?'Output '+i:'Material'),data=ha.map((_,i)=>i?'literal '+i:'000001');
+ await x.open();await x.upload('A',[data],ha);await x.upload('B',[data],hb);await x.tool.handle({dataset:{vrc:'map-position'}});
+ assert.equal(x.d.querySelectorAll('[data-vrc-map-row]').length,40);assert.ok(x.d.querySelectorAll('option').length<10000);
+ x.d.querySelector('[data-vrc-map-scope="mapping"] .val-table-scroll').scrollTop=250;
+ await x.tool.handle({dataset:{vrc:'map-page',scope:'mapping',delta:'1'}});assert.equal(x.d.querySelector('[data-vrc-map-scope="mapping"] .val-table-scroll').scrollTop,0);
+ for(let i=0;i<3;i++)await x.tool.handle({dataset:{vrc:'map-page',scope:'mapping',delta:'1'}});
+ assert.equal(x.d.querySelector('[data-vrc-map-row]').dataset.vrcMapRow,'160');assert.equal(x.d.querySelector('[data-vrc-field="b"][data-index="199"]').value,'199');
+ x.change('[data-vrc-field="include"][data-index="199"]',false);assert.equal(x.tool.snapshot().settings.fields[199].include,false);
+ await x.tool.handle({dataset:{vrc:'map-page',scope:'mapping',delta:'-1'}});await x.tool.handle({dataset:{vrc:'map-page',scope:'mapping',delta:'1'}});assert.equal(x.d.querySelector('[data-vrc-field="include"][data-index="199"]').checked,false);
+ x.change('[data-vrc-all]',false);assert.ok(x.tool.snapshot().settings.fields.every(f=>f.key||!f.include));x.change('[data-vrc-all]',true);assert.ok(x.tool.snapshot().settings.fields.every(f=>f.include));
+ const r=await x.tool.run();assert.equal(r.fields.length,200);assert.equal(r.match,true);assert.equal(x.C.cell(r,0,199).b,'literal 199');assert.ok(x.d.querySelectorAll('option').length<10000);
+});
+
+test('bulk positional mapping obeys run permission and does not disturb the current result when denied',async t=>{
+ const x=fixture(t);await x.open();await x.upload('A',originals);await x.upload('B',exploded);const r=await x.tool.run();
+ x.w.WorkHubCurrentAccess={can:(_,action)=>action==='view'};await assert.rejects(x.tool.handle({dataset:{vrc:'map-position'}}),/cannot recombine/);assert.equal(x.tool.snapshot().result,r);
 });
