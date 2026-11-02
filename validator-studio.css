@@ -3458,3 +3458,158 @@ body[data-motion='off'] .val-prep-summary {
     flex-direction: column;
   }
 }
+
+/* One row per original record; keep the source and result visible while scrolling. */
+.validation-studio .val-recombined-intro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 20px;
+  background: linear-gradient(
+    120deg,
+    var(--hub-surface-soft, #f2f6eb),
+    var(--hub-surface, #fffef9)
+  );
+  border: 1px solid var(--hub-border, #d5dfce);
+}
+.validation-studio .val-recombined-intro h2 {
+  font-size: 22px;
+  margin: 7px 0;
+}
+.validation-studio .val-recombined-intro p {
+  max-width: 780px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.validation-studio #valRecombined > .val-panel-title {
+  margin-bottom: 12px;
+}
+.val-recombined-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin: 14px 0;
+}
+.val-recombined-metrics > div {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid var(--hub-border, #d5dfce);
+  border-radius: 14px;
+}
+.val-recombined-metrics strong {
+  font-size: 28px;
+  font-weight: 650;
+}
+.val-recombined-metrics small,
+.val-recombined-tools > span {
+  font-size: 12px;
+  opacity: 0.8;
+}
+.val-recombined-metrics .passed strong {
+  color: #287353;
+}
+.val-recombined-metrics .warning strong {
+  color: #926013;
+}
+.val-recombined-metrics .error strong {
+  color: #ad4141;
+}
+.val-recombined-tools {
+  display: flex;
+  gap: 20px;
+  align-items: end;
+  margin: 12px 0;
+}
+.val-recombined-tools .val-label {
+  min-width: 230px;
+}
+.val-recombined-grid {
+  width: max-content;
+  min-width: 100%;
+}
+.val-recombined-grid th,
+.val-recombined-grid td {
+  min-width: 220px;
+  max-width: 420px;
+  vertical-align: top;
+}
+.val-recombined-grid th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  min-width: 140px;
+  background: var(--hub-surface, #fffef9);
+}
+.val-recombined-grid thead th:first-child {
+  z-index: 3;
+}
+.val-recombined-grid td:nth-child(2) {
+  min-width: 190px;
+}
+.val-recombined-grid td > small,
+.val-recombined-grid th > small {
+  display: block;
+  font-size: 10px;
+  margin: 8px 0;
+}
+.val-recombined-grid pre,
+.val-recombined-detail pre {
+  font: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 5px 0 18px;
+  max-width: 500px;
+}
+.val-recombined-status {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-weight: 650;
+  background: #e9f6ed;
+  color: #246447;
+}
+.val-recombined-status.warning {
+  background: #fff0cf;
+  color: #805112;
+}
+.val-recombined-status.error {
+  background: #fce6e6;
+  color: #983b3b;
+}
+.val-recombined-grid .val-difference,
+.val-recombined-detail .val-difference {
+  background: #fff2d7;
+  color: #5c451d;
+}
+.val-recombined-grid .error,
+.val-recombined-detail tr.error {
+  background: #fce6e6;
+  color: #7c3030;
+}
+.val-recombined-detail {
+  max-width: 1200px;
+}
+.val-recombined-detail table {
+  border-collapse: collapse;
+  min-width: 100%;
+}
+.val-recombined-detail th,
+.val-recombined-detail td {
+  padding: 12px;
+  border-bottom: 1px solid var(--hub-border, #d5dfce);
+  vertical-align: top;
+  min-width: 150px;
+}
+@media (max-width: 760px) {
+  .val-recombined-metrics {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .validation-studio .val-recombined-intro,
+  .val-recombined-tools {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
