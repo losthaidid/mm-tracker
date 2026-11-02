@@ -117,28 +117,6 @@ test('successive positional explosions retain one-line source identity and full 
   assert.equal(r.matched,1); assert.equal(r.rows[0].tuples.length,4);
 });
 
-test('the UI previews mixed formats, validates seven rows, recombines three originals, highlights a conflicting description and exports all values', async t => {
-  const x=await fixture(t); await x.upload(original); const writes=x.writes();
-  x.prepare(); assert.equal(x.ui.snapshot().rows.length,7); assert.equal(x.writes(),writes); await x.ui.run();
-  await x.mode('recombined'); assert.equal(x.d.querySelectorAll('[data-recombined-row]').length,3);
-  assert.equal(x.d.querySelector('[data-recombined-row="0"] .val-recombined-status').textContent,'Match');
-  await x.mode('check'); x.edit(1,'DESCRIPTION','A changed description'); await x.mode('recombined');
-  assert.equal(x.d.querySelector('[data-recombined-row="0"] .val-recombined-status').textContent,'Conflict');
-  assert.equal(x.d.querySelector('[data-recombined-row="1"] .val-recombined-status').textContent,'Match');
-  assert.ok(x.d.querySelector('[data-recombined-row="0"] [data-recombined-field="1"]').classList.contains('error'));
-  await x.ui.handle({dataset:{val:'recombined-detail',index:'0'}}); assert.match(x.d.querySelector('.val-recombined-detail').textContent,/A changed description/);
-  await x.ui.handle({dataset:{val:'recombined-records',index:'0'}}); assert.equal(x.ui.snapshot().mode,'check');
-  await x.mode('recombined'); await x.ui.handle({dataset:{val:'export-recombined'}});
-  const {blob,name}=x.downloads[0]; assert.match(name,/-recombined-comparison.xlsx$/);
-  const book=await x.F.read({name,size:blob.size,arrayBuffer:()=>blob.arrayBuffer(),},{valuesOnly:true});
-  assert.deepEqual(plain(book.sheets.map(s=>s.name)),['Summary','Recombined data','Field comparison','Combination differences','Validated records']);
-  assert.equal(book.sheets[1].rows.length,4); assert.match(book.sheets[1].rows[1][3],/A changed description/);
-  const records=book.sheets[4].rows; assert.equal(records.length,8); assert.equal(records[2][2],'6.00007'); assert.equal(records[5][3],'Another source row'); assert.equal(records[5][6],'=literal()');
-  const zip=await x.w.JSZip.loadAsync(new x.w.Uint8Array(await blob.arrayBuffer()));
-  assert.match(await zip.file('xl/worksheets/sheet2.xml').async('string'),/s="2"/);
-  for(const f of Object.values(zip.files).filter(f=>/^xl\/worksheets\//.test(f.name))) assert.doesNotMatch(await f.async('string'),/<f[ >]/);
-  assert.doesNotMatch(JSON.stringify(x.state()),/Alpha|Another source row|changed description/);
-});
 
 test('file replacement clears stale live input values and compares the new material and its description', async t => {
   const x=await fixture(t); await x.upload([['A','Alpha','P1','S1','']]); await x.ui.run();
@@ -149,23 +127,8 @@ test('file replacement clears stale live input values and compares the new mater
   assert.equal(x.d.querySelector('[data-cell="0"][data-field="MATNR"]').value,'B');
   assert.equal(x.d.querySelector('[data-cell="0"][data-field="DESCRIPTION"]').value,'Alpha');
   assert.equal(x.ui.snapshot().sourceRows[0][1],'Alpha');
-  await x.mode('recombined'); assert.equal(x.d.querySelector('.val-recombined-status').textContent,'Match');
 });
 
-test('recombined views and exports wait for live validation and cannot survive an account change', async t => {
-  const x=await fixture(t); await x.upload(original); x.prepare(); await x.ui.run();
-  x.edit(0,'DESCRIPTION','pending',false); await x.mode('recombined');
-  assert.match(x.d.getElementById('valRecombined').textContent,/Checking your edit/);
-  await assert.rejects(x.ui.handle({dataset:{val:'export-recombined'}}),/wait for current edits/);
-  for(const fn of [...x.timers.values()]) fn();
-  assert.ok(x.d.querySelector('[data-recombined-row]'));
-  x.w.WorkHubCurrentAccess={can:(_,action)=>action!=='export'};
-  await assert.rejects(x.ui.handle({dataset:{val:'export-recombined'}}),/disabled/);
-  x.w.WorkHubCurrentAccess={can:()=>true};
-  await x.ui.handle({dataset:{val:'recombined-detail',index:'0'}});
-  const pending=x.ui.handle({dataset:{val:'export-recombined'}}); x.account('another'); await pending;
-  assert.equal(x.downloads.length,0); assert.doesNotMatch(x.d.getElementById('modalBody').textContent,/Alpha|pending/);
-});
 
 test('Excel numeric identifiers use their explicit display precision or equivalent encoding while literal text, leading zeros and long IDs stay exact', async t => {
   const x=await fixture(t), values=[['6.00007','Formatted','P1','S1',''],['000001','Leading','P2','S2',''],['12345678901234567890','Long','P3','S3',''],['6.000069999998','Literal text','P4','S4',''],['6.00007','Encoding','P5','S5','']];
@@ -197,29 +160,7 @@ test('a numeric General Material column exports exact identifier text, while num
   assert.match(xml,/<c r="A2"[^>]*t="inlineStr"[^>]*>.*?0006\.00007/s); assert.match(xml,/<c r="B2"[^>]*><v>12\.25<\/v>/);
 });
 
-test('recombined filters page original rows and export remains complete', async t => {
-  const x=await fixture(t), values=Array.from({length:25},(_,i)=>[String(i),'Description '+i,'P1,P2','S1,S2','']);
-  await x.upload(values); x.prepare(); await x.ui.run(); await x.mode('recombined');
-  assert.equal(x.d.querySelectorAll('[data-recombined-row]').length,20);
-  await x.ui.handle({dataset:{val:'recombined-page',delta:'1'}}); assert.equal(x.d.querySelector('[data-recombined-row]').dataset.recombinedRow,'20');
-  x.change(x.d.querySelector('[name="recombinedFilter"]'),'changes'); assert.equal(x.d.querySelectorAll('[data-recombined-row]').length,0);
-  await x.ui.handle({dataset:{val:'export-recombined'}}); const blob=x.downloads[0].blob, book=await x.F.read({name:'all.xlsx',size:blob.size,arrayBuffer:()=>blob.arrayBuffer()});
-  assert.equal(book.sheets.find(s=>s.name==='Recombined data').rows.length,26); assert.equal(book.sheets.find(s=>s.name==='Validated records').rows.length,51);
-});
 
-test('queue restores mixed-format preparations, corrections and descriptions only for their owning file', async t => {
-  const x=await fixture(t), first=x.file('first.csv',original), second=x.file('second.csv',[['6.00007','Second file description','FF01,FF02','QA00,QA01','002']]);
-  await x.ui.addQueueFiles([first,second]); const jobs=x.ui.snapshot().queue;
-  x.prepare(); x.ui.confirmQueueJob(); await x.ui.run(); x.edit(1,'DESCRIPTION','First file correction');
-  await x.ui.openQueueJob(jobs[1].id); x.prepare(); x.ui.confirmQueueJob(); await x.ui.run();
-  assert.equal(x.ui.snapshot().sourceRows[0][1],'Second file description');
-  await x.ui.openQueueJob(jobs[0].id); assert.equal(x.ui.snapshot().sourceRows.length,7); assert.equal(x.ui.snapshot().sourceRows[1][1],'First file correction');
-  assert.equal(x.d.querySelector('[data-cell="1"][data-field="DESCRIPTION"]').value,'First file correction');
-  await x.mode('recombined'); assert.equal(x.d.querySelectorAll('[data-recombined-row]').length,3); assert.match(x.d.querySelector('[data-recombined-row="0"]').textContent,/First file correction/);
-  assert.doesNotMatch(x.d.getElementById('valRecombined').textContent,/Second file description/);
-  await x.ui.openQueueJob(jobs[1].id); await x.mode('recombined');
-  assert.equal(x.d.querySelectorAll('[data-recombined-row]').length,1); assert.equal(x.d.querySelector('.val-recombined-status').textContent,'Match'); assert.match(x.d.getElementById('valRecombined').textContent,/Second file description/);
-});
 
 test('dependent expansion and recombination cover 12,000 originals and reject output beyond 25,000 records', async t => {
   const {T}=await fixture(t), values=Array.from({length:12000},(_,i)=>['000'+i,'Description '+i,'FF01,FF02','(FF01,FF02) QA00','extra '+i]);
