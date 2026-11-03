@@ -199,6 +199,7 @@
       preparation = null,
       preparationSteps = [],
       preparationUndo = [],
+      explodedExport = null,
       mapping = {},
       rows = [],
       result = null,
@@ -776,6 +777,7 @@
       }
     }
     function resetPreparation() {
+      explodedExport = null;
       cancelBulkFixes();
       bulkUndo = null;
       closePreparation();
@@ -982,7 +984,10 @@
       say(
         'Preparation applied to ' +
           sourceRows.length +
-          ' working row(s). Run validation to check and export these values.'
+          ' working row(s). ' +
+          (preparationSteps.some(step => step.kind === 'explode')
+            ? 'Download exploded Excel is ready. Run validation to check these values.'
+            : 'Run validation to check and export these values.')
       );
       paint();
     }
@@ -1018,8 +1023,89 @@
       );
       paint();
     }
+    async function downloadExploded() {
+      ensure();
+      const permitted = () =>
+        !root.WorkHubCurrentAccess || root.WorkHubCurrentAccess.can('validator', 'export');
+      if (!permitted()) throw Error('Exporting validation data is disabled for this account.');
+      if (busy || queueBusy || queueIO || bulkOperation || explodedExport)
+        throw Error('Wait for the current operation before downloading exploded data.');
+      if (!book || !sourceRows.length || !preparationSteps.some(step => step.kind === 'explode'))
+        throw Error('Apply Explode & map rows before downloading exploded Excel.');
+      const job = { owner, token: generation, source: sourceRows, revision: dataRevision },
+        titles = headers.slice(),
+        name = safeName(fileName.replace(/\.[^.]+$/, '')) + '-exploded.xlsx',
+        current = () =>
+          explodedExport === job &&
+          job.owner === a.owner?.() &&
+          a.ready() &&
+          job.token === generation &&
+          job.source === sourceRows &&
+          job.revision === dataRevision;
+      explodedExport = job;
+      paint();
+      try {
+        const output = await F.workbook([
+          {
+            name: 'Exploded data',
+            width: titles.length,
+            rowCount: job.source.length + 1,
+            keepTogether: true,
+            escapeText: true,
+            rows: function* () {
+              for (let index = -1; index < job.source.length; index++) {
+                if (!current()) throw Error('The working file changed during export.');
+                const row = index < 0 ? titles : job.source[index];
+                const tooLong = row.findIndex(value => value.length > 32767);
+                if (tooLong >= 0)
+                  throw Error(
+                    'Working row ' +
+                      (headerRow + index + 1) +
+                      ', column ' +
+                      F.col(tooLong) +
+                      ' exceeds Excel’s 32,767-character cell limit. No values were shortened.'
+                  );
+                yield row;
+              }
+            },
+          },
+        ]);
+        if (!current()) return;
+        if (!permitted()) throw Error('Exporting validation data is disabled for this account.');
+        a.download(
+          output,
+          name,
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        );
+        say(
+          'Downloaded ' +
+            job.source.length +
+            ' exploded working row(s) and all ' +
+            titles.length +
+            ' upload columns. Values are retained as Excel text.'
+        );
+      } catch (error) {
+        if (current()) say('Exploded Excel could not be downloaded. ' + error.message, true);
+      } finally {
+        if (explodedExport === job) {
+          explodedExport = null;
+          paint();
+        }
+      }
+    }
     function preparationView() {
-      return `<section class="val-prep-toolbar"><div><span class="val-eyebrow">PREPARE BEFORE YOU CHECK</span><h3>Your data, ready for the next step.</h3><p>${sourceRows.length} working row(s) · ${originalRows.length} original row(s)${preparationSteps.length ? ' · ' + preparationSteps.length + ' preparation(s) applied' : ''}. Preview first. The file on your device stays unchanged.</p></div><div class="val-actions">${btn('prep-sap', 'Apply SAP formatting', activeSchema().mode !== 'sap' || busy ? 'disabled title="Use a SAP template for field formatting"' : '', 'val-secondary')}${btn('prep-explode', 'Explode & map rows', busy ? 'disabled' : '', 'val-secondary')}${btn('prep-undo', 'Undo last change', !preparationUndo.length || busy ? 'disabled' : '', 'val-quiet')}${btn('prep-restore', 'Restore original upload', !preparationSteps.length || busy ? 'disabled' : '', 'val-quiet')}</div><p class="val-help">Formatting uses the current column mapping and selected template version. Undo keeps the last three transformations. Validate after preparing to refresh issue counts and exports.</p></section>`;
+      const hasExploded = preparationSteps.some(step => step.kind === 'explode'),
+        exportAllowed =
+          !root.WorkHubCurrentAccess || root.WorkHubCurrentAccess.can('validator', 'export'),
+        exportLocked =
+          !hasExploded ||
+          !exportAllowed ||
+          busy ||
+          queueBusy ||
+          queueIO ||
+          !!bulkOperation ||
+          !!explodedExport;
+      return `<section class="val-prep-toolbar"><div><span class="val-eyebrow">PREPARE BEFORE YOU CHECK</span><h3>Your data, ready for the next step.</h3><p>${sourceRows.length} working row(s) · ${originalRows.length} original row(s)${preparationSteps.length ? ' · ' + preparationSteps.length + ' preparation(s) applied' : ''}. Preview first. The file on your device stays unchanged.</p></div><div class="val-actions">${btn('prep-sap', 'Apply SAP formatting', activeSchema().mode !== 'sap' || busy ? 'disabled title="Use a SAP template for field formatting"' : '', 'val-secondary')}${btn('prep-explode', 'Explode & map rows', busy ? 'disabled' : '', 'val-secondary')}${btn('export-exploded', 'Download exploded Excel', (exportLocked ? 'disabled ' : '') + (!hasExploded ? 'title="Apply Explode & map rows to enable this download"' : ''), 'val-secondary')}${btn('prep-undo', 'Undo last change', !preparationUndo.length || busy ? 'disabled' : '', 'val-quiet')}${btn('prep-restore', 'Restore original upload', !preparationSteps.length || busy ? 'disabled' : '', 'val-quiet')}</div>${explodedExport ? '<p class="val-help" role="status">Preparing exploded Excel… Every working row and upload column is included.</p>' : ''}<p class="val-help">Formatting uses the current column mapping and selected template version. Undo keeps the last three transformations. Download exploded Excel after applying an explosion, without validation. Run validation to refresh issue counts and validated reports.</p></section>`;
     }
     function setupAccess(action = 'run') {
       ensure();
@@ -4448,6 +4534,10 @@
       }
       if (action === 'prep-sap' || action === 'prep-explode') {
         openPreparation(action === 'prep-sap' ? 'sap' : 'explode');
+        return;
+      }
+      if (action === 'export-exploded') {
+        await downloadExploded();
         return;
       }
       if (action === 'prep-cancel') {
