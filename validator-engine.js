@@ -1143,135 +1143,165 @@
     return cache.get(key).get(valueKey(values)) || { rows: [], count: 0 };
   }
   /** Offer maintained values for one field; tuple lookups retain the other mapped values. */
-  function suggestions(t, row, fieldKey, query = '', context = {}) {
+  function createSuggester(t, context = {}, fixed = false) {
     checkSchema(t);
     checkContext(t, context);
-    const field = t.columns.find(c => c.key === fieldKey);
-    if (!field) throw Error('Choose an existing field.');
-    const candidates = new Map(),
-      cache = new Map();
-    const exactReference =
-      t.lookups.some(l => l.caseSensitive) &&
-      t.rules.some(
-        rule =>
-          ruleApplies(rule, context) &&
-          testGroup(rule.when, row, t, cache) &&
-          requirements(rule).some(requirement => {
-            const c = resolveCondition(requirement, t);
-            return (
-              c.field === fieldKey &&
-              ['lookup', 'lookupTuple'].includes(c.operator) &&
-              t.lookups.find(l => l.id === c.lookupId)?.caseSensitive
-            );
-          })
-      );
-    const matchField = exactReference ? { ...field, caseSensitive: true } : field;
-    const add = (value, source, detail = '') => {
-      if (
-        blank(value) ||
-        comparable(value, matchField, t.mode) === comparable(own(row, fieldKey), matchField, t.mode)
-      )
-        return;
-      const key = valueKey(comparable(value, matchField, t.mode));
-      if (!candidates.has(key)) candidates.set(key, { value: String(value), source, detail });
-    };
-    for (const value of tokens(field.values)) add(value, 'Allowed values');
-    for (const rule of t.rules)
-      for (const requirement of requirements(rule)) {
-        const c = resolveCondition(requirement, t);
+    const cache = new Map();
+    return (row, fieldKey, query = '', extra = []) => {
+      const field = t.columns.find(c => c.key === fieldKey);
+      if (!field) throw Error('Choose an existing field.');
+      const candidates = new Map();
+      const exactReference =
+        t.lookups.some(l => l.caseSensitive) &&
+        t.rules.some(
+          rule =>
+            ruleApplies(rule, context) &&
+            testGroup(rule.when, row, t, cache) &&
+            requirements(rule).some(requirement => {
+              const c = resolveCondition(requirement, t);
+              return (
+                c.field === fieldKey &&
+                ['lookup', 'lookupTuple'].includes(c.operator) &&
+                t.lookups.find(l => l.id === c.lookupId)?.caseSensitive
+              );
+            })
+        );
+      const matchField = exactReference ? { ...field, caseSensitive: true } : field;
+      const add = (value, source, detail = '') => {
         if (
-          !ruleApplies(rule, context) ||
-          c.field !== fieldKey ||
-          !testGroup(rule.when, row, t, cache) ||
-          !['lookup', 'lookupTuple', 'in'].includes(c.operator)
+          (!fixed && blank(value)) ||
+          comparable(value, matchField, t.mode) ===
+            comparable(own(row, fieldKey), matchField, t.mode)
         )
-          continue;
-        if (c.operator === 'in') {
-          tokens(c.value).forEach(v => add(v, rule.name));
-          continue;
-        }
-        const list = t.lookups.find(l => l.id === c.lookupId);
-        const pairs =
-          c.operator === 'lookupTuple'
-            ? c.pairs
-            : [{ field: c.field, referenceColumn: c.lookupColumn }];
-        const target = pairs.find(p => p.field === fieldKey);
-        if (!list || !target) continue;
-        for (const reference of list.rows) {
+          return;
+        const key = valueKey(comparable(value, matchField, t.mode));
+        if (!candidates.has(key)) candidates.set(key, { value: String(value), source, detail });
+      };
+      for (const candidate of extra) add(candidate.value, candidate.source);
+      for (const value of tokens(field.values)) add(value, 'Allowed values');
+      for (const rule of t.rules)
+        for (const requirement of requirements(rule)) {
+          const c = resolveCondition(requirement, t);
           if (
-            !pairs
-              .filter(p => p.field !== fieldKey)
-              .every(p => {
-                const f = referenceField(
-                    list,
-                    t.columns.find(f => f.key === p.field)
-                  ),
-                  value = comparable(own(row, p.field), f, t.mode);
-                return (
-                  value !== null &&
-                  value ===
-                    comparable(reference[list.headers.indexOf(p.referenceColumn)], f, t.mode)
-                );
-              })
+            !ruleApplies(rule, context) ||
+            c.field !== fieldKey ||
+            !testGroup(rule.when, row, t, cache) ||
+            !(
+              fixed
+                ? ['lookup', 'lookupTuple', 'in', 'eq', 'fieldEq', 'empty']
+                : ['lookup', 'lookupTuple', 'in']
+            ).includes(c.operator)
           )
             continue;
-          const detail = [list.nameColumn, ...(list.descriptionColumns || [])]
-            .filter(Boolean)
-            .map(h => reference[list.headers.indexOf(h)])
-            .filter(Boolean)
-            .join(' · ');
-          add(reference[list.headers.indexOf(target.referenceColumn)], list.name, detail);
+          if (c.operator === 'in') {
+            tokens(c.value).forEach(v => add(v, rule.name));
+            continue;
+          }
+          if (['eq', 'fieldEq', 'empty'].includes(c.operator)) {
+            add(
+              c.operator === 'empty'
+                ? ''
+                : c.operator === 'fieldEq'
+                  ? own(row, c.otherField)
+                  : c.value,
+              rule.name
+            );
+            continue;
+          }
+          const list = t.lookups.find(l => l.id === c.lookupId);
+          const pairs =
+            c.operator === 'lookupTuple'
+              ? c.pairs
+              : [{ field: c.field, referenceColumn: c.lookupColumn }];
+          const target = pairs.find(p => p.field === fieldKey);
+          if (!list || !target) continue;
+          for (const reference of list.rows) {
+            if (
+              !pairs
+                .filter(p => p.field !== fieldKey)
+                .every(p => {
+                  const f = referenceField(
+                      list,
+                      t.columns.find(f => f.key === p.field)
+                    ),
+                    value = comparable(own(row, p.field), f, t.mode);
+                  return (
+                    value !== null &&
+                    value ===
+                      comparable(reference[list.headers.indexOf(p.referenceColumn)], f, t.mode)
+                  );
+                })
+            )
+              continue;
+            const detail = [list.nameColumn, ...(list.descriptionColumns || [])]
+              .filter(Boolean)
+              .map(h => reference[list.headers.indexOf(h)])
+              .filter(Boolean)
+              .join(' · ');
+            add(reference[list.headers.indexOf(target.referenceColumn)], list.name, detail);
+          }
         }
-      }
-    const q = String(query).trim().toLocaleLowerCase(),
-      current = String(own(row, fieldKey)).trim().toLocaleLowerCase();
-    const valid = value => {
-      const v = normalized(value, field),
-        n = comparable(value, field, t.mode),
-        trial = { ...row, [fieldKey]: value };
-      if (sapMode(t)) {
-        if (sapCheck(v, field)) return false;
-      }
-      if (
-        n === null ||
-        (!sapMode(t) &&
-          ((field.type === 'integer' && !Number.isInteger(n)) ||
-            (field.type === 'date' && !date(v))))
-      )
-        return false;
-      if (
-        !sapMode(t) &&
-        ((field.minLength !== '' && v.length < Number(field.minLength)) ||
-          (field.maxLength !== '' && v.length > Number(field.maxLength)))
-      )
-        return false;
-      if (
-        !sapMode(t) &&
-        ['integer', 'decimal'].includes(field.type) &&
-        ((field.min !== '' && n < Number(field.min)) || (field.max !== '' && n > Number(field.max)))
-      )
-        return false;
-      if (field.values && !tokens(field.values).some(x => comparable(x, field, t.mode) === n))
-        return false;
-      if (!sapMode(t) && field.format && !FORMATS[field.format].test(v)) return false;
-      return t.rules.every(
-        r =>
-          !ruleApplies(r, context) ||
-          !testGroup(r.when, trial, t, cache) ||
-          requirements(r).every(c => c.field !== fieldKey || testCondition(c, trial, t, cache))
+      const q = String(query).trim().toLocaleLowerCase(),
+        current = String(own(row, fieldKey)).trim().toLocaleLowerCase();
+      const valid = value => {
+        const v = normalized(value, field),
+          n = comparable(value, field, t.mode),
+          trial = { ...row, [fieldKey]: value };
+        if (sapMode(t)) {
+          if (sapCheck(v, field)) return false;
+        }
+        if (
+          n === null ||
+          (!sapMode(t) &&
+            ((field.type === 'integer' && !Number.isInteger(n)) ||
+              (field.type === 'date' && !date(v))))
+        )
+          return false;
+        if (
+          !sapMode(t) &&
+          ((field.minLength !== '' && v.length < Number(field.minLength)) ||
+            (field.maxLength !== '' && v.length > Number(field.maxLength)))
+        )
+          return false;
+        if (
+          !sapMode(t) &&
+          ['integer', 'decimal'].includes(field.type) &&
+          ((field.min !== '' && n < Number(field.min)) ||
+            (field.max !== '' && n > Number(field.max)))
+        )
+          return false;
+        if (field.values && !tokens(field.values).some(x => comparable(x, field, t.mode) === n))
+          return false;
+        if (!sapMode(t) && field.format && !FORMATS[field.format].test(v)) return false;
+        return t.rules.every(
+          r =>
+            !ruleApplies(r, context) ||
+            !testGroup(r.when, trial, t, cache) ||
+            requirements(r).every(c => c.field !== fieldKey || testCondition(c, trial, t, cache))
+        );
+      };
+      const choices = [...candidates.values()].filter(
+        c =>
+          (!q || [c.value, c.source, c.detail].some(v => v.toLocaleLowerCase().includes(q))) &&
+          ((fixed && blank(c.value)) || valid(c.value))
       );
+      choices.sort(
+        (a, b) =>
+          Number(b.value.toLocaleLowerCase().startsWith(current)) -
+            Number(a.value.toLocaleLowerCase().startsWith(current)) ||
+          a.value.localeCompare(b.value)
+      );
+      return {
+        total: choices.length,
+        choices: choices.slice(0, 30),
+        ...(fixed
+          ? { preferred: choices.filter(c => c.source === 'Configured SAP type formatting') }
+          : {}),
+      };
     };
-    const choices = [...candidates.values()].filter(
-      c =>
-        (!q || [c.value, c.source, c.detail].some(v => v.toLocaleLowerCase().includes(q))) &&
-        valid(c.value)
-    );
-    choices.sort(
-      (a, b) =>
-        Number(b.value.toLocaleLowerCase().startsWith(current)) -
-          Number(a.value.toLocaleLowerCase().startsWith(current)) || a.value.localeCompare(b.value)
-    );
-    return { total: choices.length, choices: choices.slice(0, 30) };
+  }
+  function suggestions(t, row, fieldKey, query = '', context = {}) {
+    return createSuggester(t, context)(row, fieldKey, query);
   }
   function referenceDetails(t, row, cache = new Map(), context = {}) {
     checkContext(t, context);
@@ -1496,19 +1526,11 @@
     checkSchema(next, true);
     return next;
   }
-  function validateRows(t, rows, context = {}) {
+  function createValidator(t, context = {}) {
     checkSchema(t);
     checkContext(t, context);
-    if (
-      !Array.isArray(rows) ||
-      rows.length > LIMITS.rows ||
-      rows.length * t.columns.length > LIMITS.cells
-    )
-      throw Error('Validate up to 25,000 rows and 5,000,000 cells at a time.');
     // Rebuild indexes for every run so template edits never reuse old values.
     const isSAP = sapMode(t),
-      issues = [],
-      status = rows.map(() => ({ errors: 0, warnings: 0 })),
       cache = new Map(),
       fields = new Map(t.columns.map(c => [c.key, c])),
       linkedFields = isSAP ? new Map(t.columns.map(c => [c, sapSettings(c).reference])) : null,
@@ -1520,136 +1542,150 @@
       activeRules = t.rules
         .filter(r => ruleApplies(r, context))
         .map(r => ({ rule: r, checks: requirements(r) }));
-    let totalIssues = 0;
-    function add(
-      index,
-      key,
-      message,
-      severity = 'error',
-      ruleId = 'column',
-      name = 'Column check',
-      requirementIndex
-    ) {
-      totalIssues++;
-      status[index][severity === 'warning' ? 'warnings' : 'errors']++;
-      if (issues.length < LIMITS.issues)
-        issues.push({
-          row: index + 2,
-          index,
-          field: key,
-          column: fields.get(key)?.label || key,
-          value: String(own(rows[index], key) ?? '').slice(0, 1000),
-          message,
-          severity,
-          ruleId,
-          rule: name,
-          ...(requirementIndex !== undefined ? { requirementIndex } : {}),
-        });
-    }
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      if (!row || typeof row !== 'object' || Array.isArray(row))
-        throw Error('Every data row must be a field/value record.');
-      for (const c of t.columns) {
-        const raw = own(row, c.key),
-          v = normalized(raw, c);
-        if (v.length > 32000) throw Error('A cell contains more than 32,000 characters.');
-        if (blank(v)) {
-          if (c.required) add(i, c.key, c.label + ' is required.');
-          continue;
-        }
-        // SAP checks already validate the value. Its comparable form is only
-        // needed here for an allowed-value list, and later by rules/uniqueness.
-        const n = !isSAP || c.values ? comparable(v, c, t.mode) : null;
-        if (isSAP) {
-          const issue = sapCheck(v, c);
-          if (issue) add(i, c.key, issue);
-          const ref = linkedFields.get(c);
-          if (ref && blank(own(row, ref)))
-            add(i, c.key, 'Fill the linked currency/unit field ' + ref + '.');
-        } else {
-          if (c.type === 'integer' && (n === null || !Number.isSafeInteger(n)))
-            add(i, c.key, 'Enter a whole number within the safe integer range.');
-          if (c.type === 'decimal' && n === null)
-            add(i, c.key, 'Enter a number using a dot as the decimal separator.');
-          if (c.type === 'date' && n === null)
-            add(i, c.key, 'Enter a real date in YYYY-MM-DD format.');
-          if (c.type === 'boolean' && n === null) add(i, c.key, 'Use true/false, yes/no or 1/0.');
-          if (c.minLength !== '' && v.length < Number(c.minLength))
-            add(i, c.key, 'Use at least ' + c.minLength + ' characters.');
-          if (c.maxLength !== '' && v.length > Number(c.maxLength))
-            add(i, c.key, 'Use at most ' + c.maxLength + ' characters.');
-          if (['integer', 'decimal'].includes(c.type) && n !== null) {
-            if (c.min !== '' && n < Number(c.min))
-              add(i, c.key, 'Value must be at least ' + c.min + '.');
-            if (c.max !== '' && n > Number(c.max))
-              add(i, c.key, 'Value must be at most ' + c.max + '.');
-          }
-        }
-        if (c.values && !allowed.get(c).has(n))
-          add(i, c.key, 'Choose a value from the allowed list.');
-        if (!isSAP && c.format && !FORMATS[c.format].test(v))
-          add(i, c.key, 'Use the ' + c.format + ' format.');
+    return (rows, options = {}) => {
+      if (
+        !Array.isArray(rows) ||
+        rows.length > LIMITS.rows ||
+        rows.length * t.columns.length > LIMITS.cells
+      )
+        throw Error('Validate up to 25,000 rows and 5,000,000 cells at a time.');
+      const issues = [],
+        status = rows.map(() => ({ errors: 0, warnings: 0 }));
+      let totalIssues = 0;
+      function add(
+        index,
+        key,
+        message,
+        severity = 'error',
+        ruleId = 'column',
+        name = 'Column check',
+        requirementIndex
+      ) {
+        totalIssues++;
+        status[index][severity === 'warning' ? 'warnings' : 'errors']++;
+        options.onIssue?.(index, key, message, severity, ruleId, requirementIndex);
+        if (issues.length < (options.issueLimit ?? LIMITS.issues))
+          issues.push({
+            row: index + 2,
+            index,
+            field: key,
+            column: fields.get(key)?.label || key,
+            value: String(own(rows[index], key) ?? '').slice(0, 1000),
+            message,
+            severity,
+            ruleId,
+            rule: name,
+            ...(requirementIndex !== undefined ? { requirementIndex } : {}),
+          });
       }
-      for (const { rule: r, checks } of activeRules)
-        if (testGroup(r.when, row, t, cache))
-          checks.forEach((c, index) => {
-            if (!testCondition(c, row, t, cache))
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || typeof row !== 'object' || Array.isArray(row))
+          throw Error('Every data row must be a field/value record.');
+        for (const c of t.columns) {
+          const raw = own(row, c.key),
+            v = normalized(raw, c);
+          if (v.length > 32000) throw Error('A cell contains more than 32,000 characters.');
+          if (blank(v)) {
+            if (c.required) add(i, c.key, c.label + ' is required.');
+            continue;
+          }
+          // SAP checks already validate the value. Its comparable form is only
+          // needed here for an allowed-value list, and later by rules/uniqueness.
+          const n = !isSAP || c.values ? comparable(v, c, t.mode) : null;
+          if (isSAP) {
+            const issue = sapCheck(v, c);
+            if (issue) add(i, c.key, issue);
+            const ref = linkedFields.get(c);
+            if (ref && blank(own(row, ref)))
+              add(i, c.key, 'Fill the linked currency/unit field ' + ref + '.');
+          } else {
+            if (c.type === 'integer' && (n === null || !Number.isSafeInteger(n)))
+              add(i, c.key, 'Enter a whole number within the safe integer range.');
+            if (c.type === 'decimal' && n === null)
+              add(i, c.key, 'Enter a number using a dot as the decimal separator.');
+            if (c.type === 'date' && n === null)
+              add(i, c.key, 'Enter a real date in YYYY-MM-DD format.');
+            if (c.type === 'boolean' && n === null) add(i, c.key, 'Use true/false, yes/no or 1/0.');
+            if (c.minLength !== '' && v.length < Number(c.minLength))
+              add(i, c.key, 'Use at least ' + c.minLength + ' characters.');
+            if (c.maxLength !== '' && v.length > Number(c.maxLength))
+              add(i, c.key, 'Use at most ' + c.maxLength + ' characters.');
+            if (['integer', 'decimal'].includes(c.type) && n !== null) {
+              if (c.min !== '' && n < Number(c.min))
+                add(i, c.key, 'Value must be at least ' + c.min + '.');
+              if (c.max !== '' && n > Number(c.max))
+                add(i, c.key, 'Value must be at most ' + c.max + '.');
+            }
+          }
+          if (c.values && !allowed.get(c).has(n))
+            add(i, c.key, 'Choose a value from the allowed list.');
+          if (!isSAP && c.format && !FORMATS[c.format].test(v))
+            add(i, c.key, 'Use the ' + c.format + ' format.');
+        }
+        for (const { rule: r, checks } of activeRules)
+          if (testGroup(r.when, row, t, cache))
+            checks.forEach((c, index) => {
+              if (!testCondition(c, row, t, cache))
+                add(
+                  i,
+                  c.field,
+                  r.message || describe(c, t) + '.',
+                  r.severity,
+                  r.id,
+                  r.name,
+                  checks.length > 1 ? index : undefined
+                );
+            });
+      }
+      const groups = [...t.columns.filter(c => c.unique).map(c => [c.key]), ...t.uniqueGroups];
+      for (const keys of options.skipUnique ? [] : groups) {
+        const seen = new Map(),
+          columns = keys.map(key => fields.get(key));
+        rows.forEach((row, i) => {
+          if (keys.some(k => blank(own(row, k)))) return;
+          const value = valueKey(
+            keys.map((k, index) => comparable(own(row, k), columns[index], t.mode))
+          );
+          if (!seen.has(value)) seen.set(value, []);
+          seen.get(value).push(i);
+        });
+        for (const indices of seen.values())
+          if (indices.length > 1)
+            for (const i of indices)
               add(
                 i,
-                c.field,
-                r.message || describe(c, t) + '.',
-                r.severity,
-                r.id,
-                r.name,
-                checks.length > 1 ? index : undefined
+                keys[0],
+                (keys.length === 1
+                  ? 'Duplicate value.'
+                  : 'Duplicate combination: ' + keys.join(' + ') + '.') +
+                  ' Also appears on row ' +
+                  (indices.find(n => n !== i) + 2) +
+                  '.',
+                'error',
+                'unique',
+                'Duplicate check'
               );
-          });
-    }
-    const groups = [...t.columns.filter(c => c.unique).map(c => [c.key]), ...t.uniqueGroups];
-    for (const keys of groups) {
-      const seen = new Map(),
-        columns = keys.map(key => fields.get(key));
-      rows.forEach((row, i) => {
-        if (keys.some(k => blank(own(row, k)))) return;
-        const value = valueKey(
-          keys.map((k, index) => comparable(own(row, k), columns[index], t.mode))
-        );
-        if (!seen.has(value)) seen.set(value, []);
-        seen.get(value).push(i);
-      });
-      for (const indices of seen.values())
-        if (indices.length > 1)
-          for (const i of indices)
-            add(
-              i,
-              keys[0],
-              (keys.length === 1
-                ? 'Duplicate value.'
-                : 'Duplicate combination: ' + keys.join(' + ') + '.') +
-                ' Also appears on row ' +
-                (indices.find(n => n !== i) + 2) +
-                '.',
-              'error',
-              'unique',
-              'Duplicate check'
-            );
-    }
-    const errors = status.reduce((n, r) => n + r.errors, 0),
-      warnings = status.reduce((n, r) => n + r.warnings, 0);
-    return {
-      context: copy(context),
-      appliedRules: t.rules.filter(r => ruleApplies(r, context)).length,
-      rows: rows.length,
-      passed: status.filter(r => !r.errors).length,
-      clean: status.filter(r => !r.errors && !r.warnings).length,
-      errors,
-      warnings,
-      issues,
-      status,
-      truncated: totalIssues > issues.length,
-      totalIssues,
+      }
+      const errors = status.reduce((n, r) => n + r.errors, 0),
+        warnings = status.reduce((n, r) => n + r.warnings, 0);
+      return {
+        context: copy(context),
+        appliedRules: t.rules.filter(r => ruleApplies(r, context)).length,
+        rows: rows.length,
+        passed: status.filter(r => !r.errors).length,
+        clean: status.filter(r => !r.errors && !r.warnings).length,
+        errors,
+        warnings,
+        issues,
+        status,
+        truncated: totalIssues > issues.length,
+        totalIssues,
+      };
     };
+  }
+  function validateRows(t, rows, context = {}) {
+    return createValidator(t, context)(rows);
   }
   function headerKey(v) {
     return String(v || '')
@@ -1930,6 +1966,10 @@
     publishedVersion,
     versionRuns,
     validateRows,
+    createValidator,
+    createSuggester,
+    comparable,
+    valueKey,
     testCondition,
     testGroup,
     referenceRows,

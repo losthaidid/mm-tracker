@@ -163,6 +163,9 @@
     const $ = id => document.getElementById(id),
       store = () => a.state().workhub.validator;
     const runner = root.WorkHubValidatorRunner?.create();
+    const fixesEngine = root.WorkHubValidatorCorrections,
+      fixesRunner = fixesEngine?.createRunner(),
+      fixesCheckRunner = fixesRunner ? root.WorkHubValidatorRunner?.create() : null;
     const fileCompare = root.WorkHubValidatorCompare?.install({ ...a, render: paint });
     const csvConverter = root.WorkHubValidatorCSV?.install({ ...a, render: paint });
     const recombinedComparison = root.WorkHubValidatorReconcile?.install({ ...a, render: paint });
@@ -230,6 +233,11 @@
       setupPreview = null,
       copyPreview = null,
       correction = null,
+      bulkFixes = null,
+      bulkUndo = null,
+      bulkOperation = null,
+      bulkPage = 0,
+      bulkView = 'all',
       liveTimer = null,
       livePending = false,
       liveCheck = null,
@@ -768,6 +776,8 @@
       }
     }
     function resetPreparation() {
+      cancelBulkFixes();
+      bulkUndo = null;
       closePreparation();
       originalRows = [];
       preparedRows = [];
@@ -1646,6 +1656,7 @@
       return patchSurface(current, html, current.dataset.valMode === mode);
     }
     function paint() {
+      refreshBulkFixes();
       if (!patchRender()) a.render();
     }
     function say(text, error = false) {
@@ -3142,6 +3153,7 @@
     // Reconcile only result nodes. Keep keyed cells/buttons in place so blur does not
     // swallow the next click, and editing never rebuilds the surrounding workspace.
     function patchResults() {
+      refreshBulkFixes();
       const current = $('valResultsArea');
       if (current) patchSurface(current, resultsView());
       const queue = $('valFileQueue');
@@ -3488,6 +3500,7 @@
         <div class="val-pagination">${btn('comparison-page', '← Previous', 'data-delta="-1"' + (!comparisonPage ? ' disabled' : ''), 'val-quiet')}<span>Page ${comparisonPage + 1} of ${Math.max(1, Math.ceil(total / 50))}</span>${btn('comparison-page', 'Next →', 'data-delta="1"' + ((comparisonPage + 1) * 50 >= total ? ' disabled' : ''), 'val-quiet')}</div></section>`;
     }
     function resultsView() {
+      refreshBulkFixes();
       if (!rows.length) return '';
       const group = currentAttentionGroup(),
         affected = group ? new Set(group.indices) : null,
@@ -3545,6 +3558,7 @@
             '</strong></div></div>'
           : '<div class="val-inline-note">Your data changed. Run validation again to refresh the results and exports.</div>') +
         issueReviewView() +
+        bulkFixesView() +
         '<section id="valResultsCard" class="val-card val-results' +
         (group ? ' val-group-records' : '') +
         '"><div class="val-panel-title"><div><span class="val-eyebrow">' +
@@ -4253,6 +4267,10 @@
       const action = el.dataset.val,
         id = el.dataset.id;
       message = '';
+      if (action.startsWith('prep-fixes-')) {
+        await handleBulkFixes(action, el);
+        return;
+      }
       if (action === 'queue-cancel') {
         cancelQueue();
         return;
@@ -5317,7 +5335,335 @@
       );
       paint();
     }
-    function openCorrections(index, field) {
+    function captureBulkContext() {
+      return {
+        owner,
+        token: generation,
+        source: sourceRows,
+        schema: resultSchema,
+        result,
+        queue: queueActiveId,
+        mapping: JSON.stringify(mapping),
+      };
+    }
+    function sameBulkContext(ctx, undo = false) {
+      return (
+        ctx &&
+        ctx.owner === a.owner?.() &&
+        a.ready() &&
+        ctx.source === sourceRows &&
+        ctx.schema === resultSchema &&
+        ctx.queue === queueActiveId &&
+        ctx.mapping === JSON.stringify(mapping) &&
+        (undo || (ctx.token === generation && ctx.result === result))
+      );
+    }
+    function cancelBulkFixes() {
+      fixesRunner?.cancel();
+      fixesCheckRunner?.cancel();
+      bulkOperation = null;
+      bulkFixes = null;
+    }
+    function refreshBulkFixes() {
+      if (bulkOperation && !sameBulkContext(bulkOperation.context)) cancelBulkFixes();
+      if (bulkFixes && !sameBulkContext(bulkFixes.context)) bulkFixes = null;
+      if (bulkUndo && !sameBulkContext(bulkUndo.context, true)) bulkUndo = null;
+    }
+    function bulkAccess() {
+      ensure();
+      if (root.WorkHubCurrentAccess && !root.WorkHubCurrentAccess.can('validator', 'run'))
+        throw Error('Running corrections is disabled for this account.');
+      if (!fixesRunner) throw Error('Refresh the page to load whole-file corrections.');
+      if (queueBusy || queueIO || busy) throw Error('Wait for the current file operation.');
+      if (livePending) throw Error('Wait for the current edit to finish checking.');
+      if (!result || !resultSchema || !rawResult)
+        throw Error('Run validation before suggesting corrections.');
+      E.runContext(a.state(), resultSchema, runCompanyId);
+    }
+    function bulkProgress(job, p) {
+      if (bulkOperation !== job || !sameBulkContext(job.context)) return;
+      job.progress = p;
+      const text = $('valBulkFixesStatus');
+      if (text)
+        text.textContent =
+          p.phase + ' · ' + p.completed.toLocaleString() + ' / ' + p.total.toLocaleString();
+      const bar = $('valBulkFixesProgress');
+      if (bar) {
+        bar.max = p.total || 1;
+        bar.value = p.completed;
+      }
+    }
+    async function scanBulkFixes() {
+      if (livePending) await checkEdit();
+      bulkAccess();
+      if (bulkOperation) throw Error('A correction operation is already running.');
+      const job = {
+        context: captureBulkContext(),
+        phase: 'scan',
+        progress: { phase: 'Preparing scan', completed: 0, total: rows.length },
+      };
+      bulkFixes = null;
+      bulkOperation = job;
+      paint();
+      try {
+        const plan = await fixesRunner.run(
+          {
+            schema: resultSchema,
+            rows,
+            mapping,
+            context: rawResult.context,
+            ignored: [...ignoredIssues.keys()],
+          },
+          p => bulkProgress(job, p)
+        );
+        if (bulkOperation !== job || !sameBulkContext(job.context)) return;
+        bulkAccess();
+        bulkFixes = { context: job.context, plan };
+        bulkView = 'all';
+        bulkPage = 0;
+        say(
+          plan.clear +
+            ' clear fix(es) · ' +
+            plan.review +
+            ' field(s) need review. Every loaded row was scanned.'
+        );
+      } catch (error) {
+        if (bulkOperation === job && sameBulkContext(job.context) && error.name !== 'AbortError')
+          say('Correction scan could not finish. ' + error.message, true);
+      } finally {
+        if (bulkOperation === job) {
+          bulkOperation = null;
+          paint();
+        }
+      }
+    }
+    async function applyBulkFixes(undo = false) {
+      bulkAccess();
+      if (bulkOperation) throw Error('Wait for the current correction operation.');
+      const preview = undo ? bulkUndo : bulkFixes;
+      if (!preview || !sameBulkContext(preview.context, undo))
+        throw Error('The correction preview changed. Scan the current file again.');
+      const plan = preview.plan,
+        count = undo ? preview.before.length : plan.clear;
+      if (!count) throw Error('There are no clear fixes to apply.');
+      const job = {
+        context: captureBulkContext(),
+        phase: undo ? 'undo' : 'apply',
+        progress: {
+          phase: undo ? 'Preparing undo' : 'Preparing clear fixes',
+          completed: 0,
+          total: count,
+        },
+      };
+      bulkOperation = job;
+      paint();
+      let textSize = sourceRows.reduce(
+        (sum, row) => sum + row.reduce((n, value) => n + value.length, 0),
+        0
+      );
+      const nextRows = rows.slice(),
+        nextSource = sourceRows.slice(),
+        touched = new Set(),
+        journal = {
+          indices: new Uint32Array(count),
+          columns: new Uint8Array(count),
+          before: [],
+          after: [],
+        };
+      const current = () => bulkOperation === job && sameBulkContext(job.context);
+      try {
+        for (let n = 0; n < count; n++) {
+          const target = undo ? n : plan.clearIndices[n],
+            index = undo ? preview.indices[n] : plan.indices[target],
+            field = undo ? preview.columns[n] : plan.columns[target],
+            column = resultSchema.columns[field],
+            source = Number(mapping[column.key]),
+            before = String(rows[index][column.key] ?? ''),
+            after = undo ? preview.before[n] : plan.texts[plan.values[target]];
+          if (
+            undo &&
+            (before !== preview.after[n] || sourceRows[index][source] !== preview.after[n])
+          )
+            throw Error(
+              'A corrected cell was edited again. Undo would overwrite that edit; review this row individually.'
+            );
+          if (!touched.has(index)) {
+            touched.add(index);
+            nextRows[index] = { ...rows[index] };
+            nextSource[index] = sourceRows[index].slice();
+          }
+          textSize += after.length - before.length;
+          if (textSize > E.LIMITS.text)
+            throw Error(
+              'Corrected data would exceed 50 million text characters. Apply a smaller file.'
+            );
+          nextRows[index][column.key] = after;
+          nextSource[index][source] = after;
+          journal.indices[n] = index;
+          journal.columns[n] = field;
+          journal.before.push(before);
+          journal.after.push(after);
+          if (!(n % 256)) {
+            bulkProgress(job, {
+              phase: undo ? 'Preparing undo' : 'Preparing clear fixes',
+              completed: n,
+              total: count,
+            });
+            await new Promise(resolve => root.setTimeout(resolve, 0));
+            if (!current()) return;
+          }
+        }
+        bulkProgress(job, {
+          phase: 'Revalidating the complete file',
+          completed: 0,
+          total: rows.length,
+        });
+        const context = E.runContext(a.state(), resultSchema, runCompanyId),
+          checked = fixesCheckRunner
+            ? await fixesCheckRunner.run(resultSchema, nextRows, context)
+            : await Promise.resolve().then(() => E.validateRows(resultSchema, nextRows, context));
+        if (!current()) return;
+        bulkAccess();
+        if (
+          !undo &&
+          checked.status.some(
+            (s, i) =>
+              s.errors > rawResult.status[i].errors || s.warnings > rawResult.status[i].warnings
+          )
+        )
+          throw Error(
+            'These fixes would introduce another issue. Nothing was changed; review the suggestions individually.'
+          );
+        if (rawResult.setup) checked.setup = E.copy(rawResult.setup);
+        sourceRows = nextSource;
+        rows = nextRows;
+        for (const [key, decision] of ignoredIssues)
+          if (touched.has(decision.index)) ignoredIssues.delete(key);
+        issueSelection.clear();
+        pinnedRows.clear();
+        selectedIssue = null;
+        cancelLive();
+        generation++;
+        dataRevision++;
+        comparisonCache = null;
+        rawResult = checked;
+        result = reviewed(checked);
+        bulkFixes = null;
+        bulkOperation = null;
+        bulkUndo = undo ? null : { ...journal, context: captureBulkContext() };
+        // Update counts on the existing run only; no uploaded values or correction log is saved.
+        if (currentRunId)
+          a.mutate(state => {
+            const run = state.workhub.validator.runs.find(r => r.id === currentRunId);
+            if (run) {
+              for (const k of ['rows', 'passed', 'errors', 'warnings', 'ignored'])
+                run[k] = result[k] || 0;
+              run.reviewedAt = new Date().toISOString();
+            }
+          });
+        say(
+          (undo ? 'Undid ' : 'Applied ') +
+            count +
+            ' correction(s) across ' +
+            touched.size +
+            ' row(s). Full-file validation: ' +
+            result.errors +
+            ' errors · ' +
+            result.warnings +
+            ' warnings.'
+        );
+        paint();
+      } catch (error) {
+        if (current() && error.name !== 'AbortError')
+          say('Corrections were not applied. ' + error.message, true);
+      } finally {
+        if (bulkOperation === job) {
+          bulkOperation = null;
+          paint();
+        }
+      }
+    }
+    function bulkFixesView() {
+      if (!fixesRunner || !result) return '';
+      const runAllowed =
+          !root.WorkHubCurrentAccess || root.WorkHubCurrentAccess.can('validator', 'run'),
+        locked = !!bulkOperation || busy || livePending || queueBusy || queueIO || !runAllowed,
+        p = bulkOperation?.progress,
+        plan = bulkFixes?.plan,
+        shortValue = v =>
+          esc(String(v ?? '').length > 150 ? String(v).slice(0, 150) + '…' : String(v ?? '')),
+        material = resultSchema?.columns.find(
+          c =>
+            /^(MAT|MATNR|MATERIAL|MATERIAL_NUMBER|MATERIAL_NO|ID|RECORD_ID)$/i.test(c.key) ||
+            /^material(?: number| no)?$/i.test(c.label)
+        )?.key;
+      let table = '';
+      if (plan) {
+        const list =
+            bulkView === 'clear'
+              ? plan.clearIndices
+              : bulkView === 'review'
+                ? plan.reviewIndices
+                : null,
+          total = list ? list.length : plan.total;
+        bulkPage = Math.max(0, Math.min(bulkPage, Math.ceil(total / 25) - 1));
+        const from = bulkPage * 25;
+        const entries = [];
+        for (let j = from; j < Math.min(from + 25, total); j++) {
+          const n = list ? list[j] : j,
+            index = plan.indices[n],
+            column = resultSchema.columns[plan.columns[n]],
+            code = plan.codes[n],
+            origin = origins[index];
+          entries.push(
+            `<tr><td>${headerRow + index + 1}<small>Original row ${origin?.row || headerRow + index + 1}${origin?.part ? ' · Part ' + esc(origin.part) : ''}</small></td><td>${shortValue(material ? rows[index][material] : '—')}</td><th>${esc(column.label)}</th><td><pre>${shortValue(rows[index][column.key]) || '(blank)'}</pre></td><td>${code === 0 ? '<strong>' + (shortValue(plan.texts[plan.values[n]]) || '(blank)') + '</strong>' : code === 1 ? plan.counts[n] + ' valid choices' : 'Needs review'}</td><td>${esc(fixesEngine.reasons[code])}${code === 0 ? '<small>' + esc(plan.sourceNames[plan.sources[n]]) + '</small>' : ''}</td><td>${code === 0 ? '<span class="val-status passed">Clear fix</span>' : btn('prep-fixes-review', 'Review', 'data-index="' + index + '" data-field="' + esc(column.key) + '"' + (locked ? ' disabled' : ''), 'val-quiet')}</td></tr>`
+          );
+        }
+        table = `<div class="val-actions">${[
+          ['all', 'All fields'],
+          ['clear', 'Clear fixes'],
+          ['review', 'Needs review'],
+        ]
+          .map(([filter, label]) =>
+            btn(
+              'prep-fixes-filter',
+              label,
+              `data-filter="${filter}" aria-pressed="${bulkView === filter}"`,
+              'val-quiet'
+            )
+          )
+          .join(
+            ''
+          )}</div><p class="val-help">${plan.errors.toLocaleString()} unresolved error(s) across ${plan.total.toLocaleString()} fields · ${plan.clear.toLocaleString()} clear fixes · ${plan.review.toLocaleString()} need review. Showing ${total ? from + 1 : 0}–${Math.min(from + 25, total)} of ${total.toLocaleString()} fields.</p>${entries.length ? `<div class="val-table-scroll"><table class="val-grid val-bulk-fixes-grid"><thead><tr><th>Working / original row</th><th>Material / ID</th><th>Field</th><th>Current value</th><th>Suggested value</th><th>Reason</th><th>Action</th></tr></thead><tbody>${entries.join('')}</tbody></table></div>` : '<p>No fields in this view.</p>'}<div class="val-pagination">${btn('prep-fixes-page', '← Previous fixes', 'data-delta="-1"' + (!bulkPage ? ' disabled' : ''), 'val-quiet')}<span>Page ${bulkPage + 1} of ${Math.max(1, Math.ceil(total / 25))}</span>${btn('prep-fixes-page', 'Next fixes →', 'data-delta="1"' + ((bulkPage + 1) * 25 >= total ? ' disabled' : ''), 'val-quiet')}</div>`;
+      }
+      return `<section id="valBulkFixes" class="val-card val-bulk-fixes" data-val-context="${generation}:${bulkView}:${bulkPage}"><div class="val-panel-title"><div><span class="val-eyebrow">CORRECTIONS ACROSS THE WHOLE FILE</span><h3>Review the fixes before you apply.</h3></div><div class="val-actions">${btn('prep-fixes-scan', 'Suggest fixes for all errors', locked ? 'disabled' : '', 'val-secondary')}${btn('prep-fixes-apply', 'Apply all clear fixes', locked || !plan?.clear ? 'disabled' : '', 'val-primary')}${btn('prep-fixes-undo', 'Undo correction batch', locked || !bulkUndo ? 'disabled' : '', 'val-quiet')}</div></div><p class="val-help">Checks every loaded row using this run’s selected conditions and references. Only a clear, valid replacement can be applied in bulk. Ambiguous values, duplicate identifiers and unmapped fields stay for review. Original and exploded source-row relationships are retained.</p>${bulkOperation ? `<div role="status"><strong id="valBulkFixesStatus">${esc(p.phase)} · ${p.completed.toLocaleString()} / ${p.total.toLocaleString()}</strong><progress id="valBulkFixesProgress" max="${p.total || 1}" value="${p.completed}"></progress>${btn('prep-fixes-cancel', 'Cancel corrections', '', 'val-quiet')}</div>` : ''}${table}${bulkUndo ? '<p class="val-help">Last correction batch can be undone while its corrected cells and file context remain unchanged. Your original upload and preparation history stay available.</p>' : ''}</section>`;
+    }
+    async function handleBulkFixes(action, el) {
+      if (action === 'prep-fixes-cancel') {
+        cancelBulkFixes();
+        say('Correction operation cancelled. No pending changes were applied.');
+        paint();
+        return;
+      }
+      if (action === 'prep-fixes-scan') return scanBulkFixes();
+      if (action === 'prep-fixes-apply') return applyBulkFixes();
+      if (action === 'prep-fixes-undo') return applyBulkFixes(true);
+      bulkAccess();
+      if (action === 'prep-fixes-filter') {
+        bulkView = ['all', 'clear', 'review'].includes(el.dataset.filter)
+          ? el.dataset.filter
+          : 'all';
+        bulkPage = 0;
+        patchResults();
+      }
+      if (action === 'prep-fixes-page') {
+        bulkPage += Number(el.dataset.delta);
+        patchResults();
+      }
+      if (action === 'prep-fixes-review')
+        openCorrections(Number(el.dataset.index), el.dataset.field, true);
+    }
+    function openCorrections(index, field, fixed = false) {
       if (livePending) checkEdit();
       if (livePending) throw Error('Wait for the current edit to finish checking.');
       if (!result || !rows[index] || !resultSchema)
@@ -5335,6 +5681,7 @@
         schema: JSON.stringify(activeSchema()),
         context: E.copy(result.context),
         choices: [],
+        fixed,
       };
       a.openModal(
         'Suggested corrections',
@@ -5345,12 +5692,10 @@
     function paintCorrections() {
       if (!correction || correction.owner !== a.owner?.() || correction.token !== generation)
         return;
-      const result = E.suggestions(
-        resultSchema,
+      const result = E.createSuggester(resultSchema, correction.context, correction.fixed)(
         rows[correction.index],
         correction.field,
-        $('valSuggestionSearch')?.value || '',
-        correction.context
+        $('valSuggestionSearch')?.value || ''
       );
       correction.choices = result.choices;
       $('valSuggestionChoices').innerHTML =
@@ -6046,6 +6391,11 @@
         runSelection: draft ? E.copy(setupChoices()) : null,
         runProfileId,
         livePending,
+        bulkCorrections: {
+          plan: bulkFixes?.plan || null,
+          running: !!bulkOperation,
+          canUndo: !!bulkUndo,
+        },
         queue: fileQueue.map(job => ({
           id: job.id,
           name: job.file.name,

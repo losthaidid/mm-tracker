@@ -3746,3 +3746,24 @@ body[data-motion='off'] .val-prep-summary {
 .vrc-skipped-tools {
   margin-top: 10px;
 }
+.val-bulk-fixes progress {
+  display: block;
+  width: 100%;
+  margin: 12px 0;
+  accent-color: var(--hub-accent, #356c5d);
+}
+.val-bulk-fixes-grid {
+  min-width: 940px;
+}
+.val-bulk-fixes-grid pre {
+  margin: 0;
+  max-width: 230px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+}
+.val-bulk-fixes-grid small {
+  display: block;
+  margin-top: 5px;
+  color: var(--hub-muted, #617770);
+}
