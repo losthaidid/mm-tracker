@@ -301,3 +301,34 @@ test('bulk positional mapping obeys run permission and does not disturb the curr
  const x=fixture(t);await x.open();await x.upload('A',originals);await x.upload('B',exploded);const r=await x.tool.run();
  x.w.WorkHubCurrentAccess={can:(_,action)=>action==='view'};await assert.rejects(x.tool.handle({dataset:{vrc:'map-position'}}),/cannot recombine/);assert.equal(x.tool.snapshot().result,r);
 });
+
+test('Matching key All selects mapped fields, shows mixed state, clears results and keeps comparison choices when cleared',async t=>{
+ const x=fixture(t),ha=['Material','Description','Unused A'],hb=['Material','Description','Unused B'],data=[['000001','Water Pump','extra']];
+ await x.open();await x.upload('A',data,ha);await x.upload('B',data,hb);x.change('[data-vrc-field="include"][data-index="2"]',false);await x.tool.run();
+ const all=()=>x.d.querySelector('[data-vrc-keys-all]');await Promise.resolve();assert.equal(all().indeterminate,true);
+ x.change(all(),true);await Promise.resolve();assert.equal(all().checked,true);assert.equal(all().indeterminate,false);assert.deepEqual(copy(x.tool.snapshot().settings.fields.map(f=>f.key)),[true,true,false]);assert.equal(x.tool.snapshot().result,null);await assert.rejects(x.tool.exportReport(),/before exporting/);
+ const report=await x.tool.run();assert.equal(report.match,true);assert.equal(report.keys.length,2);assert.equal(x.C.cell(report,0,0).b,'000001');
+ x.change('[data-vrc-field="key"][data-index="1"]',false);await Promise.resolve();assert.equal(all().indeterminate,true);assert.equal(all().getAttribute('aria-checked'),'mixed');
+ const choices=copy(x.tool.snapshot().settings.fields.map(f=>f.include));x.change(all(),false);await Promise.resolve();assert.equal(all().checked,false);assert.equal(all().indeterminate,false);assert.ok(x.tool.snapshot().settings.fields.every(f=>!f.key));assert.deepEqual(copy(x.tool.snapshot().settings.fields.map(f=>f.include)),choices);await assert.rejects(x.tool.run(),/matching key/);assert.equal(x.writes(),0);
+});
+
+test('Matching key All includes mapped columns before both starts and across 200-column pages while clearing unmapped keys',async t=>{
+ const x=fixture(t),ha=Array.from({length:200},(_,i)=>i?'Field '+i:'Material'),hb=ha.map((h,i)=>i===199?'Different header':h),data=ha.map((_,i)=>i?'value '+i:'000001');
+ await x.open();await x.upload('A',[data],ha);await x.upload('B',[data],hb);
+ const fields=x.tool.snapshot().settings.fields;fields[199].key=true;x.tool.configure({fields,starts:{A:15,B:15}});
+ x.change('[data-vrc-keys-all]',true);await Promise.resolve();const selected=x.tool.snapshot().settings.fields;
+ assert.equal(selected.filter(f=>f.key).length,199);assert.equal(selected[0].key,true);assert.equal(selected[198].key,true);assert.equal(selected[199].key,false);assert.equal(selected[199].b,-1);assert.equal(x.d.querySelector('[data-vrc-keys-all]').checked,true);assert.ok(x.d.querySelector('[data-vrc-map-row="0"]'));
+ for(let i=0;i<4;i++)await x.tool.handle({dataset:{vrc:'map-page',scope:'mapping',delta:'1'}});
+ assert.equal(x.d.querySelector('[data-vrc-field="key"][data-index="198"]').checked,true);assert.equal(x.d.querySelector('[data-vrc-field="key"][data-index="199"]').checked,false);assert.ok(x.d.querySelectorAll('option').length<10000);
+ x.change('[data-vrc-keys-all]',false);assert.ok(x.tool.snapshot().settings.fields.every(f=>!f.key));assert.equal(x.d.querySelector('[data-vrc-map-row]').dataset.vrcMapRow,'15');assert.equal(x.d.querySelector('[data-vrc-map-row="0"]'),null);
+});
+
+test('Matching key All stays disabled without mapped fields and enables after positional mapping',async t=>{
+ const x=fixture(t);await x.open();await x.upload('A',[['000001']],['Code A']);await x.upload('B',[['000001']],['Code B']);await Promise.resolve();assert.equal(x.d.querySelector('[data-vrc-keys-all]').disabled,true);
+ await x.tool.handle({dataset:{vrc:'map-position'}});assert.equal(x.d.querySelector('[data-vrc-keys-all]').disabled,false);x.change('[data-vrc-keys-all]',true);assert.equal((await x.tool.run()).match,true);
+});
+
+test('Matching key All respects run permission and cannot invalidate a result for a view-only account',async t=>{
+ const x=fixture(t);await x.open();await x.upload('A',originals);await x.upload('B',exploded);const report=await x.tool.run(),keys=copy(x.tool.snapshot().settings.fields.map(f=>f.key));
+ x.w.WorkHubCurrentAccess={can:(_,action)=>action==='view'};x.change('[data-vrc-keys-all]',true);assert.deepEqual(copy(x.tool.snapshot().settings.fields.map(f=>f.key)),keys);assert.equal(x.tool.snapshot().result,report);assert.equal(x.d.querySelector('[data-vrc-keys-all]').disabled,true);
+});
