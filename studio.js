@@ -1624,8 +1624,8 @@
         'displayMode',
         'Display rendering',
         [
-          ['auto', 'Automatic · adapt to the display'],
-          ['smooth', 'Smooth · TVs and high-resolution monitors'],
+          ['auto', 'Automatic · adapt to display and performance'],
+          ['smooth', 'Smooth · lighter animations'],
           ['full', 'Full effects'],
         ],
         p.displayMode

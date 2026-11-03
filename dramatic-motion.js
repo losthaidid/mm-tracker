@@ -4,7 +4,7 @@
   const body = document.body,
     view = document.getElementById('view'),
     iphone = root.WorkHubRenderProfile?.iphone === true,
-    budget = root.WorkHubRenderProfile?.budget || {
+    fallbackBudget = {
       orbits: 3,
       particles: 32,
       comets: 5,
@@ -21,6 +21,8 @@
     visibleSurfaces = new Set(),
     pendingRoots = new Set();
   let queued = false,
+    budget = root.WorkHubRenderProfile?.budget || fallbackBudget,
+    cleanupTimer = null,
     fullScan = true,
     removePending = false,
     wasLive = false,
@@ -30,14 +32,52 @@
     lastY = 0;
   layer.id = 'hubSpectacle';
   layer.setAttribute('aria-hidden', 'true');
-  layer.innerHTML = `<div class="fx-sky">${Array.from({ length: budget.orbits }, (_, i) => `<i class="fx-orbit" style="--i:${i}"></i>`).join('')}${Array.from({ length: budget.particles }, (_, i) => `<i class="fx-dust" style="--i:${i};--x:${(i * 37) % 100}%;--y:${(i * 61) % 100}%;--travel:${45 + ((i * 23) % 110)}px"></i>`).join('')}${Array.from({ length: budget.comets }, (_, i) => `<i class="fx-comet" style="--i:${i};top:${8 + i * 19}%;left:${35 + ((i * 17) % 60)}%"></i>`).join('')}</div><div class="fx-reactions"></div>`;
+  layer.innerHTML = '<div class="fx-sky"></div><div class="fx-reactions"></div>';
   body.append(layer);
-  const reactions = layer.querySelector('.fx-reactions');
+  const reactions = layer.querySelector('.fx-reactions'),
+    expires = new WeakMap();
+  const now = () => root.performance?.now?.() ?? Date.now();
+  function sky() {
+    layer.querySelector('.fx-sky').innerHTML =
+      `${Array.from({ length: budget.orbits }, (_, i) => `<i class="fx-orbit" style="--i:${i}"></i>`).join('')}${Array.from({ length: budget.particles }, (_, i) => `<i class="fx-dust" style="--i:${i};--x:${(i * 37) % 100}%;--y:${(i * 61) % 100}%;--travel:${45 + ((i * 23) % 110)}px"></i>`).join('')}${Array.from({ length: budget.comets }, (_, i) => `<i class="fx-comet" style="--i:${i};top:${8 + i * 19}%;left:${35 + ((i * 17) % 60)}%"></i>`).join('')}`;
+  }
+  function clearReactions() {
+    if (cleanupTimer !== null) root.clearTimeout(cleanupTimer);
+    cleanupTimer = null;
+    reactions.replaceChildren();
+  }
+  function sweepReactions() {
+    cleanupTimer = null;
+    const time = now();
+    let next = Infinity;
+    for (const el of [...reactions.children]) {
+      const end = expires.get(el);
+      if (end > time) next = Math.min(next, end);
+      else el.remove();
+    }
+    if (next < Infinity) cleanupTimer = root.setTimeout(sweepReactions, Math.max(1, next - time));
+  }
+  function panelBudget() {
+    let count = 0;
+    for (const target of visibleSurfaces)
+      target.classList.toggle('fx-visible', count++ < budget.panels);
+  }
+  function panelAura(el) {
+    const current = el.querySelector(':scope > .fx-panel-aura');
+    if (!budget.panels) current?.remove();
+    else if (!current) {
+      const aura = document.createElement('span');
+      aura.className = 'fx-panel-aura';
+      aura.setAttribute('aria-hidden', 'true');
+      el.append(aura);
+    }
+  }
+  sky();
   const allowed = () =>
     !document.hidden &&
     body.dataset.motion !== 'off' &&
     !root.matchMedia?.('(prefers-reduced-motion: reduce)').matches &&
-    !body.matches('.hub-private,.hub-present');
+    !body.matches('.hub-private,.hub-present,.rest-room-open');
   const busy = target =>
     body.matches('.hub-sorting,.rest-room-open') ||
     !!target?.closest?.(
@@ -53,13 +93,8 @@
                 visibleSurfaces.delete(target);
                 target.classList.remove('fx-visible');
               }
-              if (!iphone) target.classList.toggle('fx-visible', isIntersecting);
             }
-            if (iphone) {
-              let count = 0;
-              for (const target of visibleSurfaces)
-                target.classList.toggle('fx-visible', count++ < budget.panels);
-            }
+            panelBudget();
           },
           { rootMargin: '80px' }
         )
@@ -101,17 +136,14 @@
       if (!el.classList.contains('fx-surface')) {
         el.classList.add('fx-surface');
       }
-      if (visibility && !observedSurfaces.has(el)) {
-        visibility.observe(el);
+      if (!observedSurfaces.has(el)) {
+        if (visibility) visibility.observe(el);
+        else visibleSurfaces.add(el);
         observedSurfaces.add(el);
-      } else if (!visibility) el.classList.toggle('fx-visible', !iphone);
-      if (!el.querySelector(':scope > .fx-panel-aura')) {
-        const aura = document.createElement('span');
-        aura.className = 'fx-panel-aura';
-        aura.setAttribute('aria-hidden', 'true');
-        el.append(aura);
       }
+      panelAura(el);
     }
+    panelBudget();
   }
   function scheduleDress() {
     if (queued) return;
@@ -125,7 +157,7 @@
     if (body.dataset.spectacle !== mode) body.dataset.spectacle = mode;
     layer.hidden = !live;
     if (!live) {
-      reactions.replaceChildren();
+      clearReactions();
       lastTrail = 0;
       visibility?.disconnect();
       observedSurfaces.clear();
@@ -140,13 +172,22 @@
   }
   function effect(className, x, y, dx = 0, dy = 0, i = 0) {
     // Rapid clicking cannot accumulate unlimited DOM or animation work.
+    if (budget.reactions <= 0) return;
     while (reactions.childElementCount >= budget.reactions) reactions.firstElementChild.remove();
     const el = document.createElement('i');
     el.className = className;
     el.style.cssText = `left:${x}px;top:${y}px;--dx:${dx}px;--dy:${dy}px;--i:${i}`;
     reactions.append(el);
-    el.addEventListener('animationend', () => el.remove(), { once: true });
-    root.setTimeout(() => el.remove(), 2200);
+    expires.set(el, now() + 2200);
+    el.addEventListener(
+      'animationend',
+      () => {
+        el.remove();
+        if (!reactions.childElementCount) clearReactions();
+      },
+      { once: true }
+    );
+    if (cleanupTimer === null) cleanupTimer = root.setTimeout(sweepReactions, 2200);
   }
   document.addEventListener(
     'pointermove',
@@ -154,20 +195,22 @@
       if (
         iphone ||
         root.WorkHubRenderProfile?.largeDisplay ||
-        !allowed() ||
         event.buttons ||
-        busy(event.target) ||
         event.pointerType === 'touch'
       )
         return;
       const now = root.performance?.now() || Date.now();
-      if (now - lastTrail < 42 || Math.hypot(event.clientX - lastX, event.clientY - lastY) < 7)
+      if (
+        now - lastTrail < (budget.panels === Infinity ? 42 : 90) ||
+        Math.hypot(event.clientX - lastX, event.clientY - lastY) < 7
+      )
         return;
+      if (!allowed() || busy(event.target)) return;
       lastTrail = now;
       lastX = event.clientX;
       lastY = event.clientY;
       effect('fx-pointer-star', lastX, lastY, Math.sin(now) * 35, -40, Math.round(now) % 8);
-      effect('fx-pointer-streak', lastX, lastY, -25, -12);
+      if (budget.panels === Infinity) effect('fx-pointer-streak', lastX, lastY, -25, -12);
     },
     { passive: true }
   );
@@ -187,8 +230,7 @@
           distance = 55 + (i % 5) * 23;
         effect('fx-burst-star', x, y, Math.cos(angle) * distance, Math.sin(angle) * distance, i);
       }
-      if (navigation && !iphone && !root.WorkHubRenderProfile?.largeDisplay)
-        effect('fx-scene-sweep', x, y);
+      if (navigation && !iphone && budget.panels === Infinity) effect('fx-scene-sweep', x, y);
     },
     { capture: true, passive: true }
   );
@@ -211,8 +253,17 @@
   });
   document.addEventListener('visibilitychange', sync);
   reduced?.addEventListener?.('change', sync);
+  root.addEventListener('workhub:render-profile', () => {
+    const next = root.WorkHubRenderProfile?.budget || fallbackBudget;
+    if (next === budget) return;
+    budget = next;
+    clearReactions();
+    sky();
+    for (const el of observedSurfaces) panelAura(el);
+    panelBudget();
+  });
   root.addEventListener('pagehide', () => {
-    reactions.replaceChildren();
+    clearReactions();
     visibility?.disconnect();
     observedSurfaces.clear();
     visibleSurfaces.clear();

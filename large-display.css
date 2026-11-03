@@ -49,3 +49,81 @@ html[data-large-display='true'] .mv-landscape {
 html[data-large-display='true'] .mv-tree:nth-child(2n) {
   animation-duration: 12s;
 }
+
+/* Automatic keeps living scenery while bounding decorative painting on ordinary displays. */
+html[data-effect-level='balanced'] .fx-dust {
+  box-shadow: none;
+}
+html[data-effect-level='balanced'] .mv-atmosphere i {
+  filter: none;
+  box-shadow: none;
+}
+html[data-effect-level='balanced'] .mv-atmosphere i:nth-child(n + 3) {
+  display: none;
+}
+html[data-effect-level='balanced'] .my-day-page :is(.mv-hero, .mv-widget-shell) {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+html[data-effect-level='balanced'] .mv-widget-shell {
+  will-change: auto;
+}
+html[data-effect-level='balanced'] .mv-light-beams {
+  display: none;
+}
+html:is([data-effect-level='balanced'], [data-effect-level='phone'], [data-effect-level='smooth'])
+  .hub-header-brand
+  .brand-title-letters
+  > span {
+  animation: none !important;
+  background: none;
+  color: var(--hub-text);
+}
+html:is([data-effect-level='balanced'], [data-effect-level='phone'], [data-effect-level='smooth'])
+  .brand-title-letters {
+  animation: motion-title-breathe 6s ease-in-out infinite;
+}
+html:is([data-effect-level='balanced'], [data-effect-level='phone'], [data-effect-level='smooth'])
+  #hubSiteTitle {
+  animation: none;
+}
+html:is([data-effect-level='balanced'], [data-effect-level='phone'], [data-effect-level='smooth'])
+  :is(.hub-widget-symbol, .mv-metric-icon, .hub-preview-dot) {
+  animation-name: motion-symbol-float;
+}
+html:is([data-effect-level='balanced'], [data-effect-level='phone'], [data-effect-level='smooth'])
+  .mv-hero
+  h2
+  em {
+  animation: none;
+}
+html:is([data-effect-level='balanced'], [data-effect-level='phone'], [data-effect-level='smooth'])
+  .rest-room[data-motion='flow']:not([data-phase='paused'])
+  .rest-globe {
+  animation-name: motion-rest-breathe;
+}
+html:is([data-effect-level='balanced'], [data-effect-level='phone'], [data-effect-level='smooth'])
+  .rest-room[data-motion='flow'][data-phase='complete']
+  [data-rest='resume'] {
+  animation-name: motion-ready-light;
+}
+@keyframes motion-title-breathe {
+  50% {
+    opacity: 0.86;
+  }
+}
+@keyframes motion-symbol-float {
+  to {
+    transform: translateY(-5px) rotate(8deg);
+  }
+}
+@keyframes motion-rest-breathe {
+  50% {
+    transform: scale(1.04) translateY(-6px);
+  }
+}
+@keyframes motion-ready-light {
+  50% {
+    opacity: 0.82;
+  }
+}
