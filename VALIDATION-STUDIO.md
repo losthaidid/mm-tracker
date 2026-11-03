@@ -90,6 +90,14 @@ can record a fresh summary when you want one. Changing the file, mapping, versio
 company or template settings still requires a new initial run. Pending corrections
 are cancelled on context/account changes. The original uploaded file is unchanged.
 
+For the whole file, choose **Suggest fixes for all errors**, review its clear fixes
+and fields needing review, then choose **Apply all clear fixes**. The scan includes
+errors beyond the on-screen issue limit. Studio revalidates the staged batch before
+changing any working records. **Undo correction batch** restores the latest batch;
+ambiguous values and duplicate identifiers remain for individual review. Apply/undo
+updates the existing run's numeric summary without saving uploaded values.
+See [whole-file corrections](docs/VALIDATION-CORRECTIONS.md).
+
 ## Easy Excel setup (one sheet)
 
 Download **simple General setup** or **simple SAP setup** in Validation Studio.

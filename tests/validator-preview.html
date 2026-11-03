@@ -4,7 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; worker-src 'self' blob:; font-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://aaotojqkiewbhtnrlcur.supabase.co; frame-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Validation Studio visual check</title>
-<link rel="stylesheet" href="../validator-studio.css?v=20261103-validation-stability-1">
+<link rel="stylesheet" href="../validator-studio.css?v=20261103-bulk-fixes-1">
 <link rel="stylesheet" href="../validator-csv.css?v=20261031-export-csv-1">
 <link rel="stylesheet" href="../work-library.css?v=20261017-wishlist-1">
 <style>
@@ -20,7 +20,7 @@ body{margin:0;padding:28px;background:#f0f2e7;font-family:system-ui,-apple-syste
 <div id="preview"></div><div id="previewStatus" role="status"></div>
 <dialog id="previewModal"><div id="previewModalBody"></div><button type="button" onclick="document.getElementById('previewModal').close()">Close</button></dialog>
 <script src="../vendor/jszip.min.js"></script>
-<script src="../validator-engine.js?v=20261030-uom-versions-1"></script>
+<script src="../validator-engine.js?v=20261103-bulk-fixes-1"></script>
 <script src="../validator-reference-data.js?v=20261030-uom-versions-1"></script>
 <script src="../vendor/ssf.js?v=0.11.2"></script>
 <script src="../validator-files.js?v=20261103-explode-recombined-1"></script>
@@ -31,12 +31,19 @@ body{margin:0;padding:28px;background:#f0f2e7;font-family:system-ui,-apple-syste
 <script src="../validator-compare.js?v=20261031-compare-xls-1"></script>
 <script src="../validator-reconcile-engine.js?v=20261103-validation-stability-1"></script>
 <script src="../validator-reconcile.js?v=20261103-matching-key-all-1"></script>
-<script src="../validator-studio.js?v=20261103-validation-stability-1"></script>
+<script src="../validator-corrections.js?v=20261103-bulk-fixes-1"></script>
+<script src="../validator-studio.js?v=20261103-bulk-fixes-1"></script>
 <script>
 const E=WorkHubValidatorEngine;
 const sample=E.example();
 if(new URLSearchParams(location.search).get('scenario')==='recombined'){
  sample.name='Material master · Plants & storage'; sample.columns=['Material','Description','Plant','Storage Location'].map((label,i)=>({...E.column(i),key:['MATNR','DESCRIPTION','PLANT','STORAGE'][i],label})); sample.rules=[]; sample.uniqueGroups=[]; sample.lookups=[];
+}
+if(new URLSearchParams(location.search).get('scenario')==='bulk-corrections'){
+ sample.name='Whole-file corrections · sample materials';
+ sample.columns=[['MATNR','Material'],['DESCRIPTION','Description'],['PLANT','Plant'],['STORAGE','Storage Location'],['FLAG','Flag'],['CHOICE','Choice']].map(([key,label],i)=>({...E.column(i),key,label,unique:key==='MATNR',required:['DESCRIPTION','FLAG'].includes(key),values:key==='FLAG'?'X':key==='CHOICE'?'A,B':''}));
+ sample.lookups=[{id:'sloc',name:'Plant/storage reference',headers:['Plant','Sloc'],rows:[['P1','S1'],['P2','S2'],['P2','S3']]}];
+ const rule=E.rule('STORAGE');rule.name='Storage belongs to Plant';rule.when={join:'all',conditions:[],groups:[]};rule.assertion={...E.condition('STORAGE'),operator:'lookupTuple',lookupId:'sloc',pairs:[{field:'PLANT',referenceColumn:'Plant'},{field:'STORAGE',referenceColumn:'Sloc'}]};sample.rules=[rule];sample.uniqueGroups=[];
 }
 let memory={projects:[],projectCompanies:[],workhub:{validator:{templates:new URLSearchParams(location.search).get('scenario')==='standalone-recombined'?[]:[sample],runs:[]}}},ui;
 const render=()=>{if(!ui.patchRender())document.getElementById('preview').innerHTML=ui.render();};
