@@ -98,6 +98,12 @@ ambiguous values and duplicate identifiers remain for individual review. Apply/u
 updates the existing run's numeric summary without saving uploaded values.
 See [whole-file corrections](docs/VALIDATION-CORRECTIONS.md).
 
+After applying **Explode & map rows**, **Download exploded Excel** exports every
+current child record and all original upload columns into one **Exploded data**
+sheet. It works before validation, includes unresolved rows and retains values as
+literal text, including leading zeros and exact material numbers. See
+[download exploded Excel](docs/VALIDATION-PREPARATION.md#download-exploded-excel-without-validation).
+
 ## Easy Excel setup (one sheet)
 
 Download **simple General setup** or **simple SAP setup** in Validation Studio.

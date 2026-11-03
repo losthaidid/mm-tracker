@@ -45,11 +45,27 @@ Unequal list lengths block the entire Apply operation. **Repeat a single mapped 
 
 Empty positions are retained: `FF01,,FF03` has three positions and the second Plant remains blank. Trim removes surrounding spaces from split values only. Quotes inside a cell are ordinary characters; this tool uses literal delimiters rather than a second CSV parser inside each cell.
 
+## Download exploded Excel without validation
+
+After **Preview changes → Apply to working data**, choose **Download exploded Excel** beside **Explode & map rows**. No validation run or completed template mapping is required. The button becomes available only after an explosion has been applied; a preview or SAP formatting alone does not enable it.
+
+The download is named after the uploaded file, ending in `-exploded.xlsx`, with exactly one **Exploded data** sheet. It includes every current working record and all upload columns in their loaded order, including unmapped columns. Current SAP formatting and later corrections are included. Filters, pages, unresolved errors and accepted-row decisions do not restrict these records. In a validation queue, it downloads only the currently open file.
+
+All values are written as literal Excel text, retaining leading zeros, exact material strings such as `6.00007`, descriptions, blank cells, long identifiers and parent/dependent assignments. Formula-like text remains text. Existing Validate upload requirements still apply. No validation-status columns or additional report sheets are added. Original and prepared snapshots, source-row links, validation results and account records are unchanged by the download.
+
+For example, Plant `FF01, FF02, FF03` with Storage `(FF01) QA00, QA01, (FF02,FF03) QA00` exports four records: FF01/QA00, FF01/QA01, FF02/QA00 and FF03/QA00, each with the same material and description from its own parent row.
+
+![Download exploded Excel beside Explode & map rows, before validation](images/validation-exploded-download.jpg)
+
+The writer uses bounded batches and keeps wide files on one sheet within the existing 25,000-record/200-column limits. It stops rather than shorten a cell exceeding Excel's 32,767-character limit. While the file is being prepared, duplicate download requests are blocked and progress text is shown. Changing the working values, replacing the upload, opening another queued file or changing account discards a pending export. Export permission is checked before generation and again before delivery. Run/edit permission is not required to download an already prepared working file.
+
+Undoing the only remaining explosion, restoring the original upload or replacing the file disables this download until another explosion is applied. Undoing a later SAP preparation leaves it available if an earlier explosion remains applied.
+
 ## Validate, correct and export
 
 Recommended order: **Upload → Explode & map → Apply SAP formatting → Run validation → Export**.
 
-Applying or undoing a transformation clears old issue counts and ignore decisions. Run validation again before exporting. Normal cell corrections and suggested-value selection continue to recheck automatically. Existing conditions, references, company scope and duplicate checks apply to the resulting records. If a material appears in several plants, use the appropriate unique combination rather than making Material alone unique.
+Applying or undoing a transformation clears old issue counts and ignore decisions. Run validation again before exporting validated reports; **Download exploded Excel** remains independent of that check. Normal cell corrections and suggested-value selection continue to recheck automatically. Existing conditions, references, company scope and duplicate checks apply to the resulting records. If a material appears in several plants, use the appropriate unique combination rather than making Material alone unique.
 
 SAP exports store internal values as literal Excel text, including codes whose General data type was previously numeric. The main **Validated data** or **Accepted data** sheet uses the template's mapped fields. When preparations have been applied, **Prepared upload** retains every original upload column and its current working values. Accepted exports include only accepted records in both sheets. **Row origins** links each working record to the original worksheet, Excel row and split part. Issues use the working row number shown in Studio; split records show their source row and part below it. All these sheets use values, not executable formulas.
 

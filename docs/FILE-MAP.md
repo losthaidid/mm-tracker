@@ -95,6 +95,8 @@ Batch C: [batch-c-engine.js](../batch-c-engine.js) handles deterministic ticket 
 | Validation profiles | Run-only check selections and saved profiles are compiled by `validator-engine.js`, maintained by `validator-studio.js`, and audited in Excel by `validator-files.js`. See [validation profiles](VALIDATION-PROFILES.md). The feature registry protects `workhub.validator.profiles`. |
 | [validator-transform.js](../validator-transform.js) | Pure SAP formatting and positional delimiter expansion, with preview samples, strict pairing and bounded output. The Studio keeps working rows, original-row links and undo in browser memory. See [upload preparation](VALIDATION-PREPARATION.md). |
 
+Exploded Excel download: `validator-studio.js` exports the active file's current source rows and original upload headers directly through `validator-files.js`'s bounded, literal-text writer. It does not require validation or filter out unresolved rows. See [download exploded Excel](VALIDATION-PREPARATION.md#download-exploded-excel-without-validation) and `tests/validator-exploded-export.test.mjs` for exact-value, lineage, wide-file, permission and stale-export checks.
+
 ## Momo, scenery, focus and sound
 
 | Files | What they control |
