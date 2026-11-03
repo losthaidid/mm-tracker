@@ -172,8 +172,8 @@ locally. Trees, water, wildlife, particles and the other existing animations rem
 ## iPhone rendering budget
 
 `render-profile.js` runs in the head before feature styles. Only an iPhone user-agent or
-`navigator.platform === 'iPhone'` selects the lighter path; iPad, Android and desktop browsers
-retain the full effects even at narrow window widths. The selection is local and does not
+`navigator.platform === 'iPhone'` selects the iPhone safety limits; iPad, Android and desktop browsers
+use the separate Automatic/Smooth/Full budgets, independently of narrow window widths. The selection is local and does not
 rewrite account preferences. `iphone-motion.css` is gated by that early profile.
 
 On iPhone, global decoration creates one orbit, twelve particles
@@ -185,6 +185,12 @@ motion-off/reduced-motion controls, drag coordinates, records and the break alar
 
 The profile and computed styles can be tested in a simulated iPhone browser path; this does not
 measure real iPhone GPU memory or establish that a particular device crash is resolved.
+
+Automatic now limits overlapping desktop glows and uses lighter decoration when local rendering
+remains slow. Smooth and Full update immediately without reloading or replacing focused inputs.
+Offscreen scenery pauses in every profile; focus/break clocks and audio remain under their
+existing controllers. See [animation performance](ANIMATION-PERFORMANCE.md) for the budgets,
+local sampling behavior and verification limits.
 
 Music playback gain is higher for both focus tracks and all three rest tracks at the same slider
 positions. Focus music keeps the existing output compressor; rest music retains full-volume

@@ -108,6 +108,7 @@
       touchLayer = null,
       completionPoint = null,
       lastSpark = 0,
+      lastLight = 0,
       sparkPoint = null;
     const animations = new Set(),
       numbers = new Map(),
@@ -463,10 +464,6 @@
           observer = new root.IntersectionObserver(
             entries => {
               for (const entry of entries) {
-                if (root.WorkHubRenderProfile?.largeDisplay) {
-                  entry.target.classList.remove('mv-out-of-view');
-                  continue;
-                }
                 entry.target.classList.toggle('mv-out-of-view', !entry.isIntersecting);
                 if (entry.isIntersecting) {
                   animateCharts(entry.target);
@@ -636,7 +633,18 @@
     document.addEventListener(
       'pointermove',
       event => {
-        if (event.pointerType === 'touch' || !page || !allowed()) return;
+        if (
+          event.pointerType === 'touch' ||
+          event.buttons ||
+          !page ||
+          root.WorkHubRenderProfile?.largeDisplay ||
+          !allowed()
+        )
+          return;
+        const time = root.performance?.now?.() ?? Date.now();
+        if (document.documentElement.dataset.effectLevel === 'balanced' && time - lastLight < 32)
+          return;
+        lastLight = time;
         lastPointer = { x: event.clientX, y: event.clientY, target: event.target };
         if (!lightFrame) lightFrame = root.requestAnimationFrame?.(light) || 0;
       },
@@ -644,14 +652,21 @@
     );
     document.addEventListener('pointerleave', () => resetLight());
     root.addEventListener('workhub:render-profile', () => {
+      if (lightFrame) root.cancelAnimationFrame?.(lightFrame);
+      if (raf) root.cancelAnimationFrame?.(raf);
+      lightFrame = raf = 0;
+      lastPointer = null;
+      lastLight = 0;
       resetLight();
+      if (root.WorkHubRenderProfile?.largeDisplay)
+        page?.querySelector('.mv-hero')?.style.removeProperty('--mv-scroll');
       stopCounters();
       cancelAnimations();
     });
     root.addEventListener(
       'scroll',
       () => {
-        if (raf || !page) return;
+        if (raf || !page || root.WorkHubRenderProfile?.largeDisplay) return;
         raf =
           root.requestAnimationFrame?.(() => {
             raf = 0;

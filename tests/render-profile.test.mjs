@@ -19,7 +19,7 @@ function setup(t, {ua=iphone,platform='iPhone',styles=false}={}) {
     constructor(callback){this.callback=callback;this.targets=new Set();observers.push(this);}
     observe(el){this.targets.add(el);}unobserve(el){this.targets.delete(el);}disconnect(){this.targets.clear();}
   };
-  if(styles){const style=document.createElement('style');style.textContent=['base.css','studio.css','my-day-visuals.css','rest-room.css','dramatic-motion.css','iphone-motion.css'].map(source).join('\n');document.head.append(style);}
+ if(styles){const style=document.createElement('style');style.textContent=['base.css','studio.css','my-day-visuals.css','rest-room.css','dramatic-motion.css','iphone-motion.css','brand-motion.css','large-display.css'].map(source).join('\n');document.head.append(style);}
   window.eval(source('render-profile.js'));
   window.eval(source('dramatic-motion.js'));
   return {window,document,observers};
@@ -58,6 +58,7 @@ test('iPhone effects cap simultaneous glints and reactions, survive navigation, 
 
 test('full rendering keeps its particle count, unlimited visible panels and navigation sweep',async t=>{
   const {window,document,observers}=setup(t,{ua:'Mozilla/5.0 (Linux; Android 16)',platform:'Linux armv8l'});await settle();
+  window.WorkHubRenderProfile.setMode('full');await settle();
   assert.equal(document.documentElement.dataset.renderProfile,'full');
   assert.equal(document.querySelectorAll('#hubSpectacle .fx-dust').length,32);
   assert.equal(document.querySelector('#hubSpectacle .fx-ribbon'),null);
