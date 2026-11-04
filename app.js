@@ -9,7 +9,8 @@
 'use strict';
 let hub = null;
 let access = null,
-  userManagement = null;
+  userManagement = null,
+  storageManager = null;
 
 // =============================================================================
 // 1. Defaults, field definitions and shared helpers
@@ -9383,6 +9384,7 @@ function persistCloudCache(check = false) {
   }
 }
 function cloudNotice() {
+  storageManager?.sync();
   const signed = !!cloud.user,
     n = $('storageNotice'),
     pending = !!(cloud.pending || cloud.inFlight),
@@ -9421,6 +9423,8 @@ function cloudNotice() {
   $('backupButton').disabled = !cloud.ready;
   $('restoreButton').disabled = !cloud.ready || cloud.conflict;
   $('workspaceResetButton').disabled = !cloud.ready || !!cloud.resetting;
+  $('storageManagerButton').disabled = !cloud.ready;
+  $('storageManagerButton').hidden = !cloud.ready;
   $('cloudRetry').hidden = !signed || cloud.conflict;
   $('cloudReload').hidden = !signed;
   $('cloudSignOut').hidden = !signed;
@@ -10473,6 +10477,52 @@ const workspaceReset = WorkHubWorkspaceReset.install({
     cloud.conflict = true;
     cloud.error = true;
     cloud.status = 'Reload cloud records to check the clear request before editing.';
+    notice();
+  },
+});
+storageManager = WorkHubStorage.install({
+  cloud: () => cloud,
+  state: () => state,
+  access: () => access,
+  payload,
+  validate,
+  today,
+  timer: () => hub.timer(),
+  closeSettings: closeSettingsMenu,
+  tell,
+  exportCheck: assertWorkspaceExport,
+  download: (data, name, type) => download(data, name, type, 'workspace'),
+  authorize: next => access?.assertChange(state, next),
+  prepare(next) {
+    hub.prepare(next, state, true);
+    access?.assertChange(state, next);
+    validate(next);
+  },
+  checkCache() {
+    if (!temporary && localStorage.getItem(cloud.key) !== cloud.lastCache)
+      throw Error('Another tab changed your records. Reload and start a fresh storage review.');
+  },
+  createClient: () =>
+    window.MMTrackerSupabase.createClient(cloudConfig.url, cloudConfig.publishableKey, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'workhub-storage:' + uid() },
+      global: { fetch: cloudFetch },
+    }),
+  apply(document, revision) {
+    applyCloudDocument(document);
+    cloud.revision = revision;
+    cloud.baseDocument = document;
+    cloud.pending = cloud.inFlight = null;
+    cloud.conflict = cloud.error = false;
+    cloud.hasDocument = true;
+    cloud.changeSerial++;
+    cloud.status = 'Saved to Supabase';
+    persistCloudCache();
+    notice();
+    render();
+  },
+  uncertain() {
+    cloud.conflict = cloud.error = true;
+    cloud.status = 'Reload cloud records to check the storage change before editing.';
     notice();
   },
 });

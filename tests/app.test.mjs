@@ -36,6 +36,7 @@ async function app(t,{storage={},rpcError=null,remote=null,login=true,styles=fal
   rpc:async(name,args)=>{
    if(name==='workhub_my_access')return{data:db.access||{userId:window.api?.cloud.user?.id||'11111111-1111-4111-8111-111111111111',role:'owner',status:'active',version:1,permissions:window.WorkHubAccessCatalog.preset(),needsPassword:false},error:db.accessError||null};
    if(name==='load_mm_tracker'||name==='load_mm_tracker_revision')return{data:db.row?[copy(db.row)]:[],error:null};
+   if(name==='workhub_storage_usage')return{data:{recordBytes:1234,storedDocumentBytes:456,revision:db.row?.revision||0,project:{databaseBytes:1000000}},error:null};
    if(name==='workhub_request_access'){db.request=copy(args);return{data:{received:true},error:null};}
    db.calls.push({name,args:copy(args)});
    if(db.error)return{data:null,error:db.error};
@@ -1941,8 +1942,8 @@ test('recipients: account saves, reopened records and JSON backups retain compan
 
 test('grouped Settings: five sections keep all existing actions and section changes stay open',async t=>{
  const {api,document,window,db}=await app(t),ui=api.hub.settingsPanel,menu=document.getElementById('settingsMenu');api.hub.chromeUX.open();await settle();
- assert.equal(document.querySelectorAll('#settingsCategories [role="tab"]').length,5);assert.deepEqual(copy(ui.snapshot().groups.map(g=>[g.id,g.count])),[['workspace',4],['work',8],['companion',4],['data',5],['account',3]]);assert.equal(document.querySelectorAll('.settings-group:not([hidden])').length,1);assert.equal(document.querySelector('.settings-group:not([hidden])').id,'settingsGroup-workspace');assert.equal(document.querySelectorAll('.settings-option').length,24);assert.equal(document.querySelector('#hubSettingsAppearance button'),null);
- for(const [id,group]of [['hubSettingsHeader','workspace'],['claimSettingsButton','work'],['recipientSettingsButton','work'],['momoAdventureSettings','companion'],['soundscapeSettings','companion'],['backupButton','data'],['workspaceResetButton','data'],['cloudSignOut','account']])assert.equal(document.getElementById(id).closest('.settings-group').id,'settingsGroup-'+group);
+ assert.equal(document.querySelectorAll('#settingsCategories [role="tab"]').length,5);assert.deepEqual(copy(ui.snapshot().groups.map(g=>[g.id,g.count])),[['workspace',4],['work',8],['companion',4],['data',6],['account',3]]);assert.equal(document.querySelectorAll('.settings-group:not([hidden])').length,1);assert.equal(document.querySelector('.settings-group:not([hidden])').id,'settingsGroup-workspace');assert.equal(document.querySelectorAll('.settings-option').length,25);assert.equal(document.querySelector('#hubSettingsAppearance button'),null);
+ for(const [id,group]of [['hubSettingsHeader','workspace'],['claimSettingsButton','work'],['recipientSettingsButton','work'],['momoAdventureSettings','companion'],['soundscapeSettings','companion'],['backupButton','data'],['storageManagerButton','data'],['workspaceResetButton','data'],['cloudSignOut','account']])assert.equal(document.getElementById(id).closest('.settings-group').id,'settingsGroup-'+group);
  document.querySelector('[data-settings-group="work"]').click();assert.equal(menu.open,true);assert.equal(ui.snapshot().active,'work');document.getElementById('recipientSettingsButton').click();await settle();assert.equal(menu.open,false);assert.ok(document.getElementById('recipientDirectory'));api.closeModal();api.hub.chromeUX.open();document.querySelector('[data-settings-group="companion"]').click();document.getElementById('soundscapeSettings').click();await settle();assert.equal(menu.open,false);assert.ok(document.querySelector('#modalBody .soundscape-room'));assert.equal(db.calls.length,0);
 });
 
@@ -1962,7 +1963,7 @@ test('grouped Settings: keyboard section navigation, narrow-screen orientation a
 test('grouped Settings: later launchers and sync visibility update without cloning controls or writing records',async t=>{
  const {api,document,window,db}=await app(t),ui=api.hub.settingsPanel,button=document.createElement('button');button.id='customWorkspaceSetting';button.textContent='Custom workspace option';let clicked=0;button.addEventListener('click',()=>clicked++);document.getElementById('hubSettingsAppearance').append(button);await settle();assert.equal(document.querySelector('#settingsItems-workspace #customWorkspaceSetting'),button);assert.equal(ui.snapshot().groups.find(g=>g.id==='workspace').count,5);for(let i=0;i<3;i++)ui.mount();assert.equal(document.querySelectorAll('#customWorkspaceSetting').length,1);
  api.hub.chromeUX.open();button.click();assert.equal(clicked,1);assert.equal(document.getElementById('settingsMenu').open,false);button.hidden=true;await settle();assert.equal(button.closest('.settings-entry').hidden,true);assert.equal(ui.snapshot().groups.find(g=>g.id==='workspace').count,4);
- api.cloud.conflict=true;api.cloud.status='Newer records need review';api.notice();await settle();assert.equal(document.getElementById('cloudRetry').closest('.settings-entry').hidden,true);assert.equal(document.getElementById('cloudReload').closest('.settings-entry').hidden,false);assert.equal(document.getElementById('restoreButton').disabled,true);assert.equal(ui.snapshot().groups.find(g=>g.id==='data').count,4);assert.match(document.getElementById('settingsSaveStatus').textContent,/review/);assert.equal(db.calls.length,0);
+ api.cloud.conflict=true;api.cloud.status='Newer records need review';api.notice();await settle();assert.equal(document.getElementById('cloudRetry').closest('.settings-entry').hidden,true);assert.equal(document.getElementById('cloudReload').closest('.settings-entry').hidden,false);assert.equal(document.getElementById('restoreButton').disabled,true);assert.equal(ui.snapshot().groups.find(g=>g.id==='data').count,5);assert.match(document.getElementById('settingsSaveStatus').textContent,/review/);assert.equal(db.calls.length,0);
 });
 
 test('grouped Settings: sign-out clears the search and hides account-owned options while sign-in remains available',async t=>{
@@ -3492,3 +3493,7 @@ test('User access: server projections remain valid across every restricted secti
   if(feature.id==='tasks')assert.doesNotMatch(JSON.stringify(projected),/PRIVATE_TASK/);
  }
 });
+
+ test('Storage settings: overview opens from Backups & sync, reads metrics only and closes on account change',async t=>{
+ const {api,document,db}=await app(t),before=api.payload(api.state());api.hub.chromeUX.open();document.querySelector('[data-settings-group="data"]').click();document.getElementById('storageManagerButton').click();await settle();const room=document.getElementById('workhubStorage');assert.equal(room.open,true);assert.match(room.textContent,/1.2 KiB/);assert.equal(db.calls.length,0);assert.deepEqual(JSON.parse(api.payload(api.state())).data,JSON.parse(before).data);api.cloud.user={id:'another-owner'};api.notice();assert.equal(room.open,false);
+ });

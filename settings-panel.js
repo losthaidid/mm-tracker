@@ -116,6 +116,11 @@
       'Ambient sounds and lo-fi music for focus.',
       'soundscape music audio nature rain focus lofi',
     ],
+    storageManagerButton: [
+      'data',
+      'See storage usage, verify compressed local archives and safely restore or remove selected records.',
+      'storage size usage space database supabase archive compress cleanup restore local',
+    ],
     backupButton: [
       'data',
       'Download a copy of your records.',
