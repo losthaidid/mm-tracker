@@ -431,7 +431,7 @@
       );
     }
     function dateButton(host, id, sub = '') {
-      if (!host || host.querySelector('[data-project-status-date]')) return;
+      if (!host || [...host.querySelectorAll('[data-project-status-date]')].some(b => b.dataset.projectStatusDate === id && (b.dataset.sub || '') === sub)) return;
       const r = find(id, sub);
       if (!r) return;
       const b = document.createElement('button');

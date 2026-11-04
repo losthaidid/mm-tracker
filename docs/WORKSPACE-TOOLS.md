@@ -8,6 +8,18 @@ Items without sub-items remain manually controlled. Existing notes, feedback, ow
 
 Opening records or restoring a backup does not rewrite old status combinations. Manually reopening an item preserves its children's work; reopening a child does not automatically change the main item's status. The existing permission and conflict checks apply before a change can be saved.
 
+## Project cards, table and bulk editing
+
+Open **Projects → Project items**. **Cards** and **Table** share the company, status, search and Work Context filters. The table uses the full content width, with a scrollable body, fixed headings and selection/item columns. Choose **Sort by** or a column heading to sort; drag a column edge to resize it. A focused edge also supports Left/Right arrow keys, with Home restoring its default width. Layout, column widths, ordering and page size are remembered on this device for the current account without saving project records.
+
+Select a description, status, priority, expected date or due date in the table to edit that field directly. **Save** applies the change and **Cancel** discards it. Enter saves a date or selection; Ctrl/Command+Enter saves a description; Escape cancels. Exact description text, identifiers, notes, feedback and linked records are preserved. **Edit item**, **Details & links**, **Track time** and **More tools** retain the full editor, traceability, status history, context, timeline and snippet workflows.
+
+Use row checkboxes or **Select page**, then **Edit selected**. **Select all matching** explicitly includes every item matching the current filters across pages. Filtering prunes items that no longer match from the selection; changing projects, leaving Project items or switching accounts clears it. Bulk editing applies to main project items and supports status, priority, expected date and due date. Only checked fields change; checking a date and leaving it blank clears that date.
+
+**Preview changes** lists current and new values, including unfinished children that will be completed by a main-item completion. **Back to fields** preserves the chosen inputs; **Cancel** makes no record changes. **Apply changes** uses one shared revision-checked save, including normal completion dates, status history and reporting updates. A changed selected record, account, project, permission, session generation or date blocks a stale review. Unrelated records are not replaced by the preview. Cloud saving, retry and conflict review keep their existing behavior.
+
+On a card, choose **Show sub-items** to see each child's owner, due date, remarks, feedback, status, timer and editor under its main item. Status changes save directly without opening the manager. The existing **Sub-items** manager remains available for its full controls. Child details and feedback render when expanded, with 10 children initially and **Show next 20** for larger lists. Main lists use 25, 50 or 100 items per page; previews show 50 field changes per page. These bounds keep large projects usable without omitting records from explicit selections or saved changes.
+
 ## Task companies and website references
 
 In **Tasks → Add task / Edit main task**, choose **Task type → Project**, then a **Linked project**. The optional **Company** dropdown contains active companies maintained for that linked project, even when another project is active in navigation. Leave it blank for project-wide work. Changing project or switching to Ticket/Custom clears the company selection. Existing inactive assignments remain visible and may be retained when editing; they cannot be assigned to a different task.

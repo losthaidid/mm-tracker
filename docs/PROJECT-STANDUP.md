@@ -2,7 +2,7 @@
 
 Open **Projects → Overview → Daily stand-up**. Each project has its own card. The report shows all of that project's items and sub-items, their actual statuses and their complete remarks, grouped by their parent item. All groups start expanded; use **Expand all / Collapse all** to change the reading view.
 
-The progress strip shows item/sub-item totals and combined status counts. Completion percentages are separate for project items and sub-items, so a completed child does not automatically mark its parent complete. Testing, Development, UAT and Pending Review count as in progress; blocked/on-hold statuses remain visibly separate.
+The progress strip shows item/sub-item totals and combined status counts. Completion percentages are separate for project items and sub-items. Completing every child completes the main item, and choosing Completed on the main item completes its unfinished children; see [Project item completion](WORKSPACE-TOOLS.md#project-item-completion). Testing, Development, UAT and Pending Review count as in progress; blocked/on-hold statuses remain visibly separate.
 
 ## Search
 
