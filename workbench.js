@@ -344,7 +344,7 @@
         if (!card) continue;
         const id = b.dataset.id;
         setPreview(card.querySelector('h3,h4,.ticket-button,.desc'), kind, id);
-        statusButton(
+        if (!card.matches('[data-pi-row]')) statusButton(
           card.querySelector(
             '.task-card-meta,.task-card-heading,.item-card-head,.ticket-card-head,.row-actions'
           ) || card,
@@ -376,7 +376,7 @@
         const card =
           b.closest('article,tr,.sub-item,.subitem-card,.subitem-manager-row') || b.parentElement;
         setPreview(card.querySelector('strong,h4'), 'specSub', b.dataset.id, b.dataset.parent);
-        statusButton(card, 'specSub', b.dataset.id, b.dataset.parent);
+        if (!card.matches('.pi-inline-child')) statusButton(card, 'specSub', b.dataset.id, b.dataset.parent);
       }
       for (const b of scope.querySelectorAll('[data-action="open-booking"]'))
         setPreview(b, 'schedule', b.dataset.date + '|' + b.dataset.time);

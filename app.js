@@ -10,7 +10,8 @@
 let hub = null;
 let access = null,
   userManagement = null,
-  storageManager = null;
+  storageManager = null,
+  projectItemsWorkspace = null;
 
 // =============================================================================
 // 1. Defaults, field definitions and shared helpers
@@ -429,6 +430,7 @@ function renderSpecs() {
 
 /** Use the shared dialog and decorate linked feature controls after its HTML is inserted. */
 function openModal(title, body) {
+  $('modal').classList.toggle('pi-dialog', body.includes('data-pi-room'));
   $('modal').classList.toggle('um-dialog', body.includes('class="um-room"'));
   $('modal').classList.toggle('standup-dialog', body.includes('class="standup-report"'));
   $('modal').classList.toggle(
@@ -1177,6 +1179,7 @@ function notice() {
 
 /** Choose the current screen, refresh its markup and then let feature modules decorate it. Rendering is not a save. */
 function render() {
+  projectItemsWorkspace?.sync();
   if (CLOUD_MODE && !cloud.ready) {
     $('view').innerHTML = '';
     $('tabs').hidden = true;
@@ -1231,6 +1234,7 @@ function render() {
   updateSelectAllControls();
   queueActualReview();
   hub?.afterRender(tab);
+  projectItemsWorkspace?.mount();
   access?.apply();
 }
 
@@ -6951,16 +6955,16 @@ function subItemTrackedTime(itemId, subItemId = '') {
 function subItemTimerButton(item, sub) {
   return `<button type="button" class="small" data-hub="timer-new" data-kind="project" data-id="${esc(item.projectId)}" data-item="${esc(item.id)}" data-subitem="${esc(sub.id)}" aria-label="Track time for ${esc(sub.title)}">◷ Track time</button>`;
 }
-function renderSubItemSummary(item) {
+function renderSubItemSummary(item, inline = false) {
   const m = subItemMetrics(item);
   if (!m.rows.length)
-    return `<div class="subitem-empty"><span>No sub-items yet</span><button class="small" data-action="manage-subitems" data-id="${esc(item.id)}">Add sub-item</button></div>`;
+    return `<div class="subitem-empty"><span>No sub-items yet</span>${inline ? '' : `<button class="small" data-action="manage-subitems" data-id="${esc(item.id)}">Add sub-item</button>`}</div>`;
   return `<div class="subitem-summary"><div class="subitem-summary-head"><div><span>Sub-item progress</span><strong>${m.completed}/${m.rows.length} complete</strong></div><strong>${m.percent}%</strong></div><div class="progress"><span style="width:${m.percent}%"></span></div><div class="subitem-chips">${m.rows
     .slice(0, 3)
     .map(s => `<span class="subitem-chip status-${statusClass(s.status)}">${esc(s.title)}</span>`)
     .join(
       ''
-    )}${m.rows.length > 3 ? `<span class="subitem-chip more">+${m.rows.length - 3} more</span>` : ''}</div>${m.blocked || m.overdue ? `<small>${m.blocked ? m.blocked + ' blocked' : ''}${m.blocked && m.overdue ? ' · ' : ''}${m.overdue ? m.overdue + ' overdue' : ''}</small>` : ''}<button class="small" data-action="manage-subitems" data-id="${esc(item.id)}">Manage sub-items</button></div>`;
+    )}${m.rows.length > 3 ? `<span class="subitem-chip more">+${m.rows.length - 3} more</span>` : ''}</div>${m.blocked || m.overdue ? `<small>${m.blocked ? m.blocked + ' blocked' : ''}${m.blocked && m.overdue ? ' · ' : ''}${m.overdue ? m.overdue + ' overdue' : ''}</small>` : ''}${inline ? '' : `<button class="small" data-action="manage-subitems" data-id="${esc(item.id)}">Manage sub-items</button>`}</div>`;
 }
 
 function projectItemFeedbackPanel(item, sub = null) {
@@ -6983,7 +6987,8 @@ function renderProjectSpecs() {
       .filter(c => c.projectId === project?.id)
       .sort((a, b) => a.name.localeCompare(b.name)),
     companyName = id => companies.find(c => c.id === id)?.name || 'Unassigned',
-    scoped = scopedProjectItems(),
+    allIds = new Set(all.map(r => r.id)),
+    scoped = scopedProjectItems().filter(r => allIds.has(r.id)),
     rs = scoped.filter(
       r =>
         match(
@@ -7008,9 +7013,10 @@ function renderProjectSpecs() {
       (n, r) => n + (r.subItems || []).filter(s => s.status === 'Completed').length,
       0
     );
-  return `<section class="panel box governance-shell"><div class="flex-title"><div><span class="eyebrow">${esc(project?.name || 'SAP Projects')}</span><h2>Project items</h2><p class="muted">Parent deliverables, company ownership and trackable sub-items in one board.</p></div><button class="primary" data-action="new" data-group="specs">Add project item</button></div><div class="item-board-summary"><div><span>Project items</span><strong>${all.length}</strong></div><div><span>Sub-items</span><strong>${subTotal}</strong></div><div><span>Sub-items completed</span><strong>${subDone}</strong></div></div><div class="governance-browser"><aside class="governance-picker"><label for="itemCompany">Company</label><select id="itemCompany"><option value="">All companies</option>${companies.map(c => `<option value="${esc(c.id)}"${itemCompanyId === c.id ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}<option value="unassigned"${itemCompanyId === 'unassigned' ? ' selected' : ''}>Unassigned items</option></select><div class="company-focus"><span>Delivery progress</span><strong>${completed} of ${scoped.length} completed</strong><div class="progress"><span style="width:${scoped.length ? (completed / scoped.length) * 100 : 0}%"></span></div><small>${overdue} overdue · ${all.length} items in this project</small></div><nav class="area-picker" aria-label="Project item statuses">${['', ...statuses].map(s => `<button data-action="item-status" data-status="${esc(s)}" class="${specFilter === s ? 'active' : ''}"><span>${esc(s) || 'All statuses'}</span><strong>${s ? scoped.filter(r => r.status === s).length : scoped.length}</strong></button>`).join('')}</nav></aside><section class="governance-detail"><div class="governance-detail-head"><span class="eyebrow">${esc(itemCompanyId ? (itemCompanyId === 'unassigned' ? 'Unassigned items' : companyName(itemCompanyId)) : 'All companies')}</span><h3>${esc(specFilter) || 'Delivery board'}</h3><p class="muted">${rs.length} of ${scoped.length} items shown</p><label class="sr-only" for="specSearch">Search project items</label><input id="specSearch" type="search" value="${esc(specQuery)}" placeholder="Search item, company, sub-item, owner or status"></div>${
+  const displayRows = projectItemsWorkspace?.prepare(rs) || rs;
+  return `<section class="panel box governance-shell project-items-workspace"><div class="flex-title"><div><span class="eyebrow">${esc(project?.name || 'SAP Projects')}</span><h2>Project items</h2><p class="muted">Parent deliverables, company ownership and trackable sub-items in one board.</p></div><button class="primary" data-action="new" data-group="specs">Add project item</button></div><div class="item-board-summary"><div><span>Project items</span><strong>${all.length}</strong></div><div><span>Sub-items</span><strong>${subTotal}</strong></div><div><span>Sub-items completed</span><strong>${subDone}</strong></div></div><div class="governance-browser"><aside class="governance-picker"><label for="itemCompany">Company</label><select id="itemCompany"><option value="">All companies</option>${companies.map(c => `<option value="${esc(c.id)}"${itemCompanyId === c.id ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}<option value="unassigned"${itemCompanyId === 'unassigned' ? ' selected' : ''}>Unassigned items</option></select><div class="company-focus"><span>Delivery progress</span><strong>${completed} of ${scoped.length} completed</strong><div class="progress"><span style="width:${scoped.length ? (completed / scoped.length) * 100 : 0}%"></span></div><small>${overdue} overdue · ${all.length} items in this project</small></div><nav class="area-picker" aria-label="Project item statuses">${['', ...statuses].map(s => `<button data-action="item-status" data-status="${esc(s)}" class="${specFilter === s ? 'active' : ''}"><span>${esc(s) || 'All statuses'}</span><strong>${s ? scoped.filter(r => r.status === s).length : scoped.length}</strong></button>`).join('')}</nav></aside><section class="governance-detail"><div class="governance-detail-head"><span class="eyebrow">${esc(itemCompanyId ? (itemCompanyId === 'unassigned' ? 'Unassigned items' : companyName(itemCompanyId)) : 'All companies')}</span><h3>${esc(specFilter) || 'Delivery board'}</h3><p class="muted">${rs.length} of ${scoped.length} items shown</p><label class="sr-only" for="specSearch">Search project items</label><input id="specSearch" type="search" value="${esc(specQuery)}" placeholder="Search item, company, sub-item, owner or status"></div>${projectItemsWorkspace?.toolbar() || ''}${
     rs.length
-      ? `<div class="process-card-grid item-trace-grid">${rs
+      ? projectItemsWorkspace?.isTable() ? projectItemsWorkspace.table() : `<div class="process-card-grid item-trace-grid">${displayRows
           .map(r => {
             const trace = projectItemTrace(r.id),
               linked =
@@ -7019,11 +7025,11 @@ function renderProjectSpecs() {
                 trace.plans.length +
                 trace.decisions.length,
               mismatch = trace.feedback.some(f => f.companyId && f.companyId !== r.companyId);
-            return `<article class="process-card item-card${r.status !== 'Completed' && r.dueDate && r.dueDate < today() ? ' item-overdue' : ''}${mismatch ? ' trace-mismatch' : ''}"><div class="process-card-head"><div><button class="process-code trace-code" data-action="view-item-links" data-id="${esc(r.id)}">${esc(projectItemLabel(r))}</button><h4>${esc(r.description) || 'Untitled item'}</h4></div>${tag(r.status)}</div><div class="item-meta"><span>${esc(companyName(r.companyId))}</span><span>Priority ${esc(r.priority) || '—'}</span></div><dl class="item-dates"><div><dt>Expected date</dt><dd>${dateLabel(r.expectedDate)}</dd></div><div><dt>Due date</dt><dd>${dateLabel(r.dueDate)}${r.status !== 'Completed' && r.dueDate && r.dueDate < today() ? '<small>Overdue</small>' : ''}</dd></div></dl>${r.remarks ? `<p class="item-remarks">${esc(r.remarks)}</p>` : ''}${projectItemFeedbackSections(r)}${subItemTrackedTime(r.id)}${renderSubItemSummary(r)}${mismatch ? '<div class="trace-inline-warning">Company link needs review</div>' : ''}<div class="trace-strip"><button data-action="view-item-links" data-id="${esc(r.id)}"><strong>${trace.feedback.length}</strong><span>phase feedback</span></button><button data-action="view-item-links" data-id="${esc(r.id)}"><strong>${linked}</strong><span>linked actions</span></button></div><div class="item-card-footer"><span>${r.url && /^https?:\/\//i.test(r.url) ? `<a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${esc(r.reference) || 'Open reference'} ↗</a>` : esc(r.reference) || 'No reference'}</span><div class="actions"><button class="small" data-action="manage-subitems" data-id="${esc(r.id)}">Sub-items</button><button class="small" data-action="view-item-links" data-id="${esc(r.id)}">Traceability</button><button class="small" data-action="edit" data-group="specs" data-id="${esc(r.id)}">Edit item</button></div></div></article>`;
+            return `<article class="process-card item-card${r.status !== 'Completed' && r.dueDate && r.dueDate < today() ? ' item-overdue' : ''}${mismatch ? ' trace-mismatch' : ''}">${projectItemsWorkspace?.selection(r) || ''}<div class="process-card-head item-card-head"><div><button class="process-code trace-code" data-action="view-item-links" data-id="${esc(r.id)}">${esc(projectItemLabel(r))}</button><h4>${esc(r.description) || 'Untitled item'}</h4></div>${tag(r.status)}</div><div class="item-meta"><span>${esc(companyName(r.companyId))}</span><span>Priority ${esc(r.priority) || '—'}</span></div><dl class="item-dates"><div><dt>Expected date</dt><dd>${dateLabel(r.expectedDate)}</dd></div><div><dt>Due date</dt><dd>${dateLabel(r.dueDate)}${r.status !== 'Completed' && r.dueDate && r.dueDate < today() ? '<small>Overdue</small>' : ''}</dd></div></dl>${r.remarks ? `<p class="item-remarks">${esc(r.remarks)}</p>` : ''}${projectItemFeedbackPanel(r)}${subItemTrackedTime(r.id)}${renderSubItemSummary(r, true)}${projectItemsWorkspace?.children(r) || ''}${mismatch ? '<div class="trace-inline-warning">Company link needs review</div>' : ''}<div class="trace-strip"><button data-action="view-item-links" data-id="${esc(r.id)}"><strong>${trace.feedback.length}</strong><span>phase feedback</span></button><button data-action="view-item-links" data-id="${esc(r.id)}"><strong>${linked}</strong><span>linked actions</span></button></div><div class="item-card-footer"><span>${r.url && /^https?:\/\//i.test(r.url) ? `<a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${esc(r.reference) || 'Open reference'} ↗</a>` : esc(r.reference) || 'No reference'}</span><div class="actions"><button class="small" data-action="manage-subitems" data-id="${esc(r.id)}">Sub-items</button><button class="small" data-action="view-item-links" data-id="${esc(r.id)}">Traceability</button><button class="small" data-action="edit" data-group="specs" data-id="${esc(r.id)}">Edit item</button></div></div></article>`;
           })
           .join('')}</div>`
       : '<div class="governance-empty"><strong>No matching project items</strong><p>Choose another company or status, clear the search, or add a project item.</p></div>'
-  }</section></div></section>`;
+  }${projectItemsWorkspace?.footer() || ''}</section></div></section>`;
 }
 
 function openSubItems(parentId) {
@@ -10358,6 +10364,21 @@ hub = WorkHubStudio.install({
   ticket(id) {
     detail(id);
   },
+});
+projectItemsWorkspace = WorkHubProjectItems.install({
+  state: () => state,
+  ready: () => !CLOUD_MODE || cloud.ready,
+  owner: () => CLOUD_MODE ? cloud.user?.id || '' : 'local',
+  generation: () => cloud.generation,
+  active: () => tab === 'specs' && projectView === 'items',
+  canEdit: () => !access || access.can('specs', 'edit'),
+  statuses: OPTIONS.specStatus,
+  priorities: OPTIONS.specPriority,
+  subStatuses: SUBITEM_STATUSES,
+  today, mutate, render, openModal, closeModal, tell,
+  feedback: projectItemFeedbackPanel,
+  trackedTime: subItemTrackedTime,
+  timerButton: subItemTimerButton,
 });
 access = CLOUD_MODE
   ? WorkHubAccess.install({
