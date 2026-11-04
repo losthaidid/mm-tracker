@@ -193,7 +193,7 @@ Presentation breaks: [presentation-break.js](../presentation-break.js) owns cust
 - `audience-view.js` / `audience.css`: shared 16:9 public scene and preview renderer.
 - `audience.html` / `audience.js`: isolated audience window; no account client or record storage.
 - `rehearsal-engine.js` / `rehearsal.js`: named decision definitions, automatic defaults and interactive playback.
-- `startup.js` and critical `index.html` styles: maintained branding, lightweight loading illustration and actual startup stages.
+- `startup.js` and critical `index.html` styles: maintained branding, lightweight loading illustration, theme-matched drifting geometric patterns around the card, and actual startup stages. The surrounding patterns use two inline SVG layers, respect Smooth/mobile/motion-off preferences, and share the cover's hidden/error/finish lifecycle.
 - `docs/BATCH-D-PRESENTING.md`: usage and verification notes for selections 4, 42, 97 and 209.
 
 - `docs/VALIDATION-GROUPS-REVIEW.md` — SAP column groups, saved value sets and reversible per-run issue review.

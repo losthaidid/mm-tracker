@@ -32,6 +32,16 @@ Startup uses the maintained account workspace name when its matching device reco
 
 Studio theme changes now update the page contents, outer document background and document-level colour tokens in one application. Preview, Save theme, Use combination, theme import and Discard preview all use this same path; none requires a reload. Switching back from custom or dark colours clears the previous palette before resolving the next one. Existing preview-versus-save behaviour is preserved.
 
+### Surrounding loading patterns
+
+The space around the loading card now contains drifting geometric outlines, arcs, dots and fading stars. The two decorative SVG panels sit behind the opaque card, ignore pointer events and are excluded from keyboard navigation and the accessibility tree. Their colours follow the matching account's saved preset/custom palette, including light and dark appearances.
+
+Only transforms and opacity animate. There are no added images, requests, timers, canvas loops, blur effects or minimum loading times. Smooth rendering, the iPhone profile and screens up to 900 px hide secondary geometry and stars; Smooth/iPhone use a slower drift. The early cover restores the matching account's saved Display rendering choice before Studio loads, without writing preferences. Off/reduced-motion disables animation, hidden tabs pause it, real errors stop it, and finishing startup removes the entire surround with the existing cover.
+
+Validation: 41 startup, rendering-profile, animation, theme and branding checks passed. Browser preview checks covered desktop, a 390 × 844 phone-width frame, short-screen scrolling, Smooth, Off, loading-stage changes, hidden/visible transitions, failed loading and successful cover removal. These were isolated previews with synthetic appearance settings; no account records were loaded or changed, and physical-device frame rates were not benchmarked.
+
+![Surrounding loading patterns](images/loading-surround-patterns.jpg)
+
 ## Source and verification
 
 `rehearsal-engine.js` validates decision definitions and builds bounded routes. `rehearsal.js` maintains them and publishes an explicit audience-only snapshot. `presentation-screen.js` handles explicitly selected displays, permission failure, disconnected screens and late owner changes. `presenter.js` owns private controls, the audience connection, breaks and temporary annotations. `audience-view.js` / `audience.css` render the same scene in both windows; `audience.html` / `audience.js` are the isolated audience page. Startup remains in critical `index.html` styles and `startup.js`.
