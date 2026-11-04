@@ -328,6 +328,7 @@
     <link rel="stylesheet" href="./theme-surfaces.css?v=20261027-live-theme-1" />
     <link rel="stylesheet" href="./process-workspace.css?v=20261027-keyboard-1" />
     <link rel="stylesheet" href="./work-schedule.css?v=20261027-schedule-review-1" />
+    <link rel="stylesheet" href="./storage.css?v=20261104-storage-1" />
     <link rel="stylesheet" href="./custom.css?v=20261019-source-1" />
   </head>
   <body>
@@ -740,6 +741,7 @@
             ><button type="button" data-action="edit-lists">Built-in lists</button
             ><button type="button" data-action="tab-visibility">Screen visibility</button
             ><button id="workhubUserManagement" type="button" hidden>User management</button
+            ><button id="storageManagerButton" type="button" hidden>Storage &amp; cleanup</button
             ><button id="backupButton">Backup</button><button id="restoreButton">Restore</button
             ><button type="button" class="danger" id="workspaceResetButton">
               Back up &amp; clear all records</button
@@ -956,7 +958,7 @@
     <script src="./claims.js?v=20261027-schedule-review-1"></script>
     <script src="./recipients-engine.js?v=20261019-source-1"></script>
     <script src="./recipients.js?v=20261019-source-1"></script>
-    <script src="./settings-panel.js?v=20261029-users-1"></script>
+    <script src="./settings-panel.js?v=20261104-storage-1"></script>
     <script src="./built-in-lists.js?v=20261025-canvas-4"></script>
     <script src="./dramatic-motion.js?v=20261104-smooth-motion-1"></script>
     <script src="./my-day-engine.js?v=20261024-terrarium-1"></script>
@@ -969,6 +971,8 @@
     <script src="./my-day.js?v=20261024-performance-1"></script>
     <script src="./brand-motion.js?v=20261026-workspace-6"></script>
     <script src="./workspace-reset.js?v=20261026-workspace-6"></script>
+    <script src="./storage-engine.js?v=20261104-storage-1"></script>
+    <script src="./storage-manager.js?v=20261104-storage-1"></script>
     <script src="./schedule-engine.js?v=20261027-schedule-review-1"></script>
     <script src="./work-schedule.js?v=20261027-day-execution-1"></script>
     <script src="./access-catalog.js?v=20261029-profiles-1"></script>
@@ -1169,6 +1173,6 @@
       }
     </script>
     <!-- Start the application after all feature modules and the empty seed defaults are ready. -->
-    <script src="./app.js?v=20261029-users-1"></script>
+    <script src="./app.js?v=20261104-storage-1"></script>
   </body>
 </html>
