@@ -86,6 +86,7 @@
     for (const property of appearanceProperties) page.style.removeProperty(property);
     delete page.dataset.startupTheme;
     delete page.dataset.startupBackground;
+    delete page.dataset.startupRendering;
   }
   function appearance(preferences) {
     if (finished) return;
@@ -134,6 +135,8 @@
       border: mix(colors.surface, ink, 0.24),
       grid: ink + '08',
       pattern: accent + '12',
+      'surround-accent': mix(colors.page, colors.accent, 0.52),
+      'surround-secondary': mix(colors.page, colors.secondary, 0.6),
       shadow: dark ? '#00000044' : '#17232f18',
       'accent-color': accent,
       secondary,
@@ -171,6 +174,10 @@
       Array.isArray(themeConfig.backgrounds) && themeConfig.backgrounds.includes(p.background)
         ? p.background
         : 'grid';
+    // The cover is painted before Studio restores the full renderer's preference.
+    page.dataset.startupRendering = ['auto', 'smooth', 'full'].includes(p.displayMode)
+      ? p.displayMode
+      : 'auto';
   }
 
   // Reuse only the matching account's existing recovery copy for its display name.

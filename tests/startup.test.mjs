@@ -100,14 +100,17 @@ test('startup cover hides original markup before external JavaScript or styles a
 
 test('startup cover fades and is removed after readiness without delaying the workspace', t => {
   const { window, document, timers } = startup(t);
+  const surround = document.querySelector('.startup-surround'), panel = surround.querySelector('.startup-surround-panel');
   window.WorkHubStartup.finish();
   assert.equal(document.documentElement.hasAttribute('data-workhub-startup'), false);
   assert.notEqual(window.getComputedStyle(document.querySelector('body > header')).visibility, 'hidden');
   assert.equal(document.getElementById('workhubStartup').getAttribute('aria-hidden'), 'true');
   assert.equal(window.getComputedStyle(document.getElementById('workhubStartup')).opacity, '0');
+  assert.equal(window.getComputedStyle(panel).animation, 'none');
   assert.equal([...timers.values()].some(timer => timer.delay === 12000), false);
   [...timers.values()].find(timer => timer.delay === 220).callback();
   assert.equal(document.getElementById('workhubStartup'), null);
+  assert.equal(surround.isConnected, false);
   window.dispatchEvent(new window.ErrorEvent('error', { message: 'An unrelated later error' }));
   assert.equal(document.documentElement.hasAttribute('data-workhub-startup'), false);
 });
@@ -153,11 +156,16 @@ test('startup resumes the same animation after tab visibility and page restorati
   Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
   window.eval(source);
   const scene = document.querySelector('.startup-scene'), animation = window.getComputedStyle(scene).animation;
+  const panel = document.querySelector('.startup-surround-panel'), surroundAnimation = window.getComputedStyle(panel).animation;
+  assert.match(surroundAnimation, /startup-surround-drift/);
   assert.equal(page.hasAttribute('data-startup-hidden'), true);
   assert.equal(window.getComputedStyle(scene).animationPlayState, 'paused');
+  assert.equal(window.getComputedStyle(panel).animationPlayState, 'paused');
   hidden = false; window.dispatchEvent(new window.Event('pageshow'));
   assert.equal(page.hasAttribute('data-startup-hidden'), false);
   assert.notEqual(window.getComputedStyle(scene).animationPlayState, 'paused');
+  assert.notEqual(window.getComputedStyle(panel).animationPlayState, 'paused');
+  assert.equal(window.getComputedStyle(panel).animation, surroundAnimation);
   assert.equal(window.getComputedStyle(scene).animation, animation);
   hidden = true; document.dispatchEvent(new window.Event('visibilitychange'));
   assert.equal(page.hasAttribute('data-startup-hidden'), true);
@@ -179,6 +187,7 @@ test('failed startup files or runtime errors keep recovery visible without revea
     assert.match(document.getElementById('workhubStartupStatus').textContent, /could not finish opening/);
     assert.equal(window.getComputedStyle(document.querySelector('body > header')).visibility, 'hidden');
     assert.ok(document.getElementById('workhubStartupReload'));
+    assert.equal(window.getComputedStyle(document.querySelector('.startup-surround-panel')).animation, 'none');
   }
 });
 
@@ -271,5 +280,36 @@ test('startup theme changes preserve the live animation markup and clear only lo
  window.WorkHubStartup.phase('records','Opening records…');assert.equal(root.dataset.startupTheme,'rose');assert.equal(root.style.getPropertyValue('--startup-page'),'#fcf1f5');
  window.WorkHubStartup.finish();assert.equal(root.hasAttribute('data-workhub-startup'),false);assert.equal(document.getElementById('workhubStartup').classList.contains('is-leaving'),true);
  [...timers.values()].find(timer=>timer.delay===220).callback();assert.equal(root.hasAttribute('data-startup-theme'),false);assert.equal(root.style.getPropertyValue('--startup-page'),'');assert.equal(root.style.getPropertyValue('--hub-accent'),'#abcdef');
+ assert.equal(root.hasAttribute('data-startup-rendering'),false);assert.equal(root.style.getPropertyValue('--startup-surround-accent'),'');
  window.WorkHubStartup.appearance({theme:'forest'});assert.equal(root.hasAttribute('data-startup-theme'),false);
+});
+
+test('startup surround is decorative and needs no additional requests, focus stops or running timers', t => {
+  const { window, document, timers } = startup(t), surround = document.querySelector('.startup-surround');
+  assert.equal(surround.getAttribute('aria-hidden'), 'true');
+  assert.equal(surround.hasAttribute('inert'), true);
+  assert.equal(window.getComputedStyle(surround).pointerEvents, 'none');
+  assert.equal(surround.querySelectorAll('a,button,input,[tabindex],image,use,filter,script,canvas').length, 0);
+  assert.ok(surround.querySelectorAll('svg').length <= 2);
+  assert.deepEqual([...timers.values()].map(timer => timer.delay), [12000]);
+  const panel = surround.querySelector('.startup-surround-panel');
+  window.WorkHubStartup.phase('records', 'Opening your records…');
+  assert.equal(surround.querySelector('.startup-surround-panel'), panel);
+});
+
+test('startup restores only the matching account rendering choice before Studio loads without rewriting it', t => {
+  const { window, document } = startup(t), root = document.documentElement;
+  window.localStorage.setItem(cacheKey('other'), storedAppearance({ displayMode: 'full' }));
+  for (const mode of ['smooth', 'full', 'auto', 'invalid', null]) {
+    const value = storedAppearance({ theme: 'ocean', displayMode: mode });
+    window.localStorage.setItem(cacheKey('owner'), value);
+    window.WorkHubStartup.account(project, 'owner');
+    assert.equal(root.dataset.startupRendering, ['smooth', 'full', 'auto'].includes(mode) ? mode : 'auto');
+    assert.equal(window.localStorage.getItem(cacheKey('owner')), value);
+  }
+  window.WorkHubStartup.appearance({ theme: 'forest', displayMode: 'smooth' });
+  const forestInk = root.style.getPropertyValue('--startup-surround-accent');
+  window.WorkHubStartup.account(project, 'unknown');
+  assert.equal(root.dataset.startupRendering, 'auto');
+  assert.notEqual(root.style.getPropertyValue('--startup-surround-accent'), forestInk);
 });

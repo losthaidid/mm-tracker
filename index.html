@@ -32,8 +32,18 @@
         opacity: 1; transition: opacity 180ms ease;
       }
       #workhubStartup.is-leaving { opacity: 0; pointer-events: none; }
+      /* Two bounded SVG layers frame the cover; only transforms and opacity animate. */
+      #workhubStartup .startup-surround { position: fixed; inset: 0; z-index: 0; overflow: hidden; contain: strict; pointer-events: none; user-select: none; }
+      #workhubStartup .startup-surround-panel { position: absolute; top: 50%; width: clamp(280px, 30vw, 520px); height: min(90vh, 820px); margin-top: max(-45vh, -410px); color: var(--startup-surround-accent, #4f8484); animation: startup-surround-drift 24s ease-in-out infinite; }
+      #workhubStartup .startup-surround-panel.left { left: 1.5vw; }
+      #workhubStartup .startup-surround-panel.right { right: 1.5vw; color: var(--startup-surround-secondary, #85788f); animation-duration: 29s; animation-delay: -11s; animation-direction: reverse; }
+      #workhubStartup .startup-surround-panel svg { display: block; width: 100%; height: 100%; overflow: visible; }
+      #workhubStartup .startup-surround-thread { opacity: .38; }
+      #workhubStartup .startup-surround-detail { opacity: .48; }
+      #workhubStartup .startup-surround-sparks { transform-box: fill-box; transform-origin: center; animation: startup-surround-spark 7s ease-in-out infinite; }
+      #workhubStartup .right .startup-surround-sparks { animation-delay: -3s; animation-duration: 9s; }
       #workhubStartup .startup-card {
-        position: relative; box-sizing: border-box; isolation: isolate; width: min(100%, 650px);
+        position: relative; z-index: 1; box-sizing: border-box; isolation: isolate; width: min(100%, 650px);
         margin: auto; padding: 24px 38px 22px; border: 1px solid var(--startup-border, #638b9b55); border-radius: var(--startup-radius, 30px);
         background: linear-gradient(155deg, var(--startup-surface, #173546e8), var(--startup-surface-soft, #0c202fe8) 60%, var(--startup-surface-alt, #17283be8));
         box-shadow: 0 25px 80px var(--startup-shadow, #0004), inset 0 1px var(--startup-grid, #d9f9ff12);
@@ -133,7 +143,18 @@
       @keyframes startup-progress { 0% { transform: translateX(-100%); } 100% { transform: translateX(460%); } }
       @keyframes startup-tap-wave { 0% { opacity: .7; transform: scale(.7); } 100% { opacity: 0; transform: scale(2.2); } }
       @keyframes startup-tap { 0% { transform: scale(1) rotate(0); } 35% { transform: scale(1.16) rotate(18deg); } 100% { transform: scale(1) rotate(0); } }
+      @keyframes startup-surround-drift { 0%,100% { transform: translate3d(0, 10px, 0) rotate(-2deg); } 50% { transform: translate3d(12px, -14px, 0) rotate(2deg); } }
+      @keyframes startup-surround-spark { 0%,100% { opacity: .35; transform: translateY(3px) scale(.98); } 50% { opacity: .95; transform: translateY(-5px) scale(1.02); } }
+      @media (max-width: 900px) {
+        #workhubStartup .startup-surround-panel { width: 300px; }
+        #workhubStartup .startup-surround-panel.left { left: -120px; }
+        #workhubStartup .startup-surround-panel.right { right: -120px; }
+        #workhubStartup .startup-surround-detail, #workhubStartup .startup-surround-sparks { display: none; }
+      }
       @media (max-width: 520px) {
+        #workhubStartup .startup-surround-panel { width: 260px; }
+        #workhubStartup .startup-surround-panel.left { left: -128px; }
+        #workhubStartup .startup-surround-panel.right { right: -128px; }
         #workhubStartup { padding-left: 14px; padding-right: 14px; }
         #workhubStartup .startup-card { padding: 20px 20px 18px; border-radius: var(--startup-radius, 24px); }
         #workhubStartup .startup-topline { font-size: 8px; margin-bottom: 22px; }
@@ -146,6 +167,8 @@
       html[data-render-profile='iphone'] #workhubStartup .startup-orbit.third { animation: none; }
       html[data-render-profile='iphone'] #workhubStartup .startup-task.third { display: none; }
       html[data-render-profile='iphone'] #workhubStartup .startup-spark:nth-child(n+7) { display: none; }
+      html:is([data-startup-rendering='smooth'],[data-effect-level='smooth'],[data-render-profile='iphone']) #workhubStartup :is(.startup-surround-detail,.startup-surround-sparks) { display: none; }
+      html:is([data-startup-rendering='smooth'],[data-effect-level='smooth'],[data-render-profile='iphone']) #workhubStartup .startup-surround-panel { animation-duration: 36s; }
       html[data-startup-hidden] #workhubStartup * { animation-play-state: paused !important; }
       html[data-startup-hidden] #workhubStartup *::before, html[data-startup-hidden] #workhubStartup *::after { animation-play-state: paused !important; }
       html[data-workhub-startup-state='error'] #workhubStartup *, html[data-startup-motion='off'] #workhubStartup *, #workhubStartup.is-leaving * { animation: none !important; }
@@ -249,7 +272,7 @@
         ]
       }
     </script>
-    <script src="./startup.js?v=20261027-continuous-motion-1"></script>
+    <script src="./startup.js?v=20261104-surround-patterns-1"></script>
     <script src="./render-profile.js?v=20261104-smooth-motion-1"></script>
     <!-- Shared foundation first; feature styles follow; custom.css is your editing space. -->
     <link rel="stylesheet" href="./base.css?v=20261021-schedule-items-letter-1" />
@@ -309,6 +332,54 @@
   </head>
   <body>
     <div id="workhubStartup">
+      <div class="startup-surround" aria-hidden="true" inert>
+        <div class="startup-surround-panel left">
+          <svg viewBox="0 0 440 760" fill="none" focusable="false">
+            <g class="startup-surround-thread" stroke="currentColor" stroke-width="1">
+              <path d="M-80 400a240 240 0 1 1 480 0M-40 400a200 200 0 1 1 400 0M0 400a160 160 0 1 1 320 0" />
+              <path d="m40 125 110 65 110-65 110 65v130l-110 65-110-65-110 65V125Zm0 130 110-65 110 65 110-65M150 190v130m110-195v130m0 0v130" />
+              <path d="m-30 535 130-75 130 75v150l-130 75-130-75V535Zm0 0 130 75 130-75M100 610v150" />
+              <path d="M65 90h100m-50-50v100M300 510v100h90m-90-50h50" stroke-dasharray="2 8" />
+            </g>
+            <g class="startup-surround-detail" stroke="currentColor" stroke-width="1.2">
+              <path d="m315 55 30 18v34l-30 18-30-18V73Z" />
+              <rect x="72" y="354" width="38" height="38" rx="9" transform="rotate(-14 91 373)" />
+              <path d="m292 636 24-24 24 24-24 24Z" />
+              <circle cx="160" cy="400" r="115" stroke-dasharray="2 12" />
+              <path d="M40 255h48m-24-24v48m268 155h32m-16-16v32" />
+            </g>
+            <g class="startup-surround-sparks" fill="currentColor">
+              <circle cx="40" cy="125" r="3" /><circle cx="260" cy="255" r="3" />
+              <circle cx="100" cy="610" r="3.5" /><circle cx="348" cy="400" r="2.5" />
+              <circle cx="150" cy="90" r="2" /><circle cx="350" cy="560" r="2" />
+              <path d="m194 440 3 9 9 3-9 3-3 9-3-9-9-3 9-3Zm60-367 2 6 6 2-6 2-2 6-2-6-6-2 6-2Z" />
+            </g>
+          </svg>
+        </div>
+        <div class="startup-surround-panel right">
+          <svg viewBox="0 0 440 760" fill="none" focusable="false">
+            <g class="startup-surround-thread" stroke="currentColor" stroke-width="1">
+              <path d="M30 320a220 220 0 1 1 440 0M70 320a180 180 0 1 1 360 0M110 320a140 140 0 1 1 280 0" />
+              <path d="m155 280 110 65 110-65 110 65v130l-110 65-110-65-110 65V280Zm0 130 110-65 110 65 110-65M265 345v130m110-195v130m0 0v130" />
+              <path d="m-30 585 100-58 100 58v116l-100 58-100-58V585Zm0 0 100 58 100-58M70 643v116" />
+              <path d="M85 95v85H5m310 385v95h95" stroke-dasharray="2 8" />
+            </g>
+            <g class="startup-surround-detail" stroke="currentColor" stroke-width="1.2">
+              <path d="m100 225 26-15 26 15v30l-26 15-26-15Z" />
+              <rect x="274" y="98" width="42" height="42" rx="10" transform="rotate(14 295 119)" />
+              <path d="m266 664 20-20 20 20-20 20Z" />
+              <circle cx="250" cy="320" r="92" stroke-dasharray="2 12" />
+              <path d="M195 563h44m-22-22v44M342 202h28m-14-14v28" />
+            </g>
+            <g class="startup-surround-sparks" fill="currentColor">
+              <circle cx="155" cy="280" r="3" /><circle cx="375" cy="410" r="3" />
+              <circle cx="70" cy="643" r="3.5" /><circle cx="410" cy="660" r="2" />
+              <circle cx="85" cy="95" r="2.5" /><circle cx="250" cy="100" r="2" />
+              <path d="m118 383 3 9 9 3-9 3-3 9-3-9-9-3 9-3Zm106-226 2 6 6 2-6 2-2 6-2-6-6-2 6-2Z" />
+            </g>
+          </svg>
+        </div>
+      </div>
       <section class="startup-card" aria-labelledby="workhubStartupTitle">
         <div class="startup-topline" aria-hidden="true">
           <span class="startup-live">A little space for your day</span
