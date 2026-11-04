@@ -313,9 +313,64 @@
       )
         throw Error('Check project item status dates and history.');
   }
+  /** Completion is an edit-time action; loading old records never rewrites their statuses. */
+  function completeProjectItems(next, previous, today) {
+    const oldItems = new Map((previous?.specs || []).map(item => [item.id, item])),
+      at = new Date().toISOString();
+    for (const item of next.specs || []) {
+      const before = oldItems.get(item.id),
+        requested = item._completeSubItems === true,
+        subs = item.subItems || [];
+      delete item._completeSubItems;
+      if (!subs.length) continue;
+      if (
+        item.status === 'Completed' &&
+        (requested || !before || before.status !== 'Completed')
+      ) {
+        const date = item._statusDateExplicit
+          ? item.statusDate || today
+          : item.statusDate && item.statusDate !== before?.statusDate
+            ? item.statusDate
+            : today;
+        // Parent editors can share child references with the previous document.
+        // Clone before cascading so a rejected save cannot alter current records.
+        item.subItems = subs.map(sub => {
+          const copy = JSON.parse(JSON.stringify(sub));
+          if (copy.status !== 'Completed') {
+            copy.status = 'Completed';
+            copy.updatedAt = at;
+            copy.statusDate = date;
+            copy._statusDateExplicit = true;
+          }
+          return copy;
+        });
+        continue;
+      }
+      const oldSubs = new Map((before?.subItems || []).map(sub => [sub.id, sub])),
+        childrenChanged =
+          !before ||
+          subs.length !== oldSubs.size ||
+          subs.some(sub => oldSubs.get(sub.id)?.status !== sub.status),
+        manualParentChange = before && item.status !== before.status;
+      if (
+        !manualParentChange &&
+        childrenChanged &&
+        subs.every(sub => sub.status === 'Completed') &&
+        item.status !== 'Completed'
+      ) {
+        item.status = 'Completed';
+        item.statusDate = today;
+        item._statusDateExplicit = true;
+      }
+    }
+  }
   function prepare(next, previous, today, restoring = false) {
     upgrade(next);
-    if (restoring) return;
+    if (restoring) {
+      for (const item of next.specs || []) delete item._completeSubItems;
+      return;
+    }
+    completeProjectItems(next, previous, today);
     const old = new Map(rows(previous || {}).map(r => [r.id, r]));
     for (const r of rows(next)) {
       const before = old.get(r.id),

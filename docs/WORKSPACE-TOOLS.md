@@ -1,5 +1,13 @@
 # Work sessions, account reset and interactive workspace
 
+## Project item completion
+
+In **Projects → Project items**, completing the last unfinished sub-item automatically sets its main item to **Completed**. Choosing **Completed** on the main item, through **Edit item** or its status badge, also completes every unfinished sub-item. Both directions use one saved change, so the progress totals and reports update together.
+
+Items without sub-items remain manually controlled. Existing notes, feedback, owners, dates, IDs and links are retained. Changed statuses receive the normal status dates and history; already completed children retain their completion dates. A main item's chosen completion date is also used for the children completed by that action. Automatically completing a main item from its children records today's date.
+
+Opening records or restoring a backup does not rewrite old status combinations. Manually reopening an item preserves its children's work; reopening a child does not automatically change the main item's status. The existing permission and conflict checks apply before a change can be saved.
+
 ## Task companies and website references
 
 In **Tasks → Add task / Edit main task**, choose **Task type → Project**, then a **Linked project**. The optional **Company** dropdown contains active companies maintained for that linked project, even when another project is active in navigation. Leave it blank for project-wide work. Changing project or switching to Ticket/Custom clears the company selection. Existing inactive assignments remain visible and may be retained when editing; they cannot be assigned to a different task.
