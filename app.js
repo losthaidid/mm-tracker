@@ -3742,7 +3742,7 @@ function editRecord(group, id) {
     projectId = old?.projectId || state.activeProjectId;
   openModal(
     (old ? 'Edit ' : 'Add ') + { tickets: 'ticket', tasks: 'task', specs: 'project item' }[group],
-    `<form id="editForm" data-group="${group}" data-id="${esc(id || '')}"><div class="form-grid">${group === 'specs' ? projectField(projectId) + projectCompanyField(projectId, r.companyId || '') : ''}${FIELDS[group].map(([k, l, t, required]) => field(k, l, t, required, r[k] ?? '', group)).join('')}${group === 'tasks' ? taskLinkFields(r) + taskReferenceFields(r) : ''}</div>${group === 'tickets' ? '<p class="hint">Changing History tracker automatically updates the history date and time when you save.</p>' : ''}<div class="modal-actions"><div>${old ? `<button type="button" class="danger" data-action="delete" data-group="${group}" data-id="${esc(id)}">Delete ${group === 'tickets' ? 'ticket' : 'record'}</button>` : ''}</div><div class="actions"><button type="button" data-action="cancel">Cancel</button><button class="primary" type="submit">Save ${group === 'tickets' ? 'ticket' : 'record'}</button></div></div></form>`
+    `<form id="editForm" data-group="${group}" data-id="${esc(id || '')}"><div class="form-grid">${group === 'specs' ? projectField(projectId) + projectCompanyField(projectId, r.companyId || '') : ''}${FIELDS[group].map(([k, l, t, required]) => field(k, l, t, required, r[k] ?? '', group)).join('')}${group === 'tasks' ? taskLinkFields(r) + taskReferenceFields(r) : ''}</div>${group === 'tickets' ? '<p class="hint">Changing History tracker automatically updates the history date and time when you save.</p>' : group === 'specs' ? '<p class="hint">Completing this item completes its sub-items. Completing every sub-item automatically completes this item.</p>' : ''}<div class="modal-actions"><div>${old ? `<button type="button" class="danger" data-action="delete" data-group="${group}" data-id="${esc(id)}">Delete ${group === 'tickets' ? 'ticket' : 'record'}</button>` : ''}</div><div class="actions"><button type="button" data-action="cancel">Cancel</button><button class="primary" type="submit">Save ${group === 'tickets' ? 'ticket' : 'record'}</button></div></div></form>`
   );
 }
 
@@ -3816,7 +3816,8 @@ function saveEdit(form) {
     r.itemType = r.itemType.trim();
     r.itemId = r.itemId.trim();
     r.ricefw = r.itemId;
-    r.subItems = old?.subItems || [];
+    r.subItems = clone(old?.subItems || []);
+    r._completeSubItems = r.status === 'Completed';
     if (!state.lists.projectItemTypes.includes(r.itemType))
       throw Error('Choose a project item type from the built-in list.');
     if (

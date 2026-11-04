@@ -220,7 +220,9 @@ test('Solution Studio: stale edits, replaced forms, privacy and account changes 
 
 function standupFixture(api,document){
  api.editRecord('specs');let f=document.getElementById('editForm');f.elements.namedItem('description').value='PO configuration';f.elements.namedItem('status').value='In Progress';f.elements.namedItem('remarks').value='Core setup ready';api.saveEdit(f);const item=api.state().specs.at(-1);
- for(const [title,status,remarks]of [['Standard PO','Completed','Tested successfully'],['Subcontracting','Blocked','Awaiting business reply']]){api.editSubItem(item.id);f=document.getElementById('subItemForm');f.elements.namedItem('title').value=title;f.elements.namedItem('status').value=status;f.elements.namedItem('remarks').value=remarks;api.saveSubItem(f);}
+ for(const [title,status,remarks]of [['Standard PO','Completed','Tested successfully'],['Subcontracting','Blocked','Awaiting business reply']]){api.editSubItem(item.id);f=document.getElementById('subItemForm');f.elements.namedItem('title').value=title;f.elements.namedItem('status').value=status==='Completed'?'In Progress':status;f.elements.namedItem('remarks').value=remarks;api.saveSubItem(f);}
+ // Finish the first child after both exist, keeping this report fixture partially complete.
+ api.hub.workbench.changeStatus('specSub',api.state().specs.find(r=>r.id===item.id).subItems[0].id,item.id,'Completed');
  api.closeModal();return api.state().specs.find(r=>r.id===item.id);
 }
 
@@ -3497,3 +3499,22 @@ test('User access: server projections remain valid across every restricted secti
  test('Storage settings: overview opens from Backups & sync, reads metrics only and closes on account change',async t=>{
  const {api,document,db}=await app(t),before=api.payload(api.state());api.hub.chromeUX.open();document.querySelector('[data-settings-group="data"]').click();document.getElementById('storageManagerButton').click();await settle();const room=document.getElementById('workhubStorage');assert.equal(room.open,true);assert.match(room.textContent,/1.2 KiB/);assert.equal(db.calls.length,0);assert.deepEqual(JSON.parse(api.payload(api.state())).data,JSON.parse(before).data);api.cloud.user={id:'another-owner'};api.notice();assert.equal(room.open,false);
  });
+
+test('Project completion rules: child editor and quick controls complete the parent in the same cloud save and survive reopening',async t=>{
+ const ctx=await app(t),{api,document,db}=ctx,{itemId,subItemId}=await addProjectDeliverable(ctx),get=()=>api.state().specs.find(x=>x.id===itemId);
+ api.editSubItem(itemId);let f=document.getElementById('subItemForm');fill(f,{title:'Confirm handover',status:'Blocked',remarks:'Keep other notes',feedback:'001 / 6.00007'});api.saveSubItem(f);await settle();const sibling=get().subItems.find(s=>s.id!==subItemId).id;
+ api.editSubItem(itemId,subItemId);f=document.getElementById('subItemForm');f.elements.status.value='Completed';api.saveSubItem(f);await settle();assert.notEqual(get().status,'Completed');const before=copy(get()),calls=db.calls.length;
+ api.workhubChange({dataset:{subitemStatus:itemId,subitemId:sibling},value:'Completed'});await settle();assert.equal(get().status,'Completed');assert.equal(get().statusHistory.at(-1).status,'Completed');assert.equal(get().subItems.find(s=>s.id===sibling).feedback,'001 / 6.00007');assert.equal(get().description,before.description);assert.equal(db.calls.length,calls+1);assert.equal(db.row.document.data.specs.find(x=>x.id===itemId).status,'Completed');
+ const restored=api.parseBackup(api.payload(api.state()));assert.equal(restored.specs.find(x=>x.id===itemId).status,'Completed');const reopened=await app(t,{remote:copy(db.row),login:false});await reopened.api.loadCloud(sessionUser);await settle();assert.ok(reopened.api.state().specs.find(x=>x.id===itemId).subItems.every(s=>s.status==='Completed'));
+});
+
+test('Project completion rules: parent editor and status badge cascade atomically without changing another item or child details',async t=>{
+ const ctx=await app(t),{api,document,db}=ctx,{itemId}=await addProjectDeliverable(ctx),other=await addProjectDeliverable(ctx,'MM-99');const get=()=>api.state().specs.find(x=>x.id===itemId),untouched=copy(api.state().specs.find(x=>x.id===other.itemId));
+ api.editSubItem(itemId);let f=document.getElementById('subItemForm');fill(f,{title:'Keep own feedback',status:'Blocked',feedback:'Approval text',owner:'User',dueDate:'2026-12-01'});api.saveSubItem(f);await settle();const prior=copy(get());api.editRecord('specs',itemId);f=document.getElementById('editForm');f.elements.status.value='Completed';const calls=db.calls.length;api.saveEdit(f);await settle();assert.equal(db.calls.length,calls+1);assert.ok(get().subItems.every(s=>s.status==='Completed'));for(let i=0;i<get().subItems.length;i++)for(const k of ['id','title','remarks','feedback','owner','dueDate','createdAt'])assert.equal(get().subItems[i][k],prior.subItems[i][k]);assert.deepEqual(copy(api.state().specs.find(x=>x.id===other.itemId)),untouched);
+ api.hub.workbench.changeStatus('specs',itemId,'','In Progress');await settle();assert.equal(get().status,'In Progress');api.hub.workbench.changeStatus('specSub',get().subItems[0].id,itemId,'Blocked');await settle();api.hub.workbench.changeStatus('specs',itemId,'','Completed');await settle();assert.ok(get().subItems.every(s=>s.status==='Completed'));
+});
+
+test('Project completion rules: stale or denied saves do not mutate current children through shared editor references',async t=>{
+ const ctx=await app(t),{api,document,db}=ctx,{itemId}=await addProjectDeliverable(ctx),before=copy(api.state().specs);api.editRecord('specs',itemId);const f=document.getElementById('editForm');f.elements.status.value='Completed';api.cloud.conflict=true;const calls=db.calls.length;assert.throws(()=>api.saveEdit(f),/reload cloud records/);assert.deepEqual(copy(api.state().specs),before);assert.equal(db.calls.length,calls);api.cloud.conflict=false;
+ const p=api.access.snapshot();p.role='member';p.permissions=ctx.window.WorkHubAccessCatalog.preset();p.permissions.specs.edit=false;db.access=p;await api.access.load(api.cloud.user);assert.throws(()=>api.saveEdit(f),/permissions/);assert.deepEqual(copy(api.state().specs),before);assert.equal(db.calls.length,calls);
+});

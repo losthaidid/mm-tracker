@@ -213,8 +213,11 @@
       if (!statuses(kind).some(([v]) => v === value)) throw Error('Choose a valid status.');
       if (date && ['specs', 'specSub'].includes(kind) && !root.WorkHubReminders.validDate(date))
         throw Error('Choose a valid status date.');
+      const finishChildren =
+        kind === 'specs' && value === 'Completed' &&
+        found.record.subItems?.some(sub => sub.status !== 'Completed');
       if (
-        (!date && found.record.status === value) ||
+        (!date && found.record.status === value && !finishChildren) ||
         (kind === 'tasks' && (found.record.done ? 'done' : found.record.boardStatus) === value)
       )
         return true;
@@ -238,6 +241,7 @@
         } else {
           const r = d[kind].find(x => x.id === id);
           r.status = value;
+          if (kind === 'specs' && value === 'Completed') r._completeSubItems = true;
           if (kind === 'specs' && date) {
             r.statusDate = date;
             r._statusDateExplicit = true;
