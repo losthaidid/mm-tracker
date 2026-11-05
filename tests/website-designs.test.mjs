@@ -44,9 +44,9 @@ test('Website designs: mobile regrouping moves real buttons once and retains all
 test('Website designs: group menu supports Escape and navigation without creating duplicate routes or record writes',t=>{
   const x=fixture(t);x.saved('clear-desk');const menu=x.d.getElementById('wdSectionMenu');menu.open=true;menu.querySelector('button').dispatchEvent(new x.w.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));assert.equal(menu.open,false);assert.equal(x.d.activeElement,menu.querySelector('summary'));menu.open=true;menu.querySelector('button').click();assert.equal(menu.open,false);assert.equal(new Set([...x.d.querySelectorAll('#tabs button')].map(n=>n.dataset.tab)).size,15);assert.equal(x.writes(),0);
 });
-test('Website designs: all six choices preview and save without replacing content or route controls',t=>{
- const x=fixture(t),nodes=[...x.d.querySelectorAll('#tabs button')],editor=x.d.getElementById('editor');x.ui.open();assert.equal(x.d.querySelectorAll('[name="websiteDesign"]').length,6);x.ui.close();
- for(const design of ['editorial','canvas','compact-pro']){const before=structuredClone(x.state()),writes=x.writes();x.ui.open();x.select(design);assert.equal(x.ui.snapshot().design,design);assert.deepEqual(x.state(),before);assert.equal(x.writes(),writes);assert.ok(nodes.every(n=>n.isConnected));assert.equal(x.d.getElementById('editor'),editor);x.submit();assert.equal(x.ui.snapshot().saved,design);assert.equal(x.writes(),writes+1);}
+test('Website designs: all seven choices preview and save without replacing content or route controls',t=>{
+ const x=fixture(t),nodes=[...x.d.querySelectorAll('#tabs button')],editor=x.d.getElementById('editor');x.ui.open();assert.equal(x.d.querySelectorAll('[name="websiteDesign"]').length,7);x.ui.close();
+ for(const design of ['editorial','canvas','compact-pro','fiori']){const before=structuredClone(x.state()),writes=x.writes();x.ui.open();x.select(design);assert.equal(x.ui.snapshot().design,design);assert.deepEqual(x.state(),before);assert.equal(x.writes(),writes);assert.ok(nodes.every(n=>n.isConnected));assert.equal(x.d.getElementById('editor'),editor);x.submit();assert.equal(x.ui.snapshot().saved,design);assert.equal(x.writes(),writes+1);}
 });
 test('Website designs: Editorial and Compact Pro group visibility follows the original section permissions',t=>{
  const x=fixture(t);for(const design of ['editorial','compact-pro']){x.saved(design);const groups=[...x.d.querySelectorAll('#tabs > .wd-nav-group')];assert.equal(groups.length,3);const group=groups[1];for(const node of group.querySelectorAll('button'))node.hidden=true;x.ui.mount();assert.equal(group.hidden,true);assert.equal(x.d.querySelector('[data-tab="tasks"]').hidden,false);assert.equal(x.writes(),0);for(const node of group.querySelectorAll('button'))node.hidden=false;}
@@ -56,4 +56,11 @@ test('Website designs: collapsing Compact Pro is local, keeps labels and buttons
 });
 test('Website designs: all three new mobile layouts retain every original section in an accessible menu',t=>{
  const x=fixture(t),nodes=[...x.d.querySelectorAll('#tabs button')];x.mobile(true);for(const design of ['editorial','canvas','compact-pro']){x.saved(design);const menu=x.d.getElementById('wdSectionMenu');assert.ok(menu);assert.equal(menu.querySelectorAll('button').length,15);assert.ok(nodes.every(n=>n.isConnected));menu.open=true;menu.querySelector('summary').dispatchEvent(new x.w.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));assert.equal(menu.open,false);assert.equal(x.d.activeElement,menu.querySelector('summary'));}assert.equal(x.writes(),0);
+});
+
+test('Website designs: Fiori uses existing navigation controls and preserves a typed draft on desktop, mobile and cancellation',t=>{
+ const x=fixture(t),nodes=[...x.d.querySelectorAll('#tabs button')],editor=x.d.getElementById('editor'),before=structuredClone(x.state());
+ editor.value='Typed exact 001 / 6.00007';x.ui.open();x.select('fiori');assert.equal(x.ui.snapshot().design,'fiori');assert.equal(x.d.querySelectorAll('#tabs .wd-primary-nav button').length,5);assert.ok(nodes.every(n=>n.isConnected));assert.equal(x.d.getElementById('editor'),editor);
+ x.mobile(true);assert.equal(x.d.querySelectorAll('#wdSectionMenu button').length,15);assert.equal(editor.value,'Typed exact 001 / 6.00007');x.ui.close();assert.equal(x.ui.snapshot().design,'current');assert.deepEqual(x.state(),before);assert.equal(x.writes(),0);
+ x.ui.open();x.select('fiori');x.submit();assert.equal(x.ui.snapshot().saved,'fiori');assert.equal(x.writes(),1);x.signOut();assert.equal(x.ui.snapshot().design,'current');
 });

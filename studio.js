@@ -327,7 +327,8 @@
       wardrobe = null,
       backgrounds = null,
       workSchedule = null,
-      websiteDesigns = null;
+      websiteDesigns = null,
+      taskCompletion = null;
     const reminders = root.WorkHubReminders?.install({
       ...a,
       hubAction: el => handle(el),
@@ -1382,6 +1383,8 @@
         child.status = 'Completed';
         child.updatedAt = now();
       }, 'Sub-task completed.');
+      if (ok && !task.done && a.state().tasks.find(t => t.id === parentId)?.done)
+        a.tell('Sub-task and main task completed. View in Completed tasks.');
       if (ok && detail) taskDetail(parentId);
     }
     function taskDetail(id) {
@@ -2746,20 +2749,7 @@
           if (h.scrapbook.length > 2000) h.scrapbook.shift();
         }
       }
-      const oldTasks = new Map((previous?.tasks || []).map(t => [t.id, t]));
-      for (const t of next.tasks) {
-        if (t.done) {
-          t.boardStatus = 'done';
-          if (!oldTasks.get(t.id)?.done) {
-            const completedAt = now();
-            for (const sub of t.subTasks)
-              if (sub.status !== 'Completed') {
-                sub.status = 'Completed';
-                sub.updatedAt = completedAt;
-              }
-          }
-        } else if (t.boardStatus === 'done') t.boardStatus = 'todo';
-      }
+      root.WorkHubTaskCompletion.prepare(next, previous, today(), now(), restoring);
       root.WorkHubBatchEngine?.prepare(next, previous, restoring);
       root.WorkHubWorkLibraryEngine?.prepare(next, previous, restoring);
     }
@@ -2870,6 +2860,7 @@
       mountChrome();
       chromeUX?.mount();
       websiteDesigns?.mount();
+      taskCompletion?.mount(tab);
       reminders?.decorate(tab);
       projectDates?.decorate();
       batchA?.mount(tab);
@@ -4198,6 +4189,12 @@
       mutate: a.mutate,
       tell: a.tell,
     });
+    taskCompletion = root.WorkHubTaskCompletion.install({
+      ...a,
+      today,
+      canEdit: () =>
+        !root.WorkHubCurrentAccess || root.WorkHubCurrentAccess.can('tasks', 'edit'),
+    });
     moments = root.WorkHubMomoMoments?.install({
       ...a,
       ready: () => a.cloud().ready,
@@ -4326,6 +4323,7 @@
       processDeck,
       chromeUX,
       websiteDesigns,
+      taskCompletion,
       render,
       afterRender,
       prepare,

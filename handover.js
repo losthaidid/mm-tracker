@@ -32,6 +32,9 @@
         from: '',
         to: '',
         summary: '',
+        layout: 'detailed',
+        context: true,
+        time: true,
         notes: true,
         feedback: true,
         nextSteps: true,
@@ -78,6 +81,7 @@
             r.parent?.title,
             r.parent?.identifier,
             r.project,
+            r.company,
             r.owner,
             r.status,
           ]
@@ -104,9 +108,11 @@
             .sort((x, y) => y.createdAt.localeCompare(x.createdAt))
             .slice(0, 5)
         : [];
-      return `<section class="df-room ho-room"><header class="df-hero ho-hero"><div><span class="hub-kicker">A CLEAR NEXT CHAPTER</span><h2>Leave the work in good hands.</h2><p>Choose the records that matter. Add context, review a dated snapshot, and take a Handover pack with you.</p></div><div class="df-hero-symbol" aria-hidden="true">▥<span>✓</span></div></header><div class="ho-workflow"><span class="${!pack ? 'current' : ''}"><b>1</b> Choose work</span><span class="${pack ? 'current' : ''}"><b>2</b> Preview snapshot</span><span><b>3</b> Download or share</span></div><div class="ho-layout"><section class="df-panel"><div class="df-bar"><div><h3>Build your pack</h3><p class="muted">Tasks, tickets, project items and follow-ups. Sub-items keep their parent reference.</p></div><span class="df-badge">${count} selected / 500</span></div><div class="ho-details"><label>Pack title<input data-ho-field="title" value="${esc(options.title)}" maxlength="200"></label><label>From<input data-ho-field="from" value="${esc(options.from)}" maxlength="200" placeholder="Your name / team"></label><label>To<input data-ho-field="to" value="${esc(options.to)}" maxlength="200" placeholder="Next owner / team"></label><label class="ho-wide">Handover note<textarea data-ho-field="summary" maxlength="10000" rows="3" placeholder="What should the next person know first?">${esc(options.summary)}</textarea></label></div><div class="ho-include">${[
-        ['notes', 'Notes'],
-        ['feedback', 'Feedback / latest ticket update'],
+      return `<section class="df-room ho-room"><header class="df-hero ho-hero"><div><span class="hub-kicker">A CLEAR NEXT CHAPTER</span><h2>Leave the work in good hands.</h2><p>Choose the records that matter. Add context, review a dated snapshot, and take a Handover pack with you.</p></div><div class="df-hero-symbol" aria-hidden="true">▥<span>✓</span></div></header><div class="ho-workflow"><span class="${!pack ? 'current' : ''}"><b>1</b> Choose work</span><span class="${pack ? 'current' : ''}"><b>2</b> Preview snapshot</span><span><b>3</b> Download or share</span></div><div class="ho-layout"><section class="df-panel"><div class="df-bar"><div><h3>Build your pack</h3><p class="muted">Tasks, tickets, project items and follow-ups. Each child keeps its own notes, feedback and parent reference.</p></div><span class="df-badge">${count} selected / 500</span></div><div class="ho-details"><label>Pack title<input data-ho-field="title" value="${esc(options.title)}" maxlength="200"></label><label>From<input data-ho-field="from" value="${esc(options.from)}" maxlength="200" placeholder="Your name / team"></label><label>To<input data-ho-field="to" value="${esc(options.to)}" maxlength="200" placeholder="Next owner / team"></label><label>Pack layout<select data-ho-field="layout"><option value="detailed"${options.layout === 'detailed' ? ' selected' : ''}>Detailed · sections and full context</option><option value="compact"${options.layout === 'compact' ? ' selected' : ''}>Compact · same content, less spacing</option></select></label><label class="ho-wide">Handover note<textarea data-ho-field="summary" maxlength="10000" rows="3" placeholder="What should the next person know first?">${esc(options.summary)}</textarea></label></div><div class="ho-include">${[
+        ['notes', 'Record notes'],
+        ['feedback', 'Full feedback & update history'],
+        ['context', 'Record details, dates & progress'],
+        ['time', 'Saved work sessions'],
         ['nextSteps', 'Next steps & blockers'],
         ['references', 'References'],
       ]
@@ -116,36 +122,97 @@
         )
         .join(
           ''
-        )}</div><div class="df-filters"><label>Search work<input type="search" data-ho-filter="query" value="${esc(query)}" placeholder="Title, number or owner"></label><label>Source<select data-ho-filter="kind"><option value="">All sources</option>${E.kinds
+        )}</div><p class="muted">Saved sessions include their own wrap-up notes. Running timers are excluded. Both layouts retain all included values.</p><div class="df-filters"><label>Search work<input type="search" data-ho-filter="query" value="${esc(query)}" placeholder="Title, number or owner"></label><label>Source<select data-ho-filter="kind"><option value="">All sources</option>${E.kinds
         .filter(k => can(k, 'export'))
         .map(k => `<option value="${k}"${kind === k ? ' selected' : ''}>${E.labels[k]}</option>`)
         .join(
           ''
-        )}</select></label>${projects.length ? `<label>Project<select data-ho-filter="project"><option value="">All projects</option>${projects.map(p => `<option value="${esc(p.id)}"${p.id === project ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>` : ''}<label class="df-check"><input type="checkbox" data-ho-filter="completed"${completed ? ' checked' : ''}>Include completed</label></div><div class="actions ho-select">${button('select-filtered', 'Select all filtered', busy ? 'disabled' : '')}${button('clear', 'Clear selection', busy ? 'disabled' : '')}<small>${rows.length} available · only sources you may export are shown</small></div>${rows.length ? `<div class="ho-records">${visible.map(r => `<label class="ho-record${r.childId ? ' ho-child' : ''}"><input type="checkbox" data-ho-record="${esc(r.key)}" ${selected.has(r.key) ? 'checked' : ''} ${busy ? 'disabled' : ''}><span><small>${E.labels[r.kind]}${r.childId ? ' · Sub-item' : ''}${r.project ? ' / ' + esc(r.project) : ''}</small><strong>${esc([r.identifier, r.title].filter(Boolean).join(' · '))}</strong>${r.parent ? `<small>Under ${esc([r.parent.identifier, r.parent.title].filter(Boolean).join(' · '))}</small>` : ''}<small>${esc([r.status, r.owner, r.due ? 'Due ' + r.due : ''].filter(Boolean).join(' · '))}</small></span></label>`).join('')}</div><div class="df-pagination">${button('prev', 'Previous', page === 0 || busy ? 'disabled' : '')}<span>Page ${page + 1} of ${Math.ceil(rows.length / 50)}</span>${button('next', 'Next', (page + 1) * 50 >= rows.length || busy ? 'disabled' : '')}</div>` : '<div class="df-empty"><h3>No matching unfinished work</h3><p>Try another filter or include completed work.</p></div>'}<div class="modal-actions">${button('preview', 'Preview Handover pack', `class="primary" ${!count || busy || !can('handover', 'export') ? 'disabled' : ''}`)}</div></section><aside class="ho-aside"><section class="df-panel ho-ready"><span class="df-badge">YOUR SNAPSHOT</span><h3>${pack ? 'Ready to pass on.' : 'A useful handover starts with context.'}</h3><p>${pack ? `${pack.records.length} records captured ${esc(new Date(pack.createdAt).toLocaleString())}.` : 'Keep open work, the latest feedback and the next action together in one readable PDF.'}</p><p class="muted">Preview captures a fixed copy. Later edits to live work do not change an exported file. Create a fresh preview for an updated pack.</p>${pack ? `<div class="actions">${fileUrl ? `<a class="ph-download-link" href="${esc(fileUrl)}" download="${esc(E.filename(pack))}" data-ho-file>Download PDF</a>` : button('download', 'Prepare PDF', `class="primary" ${busy ? 'disabled' : ''}`)}${can('files', 'create') && can('files', 'export') ? button('drive', 'Save to Drive & QR', busy ? 'disabled' : '') : ''}</div>` : ''}<p id="hoStatus" role="status" class="${error ? 'df-error' : ''}">${esc(message)}</p></section>${history.length ? `<section class="df-panel"><h3>Recent saved packs</h3><p class="muted">Each file is a separate dated snapshot.</p>${history.map(f => `<div class="ho-history"><strong>${esc(f.name)}</strong><small>${esc(new Date(f.createdAt).toLocaleString())}</small>${can('files', 'export') ? `<button type="button" data-df="file" data-id="${esc(f.id)}">Download / QR</button>` : ''}</div>`).join('')}</section>` : ''}</aside></div>${pack ? previewHTML() : ''}</section>`;
+        )}</select></label>${projects.length ? `<label>Project<select data-ho-filter="project"><option value="">All projects</option>${projects.map(p => `<option value="${esc(p.id)}"${p.id === project ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>` : ''}<label class="df-check"><input type="checkbox" data-ho-filter="completed"${completed ? ' checked' : ''}>Include completed</label></div><div class="actions ho-select">${button('select-filtered', 'Select all filtered', busy ? 'disabled' : '')}${button('clear', 'Clear selection', busy ? 'disabled' : '')}<small>${rows.length} available · only sources you may export are shown</small></div>${rows.length ? `<div class="ho-records">${visible.map(r => `<label class="ho-record${r.childId ? ' ho-child' : ''}"><input type="checkbox" data-ho-record="${esc(r.key)}" ${selected.has(r.key) ? 'checked' : ''} ${busy ? 'disabled' : ''}><span><small>${E.labels[r.kind]}${r.childId ? ' · Sub-item' : ''}${r.project ? ' / ' + esc(r.project) : ''}</small><strong>${esc([r.identifier, r.title].filter(Boolean).join(' · '))}</strong>${r.parent ? `<small>Under ${esc([r.parent.identifier, r.parent.title].filter(Boolean).join(' · '))}</small>` : ''}<small>${esc([r.status, r.owner, r.due ? 'Due ' + r.due : ''].filter(Boolean).join(' · '))}</small></span></label>`).join('')}</div><div class="df-pagination">${button('prev', 'Previous', page === 0 || busy ? 'disabled' : '')}<span>Page ${page + 1} of ${Math.ceil(rows.length / 50)}</span>${button('next', 'Next', (page + 1) * 50 >= rows.length || busy ? 'disabled' : '')}</div>` : '<div class="df-empty"><h3>No matching unfinished work</h3><p>Try another filter or include completed work.</p></div>'}<div class="modal-actions">${button('preview', 'Preview Handover pack', `class="primary" ${!count || busy || !can('handover', 'export') ? 'disabled' : ''}`)}</div></section><aside class="ho-aside"><section class="df-panel ho-ready"><span class="df-badge">YOUR SNAPSHOT</span><h3>${pack ? 'Ready to pass on.' : 'A useful handover starts with context.'}</h3><p>${pack ? `${pack.records.length} records captured ${esc(new Date(pack.createdAt).toLocaleString())}.` : 'Keep full updates, owners, progress, blockers and next actions together in one readable PDF.'}</p><p class="muted">Preview captures a fixed copy. Later edits to live work do not change an exported file. Create a fresh preview for an updated pack.</p>${pack ? `<div class="actions">${fileUrl ? `<a class="ph-download-link" href="${esc(fileUrl)}" download="${esc(E.filename(pack))}" data-ho-file>Download PDF</a>` : button('download', 'Prepare PDF', `class="primary" ${busy ? 'disabled' : ''}`)}${can('files', 'create') && can('files', 'export') ? button('drive', 'Save to Drive & QR', busy ? 'disabled' : '') : ''}</div>` : ''}<p id="hoStatus" role="status" class="${error ? 'df-error' : ''}">${esc(message)}</p></section>${history.length ? `<section class="df-panel"><h3>Recent saved packs</h3><p class="muted">Each file is a separate dated snapshot.</p>${history.map(f => `<div class="ho-history"><strong>${esc(f.name)}</strong><small>${esc(new Date(f.createdAt).toLocaleString())}</small>${can('files', 'export') ? `<button type="button" data-df="file" data-id="${esc(f.id)}">Download / QR</button>` : ''}</div>`).join('')}</section>` : ''}</aside></div>${pack ? previewHTML() : ''}</section>`;
+    }
+    function recordName(r) {
+      return [r.identifier, r.title].filter(Boolean).join(' · ');
+    }
+    function attentionHTML(info) {
+      if (!info.attention.length)
+        return '<p class="ho-no-attention">No overdue, blocked or high-priority records in this selection.</p>';
+      return '<div class="ho-attention-list">' + info.attention.map(item =>
+        '<article><div><strong>' + esc(recordName(item.record)) +
+        '</strong>' + (item.record.parent ? '<small>Under ' +
+          esc([item.record.parent.identifier, item.record.parent.title].filter(Boolean).join(' · ')) +
+          '</small>' : '') + '<small>' +
+        esc([item.record.owner, item.record.project].filter(Boolean).join(' · ')) +
+        '</small></div><p>' + esc(item.reasons.join(' · ')) + '</p></article>'
+      ).join('') + '</div>';
     }
     function previewHTML() {
-      previewPage = Math.min(previewPage, Math.max(0, Math.ceil(pack.records.length / 25) - 1));
-      return `<section class="df-panel ho-preview" id="hoPreview"><div class="df-bar"><div><span class="hub-kicker">DATED PREVIEW</span><h3>${esc(pack.title)}</h3><p>${esc([pack.from && 'From ' + pack.from, pack.to && 'To ' + pack.to].filter(Boolean).join(' → '))}</p></div><span class="df-badge">${pack.records.length} records</span></div>${pack.summary ? `<p class="ho-preserve">${esc(pack.summary)}</p>` : ''}${pack.records
-        .slice(previewPage * 25, previewPage * 25 + 25)
-        .map(
-          r =>
-            `<article class="ho-preview-record"><small>${E.labels[r.kind]}${r.childId ? ' · Sub-item' : ''} · ${esc(r.id)}${r.childId ? ' / ' + esc(r.childId) : ''}</small><h4>${esc([r.identifier, r.title].filter(Boolean).join(' · '))}</h4>${r.parent ? `<p>Parent: ${esc([r.parent.identifier, r.parent.title].filter(Boolean).join(' · '))}</p>` : ''}<p>${esc([r.status, r.priority, r.owner, r.project, r.due ? 'Due ' + r.due : '', r.expected ? 'Expected ' + r.expected : ''].filter(Boolean).join(' · '))}</p>${[
-              ['Notes', r.notes],
-              [r.kind === 'tickets' ? 'Latest ticket update' : 'Feedback', r.feedback],
-              ['Next step', r.nextStep],
-              ['Blocker', r.blocker],
-            ]
-              .filter(([, v]) => v)
-              .map(
-                ([k, v]) => `<div><strong>${k}</strong><p class="ho-preserve">${esc(v)}</p></div>`
-              )
-              .join(
-                ''
-              )}${r.references.map(f => `<p class="ho-preserve"><strong>Reference · ${esc(f.label)}</strong>${f.url ? '<br>' + esc(f.url) : ''}</p>`).join('')}</article>`
-        )
-        .join(
-          ''
-        )}<div class="df-pagination">${button('preview-prev', 'Previous records', previewPage === 0 || busy ? 'disabled' : '')}<span>Preview ${previewPage + 1} / ${Math.ceil(pack.records.length / 25)}</span>${button('preview-next', 'Next records', (previewPage + 1) * 25 >= pack.records.length || busy ? 'disabled' : '')}</div></section>`;
+      const groups = E.groups(pack.records),
+        info = E.overview(pack),
+        size = 10;
+      previewPage = Math.min(previewPage, Math.max(0, Math.ceil(groups.length / size) - 1));
+      const metrics = [
+        [info.total, 'Selected records'],
+        [info.open, 'Open'],
+        [info.completed, 'Finished'],
+        [info.overdue, 'Overdue'],
+      ];
+      return '<section class="df-panel ho-preview ho-pack-' + esc(pack.layout) +
+        '" id="hoPreview" aria-label="Handover snapshot preview"><div class="ho-object-header">' +
+        '<div><span class="hub-kicker">HANDOVER SNAPSHOT · ' + esc(pack.asOf) +
+        '</span><h3>' + esc(pack.title) + '</h3><p>' +
+        esc([pack.from && 'From ' + pack.from, pack.to && 'To ' + pack.to].filter(Boolean).join(' → ')) +
+        '</p><small>' + esc(new Date(pack.createdAt).toLocaleString()) +
+        ' · ' + (pack.layout === 'compact' ? 'Compact' : 'Detailed') +
+        ' layout · preview and PDF contain the same fields</small></div><span class="df-badge">' +
+        info.groups + ' work groups</span></div>' +
+        '<nav class="ho-pack-nav" aria-label="Handover preview sections"><a href="#hoOverview">Overview</a>' +
+        '<a href="#hoAttention">Needs attention</a><a href="#hoActions">Next actions</a>' +
+        '<a href="#hoRecords">Work records</a></nav>' +
+        '<section class="ho-pack-section" id="hoOverview"><h4>At a glance</h4><div class="ho-summary-grid">' +
+        metrics.map(([n, label]) => '<div><strong>' + n + '</strong><span>' + label + '</span></div>').join('') +
+        '</div><p class="muted">' + info.main + ' main records · ' + info.children +
+        ' sub-items. Counts describe selected records; parent progress covers all of its source sub-items.</p>' +
+        (pack.summary ? '<div class="ho-pack-note"><strong>Handover note</strong><p class="ho-preserve">' +
+          esc(pack.summary) + '</p></div>' : '') +
+        '<dl class="ho-status-counts">' + info.statuses.map(s => '<div><dt>' + esc(s.status) +
+          '</dt><dd>' + s.count + '</dd></div>').join('') + '</dl></section>' +
+        '<section class="ho-pack-section" id="hoAttention"><h4>Needs attention</h4><p class="muted">' +
+        'Based on recorded priority, due dates, status and prerequisites as of ' + esc(pack.asOf) +
+        '.</p>' + attentionHTML(info) + '</section>' +
+        '<section class="ho-pack-section" id="hoActions"><h4>Next actions</h4>' +
+        (info.actions.length ? '<div class="ho-action-list">' + info.actions.map(r =>
+          '<article><strong>' + esc(recordName(r)) + '</strong>' +
+          '<p class="ho-preserve">' + esc(r.nextStep) + '</p>' +
+          '<small>' + esc([r.owner && 'Owner: ' + r.owner, r.due && 'Due: ' + r.due].filter(Boolean).join(' · ')) +
+          '</small></article>').join('') + '</div>' :
+          '<p class="muted">No next actions were recorded in the included fields.</p>') +
+        (info.unassigned ? '<p class="ho-information">' + info.unassigned +
+          ' open record(s) have no owner / PIC recorded. The pack recipient is not assigned as their owner.</p>' : '') +
+        '</section><section class="ho-pack-section" id="hoRecords"><h4>Work records</h4>' +
+        '<p class="muted">Only selected records are included. Missing values are left blank; information is not inferred.</p>' +
+        groups.slice(previewPage * size, previewPage * size + size).map(group =>
+          '<section class="ho-work-group"><header><small>' + E.labels[group.kind] +
+          ' · ' + group.records.length + ' selected record(s)</small><h4>' + esc(group.title) +
+          '</h4>' + (!group.parentSelected ? '<p class="muted">Parent shown for identification. Its details were not selected.</p>' : '') +
+          '</header>' + group.records.map(r =>
+            '<article class="ho-preview-record' + (r.childId ? ' ho-preview-child' : '') +
+            '"><div class="ho-record-heading"><div><small>' + (r.childId ? 'SUB-ITEM' : 'MAIN RECORD') +
+            '</small><h4>' + esc(recordName(r)) + '</h4></div><span class="ho-object-status" data-ho-tone="' +
+            (E.closed(r.status) ? 'positive' : /blocked|on hold/i.test(r.status) ? 'warning' : 'neutral') +
+            '">' + esc(r.status) + '</span></div>' +
+            (r.parent ? '<p class="muted">Parent: ' + esc([r.parent.identifier, r.parent.title].filter(Boolean).join(' · ')) + '</p>' : '') +
+            E.sections(r).map(section => '<section class="ho-record-section"><h5>' +
+              esc(section.title) + '</h5><dl class="ho-field-grid">' + section.fields.map(f =>
+                '<div><dt>' + esc(f.label) + '</dt><dd class="ho-preserve">' + esc(f.value) + '</dd></div>'
+              ).join('') + '</dl></section>').join('') +
+            '<details class="ho-record-identity"><summary>Record identifiers</summary><p class="ho-preserve">' +
+            esc(r.childId ? r.id + ' / ' + r.childId : r.id) + '</p></details></article>'
+          ).join('') + '</section>'
+        ).join('') + '<div class="df-pagination">' +
+        button('preview-prev', 'Previous records', previewPage === 0 || busy ? 'disabled' : '') +
+        '<span>Groups ' + (previewPage * size + 1) + '–' + Math.min(groups.length, (previewPage + 1) * size) +
+        ' of ' + groups.length + '</span>' +
+        button('preview-next', 'Next records', (previewPage + 1) * size >= groups.length || busy ? 'disabled' : '') +
+        '</div></section></section>';
     }
     function invalidate() {
       if (fileUrl) URL.revokeObjectURL(fileUrl);

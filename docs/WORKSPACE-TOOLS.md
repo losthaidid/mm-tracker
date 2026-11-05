@@ -20,6 +20,14 @@ Use row checkboxes or **Select page**, then **Edit selected**. **Select all matc
 
 On a card, choose **Show sub-items** to see each child's owner, due date, remarks, feedback, status, timer and editor under its main item. Status changes save directly without opening the manager. The existing **Sub-items** manager remains available for its full controls. Child details and feedback render when expanded, with 10 children initially and **Show next 20** for larger lists. Main lists use 25, 50 or 100 items per page; previews show 50 field changes per page. These bounds keep large projects usable without omitting records from explicit selections or saved changes.
 
+## Main task completion
+
+Completing the last unfinished subtask now marks its main task **Completed**, sets its completion date and moves it to **Completed tasks** in the same save. The subtask editor, Complete buttons and board details use the same rule. Marking a parent Completed still completes its unfinished children. Child notes, feedback, identifiers and existing completion timestamps are preserved.
+
+Older main tasks whose children were already Completed are not silently changed on load. Open **Tasks → Review main tasks**, select the parents, choose a completion date and select **Complete selected tasks**. The review handles up to 100 parents per batch. Cancel leaves them unchanged. A changed task, lost edit permission, cloud conflict or account change prevents a stale review from overwriting records.
+
+An empty group never auto-completes. Manually reopening a parent is respected; unrelated edits do not immediately complete it again. Reopening a child does not silently change its parent's status. Backups preserve recorded status combinations.
+
 ## Task companies and website references
 
 In **Tasks → Add task / Edit main task**, choose **Task type → Project**, then a **Linked project**. The optional **Company** dropdown contains active companies maintained for that linked project, even when another project is active in navigation. Leave it blank for project-wide work. Changing project or switching to Ticket/Custom clears the company selection. Existing inactive assignments remain visible and may be retained when editing; they cannot be assigned to a different task.

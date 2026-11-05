@@ -1,13 +1,31 @@
 # Handover packs
 
-Choose **Handover packs** in navigation. Give the pack a title, optional From/To names and a handover note. Filter and select Tasks, Tickets, Project items and Waiting-on records. Completed work is excluded initially; Include completed makes it available. Archived records are excluded. Source sections require export permission.
+Choose **Handover packs** in navigation. Give the pack a title, optional From/To names and a handover note. Filter and select Tasks, Tickets, Project items and Waiting-on records. Completed work is excluded initially; **Include completed** makes it available. Archived records are excluded. Each source requires export permission.
 
-Main records and sub-items are separate selectable records. Each child captures its own title, feedback, owner and due date and retains its actual parent ID/title/identifier; it never inherits another child's values. Select all filtered selects every matching row across pages, up to 500 records, and preserves existing selections. It rejects an oversized selection instead of taking only part of it.
+Main records and sub-items are separate selections. Each child captures its own title, notes, feedback, owner, due date and recorded time. Its real parent identifier/title stays alongside it. It never inherits a sibling's information or the parent's notes. Selecting a child alone shows the parent label for identification without exporting unselected parent content. **Select all filtered** covers all matching pages, up to 500 records, while retaining existing selections. Oversized selections are rejected rather than partly selected.
 
-Optional fields: notes, feedback/latest ticket update, next steps/blockers and references. Next steps and active blockers come from the existing record context; the app does not invent or write back actions. Ticket history uses the latest parsed existing update. Other feedback is preserved in full. Dates and text identifiers are not converted to numbers.
+## Pack contents
 
-**Preview Handover pack** creates a detached snapshot. Review 25 records at a time. Prepare PDF generates all selected records and reveals an explicit Download PDF link with wrapped, paginated Unicode text. There is a 1,000,000-character snapshot bound and 240-page PDF bound; exceeding either produces a clear error without a partial export or shortened fields. PDF pages are rendered locally as images; the result preserves visual text but is not a searchable or tagged text PDF.
+The preview and PDF use the same sections and fields:
 
-Editing pack fields or selection requires a new preview. Editing live source work after preview does not change the frozen snapshot. No status, feedback or source data changes when selecting, previewing, downloading or saving a pack. Source access is checked again before exporting and saving to Drive; sign-out or account changes cancel pending work.
+- **At a glance:** selected record counts, open/finished counts, status breakdown, overdue count, From/To and the handover note.
+- **Needs attention:** recorded overdue dates, blocked/on-hold work, High/Critical/Urgent priority and unresolved prerequisites. A record can have several reasons but appears once.
+- **Next actions:** recorded actions, owners/PICs and due dates. Missing owners are reported; the pack recipient is not assigned as an owner.
+- **Work records:** parent/sub-item groups, status, priority, owner, project/company, related work, dates, source sub-item progress, notes, full feedback, full ticket update history, project status history, record-specific fields, prerequisites and references.
+- **Recorded work:** saved sessions matched to the exact parent or child, active duration, dates and each session's own notes/wrap-up. Parent totals exclude child sessions. Running timers and unrelated project sessions are excluded.
 
-**Save to Drive & QR** uses the same generated PDF. If Google Drive is not connected, setup opens and the local download remains available; connect and save again. Recent saved packs appear in the side panel and Files. Every saved PDF is a new file/snapshot; existing links do not silently switch to newer work. Pack contents are stored only in Drive (or downloaded locally), not duplicated as a report in the workspace database.
+Summary counts describe selected records. A parent's progress explicitly describes all of that parent's source sub-items, including sub-items not selected for the pack. Values are not inferred or shortened. Identifiers such as 001 and 6.00007 remain text.
+
+Choose **Detailed** for more spacing and section separation or **Compact** for a denser layout. Both retain all included content. Checkboxes control record notes, full feedback/update history, record details/dates/progress, saved sessions, next steps/blockers and references. Saved sessions include their own wrap-up notes; deselect Saved work sessions to exclude them. Optional field exclusions apply equally to preview and PDF.
+
+Project/company context, linked ticket details, workflow context and saved sessions are included only when the corresponding sources may be exported. Those permissions are checked again before export; revoking access invalidates the captured preview.
+
+## Preview and export
+
+**Preview Handover pack** creates a detached snapshot. The redesigned object-page preview includes a section navigator and up to 10 complete parent groups per preview page. Groups are kept together, with main records before their selected children. The PDF contains every selected group regardless of the preview page.
+
+**Prepare PDF** generates a Fiori-inspired cover, summary, attention/action lists and grouped record sections. Download appears as an explicit **Download PDF** link when preparation succeeds. Unicode text wraps across pages. There is a 1,000,000-character snapshot bound and 240-page PDF bound; exceeding either produces an error without a partial export or shortened fields. Pages are rendered locally as images, preserving visual text; the PDF is not searchable or tagged.
+
+Editing pack fields, layout, checkboxes or selection requires a fresh preview. Later edits to source work do not alter the captured snapshot. Selecting, previewing and exporting never change source statuses, owners, notes or feedback. Sign-out or account/permission changes cancel pending work.
+
+**Save to Drive & QR** uses the same generated PDF. If Drive is not connected, setup opens and local download remains available; connect and save again. Recent saved packs appear in the side panel and Files. Each PDF is a separate dated snapshot; existing files and QR links are not rewritten. Pack contents are stored in Drive or downloaded locally, not duplicated in the workspace database.

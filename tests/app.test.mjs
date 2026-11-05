@@ -3027,6 +3027,7 @@ test('Ticket objects: maintained bookmark choices save one field and reject stal
 test('Work sessions hide completed tasks, subtasks and tickets and use maintained project charge codes only',async t=>{
  const {api,document,window}=await app(t);
  const active=addMainTask(api,document,'Active timer work'),done=addMainTask(api,document,'Finished timer work');
+ addTaskSub(api,document,active,'Unfinished subtask','','','In Progress');
  const closedSub=addTaskSub(api,document,active,'Finished subtask','','','Completed');
  const ticket=addWishlistTicket(api,document);await settle();
  api.mutate(d=>{const task=d.tasks.find(x=>x.id===done);task.done=true;task.doneDate='2026-10-26';d.projects[0].code='PROJ-100';const old=copy(d.tickets.find(x=>x.id===ticket));old.id='closed-timer-ticket';old.ticket='CLOSED-100';old.status='Closed';d.tickets.push(old);});await settle();api.closeModal();
@@ -3630,9 +3631,57 @@ test('Website designs: preview cannot save after a conflict, denied permission o
 });
 test('Website designs: every existing section remains reachable in each saved design with one route per section',async t=>{
  const {api,document,db}=await app(t),ids=['home','tickets','tasks','schedule','specs','notes','knowledge','processhub','files','handover','waiting','studio','lab','validator','snippets'];
- for(const design of ['current','clear-desk','modern-hub','editorial','canvas','compact-pro']){api.mutate(d=>d.workhub.preferences.design=design);await settle();const writes=db.calls.length;for(const id of ids){const node=document.querySelector('#tabs button[data-tab="'+id+'"]');assert.ok(node,design+' '+id);node.click();await settle();assert.ok(document.getElementById('view').innerHTML.length>50,design+' '+id);assert.equal(document.querySelectorAll('#tabs button[data-tab="'+id+'"]').length,1);assert.equal(document.body.dataset.hubDesign,design);}assert.equal(db.calls.length,writes);assert.equal(api.parseBackup(api.payload(api.state())).workhub.preferences.design,design);assert.equal(db.row.document.data.workhub.preferences.design,design);}
+ for(const design of ['current','clear-desk','modern-hub','editorial','canvas','fiori','compact-pro']){api.mutate(d=>d.workhub.preferences.design=design);await settle();const writes=db.calls.length;for(const id of ids){const node=document.querySelector('#tabs button[data-tab="'+id+'"]');assert.ok(node,design+' '+id);node.click();await settle();assert.ok(document.getElementById('view').innerHTML.length>50,design+' '+id);assert.equal(document.querySelectorAll('#tabs button[data-tab="'+id+'"]').length,1);assert.equal(document.body.dataset.hubDesign,design);}assert.equal(db.calls.length,writes);assert.equal(api.parseBackup(api.payload(api.state())).workhub.preferences.design,design);assert.equal(db.row.document.data.workhub.preferences.design,design);}
  const reopened=await app(t,{remote:copy(db.row),login:false});await reopened.api.loadCloud(sessionUser);await settle();assert.equal(reopened.document.body.dataset.hubDesign,'compact-pro');assert.equal(reopened.db.calls.length,0);
 });
 test('Website designs: saving colours from an open preview retains the separately saved design',async t=>{
  const {api,document,window,db}=await app(t);api.hub.setTool('theme');api.showTab('studio');document.querySelector('[data-theme-choice="forest"]').click();const form=document.getElementById('hubTheme');assert.equal(api.state().workhub.preferences.theme,'ocean');const ui=api.hub.websiteDesigns;ui.open();const radio=document.querySelector('[name="websiteDesign"][value="clear-desk"]');radio.checked=true;radio.dispatchEvent(new window.Event('change',{bubbles:true}));document.querySelector('#websiteDesignChooser form').dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));await settle();assert.equal(document.getElementById('hubTheme'),form);assert.equal(api.state().workhub.preferences.theme,'ocean');assert.equal(document.body.dataset.hubTheme,'forest');api.hub.submit(form);await settle();assert.equal(api.state().workhub.preferences.theme,'forest');assert.equal(api.state().workhub.preferences.design,'clear-desk');assert.equal(document.body.dataset.hubDesign,'clear-desk');assert.equal(db.row.document.data.workhub.preferences.design,'clear-desk');
+});
+
+async function legacyTaskCompletionFixture(t) {
+ const ctx=await app(t),ids=[];
+ for(let i=0;i<3;i++){const id=addMainTask(ctx.api,ctx.document,'Legacy '+i+' · 001 / 6.00007');addTaskSub(ctx.api,ctx.document,id,'Child '+i,'Own notes '+i,'Own feedback '+i,'In Progress');ids.push(id);}
+ await settle();const remote=copy(ctx.db.row);
+ for(const id of ids.slice(0,2)){const task=remote.document.data.tasks.find(r=>r.id===id);for(const sub of task.subTasks)sub.status='Completed';}
+ const reopened=await app(t,{remote,login:false});await reopened.api.loadCloud(sessionUser);await settle();reopened.api.showTab('tasks');
+ return{...reopened,ids};
+}
+test('Task completion rollup: last-child quick completion saves parent and child together and survives reopening',async t=>{
+ const {api,document,db,window}=await app(t);useDay(window,'2026-11-06');
+ const id=addMainTask(api,document,'Parent 001 / 6.00007'),a=addTaskSub(api,document,id,'First','First notes','First feedback'),b=addTaskSub(api,document,id,'Last','Last notes','Last feedback');await settle();
+ await api.hub.handle({dataset:{hub:'subtask-complete',parent:id,id:a}});await settle();
+ const before=copy(api.state().tasks.find(r=>r.id===id)),writes=db.calls.length;
+ await api.hub.handle({dataset:{hub:'subtask-complete',parent:id,id:b}});await settle();
+ const task=api.state().tasks.find(r=>r.id===id);assert.equal(task.done,true);assert.equal(task.boardStatus,'done');assert.equal(task.doneDate,'2026-11-06');assert.equal(db.calls.length,writes+1);
+ assert.equal(task.task,before.task);assert.deepEqual(copy(task.subTasks[0]),before.subTasks[0]);for(const field of ['title','remarks','feedback','createdAt'])assert.equal(task.subTasks[1][field],before.subTasks[1][field]);
+ assert.equal(api.parseBackup(api.payload(api.state())).tasks.find(r=>r.id===id).done,true);
+ const reopened=await app(t,{remote:copy(db.row),login:false});await reopened.api.loadCloud(sessionUser);assert.equal(reopened.api.state().tasks.find(r=>r.id===id).done,true);
+});
+test('Task completion rollup: editor and board details complete the parent while manual reopening remains under user control',async t=>{
+ const {api,document,window}=await app(t);const id=addMainTask(api,document,'Editor main'),sub=addTaskSub(api,document,id,'Own child','Notes','Feedback','In Progress');await settle();
+ api.editTaskSub(id,sub);let f=document.getElementById('taskSubForm');f.elements.status.value='Completed';api.saveTaskSub(f);await settle();assert.equal(api.state().tasks.find(r=>r.id===id).done,true);
+ api.editRecord('tasks',id);f=document.getElementById('editForm');f.elements.done.checked=false;api.saveEdit(f);await settle();assert.equal(api.state().tasks.find(r=>r.id===id).done,false);assert.equal(api.state().tasks.find(r=>r.id===id).subTasks[0].status,'Completed');
+ api.mutate(d=>d.tasks.find(r=>r.id===id).feedback='Unrelated update');await settle();assert.equal(api.state().tasks.find(r=>r.id===id).done,false);
+ api.editTaskSub(id,sub);f=document.getElementById('taskSubForm');f.elements.status.value='In Progress';api.saveTaskSub(f);await settle();api.hub.setBoard(true);api.showTab('tasks');await api.hub.handle({dataset:{hub:'task-detail',id}});await settle();
+ document.querySelector('#modalBody [data-hub="subtask-complete"]').click();await settle();assert.equal(api.state().tasks.find(r=>r.id===id).done,true);assert.equal(document.getElementById('modal').open,true);assert.match(document.getElementById('modalBody').textContent,/Feedback/);
+});
+test('Task completion rollup: legacy review does not save on load or cancel and completes only checked parents on the chosen date',async t=>{
+ const {api,document,db,ids}=await legacyTaskCompletionFixture(t),before=copy(api.state().tasks);
+ assert.equal(db.calls.length,0);assert.match(document.getElementById('taskCompletionNotice').textContent,/2 main tasks/);
+ api.hub.taskCompletion.review();api.closeModal();await settle();assert.equal(db.calls.length,0);assert.deepEqual(copy(api.state().tasks),before);
+ api.hub.taskCompletion.review();const form=document.getElementById('taskCompletionForm');form.querySelector('[name="tasks"][value="'+ids[1]+'"]').checked=false;form.elements.completionDate.value='2026-11-04';api.hub.taskCompletion.apply(form);await settle();
+ const tasks=api.state().tasks;assert.equal(tasks.find(r=>r.id===ids[0]).done,true);assert.equal(tasks.find(r=>r.id===ids[0]).doneDate,'2026-11-04');assert.deepEqual(copy(tasks.find(r=>r.id===ids[0]).subTasks),before.find(r=>r.id===ids[0]).subTasks);
+ assert.deepEqual(copy(tasks.find(r=>r.id===ids[1])),before.find(r=>r.id===ids[1]));assert.deepEqual(copy(tasks.find(r=>r.id===ids[2])),before.find(r=>r.id===ids[2]));assert.equal(db.calls.length,1);
+});
+test('Task completion rollup: stale reviews, closed dialogs, conflicts and changed account generations cannot overwrite tasks',async t=>{
+ const {api,document,db,ids}=await legacyTaskCompletionFixture(t);
+ api.hub.taskCompletion.review();let form=document.getElementById('taskCompletionForm');api.closeModal();assert.throws(()=>api.hub.taskCompletion.apply(form),/expired/);
+ api.hub.taskCompletion.review();form=document.getElementById('taskCompletionForm');api.mutate(d=>d.tasks.find(r=>r.id===ids[0]).feedback='Newer feedback');await settle();assert.throws(()=>api.hub.taskCompletion.apply(form),/changed/);
+ api.hub.taskCompletion.review();form=document.getElementById('taskCompletionForm');const before=copy(api.state().tasks);api.cloud.conflict=true;assert.throws(()=>api.hub.taskCompletion.apply(form),/conflict|newer|resolve|review/i);assert.deepEqual(copy(api.state().tasks),before);api.cloud.conflict=false;
+ api.hub.taskCompletion.review();form=document.getElementById('taskCompletionForm');api.cloud.generation++;assert.throws(()=>api.hub.taskCompletion.apply(form),/expired/);assert.deepEqual(copy(api.state().tasks),before);
+});
+test('Task completion rollup: permission loss and rejected parent saves preserve original child statuses and notes',async t=>{
+ const {api,document,window,db}=await app(t),id=addMainTask(api,document,'Protected parent');addTaskSub(api,document,id,'Protected child','Exact 001','Keep feedback','In Progress');await settle();
+ const before=copy(api.state().tasks);api.editRecord('tasks',id);const form=document.getElementById('editForm');form.elements.done.checked=true;api.cloud.conflict=true;assert.throws(()=>api.saveEdit(form));assert.deepEqual(copy(api.state().tasks),before);api.cloud.conflict=false;api.closeModal();
+ api.access.can=(feature,action='view')=>feature!=='tasks'||action==='view';api.showTab('tasks');assert.equal(document.getElementById('taskCompletionNotice'),null);assert.throws(()=>api.hub.taskCompletion.review(),/cannot complete/);assert.deepEqual(copy(api.state().tasks),before);
 });

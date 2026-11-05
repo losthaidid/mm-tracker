@@ -33,6 +33,13 @@
       description: 'A floating section launcher, an open working area and a dashboard of tiles.',
       layout: 'Floating navigation · open canvas',
     },
+    fiori: {
+      name: 'Fiori Workspace',
+      eyebrow: 'CLEAR & ACTIONABLE',
+      description:
+        'A SAP Fiori-inspired shell with object headers, structured sections and clear status cues.',
+      layout: 'Shell navigation · structured work pages',
+    },
     'compact-pro': {
       name: 'Compact Pro',
       eyebrow: 'PRECISE & PRACTICAL',
@@ -127,7 +134,7 @@
       const nodes = [...nav.querySelectorAll('button[data-tab]')];
       const mobile = !!media?.matches;
       let kind = 'flat';
-      if (id === 'clear-desk') kind = mobile ? 'top-mobile' : 'top';
+      if (id === 'clear-desk' || id === 'fiori') kind = mobile ? 'top-mobile' : 'top';
       if (id === 'modern-hub' && mobile) kind = 'dock';
       if (id === 'editorial') kind = mobile ? 'top-mobile' : 'index';
       if (id === 'canvas') kind = 'launcher';
@@ -297,7 +304,7 @@
       dialog.dataset.accessFeature = 'workspace';
       dialog.setAttribute('aria-labelledby', 'wdChooserTitle');
       dialog.innerHTML =
-        '<form><header class="wd-chooser-head"><div><span class="hub-kicker">A SPACE THAT FITS YOUR DAY</span><h2 id="wdChooserTitle">Make room for a different view.</h2><p>Six designs. The same work, always with you.</p></div><button type="button" data-wd-close aria-label="Close website design preview">×</button></header><fieldset class="wd-design-options"><legend>Choose your website design</legend>' +
+        '<form><header class="wd-chooser-head"><div><span class="hub-kicker">A SPACE THAT FITS YOUR DAY</span><h2 id="wdChooserTitle">Make room for a different view.</h2><p>Seven designs. The same work, always with you.</p></div><button type="button" data-wd-close aria-label="Close website design preview">×</button></header><fieldset class="wd-design-options"><legend>Choose your website design</legend>' +
         Object.entries(DESIGNS)
           .map(
             ([id, d]) =>

@@ -3800,7 +3800,7 @@ function saveEdit(form) {
     }
   }
   if (group === 'tasks') {
-    r.subTasks = old?.subTasks || [];
+    r.subTasks = clone(old?.subTasks || []);
     r.boardStatus = old?.boardStatus || (r.done ? 'done' : 'todo');
     r.archived = old?.archived || false;
     r.archivedAt = old?.archivedAt || '';
@@ -7723,7 +7723,7 @@ function editTaskSub(parentId, id = '') {
   const sub = old || { title: '', status: 'Not started', remarks: '', feedback: '' };
   openModal(
     old ? 'Edit sub-task' : 'Add sub-task',
-    `<form id="taskSubForm" data-parent="${esc(parentId)}" data-id="${esc(id)}"><div class="manual-entry-hero"><span class="eyebrow">Main task${task.number ? ' · ' + esc(task.number) : ''}</span><strong>${esc(task.task)}</strong></div><div class="form-grid"><div class="wide"><label for="taskSubTitle">Sub-task *</label><input id="taskSubTitle" name="title" maxlength="500" required value="${esc(sub.title)}"></div><div><label for="taskSubStatus">Status *</label><select id="taskSubStatus" name="status">${SUBITEM_STATUSES.map(status => `<option${status === sub.status ? ' selected' : ''}>${esc(status)}</option>`).join('')}</select></div><div class="wide"><label for="taskSubRemarks">Remarks</label><textarea id="taskSubRemarks" name="remarks" maxlength="32767">${esc(sub.remarks)}</textarea></div><div class="wide"><label for="taskSubFeedback">Feedback</label><textarea id="taskSubFeedback" name="feedback" maxlength="32767">${esc(sub.feedback)}</textarea></div></div><p class="hint">Status, remarks and feedback belong only to this sub-task.</p><div class="modal-actions"><div>${old ? `<button type="button" class="danger" data-action="delete-task-sub" data-parent="${esc(parentId)}" data-id="${esc(id)}">Delete sub-task</button>` : ''}</div><div class="actions"><button type="button" data-action="cancel">Cancel</button><button type="submit" class="primary">Save sub-task</button></div></div></form>`
+    `<form id="taskSubForm" data-parent="${esc(parentId)}" data-id="${esc(id)}"><div class="manual-entry-hero"><span class="eyebrow">Main task${task.number ? ' · ' + esc(task.number) : ''}</span><strong>${esc(task.task)}</strong></div><div class="form-grid"><div class="wide"><label for="taskSubTitle">Sub-task *</label><input id="taskSubTitle" name="title" maxlength="500" required value="${esc(sub.title)}"></div><div><label for="taskSubStatus">Status *</label><select id="taskSubStatus" name="status">${SUBITEM_STATUSES.map(status => `<option${status === sub.status ? ' selected' : ''}>${esc(status)}</option>`).join('')}</select></div><div class="wide"><label for="taskSubRemarks">Remarks</label><textarea id="taskSubRemarks" name="remarks" maxlength="32767">${esc(sub.remarks)}</textarea></div><div class="wide"><label for="taskSubFeedback">Feedback</label><textarea id="taskSubFeedback" name="feedback" maxlength="32767">${esc(sub.feedback)}</textarea></div></div><p class="hint">Remarks and feedback belong only to this sub-task. Completing the last unfinished sub-task also completes its main task.</p><div class="modal-actions"><div>${old ? `<button type="button" class="danger" data-action="delete-task-sub" data-parent="${esc(parentId)}" data-id="${esc(id)}">Delete sub-task</button>` : ''}</div><div class="actions"><button type="button" data-action="cancel">Cancel</button><button type="submit" class="primary">Save sub-task</button></div></div></form>`
   );
 }
 function saveTaskSub(form) {
@@ -7732,7 +7732,8 @@ function saveTaskSub(form) {
     value = name => form.elements.namedItem(name).value,
     title = value('title').trim(),
     status = value('status'),
-    now = new Date().toISOString();
+    now = new Date().toISOString(),
+    wasDone = !!state.tasks.find(task => task.id === parentId)?.done;
   const ok = mutate(d => {
     const task = d.tasks.find(task => task.id === parentId);
     if (!task) throw Error('Main task not found.');
@@ -7752,7 +7753,11 @@ function saveTaskSub(form) {
   });
   if (ok) {
     closeModal();
-    tell('Sub-task saved.');
+    tell(
+      !wasDone && state.tasks.find(task => task.id === parentId)?.done
+        ? 'Sub-task saved. Main task completed. View in Completed tasks.'
+        : 'Sub-task saved.'
+    );
   }
 }
 function taskCard(task) {
@@ -10360,6 +10365,7 @@ hub = WorkHubStudio.install({
   },
   syncHealth: () => ({ cacheAvailable: !temporary && !!cloud.lastCache }),
   today,
+  validDate,
   month: () => month,
   day: () => scheduleDay,
   mutate,

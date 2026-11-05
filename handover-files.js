@@ -21,9 +21,11 @@
     doc.setTitle(pack.title);
     doc.setSubject('WorkHub handover snapshot · ' + pack.createdAt);
     doc.setCreationDate(new Date(pack.createdAt));
-    const W = 1240,
+    const E = root.WorkHubHandoverEngine,
+      compact = pack.layout === 'compact',
+      W = 1240,
       H = 1754,
-      M = 84,
+      M = compact ? 72 : 84,
       bottom = H - 100;
     let canvas,
       ctx,
@@ -41,11 +43,14 @@
       if (!ctx) throw Error('PDF drawing is unavailable. Try a current desktop browser.');
       ctx.fillStyle = '#fff';
       ctx.fillRect(0, 0, W, H);
-      ctx.fillStyle = '#078597';
-      ctx.fillRect(M, 55, 48, 5);
+      ctx.fillStyle = '#eef4fb';
+      ctx.fillRect(0, 0, W, 88);
+      ctx.fillStyle = '#0064d9';
+      ctx.fillRect(0, 0, W, 7);
+      ctx.fillRect(M, 48, 32, 5);
       ctx.font = '500 18px system-ui, sans-serif';
       ctx.fillStyle = '#527077';
-      ctx.fillText('WORKHUB / HANDOVER', M + 64, 65);
+      ctx.fillText('WORKHUB / HANDOVER PACK', M + 50, 62);
       y = 115;
     }
     async function finish() {
@@ -119,67 +124,126 @@
     async function field(label, value) {
       if (value) {
         await write(label.toUpperCase(), 17, true, '#527a82');
-        await write(value);
-        y += 13;
+        await write(value, compact ? 21 : 23);
+        y += compact ? 7 : 13;
       }
     }
-    start();
-    await write(pack.title, 42, true);
-    y += 18;
-    await write(
-      new Date(pack.createdAt).toLocaleString() + ' · ' + pack.records.length + ' work records',
-      21,
-      false,
-      '#527a82'
-    );
-    y += 25;
-    await field('From', pack.from);
-    await field('To', pack.to);
-    await field('Handover note', pack.summary);
-    await write('A dated copy of the selected work', 26, true);
-    y += 8;
-    await write(
-      'Statuses, identifiers and dates are captured as shown at preview time. Later edits to your workspace do not change this file.',
-      21
-    );
-    y += 24;
-    for (const [i, r] of pack.records.entries()) {
-      check();
-      if (y > bottom - 170) {
+    async function heading(title, size = 27) {
+      if (y > bottom - 150) {
         await finish();
         start();
       }
-      ctx.fillStyle = '#d1e6e5';
-      ctx.fillRect(M, y, W - M * 2, 2);
-      y += 20;
+      y += compact ? 10 : 18;
+      await write(title, size, true, '#004b8d');
+      y += 9;
+    }
+    const recordName = r => [r.identifier, r.title].filter(Boolean).join(' · ');
+    const info = E.overview(pack);
+    start();
+    await write('HANDOVER SNAPSHOT', 18, true, '#0064d9');
+    y += 8;
+    await write(pack.title, 42, true, '#152935');
+    y += 18;
+    await write(
+      new Date(pack.createdAt).toLocaleString() + ' · ' + info.groups + ' work groups',
+      21, false, '#527a82'
+    );
+    y += 20;
+    await field('From', pack.from);
+    await field('To', pack.to);
+    await field('Handover note', pack.summary);
+    await heading('At a glance', 30);
+    await write(
+      info.total + ' selected records  ·  ' + info.open + ' open  ·  ' +
+      info.completed + ' finished  ·  ' + info.overdue + ' overdue',
+      24, true
+    );
+    y += 10;
+    await write(
+      info.main + ' main records · ' + info.children +
+      ' sub-items. Summary counts cover selected records; each parent progress count covers all of its source sub-items.',
+      21
+    );
+    await field('Status breakdown', info.statuses.map(s => s.status + ': ' + s.count).join(' · '));
+    await write(
+      'Statuses, identifiers and dates are captured at preview time. Later edits do not change this dated file. Missing values are left blank; no owner, date or next action has been inferred.',
+      20, false, '#527077'
+    );
+    await heading('Needs attention');
+    await write(
+      'Based on recorded priority, due dates, status and prerequisites as of ' +
+      (pack.asOf || pack.createdAt.slice(0, 10)) + '.', 20
+    );
+    y += 12;
+    if (!info.attention.length)
+      await write('No overdue, blocked or high-priority records in this selection.', 21);
+    for (const item of info.attention) {
+      check();
+      await write(recordName(item.record), 23, true);
+      await field('Attention', [
+        item.record.parent && 'Under ' +
+          [item.record.parent.identifier, item.record.parent.title].filter(Boolean).join(' · '),
+        item.reasons.join(' · '),
+        item.record.owner && 'Owner: ' + item.record.owner,
+      ].filter(Boolean).join('\n'));
+    }
+    await heading('Next actions');
+    if (!info.actions.length)
+      await write('No next actions were recorded in the included fields.', 21);
+    for (const r of info.actions) {
+      await write(recordName(r), 23, true);
+      await field('Next action', [
+        r.nextStep,
+        r.owner && 'Owner: ' + r.owner,
+        r.due && 'Due: ' + r.due,
+      ].filter(Boolean).join('\n'));
+    }
+    if (info.unassigned)
       await write(
-        `${String(i + 1).padStart(2, '0')} / ${root.WorkHubHandoverEngine.labels[r.kind]}${r.childId ? ' · Sub-item' : ''}`,
-        18,
-        true,
-        '#078597'
+        info.unassigned + ' open record(s) have no owner / PIC recorded. The pack recipient is not assigned as their owner.',
+        21, false, '#735200'
       );
-      y += 8;
-      await write([r.identifier, r.title].filter(Boolean).join(' · '), 29, true);
-      y += 12;
-      if (r.parent)
-        await field(
-          'Parent record',
-          [r.parent.identifier, r.parent.title, '(ID: ' + r.parent.id + ')']
-            .filter(Boolean)
-            .join(' · ')
+    await heading('Work records', 32);
+    await write(
+      'Only selected records are included. Parent labels identify the correct group; unselected parent notes and unselected child records are not copied into this pack.',
+      20
+    );
+    let number = 0;
+    for (const group of E.groups(pack.records)) {
+      check();
+      await heading(E.labels[group.kind] + ' / ' + group.title, 29);
+      if (!group.parentSelected)
+        await write('Parent shown for identification. Its details were not selected.', 20);
+      for (const r of group.records) {
+        check();
+        if (y > bottom - 170) {
+          await finish();
+          start();
+        }
+        ctx.fillStyle = '#d4e2ef';
+        ctx.fillRect(M, y, W - M * 2, 2);
+        y += compact ? 12 : 20;
+        await write(
+          String(++number).padStart(2, '0') + ' / ' +
+          (r.childId ? 'SUB-ITEM' : 'MAIN RECORD') + ' · ' + r.status,
+          18, true, E.closed(r.status) ? '#256f3a' : '#0064d9'
         );
-      await field('Record ID', r.childId ? r.id + ' / ' + r.childId : r.id);
-      await field('Project', r.project || r.projectId);
-      await field('Status / Priority', [r.status, r.priority].filter(Boolean).join(' · '));
-      await field('Owner', r.owner);
-      await field('Due / Follow-up', r.due);
-      await field('Expected date', r.expected);
-      await field('Notes', r.notes);
-      await field(r.kind === 'tickets' ? 'Latest ticket update' : 'Feedback', r.feedback);
-      await field('Next step', r.nextStep);
-      await field('Blocker', r.blocker);
-      for (const ref of r.references) await field('Reference · ' + ref.label, ref.url || ref.label);
-      y += 20;
+        y += 8;
+        await write(recordName(r), compact ? 26 : 29, true);
+        y += 12;
+        if (r.parent)
+          await field(
+            'Parent record',
+            [r.parent.identifier, r.parent.title, '(ID: ' + r.parent.id + ')']
+              .filter(Boolean).join(' · ')
+          );
+        for (const section of E.sections(r)) {
+          await heading(section.title, compact ? 23 : 25);
+          for (const f of section.fields) await field(f.label, f.value);
+        }
+        await field('Record ID', r.childId ? r.id + ' / ' + r.childId : r.id);
+        y += compact ? 10 : 20;
+      }
     }
     await finish();
     check();
