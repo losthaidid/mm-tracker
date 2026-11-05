@@ -238,6 +238,39 @@
     }
     return [...result.values()];
   }
+  function previewPages(records, limit = 25) {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100)
+      throw Error('Choose a preview page size between 1 and 100.');
+    const pages = [];
+    let page = [], count = 0;
+    const finish = () => {
+      if (page.length) pages.push(page);
+      page = [];
+      count = 0;
+    };
+    for (const group of groups(records)) {
+      if (group.records.length <= limit) {
+        if (count + group.records.length > limit) finish();
+        page.push({ ...group, total: group.records.length, continued: false });
+        count += group.records.length;
+        if (count === limit) finish();
+        continue;
+      }
+      finish();
+      for (let start = 0; start < group.records.length; start += limit) {
+        page.push({
+          ...group,
+          records: group.records.slice(start, start + limit),
+          total: group.records.length,
+          continued: start > 0,
+        });
+        count = page[0].records.length;
+        finish();
+      }
+    }
+    finish();
+    return pages;
+  }
   function overview(pack) {
     const records = pack.records,
       open = records.filter(r => !closed(r.status)),
@@ -421,7 +454,7 @@
     );
   }
   root.WorkHubHandoverEngine = {
-    MAX_RECORDS, MAX_CHARS, kinds, labels, closed, collect, groups, overview,
+    MAX_RECORDS, MAX_CHARS, kinds, labels, closed, collect, groups, previewPages, overview,
     sections, duration, snapshot, allowed, filename,
   };
 })(globalThis);

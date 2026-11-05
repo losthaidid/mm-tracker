@@ -145,10 +145,9 @@
       ).join('') + '</div>';
     }
     function previewHTML() {
-      const groups = E.groups(pack.records),
-        info = E.overview(pack),
-        size = 10;
-      previewPage = Math.min(previewPage, Math.max(0, Math.ceil(groups.length / size) - 1));
+      const pages = E.previewPages(pack.records),
+        info = E.overview(pack);
+      previewPage = Math.min(previewPage, Math.max(0, pages.length - 1));
       const metrics = [
         [info.total, 'Selected records'],
         [info.open, 'Open'],
@@ -190,9 +189,10 @@
           ' open record(s) have no owner / PIC recorded. The pack recipient is not assigned as their owner.</p>' : '') +
         '</section><section class="ho-pack-section" id="hoRecords"><h4>Work records</h4>' +
         '<p class="muted">Only selected records are included. Missing values are left blank; information is not inferred.</p>' +
-        groups.slice(previewPage * size, previewPage * size + size).map(group =>
+        pages[previewPage].map(group =>
           '<section class="ho-work-group"><header><small>' + E.labels[group.kind] +
-          ' · ' + group.records.length + ' selected record(s)</small><h4>' + esc(group.title) +
+          ' · ' + group.records.length + ' of ' + group.total + ' selected record(s)' +
+          (group.continued ? ' · Continued' : '') + '</small><h4>' + esc(group.title) +
           '</h4>' + (!group.parentSelected ? '<p class="muted">Parent shown for identification. Its details were not selected.</p>' : '') +
           '</header>' + group.records.map(r =>
             '<article class="ho-preview-record' + (r.childId ? ' ho-preview-child' : '') +
@@ -210,9 +210,8 @@
           ).join('') + '</section>'
         ).join('') + '<div class="df-pagination">' +
         button('preview-prev', 'Previous records', previewPage === 0 || busy ? 'disabled' : '') +
-        '<span>Groups ' + (previewPage * size + 1) + '–' + Math.min(groups.length, (previewPage + 1) * size) +
-        ' of ' + groups.length + '</span>' +
-        button('preview-next', 'Next records', (previewPage + 1) * size >= groups.length || busy ? 'disabled' : '') +
+        '<span>Preview page ' + (previewPage + 1) + ' of ' + pages.length + ' · up to 25 records</span>' +
+        button('preview-next', 'Next records', previewPage + 1 >= pages.length || busy ? 'disabled' : '') +
         '</div></section></section>';
     }
     function invalidate() {

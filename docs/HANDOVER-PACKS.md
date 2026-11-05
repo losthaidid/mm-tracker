@@ -22,7 +22,7 @@ Project/company context, linked ticket details, workflow context and saved sessi
 
 ## Preview and export
 
-**Preview Handover pack** creates a detached snapshot. The redesigned object-page preview includes a section navigator and up to 10 complete parent groups per preview page. Groups are kept together, with main records before their selected children. The PDF contains every selected group regardless of the preview page.
+**Preview Handover pack** creates a detached snapshot. The redesigned object-page preview includes a section navigator and up to 25 records per preview page. Smaller groups stay together. Larger groups continue across pages with a repeated parent label; main records stay before their selected children. The PDF contains every selected group regardless of the preview page.
 
 **Prepare PDF** generates a Fiori-inspired cover, summary, attention/action lists and grouped record sections. Download appears as an explicit **Download PDF** link when preparation succeeds. Unicode text wraps across pages. There is a 1,000,000-character snapshot bound and 240-page PDF bound; exceeding either produces an error without a partial export or shortened fields. Pages are rendered locally as images, preserving visual text; the PDF is not searchable or tagged.
 

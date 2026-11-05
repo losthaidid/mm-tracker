@@ -131,6 +131,19 @@ test('Enhanced handover: related project, workflow and recorded-time access is c
   const permitted = E.snapshot(d, rows.map(r => r.key), { asOf: '2026-11-06' }, can);
   assert.equal(E.allowed(permitted, can), true);
 });
+test('Enhanced handover: a 500-record group stays correctly ordered across bounded preview pages without truncation', () => {
+  const d = source(), rows = E.collect(d), base = rows.find(r => r.kind === 'tasks' && !r.childId),
+    child = rows.find(r => r.childId === 'a'),
+    records = [base, ...Array.from({ length: 499 }, (_, i) => ({ ...child, childId: String(i), key: 'child-' + i }))],
+    pages = E.previewPages(records);
+  assert.equal(pages.length, 20);
+  assert.ok(pages.every(page => page.reduce((n, g) => n + g.records.length, 0) <= 25));
+  assert.equal(pages[0][0].continued, false);
+  assert.equal(pages[1][0].continued, true);
+  assert.equal(pages[1][0].title, '001 · Material 6.00007');
+  assert.deepEqual(pages.flatMap(page => page.flatMap(g => g.records)), records);
+  assert.throws(() => E.previewPages(records, 0), /page size/);
+});
 function uiFixture(t) {
   const dom = new JSDOM('<body><main id="view"></main></body>', { runScripts: 'outside-only', url: 'https://example.test' }),
     w = dom.window, d = w.document;
