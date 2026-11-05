@@ -20,6 +20,25 @@
       description: 'A compact navigation rail, generous cards and a fresh dashboard.',
       layout: 'Compact rail · spacious panels',
     },
+    editorial: {
+      name: 'Editorial',
+      eyebrow: 'THOUGHTFUL & COMPOSED',
+      description:
+        'A magazine-inspired workspace with an index, elegant headings and divided panels.',
+      layout: 'Grouped index · editorial panels',
+    },
+    canvas: {
+      name: 'Canvas',
+      eyebrow: 'ROOM TO EXPLORE',
+      description: 'A floating section launcher, an open working area and a dashboard of tiles.',
+      layout: 'Floating navigation · open canvas',
+    },
+    'compact-pro': {
+      name: 'Compact Pro',
+      eyebrow: 'PRECISE & PRACTICAL',
+      description: 'Collapsible navigation, compact toolbars and dense tables for detailed work.',
+      layout: 'Collapsible menu · dense workspace',
+    },
   };
   const ORDER = [
     'home',
@@ -73,6 +92,7 @@
       base = 'current',
       focus = null,
       saving = false,
+      compactCollapsed = false,
       grouping = '',
       groupedNodes = [];
     const context = () => [a.ready() ? a.owner() : '', a.generation()];
@@ -90,6 +110,9 @@
     function apply() {
       const id = a.ready() ? (dialog ? draft : current()) : 'current';
       if (document.body.dataset.hubDesign !== id) document.body.dataset.hubDesign = id;
+      if (id === 'compact-pro')
+        document.body.dataset.wdNavCollapsed = String(compactCollapsed && !media?.matches);
+      else delete document.body.dataset.wdNavCollapsed;
       arrange(id);
       for (const label of document.querySelectorAll('[data-wd-active-label]')) {
         const text = DESIGNS[id].name + (dialog && draft !== base ? ' · preview' : '');
@@ -103,14 +126,12 @@
       if (!nav) return;
       const nodes = [...nav.querySelectorAll('button[data-tab]')];
       const mobile = !!media?.matches;
-      const kind =
-        id === 'clear-desk'
-          ? mobile
-            ? 'top-mobile'
-            : 'top'
-          : id === 'modern-hub' && mobile
-            ? 'dock'
-            : 'flat';
+      let kind = 'flat';
+      if (id === 'clear-desk') kind = mobile ? 'top-mobile' : 'top';
+      if (id === 'modern-hub' && mobile) kind = 'dock';
+      if (id === 'editorial') kind = mobile ? 'top-mobile' : 'index';
+      if (id === 'canvas') kind = 'launcher';
+      if (id === 'compact-pro') kind = mobile ? 'top-mobile' : 'compact';
       if (
         grouping !== kind ||
         nodes.length !== groupedNodes.length ||
@@ -124,7 +145,22 @@
         for (const node of sorted) nav.append(node);
         for (const wrapper of [...nav.children])
           if (!wrapper.matches('button[data-tab]')) wrapper.remove();
-        if (kind !== 'flat') {
+        const appendGroups = (host, primary = []) => {
+          for (const [title, keys] of GROUPS) {
+            const group = document.createElement('div');
+            group.className = 'wd-nav-group';
+            const heading = document.createElement('strong');
+            heading.textContent = title;
+            group.append(heading);
+            for (const node of sorted.filter(
+              n => keys.includes(n.dataset.tab) && !primary.includes(n.dataset.tab)
+            ))
+              group.append(node);
+            if (group.querySelector('button')) host.append(group);
+          }
+        };
+        if (kind === 'index' || kind === 'compact') appendGroups(nav);
+        else if (kind !== 'flat') {
           const primary =
             kind === 'top'
               ? ['home', 'tickets', 'tasks', 'schedule', 'specs']
@@ -143,18 +179,7 @@
             '<summary aria-label="Browse all workspace sections"><span class="wd-menu-symbol" aria-hidden="true">▦</span><span data-wd-menu-label>Sections</span><span aria-hidden="true">⌄</span></summary><div class="wd-section-popover"></div>';
           nav.append(more);
           const popover = more.lastElementChild;
-          for (const [title, keys] of GROUPS) {
-            const group = document.createElement('div');
-            group.className = 'wd-nav-group';
-            const heading = document.createElement('strong');
-            heading.textContent = title;
-            group.append(heading);
-            for (const node of sorted.filter(
-              n => keys.includes(n.dataset.tab) && !primary.includes(n.dataset.tab)
-            ))
-              group.append(node);
-            if (group.querySelector('button')) popover.append(group);
-          }
+          appendGroups(popover, primary);
           more.addEventListener('keydown', e => {
             if (e.key === 'Escape') {
               e.preventDefault();
@@ -170,11 +195,11 @@
       }
       const active = nodes.find(n => n.classList.contains('active') && !n.hidden);
       const menu = $('wdSectionMenu');
+      for (const group of nav.querySelectorAll('.wd-nav-group'))
+        group.hidden = ![...group.querySelectorAll('button')].some(
+          b => !b.hidden && b.style.display !== 'none'
+        );
       if (menu) {
-        for (const group of menu.querySelectorAll('.wd-nav-group'))
-          group.hidden = ![...group.querySelectorAll('button')].some(
-            b => !b.hidden && b.style.display !== 'none'
-          );
         menu.hidden = ![...menu.querySelectorAll('button')].some(
           b => !b.hidden && b.style.display !== 'none'
         );
@@ -182,12 +207,26 @@
         const text = active && menu.contains(active) ? active.textContent.trim() : 'Sections';
         if (label.textContent !== text) label.textContent = text;
       }
+      const collapse = $('wdNavToggle');
+      if (collapse) {
+        collapse.hidden = id !== 'compact-pro' || mobile || !a.ready();
+        collapse.setAttribute('aria-expanded', String(!compactCollapsed));
+        collapse.setAttribute(
+          'aria-label',
+          compactCollapsed ? 'Expand navigation' : 'Collapse navigation'
+        );
+        collapse.title = compactCollapsed ? 'Expand navigation' : 'Collapse navigation';
+        collapse.querySelector('[data-wd-collapse-icon]').textContent = compactCollapsed
+          ? '⇥'
+          : '⇤';
+      }
+      const tooltips = id === 'modern-hub' || (id === 'compact-pro' && compactCollapsed);
       for (const button of nodes) {
-        if (id === 'modern-hub' && !button.title) {
+        if (tooltips && !button.title) {
           button.dataset.wdTitle =
             button.querySelector('.hub-nav-label')?.textContent || button.textContent.trim();
           button.title = button.dataset.wdTitle;
-        } else if (id !== 'modern-hub' && button.dataset.wdTitle) {
+        } else if (!tooltips && button.dataset.wdTitle) {
           if (button.title === button.dataset.wdTitle) button.removeAttribute('title');
           delete button.dataset.wdTitle;
         }
@@ -201,6 +240,7 @@
       if (next !== owner || epoch !== generation) {
         owner = next;
         generation = epoch;
+        compactCollapsed = false;
         close(false);
       } else if (dialog && !saving && current() !== base) close(false);
       const host = $('hubSettingsAppearance');
@@ -212,6 +252,17 @@
         button.dataset.accessFeature = 'workspace';
         button.textContent = 'Website design';
         host.append(button);
+      }
+      const sidebar = $('hubSidebar');
+      if (sidebar && !$('wdNavToggle')) {
+        const toggle = document.createElement('button');
+        toggle.id = 'wdNavToggle';
+        toggle.type = 'button';
+        toggle.setAttribute('aria-controls', 'tabs');
+        toggle.hidden = true;
+        toggle.innerHTML =
+          '<span data-wd-collapse-icon aria-hidden="true">⇤</span><span class="wd-collapse-label">Collapse menu</span>';
+        sidebar.prepend(toggle);
       }
       const page = document.querySelector('#hubShell > main.page');
       if (page && !$('wdWorkspaceBar')) {
@@ -246,7 +297,7 @@
       dialog.dataset.accessFeature = 'workspace';
       dialog.setAttribute('aria-labelledby', 'wdChooserTitle');
       dialog.innerHTML =
-        '<form><header class="wd-chooser-head"><div><span class="hub-kicker">A SPACE THAT FITS YOUR DAY</span><h2 id="wdChooserTitle">Make room for a different view.</h2><p>Three designs. The same work, always with you.</p></div><button type="button" data-wd-close aria-label="Close website design preview">×</button></header><fieldset class="wd-design-options"><legend>Choose your website design</legend>' +
+        '<form><header class="wd-chooser-head"><div><span class="hub-kicker">A SPACE THAT FITS YOUR DAY</span><h2 id="wdChooserTitle">Make room for a different view.</h2><p>Six designs. The same work, always with you.</p></div><button type="button" data-wd-close aria-label="Close website design preview">×</button></header><fieldset class="wd-design-options"><legend>Choose your website design</legend>' +
         Object.entries(DESIGNS)
           .map(
             ([id, d]) =>
@@ -334,6 +385,13 @@
       dialog.querySelector('[data-wd-close]').focus({ preventScroll: true });
     }
     document.addEventListener('click', e => {
+      if (e.target.closest?.('#wdNavToggle')) {
+        if (a.ready() && document.body.dataset.hubDesign === 'compact-pro') {
+          compactCollapsed = !compactCollapsed;
+          apply();
+        }
+        return;
+      }
       const opener = e.target.closest?.('[data-website-design-open]');
       if (opener) {
         try {

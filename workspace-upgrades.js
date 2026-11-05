@@ -49,7 +49,10 @@
   }
   function appearanceValidate(p) {
     if (
-      (p.design !== undefined && !['current', 'clear-desk', 'modern-hub'].includes(p.design)) ||
+      (p.design !== undefined &&
+        !['current', 'clear-desk', 'modern-hub', 'editorial', 'canvas', 'compact-pro'].includes(
+          p.design
+        )) ||
       !p.colors ||
       Object.keys(COLORS).some(k => !color(p.colors[k])) ||
       !Array.isArray(p.palettes) ||

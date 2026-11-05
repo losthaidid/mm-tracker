@@ -48,8 +48,8 @@
     ],
     websiteDesignButton: [
       'workspace',
-      'Switch between Current, Clear Desk and Modern Hub.',
-      'website design layout sidebar rail navigation appearance preview',
+      'Preview six website designs and save the layout that suits your work.',
+      'website design layout sidebar rail navigation appearance preview editorial canvas compact pro',
     ],
     appearance: [
       'workspace',
