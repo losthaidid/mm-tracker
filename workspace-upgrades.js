@@ -49,6 +49,7 @@
   }
   function appearanceValidate(p) {
     if (
+      (p.design !== undefined && !['current', 'clear-desk', 'modern-hub'].includes(p.design)) ||
       !p.colors ||
       Object.keys(COLORS).some(k => !color(p.colors[k])) ||
       !Array.isArray(p.palettes) ||
@@ -323,10 +324,7 @@
         subs = item.subItems || [];
       delete item._completeSubItems;
       if (!subs.length) continue;
-      if (
-        item.status === 'Completed' &&
-        (requested || !before || before.status !== 'Completed')
-      ) {
+      if (item.status === 'Completed' && (requested || !before || before.status !== 'Completed')) {
         const date = item._statusDateExplicit
           ? item.statusDate || today
           : item.statusDate && item.statusDate !== before?.statusDate
@@ -431,7 +429,13 @@
       );
     }
     function dateButton(host, id, sub = '') {
-      if (!host || [...host.querySelectorAll('[data-project-status-date]')].some(b => b.dataset.projectStatusDate === id && (b.dataset.sub || '') === sub)) return;
+      if (
+        !host ||
+        [...host.querySelectorAll('[data-project-status-date]')].some(
+          b => b.dataset.projectStatusDate === id && (b.dataset.sub || '') === sub
+        )
+      )
+        return;
       const r = find(id, sub);
       if (!r) return;
       const b = document.createElement('button');
