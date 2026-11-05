@@ -179,12 +179,13 @@
         'Based on recorded priority, due dates, status and prerequisites as of ' + esc(pack.asOf) +
         '.</p>' + attentionHTML(info) + '</section>' +
         '<section class="ho-pack-section" id="hoActions"><h4>Next actions</h4>' +
+        '<p class="muted">From the saved work context. Session wrap-ups stay with their record under Recorded work.</p>' +
         (info.actions.length ? '<div class="ho-action-list">' + info.actions.map(r =>
           '<article><strong>' + esc(recordName(r)) + '</strong>' +
           '<p class="ho-preserve">' + esc(r.nextStep) + '</p>' +
           '<small>' + esc([r.owner && 'Owner: ' + r.owner, r.due && 'Due: ' + r.due].filter(Boolean).join(' · ')) +
           '</small></article>').join('') + '</div>' :
-          '<p class="muted">No next actions were recorded in the included fields.</p>') +
+          '<p class="muted">No next actions were recorded in the work context.</p>') +
         (info.unassigned ? '<p class="ho-information">' + info.unassigned +
           ' open record(s) have no owner / PIC recorded. The pack recipient is not assigned as their owner.</p>' : '') +
         '</section><section class="ho-pack-section" id="hoRecords"><h4>Work records</h4>' +

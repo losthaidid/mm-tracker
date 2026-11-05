@@ -106,7 +106,7 @@ function fixture(t, count = 2) {
   });
   return { w, d, ui, messages, state: () => state, writes: () => writes,
     change() { state.tasks[0].feedback = 'Newer update'; },
-    switchOwner() { owner = 'b'; generation++; },
+    switchOwner() { owner = 'b'; generation++; ui.mount('tasks'); },
     deny() { permitted = false; },
   };
 }
@@ -142,6 +142,7 @@ test('Task completion review: changed records, closed dialogs, account changes a
   x.ui.review(); form = x.d.getElementById('taskCompletionForm'); x.change();
   assert.throws(() => x.ui.apply(form), /changed/);
   x.ui.review(); form = x.d.getElementById('taskCompletionForm'); x.switchOwner();
+  assert.equal(x.d.getElementById('modal').hasAttribute('open'), false);
   assert.throws(() => x.ui.apply(form), /expired/);
   x.deny();
   assert.throws(() => x.ui.review(), /cannot complete/);

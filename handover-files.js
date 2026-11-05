@@ -188,8 +188,10 @@
       ].filter(Boolean).join('\n'));
     }
     await heading('Next actions');
+    await write('From the saved work context. Session wrap-ups stay with their record under Recorded work.', 20);
+    y += 12;
     if (!info.actions.length)
-      await write('No next actions were recorded in the included fields.', 21);
+      await write('No next actions were recorded in the work context.', 21);
     for (const r of info.actions) {
       await write(recordName(r), 23, true);
       await field('Next action', [

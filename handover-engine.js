@@ -149,7 +149,7 @@
         title: string(r.task || r.title || r.description || r.ticket || r.itemId || 'Untitled'),
         projectId: string(projectId),
         project: string(project),
-        company: company?.projectId === projectId
+        company: company && company.projectId === projectId
           ? string(company.name) + (company.active === false ? ' (inactive)' : '')
           : '',
         identifier: string(r.ticket || r.number || r.itemId || ''),

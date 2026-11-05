@@ -39,6 +39,10 @@
       generation = () => a.cloud().generation,
       editable = () => ready() && a.canEdit();
     function mount(tab) {
+      const form = document.getElementById('taskCompletionForm'),
+        review = form && reviews.get(form);
+      if (review && (!editable() || review.owner !== identity() || review.generation !== generation()))
+        a.closeModal();
       const old = document.getElementById('taskCompletionNotice');
       if (tab !== 'tasks' || !editable()) {
         old?.remove();
