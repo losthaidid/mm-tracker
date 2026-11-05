@@ -271,9 +271,9 @@
       if (
         session &&
         rows.some(r => !r.manual && !r.saved && r.selected) &&
-        !root.confirm(
+        !(await root.WorkHubDialogs.confirm(
           'Replace this statement review? Unsaved PDF selections and crop adjustments will be cleared. Saved expenses and manual drafts are kept.'
-        )
+        ))
       )
         return;
       const manualRows = rows.filter(r => r.manual && !r.saved);

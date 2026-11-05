@@ -748,7 +748,7 @@
       $('rehearsalInspector').innerHTML = connectorInspector();
       $('rehearsalViewport')?.focus({ preventScroll: true });
     }
-    function deleteSelection() {
+    async function deleteSelection() {
       const p = model();
       if (editing) {
         a.tell('Save or cancel step details before deleting steps or links.');
@@ -768,7 +768,7 @@
       }
       if (ids.length >= p.steps.length) throw Error('Keep at least one process step.');
       if (
-        !root.confirm(
+        !(await root.WorkHubDialogs.confirm(
           'Delete ' +
             (ids.length
               ? ids.length + ' step' + (ids.length === 1 ? '' : 's') + ' and their connections'
@@ -780,7 +780,7 @@
             '?' +
             (edges.length && !ids.length ? ' Both steps will be kept.' : '') +
             '\nYou can undo this canvas edit.'
-        )
+        ))
       )
         return;
       followCamera = false;
@@ -1071,7 +1071,12 @@
         overlay.showModal();
       }
       const stage = overlay.firstElementChild;
-      if (!stage.contains(el)) stage.replaceChildren(el);
+      if (!stage.contains(el)) {
+        // Keep the fullscreen host and open website dialogs stable during a repaint.
+        const previous = [...stage.children].find(child => child.id === 'rehearsalRoot');
+        if (previous) previous.replaceWith(el);
+        else stage.prepend(el);
+      }
       document.body.classList.add('process-hub-full-open');
     }
     function setMode(value, native = true) {
@@ -1097,10 +1102,16 @@
       }
       if (value === 'normal') $('rehearsalProcess')?.focus();
     }
-    function beginDraft(blank = false, source = null) {
+    async function beginDraft(blank = false, source = null) {
       guard(owner);
-      if (draft && !root.confirm('Discard the current process draft?')) return;
-      if (editing && !draft && !root.confirm('Discard the unsaved step details?')) return;
+      if (draft && !(await root.WorkHubDialogs.confirm('Discard the current process draft?')))
+        return;
+      if (
+        editing &&
+        !draft &&
+        !(await root.WorkHubDialogs.confirm('Discard the unsaved step details?'))
+      )
+        return;
       captureDraftFields();
       const p = source ? E.copy(source) : E.normalize(E.seed(uid(), now(), blank));
       baseFingerprint = source
@@ -1164,8 +1175,9 @@
       if (editHistory.length) editHistory.at(-1).after = JSON.stringify(model());
       a.tell('Process saved. Animated playback is looping.');
     }
-    function discardDraft() {
-      if (!draft || !root.confirm('Discard your unsaved process changes?')) return;
+    async function discardDraft() {
+      if (!draft || !(await root.WorkHubDialogs.confirm('Discard your unsaved process changes?')))
+        return;
       draft = null;
       editing = false;
       editorSnapshot = null;
@@ -2232,7 +2244,7 @@
         return;
       }
       if (action === 'delete-steps') {
-        deleteSelection();
+        await deleteSelection();
         return;
       }
       if (
@@ -2242,7 +2254,7 @@
       ) {
         if (!activeLink) return;
         if (action === 'connector-delete') {
-          deleteSelection();
+          await deleteSelection();
           return;
         }
         const edge = E.copy(E.connector(p, activeLink.from, activeLink.to));
@@ -2329,11 +2341,11 @@
       }
       void unlock();
       if (action === 'new') {
-        beginDraft(true);
+        await beginDraft(true);
         return;
       }
       if (action === 'edit-process') {
-        beginDraft(false, p);
+        await beginDraft(false, p);
         return;
       }
       if (action === 'save-draft') {
@@ -2341,7 +2353,7 @@
         return;
       }
       if (action === 'discard-draft') {
-        discardDraft();
+        await discardDraft();
         return;
       }
       if (action === 'fullscreen' || action === 'present' || action === 'normal') {
@@ -2422,7 +2434,10 @@
         return;
       }
       if (action === 'scenario-delete') {
-        if (p.scenarios.length > 1 && root.confirm('Delete this scenario?')) {
+        if (
+          p.scenarios.length > 1 &&
+          (await root.WorkHubDialogs.confirm('Delete this scenario?'))
+        ) {
           const old = scenarioId;
           scenarioId = p.scenarios.find(s => s.id !== old).id;
           saveMutation(row => {
@@ -2433,7 +2448,14 @@
         return;
       }
       if (action === 'delete-process') {
-        if (root.confirm('Delete this saved process and its screenshots?')) {
+        if (
+          await root.WorkHubDialogs.confirm('Delete “' + p.name + '” and its saved screenshots?', {
+            title: 'Delete process?',
+            confirmLabel: 'Delete process',
+            cancelLabel: 'Keep process',
+            danger: true,
+          })
+        ) {
           processId = '';
           route = null;
           editing = false;
@@ -2461,7 +2483,10 @@
         return;
       }
       if (action === 'delete-step') {
-        if (p.steps.length > 1 && root.confirm('Delete this step and remove its connections?')) {
+        if (
+          p.steps.length > 1 &&
+          (await root.WorkHubDialogs.confirm('Delete this step and remove its connections?'))
+        ) {
           editing = false;
           editorSnapshot = null;
           saveMutation(row => E.removeStep(row, id));
@@ -3147,7 +3172,7 @@
     }
     document.addEventListener(
       'keydown',
-      event => {
+      async event => {
         const surface = event.target.closest?.('#rehearsalRoot'),
           form = event.target.closest?.('#rehearsalProcessForm,#rehearsalScenarioForm');
         if (
@@ -3203,7 +3228,7 @@
                 const edge = E.copy(E.connector(model(), activeLink.from, activeLink.to));
                 edge.via.splice(Number(handle.slice(5)), 1);
                 saveMutation(row => E.setConnector(row, edge));
-              } else deleteSelection();
+              } else await deleteSelection();
             } catch (err) {
               a.tell(err.message, true);
             }

@@ -49,7 +49,15 @@
       qrFile = '',
       qrLink = '',
       qrUrl = '',
-      configuredClient = '';
+      configuredClient = '',
+      layout = 'table',
+      galleryEpoch = 0;
+    const previewContext = () => [a.owner(), a.generation(), api.identity()?.id || ''].join('|');
+    const previews = root.WorkHubFilePreviews.create({
+      context: previewContext,
+      valid: () => a.ready() && can('export') && api.connected(),
+      tell: e => a.tell(e.message || String(e), true),
+    });
     function releaseQR() {
       if (qrUrl) URL.revokeObjectURL(qrUrl);
       qrUrl = '';
@@ -85,7 +93,16 @@
           )
         )
           a.closeModal();
+        previews.clear();
         account = next;
+        try {
+          layout =
+            localStorage.getItem('workhub.files.layout.v1:' + account) === 'gallery'
+              ? 'gallery'
+              : 'table';
+        } catch {
+          layout = 'table';
+        }
         generation = a.generation();
         api.clear();
         releaseQR();
@@ -96,6 +113,7 @@
         page = 0;
         qrFile = qrLink = '';
       }
+      previews.sync();
       const b = document.getElementById('driveSettingsButton');
       if (b) b.hidden = !a.ready() || !can();
       const client = data()?.clientId || '';
@@ -170,21 +188,47 @@
         d.workhub.driveFiles = merged;
       });
     }
+    const perPage = () => (layout === 'gallery' ? 12 : 50);
+    const sortedFiles = () =>
+      data()
+        .files.filter(
+          f =>
+            (!type || f.sourceType === type) &&
+            [f.name, f.sourceType, f.scope, f.source?.id]
+              .join(' ')
+              .toLowerCase()
+              .includes(query.toLowerCase())
+        )
+        .sort((x, y) => y.createdAt.localeCompare(x.createdAt));
+    const fileTag = f =>
+      f.mimeType === 'application/pdf'
+        ? 'PDF'
+        : f.mimeType.startsWith('image/')
+          ? 'IMAGE'
+          : /sheet|excel|csv/.test(f.mimeType)
+            ? 'SHEET'
+            : /zip/.test(f.mimeType)
+              ? 'ZIP'
+              : 'FILE';
+    function previewButton(f) {
+      return can('export') && root.WorkHubFilePreviews.supported(f)
+        ? button('preview', 'Preview', `data-id="${esc(f.id)}" aria-label="Preview ${esc(f.name)}"`)
+        : '';
+    }
+    function card(f) {
+      const preview = can('export') && root.WorkHubFilePreviews.supported(f);
+      return `<article class="df-card"><div class="df-card-top"><span class="df-badge">${fileTag(f)}</span><span>${E.size(f.size)}</span></div>${preview ? `<button type="button" class="df-card-cover" data-df="preview" data-id="${esc(f.id)}" aria-label="Preview ${esc(f.name)}">` : `<a class="df-card-cover" href="${esc(E.url(f.webViewLink))}" target="_blank" rel="noopener noreferrer" aria-label="Open ${esc(f.name)} in Drive">`}<span data-df-thumb="${esc(f.id)}" class="df-thumb-slot"><svg viewBox="0 0 64 76" fill="none" aria-hidden="true"><path d="M10 2h29l15 16v54H10z" fill="currentColor" opacity=".08"/><path d="M10 2h29l15 16v54H10zM39 2v17h15M19 34h27M19 44h27M19 54h18" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span>${fileTag(f)}</span></span>${preview ? '</button>' : '</a>'}<div class="df-card-body"><h4 title="${esc(f.name)}">${esc(f.name)}</h4><p>${esc(f.sourceType === 'process' ? 'Process Hub · ' + f.scope : f.sourceType === 'handover' ? 'Handover snapshot' : 'Original upload')}</p><small>${f.source ? esc(sourceLabel(f.source)) : 'No linked record'}</small><small>${esc(new Date(f.createdAt).toLocaleDateString())}</small><div class="actions">${previewButton(f)}${can('export') ? button('file', 'Download / QR', `data-id="${esc(f.id)}"`) : ''}${link(f.webViewLink, 'Drive ↗')}</div></div></article>`;
+    }
     function render() {
       sync();
+      galleryEpoch++;
+      previews.clearThumbnails();
       const all = data().files,
-        rows = all
-          .filter(
-            f =>
-              (!type || f.sourceType === type) &&
-              [f.name, f.sourceType, f.scope, f.source?.id]
-                .join(' ')
-                .toLowerCase()
-                .includes(query.toLowerCase())
-          )
-          .sort((x, y) => y.createdAt.localeCompare(x.createdAt));
-      page = Math.max(0, Math.min(page, Math.ceil(rows.length / 50) - 1));
-      return `<section class="df-room"><header class="df-hero"><div><span class="hub-kicker">YOUR FILES, WITH YOUR WORK</span><h2>A home for every handoff.</h2><p>Keep original files and dated exports in Google Drive. Link them to the work they belong to, then download or share by QR.</p></div><div class="df-hero-symbol" aria-hidden="true">▤<span>↗</span></div></header><div class="df-stats"><div><small>Files in your library</small><strong>${all.length}</strong></div><div><small>Stored in Google Drive</small><strong>${E.size(all.reduce((n, f) => n + f.size, 0))}</strong></div><div><small>Connection on this device</small><strong class="df-connection">${api.connected() ? 'Connected' : 'Not connected'}</strong><small>${esc(api.identity()?.email || 'Connect when you want to upload or change sharing.')}</small></div></div><section class="df-panel"><div class="df-bar"><div><h3>File library</h3><p class="muted">File contents stay in Drive. Your workspace saves names, links and record references.</p></div><div class="actions">${button('settings', api.connected() ? 'Drive settings' : 'Set up / connect Google Drive')}${can('create') ? button('upload-dialog', '＋ Upload file', 'class="primary" data-df-busy') : ''}${can('create') ? button('refresh', 'Refresh Drive', 'data-df-busy') : ''}</div></div><div class="df-filters"><label>Find a file<input type="search" data-df-filter="query" value="${esc(query)}" placeholder="Search file name or source"></label><label>Source<select data-df-filter="type"><option value="">All files</option>${[
+        rows = sortedFiles(),
+        limit = perPage();
+      page = Math.max(0, Math.min(page, Math.ceil(rows.length / limit) - 1));
+      const visible = rows.slice(page * limit, page * limit + limit);
+      return `<section class="df-room"><header class="df-hero"><div><span class="hub-kicker">YOUR FILES, WITH YOUR WORK</span><h2>A home for every handoff.</h2><p>Keep original files and dated exports in Google Drive. Preview, find and share the file you need.</p></div><div class="df-hero-symbol" aria-hidden="true">▤<span>↗</span></div></header><div class="df-stats"><div><small>Files in your library</small><strong>${all.length}</strong></div><div><small>Stored in Google Drive</small><strong>${E.size(all.reduce((n, f) => n + f.size, 0))}</strong></div><div><small>Connection on this device</small><strong class="df-connection">${api.connected() ? 'Connected' : 'Not connected'}</strong><small>${esc(api.identity()?.email || 'Connect to preview, upload or change sharing.')}</small></div></div><section class="df-panel"><div class="df-bar"><div><h3>File library</h3><p class="muted">File contents stay in Drive. Previews and thumbnails are kept only for this session.</p></div><div class="actions">${button('settings', api.connected() ? 'Drive settings' : 'Set up / connect Google Drive')}${can('create') ? button('upload-dialog', '＋ Upload file', 'class="primary" data-df-busy') + button('refresh', 'Refresh Drive', 'data-df-busy') : ''}</div></div><div class="df-view-bar"><div role="group" aria-label="File library view">${button('table', 'Table', `aria-pressed="${layout === 'table'}"`)}${button('gallery', 'Gallery', `aria-pressed="${layout === 'gallery'}"`)}</div>${layout === 'gallery' && can('export') ? button('thumbnails', 'Load thumbnails', `data-df-busy ${!api.connected() || !visible.some(f => root.WorkHubFilePreviews.supported(f) && f.size <= 8 * 1024 * 1024) ? 'disabled' : ''}`) : ''}</div><div class="df-filters"><label>Find a file<input type="search" data-df-filter="query" value="${esc(query)}" placeholder="Search file name or source"></label><label>Source<select data-df-filter="type"><option value="">All files</option>${[
         ['upload', 'Uploads'],
         ['process', 'Process Hub'],
         ['handover', 'Handover packs'],
@@ -192,19 +236,7 @@
         .map(([k, v]) => `<option value="${k}"${type === k ? ' selected' : ''}>${v}</option>`)
         .join(
           ''
-        )}</select></label><span>${rows.length} file${rows.length === 1 ? '' : 's'}</span></div><p id="dfStatus" role="status" class="${messageError ? 'df-error' : ''}">${esc(message)}</p>${
-        rows.length
-          ? `<div class="df-table"><table><thead><tr><th>File</th><th>Linked work</th><th>Size / saved</th><th>Actions</th></tr></thead><tbody>${rows
-              .slice(page * 50, page * 50 + 50)
-              .map(
-                f =>
-                  `<tr><td><strong>${esc(f.name)}</strong><small>${esc(f.sourceType === 'process' ? 'Process Hub · ' + f.scope : f.sourceType === 'handover' ? 'Handover snapshot' : f.mimeType)}</small></td><td>${f.source ? esc(sourceLabel(f.source)) : '—'}${f.projectId ? `<small>${esc(a.state().projects.find(p => p.id === f.projectId)?.name || 'Project reference')}</small>` : ''}</td><td>${E.size(f.size)}<small>${esc(new Date(f.createdAt).toLocaleDateString())}</small></td><td><div class="actions">${link(f.webViewLink, 'Open in Drive')}${can('export') ? button('file', 'Download / QR', `data-id="${esc(f.id)}"`) : ''}</div></td></tr>`
-              )
-              .join(
-                ''
-              )}</tbody></table></div><div class="df-pagination">${button('prev', 'Previous', page === 0 ? 'disabled' : '')}<span>Page ${page + 1} of ${Math.ceil(rows.length / 50)}</span>${button('next', 'Next', (page + 1) * 50 >= rows.length ? 'disabled' : '')}</div>`
-          : '<div class="df-empty"><span aria-hidden="true">▤</span><h3>Bring a file along.</h3><p>Upload a document here, or save an export from Process Hub or Handover packs.</p><p class="muted">Files are private by default. Sharing is reviewed one file at a time.</p></div>'
-      }</section></section>`;
+        )}</select></label><span>${rows.length} file${rows.length === 1 ? '' : 's'}</span></div>${layout === 'gallery' ? '<p class="hub-meta">Load thumbnails for the 12 cards on this page when connected. Supported files up to 8 MB get a thumbnail; Preview opens supported files up to 25 MB.</p>' : ''}<p id="dfStatus" role="status" class="${messageError ? 'df-error' : ''}">${esc(message)}</p>${rows.length ? (layout === 'gallery' ? `<div class="df-gallery">${visible.map(card).join('')}</div>` : `<div class="df-table"><table><thead><tr><th>File</th><th>Linked work</th><th>Size / saved</th><th>Actions</th></tr></thead><tbody>${visible.map(f => `<tr><td><strong>${esc(f.name)}</strong><small>${esc(f.mimeType)}</small></td><td>${f.source ? esc(sourceLabel(f.source)) : '—'}${f.projectId ? `<small>${esc(a.state().projects.find(p => p.id === f.projectId)?.name || 'Project reference')}</small>` : ''}</td><td>${E.size(f.size)}<small>${esc(new Date(f.createdAt).toLocaleDateString())}</small></td><td><div class="actions">${previewButton(f)}${link(f.webViewLink, 'Open in Drive')}${can('export') ? button('file', 'Download / QR', `data-id="${esc(f.id)}"`) : ''}</div></td></tr>`).join('')}</tbody></table></div>`) + `<div class="df-pagination">${button('prev', 'Previous', page === 0 ? 'disabled' : '')}<span>Page ${page + 1} of ${Math.ceil(rows.length / limit)}</span>${button('next', 'Next', (page + 1) * limit >= rows.length ? 'disabled' : '')}</div>` : '<div class="df-empty"><span aria-hidden="true">▤</span><h3>Bring a file along.</h3><p>Upload a document here, or save an export from Process Hub or Handover packs.</p></div>'}</section></section>`;
     }
     function setup() {
       guard();
@@ -324,6 +356,59 @@
     }
     async function handle(el) {
       const op = el.dataset.df;
+      if (op === 'table' || op === 'gallery') {
+        guard();
+        layout = op;
+        page = 0;
+        try {
+          localStorage.setItem('workhub.files.layout.v1:' + account, layout);
+        } catch {}
+        a.render();
+        return;
+      }
+      if (op === 'preview') {
+        guard('export');
+        mustConnect();
+        const f = data().files.find(f => f.id === el.dataset.id);
+        if (!f) throw Error('Refresh Drive and open the file again.');
+        if (f.googleUserId !== api.identity().id)
+          throw Error('Connect the Google account that owns this file.');
+        await previews.open(f, (signal, maxBytes) => api.readMedia(f.id, { signal, maxBytes }));
+        return;
+      }
+      if (op === 'thumbnails')
+        return run(async s => {
+          guard('export');
+          mustConnect();
+          const token = galleryEpoch,
+            visible = sortedFiles()
+              .slice(page * perPage(), page * perPage() + perPage())
+              .filter(f => f.googleUserId === api.identity().id);
+          message = 'Loading thumbnails from Drive…';
+          busyPaint();
+          await previews.thumbnails(
+            visible,
+            (f, signal, maxBytes) => api.readMedia(f.id, { signal, maxBytes }),
+            (id, url, error) => {
+              if (token !== galleryEpoch || !alive(s, 'export')) return;
+              const slot = [...document.querySelectorAll('[data-df-thumb]')].find(
+                el => el.dataset.dfThumb === id
+              );
+              if (!slot) return;
+              if (url) {
+                const image = document.createElement('img');
+                image.src = url;
+                image.alt = data().files.find(f => f.id === id)?.name || 'File thumbnail';
+                slot.replaceChildren(image);
+              } else {
+                slot.setAttribute('title', error);
+              }
+            }
+          );
+          if (token === galleryEpoch && alive(s, 'export'))
+            message =
+              'Thumbnails loaded for supported files on this page. Use Preview or Drive for other files.';
+        });
       if (op === 'close') {
         releaseQR();
         modal++;
@@ -572,7 +657,7 @@
         a.tell(e.message, true);
       }
     });
-    return { render, sync, setup, handle, submit, saveGenerated, fileDialog, api };
+    return { render, sync, setup, handle, submit, saveGenerated, fileDialog, api, previews };
   }
   root.WorkHubFilesLibrary = { install, matrix, drawQR };
 })(globalThis);

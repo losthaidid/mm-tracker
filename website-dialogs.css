@@ -1,0 +1,81 @@
+.wh-confirm {
+  width: min(480px, calc(100vw - 32px));
+  max-height: calc(100dvh - 36px);
+  margin: auto;
+  padding: 30px;
+  border: 1px solid var(--hub-border, #ccdeda);
+  border-radius: 22px;
+  background: var(--panel, #fff);
+  color: var(--ink, #243449);
+  box-shadow: 0 24px 90px #102b3540;
+  overflow: auto;
+}
+.wh-confirm::backdrop {
+  background: #102b3566;
+}
+.wh-confirm form {
+  display: block;
+  margin: 0;
+}
+.wh-confirm-mark {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 15px;
+  background: color-mix(in srgb, var(--accent, #078597) 10%, var(--panel, #fff));
+  color: var(--accent, #078597);
+  margin-bottom: 18px;
+}
+.wh-confirm-mark svg {
+  width: 26px;
+  height: 26px;
+}
+.wh-confirm-kicker {
+  font-size: 10px;
+  letter-spacing: 1.4px;
+  font-weight: 700;
+  opacity: 0.7;
+}
+.wh-confirm h2 {
+  color: var(--ink, #243449);
+  font-size: 24px;
+  line-height: 1.25;
+  margin: 10px 0 14px;
+}
+.wh-confirm p {
+  color: var(--ink, #243449);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.7;
+  font-size: 14px;
+  margin: 0 0 25px;
+}
+.wh-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 20px;
+  border-top: 1px solid var(--hub-border, #ccdeda);
+}
+.wh-confirm-actions button {
+  min-height: 42px;
+  min-width: 95px;
+}
+.wh-confirm .wh-confirm-actions button.danger {
+  background: #b83b4d;
+  border-color: #b83b4d;
+  color: white;
+}
+.wh-confirm .wh-confirm-actions button.danger:hover {
+  background: #9c2f3f;
+}
+@media (max-width: 520px) {
+  .wh-confirm {
+    padding: 23px;
+    border-radius: 18px;
+  }
+  .wh-confirm-actions {
+    flex-wrap: wrap;
+  }
+}

@@ -2895,16 +2895,16 @@
     }
     let undo = null,
       lastInteraction = Date.now();
-    function remove(collection, id) {
+    async function remove(collection, id) {
       const found = data()[collection].find(x => x.id === id);
       if (!found) return;
       const record = copy(found);
       if (
-        !confirm(
+        !(await window.WorkHubDialogs.confirm(
           collection === 'sessions'
             ? 'Delete this recorded session? Its existing Schedule and Project entries will be kept. You can undo this deletion from the workspace toolbar.'
             : 'Delete this record? You can undo this action.'
-        )
+        ))
       )
         return;
       if (
@@ -3083,7 +3083,7 @@
         return;
       }
       if (action === 'note-delete') {
-        remove('notes', id);
+        await remove('notes', id);
         return;
       }
       if (action === 'note-copy') {
@@ -3115,15 +3115,15 @@
         return;
       }
       if (action === 'waiting-delete') {
-        remove('waiting', id);
+        await remove('waiting', id);
         return;
       }
       if (action === 'process-edit') {
         navigate('processhub');
         if (id) {
           rehearsal?.open(id);
-          rehearsal?.beginDraft(false, rehearsal.model());
-        } else rehearsal?.beginDraft(true);
+          await rehearsal?.beginDraft(false, rehearsal.model());
+        } else await rehearsal?.beginDraft(true);
         return;
       }
       if (action === 'process-open') {
@@ -3135,7 +3135,7 @@
         return;
       }
       if (action === 'process-delete') {
-        remove('processes', id);
+        await remove('processes', id);
         processId = '';
         return;
       }
@@ -3178,7 +3178,7 @@
         return;
       }
       if (action === 'step-delete') {
-        if (confirm('Delete this process step and its connections?')) {
+        if (await window.WorkHubDialogs.confirm('Delete this process step and its connections?')) {
           save(h => {
             const p = h.processes.find(p => p.id === processId);
             p.steps = p.steps.filter(s => s.id !== id);
@@ -3277,7 +3277,7 @@
         return;
       }
       if (action === 'scrap-delete') {
-        remove('scrapbook', id);
+        await remove('scrapbook', id);
         return;
       }
       if (action === 'timer-drag') return;
@@ -3392,7 +3392,7 @@
         return;
       }
       if (action === 'session-delete') {
-        remove('sessions', id);
+        await remove('sessions', id);
         return;
       }
       if (action === 'session-retry') {

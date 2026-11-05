@@ -548,18 +548,18 @@
         open(c.id);
       } else companyForm('', name);
     }
-    function removeCompany(id) {
+    async function removeCompany(id) {
       const row = data().companies.find(c => c.id === id),
         index = data().companies.findIndex(c => c.id === id);
       if (!row) throw Error('This company list no longer exists.');
       if (
-        !root.confirm(
+        !(await root.WorkHubDialogs.confirm(
           'Remove the email list for "' +
             row.name +
             '" and its ' +
             row.contacts.length +
             ' saved recipients? This affects the email directory only.'
-        )
+        ))
       )
         return;
       if (
@@ -690,7 +690,7 @@
         $('recipientCopyPreview').select();
         $('recipientCopyStatus').textContent =
           'Addresses selected. Use your device’s Copy command.';
-      } else if (action === 'delete-company') removeCompany(id);
+      } else if (action === 'delete-company') await removeCompany(id);
       else if (action === 'delete-contact') removeContact(id);
       else if (action === 'undo') restore();
     }

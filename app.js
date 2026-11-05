@@ -774,9 +774,9 @@ $('restoreFile').addEventListener('change', async e => {
     if (f.size > 128 * 1024 * 1024) throw Error('Choose a backup below 128 MB.');
     const next = parseBackup(await f.text());
     if (
-      !confirm(
+      !(await window.WorkHubDialogs.confirm(
         `Replace all current records with this backup (${next.tickets.length} tickets, ${next.tasks.length} tasks, ${next.specs.length} specs)? Back up current records first if needed.`
-      )
+      ))
     )
       return;
     month = next.calendarMonth;
@@ -1181,6 +1181,7 @@ function notice() {
 
 /** Choose the current screen, refresh its markup and then let feature modules decorate it. Rendering is not a save. */
 function render() {
+  window.WorkHubDialogs.sync();
   filesLibrary?.sync();
   handoverWorkspace?.sync();
   projectItemsWorkspace?.sync();
@@ -2475,7 +2476,7 @@ async function beginRestore() {
   $('restoreFile').click();
 }
 async function authorizeActivityDeletion(label) {
-  if (!confirm(label)) return false;
+  if (!(await window.WorkHubDialogs.confirm(label))) return false;
   if (CLOUD_MODE) return verifyCloudCredentials('Delete activity', false);
   return true;
 }
@@ -2572,7 +2573,9 @@ async function action(b) {
     }
     case 'delete':
       if (
-        confirm(`Delete this ${g === 'tickets' ? 'ticket and its progress tracker' : 'record'}?`)
+        await window.WorkHubDialogs.confirm(
+          `Delete this ${g === 'tickets' ? 'ticket and its progress tracker' : 'record'}?`
+        )
       ) {
         const ok = mutate(d => {
           const old = d[g].find(t => t.id === id);
@@ -2612,7 +2615,11 @@ async function action(b) {
       }
       break;
     case 'delete-progress':
-      if (confirm('Delete this progress tracker? The ticket itself will remain.')) {
+      if (
+        await window.WorkHubDialogs.confirm(
+          'Delete this progress tracker? The ticket itself will remain.'
+        )
+      ) {
         const ok = mutate(d => (d.trackers = d.trackers.filter(t => t.id !== id)));
         closeModal();
         if (ok) tell('Tracker deleted.');
@@ -4344,7 +4351,7 @@ function renderProjectOverview(m) {
 }
 
 async function enhancementAction(b) {
-  if (workhubAction(b)) return true;
+  if (await workhubAction(b)) return true;
   const a = b.dataset.action,
     id = b.dataset.id;
   if (a === 'task-reference-add' || a === 'task-reference-remove') {
@@ -4364,7 +4371,7 @@ async function enhancementAction(b) {
     return true;
   }
   if (a === 'delete-project') {
-    deleteProject(id);
+    await deleteProject(id);
     return true;
   }
   if (a === 'project-management') {
@@ -4475,7 +4482,7 @@ async function enhancementAction(b) {
     return true;
   }
   if (a === 'delete-mapping') {
-    if (confirm('Delete this imported mapping row?')) {
+    if (await window.WorkHubDialogs.confirm('Delete this imported mapping row?')) {
       const ok = mutate(
         d => (d.projectProcessMappings = d.projectProcessMappings.filter(x => x.id !== id))
       );
@@ -4488,9 +4495,9 @@ async function enhancementAction(b) {
     const c = state.projectCompanies.find(c => c.id === id);
     if (
       c &&
-      confirm(
+      (await window.WorkHubDialogs.confirm(
         `Delete company "${c.name}", its process mappings, and its project-item and task company links? Company-linked phase gates will be kept as project-wide gates.`
-      )
+      ))
     ) {
       const ok = mutate(d => {
         d.projectCompanies = d.projectCompanies.filter(x => x.id !== id);
@@ -4515,7 +4522,7 @@ async function enhancementAction(b) {
     return true;
   }
   if (a === 'delete-decision') {
-    if (confirm('Delete this legacy implementation decision?')) {
+    if (await window.WorkHubDialogs.confirm('Delete this legacy implementation decision?')) {
       mutate(d => (d.projectDecisions = d.projectDecisions.filter(x => x.id !== id)));
       render();
       tell('Decision deleted.');
@@ -4542,7 +4549,11 @@ async function enhancementAction(b) {
     return true;
   }
   if (a === 'delete-gate') {
-    if (confirm('Permanently delete this phase gate from the current project?')) {
+    if (
+      await window.WorkHubDialogs.confirm(
+        'Permanently delete this phase gate from the current project?'
+      )
+    ) {
       const ok = mutate(d => (d.phaseGates = d.phaseGates.filter(x => x.id !== id)));
       openProjectManagement();
       if (ok) tell('Phase gate deleted.');
@@ -5600,7 +5611,7 @@ function feedbackChangeSummary(old, next) {
   return changes.join(' · ') || 'Feedback reviewed with no field changes.';
 }
 
-function saveFeedback(form) {
+async function saveFeedback(form) {
   const value = k => form.elements.namedItem(k)?.value || '',
     id = form.dataset.id || uid(),
     old = state.projectFeedback.find(x => x.id === id),
@@ -5678,9 +5689,9 @@ function saveFeedback(form) {
   );
   if (
     similar &&
-    !confirm(
+    !(await window.WorkHubDialogs.confirm(
       `Similar open feedback already exists: “${similar.summary}”. Save this as a separate record anyway?`
-    )
+    ))
   )
     return;
   next.history.push(feedbackHistory(feedbackChangeSummary(old, next)));
@@ -5778,16 +5789,16 @@ function saveMeetingFeedback(form) {
 let feedbackOverdueOnly = false,
   feedbackLinkedGateId = '';
 
-function carryFeedback(id) {
+async function carryFeedback(id) {
   const source = state.projectFeedback.find(f => f.id === id),
     phase = source && nextPhase(source.phase);
   if (!source) throw Error('Feedback not found.');
   if (!phase) throw Error('This feedback is already in the final project phase.');
   if (source.carriedToId) throw Error('This feedback has already been carried forward.');
   if (
-    !confirm(
+    !(await window.WorkHubDialogs.confirm(
       `Carry this feedback from ${source.phase} to ${phase}? The current record will remain in history as Deferred.`
-    )
+    ))
   )
     return;
   const copyId = uid(),
@@ -6147,7 +6158,7 @@ function openProjectManagement() {
   );
 }
 
-function deleteProject(id) {
+async function deleteProject(id) {
   const p = state.projects.find(x => x.id === id);
   if (!p) throw Error('Project not found.');
   const items = state.specs.filter(s => s.projectId === id).length,
@@ -6155,9 +6166,9 @@ function deleteProject(id) {
     companies = state.projectCompanies.filter(c => c.projectId === id).length,
     feedback = state.projectFeedback.filter(f => f.projectId === id).length;
   if (
-    !confirm(
+    !(await window.WorkHubDialogs.confirm(
       `Delete project "${p.name}"? This removes ${items} project items, ${plans} planned activities, ${companies} companies, all gates, mappings, and ${feedback} feedback records. Linked tasks will be kept as Custom tasks. Download a backup first if needed.`
-    )
+    ))
   )
     return;
   const ok = mutate(d => {
@@ -6244,7 +6255,7 @@ function exportPhasePack() {
   tell(`${phase} phase pack downloaded with gates, feedback, project items, and linked actions.`);
 }
 
-function workhubAction(b) {
+async function workhubAction(b) {
   const a = b.dataset.action,
     id = b.dataset.id;
   if (a === 'item-status') {
@@ -6383,7 +6394,7 @@ function workhubAction(b) {
     return true;
   }
   if (a === 'carry-feedback') {
-    carryFeedback(id);
+    await carryFeedback(id);
     return true;
   }
   if (a === 'convert-feedback') {
@@ -6444,7 +6455,9 @@ function workhubAction(b) {
     const f = state.projectFeedback.find(x => x.id === id);
     if (
       f &&
-      confirm(`Permanently delete feedback "${f.summary}"? Converted actions will remain.`)
+      (await window.WorkHubDialogs.confirm(
+        `Permanently delete feedback "${f.summary}"? Converted actions will remain.`
+      ))
     ) {
       const ok = mutate(d => {
         d.projectFeedback = d.projectFeedback.filter(x => x.id !== id);
@@ -6462,7 +6475,9 @@ function workhubAction(b) {
     const g = state.phaseGates.find(x => x.id === id);
     if (
       g &&
-      confirm('Permanently delete this phase gate? Linked feedback will remain and be unlinked.')
+      (await window.WorkHubDialogs.confirm(
+        'Permanently delete this phase gate? Linked feedback will remain and be unlinked.'
+      ))
     ) {
       const ok = mutate(d => {
         d.phaseGates = d.phaseGates.filter(x => x.id !== id);
@@ -6481,9 +6496,9 @@ function workhubAction(b) {
     const c = state.projectCompanies.find(x => x.id === id);
     if (
       c &&
-      confirm(
+      (await window.WorkHubDialogs.confirm(
         `Delete company "${c.name}", its process mappings, and its project-item and task company links? Gates and feedback will be kept as project-wide records.`
-      )
+      ))
     ) {
       const ok = mutate(d => {
         d.projectCompanies = d.projectCompanies.filter(x => x.id !== id);
@@ -6510,9 +6525,9 @@ function workhubAction(b) {
     const item = state.specs.find(x => x.id === id);
     if (
       item &&
-      confirm(
+      (await window.WorkHubDialogs.confirm(
         'Delete this project item? Phase Feedback will remain, with this project-item link removed.'
-      )
+      ))
     ) {
       const ok = mutate(d => {
         d.specs = d.specs.filter(x => x.id !== id);
@@ -6641,7 +6656,7 @@ document.addEventListener('input', e => {
     rerenderKeepFocus(id);
   }
 });
-document.addEventListener('submit', e => {
+document.addEventListener('submit', async e => {
   if (
     !['feedbackForm', 'feedbackMeetingForm', 'feedbackConvertForm', 'gateSkipForm'].includes(
       e.target.id
@@ -6650,7 +6665,7 @@ document.addEventListener('submit', e => {
     return;
   e.preventDefault();
   try {
-    if (e.target.id === 'feedbackForm') saveFeedback(e.target);
+    if (e.target.id === 'feedbackForm') await saveFeedback(e.target);
     else if (e.target.id === 'feedbackMeetingForm') saveMeetingFeedback(e.target);
     else if (e.target.id === 'feedbackConvertForm') saveFeedbackConversion(e.target);
     else saveGateSkip(e.target);
@@ -7293,7 +7308,7 @@ projectHealthDetails = function (projectId = state.activeProjectId, d = state, a
 };
 
 const workhubActionV9Base = workhubAction;
-workhubAction = function (button) {
+workhubAction = async function (button) {
   const action = button.dataset.action,
     id = button.dataset.id;
   if (action === 'manage-mm-areas') {
@@ -7342,7 +7357,7 @@ workhubAction = function (button) {
     const parentId = button.dataset.parent,
       item = state.specs.find(s => s.id === parentId),
       sub = item?.subItems?.find(s => s.id === id);
-    if (sub && confirm(`Delete sub-item "${sub.title}"?`)) {
+    if (sub && (await window.WorkHubDialogs.confirm(`Delete sub-item "${sub.title}"?`))) {
       const ok = mutate(d => {
         const parent = d.specs.find(s => s.id === parentId);
         parent.subItems = parent.subItems.filter(s => s.id !== id);
@@ -7849,7 +7864,7 @@ function shiftDate(date, days) {
   return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
 }
 const workhubActionV10Base = workhubAction;
-workhubAction = function (button) {
+workhubAction = async function (button) {
   const action = button.dataset.action;
   if (action === 'edit-project' && tab === 'schedule') {
     const project = state.projects.find(project => project.id === button.dataset.id);
@@ -7881,7 +7896,7 @@ workhubAction = function (button) {
     return true;
   }
   if (action === 'delete-task-sub') {
-    if (confirm('Delete this sub-task and its remarks and feedback?')) {
+    if (await window.WorkHubDialogs.confirm('Delete this sub-task and its remarks and feedback?')) {
       mutate(d => {
         const task = d.tasks.find(task => task.id === button.dataset.parent);
         if (!task) throw Error('Main task not found.');
@@ -10064,9 +10079,9 @@ async function cloudAction(b) {
     closeSettingsMenu();
     if (
       (cloud.pending || cloud.inFlight || cloud.conflict) &&
-      !confirm(
+      !(await window.WorkHubDialogs.confirm(
         'Reload cloud records and discard changes waiting in this browser? Download a backup first if you need them.'
-      )
+      ))
     )
       return true;
     if (!(await verifyCloudCredentials('Reload cloud records', true))) return true;
@@ -10280,6 +10295,16 @@ filteredTasks = () =>
       !WorkHubReminders.isSnoozed(state, 'tasks', r.id, today()) &&
       (!hub?.batchA || hub.batchA.matches('tasks', r.id))
   );
+window.WorkHubDialogs.configure({
+  context: () => [
+    !CLOUD_MODE || cloud.ready,
+    CLOUD_MODE ? cloud.user?.id || '' : 'local',
+    cloud.generation,
+    state,
+    access?.snapshot()?.version || 0,
+  ],
+  tell,
+});
 const fileWorkspaceAdapter = {
   state: () => state,
   ready: () => !CLOUD_MODE || cloud.ready,

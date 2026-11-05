@@ -731,7 +731,9 @@
       if (action === 'capture') {
         if (
           current().plan.length &&
-          !root.confirm('Replace the captured plan with today’s current schedule?')
+          !(await root.WorkHubDialogs.confirm(
+            'Replace the captured plan with today’s current schedule?'
+          ))
         )
           return;
         save(

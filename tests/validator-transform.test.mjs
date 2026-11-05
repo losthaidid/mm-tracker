@@ -43,7 +43,7 @@ test('Explode supports literal delimiters, multiple mapped columns and preflight
 async function fixture(t, csv='Availability Check,Plant,Storage Location,Extra\n2,"FF01, FF02, FF03","ST00, WH00, WH01",=1+1') {
  const dom=new JSDOM('<div id="view"></div><dialog id="modal"><div id="modalBody"></div></dialog>',{runScripts:'outside-only',pretendToBeVisual:true,url:'https://example.test'}),w=dom.window,d=w.document;t.after(()=>w.close());
  Object.assign(w,{TextEncoder,TextDecoder,Blob,setImmediate,clearImmediate});let account='owner',ready=true,writes=0,downloads=[];
- w.setTimeout=(fn,ms)=>{if(ms===50)queueMicrotask(fn);return 0;};w.clearTimeout=()=>{};w.confirm=()=>true;
+ w.setTimeout=(fn,ms)=>{if(ms===50)queueMicrotask(fn);return 0;};w.clearTimeout=()=>{};w.confirm=()=>true;w.WorkHubDialogs={confirm:async(...args)=>w.confirm(...args)};
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;};
  for(const f of ['vendor/jszip.min.js','validator-engine.js','validator-transform.js','validator-files.js','validator-studio.js'])w.eval(read(f));
  const E=w.WorkHubValidatorEngine,s=E.create('Prepared material');s.mode='sap';s.columns=[{...E.column(0),key:'AVAIL',label:'Availability Check',type:'integer',sapType:'CHAR',sapLength:2,values:'02'},...['Plant','Storage Location'].map((name,i)=>({...E.column(i+1),key:i?'STORAGE':'PLANT',label:name,sapType:'CHAR',sapLength:4}))];
@@ -63,8 +63,8 @@ test('Preparation UI previews without writes, validates all paired rows, and exp
  const xml=await (await x.w.JSZip.loadAsync(new x.w.Uint8Array(await blob.arrayBuffer()))).file('xl/worksheets/sheet1.xml').async('string');assert.match(xml,/t="inlineStr"[^>]*>.*?02/s);assert.doesNotMatch(xml,/<f[ >]/);const origins=book.sheets.find(s=>s.name==='Row origins').rows;assert.equal(origins[3][3],'2');assert.equal(origins[3][4],'3');
 });
 test('Preparation undo and restore keep the original upload and invalidate previous results',async t=>{
- const x=await fixture(t),{ui}=x;x.explode();ui.applyPreparation();x.pad();ui.applyPreparation();await ui.run();ui.undoPreparation();assert.equal(ui.snapshot().sourceRows.length,3);assert.equal(ui.snapshot().sourceRows[0][0],'2');assert.equal(ui.snapshot().result,null);ui.undoPreparation();assert.equal(ui.snapshot().sourceRows.length,1);assert.match(ui.snapshot().sourceRows[0][1],/FF01, FF02/);assert.equal(ui.snapshot().undoCount,0);
- x.explode();ui.applyPreparation();ui.undoPreparation(true);assert.equal(ui.snapshot().sourceRows.length,1);assert.equal(ui.snapshot().preparations.length,0);
+ const x=await fixture(t),{ui}=x;x.explode();ui.applyPreparation();x.pad();ui.applyPreparation();await ui.run();await ui.undoPreparation();assert.equal(ui.snapshot().sourceRows.length,3);assert.equal(ui.snapshot().sourceRows[0][0],'2');assert.equal(ui.snapshot().result,null);await ui.undoPreparation();assert.equal(ui.snapshot().sourceRows.length,1);assert.match(ui.snapshot().sourceRows[0][1],/FF01, FF02/);assert.equal(ui.snapshot().undoCount,0);
+ x.explode();ui.applyPreparation();await ui.undoPreparation(true);assert.equal(ui.snapshot().sourceRows.length,1);assert.equal(ui.snapshot().preparations.length,0);
 });
 test('Preparation option edits retain controls and require a fresh preview; count mismatches block Apply',async t=>{
  const x=await fixture(t),{ui,d,w}=x;x.pad();const select=d.querySelector('[data-prep-mode="AVAIL"]');select.focus();select.value='keep';select.dispatchEvent(new w.Event('change',{bubbles:true}));assert.equal(d.querySelector('[data-prep-mode="AVAIL"]'),select);assert.equal(d.activeElement,select);assert.equal(d.querySelector('[data-val="prep-apply"]').disabled,true);assert.throws(()=>ui.applyPreparation(),/Preview/);

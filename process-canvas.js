@@ -658,7 +658,7 @@
         .querySelector('[name="from"]')
         .addEventListener('change', e => connectionEditor(e.target.value));
     }
-    function action(name, button = null) {
+    async function action(name, button = null) {
       const p = a.canvas.model(),
         next = copy(p),
         m = next.annotations.find(m => m.id === selected);
@@ -721,7 +721,9 @@
           if (editor && !editor.querySelector('[data-pc-form="connection"]'))
             throw Error('Save or cancel step details before deleting a link.');
           if (
-            !root.confirm('Delete the selected link? Both steps will be kept. Undo can restore it.')
+            !(await root.WorkHubDialogs.confirm(
+              'Delete the selected link? Both steps will be kept. Undo can restore it.'
+            ))
           )
             return;
           E.disconnect(next, selectedEdge.from, selectedEdge.to);
@@ -739,13 +741,13 @@
         if (!ids.length) throw Error('Select one or more steps first.');
         if (ids.length >= p.steps.length) throw Error('Keep at least one process step.');
         if (
-          !root.confirm(
+          !(await root.WorkHubDialogs.confirm(
             'Delete ' +
               ids.length +
               ' selected step' +
               (ids.length === 1 ? '' : 's') +
               ' and their connections? You can undo this canvas edit.'
-          )
+          ))
         )
           return;
         E.removeSteps(next, ids);
@@ -880,7 +882,7 @@
     }
     stage.addEventListener(
       'click',
-      e => {
+      async e => {
         const type = e.target.closest('[data-pc-type]')?.dataset.pcType;
         if (type && e.detail === 0) {
           try {
@@ -899,7 +901,7 @@
           if (name) {
             e.preventDefault();
             e.stopImmediatePropagation();
-            action(name, b);
+            await action(name, b);
             if (!['links', 'edit-step', 'cancel'].includes(name)) collapse();
             return;
           }
@@ -913,7 +915,7 @@
             e.preventDefault();
             e.stopImmediatePropagation();
             if (old === 'undo') {
-              action('undo');
+              await action('undo');
               collapse();
               return;
             }
@@ -1512,9 +1514,9 @@
           surface: panel,
           presenter: true,
           skip: command => command === 'delete' && !!e.target.closest('[data-link-handle]'),
-          run: command => {
+          run: async command => {
             try {
-              if (command === 'help') action('shortcuts');
+              if (command === 'help') await action('shortcuts');
               else if (command === 'save') {
                 const form = editor?.querySelector('form');
                 if (form) form.requestSubmit();
@@ -1525,13 +1527,13 @@
                 types.closest('details').open = true;
                 types.querySelector('[data-pc-type]')?.focus({ preventScroll: true });
               } else if (command === 'edit') {
-                action(selectedEdge ? 'edit-connection' : 'edit-step');
+                await action(selectedEdge ? 'edit-connection' : 'edit-step');
                 editor?.querySelector('input,select,textarea')?.focus({ preventScroll: true });
               } else {
                 if (['select', 'explore', 'pen', 'arrow', 'text', 'laser'].includes(command))
                   setTool(command === 'explore' ? 'move' : command);
-                else if (command === 'connect') action('connect');
-                else if (['select-all', 'undo', 'sound'].includes(command)) action(command);
+                else if (command === 'connect') await action('connect');
+                else if (['select-all', 'undo', 'sound'].includes(command)) await action(command);
                 else if (command === 'delete') {
                   if (selected && !selectedEdge) {
                     if (editor)
@@ -1540,7 +1542,7 @@
                       next = copy(before);
                     next.annotations = next.annotations.filter(m => m.id !== selected);
                     if (commit(next, before)) selected = '';
-                  } else action('delete-steps');
+                  } else await action('delete-steps');
                 } else panel.querySelector('[data-presenter="' + command + '"]')?.click();
                 host.focus({ preventScroll: true });
               }
@@ -1554,7 +1556,7 @@
     );
     host.addEventListener(
       'keydown',
-      e => {
+      async e => {
         if (!live()) return;
         if (selectedEdge && !e.target.closest('input,textarea,select,[contenteditable="true"]')) {
           const handle = e.target.closest('[data-link-handle]')?.dataset.linkHandle;
@@ -1569,7 +1571,7 @@
                 edge.via.splice(Number(handle.slice(5)), 1);
                 E.setConnector(next, edge);
                 commit(next, before);
-              } else action('delete-steps');
+              } else await action('delete-steps');
             } catch (err) {
               notify(err.message);
             }

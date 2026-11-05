@@ -866,12 +866,12 @@
           r = data()[collection].find(x => x.id === id);
         if (!r) return;
         if (
-          !root.confirm(
+          !(await root.WorkHubDialogs.confirm(
             'Remove ' +
               (r.title || r.name) +
               '?' +
               (collection === 'bundles' ? ' Its snippets will remain unbundled.' : '')
-          )
+          ))
         )
           return;
         const related =
