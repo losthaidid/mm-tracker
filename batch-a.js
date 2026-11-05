@@ -1112,7 +1112,9 @@
       if (action === 'settings') {
         if (
           $('modalBody')?.querySelector('form') &&
-          !root.confirm('Open settings and discard unsaved changes in this form?')
+          !(await root.WorkHubDialogs.confirm(
+            'Open settings and discard unsaved changes in this form?'
+          ))
         )
           return;
         if ($('settingsMenu')) $('settingsMenu').open = false;
@@ -1189,7 +1191,11 @@
         const label = action === 'label-remove',
           item = data()[label ? 'labels' : 'environments'].find(x => x.id === id);
         if (!item) return;
-        if (!root.confirm('Remove ' + item.name + ' from the list and all assigned records?'))
+        if (
+          !(await root.WorkHubDialogs.confirm(
+            'Remove ' + item.name + ' from the list and all assigned records?'
+          ))
+        )
           return;
         if (
           save(d => {

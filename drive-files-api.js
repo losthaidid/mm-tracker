@@ -3,7 +3,7 @@
   'use strict';
   const SCOPE = 'https://www.googleapis.com/auth/drive.file';
   const FIELDS =
-    'id,name,mimeType,size,createdTime,webViewLink,webContentLink,resourceKey,appProperties,ownedByMe,trashed,capabilities(canShare,canDownload)';
+    'id,name,mimeType,size,createdTime,modifiedTime,webViewLink,webContentLink,resourceKey,appProperties,ownedByMe,trashed,capabilities(canShare,canDownload),imageMediaMetadata(width,height)';
   let scriptPromise;
   function load() {
     if (root.google?.accounts?.oauth2) return Promise.resolve();
@@ -66,11 +66,15 @@
       sync();
       return !!(token && Date.now() < expires && identity && account === owner());
     }
-    async function api(path, options = {}, g = generation, upload = false) {
+    async function api(path, options = {}, g = generation, upload = false, binaryLimit = 0) {
       check(g);
       if (!/^\/(?:files|permissions|about)(?:[/?]|$)/.test(path))
         throw Error('Unsupported Drive request.');
       const c = new AbortController();
+      const outer = options.signal,
+        abort = () => c.abort();
+      outer?.addEventListener('abort', abort, { once: true });
+      if (outer?.aborted) c.abort();
       controllers.add(c);
       const timer = setTimeout(() => c.abort(), upload ? 180000 : 30000);
       try {
@@ -107,6 +111,39 @@
           );
         }
         if (res.status === 204) return null;
+        if (binaryLimit) {
+          if (Number(res.headers.get('content-length') || 0) > binaryLimit)
+            throw Error('This file is too large for an in-app preview. Open it in Google Drive.');
+          const chunks = [];
+          let bytes = 0;
+          if (res.body?.getReader) {
+            const reader = res.body.getReader();
+            try {
+              for (;;) {
+                const { value, done } = await reader.read();
+                check(g);
+                if (done) break;
+                bytes += value.byteLength;
+                if (bytes > binaryLimit) {
+                  await reader.cancel();
+                  throw Error(
+                    'This file is too large for an in-app preview. Open it in Google Drive.'
+                  );
+                }
+                chunks.push(value);
+              }
+            } finally {
+              reader.releaseLock();
+            }
+          } else {
+            const value = await res.arrayBuffer();
+            check(g);
+            if (value.byteLength > binaryLimit)
+              throw Error('This file is too large for an in-app preview.');
+            chunks.push(value);
+          }
+          return new Blob(chunks);
+        }
         const value = await res.json();
         check(g);
         return value;
@@ -117,6 +154,7 @@
           );
         throw e;
       } finally {
+        outer?.removeEventListener('abort', abort);
         clearTimeout(timer);
         controllers.delete(c);
       }
@@ -422,7 +460,41 @@
       check(g);
       return await get(id, g);
     }
+    async function readMedia(id, { signal, maxBytes = 25 * 1024 * 1024 } = {}) {
+      const g = generation;
+      if (a.can?.('files', 'export') === false)
+        throw Error('File previews are disabled for this account.');
+      if (signal?.aborted) throw Error('Preview cancelled.');
+      if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > 25 * 1024 * 1024)
+        throw Error('Invalid preview size limit.');
+      const file = await get(id, g);
+      check(g);
+      if (
+        !['application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(
+          file.mimeType
+        )
+      )
+        throw Error(
+          'This format can be opened in Google Drive. In-app previews support PDF, PNG, JPEG, WebP and GIF.'
+        );
+      if (!file.capabilities?.canDownload)
+        throw Error('Google Drive does not allow this file to be previewed or downloaded.');
+      if (Number(file.size) > maxBytes)
+        throw Error('This file exceeds the preview size limit. Open it in Google Drive.');
+      const image = file.imageMediaMetadata;
+      if (image && image.width * image.height > 32000000)
+        throw Error('This image is too large to preview comfortably. Open it in Google Drive.');
+      if (signal?.aborted) throw Error('Preview cancelled.');
+      const blob = await api('/files/' + id + '?alt=media', { signal }, g, false, maxBytes);
+      check(g);
+      if (a.can?.('files', 'export') === false) throw Error('File preview access changed.');
+      if (signal?.aborted) throw Error('Preview cancelled.');
+      if (Number(file.size) && blob.size !== Number(file.size))
+        throw Error('The preview download is incomplete. Try again.');
+      return { file, blob: new Blob([blob], { type: file.mimeType }) };
+    }
     return {
+      readMedia,
       connect,
       disconnect,
       connected,

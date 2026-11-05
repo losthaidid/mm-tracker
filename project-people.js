@@ -221,16 +221,16 @@
       scroll = { left: Math.max(0, (b.x - 12) * zoom), top: Math.max(0, (b.y - 12) * zoom) };
       const next = scroll; refresh(); scroll = next; mount();
     }
-    function arrange() {
+    async function arrange() {
       guard(); if (!records().people.length) return;
-      if (!root.confirm('Arrange everyone by reporting level? This replaces saved card positions; responsibilities stay the same.')) return;
+      if (!(await root.WorkHubDialogs.confirm('Arrange everyone by reporting level? This replaces saved card positions; responsibilities stay the same.'))) return;
       const positions = new Map(E.layout(records().people).map(p => [p.id, p]));
       save(d => { for (const p of E.records(d, pid).people) Object.assign(p, positions.get(p.id)); }, 'Chart arranged by reporting level.'); fit();
     }
-    function starter() {
+    async function starter() {
       guard(); const areas = E.project(state(), pid).mmAreas, procurement = areas.find(a => /procure|purchas/i.test(a.name)) || areas.find(a => a.visible) || areas[0], inventory = areas.find(a => /inventory|stock/i.test(a.name)) || procurement;
       const proposed = [[procurement, 'Create PR'], [procurement, 'Approve PR'], [procurement, 'Create PO'], [procurement, 'Approve PO'], [inventory, 'Perform goods receipt'], [inventory, 'Perform goods issue']];
-      if (!root.confirm('Add six editable PR / PO / goods-movement example activities under ' + procurement.name + ' and ' + inventory.name + '? Existing activity names are kept.')) return;
+      if (!(await root.WorkHubDialogs.confirm('Add six editable PR / PO / goods-movement example activities under ' + procurement.name + ' and ' + inventory.name + '? Existing activity names are kept.'))) return;
       save(d => { for (const [area, name] of proposed) if (!E.records(d, pid).activities.some(a => a.areaId === area.id && a.kind === 'activity' && a.name.toLowerCase() === name.toLowerCase())) E.upsertActivity(d, { id: uid(), projectId: pid, areaId: area.id, kind: 'activity', name, sourceMappingId: '' }); }, 'Example activities added. You can rename or move them to another MM area.');
     }
     async function handle(el) {
@@ -250,8 +250,8 @@
       else if (action === 'clear-filter') { query = department = areaFilter = activityFilter = ''; refresh(); }
       else if (action === 'zoom-in' || action === 'zoom-out') { zoom = Math.max(.1, Math.min(2, zoom + (action === 'zoom-in' ? .1 : -.1))); refresh(); }
       else if (action === 'fit') fit();
-      else if (action === 'arrange') arrange();
-      else if (action === 'starter') starter();
+      else if (action === 'arrange') (await arrange());
+      else if (action === 'starter') (await starter());
       else if (action === 'areas') { dialog = null; a.manageMMAreas(); }
       else if (action === 'reuse') reuse();
       else if (action === 'export-png') exportDialog();
@@ -264,16 +264,16 @@
         catch { guard(copyOwner, copyProject); a.openModal('Copy email address', `<div data-pe-dialog="copy"><label>Email address<input readonly value="${esc(p.email)}" aria-label="Email address to copy"></label><p>Select and copy this address.</p></div>`); }
       } else if (action === 'remove-person') {
         const p = person(id); if (!p) return;
-        if (root.confirm('Remove ' + p.name + ' and their assignments? Their direct reports will have no manager. Activities remain available to reassign.')) {
+        if ((await root.WorkHubDialogs.confirm('Remove ' + p.name + ' and their assignments? Their direct reports will have no manager. Activities remain available to reassign.'))) {
           if (save(d => E.removePerson(d, pid, id), 'Person removed. Activities are available to reassign.')) { dialog = null; a.closeModal(); }
         }
       } else if (action === 'remove-activity') {
         const activity = records().activities.find(a => a.id === id); if (!activity) return;
-        if (root.confirm('Delete ' + activity.name + ' and all its responsibility assignments?')) {
+        if ((await root.WorkHubDialogs.confirm('Delete ' + activity.name + ' and all its responsibility assignments?'))) {
           if (save(d => E.removeActivity(d, pid, id), 'Activity and its assignments removed.')) { dialog = null; a.closeModal(); }
         }
       } else if (action === 'unassign') {
-        if (root.confirm('Remove this responsibility from the person? The activity stays in your tray.')) {
+        if ((await root.WorkHubDialogs.confirm('Remove this responsibility from the person? The activity stays in your tray.'))) {
           if (save(d => { const h = E.data(d); h.assignments = h.assignments.filter(r => r.id !== id || r.projectId !== pid); }, 'Responsibility unassigned.')) details(el.dataset.person);
         }
       }

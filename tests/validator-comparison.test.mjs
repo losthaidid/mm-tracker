@@ -25,7 +25,7 @@ async function fixture(t, values = original) {
     return id;
   };
   w.clearTimeout = id => timers.delete(id);
-  w.confirm = () => true;
+  w.confirm = () => true;w.WorkHubDialogs={confirm:async(...args)=>w.confirm(...args)};
   w.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
   w.HTMLDialogElement.prototype.close = function () { this.open = false; };
   for (const file of ['vendor/jszip.min.js', 'validator-engine.js', 'validator-transform.js', 'validator-files.js', 'validator-studio.js']) w.eval(read(file));
@@ -188,10 +188,10 @@ test('comparison waits for live checks and export permission, and excludes rejec
 
 test('comparison snapshots follow undo, restore, new uploads and account cleanup; late exports are discarded', async t => {
   const x = await fixture(t); x.prepare('explode'); x.prepare('sap'); await x.ui.run();
-  x.edit(0, 'DESCRIPTION', 'Correction'); x.ui.undoPreparation();
+  x.edit(0, 'DESCRIPTION', 'Correction'); await x.ui.undoPreparation();
   assert.equal(x.ui.snapshot().preparedRows[0][0], '1');
   assert.equal(x.ui.snapshot().preparedRows[0][1], 'Alpha\nname');
-  await x.ui.run(); x.ui.undoPreparation(true); await x.ui.run();
+  await x.ui.run(); await x.ui.undoPreparation(true); await x.ui.run();
   assert.deepEqual(copy(x.ui.snapshot().preparedRows), original);
   await x.upload([['000003','New','P1','S1','keep','z']]); await x.ui.run();
   assert.equal(x.ui.snapshot().originalRows[0][1], 'New');

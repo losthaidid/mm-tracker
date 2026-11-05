@@ -60,7 +60,7 @@ test('profiles are bounded, uniquely named per template and survive normal state
 
 async function workspace(t,{linked=false,worker=false,configure}={}){
  const dom=new JSDOM('<div id="view"></div><dialog id="modal"><div id="modalBody"></div></dialog>',{url:'https://example.test',runScripts:'outside-only',pretendToBeVisual:true}),w=dom.window,d=w.document;t.after(()=>w.close());
- Object.assign(w,{TextEncoder,TextDecoder,Blob,setImmediate,clearImmediate});w.confirm=()=>true;let account='owner',ready=true,writes=0,captured,resolveWorker;
+ Object.assign(w,{TextEncoder,TextDecoder,Blob,setImmediate,clearImmediate});w.confirm=()=>true;w.WorkHubDialogs={confirm:async(...args)=>w.confirm(...args)};let account='owner',ready=true,writes=0,captured,resolveWorker;
  w.setTimeout=(fn,ms)=>{if(ms===50)queueMicrotask(fn);return 0;};w.clearTimeout=()=>{};
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;};
  for(const f of ['vendor/jszip.min.js','validator-engine.js','validator-files.js'])w.eval(read(f));
@@ -72,7 +72,7 @@ async function workspace(t,{linked=false,worker=false,configure}={}){
  const render=()=>{if(!ui.patchRender())d.getElementById('view').innerHTML=ui.render();};
  ui=w.WorkHubValidatorStudio.install({state:()=>state,ready:()=>ready,owner:()=>account,render,tell:()=>{},mutate(fn){const next=engine.copy(state);fn(next);engine.prepare(next,state);engine.validateState(next);state=next;writes++;render();return true;},openModal(title,body){d.getElementById('modalBody').innerHTML=body;d.getElementById('modal').showModal();},closeModal(){d.getElementById('modal').close();},download(blob,name){downloads.push({blob,name});}});
  render();ui.saveDraft(true);await ui.loadFile({name:'PRIVATE-materials.csv',size:50,text:async()=> 'Material,Plant\nPRIVATE-001,FF01'});
- const change=(el,value)=>{if(el.type==='checkbox')el.checked=value;else el.value=value;el.dispatchEvent(new w.Event('change',{bubbles:true}));};
+ const change=(el,value)=>{if(el.type==='checkbox')el.checked=value;else el.value=value;el.dispatchEvent(new w.Event('change',{bubbles:true}));return new Promise(r=>setImmediate(r));};
  const toggle=(id,yes)=>change(d.querySelector(`[data-setup-rule="${id}"]`),yes);
  const company=id=>change(d.querySelector('[name="validationCompany"]'),id);
  const profile=id=>change(d.querySelector('[name="validationProfile"]'),id);
@@ -84,7 +84,7 @@ test('profile UI saves reusable selections, switches without losing upload or co
  const a=x.state().workhub.validator.profiles[0];assert.equal(x.writes(),before+1);assert.deepEqual(copy(a.ruleIds),['a']);assert.doesNotMatch(JSON.stringify(a),/PRIVATE/);
  x.toggle('a',false);x.toggle('b',true);await x.save('Company B');const b=x.state().workhub.validator.profiles[1];
  x.profile(a.id);await ui.run();assert.equal(ui.snapshot().result.errors,0);assert.equal(ui.snapshot().result.setup.name,'Company A');
- const cell=d.querySelector('[data-cell="0"][data-field="MAT"]');x.change(cell,'PRIVATE-edited');const mapping=copy(ui.snapshot().mapping),rows=copy(ui.snapshot().sourceRows);
+ const cell=d.querySelector('[data-cell="0"][data-field="MAT"]');await x.change(cell,'PRIVATE-edited');const mapping=copy(ui.snapshot().mapping),rows=copy(ui.snapshot().sourceRows);
  x.profile(b.id);assert.equal(ui.snapshot().result,null);assert.deepEqual(copy(ui.snapshot().sourceRows),rows);assert.deepEqual(copy(ui.snapshot().mapping),mapping);await ui.run();assert.equal(ui.snapshot().result.errors,1);
  const writes=x.writes();x.toggle('b',false);assert.equal(x.writes(),writes);assert.deepEqual(copy(x.state().workhub.validator.profiles[1].ruleIds),['b']);assert.match(d.getElementById('valRunSetup').textContent,/Temporary changes/);
  await x.save('Company B base only',true);assert.equal(x.state().workhub.validator.profiles[1].name,'Company B base only');assert.deepEqual(copy(x.state().workhub.validator.profiles[1].ruleIds),[]);
@@ -103,11 +103,11 @@ const referenceChoice=(x,id,field='PLANT')=>[...x.d.querySelectorAll('[data-setu
 test('reference checklist selects existing mappings and profiles without re-entering them or losing uploaded corrections',async t=>{
  const x=await workspace(t),{ui,d}=x;assert.equal(referenceChoice(x,'ref-a').disabled,false);assert.equal(referenceChoice(x,'ref-a').checked,true);
  await ui.handle({dataset:{val:'run-setup-none'}});const rows=copy(ui.snapshot().sourceRows),mapping=copy(ui.snapshot().mapping),definitions=copy(ui.snapshot().draft),writes=x.writes();
- const b=referenceChoice(x,'ref-b'),panel=b.closest('details'),list=b.closest('.val-setup-choices');panel.open=true;list.scrollTop=40;b.focus();x.change(b,true);
+ const b=referenceChoice(x,'ref-b'),panel=b.closest('details'),list=b.closest('.val-setup-choices');panel.open=true;list.scrollTop=40;b.focus();await x.change(b,true);
  assert.equal(referenceChoice(x,'ref-b'),b);assert.equal(d.activeElement,b);assert.equal(panel.open,true);assert.equal(list.scrollTop,40);assert.equal(x.writes(),writes);
  assert.deepEqual(copy(ui.snapshot().draft),definitions);assert.deepEqual(copy(ui.snapshot().sourceRows),rows);assert.deepEqual(copy(ui.snapshot().mapping),mapping);
  await x.save('B checklist');const saved=copy(x.state().workhub.validator.profiles[0]);assert.equal(saved.referenceChecks[0].lookupId,'ref-b');await ui.run();assert.equal(ui.snapshot().result.errors,1);
- x.change(referenceChoice(x,'ref-b'),false);assert.equal(ui.snapshot().result,null);await ui.run();assert.equal(ui.snapshot().result.errors,0);assert.deepEqual(copy(x.state().workhub.validator.profiles[0]),saved);
+ await x.change(referenceChoice(x,'ref-b'),false);assert.equal(ui.snapshot().result,null);await ui.run();assert.equal(ui.snapshot().result.errors,0);assert.deepEqual(copy(x.state().workhub.validator.profiles[0]),saved);
  x.profile(saved.id);assert.equal(referenceChoice(x,'ref-b').checked,true);await ui.run();assert.equal(ui.snapshot().result.errors,1);
 });
 test('reference search is independent and bulk deselection confirms dependent conditions',async t=>{
@@ -120,20 +120,20 @@ test('reference search is independent and bulk deselection confirms dependent co
 });
 test('required reference cancellation preserves results and confirmation deselects every active dependent condition only for this run',async t=>{
  const x=await workspace(t,{configure(s){const shared=copy(s.rules[0]);shared.id='shared';shared.name='Shared plant condition';s.rules.push(shared);s.rules.find(r=>r.id==='paused').assertion=copy(shared.assertion);}}),{ui,w}=x;x.toggle('b',false);await x.save('Original dependencies');await ui.run();
- const before=ui.snapshot(),saved=copy(x.state()),writes=x.writes(),messages=[];w.confirm=message=>{messages.push(message);return false;};const choice=referenceChoice(x,'ref-a');assert.equal(choice.disabled,false);x.change(choice,false);
+ const before=ui.snapshot(),saved=copy(x.state()),writes=x.writes(),messages=[];w.confirm=message=>{messages.push(message);return false;};const choice=referenceChoice(x,'ref-a');assert.equal(choice.disabled,false);await x.change(choice,false);
  assert.equal(choice.checked,true);assert.deepEqual(copy(ui.snapshot().result),copy(before.result));assert.deepEqual(copy(ui.snapshot().runSelection),copy(before.runSelection));assert.equal(x.writes(),writes);assert.match(messages[0],/Company A plant check/);assert.match(messages[0],/Shared plant condition/);assert.doesNotMatch(messages[0],/Company B plant check|Paused check/);
- w.confirm=()=>true;x.change(choice,false);assert.equal(choice.checked,false);assert.deepEqual(copy(ui.snapshot().runSelection.ruleIds),[]);assert.equal(ui.snapshot().result,null);assert.deepEqual(copy(ui.snapshot().sourceRows),copy(before.sourceRows));assert.deepEqual(copy(ui.snapshot().mapping),copy(before.mapping));assert.deepEqual(copy(x.state()),saved);
- x.change(choice,true);assert.equal(ui.snapshot().runSelection.referenceChecks[0].lookupId,'ref-a');assert.deepEqual(copy(ui.snapshot().runSelection.ruleIds),[]);await ui.run();assert.equal(ui.snapshot().result.errors,0);
+ w.confirm=()=>true;await x.change(choice,false);assert.equal(choice.checked,false);assert.deepEqual(copy(ui.snapshot().runSelection.ruleIds),[]);assert.equal(ui.snapshot().result,null);assert.deepEqual(copy(ui.snapshot().sourceRows),copy(before.sourceRows));assert.deepEqual(copy(ui.snapshot().mapping),copy(before.mapping));assert.deepEqual(copy(x.state()),saved);
+ await x.change(choice,true);assert.equal(ui.snapshot().runSelection.referenceChecks[0].lookupId,'ref-a');assert.deepEqual(copy(ui.snapshot().runSelection.ruleIds),[]);await ui.run();assert.equal(ui.snapshot().result.errors,0);
 });
 test('bulk reference cancellation and denied run permission leave the setup untouched',async t=>{
  const x=await workspace(t),{ui,w}=x;await ui.run();const before=ui.snapshot();let prompts=0;w.confirm=()=>{prompts++;return false;};await ui.handle({dataset:{val:'run-setup-references-none'}});assert.equal(prompts,1);assert.deepEqual(copy(ui.snapshot().result),copy(before.result));assert.deepEqual(copy(ui.snapshot().runSelection),copy(before.runSelection));assert.equal(referenceChoice(x,'ref-a').checked,true);
- w.WorkHubCurrentAccess={can:()=>false};x.render();assert.equal(referenceChoice(x,'ref-a').disabled,true);x.change(referenceChoice(x,'ref-a'),false);await new Promise(r=>setImmediate(r));assert.equal(prompts,1);assert.deepEqual(copy(ui.snapshot().runSelection),copy(before.runSelection));assert.equal(referenceChoice(x,'ref-a').checked,true);
+ w.WorkHubCurrentAccess={can:()=>false};x.render();assert.equal(referenceChoice(x,'ref-a').disabled,true);await x.change(referenceChoice(x,'ref-a'),false);await new Promise(r=>setImmediate(r));assert.equal(prompts,1);assert.deepEqual(copy(ui.snapshot().runSelection),copy(before.runSelection));assert.equal(referenceChoice(x,'ref-a').checked,true);
 });
 test('newly mapped checks stay available after deselection and unavailable saved mappings can be removed individually',async t=>{
- const x=await workspace(t),{ui,d}=x;await ui.handle({dataset:{val:'run-setup-none'}});const form=d.getElementById('valRunReferenceForm');form.elements.setupField.value='MAT';x.change(form.elements.setupReference,'ref-a');form.dispatchEvent(new x.w.Event('submit',{bubbles:true,cancelable:true}));
- const choice=referenceChoice(x,'ref-a','MAT');assert.equal(choice.checked,true);x.change(choice,false);assert.equal(referenceChoice(x,'ref-a','MAT'),choice);assert.equal(choice.checked,false);x.change(choice,true);await x.save('Material reference');
+ const x=await workspace(t),{ui,d}=x;await ui.handle({dataset:{val:'run-setup-none'}});const form=d.getElementById('valRunReferenceForm');form.elements.setupField.value='MAT';await x.change(form.elements.setupReference,'ref-a');form.dispatchEvent(new x.w.Event('submit',{bubbles:true,cancelable:true}));
+ const choice=referenceChoice(x,'ref-a','MAT');assert.equal(choice.checked,true);await x.change(choice,false);assert.equal(referenceChoice(x,'ref-a','MAT'),choice);assert.equal(choice.checked,false);await x.change(choice,true);await x.save('Material reference');
  const p=x.state().workhub.validator.profiles[0];p.referenceChecks=[{...p.referenceChecks[0],lookupId:'removed',lookupColumn:'missing'}];x.profile(p.id);const stale=referenceChoice(x,'removed','MAT');assert.equal(stale.checked,true);assert.equal(stale.disabled,false);assert.match(stale.closest('label').textContent,/Unavailable/);await assert.rejects(ui.run(),/unavailable/);
- x.change(stale,false);await ui.run();assert.equal(ui.snapshot().result.errors,0);assert.equal(p.referenceChecks[0].lookupId,'removed');
+ await x.change(stale,false);await ui.run();assert.equal(ui.snapshot().result.errors,0);assert.equal(p.referenceChecks[0].lookupId,'removed');
 });
 test('combined reference dependencies retain tuple validation and never become unconditional single-field checks',async t=>{
  const x=await workspace(t,{configure(s,E){s.rules[0].assertion={...E.condition('PLANT'),operator:'lookupTuple',lookupId:'ref-a',pairs:[{field:'PLANT',referenceColumn:'Code'},{field:'MAT',referenceColumn:'Name'}]};}}),{ui,d}=x;x.toggle('b',false);
@@ -141,7 +141,7 @@ test('combined reference dependencies retain tuple validation and never become u
  await ui.handle({dataset:{val:'run-setup-references-none'}});await ui.run();assert.equal(ui.snapshot().result.errors,1);assert.match(ui.snapshot().result.setup.references[0].column,/PLANT → Code; MAT → Name/);assert.equal(ui.snapshot().runSelection.referenceChecks.length,0);
 });
 test('additional reference bindings save once and drive validation, suggestions, live edits and literal Excel setup audit',async t=>{
- const x=await workspace(t),{ui,d}=x;await ui.handle({dataset:{val:'run-setup-none'}});const form=d.getElementById('valRunReferenceForm');form.elements.setupField.value='PLANT';x.change(form.elements.setupReference,'ref-b');assert.equal(form.elements.setupReferenceColumn.value,'Plant');form.dispatchEvent(new x.w.Event('submit',{bubbles:true,cancelable:true}));
+ const x=await workspace(t),{ui,d}=x;await ui.handle({dataset:{val:'run-setup-none'}});const form=d.getElementById('valRunReferenceForm');form.elements.setupField.value='PLANT';await x.change(form.elements.setupReference,'ref-b');assert.equal(form.elements.setupReferenceColumn.value,'Plant');form.dispatchEvent(new x.w.Event('submit',{bubbles:true,cancelable:true}));
  await x.save('B reference only');await ui.run();assert.equal(ui.snapshot().result.errors,1);assert.equal(ui.snapshot().result.setup.references.length,1);
  ui.openCorrections(0,'PLANT');assert.match(d.getElementById('valSuggestionChoices').textContent,/FF02/);assert.doesNotMatch(d.getElementById('valSuggestionChoices').textContent,/FF01/);ui.applyCorrection(0);assert.equal(ui.snapshot().result.errors,0);assert.equal(ui.snapshot().result.setup.references.length,1);
  await ui.handle({dataset:{val:'accepted'}});const blob=x.downloads[0].blob,book=await x.w.WorkHubValidatorFiles.read({name:'checked.xlsx',size:blob.size,arrayBuffer:()=>blob.arrayBuffer()});const audit=book.sheets.find(s=>s.name==='Validation setup');assert.ok(audit);assert.ok(audit.rows.some(r=>r[1]==='Skipped'));assert.match(JSON.stringify(audit.rows),/B reference only/);assert.equal(x.state().workhub.validator.runs[0].setup.name,'B reference only');assert.doesNotMatch(JSON.stringify(x.state().workhub.validator.profiles),/PRIVATE/);
@@ -167,7 +167,7 @@ test('profiles use the selected published schema and live corrections keep that 
  await ui.handle({dataset:{val:'mode',mode:'references'}});await ui.handle({dataset:{val:'reference-edit',id:'ref-a'}});const rf=x.d.getElementById('valReferenceForm');rf.elements.data.value='Code,Name\nFF99,New draft';rf.dispatchEvent(new x.w.Event('submit',{bubbles:true,cancelable:true}));assert.equal(ui.snapshot().draft.lookups[0].rows[0][0],'FF99');
  const before=copy(ui.snapshot().draft.releases);assert.deepEqual(before,[release]);
  await ui.handle({dataset:{val:'mode',mode:'check'}});x.toggle('b',false);await x.save('Published A');await ui.run();assert.equal(ui.snapshot().result.errors,0);assert.equal(x.state().workhub.validator.runs[0].version,1);
- x.change(x.d.querySelector('[data-cell="0"][data-field="PLANT"]'),'wrong');assert.equal(ui.snapshot().result.errors,1);ui.openCorrections(0,'PLANT');assert.match(x.d.getElementById('valSuggestionChoices').textContent,/FF01/);assert.doesNotMatch(x.d.getElementById('valSuggestionChoices').textContent,/FF02/);ui.applyCorrection(0);assert.equal(ui.snapshot().result.errors,0);assert.deepEqual(copy(ui.snapshot().draft.releases),before);assert.doesNotThrow(()=>E.validateState(x.state()));
+ await x.change(x.d.querySelector('[data-cell="0"][data-field="PLANT"]'),'wrong');assert.equal(ui.snapshot().result.errors,1);ui.openCorrections(0,'PLANT');assert.match(x.d.getElementById('valSuggestionChoices').textContent,/FF01/);assert.doesNotMatch(x.d.getElementById('valSuggestionChoices').textContent,/FF02/);ui.applyCorrection(0);assert.equal(ui.snapshot().result.errors,0);assert.deepEqual(copy(ui.snapshot().draft.releases),before);assert.doesNotThrow(()=>E.validateState(x.state()));
 });
 test('profile names, update conflicts and removed mappings are rejected without saving uploaded records',async t=>{
  const x=await workspace(t),{ui,d}=x;x.toggle('b',false);await x.save('A');const p=x.state().workhub.validator.profiles[0],writes=x.writes();await x.save('A');assert.equal(x.writes(),writes);assert.match(d.getElementById('valProfileError').textContent,/different profile name/);d.querySelector('dialog').close();

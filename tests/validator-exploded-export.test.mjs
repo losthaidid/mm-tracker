@@ -10,7 +10,7 @@ async function studio(t, { sap = false, missingRequired = false } = {}) {
   const dom = new JSDOM('<div id="view"></div><dialog id="modal"><div id="modalBody"></div></dialog>', { url: 'https://example.test', runScripts: 'outside-only', pretendToBeVisual: true });
   const w = dom.window, d = w.document; t.after(() => w.close());
   Object.assign(w, { Blob, TextEncoder, TextDecoder, CompressionStream, setImmediate, clearImmediate });
-  w.confirm = () => true;
+  w.confirm = () => true;w.WorkHubDialogs={confirm:async(...args)=>w.confirm(...args)};
   w.HTMLDialogElement.prototype.showModal = function () { this.open = true; }; w.HTMLDialogElement.prototype.close = function () { this.open = false; };
   const timer = w.setTimeout.bind(w); w.setTimeout = (fn, ms) => ms === 50 ? (queueMicrotask(fn), 0) : timer(fn, ms);
   for (const name of ['vendor/jszip.min.js', 'vendor/ssf.js', 'validator-engine.js', 'validator-transform.js', 'validator-files.js']) w.eval(source(name)); w.WorkHubValidatorFiles = { ...w.WorkHubValidatorFiles }; w.eval(source('validator-studio.js'));
@@ -52,7 +52,7 @@ test('download includes current SAP formatting, later corrections and unresolved
 test('availability follows applied explosions through SAP-only preparation, undo, restore and replacement uploads', async t => {
   const x = await studio(t, { sap: true }); await x.upload([example]); await assert.rejects(action(x.ui, 'export-exploded'), /Apply Explode/);
   x.ui.openPreparation('sap'); x.preview(); x.ui.applyPreparation(); assert.equal(x.button().disabled, true); x.explode(); x.ui.applyPreparation(); assert.equal(x.button().disabled, false);
-  x.ui.undoPreparation(); assert.equal(x.button().disabled, true); x.explode(); x.ui.applyPreparation(); x.ui.undoPreparation(true); assert.equal(x.button().disabled, true); x.explode(); x.ui.applyPreparation(); await x.upload([example]); assert.equal(x.button().disabled, true);
+  await x.ui.undoPreparation(); assert.equal(x.button().disabled, true); x.explode(); x.ui.applyPreparation(); await x.ui.undoPreparation(true); assert.equal(x.button().disabled, true); x.explode(); x.ui.applyPreparation(); await x.upload([example]); assert.equal(x.button().disabled, true);
 });
 
 test('export uses Export permission independently of Run/Edit and rechecks permission before delivering the file', async t => {

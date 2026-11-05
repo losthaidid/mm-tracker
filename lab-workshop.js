@@ -912,13 +912,13 @@
         }
       } else b?.remove();
     }
-    function remove(caseId, id = '') {
+    async function remove(caseId, id = '') {
       const c = find(caseId),
         p = id ? c?.attempts.find(p => p.id === id) : null;
       if (!c || (id && !p)) throw Error('This Lab item no longer exists.');
       const label = p ? 'experiment “' + p.title + '”' : 'investigation “' + c.title + '”';
       if (
-        !root.confirm(
+        !(await root.WorkHubDialogs.confirm(
           'Delete ' +
             label +
             '? ' +
@@ -927,7 +927,7 @@
                 (c.status === 'Solved' ? 'The case will reopen for review. ' : '')
               : 'Its experiments and board will also be deleted. ') +
             'Linked Knowledge notes are kept. You can Undo this deletion until the next Lab deletion or account change.'
-        )
+        ))
       )
         return false;
       cancelDrag();
@@ -1288,7 +1288,7 @@
       },
       true
     );
-    document.addEventListener('click', event => {
+    document.addEventListener('click', async event => {
       const b = event.target.closest?.('[data-workshop]');
       if (!b || b.disabled) return;
       try {
@@ -1346,8 +1346,8 @@
         } else if (x.workshop === 'result') resultForm(c.id, x.id, x.outcome);
         else if (x.workshop === 'connect') connectForm(c.id, x.id);
         else if (x.workshop === 'resolve') resolutionForm(c.id);
-        else if (x.workshop === 'delete-case') remove(c.id);
-        else if (x.workshop === 'delete-attempt') remove(c.id, x.id);
+        else if (x.workshop === 'delete-case') await remove(c.id);
+        else if (x.workshop === 'delete-attempt') await remove(c.id, x.id);
         else if (x.workshop === 'undo') restore();
         else if (x.workshop === 'retry') {
           ensureEditable(c);

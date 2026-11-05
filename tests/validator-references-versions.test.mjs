@@ -12,7 +12,7 @@ async function fixture(t, { versions = 0, runner, mode = 'general' } = {}) {
   const w = dom.window, d = w.document;
   t.after(() => w.close());
   Object.assign(w, { Blob, TextEncoder, TextDecoder, setImmediate, clearImmediate });
-  w.confirm = () => true;
+  w.confirm = () => true;w.WorkHubDialogs={confirm:async(...args)=>w.confirm(...args)};
   const timer = w.setTimeout.bind(w);
   w.setTimeout = (fn, ms) => ms === 50 ? (queueMicrotask(fn), 0) : timer(fn, ms);
   w.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
@@ -34,7 +34,7 @@ async function fixture(t, { versions = 0, runner, mode = 'general' } = {}) {
     openModal(title, body) { d.getElementById('modalBody').innerHTML = body; d.getElementById('modal').showModal(); }, closeModal() { d.getElementById('modal').close(); },
   });
   render();
-  const change = (el, value) => { if (el.type === 'checkbox') el.checked = value; else el.value = value; el.dispatchEvent(new w.Event('change', { bubbles: true })); };
+  const change = (el, value) => { if (el.type === 'checkbox') el.checked = value; else el.value = value; el.dispatchEvent(new w.Event('change', { bubbles: true })); return new Promise(r=>setImmediate(r)); };
   const handle = (val, extras = {}) => ui.handle({ dataset: { val, ...extras } });
   return { w, d, E, F, ui, messages, downloads, render, handle, change, state: () => state, writes: () => writes, failSave(value) { rejectSave = value; }, switchOwner() { owner = 'other'; ready = false; }, async mode(value) { await handle('mode', { mode: value }); }, async chooseVersion(value) { await this.mode('check'); change(d.querySelector('[name="version"]'), value); }, deleteVersion(n) { return handle('delete-version', { version: String(n) }); }, list: () => w.WorkHubValidatorReferences.unitOfMeasurement() };
 }
@@ -110,8 +110,8 @@ test('Unit of Measurement works through existing independent reference selection
   await ui.loadFile(upload('Unit of Measurement\nEA\nea\nBTL\nbtl\n000\n001'));
   const form = d.getElementById('valRunReferenceForm'); form.dispatchEvent(new x.w.Event('submit', { bubbles: true, cancelable: true }));
   await ui.run(); assert.equal(ui.snapshot().result.errors, 1); assert.equal(ui.snapshot().result.issues[0].value, 'ea');
-  const check = d.querySelector('[data-setup-reference]'); assert.equal(check.disabled, false); x.change(check, false); await ui.run(); assert.equal(ui.snapshot().result.errors, 0);
-  x.change(d.querySelector('[data-setup-reference]'), true); await ui.run(); assert.equal(ui.snapshot().result.errors, 1);
+  const check = d.querySelector('[data-setup-reference]'); assert.equal(check.disabled, false); await x.change(check, false); await ui.run(); assert.equal(ui.snapshot().result.errors, 0);
+  await x.change(d.querySelector('[data-setup-reference]'), true); await ui.run(); assert.equal(ui.snapshot().result.errors, 1);
   const tpl = ui.snapshot().draft, blob = await x.F.template(tpl), book = await x.F.read({ name: 'template.xlsx', size: blob.size, arrayBuffer: () => blob.arrayBuffer() });
   const rows = book.sheets.find(s => s.name.startsWith('Ref ')).rows;
   assert.equal(rows.length, 292); const values = new Map(rows.slice(1)); assert.equal(values.get('000'), 'm/min'); assert.equal(values.get('001') || '', ''); assert.equal(values.get('"2'), 'Inch2'); assert.equal(values.get('µL'), 'µl'); assert.equal(values.get('btl'), 'Btu/lb');
@@ -130,7 +130,7 @@ test('production worker retains exact unit-reference matching', async t => {
 
 test('unused version deletion preserves unsaved draft edits, other versions and future numbering', async t => {
   const x = await fixture(t, { versions: 3 }), { d, ui } = x, original = plain(x.state().workhub.validator.templates[0].releases);
-  const form = d.getElementById('valColumnForm'); x.change(form.elements.label, 'My unsaved unit label'); form.elements.label.dispatchEvent(new x.w.Event('input', { bubbles: true }));
+  const form = d.getElementById('valColumnForm'); await x.change(form.elements.label, 'My unsaved unit label'); form.elements.label.dispatchEvent(new x.w.Event('input', { bubbles: true }));
   await x.mode('history'); assert.equal(d.querySelectorAll('[data-val="delete-version"]:not(:disabled)').length, 3);
   await x.deleteVersion(3); let saved = x.state().workhub.validator.templates[0];
   assert.deepEqual(plain(saved.releases), original.slice(0, 2)); assert.equal(saved.lastPublishedVersion, 3); assert.equal(saved.columns[0].label, 'Unit of Measurement');

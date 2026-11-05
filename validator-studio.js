@@ -480,9 +480,9 @@
       if (
         !fileQueue.length &&
         book &&
-        !root.confirm(
+        !(await root.WorkHubDialogs.confirm(
           'Start a file queue? Download the current single-file results first if you need them.'
-        )
+        ))
       )
         return;
       const empty = !fileQueue.length;
@@ -991,14 +991,14 @@
       );
       paint();
     }
-    function undoPreparation(restore = false) {
+    async function undoPreparation(restore = false) {
       prepareAccess();
       if (!preparationUndo.length && !restore) throw Error('There is no preparation to undo.');
       if (
-        !root.confirm(
+        !(await root.WorkHubDialogs.confirm(
           (restore ? 'Restore the original upload?' : 'Undo the last transformation?') +
             ' Later cell corrections and current validation results will be cleared.'
-        )
+        ))
       )
         return;
       closePreparation();
@@ -1281,7 +1281,7 @@
         if (!extraReferenceChoices.some(x => referenceKey(x) === referenceKey(c)))
           extraReferenceChoices.push(E.copy(c));
     }
-    function deselectRunReferences(s, keys) {
+    async function deselectRunReferences(s, keys) {
       const dependent = activeSchema().rules.filter(
         r =>
           s.ruleIds.includes(r.id) &&
@@ -1290,11 +1290,11 @@
       );
       if (
         dependent.length &&
-        !root.confirm(
+        !(await root.WorkHubDialogs.confirm(
           'Deselecting these reference checks will also deselect these conditions for this validation run:\n\n' +
             dependent.map(r => '• ' + r.name).join('\n') +
             '\n\nYour saved template and profiles stay unchanged. Continue?'
-        )
+        ))
       )
         return false;
       const ids = new Set(dependent.map(r => r.id));
@@ -1773,9 +1773,16 @@
       if (!r) throw Error('Choose an available template version.');
       return E.copy(r.schema);
     }
-    function pick(id, force = false) {
-      if (!force && dirty && !root.confirm('Switch templates and discard unsaved draft changes?'))
+    async function pick(id, force = false) {
+      if (
+        !force &&
+        dirty &&
+        !(await root.WorkHubDialogs.confirm('Switch templates and discard unsaved draft changes?'))
+      )
         return;
+      selectTemplate(id);
+    }
+    function selectTemplate(id) {
       const t = store().templates.find(t => t.id === id);
       draft = t ? E.copy(t) : null;
       selected = t?.id || '';
@@ -1817,8 +1824,12 @@
       page = 0;
       busy = false;
     }
-    function create(example = false) {
-      if (dirty && !root.confirm('Create a template and discard unsaved draft changes?')) return;
+    async function create(example = false) {
+      if (
+        dirty &&
+        !(await root.WorkHubDialogs.confirm('Create a template and discard unsaved draft changes?'))
+      )
+        return;
       draft = example ? E.example() : E.create();
       selected = draft.id;
       baseStamp = '';
@@ -4100,7 +4111,7 @@
         reasons.push('Requires template edit and delete permissions');
       return { saved, queued, active, reason: reasons.join(' · ') };
     }
-    function deleteVersion(releaseVersion) {
+    async function deleteVersion(releaseVersion) {
       setupAccess('edit');
       setupAccess('delete');
       const templateId = draft.id,
@@ -4117,14 +4128,14 @@
       if (saved.updatedAt !== baseStamp)
         throw Error('This template changed elsewhere. Reopen it before deleting a version.');
       if (
-        !root.confirm(
+        !(await root.WorkHubDialogs.confirm(
           'Delete published version ' +
             releaseVersion +
             ' of “' +
             draft.name +
             '”? This removes its frozen definition and frees a version slot. Export the template definition first if you need a copy.' +
             (version === String(releaseVersion) ? ' Validation will switch to Current draft.' : '')
-        )
+        ))
       )
         return;
       ensure();
@@ -4273,7 +4284,7 @@
     }
     function render() {
       sync();
-      if (!draft && store().templates.length) pick(store().templates[0].id, true);
+      if (!draft && store().templates.length) selectTemplate(store().templates[0].id);
       return (
         '<section class="validation-studio' +
         (['file-compare', 'excel-csv', 'recombined'].includes(mode) ? ' val-compare-wide' : '') +
@@ -4387,7 +4398,7 @@
       if (action === 'queue-clear') {
         queueAccess();
         if (
-          root.confirm(
+          await root.WorkHubDialogs.confirm(
             'Clear all queue files and working results? Download any reports you need first.'
           )
         ) {
@@ -4400,7 +4411,12 @@
         queueAccess();
         const job = fileQueue.find(j => j.id === id);
         if (!job) return;
-        if (!root.confirm('Remove ' + job.file.name + ' and its working results?')) return;
+        if (
+          !(await root.WorkHubDialogs.confirm(
+            'Remove ' + job.file.name + ' and its working results?'
+          ))
+        )
+          return;
         const current = id === queueActiveId;
         fileQueue = fileQueue.filter(j => j.id !== id);
         if (current) {
@@ -4502,7 +4518,7 @@
         }
         if (action === 'run-setup-references-none') {
           const keys = new Set(referenceChoices(activeSchema(), s).map(c => c.key));
-          if (!deselectRunReferences(s, keys)) return;
+          if (!(await deselectRunReferences(s, keys))) return;
         }
         runSelection = s;
         setupChanged();
@@ -4513,11 +4529,11 @@
         const p = profiles().find(p => p.id === runProfileId);
         if (!p) throw Error('Choose a saved profile first.');
         if (
-          !root.confirm(
+          !(await root.WorkHubDialogs.confirm(
             'Delete profile "' +
               p.name +
               '"? The template, conditions, references and uploaded data will remain.'
-          )
+          ))
         )
           return;
         if (
@@ -4549,7 +4565,7 @@
         return;
       }
       if (action === 'prep-undo' || action === 'prep-restore') {
-        undoPreparation(action === 'prep-restore');
+        await undoPreparation(action === 'prep-restore');
         return;
       }
       if (action === 'setup-help') {
@@ -4560,11 +4576,11 @@
         return;
       }
       if (action === 'new' || action === 'example') {
-        create(action === 'example');
+        await create(action === 'example');
         return;
       }
       if (action === 'open') {
-        pick(id);
+        await pick(id);
         paint();
         return;
       }
@@ -5045,9 +5061,9 @@
       }
       if (action === 'delete-template') {
         if (
-          !root.confirm(
+          !(await root.WorkHubDialogs.confirm(
             'Delete this template and its saved versions? Export its definition first if you want to keep a copy.'
-          )
+          ))
         )
           return;
         const templateId = draft.id;
@@ -5069,7 +5085,12 @@
         }
       }
       if (action === 'restore-version') {
-        if (dirty && !root.confirm('Replace the current draft with this published version?'))
+        if (
+          dirty &&
+          !(await root.WorkHubDialogs.confirm(
+            'Replace the current draft with this published version?'
+          ))
+        )
           return;
         const r = draft.releases.find(r => String(r.version) === el.dataset.version);
         Object.assign(draft, { projectId: '', projectName: '' }, E.copy(r.schema));
@@ -5081,7 +5102,7 @@
         mode = 'columns';
       }
       if (action === 'delete-version') {
-        deleteVersion(Number(el.dataset.version));
+        await deleteVersion(Number(el.dataset.version));
         return;
       }
       paint();
@@ -6103,7 +6124,7 @@
                 c => c.key === el.dataset.setupReference
               );
             if (!c || (el.checked && !c.available)) throw Error('This reference is unavailable.');
-            if (!el.checked && !deselectRunReferences(s, new Set([c.key]))) {
+            if (!el.checked && !(await deselectRunReferences(s, new Set([c.key])))) {
               el.checked = true;
               return;
             }
@@ -6146,9 +6167,9 @@
             draft.rules.some(r => r.companyScope === 'selected')
           ) {
             if (
-              !root.confirm(
+              !(await root.WorkHubDialogs.confirm(
                 'Changing project will clear company assignments and pause company-specific conditions. Reassign their companies and enable them again in Conditions. Continue?'
-              )
+              ))
             ) {
               el.value = draft.projectId || '';
               return;
@@ -6263,7 +6284,12 @@
             throw Error('Choose a Validation Studio template definition.');
           const t = value.template;
           E.validateState({ workhub: { validator: { templates: [t], runs: [] } } });
-          if (dirty && !root.confirm('Import this definition and discard unsaved draft changes?'))
+          if (
+            dirty &&
+            !(await root.WorkHubDialogs.confirm(
+              'Import this definition and discard unsaved draft changes?'
+            ))
+          )
             return;
           draft = E.copy(t);
           draft.id = E.uid();
@@ -6300,9 +6326,9 @@
         if (el.name === 'version') {
           if (
             preparationSteps.length &&
-            !root.confirm(
+            !(await root.WorkHubDialogs.confirm(
               'Changing version restores the original upload and clears preparations and cell corrections. Continue?'
-            )
+            ))
           ) {
             el.value = version;
             return;
@@ -6329,9 +6355,9 @@
         if (el.name === 'sheet' || el.name === 'headerRow') {
           if (
             preparationSteps.length &&
-            !root.confirm(
+            !(await root.WorkHubDialogs.confirm(
               'Changing the worksheet or header restores its original values and clears preparations and cell corrections. Continue?'
-            )
+            ))
           ) {
             el.value = el.name === 'sheet' ? sheetIndex : headerRow;
             return;
