@@ -836,25 +836,72 @@
       { passive: true }
     );
     function icon(name) {
+      // A distinct silhouette for every section; the brand and drag affordance stay familiar.
       const paths = {
-        snippets: 'M4 4h16v16H4V4M8 8h8M8 12h8M8 16h5',
-        validator: 'M4 4h16v16H4V4M4 9h16M9 9v11m4-7 2 2 4-4',
-        home: 'M3 10l9-7 9 7M5 9v11h14V9M9 20v-7h6v7',
-        tickets: 'M4 5h16v5a2 2 0 000 4v5H4v-5a2 2 0 000-4V5M15 5v3m0 3v2m0 3v3',
-        tasks: 'M8 6h13M8 12h13M8 18h13M2 6l1 1 2-2M2 12l1 1 2-2M2 18l1 1 2-2',
-        schedule: 'M4 5h16v16H4V5M8 2v6M16 2v6M4 10h16M8 14h3m3 3h3',
-        specs: 'M3 7h7l2-3h9v16H3V7M3 10h18',
-        notes: 'M4 3h13a3 3 0 0 1 3 3v15H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3Zm2 0v18M9 8h7M9 12h5',
-        knowledge: 'M12 5c-3-3-7-2-10-1v15c4-1 7-1 10 1 3-2 6-2 10-1V4c-3-1-7-2-10 1v15',
-        processhub: 'M8 3h8v5H8V3M4 16h6v5H4v-5M15 16h6v5h-6v-5M12 8v4M7 16v-4h11v4',
-        waiting: 'M6 3h12M6 21h12M7 3v4l5 5-5 5v4M17 3v4l-5 5 5 5v4',
-        studio: 'M12 3l2.5 6 6.5 3-6.5 3-2.5 6-2.5-6L3 12l6.5-3L12 3',
+        home: 'M3 17h18M5 21h14M7 17a5 5 0 0 1 10 0M12 3v3M4 7l2 2M20 7l-2 2M2 12h2m16 0h2',
+        tickets:
+          'M4 5h16v4a3 3 0 0 0 0 6v4H4v-4a3 3 0 0 0 0-6V5M15 5v2m0 3v1m0 3v1m0 3v1M7 9h4m-4 4h3',
+        tasks:
+          'M8 5H6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M8 3h8v4H8V3M8 12l2 2 5-4M8 18h8',
+        schedule:
+          'M6 5h12a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3ZM8 2v6m8-6v6M3 10h18M7 14h1m-1 4h1m4-4h1',
+        specs:
+          'M3 7V6a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7ZM9 18v-7m0 0h7l-2 2 2 2H9',
+        notes:
+          'M6 3h9a2 2 0 0 1 2 2v4M6 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h1v18M2 7h4m-4 5h4m-4 5h4M9 7h4m-4 4h2M12 17l6-6 3 3-6 6-4 1 1-4Zm4-4 3 3',
+        knowledge:
+          'M12 6C9 3 5 3 2 4v15c4-1 7 0 10 2 3-2 6-3 10-2V4c-3-1-7-1-10 2v15M6 8l3 1m-3 3 3 1m6-4 3-1m-3 5 3-1',
+        processhub: 'M12 8v4M6 16v-4h12v4M3 16h6v5H3v-5Zm12 0h6v5h-6v-5ZM12 2l4 3-4 3-4-3 4-3Z',
+        files: 'M8 3h8l4 4v11H8V3m8 0v5h4M4 7v14h12M11 12h6m-6 3h4',
+        handover: 'M3 7l8-4 8 4-8 4-8-4Zm0 0v10l8 4V11m8-4v5M7 5l8 4M15 17h7m-3-3 3 3-3 3',
+        waiting: 'M6 3h12M6 21h12M7 3v4l5 5-5 5v4M17 3v4l-5 5 5 5v4M9 7h6M9 18l3-3 3 3',
+        studio:
+          'M12 3a9 9 0 0 0 0 18h1.5a2.5 2.5 0 0 0 0-5H13a1 1 0 0 1 0-2h3.5A4.5 4.5 0 0 0 21 9.5 6.5 6.5 0 0 0 14.5 3H12Z',
+        lab: 'M9 3h6M10 3v6l-5.5 9a2 2 0 0 0 1.7 3h11.6a2 2 0 0 0 1.7-3L14 9V3M7.5 13h9M9 17h.01M13 18h.01M14 15h.01',
+        validator: 'M12 2l9 4v6c0 5-4 8-9 10-5-2-9-5-9-10V6l9-4ZM8 12l3 3 5-6',
+        snippets:
+          'M6 4h12a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3ZM8 9l-3 3 3 3m8-6 3 3-3 3M13 8l-2 8',
+        brand: 'M12 3l2.5 6 6.5 3-6.5 3-2.5 6-2.5-6L3 12l6.5-3L12 3',
         drag: 'M8 5h.01M16 5h.01M8 12h.01M16 12h.01M8 19h.01M16 19h.01',
       };
+      const tones = {
+        home: 'M7 17a5 5 0 0 1 10 0Z',
+        tickets: 'M4 5h11v14H4v-4a3 3 0 0 0 0-6V5Z',
+        tasks: 'M8 3h8v4H8Z',
+        schedule: 'M3 8a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v2H3Z',
+        specs: 'M3 7h18v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z',
+        notes: 'M12 17l6-6 3 3-6 6-4 1Z',
+        knowledge: 'M12 6c-3-3-7-3-10-2v15c4-1 7 0 10 2Z',
+        processhub: 'M12 2l4 3-4 3-4-3Zm3 14h6v5h-6Z',
+        files: 'M8 3h8l4 4v11H8Z',
+        handover: 'M3 7l8 4v10l-8-4Z',
+        waiting: 'M7 3h10v4l-5 5-5-5Zm2 15 3-3 3 3v3H9Z',
+        studio:
+          'M12 3a9 9 0 0 0 0 18h1.5a2.5 2.5 0 0 0 0-5H13a1 1 0 0 1 0-2h3.5A4.5 4.5 0 0 0 21 9.5 6.5 6.5 0 0 0 14.5 3Z',
+        lab: 'M7.5 13h9l3 5a2 2 0 0 1-1.7 3H6.2a2 2 0 0 1-1.7-3Z',
+        validator: 'M12 2l9 4v6c0 5-4 8-9 10Z',
+        snippets: 'M6 4h12a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3Z',
+      };
+      const details =
+        name === 'studio'
+          ? '<g fill="currentColor" stroke="none"><circle cx="7" cy="10" r="1.2"/><circle cx="10" cy="6.5" r="1.2"/><circle cx="15" cy="7" r="1.2"/></g>'
+          : name === 'schedule'
+            ? '<rect x="14" y="14" width="4" height="4" rx="1" fill="currentColor" stroke="none"/>'
+            : '';
       return (
-        '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' +
-        (paths[name] || paths.studio) +
-        '"/></svg>'
+        '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" data-section-icon="' +
+        esc(name) +
+        '">' +
+        (tones[name]
+          ? '<path class="hub-icon-tone" d="' +
+            tones[name] +
+            '" fill="currentColor" fill-opacity=".14" stroke="none"/>'
+          : '') +
+        '<path d="' +
+        (paths[name] || paths.brand) +
+        '"/>' +
+        details +
+        '</svg>'
       );
     }
     function mountShell() {
@@ -867,7 +914,7 @@
           brand.className = 'hub-header-brand';
           brand.innerHTML =
             '<span class="hub-brand-mark">' +
-            icon('studio') +
+            icon('brand') +
             '</span><div class="hub-header-copy"><h1 id="hubSiteTitle"></h1><p id="hubSiteSubtitle"></p></div>';
         }
         const title = $('hubSiteTitle');
