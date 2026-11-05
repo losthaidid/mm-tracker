@@ -11,7 +11,7 @@ permissions:
 jobs:
   tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,4 +24,8 @@ jobs:
           python-version: '3.12'
       - name: Install independent XLS test reader
         run: python3 -m pip install xlrd==2.0.2
+      - name: Check handover, design and task components
+        run: |
+          node --test tests/task-completion.test.mjs tests/handover-enhancements.test.mjs tests/drive-handover.test.mjs tests/website-designs.test.mjs tests/source-layout.test.mjs
+          node --max-old-space-size=4096 --test --test-name-pattern='^(Task completion rollup:|Handover packs:|Website designs:|Work sessions hide completed tasks)' tests/app.test.mjs
       - run: npm test

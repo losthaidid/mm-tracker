@@ -1,0 +1,373 @@
+/* Fiori-inspired shell. Theme tokens retain personal palettes and dark mode. */
+.wd-mini-fiori .wd-mini-head {
+  height: 23px;
+  background: var(--hub-link);
+  border: 0;
+}
+.wd-mini-fiori .wd-mini-nav {
+  top: 23px;
+  bottom: auto;
+  height: 19px;
+  width: 100%;
+  background: var(--hub-surface);
+  border-width: 0 0 1px;
+}
+.wd-mini-fiori .wd-mini-nav:after {
+  margin: 8px 12px;
+  width: 23px;
+  height: 3px;
+  box-shadow: 34px 0 0 var(--hub-border), 68px 0 0 var(--hub-border);
+}
+.wd-mini-fiori .wd-mini-title {
+  top: 52px;
+  left: 13px;
+  right: 13px;
+  height: 27px;
+  background: var(--hub-surface);
+}
+.wd-mini-fiori .wd-mini-one,
+.wd-mini-fiori .wd-mini-two {
+  top: 90px;
+  height: 49px;
+  border-radius: 7px;
+}
+.wd-mini-fiori .wd-mini-one {
+  left: 13px;
+  width: calc((100% - 38px) / 2);
+}
+.wd-mini-fiori .wd-mini-two {
+  left: calc(50% + 5px);
+  right: 13px;
+}
+body[data-hub-design='fiori'] {
+  --fi-shell: color-mix(in srgb, var(--hub-surface) 93%, var(--hub-accent));
+  --fi-shadow: 0 2px 8px #10243a0d;
+}
+body[data-hub-design='fiori'] #hubHeader {
+  position: relative;
+  top: auto;
+  min-height: 64px;
+  padding: 14px 28px;
+  border: 0;
+  border-bottom: 3px solid var(--hub-link);
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--fi-shell);
+  z-index: 120;
+}
+body[data-hub-design='fiori'] #hubHeader h1 {
+  margin: 0;
+  font: 750 24px / 1.2 var(--hub-font);
+  letter-spacing: -0.035em;
+}
+body[data-hub-design='fiori'] #hubHeader p {
+  margin-top: 5px;
+  font-size: 11px;
+  color: var(--hub-muted);
+}
+body[data-hub-design='fiori'] #hubShell {
+  display: block;
+}
+body[data-hub-design='fiori'] #hubSidebar {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 85;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  padding: 0 28px;
+  border: 0;
+  border-bottom: 1px solid var(--hub-border);
+  background: var(--hub-surface);
+}
+body[data-hub-design='fiori'] #hubSidebar[hidden] {
+  display: none;
+}
+body[data-hub-design='fiori'] #hubSidebar .hub-side-intro,
+body[data-hub-design='fiori'] #hubSidebar .hub-side-note {
+  display: none;
+}
+body[data-hub-design='fiori'] #tabs {
+  display: flex;
+  flex: 1;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  min-width: 0;
+  padding: 8px 0;
+  gap: 14px;
+  overflow: visible;
+}
+body[data-hub-design='fiori'] #tabs .wd-primary-nav > button {
+  width: auto;
+  padding: 11px 15px;
+  gap: 9px;
+  min-height: 44px;
+  font-size: 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  box-shadow: none;
+}
+body[data-hub-design='fiori'] #tabs button.active {
+  color: var(--hub-link);
+  background: var(--hub-blue-soft);
+  border-color: var(--hub-link);
+  box-shadow: inset 0 -3px 0 var(--hub-link);
+}
+body[data-hub-design='fiori'] #tabs .hub-nav-icon {
+  width: 20px;
+  height: 20px;
+  flex-basis: 20px;
+}
+body[data-hub-design='fiori'] #hubSidebar #hubAtmosphereCard {
+  min-width: 90px;
+  max-width: 140px;
+  min-height: 38px;
+  margin: 0;
+  padding: 7px 10px;
+  border-radius: 7px;
+  font-size: 10px;
+  background: var(--hub-surface-soft);
+}
+body[data-hub-design='fiori'] #hubAtmosphereCard svg,
+body[data-hub-design='fiori'] #hubAtmosphereCard .hub-atmosphere-window {
+  display: none;
+}
+body[data-hub-design='fiori'] .wd-section-menu > summary {
+  min-height: 44px;
+  border-radius: 8px;
+}
+body[data-hub-design='fiori'] .wd-section-popover {
+  border-radius: 12px;
+  box-shadow: 0 8px 32px #10243a26;
+}
+body[data-hub-design='fiori'] #hubShell > main.page {
+  min-width: 0;
+  width: 100%;
+  max-width: 1920px;
+  margin: auto;
+  padding: 24px 32px 110px;
+}
+body[data-hub-design='fiori'] #wdWorkspaceBar {
+  padding: 4px 0 20px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--hub-border);
+}
+body[data-hub-design='fiori'] .wd-context-eyebrow {
+  letter-spacing: 0.09em;
+}
+body[data-hub-design='fiori'] #wdSectionTitle {
+  font: 750 clamp(24px, 3vw, 32px) / 1.2 var(--hub-font);
+}
+body[data-hub-design='fiori'] #wdWorkspaceBar > button {
+  border-radius: 8px;
+}
+body[data-hub-design='fiori'] #hubToolbar {
+  min-width: 0;
+  gap: 8px;
+  margin: 0 0 24px;
+  padding: 12px 14px;
+  border: 1px solid var(--hub-border);
+  border-radius: 10px;
+  background: var(--hub-surface);
+  box-shadow: var(--fi-shadow);
+}
+body[data-hub-design='fiori'] #view :is(
+  .hub-card, .panel, .df-panel, .item-card, .ticket-folio, .project-banner,
+  .pi-main, .project-items-workspace, .val-panel, .val-mode-card, .val-profile-card,
+  .val-setup-card, .ho-ready, .wl-panel, .wl-card, .nt-card, .md-widget,
+  .task-main-card, .ticket-card, .nt-editor, .nt-sidebar
+) {
+  border-radius: 12px;
+  border-color: var(--hub-border);
+  box-shadow: var(--fi-shadow);
+}
+body[data-hub-design='fiori'] #view :is(
+  .hub-head, .workspace-heading, .df-hero, .wl-hero, .val-head
+) {
+  min-height: 0;
+  padding: 24px 28px;
+  border: 1px solid var(--hub-border);
+  border-radius: 12px;
+  background: var(--hub-surface);
+  box-shadow: var(--fi-shadow);
+}
+body[data-hub-design='fiori'] #view :is(
+  .hub-head, .workspace-heading, .df-hero, .wl-hero, .val-head
+) h2 {
+  font: 750 clamp(26px, 3vw, 36px) / 1.2 var(--hub-font);
+  letter-spacing: -0.035em;
+  color: var(--hub-text);
+}
+body[data-hub-design='fiori'] #view .df-hero-symbol {
+  width: 94px;
+  height: 94px;
+  font-size: 44px;
+  border-radius: 18px;
+  background: var(--hub-blue-soft);
+  color: var(--hub-link);
+  transform: none;
+  box-shadow: none;
+}
+body[data-hub-design='fiori'] #view :is(.df-stats, .val-metrics) {
+  gap: 16px;
+}
+body[data-hub-design='fiori'] #view .df-stats > div {
+  padding: 22px;
+  border: 1px solid var(--hub-border);
+  border-radius: 12px;
+  background: var(--hub-surface);
+  box-shadow: var(--fi-shadow);
+}
+body[data-hub-design='fiori'] #view .hub-layout {
+  gap: 20px;
+}
+body[data-hub-design='fiori'] :is(#view, #modal, #hubToolbar) button,
+body[data-hub-design='fiori'] #modal .modal-actions button {
+  border-radius: 8px;
+}
+body[data-hub-design='fiori'] :is(#view, #modal) :is(input, select, textarea) {
+  border-radius: 6px;
+}
+body[data-hub-design='fiori'] :is(#view, #modal) :is(
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']),
+  select
+) {
+  min-height: 38px;
+}
+body[data-hub-design='fiori'] :is(#view, #modal) :is(
+  button, input, select, textarea, summary, a
+):focus-visible {
+  outline: 2px solid var(--hub-link);
+  outline-offset: 3px;
+}
+body[data-hub-design='fiori'] #view :is(th, td) {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  border-color: var(--hub-border);
+}
+body[data-hub-design='fiori'] #view th {
+  background: var(--hub-surface-soft);
+  color: var(--hub-soft-text, var(--hub-text));
+  font-weight: 700;
+}
+body[data-hub-design='fiori'] #modal {
+  border: 1px solid var(--hub-border);
+  border-radius: 14px;
+  background: var(--hub-surface);
+  box-shadow: 0 20px 64px #10243a30;
+}
+body[data-hub-design='fiori'] #view .my-day-page .md-day-intro.mv-hero {
+  min-height: 0;
+  padding: 28px;
+  border-radius: 12px;
+  border: 1px solid var(--hub-border);
+  background: var(--hub-surface);
+  color: var(--hub-text);
+  box-shadow: var(--fi-shadow);
+  --hub-scenic-text: var(--hub-text);
+  --hub-scenic-muted: var(--hub-muted);
+  --hub-scenic-accent: var(--hub-link);
+}
+body[data-hub-design='fiori'] #view .mv-hero :is(.mv-scene, .mv-hero-shade) {
+  opacity: 0.04;
+}
+body[data-hub-design='fiori'] #view .mv-hero .mv-hero-content {
+  width: 100%;
+  max-width: none;
+}
+body[data-hub-design='fiori'] #view .mv-hero h2 {
+  font: 750 clamp(28px, 3.5vw, 42px) / 1.15 var(--hub-font);
+  color: var(--hub-text);
+  margin: 14px 0;
+}
+body[data-hub-design='fiori'] #view .mv-hero h2 em {
+  color: var(--hub-link);
+  font-style: normal;
+}
+body[data-hub-design='fiori'] #view .mv-hero :is(
+  .mv-welcome, .mv-day-label, .mv-hero-eyebrow, .mv-hero-metric small,
+  .mv-hero-metric em, .mv-edition, .mv-ribbon
+) {
+  color: var(--hub-muted);
+}
+body[data-hub-design='fiori'] #view .mv-hero-metrics {
+  position: relative;
+  inset: auto;
+  padding: 20px 0 0;
+  margin: 20px 0 0;
+  border: 0;
+  border-top: 1px solid var(--hub-border);
+  background: transparent;
+  gap: 14px;
+}
+body[data-hub-design='fiori'] #view .mv-hero .mv-hero-metric {
+  padding: 15px;
+  border: 1px solid var(--hub-border);
+  border-radius: 9px;
+  background: var(--hub-surface-soft);
+}
+body[data-hub-design='fiori'] #view .mv-hero-metric strong,
+body[data-hub-design='fiori'] #view .mv-hero-metric strong span {
+  color: var(--hub-text);
+}
+body[data-hub-design='fiori'] #view .mv-metric-icon {
+  background: var(--hub-surface);
+  border-color: var(--hub-border);
+  color: var(--hub-link);
+}
+body[data-hub-design='fiori'].hub-present #wdWorkspaceBar {
+  display: none;
+}
+@media (min-width: 901px) and (max-width: 1150px) {
+  body[data-hub-design='fiori'] #hubSidebar {
+    padding-inline: 18px;
+    gap: 10px;
+  }
+  body[data-hub-design='fiori'] #tabs .wd-primary-nav > button {
+    padding-inline: 9px;
+    gap: 5px;
+  }
+  body[data-hub-design='fiori'] #hubSidebar #hubAtmosphereCard {
+    max-width: 100px;
+  }
+}
+@media (max-width: 900px) {
+  body[data-hub-design='fiori'] #hubHeader {
+    padding: 16px 18px;
+  }
+  body[data-hub-design='fiori'] #hubSidebar {
+    padding: 0 18px;
+  }
+  body[data-hub-design='fiori'] #tabs {
+    padding: 9px 0;
+    width: 100%;
+  }
+  body[data-hub-design='fiori'] #tabs .wd-primary-nav:empty {
+    display: none;
+  }
+  body[data-hub-design='fiori'] .wd-section-menu {
+    flex: 1;
+  }
+  body[data-hub-design='fiori'] .wd-section-menu > summary {
+    width: 100%;
+    justify-content: space-between;
+  }
+  body[data-hub-design='fiori'] #hubShell > main.page {
+    padding: 20px 18px 110px;
+  }
+  body[data-hub-design='fiori'] #view :is(
+    .hub-head, .workspace-heading, .df-hero, .wl-hero, .val-head
+  ) {
+    padding: 22px;
+  }
+  body[data-hub-design='fiori'] #view .my-day-page .md-day-intro.mv-hero {
+    padding: 22px;
+  }
+  body[data-hub-design='fiori'] #view .mv-hero-metrics {
+    grid-template-columns: 1fr;
+  }
+}

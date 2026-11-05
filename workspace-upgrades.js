@@ -50,7 +50,7 @@
   function appearanceValidate(p) {
     if (
       (p.design !== undefined &&
-        !['current', 'clear-desk', 'modern-hub', 'editorial', 'canvas', 'compact-pro'].includes(
+        !['current', 'clear-desk', 'modern-hub', 'editorial', 'canvas', 'compact-pro', 'fiori'].includes(
           p.design
         )) ||
       !p.colors ||
