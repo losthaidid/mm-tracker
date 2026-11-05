@@ -9,12 +9,14 @@
   "dependencies": {
     "@supabase/supabase-js": "2.117.2",
     "esbuild": "0.28.2",
-    "pdfjs-dist": "6.4.299",
-    "pdf-lib": "1.17.1"
+    "pdf-lib": "1.17.1",
+    "pdfjs-dist": "6.4.299"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.10",
     "jsdom": "30.1.2",
-    "prettier": "3.6.2"
+    "jsqr": "1.4.0",
+    "prettier": "3.6.2",
+    "qrcode-generator": "2.0.4"
   }
 }

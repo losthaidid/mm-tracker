@@ -5,7 +5,7 @@ import { JSDOM } from 'jsdom';
 const source = f => readFileSync(new URL('../' + f, import.meta.url), 'utf8');
 const copy = x => JSON.parse(JSON.stringify(x));
 const settle = async () => { for (let i = 0; i < 24; i++) await Promise.resolve(); };
-function hub(t, initial = {}, rich = false) {
+function hub(t, initial = {}, rich = false, adapter = {}) {
   const dom = new JSDOM('<body><main id="view"></main><dialog id="modal"><div id="modalBody"></div></dialog></body>', { url: 'http://preview.test/', runScripts: 'outside-only', pretendToBeVisual: true });
   t.after(() => dom.window.close());
   const { window } = dom, { document } = window;
@@ -23,6 +23,7 @@ function hub(t, initial = {}, rich = false) {
   ui = window.WorkHubRehearsal.install({ state: () => state, ready: () => account.ready, owner: () => account.id, active: () => account.active, prefs: () => ({ motion: 'calm' }), render,
     mutate(fn) { const next = copy(state); fn(next); E.validate(next); state = next; writes.push(copy(state)); render(); return true; },
     tell: s => messages.push(s), download: (blob, name) => downloads.push({ blob, name }),
+    ...adapter,
     openModal(title, html) { document.getElementById('modalBody').innerHTML = html; document.getElementById('modal').showModal(); }, closeModal() { document.getElementById('modal').close(); },
   });
   render();
@@ -755,4 +756,8 @@ test('Presenter keyboard: editing and saving step details use guarded form valid
  const form=h.panel.querySelector('[data-pc-form="step"]');assert.ok(form);const title=form.elements.namedItem('title');title.value='Reviewed with keyboard';
  assert.equal((await processKey(h,'z',{ctrlKey:true},title)).defaultPrevented,false);assert.equal((await processKey(h,'s',{ctrlKey:true},title)).defaultPrevented,true);
  assert.equal(h.ui.model().steps.find(s=>s.id===id).title,'Reviewed with keyboard');assert.equal(h.panel.querySelector('[data-pc-form="step"]'),null);assert.equal(h.writes.length,1);assert.equal(h.ui.snapshot().paused,false);
+});
+
+test('Process Hub Drive export uses the same prepared bytes, scope and process ID as the local download',async t=>{
+ const saved=[];const h=hub(t,{},false,{can:()=>true,saveDriveFile:async value=>saved.push(value)});await h.click('keep');const blob=new Blob(['EXACT_001_6.00007'],{type:'application/pdf'});let capturedScope;h.F.export=async(p,options)=>{capturedScope=options.scope;return blob;};await h.click('export');const form=h.document.getElementById('processHubExport');assert.equal(form.elements.namedItem('scope').value,'audience');form.dispatchEvent(new h.window.Event('submit',{bubbles:true,cancelable:true}));await settle();const local=h.document.querySelector('#processHubExportReady a'),drive=[...h.document.querySelectorAll('#processHubExportReady button')].find(b=>b.textContent==='Save to Drive & QR');assert.ok(local);assert.ok(drive);drive.click();await settle();assert.equal(saved.length,1);assert.equal(saved[0].blob,blob);assert.equal(saved[0].name,local.download);assert.equal(saved[0].scope,capturedScope);assert.equal(saved[0].source.kind,'processhub');assert.ok(h.E.library(h.state()).some(p=>p.id===saved[0].source.id));assert.equal(saved[0].allowed(),true);h.account.id='another-owner';assert.equal(saved[0].allowed(),false);
 });

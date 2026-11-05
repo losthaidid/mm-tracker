@@ -8,6 +8,8 @@
 
 'use strict';
 let hub = null;
+let filesLibrary = null,
+  handoverWorkspace = null;
 let access = null,
   userManagement = null,
   storageManager = null,
@@ -1179,6 +1181,8 @@ function notice() {
 
 /** Choose the current screen, refresh its markup and then let feature modules decorate it. Rendering is not a save. */
 function render() {
+  filesLibrary?.sync();
+  handoverWorkspace?.sync();
   projectItemsWorkspace?.sync();
   if (CLOUD_MODE && !cloud.ready) {
     $('view').innerHTML = '';
@@ -1216,7 +1220,12 @@ function render() {
         schedule: renderSchedule,
         specs: renderProjectDashboard,
       }[tab],
-      custom = hub?.render(tab);
+      custom =
+        tab === 'files'
+          ? filesLibrary?.render()
+          : tab === 'handover'
+            ? handoverWorkspace?.render()
+            : hub?.render(tab);
     $('view').innerHTML = custom !== undefined ? custom : fn ? fn() : '';
   }
   $('tabs').hidden = false;
@@ -7016,18 +7025,20 @@ function renderProjectSpecs() {
   const displayRows = projectItemsWorkspace?.prepare(rs) || rs;
   return `<section class="panel box governance-shell project-items-workspace"><div class="flex-title"><div><span class="eyebrow">${esc(project?.name || 'SAP Projects')}</span><h2>Project items</h2><p class="muted">Parent deliverables, company ownership and trackable sub-items in one board.</p></div><button class="primary" data-action="new" data-group="specs">Add project item</button></div><div class="item-board-summary"><div><span>Project items</span><strong>${all.length}</strong></div><div><span>Sub-items</span><strong>${subTotal}</strong></div><div><span>Sub-items completed</span><strong>${subDone}</strong></div></div><div class="governance-browser"><aside class="governance-picker"><label for="itemCompany">Company</label><select id="itemCompany"><option value="">All companies</option>${companies.map(c => `<option value="${esc(c.id)}"${itemCompanyId === c.id ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}<option value="unassigned"${itemCompanyId === 'unassigned' ? ' selected' : ''}>Unassigned items</option></select><div class="company-focus"><span>Delivery progress</span><strong>${completed} of ${scoped.length} completed</strong><div class="progress"><span style="width:${scoped.length ? (completed / scoped.length) * 100 : 0}%"></span></div><small>${overdue} overdue · ${all.length} items in this project</small></div><nav class="area-picker" aria-label="Project item statuses">${['', ...statuses].map(s => `<button data-action="item-status" data-status="${esc(s)}" class="${specFilter === s ? 'active' : ''}"><span>${esc(s) || 'All statuses'}</span><strong>${s ? scoped.filter(r => r.status === s).length : scoped.length}</strong></button>`).join('')}</nav></aside><section class="governance-detail"><div class="governance-detail-head"><span class="eyebrow">${esc(itemCompanyId ? (itemCompanyId === 'unassigned' ? 'Unassigned items' : companyName(itemCompanyId)) : 'All companies')}</span><h3>${esc(specFilter) || 'Delivery board'}</h3><p class="muted">${rs.length} of ${scoped.length} items shown</p><label class="sr-only" for="specSearch">Search project items</label><input id="specSearch" type="search" value="${esc(specQuery)}" placeholder="Search item, company, sub-item, owner or status"></div>${projectItemsWorkspace?.toolbar() || ''}${
     rs.length
-      ? projectItemsWorkspace?.isTable() ? projectItemsWorkspace.table() : `<div class="process-card-grid item-trace-grid">${displayRows
-          .map(r => {
-            const trace = projectItemTrace(r.id),
-              linked =
-                trace.feedback.length +
-                trace.tasks.length +
-                trace.plans.length +
-                trace.decisions.length,
-              mismatch = trace.feedback.some(f => f.companyId && f.companyId !== r.companyId);
-            return `<article class="process-card item-card${r.status !== 'Completed' && r.dueDate && r.dueDate < today() ? ' item-overdue' : ''}${mismatch ? ' trace-mismatch' : ''}">${projectItemsWorkspace?.selection(r) || ''}<div class="process-card-head item-card-head"><div><button class="process-code trace-code" data-action="view-item-links" data-id="${esc(r.id)}">${esc(projectItemLabel(r))}</button><h4>${esc(r.description) || 'Untitled item'}</h4></div>${tag(r.status)}</div><div class="item-meta"><span>${esc(companyName(r.companyId))}</span><span>Priority ${esc(r.priority) || '—'}</span></div><dl class="item-dates"><div><dt>Expected date</dt><dd>${dateLabel(r.expectedDate)}</dd></div><div><dt>Due date</dt><dd>${dateLabel(r.dueDate)}${r.status !== 'Completed' && r.dueDate && r.dueDate < today() ? '<small>Overdue</small>' : ''}</dd></div></dl>${r.remarks ? `<p class="item-remarks">${esc(r.remarks)}</p>` : ''}${projectItemFeedbackPanel(r)}${subItemTrackedTime(r.id)}${renderSubItemSummary(r, true)}${projectItemsWorkspace?.children(r) || ''}${mismatch ? '<div class="trace-inline-warning">Company link needs review</div>' : ''}<div class="trace-strip"><button data-action="view-item-links" data-id="${esc(r.id)}"><strong>${trace.feedback.length}</strong><span>phase feedback</span></button><button data-action="view-item-links" data-id="${esc(r.id)}"><strong>${linked}</strong><span>linked actions</span></button></div><div class="item-card-footer"><span>${r.url && /^https?:\/\//i.test(r.url) ? `<a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${esc(r.reference) || 'Open reference'} ↗</a>` : esc(r.reference) || 'No reference'}</span><div class="actions"><button class="small" data-action="manage-subitems" data-id="${esc(r.id)}">Sub-items</button><button class="small" data-action="view-item-links" data-id="${esc(r.id)}">Traceability</button><button class="small" data-action="edit" data-group="specs" data-id="${esc(r.id)}">Edit item</button></div></div></article>`;
-          })
-          .join('')}</div>`
+      ? projectItemsWorkspace?.isTable()
+        ? projectItemsWorkspace.table()
+        : `<div class="process-card-grid item-trace-grid">${displayRows
+            .map(r => {
+              const trace = projectItemTrace(r.id),
+                linked =
+                  trace.feedback.length +
+                  trace.tasks.length +
+                  trace.plans.length +
+                  trace.decisions.length,
+                mismatch = trace.feedback.some(f => f.companyId && f.companyId !== r.companyId);
+              return `<article class="process-card item-card${r.status !== 'Completed' && r.dueDate && r.dueDate < today() ? ' item-overdue' : ''}${mismatch ? ' trace-mismatch' : ''}">${projectItemsWorkspace?.selection(r) || ''}<div class="process-card-head item-card-head"><div><button class="process-code trace-code" data-action="view-item-links" data-id="${esc(r.id)}">${esc(projectItemLabel(r))}</button><h4>${esc(r.description) || 'Untitled item'}</h4></div>${tag(r.status)}</div><div class="item-meta"><span>${esc(companyName(r.companyId))}</span><span>Priority ${esc(r.priority) || '—'}</span></div><dl class="item-dates"><div><dt>Expected date</dt><dd>${dateLabel(r.expectedDate)}</dd></div><div><dt>Due date</dt><dd>${dateLabel(r.dueDate)}${r.status !== 'Completed' && r.dueDate && r.dueDate < today() ? '<small>Overdue</small>' : ''}</dd></div></dl>${r.remarks ? `<p class="item-remarks">${esc(r.remarks)}</p>` : ''}${projectItemFeedbackPanel(r)}${subItemTrackedTime(r.id)}${renderSubItemSummary(r, true)}${projectItemsWorkspace?.children(r) || ''}${mismatch ? '<div class="trace-inline-warning">Company link needs review</div>' : ''}<div class="trace-strip"><button data-action="view-item-links" data-id="${esc(r.id)}"><strong>${trace.feedback.length}</strong><span>phase feedback</span></button><button data-action="view-item-links" data-id="${esc(r.id)}"><strong>${linked}</strong><span>linked actions</span></button></div><div class="item-card-footer"><span>${r.url && /^https?:\/\//i.test(r.url) ? `<a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${esc(r.reference) || 'Open reference'} ↗</a>` : esc(r.reference) || 'No reference'}</span><div class="actions"><button class="small" data-action="manage-subitems" data-id="${esc(r.id)}">Sub-items</button><button class="small" data-action="view-item-links" data-id="${esc(r.id)}">Traceability</button><button class="small" data-action="edit" data-group="specs" data-id="${esc(r.id)}">Edit item</button></div></div></article>`;
+            })
+            .join('')}</div>`
       : '<div class="governance-empty"><strong>No matching project items</strong><p>Choose another company or status, clear the search, or add a project item.</p></div>'
   }${projectItemsWorkspace?.footer() || ''}</section></div></section>`;
 }
@@ -10269,7 +10280,25 @@ filteredTasks = () =>
       !WorkHubReminders.isSnoozed(state, 'tasks', r.id, today()) &&
       (!hub?.batchA || hub.batchA.matches('tasks', r.id))
   );
+const fileWorkspaceAdapter = {
+  state: () => state,
+  ready: () => !CLOUD_MODE || cloud.ready,
+  owner: () => (CLOUD_MODE ? cloud.user?.id || '' : 'local'),
+  generation: () => cloud.generation,
+  can: (feature, action = 'view') => !access || access.can(feature, action),
+  mutate,
+  render,
+  openModal,
+  closeModal,
+  tell,
+  download,
+  saveDriveFile: options => filesLibrary.saveGenerated(options),
+};
+filesLibrary = WorkHubFilesLibrary.install(fileWorkspaceAdapter);
+handoverWorkspace = WorkHubHandover.install(fileWorkspaceAdapter);
 hub = WorkHubStudio.install({
+  can: fileWorkspaceAdapter.can,
+  saveDriveFile: fileWorkspaceAdapter.saveDriveFile,
   state: () => state,
   cloud: () => cloud,
   refreshSchedule: refreshScheduleStatuses,
@@ -10368,14 +10397,19 @@ hub = WorkHubStudio.install({
 projectItemsWorkspace = WorkHubProjectItems.install({
   state: () => state,
   ready: () => !CLOUD_MODE || cloud.ready,
-  owner: () => CLOUD_MODE ? cloud.user?.id || '' : 'local',
+  owner: () => (CLOUD_MODE ? cloud.user?.id || '' : 'local'),
   generation: () => cloud.generation,
   active: () => tab === 'specs' && projectView === 'items',
   canEdit: () => !access || access.can('specs', 'edit'),
   statuses: OPTIONS.specStatus,
   priorities: OPTIONS.specPriority,
   subStatuses: SUBITEM_STATUSES,
-  today, mutate, render, openModal, closeModal, tell,
+  today,
+  mutate,
+  render,
+  openModal,
+  closeModal,
+  tell,
   feedback: projectItemFeedbackPanel,
   trackedTime: subItemTrackedTime,
   timerButton: subItemTimerButton,
@@ -10526,7 +10560,12 @@ storageManager = WorkHubStorage.install({
   },
   createClient: () =>
     window.MMTrackerSupabase.createClient(cloudConfig.url, cloudConfig.publishableKey, {
-      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'workhub-storage:' + uid() },
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+        storageKey: 'workhub-storage:' + uid(),
+      },
       global: { fetch: cloudFetch },
     }),
   apply(document, revision) {

@@ -107,6 +107,7 @@
     root.WorkHubRehearsalEngine?.upgrade(d);
     root.WorkHubExperienceEngine?.upgrade(d);
     root.WorkHubSapTcodesEngine?.upgrade(d);
+    root.WorkHubDriveFilesEngine?.upgrade(d);
     if (h.simulator === undefined)
       h.simulator = {
         quantity: 100,
@@ -133,6 +134,7 @@
     root.WorkHubRehearsalEngine?.validate(d);
     root.WorkHubExperienceEngine?.validate(d);
     root.WorkHubSapTcodesEngine?.validate(d);
+    root.WorkHubDriveFilesEngine?.validate(d);
     root.WorkHubReminders?.validate(d);
     root.WorkHubProjectDates.validate(d);
     root.WorkHubLeave.validate(d);
@@ -921,6 +923,8 @@
         notes: 'Notes',
         knowledge: 'Knowledge',
         processhub: 'Process Hub',
+        files: 'Files',
+        handover: 'Handover packs',
         waiting: 'Waiting on',
         studio: 'Studio',
         lab: 'Troubleshooting lab',
@@ -1018,6 +1022,8 @@
         notes: 'Notes',
         knowledge: 'Knowledge',
         processhub: 'Process Hub',
+        files: 'Files',
+        handover: 'Handover packs',
         waiting: 'Waiting on',
         studio: 'Studio',
         lab: 'Troubleshooting lab',

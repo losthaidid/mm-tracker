@@ -151,6 +151,11 @@
       'Reload saved records and review sync issues.',
       'cloud reload conflict sync recovery records',
     ],
+    driveSettingsButton: [
+      'data',
+      'Connect Google Drive, upload files and set up QR downloads.',
+      'drive google files oauth client setup handover qr sharing',
+    ],
     cloudAccountButton: [
       'account',
       'Sign in or manage your account.',
