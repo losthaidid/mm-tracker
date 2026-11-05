@@ -39,6 +39,8 @@
     ['knowledge', 'Knowledge', 'Screens', '', ['workhub.notes']],
     ['notes', 'Notes', 'Screens', '', ['workhub.notebook']],
     ['processhub', 'Process Hub', 'Screens', '', ['workhub.processes', 'workhub.rehearsal']],
+    ['files', 'Files', 'Screens', '', ['workhub.driveFiles']],
+    ['handover', 'Handover packs', 'Screens', '', []],
     ['waiting', 'Waiting on', 'Screens', '', ['workhub.waiting']],
     ['studio', 'Studio', 'Screens', '', []],
     ['lab', 'Troubleshooting lab', 'Screens', '', ['workhub.lab']],

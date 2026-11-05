@@ -9,7 +9,7 @@
     />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; script-src 'self' 'unsafe-inline'; worker-src 'self' blob:; font-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://aaotojqkiewbhtnrlcur.supabase.co; frame-src 'none'; base-uri 'none'; form-action 'none'"
+      content="default-src 'none'; script-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/client; worker-src 'self' blob:; font-src 'self' blob: data:; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; img-src 'self' data: blob:; connect-src 'self' https://aaotojqkiewbhtnrlcur.supabase.co https://www.googleapis.com/drive/v3/ https://www.googleapis.com/upload/drive/v3/ https://accounts.google.com/gsi/; frame-src https://accounts.google.com/gsi/; base-uri 'none'; form-action 'none'"
     />
     <title>Your workspace</title>
     <link
@@ -329,6 +329,7 @@
     <link rel="stylesheet" href="./process-workspace.css?v=20261027-keyboard-1" />
     <link rel="stylesheet" href="./work-schedule.css?v=20261027-schedule-review-1" />
     <link rel="stylesheet" href="./storage.css?v=20261104-storage-1" />
+    <link rel="stylesheet" href="./files-handover.css?v=20261105-drive-handover-1" />
     <link rel="stylesheet" href="./project-items.css?v=20261104-project-workspace-1" />
     <link rel="stylesheet" href="./custom.css?v=20261019-source-1" />
   </head>
@@ -338,9 +339,15 @@
         <div class="startup-surround-panel left">
           <svg viewBox="0 0 440 760" fill="none" focusable="false">
             <g class="startup-surround-thread" stroke="currentColor" stroke-width="1">
-              <path d="M-80 400a240 240 0 1 1 480 0M-40 400a200 200 0 1 1 400 0M0 400a160 160 0 1 1 320 0" />
-              <path d="m40 125 110 65 110-65 110 65v130l-110 65-110-65-110 65V125Zm0 130 110-65 110 65 110-65M150 190v130m110-195v130m0 0v130" />
-              <path d="m-30 535 130-75 130 75v150l-130 75-130-75V535Zm0 0 130 75 130-75M100 610v150" />
+              <path
+                d="M-80 400a240 240 0 1 1 480 0M-40 400a200 200 0 1 1 400 0M0 400a160 160 0 1 1 320 0"
+              />
+              <path
+                d="m40 125 110 65 110-65 110 65v130l-110 65-110-65-110 65V125Zm0 130 110-65 110 65 110-65M150 190v130m110-195v130m0 0v130"
+              />
+              <path
+                d="m-30 535 130-75 130 75v150l-130 75-130-75V535Zm0 0 130 75 130-75M100 610v150"
+              />
               <path d="M65 90h100m-50-50v100M300 510v100h90m-90-50h50" stroke-dasharray="2 8" />
             </g>
             <g class="startup-surround-detail" stroke="currentColor" stroke-width="1.2">
@@ -351,9 +358,12 @@
               <path d="M40 255h48m-24-24v48m268 155h32m-16-16v32" />
             </g>
             <g class="startup-surround-sparks" fill="currentColor">
-              <circle cx="40" cy="125" r="3" /><circle cx="260" cy="255" r="3" />
-              <circle cx="100" cy="610" r="3.5" /><circle cx="348" cy="400" r="2.5" />
-              <circle cx="150" cy="90" r="2" /><circle cx="350" cy="560" r="2" />
+              <circle cx="40" cy="125" r="3" />
+              <circle cx="260" cy="255" r="3" />
+              <circle cx="100" cy="610" r="3.5" />
+              <circle cx="348" cy="400" r="2.5" />
+              <circle cx="150" cy="90" r="2" />
+              <circle cx="350" cy="560" r="2" />
               <path d="m194 440 3 9 9 3-9 3-3 9-3-9-9-3 9-3Zm60-367 2 6 6 2-6 2-2 6-2-6-6-2 6-2Z" />
             </g>
           </svg>
@@ -361,9 +371,15 @@
         <div class="startup-surround-panel right">
           <svg viewBox="0 0 440 760" fill="none" focusable="false">
             <g class="startup-surround-thread" stroke="currentColor" stroke-width="1">
-              <path d="M30 320a220 220 0 1 1 440 0M70 320a180 180 0 1 1 360 0M110 320a140 140 0 1 1 280 0" />
-              <path d="m155 280 110 65 110-65 110 65v130l-110 65-110-65-110 65V280Zm0 130 110-65 110 65 110-65M265 345v130m110-195v130m0 0v130" />
-              <path d="m-30 585 100-58 100 58v116l-100 58-100-58V585Zm0 0 100 58 100-58M70 643v116" />
+              <path
+                d="M30 320a220 220 0 1 1 440 0M70 320a180 180 0 1 1 360 0M110 320a140 140 0 1 1 280 0"
+              />
+              <path
+                d="m155 280 110 65 110-65 110 65v130l-110 65-110-65-110 65V280Zm0 130 110-65 110 65 110-65M265 345v130m110-195v130m0 0v130"
+              />
+              <path
+                d="m-30 585 100-58 100 58v116l-100 58-100-58V585Zm0 0 100 58 100-58M70 643v116"
+              />
               <path d="M85 95v85H5m310 385v95h95" stroke-dasharray="2 8" />
             </g>
             <g class="startup-surround-detail" stroke="currentColor" stroke-width="1.2">
@@ -374,10 +390,15 @@
               <path d="M195 563h44m-22-22v44M342 202h28m-14-14v28" />
             </g>
             <g class="startup-surround-sparks" fill="currentColor">
-              <circle cx="155" cy="280" r="3" /><circle cx="375" cy="410" r="3" />
-              <circle cx="70" cy="643" r="3.5" /><circle cx="410" cy="660" r="2" />
-              <circle cx="85" cy="95" r="2.5" /><circle cx="250" cy="100" r="2" />
-              <path d="m118 383 3 9 9 3-9 3-3 9-3-9-9-3 9-3Zm106-226 2 6 6 2-6 2-2 6-2-6-6-2 6-2Z" />
+              <circle cx="155" cy="280" r="3" />
+              <circle cx="375" cy="410" r="3" />
+              <circle cx="70" cy="643" r="3.5" />
+              <circle cx="410" cy="660" r="2" />
+              <circle cx="85" cy="95" r="2.5" />
+              <circle cx="250" cy="100" r="2" />
+              <path
+                d="m118 383 3 9 9 3-9 3-3 9-3-9-9-3 9-3Zm106-226 2 6 6 2-6 2-2 6-2-6-6-2 6-2Z"
+              />
             </g>
           </svg>
         </div>
@@ -743,6 +764,7 @@
             ><button type="button" data-action="tab-visibility">Screen visibility</button
             ><button id="workhubUserManagement" type="button" hidden>User management</button
             ><button id="storageManagerButton" type="button" hidden>Storage &amp; cleanup</button
+            ><button id="driveSettingsButton" type="button" hidden>Google Drive setup</button
             ><button id="backupButton">Backup</button><button id="restoreButton">Restore</button
             ><button type="button" class="danger" id="workspaceResetButton">
               Back up &amp; clear all records</button
@@ -803,6 +825,11 @@
               Forgot password?
             </button>
           </div>
+          <p class="hint">
+            <a href="./privacy.html" target="_blank" rel="noopener noreferrer"
+              >Google Drive privacy</a
+            >
+          </p>
           <p id="cloudAuthMessage" role="status" aria-live="polite"></p>
         </form>
         <p class="hint">
@@ -929,7 +956,7 @@
     <script src="./audience-view.js?v=20261027-link-editor-1"></script>
     <script src="./presentation-screen.js?v=20261025-display-fix-5"></script>
     <script src="./presenter.js?v=20261026-live-process-1"></script>
-    <script src="./rehearsal.js?v=20261027-keyboard-1"></script>
+    <script src="./rehearsal.js?v=20261105-drive-handover-1"></script>
     <script src="./project-standup-engine.js?v=20261022-standup-search-2"></script>
     <script src="./project-standup.js?v=20261022-standup-search-1"></script>
     <script src="./project-people-engine.js?v=20261021-people-1"></script>
@@ -961,7 +988,7 @@
     <script src="./claims.js?v=20261027-schedule-review-1"></script>
     <script src="./recipients-engine.js?v=20261019-source-1"></script>
     <script src="./recipients.js?v=20261019-source-1"></script>
-    <script src="./settings-panel.js?v=20261104-storage-1"></script>
+    <script src="./settings-panel.js?v=20261105-drive-handover-1"></script>
     <script src="./built-in-lists.js?v=20261025-canvas-4"></script>
     <script src="./dramatic-motion.js?v=20261104-smooth-motion-1"></script>
     <script src="./my-day-engine.js?v=20261024-terrarium-1"></script>
@@ -974,14 +1001,21 @@
     <script src="./my-day.js?v=20261024-performance-1"></script>
     <script src="./brand-motion.js?v=20261026-workspace-6"></script>
     <script src="./workspace-reset.js?v=20261026-workspace-6"></script>
+    <script src="./vendor/qrcode/qrcode.js?v=2.0.4"></script>
+    <script src="./drive-files-engine.js?v=20261105-drive-handover-1"></script>
+    <script src="./drive-files-api.js?v=20261105-drive-handover-1"></script>
+    <script src="./files-library.js?v=20261105-drive-handover-1"></script>
+    <script src="./handover-engine.js?v=20261105-drive-handover-1"></script>
+    <script src="./handover-files.js?v=20261105-drive-handover-1"></script>
+    <script src="./handover.js?v=20261105-drive-handover-1"></script>
     <script src="./storage-engine.js?v=20261104-storage-1"></script>
     <script src="./storage-manager.js?v=20261104-storage-1"></script>
     <script src="./schedule-engine.js?v=20261027-schedule-review-1"></script>
     <script src="./work-schedule.js?v=20261027-day-execution-1"></script>
-    <script src="./access-catalog.js?v=20261029-profiles-1"></script>
-    <script src="./access-control.js?v=20261029-reference-choices-1"></script>
+    <script src="./access-catalog.js?v=20261105-drive-handover-1"></script>
+    <script src="./access-control.js?v=20261105-drive-handover-1"></script>
     <script src="./user-management.js?v=20261029-users-1"></script>
-    <script src="./studio.js?v=20261104-smooth-motion-1"></script>
+    <script src="./studio.js?v=20261105-drive-handover-1"></script>
     <!-- Empty starter records and default lists; this is not your saved account data. -->
     <script id="seedData" type="application/json">
       {
@@ -1176,6 +1210,6 @@
       }
     </script>
     <!-- Start the application after all feature modules and the empty seed defaults are ready. -->
-    <script src="./app.js?v=20261104-project-workspace-1"></script>
+    <script src="./app.js?v=20261105-drive-handover-1"></script>
   </body>
 </html>

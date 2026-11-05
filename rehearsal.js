@@ -1330,6 +1330,37 @@
               ? 'Download PDF ZIP'
               : 'Download PNG';
         $('processHubExportReady').replaceChildren(link);
+        if (
+          a.saveDriveFile &&
+          a.can?.('files', 'create') &&
+          a.can('files', 'export') &&
+          a.can('processhub', 'export')
+        ) {
+          const save = document.createElement('button');
+          save.type = 'button';
+          save.textContent = 'Save to Drive & QR';
+          save.addEventListener('click', async () => {
+            if (!alive() || save.disabled) return;
+            save.disabled = true;
+            try {
+              guard(identity);
+              await a.saveDriveFile({
+                blob: file,
+                name: filename,
+                sourceType: 'process',
+                source: { kind: 'processhub', id: p.id },
+                projectId: p.projectId || '',
+                scope,
+                allowed: () => a.ready() && a.owner() === identity && a.can('processhub', 'export'),
+              });
+            } catch (e) {
+              if (a.ready() && a.owner() === identity) a.tell(e.message, true);
+            } finally {
+              if (save.isConnected) save.disabled = false;
+            }
+          });
+          $('processHubExportReady').append(save);
+        }
         $('processHubExportStatus').textContent =
           'Your file is ready. Select ' + link.textContent + ' to save it.';
         submit.textContent = 'Prepare again';

@@ -8,6 +8,8 @@ insert into public.workhub_feature_catalog(id,name,parent,paths) values
 ('knowledge','Knowledge','',array['workhub.notes']::text[]),
 ('notes','Notes','',array['workhub.notebook']::text[]),
 ('processhub','Process Hub','',array['workhub.processes','workhub.rehearsal']::text[]),
+('files','Files','',array['workhub.driveFiles']::text[]),
+('handover','Handover packs','',array[]::text[]),
 ('waiting','Waiting on','',array['workhub.waiting']::text[]),
 ('studio','Studio','',array[]::text[]),
 ('lab','Troubleshooting lab','',array['workhub.lab']::text[]),

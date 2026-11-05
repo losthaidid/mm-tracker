@@ -23,6 +23,11 @@
     function feature(target) {
       const explicit = target?.closest?.('[data-access-feature]')?.dataset.accessFeature;
       if (explicit) return explicit;
+      if (
+        target?.closest?.('[data-df],#dfSetup,#dfUpload,#dfFile,#dfUnshare,.df-room:not(.ho-room)')
+      )
+        return 'files';
+      if (target?.closest?.('[data-ho],.ho-room')) return 'handover';
       const tab = target?.closest?.('[data-tab]')?.dataset.tab;
       if (C.byId.has(tab)) return tab;
       const tool = target?.closest?.('[data-hub="tool"],[data-tool]')?.dataset.tool;
@@ -179,7 +184,21 @@
         control.dataset.hub ||
         '';
       const label = (control.textContent || '').trim();
-      if (
+      const dfAction = {
+        file: 'export',
+        copy: 'export',
+        'qr-png': 'export',
+        share: 'edit',
+        'unshare-review': 'edit',
+        refresh: 'create',
+        'upload-dialog': 'create',
+      }[control.dataset.df];
+      const hoAction = ['preview', 'download', 'drive'].includes(control.dataset.ho)
+        ? 'export'
+        : '';
+      if (dfAction || hoAction) action = dfAction || hoAction;
+      else if (event.type === 'submit' && ['dfSetup', 'dfUnshare'].includes(t.id)) action = 'edit';
+      else if (
         /export|download|^pdf$|^xlsx$|^csv$|^original$/.test(op) ||
         /^(Export|Download)\b/i.test(label)
       )
