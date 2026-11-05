@@ -46,6 +46,11 @@
       'Website title and welcome subtitle.',
       'header branding title name',
     ],
+    websiteDesignButton: [
+      'workspace',
+      'Switch between Current, Clear Desk and Modern Hub.',
+      'website design layout sidebar rail navigation appearance preview',
+    ],
     appearance: [
       'workspace',
       'Colours, themes, spacing and animation.',

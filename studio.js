@@ -263,6 +263,7 @@
     if (
       !p ||
       !['name', 'workspace'].every(k => text(p[k], 200)) ||
+      (p.design !== undefined && !['current', 'clear-desk', 'modern-hub'].includes(p.design)) ||
       ![...Object.keys(root.WorkHubAppearance.THEMES), 'custom'].includes(p.theme) ||
       !/^#[0-9a-f]{6}$/i.test(p.accent) ||
       ![6, 12, 16, 24].includes(p.radius) ||
@@ -322,7 +323,8 @@
       experience = null,
       wardrobe = null,
       backgrounds = null,
-      workSchedule = null;
+      workSchedule = null,
+      websiteDesigns = null;
     const reminders = root.WorkHubReminders?.install({
       ...a,
       hubAction: el => handle(el),
@@ -1627,7 +1629,7 @@
           ]),
           ['custom', 'Custom colours', p.accent],
         ];
-      return `<div class="hub-theme-layout"><section class="hub-card hub-theme-controls"><div class="flex-title"><div><span class="hub-kicker">MAKE YOURSELF AT HOME</span><h3>Your space, your style</h3><p>Try a look, then save it to your account.</p></div><div class="actions">${btn('theme-export', 'Export')}${btn('theme-import', 'Import')}</div></div><form id="hubTheme"><section class="hub-theme-section"><h4>Choose your colours</h4><input type="hidden" name="theme" value="${esc(p.theme)}"><div class="hub-palette-options" role="group" aria-label="Workspace colour palette">${palettes.map(([id, name, color]) => btn('theme-choice', '<span class="hub-palette-swatch" style="--palette:' + color + '"></span><span>' + name + '</span>', 'data-theme-choice="' + id + '" aria-pressed="' + (id === p.theme) + '"', 'hub-palette-choice')).join('')}</div><div class="form-grid">${field('accent', 'Your custom colour', p.accent, 'color')}${select('background', 'Page background', root.WorkHubAppearance.BACKGROUNDS, p.background, 'Choose background')}</div>${root.WorkHubAppearance.fields(p)}<div class="actions"><button type="button" data-photo="open">My background pictures</button></div></section><section class="hub-theme-section"><h4>Text & layout</h4><div class="form-grid">${select(
+      return `<div class="hub-theme-layout"><section class="hub-card hub-theme-controls"><div class="flex-title"><div><span class="hub-kicker">MAKE YOURSELF AT HOME</span><h3>Your space, your style</h3><p>Try a look, then save it to your account.</p></div><div class="actions">${btn('theme-export', 'Export')}${btn('theme-import', 'Import')}</div></div><form id="hubTheme">${root.WorkHubWebsiteDesigns?.launcher(p) || ''}<section class="hub-theme-section"><h4>Choose your colours</h4><input type="hidden" name="theme" value="${esc(p.theme)}"><div class="hub-palette-options" role="group" aria-label="Workspace colour palette">${palettes.map(([id, name, color]) => btn('theme-choice', '<span class="hub-palette-swatch" style="--palette:' + color + '"></span><span>' + name + '</span>', 'data-theme-choice="' + id + '" aria-pressed="' + (id === p.theme) + '"', 'hub-palette-choice')).join('')}</div><div class="form-grid">${field('accent', 'Your custom colour', p.accent, 'color')}${select('background', 'Page background', root.WorkHubAppearance.BACKGROUNDS, p.background, 'Choose background')}</div>${root.WorkHubAppearance.fields(p)}<div class="actions"><button type="button" data-photo="open">My background pictures</button></div></section><section class="hub-theme-section"><h4>Text & layout</h4><div class="form-grid">${select(
         'font',
         'Typography',
         [
@@ -2864,6 +2866,7 @@
       viewTab = tab;
       mountChrome();
       chromeUX?.mount();
+      websiteDesigns?.mount();
       reminders?.decorate(tab);
       projectDates?.decorate();
       batchA?.mount(tab);
@@ -2981,6 +2984,7 @@
         ...prefs(),
         ...Object.fromEntries(new FormData(form)),
         ...root.WorkHubAppearance.values(form, prefs()),
+        design: prefs().design,
       };
       for (const k of Object.keys(v)) if (k.startsWith('color-')) delete v[k];
       v.radius = Number(v.radius);
@@ -4181,6 +4185,16 @@
       },
     });
     chromeUX = root.WorkHubChromeUX.install({ prefs: () => themePreview || prefs() });
+    websiteDesigns = root.WorkHubWebsiteDesigns?.install({
+      ready: () => a.cloud().ready,
+      owner: () => a.cloud().user?.id || 'local',
+      generation: () => a.cloud().generation,
+      prefs,
+      canEdit: () =>
+        !root.WorkHubCurrentAccess || root.WorkHubCurrentAccess.can('workspace', 'edit'),
+      mutate: a.mutate,
+      tell: a.tell,
+    });
     moments = root.WorkHubMomoMoments?.install({
       ...a,
       ready: () => a.cloud().ready,
@@ -4308,6 +4322,7 @@
       projectDates,
       processDeck,
       chromeUX,
+      websiteDesigns,
       render,
       afterRender,
       prepare,

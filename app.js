@@ -1182,6 +1182,11 @@ function notice() {
 /** Choose the current screen, refresh its markup and then let feature modules decorate it. Rendering is not a save. */
 function render() {
   window.WorkHubDialogs.sync();
+  // A design-only save updates the shell while keeping open editors and working data intact.
+  if (hub?.websiteDesigns?.preservingContent()) {
+    hub.websiteDesigns.mount();
+    return;
+  }
   filesLibrary?.sync();
   handoverWorkspace?.sync();
   projectItemsWorkspace?.sync();
@@ -1246,6 +1251,7 @@ function render() {
   hub?.afterRender(tab);
   projectItemsWorkspace?.mount();
   access?.apply();
+  hub?.websiteDesigns?.mount();
 }
 
 function taskLinkedLabel(t, d = state) {
