@@ -264,7 +264,7 @@
       !p ||
       !['name', 'workspace'].every(k => text(p[k], 200)) ||
       (p.design !== undefined &&
-        !['current', 'clear-desk', 'modern-hub', 'editorial', 'canvas', 'compact-pro'].includes(
+        !['current', 'clear-desk', 'modern-hub', 'editorial', 'canvas', 'compact-pro', 'fiori'].includes(
           p.design
         )) ||
       ![...Object.keys(root.WorkHubAppearance.THEMES), 'custom'].includes(p.theme) ||

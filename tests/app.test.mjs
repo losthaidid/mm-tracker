@@ -3677,7 +3677,7 @@ test('Task completion rollup: stale reviews, closed dialogs, conflicts and chang
  const {api,document,db,ids}=await legacyTaskCompletionFixture(t);
  api.hub.taskCompletion.review();let form=document.getElementById('taskCompletionForm');api.closeModal();assert.throws(()=>api.hub.taskCompletion.apply(form),/expired/);
  api.hub.taskCompletion.review();form=document.getElementById('taskCompletionForm');api.mutate(d=>d.tasks.find(r=>r.id===ids[0]).feedback='Newer feedback');await settle();assert.throws(()=>api.hub.taskCompletion.apply(form),/changed/);
- api.hub.taskCompletion.review();form=document.getElementById('taskCompletionForm');const before=copy(api.state().tasks);api.cloud.conflict=true;assert.throws(()=>api.hub.taskCompletion.apply(form),/conflict|newer|resolve|review/i);assert.deepEqual(copy(api.state().tasks),before);api.cloud.conflict=false;
+ api.hub.taskCompletion.review();form=document.getElementById('taskCompletionForm');const before=copy(api.state().tasks);api.cloud.conflict=true;assert.throws(()=>api.hub.taskCompletion.apply(form),/reload cloud records before editing/i);assert.deepEqual(copy(api.state().tasks),before);api.cloud.conflict=false;
  api.hub.taskCompletion.review();form=document.getElementById('taskCompletionForm');api.cloud.generation++;assert.throws(()=>api.hub.taskCompletion.apply(form),/expired/);assert.deepEqual(copy(api.state().tasks),before);
 });
 test('Task completion rollup: permission loss and rejected parent saves preserve original child statuses and notes',async t=>{
