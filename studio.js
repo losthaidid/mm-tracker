@@ -263,7 +263,10 @@
     if (
       !p ||
       !['name', 'workspace'].every(k => text(p[k], 200)) ||
-      (p.design !== undefined && !['current', 'clear-desk', 'modern-hub'].includes(p.design)) ||
+      (p.design !== undefined &&
+        !['current', 'clear-desk', 'modern-hub', 'editorial', 'canvas', 'compact-pro'].includes(
+          p.design
+        )) ||
       ![...Object.keys(root.WorkHubAppearance.THEMES), 'custom'].includes(p.theme) ||
       !/^#[0-9a-f]{6}$/i.test(p.accent) ||
       ![6, 12, 16, 24].includes(p.radius) ||
