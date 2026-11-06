@@ -34,12 +34,18 @@ test('guide export headings retain custom Unicode and intentional blanks while l
  for(const exportHeading of ['OPERATIONS / Panduan pengguna — 测试','', 'W'.repeat(180)])assert.equal(E.guide({...old,exportHeading}).exportHeading,exportHeading);
  for(const exportHeading of [null,42,{},'x'.repeat(181)])assert.throws(()=>E.guide({...old,exportHeading}),/heading/);
 });
+test('guide branding defaults preserve legacy exports and reject malformed logo, footer and colour values',()=>{
+ const old=E.guide(guide());assert.deepEqual(copy(old.footer),{text:'',align:'center',size:180,opacity:1,logo:null});assert.deepEqual(copy(old.colours),{accent:'#285b4d',paper:'#f8f7f1'});
+ const logo=copy(image),footer={text:'My team',align:'right',size:260,opacity:.2,logo};const g=E.guide({...guide(),footer,colours:{accent:'#336699',paper:'#fffaff'}});assert.deepEqual(copy(g.footer),footer);assert.equal(g.colours.accent,'#336699');
+ for(const change of [f=>f.text='x'.repeat(121),f=>f.align='top',f=>f.opacity=0,f=>f.opacity=1.1,f=>f.size=999,f=>f.logo.src='https://example.com/logo.png',f=>f.logo.src='data:image/svg+xml;base64,PHN2Zz4=',f=>f.logo.width=601,f=>f.logo=false]){const f=copy(footer);change(f);assert.throws(()=>E.guide({...guide(),footer:f}));}
+ for(const colours of [null,{}, {accent:'red',paper:'#ffffff'}, {accent:'#123456',paper:'url(example.com)'}])assert.throws(()=>E.guide({...guide(),colours}),/colour/);
+});
 function ui(t){
  const dom=new JSDOM('<button id="launch">Studio</button><div id="host"></div>',{url:'https://losthaidid.github.io/mm-tracker/',runScripts:'outside-only',pretendToBeVisual:true});t.after(()=>dom.window.close());const w=dom.window,d=w.document;let owner='one';const blobs=[],revoked=[],renders=[],exports=[];
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;};w.HTMLCanvasElement.prototype.getContext=()=>({fillRect(){},strokeRect(){}});w.HTMLCanvasElement.prototype.setPointerCapture=function(){};w.HTMLCanvasElement.prototype.toDataURL=()=>image.src;
  w.URL.createObjectURL=blob=>{blobs.push(blob);return 'blob:local-'+blobs.length;};w.URL.revokeObjectURL=url=>revoked.push(url);w.Blob=Blob;
  w.eval(source('batch-c-engine.js'));
- w.WorkHubBatchCFiles={imageFromFile:async()=>copy(image),loadImage:async()=>({}),draw:(c,s,img,original)=>renders.push({s:copy(s),original}),release(){},raster:async()=>({width:8,height:6,toDataURL:()=>image.src}),export:async(g,format,alive)=>{exports.push({g:copy(g),format,alive});return new Blob(['clean export']);}};
+ w.WorkHubBatchCFiles={imageFromFile:async()=>copy(image),logoFromFile:async()=>copy(image),loadImage:async()=>({}),draw:(c,s,img,original)=>renders.push({s:copy(s),original}),release(){},raster:async()=>({width:8,height:6,toDataURL:()=>image.src}),export:async(g,format,alive)=>{exports.push({g:copy(g),format,alive});return new Blob(['clean export']);}};
  w.eval(source('batch-c.js'));const state={tickets:[{id:'t',ticket:'<T1>',description:'Connection timeout during upload',history:'Fix: <script>literal</script>',pic:'Rina',status:'Closed'}]};
  const adapter={ready:()=>!!owner,owner:()=>owner,state:()=>state,tell(){},latestHistory:t=>t.history},module=w.WorkHubBatchC.install(adapter);
  const click=(op,extra={})=>{const b=d.createElement('button');b.dataset.bc=op;Object.assign(b.dataset,extra);return module.handle(b);};
@@ -70,6 +76,22 @@ test('guide heading edits update PDF/JPG exports, invalidate downloads, survive 
  await c.module.importGuide({size:JSON.stringify(saved).length,text:async()=>JSON.stringify(saved)});assert.equal(c.d.querySelector('[data-bc-export-heading]').value,custom);assert.equal(c.d.querySelector('.bc-guide-fields img'),null);
  c.account('another');c.module.open('guide');assert.equal(c.d.querySelector('[data-bc-export-heading]').value,E.DEFAULT_GUIDE_HEADING);
 });
+test('footer/logo/colours survive editable save-open and edits invalidate prepared exports without changing account records',async t=>{
+ const c=ui(t),before=copy(c.state);c.module.open('guide');await c.module.add([{name:'sample.png'}]);await c.module.addLogo({name:'logo.png'});
+ const edit=(selector,value,type='input')=>{const el=c.d.querySelector(selector);el.value=value;el.dispatchEvent(new c.w.Event(type,{bubbles:true}));};
+ edit('[data-bc-footer-text]','My team / Internal');edit('[data-bc-footer-align]','right','change');edit('[data-bc-footer-size]','260','change');edit('[data-bc-footer-opacity]','20');edit('[data-bc-palette]','blue','change');
+ await c.module.prepare('pdf');assert.equal(c.exports.at(-1).g.footer.opacity,.2);assert.equal(c.exports.at(-1).g.colours.accent,'#245e9a');
+ edit('[data-bc-paper]','#202030');assert.equal(c.d.querySelector('[data-bc-ready] a'),null);assert.equal(c.d.querySelector('[data-bc-palette]').value,'custom');
+ await c.module.prepare('editable');const saved=await c.last();assert.equal(saved.footer.logo.src,image.src);assert.equal(saved.footer.align,'right');assert.equal(saved.colours.paper,'#202030');
+ c.module.close();await c.module.importGuide({size:JSON.stringify(saved).length,text:async()=>JSON.stringify(saved)});assert.equal(c.d.querySelector('[data-bc-footer-text]').value,'My team / Internal');assert.equal(c.d.querySelector('[data-bc-footer-preview]').src,image.src);assert.equal(c.d.querySelector('[data-bc-footer-preview]').style.opacity,'0.2');
+ await c.click('remove-logo');await c.module.prepare('editable');assert.equal((await c.last()).footer.logo,null);assert.deepEqual(c.state,before);
+ c.account('other');c.module.open('guide');assert.equal(c.d.querySelector('[data-bc-footer-text]').value,'');assert.equal(c.d.querySelector('[data-bc-paper]').value,'#f8f7f1');assert.equal(c.d.querySelector('[data-bc-footer-preview]').hasAttribute('src'),false);
+});
+test('failed or cancelled logo loads leave existing branding intact and cannot populate another account',async t=>{
+ const c=ui(t);c.module.open('guide');await c.module.add([{name:'sample.png'}]);await c.module.addLogo({name:'logo.png'});await c.module.prepare('editable');const before=await c.last();
+ c.w.WorkHubBatchCFiles.logoFromFile=async()=>{throw Error('Corrupt logo');};await assert.rejects(()=>c.module.addLogo({}),/Corrupt/);await c.module.prepare('editable');assert.deepEqual(await c.last(),before);
+ let finish;c.w.WorkHubBatchCFiles.logoFromFile=()=>new Promise(resolve=>finish=resolve);const pending=c.module.addLogo({});c.account('next');finish(copy(image));await pending;c.module.open('guide');assert.equal(c.d.querySelector('[data-bc-footer-preview]').hasAttribute('src'),false);
+});
 test('pointer edits, crop, original comparison and undo/redo never change the original image',async t=>{
  const c=ui(t);c.module.open('privacy');await c.module.add([{name:'private.png'}]);const canvas=c.d.querySelector('canvas');canvas.getBoundingClientRect=()=>({left:0,top:0,width:100,height:100});const pointer=(name,x,y)=>{const e=new c.w.Event(name,{bubbles:true,cancelable:true});Object.assign(e,{pointerId:1,clientX:x,clientY:y,button:0,isPrimary:true});canvas.dispatchEvent(e);};
  pointer('pointerdown',10,10);pointer('pointermove',90,90);pointer('pointerup',90,90);await c.module.prepare('editable');let saved=await c.last();assert.equal(saved.steps[0].marks.length,1);assert.equal(saved.steps[0].image.src,image.src);
@@ -93,7 +115,7 @@ test('adding a privacy-edited image to the guide uses a flattened image and leav
 function fileFixture(){
  const calls=[],w={WorkHubBatchCEngine:E,atob:s=>Buffer.from(s,'base64').toString('binary')};
  w.Image=class{set src(value){const size=w.WorkHubBatchCFiles.dimensions(new Uint8Array(Buffer.from(value.split(',')[1],'base64')));this.naturalWidth=size.width;this.naturalHeight=size.height;queueMicrotask(()=>this.onload());}};
- const context={fillRect(...args){calls.push(['fill',this.fillStyle,...args]);},drawImage(...args){calls.push(['draw',...args]);},save(){},restore(){},beginPath(){},rect(){},clip(){},moveTo(){},lineTo(){},stroke(){calls.push(['stroke']);},measureText:t=>({width:String(t).length*14}),fillText(text,x,y){calls.push(['text',text,x,y,this.font]);}};
+ const stack=[],context={globalAlpha:1,fillRect(...args){calls.push(['fill',this.fillStyle,...args]);},drawImage(...args){calls.push(['draw',...args],['alpha-draw',this.globalAlpha,...args]);},save(){stack.push({globalAlpha:this.globalAlpha,font:this.font,fillStyle:this.fillStyle});},restore(){Object.assign(this,stack.pop());},beginPath(){},rect(){},clip(){},moveTo(){},lineTo(){},stroke(){calls.push(['stroke']);},measureText:t=>({width:String(t).length*14}),fillText(text,x,y){calls.push(['text',text,x,y,this.font,this.fillStyle,this.globalAlpha]);}};
  const document={baseURI:new URL('../index.html',import.meta.url).href,createElement:()=>({width:1,height:1,getContext:()=>context,toBlob(callback,type,quality){calls.push(['encode',type,quality]);callback(new Blob([png(this.width,this.height)],{type}));}})};
  new Function('window','document',source('batch-c-files.js'))(w,document);new Function('window','module','exports',source('vendor/jszip.min.js'))(w,undefined,undefined);
  return {F:w.WorkHubBatchCFiles,w,calls,document};
@@ -126,6 +148,26 @@ test('line breaks in imported export headings cannot consume the screenshot area
  const {F,calls}=fileFixture(),g={...guide(),exportHeading:'TEAM\n'.repeat(30)};
  for await(const page of F.pages(E.guide(g),()=>true))F.release(page);
  const titles=calls.filter(c=>c[0]==='text'&&c[4]==='600 27px system-ui, sans-serif');assert.equal(titles.length,2);assert.ok(titles.every(c=>c[3]<250));
+});
+test('footer branding repeats on continuation pages without covering captions or fading page numbers',async()=>{
+ const {F,calls}=fileFixture(),g=guide();g.footer={...copy(E.footer()),text:'PRIVATE / MY TEAM',logo:copy(image),opacity:.2,align:'right',size:260};g.colours=E.colours(E.GUIDE_PALETTES.blue);g.steps[0].caption=Array.from({length:80},(_,i)=>'Instruction '+i).join('\n');let count=0;
+ for await(const page of F.pages(E.guide(g),()=>true)){count++;F.release(page);}
+ assert.ok(count>2);const captions=calls.filter(c=>c[0]==='text'&&/^Instruction/.test(c[1]));assert.ok(captions.every(c=>c[3]<=1510));assert.ok(captions.some(c=>c[1]==='Instruction 79'));
+ const footer=calls.filter(c=>c[0]==='text'&&c[1]==='PRIVATE / MY TEAM');assert.equal(footer.length,count);assert.ok(footer.every(c=>c[3]===1650&&c[6]===.2));
+ const logos=calls.filter(c=>c[0]==='alpha-draw'&&c[4]===1560);assert.equal(logos.length,count);assert.ok(logos.every(c=>c[1]===.2&&c[3]>=70&&c[5]<=260&&c[6]<=64));assert.ok(calls.filter(c=>c[0]==='text'&&/^Page /.test(c[1])).every(c=>c[6]===1));
+ assert.ok(calls.some(c=>c[0]==='text'&&c[5]==='#245e9a'));
+});
+test('custom page colours keep readable text and logo imports reject formats without alpha support',async()=>{
+ const {F}=fileFixture();assert.equal(F.palette({accent:'#ffffff',paper:'#ffffff'}).accent,'#17232d');assert.equal(F.palette({accent:'#111111',paper:'#111111'}).ink,'#fffdf7');
+ for(const p of Object.values(E.GUIDE_PALETTES))assert.equal(F.palette(p).accent,p.accent);
+ await assert.rejects(()=>F.logoFromFile({type:'image/jpeg',size:10}),/PNG or WebP/);await assert.rejects(()=>F.logoFromFile({type:'image/png',size:3*1024*1024}),/2 MB/);
+ await assert.rejects(()=>F.loadImage({...image,width:7},()=>true,600),/dimensions/);
+ await assert.rejects(()=>F.loadImage({src:'data:image/png;base64,'+png(700,1).toString('base64'),width:600,height:1},()=>true,600),/oversized footer/);
+});
+test('footer size controls resize tall/square logos instead of only changing their maximum width',async()=>{
+ const {F,calls}=fileFixture(),heights=[];
+ for(const size of [100,180,260]){calls.length=0;for await(const page of F.pages(E.guide({...guide(),footer:{logo:copy(image),size}}),()=>true))F.release(page);heights.push(calls.find(c=>c[0]==='alpha-draw'&&c[4]===1560)[6]);}
+ assert.deepEqual(heights,[32,48,64]);
 });
 test('blur renders through bounded image resampling without depending on canvas filter support',async()=>{
  const {F,calls}=fileFixture(),s=step('blur');s.marks=[{type:'blur',color:'#123456',size:.1,points:[[0,0],[1,1]]}];await F.raster(s);const resamples=calls.filter(c=>c[0]==='draw'&&c.length===10);assert.equal(resamples.length,2);assert.equal(resamples[0].at(-2),1);assert.equal(resamples[0].at(-1),1);
