@@ -15,6 +15,7 @@
     kind: 'workhub-screenshot-guide',
     version: 1,
     title: '',
+    layout: 'walkthrough',
     exportHeading: E.DEFAULT_GUIDE_HEADING,
     footer: E.footer(),
     colours: E.colours(),
@@ -46,7 +47,7 @@
       guidePreviewPage = null,
       guidePreviewRunning = false,
       guidePreviewPending = false,
-      guidePreviewView = 'footer';
+      guidePreviewView = 'page';
     let projects = { privacy: blank(), guide: blank() },
       histories = new Map(),
       redo = new Map(),
@@ -60,7 +61,7 @@
       const f = project().footer,
         c = project().colours;
       return (
-        '<details class="bc-branding"><summary>Export colours, footer logo &amp; watermark</summary>' +
+        '<details class="bc-branding"><summary>Live preview, export colours, footer logo &amp; watermark</summary>' +
         '<div class="bc-branding-content"><div class="bc-branding-grid"><fieldset><legend>Export colours</legend>' +
         '<label>Colour preset<select data-bc-palette>' +
         Object.entries(E.GUIDE_PALETTES)
@@ -144,8 +145,8 @@
         '<p class="bc-guide-heading-help">Lower opacity creates a faint footer watermark. No background box is added. Footer space is reserved above page numbering.</p>' +
         '</fieldset></div><section class="bc-guide-preview" aria-label="Live export preview"><div class="bc-guide-preview-head"><div><h3>Live export preview</h3>' +
         '<p class="bc-guide-heading-help">First exported page. Changes update automatically.</p></div><div class="bc-preview-views" role="group" aria-label="Preview view">' +
-        button('preview-page', 'Full page', 'aria-pressed="false"') +
-        button('preview-footer', 'Footer close-up', 'aria-pressed="true"') +
+        button('preview-page', 'Full page', 'aria-pressed="true"') +
+        button('preview-footer', 'Footer close-up', 'aria-pressed="false"') +
         button('refresh-preview', 'Refresh preview', 'data-needs-steps') +
         '</div></div>' +
         '<p data-bc-preview-status role="status" aria-live="polite">Add a screenshot to preview your guide.</p>' +
@@ -160,6 +161,10 @@
       const preset = Object.entries(E.GUIDE_PALETTES).find(
         ([, p]) => p.accent === c.accent && p.paper === c.paper
       );
+      $('[data-bc-layout]').value = project().layout;
+      $('[data-bc-layout-help]').textContent =
+        E.GUIDE_LAYOUTS[project().layout]?.description ||
+        'Original one-step-per-page layout. Choose a new layout to redesign this guide.';
       $('[data-bc-palette]').value = preset?.[0] || 'custom';
       $('[data-bc-accent]').value = c.accent;
       $('[data-bc-paper]').value = c.paper;
@@ -192,7 +197,7 @@
           ((layout.width * 210) / 1240).toFixed(1) +
           ' × ' +
           ((layout.height * 210) / 1240).toFixed(1) +
-          ' mm on A4.'
+          ' mm at A4 page width.'
         : 'Add a logo to adjust its size and position.';
     }
     function cancelGuidePreview() {
@@ -216,13 +221,23 @@
         String(guidePreviewView === 'footer')
       );
       if (!guidePreviewPage) return;
-      const top = guidePreviewView === 'footer' ? 1340 : 0,
-        height = 1754 - top;
+      const top = guidePreviewView === 'footer' ? Math.max(0, guidePreviewPage.height - 414) : 0,
+        height = guidePreviewPage.height - top;
       canvas.width = 620;
       canvas.height = Math.round(height / 2);
       canvas
         .getContext('2d')
-        .drawImage(guidePreviewPage, 0, top, 1240, height, 0, 0, canvas.width, canvas.height);
+        .drawImage(
+          guidePreviewPage,
+          0,
+          top,
+          guidePreviewPage.width,
+          height,
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
       sheet.hidden = false;
       sheet.dataset.view = guidePreviewView;
       canvas.setAttribute(
@@ -287,7 +302,8 @@
         page = null;
         paintGuidePreview();
         $('[data-bc-preview-status]').textContent =
-          'Preview ready. Full exports include all steps and continuation pages.';
+          (E.GUIDE_LAYOUTS[snapshot.layout]?.label || 'Original layout') +
+          ' preview ready. Full exports include all steps and continuation pages.';
       } catch (err) {
         if (alive())
           $('[data-bc-preview-status]').textContent = 'Preview unavailable: ' + err.message;
@@ -838,6 +854,16 @@
             '"></label><div><label class="bc-guide-name">Export heading<input data-bc-export-heading maxlength="180" aria-describedby="bcExportHeadingHelp" placeholder="e.g. MY COMPANY / USER GUIDE" value="' +
             esc(project().exportHeading) +
             '"></label><p id="bcExportHeadingHelp" class="bc-guide-heading-help">Shown at the top of every PDF, JPG and PNG page. Leave blank to hide. Saved with your editable guide.</p></div></div>' +
+            '<div class="bc-guide-layout"><label class="bc-guide-name">Export layout<select data-bc-layout aria-describedby="bcLayoutHelp">' +
+            (project().layout === 'classic'
+              ? '<option value="classic">Original layout (saved guide)</option>'
+              : '') +
+            Object.entries(E.GUIDE_LAYOUTS)
+              .map(
+                ([id, layout]) => '<option value="' + id + '">' + esc(layout.label) + '</option>'
+              )
+              .join('') +
+            '</select></label><p id="bcLayoutHelp" data-bc-layout-help class="bc-guide-heading-help"></p></div>' +
             brandingFields()
           : '') +
         '<nav class="bc-step-strip" data-bc-steps aria-label="Guide steps"' +
@@ -939,6 +965,14 @@
       room.addEventListener('change', event => {
         if (busy) return;
         const el = event.target;
+        if (el.matches('[data-bc-layout]')) {
+          project().layout = el.value;
+          guidePreviewView = 'page';
+          room.querySelector('.bc-branding').open = true;
+          changed();
+          updateBranding();
+          paintGuidePreview();
+        }
         if (el.matches('[data-bc-logo]')) {
           void addLogo(el.files[0]).catch(err => status(err.message, true));
           el.value = '';

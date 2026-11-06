@@ -2,6 +2,22 @@
 (function (root) {
   'use strict';
   const DEFAULT_GUIDE_HEADING = 'WORKHUB  /  SCREENSHOT GUIDE';
+  const GUIDE_LAYOUTS = {
+    walkthrough: {
+      label: 'Guided walkthrough',
+      description: 'Numbered steps with full-width screenshots. Short steps share a page.',
+    },
+    split: {
+      label: 'Split view',
+      description:
+        'Screenshots on the left, instructions on the right. Best for detailed explanations.',
+    },
+    compact: {
+      label: 'Quick reference card',
+      description:
+        'Two-column step cards with unused space trimmed. Best for sharing as JPG or PNG.',
+    },
+  };
   const GUIDE_PALETTES = {
     green: { label: 'Green', accent: '#285b4d', paper: '#f8f7f1' },
     blue: { label: 'Blue', accent: '#245e9a', paper: '#f5f8fc' },
@@ -184,6 +200,12 @@
       throw Error('Choose a valid WorkHub guide file with up to 24 steps.');
     if (value.exportHeading !== undefined && !str(value.exportHeading, 180))
       throw Error('Use an export heading up to 180 characters.');
+    const layout = value.layout === undefined ? 'classic' : value.layout;
+    if (
+      typeof layout !== 'string' ||
+      (layout !== 'classic' && !Object.hasOwn(GUIDE_LAYOUTS, layout))
+    )
+      throw Error('Choose a valid guide layout.');
     const branding = footer(value.footer),
       appearance = colours(value.colours),
       ids = new Set();
@@ -245,6 +267,7 @@
       kind: value.kind,
       version: 1,
       title: value.title,
+      layout,
       exportHeading:
         value.exportHeading === undefined ? DEFAULT_GUIDE_HEADING : value.exportHeading,
       footer: branding,
@@ -270,6 +293,7 @@
       .slice(0, 90) || 'screenshot-guide';
   root.WorkHubBatchCEngine = {
     DEFAULT_GUIDE_HEADING,
+    GUIDE_LAYOUTS,
     GUIDE_PALETTES,
     footer,
     logoLayout,
