@@ -41,6 +41,12 @@
       ticketForm = null,
       twinTimer = 0,
       trigger = null;
+    let guidePreviewTimer = 0,
+      guidePreviewJob = 0,
+      guidePreviewPage = null,
+      guidePreviewRunning = false,
+      guidePreviewPending = false,
+      guidePreviewView = 'footer';
     let projects = { privacy: blank(), guide: blank() },
       histories = new Map(),
       redo = new Map(),
@@ -55,7 +61,7 @@
         c = project().colours;
       return (
         '<details class="bc-branding"><summary>Export colours, footer logo &amp; watermark</summary>' +
-        '<div class="bc-branding-grid"><fieldset><legend>Export colours</legend>' +
+        '<div class="bc-branding-content"><div class="bc-branding-grid"><fieldset><legend>Export colours</legend>' +
         '<label>Colour preset<select data-bc-palette>' +
         Object.entries(E.GUIDE_PALETTES)
           .map(([id, p]) => '<option value="' + id + '">' + esc(p.label) + '</option>')
@@ -91,7 +97,7 @@
               '</option>'
           )
           .join('') +
-        '</select></label><label>Logo size<select data-bc-footer-size>' +
+        '</select></label><label>Size preset<select data-bc-footer-size>' +
         [
           [100, 'Small'],
           [180, 'Medium'],
@@ -108,12 +114,42 @@
               '</option>'
           )
           .join('') +
-        '</select></label></div><label>Footer opacity <span data-bc-footer-opacity-value></span>' +
+        '<option value="custom">Custom width</option></select></label></div>' +
+        '<div class="bc-logo-placement">' +
+        [
+          ['width', 'Logo width'],
+          ['x', 'Horizontal position'],
+          ['y', 'Vertical position'],
+        ]
+          .map(
+            ([key, label]) =>
+              '<label>' +
+              label +
+              ' <span data-bc-logo-' +
+              key +
+              '-value></span><input type="range" data-needs-logo data-bc-logo-' +
+              key +
+              ' min="' +
+              (key === 'width' ? '0.1' : '0') +
+              '" max="100" step="0.1"></label>'
+          )
+          .join('') +
+        '<p class="bc-guide-heading-help" data-bc-logo-dimensions></p>' +
+        button('reset-logo-layout', 'Reset logo placement', 'data-needs-logo') +
+        '<p class="bc-guide-heading-help">Move left/right or up/down within the footer. Aspect ratio is preserved; captions stay clear of the logo.</p></div>' +
+        '<label>Footer opacity <span data-bc-footer-opacity-value></span>' +
         '<input type="range" data-bc-footer-opacity min="5" max="100" value="' +
         Math.round(f.opacity * 100) +
         '"></label>' +
         '<p class="bc-guide-heading-help">Lower opacity creates a faint footer watermark. No background box is added. Footer space is reserved above page numbering.</p>' +
-        '</fieldset></div></details>'
+        '</fieldset></div><section class="bc-guide-preview" aria-label="Live export preview"><div class="bc-guide-preview-head"><div><h3>Live export preview</h3>' +
+        '<p class="bc-guide-heading-help">First exported page. Changes update automatically.</p></div><div class="bc-preview-views" role="group" aria-label="Preview view">' +
+        button('preview-page', 'Full page', 'aria-pressed="false"') +
+        button('preview-footer', 'Footer close-up', 'aria-pressed="true"') +
+        button('refresh-preview', 'Refresh preview', 'data-needs-steps') +
+        '</div></div>' +
+        '<p data-bc-preview-status role="status" aria-live="polite">Add a screenshot to preview your guide.</p>' +
+        '<div class="bc-page-sheet" data-bc-page-sheet hidden><canvas data-bc-page-preview role="img" aria-label="Preview of the first exported guide page"></canvas></div></section></div></details>'
       );
     }
     function updateBranding() {
@@ -134,6 +170,135 @@
         if (preview.getAttribute('src') !== f.logo.src) preview.src = f.logo.src;
         preview.style.opacity = f.opacity;
       } else preview.removeAttribute('src');
+      const layout = E.logoLayout(f);
+      $('[data-bc-footer-size]').value = f.widthPct === undefined ? String(f.size) : 'custom';
+      $('[data-bc-footer-align]').value = f.align;
+      for (const [key, value] of [
+        ['width', layout?.widthPct || 0],
+        ['x', layout?.xPct || 0],
+        ['y', layout?.yPct || 0],
+      ]) {
+        const input = $('[data-bc-logo-' + key + ']');
+        if (key === 'width') {
+          input.max = layout?.maxWidthPct || 100;
+          input.min = Math.min(0.1, layout?.maxWidthPct || 0.1);
+        }
+        input.value = value;
+        $('[data-bc-logo-' + key + '-value]').textContent = value.toFixed(1) + '%';
+        input.disabled = busy || !f.logo;
+      }
+      $('[data-bc-logo-dimensions]').textContent = layout
+        ? 'Printed logo: ' +
+          ((layout.width * 210) / 1240).toFixed(1) +
+          ' × ' +
+          ((layout.height * 210) / 1240).toFixed(1) +
+          ' mm on A4.'
+        : 'Add a logo to adjust its size and position.';
+    }
+    function cancelGuidePreview() {
+      clearTimeout(guidePreviewTimer);
+      guidePreviewTimer = 0;
+      guidePreviewJob++;
+      guidePreviewPending = false;
+      if (guidePreviewPage) F.release(guidePreviewPage);
+      guidePreviewPage = null;
+    }
+    function paintGuidePreview() {
+      const canvas = $('[data-bc-page-preview]'),
+        sheet = $('[data-bc-page-sheet]');
+      if (!canvas || !sheet) return;
+      $('[data-bc="preview-page"]').setAttribute(
+        'aria-pressed',
+        String(guidePreviewView === 'page')
+      );
+      $('[data-bc="preview-footer"]').setAttribute(
+        'aria-pressed',
+        String(guidePreviewView === 'footer')
+      );
+      if (!guidePreviewPage) return;
+      const top = guidePreviewView === 'footer' ? 1340 : 0,
+        height = 1754 - top;
+      canvas.width = 620;
+      canvas.height = Math.round(height / 2);
+      canvas
+        .getContext('2d')
+        .drawImage(guidePreviewPage, 0, top, 1240, height, 0, 0, canvas.width, canvas.height);
+      sheet.hidden = false;
+      sheet.dataset.view = guidePreviewView;
+      canvas.setAttribute(
+        'aria-label',
+        guidePreviewView === 'footer'
+          ? 'Footer close-up of the first exported page'
+          : 'First exported guide page'
+      );
+      $('[data-bc="preview-page"]').setAttribute(
+        'aria-pressed',
+        String(guidePreviewView === 'page')
+      );
+      $('[data-bc="preview-footer"]').setAttribute(
+        'aria-pressed',
+        String(guidePreviewView === 'footer')
+      );
+    }
+    function scheduleGuidePreview(delay = 200) {
+      clearTimeout(guidePreviewTimer);
+      guidePreviewJob++;
+      if (mode !== 'guide' || !room?.querySelector('.bc-branding')?.open) return;
+      if (project().steps.length) {
+        $('[data-bc-preview-status]').textContent = 'Updating preview…';
+        guidePreviewTimer = setTimeout(() => {
+          void renderGuidePreview();
+        }, delay);
+      } else {
+        if (guidePreviewPage) F.release(guidePreviewPage);
+        guidePreviewPage = null;
+        $('[data-bc-page-sheet]').hidden = true;
+        $('[data-bc-preview-status]').textContent = 'Add a screenshot to preview your guide.';
+      }
+    }
+    async function renderGuidePreview() {
+      clearTimeout(guidePreviewTimer);
+      guidePreviewTimer = 0;
+      if (guidePreviewRunning) {
+        guidePreviewPending = true;
+        return;
+      }
+      if (mode !== 'guide' || !room?.querySelector('.bc-branding')?.open || !project().steps.length)
+        return;
+      const dialog = room,
+        current = owner,
+        version = revision,
+        job = guidePreviewJob,
+        alive = () =>
+          room === dialog &&
+          a.ready() &&
+          a.owner() === current &&
+          mode === 'guide' &&
+          revision === version &&
+          guidePreviewJob === job;
+      let page;
+      guidePreviewRunning = true;
+      try {
+        const snapshot = E.guide(project());
+        page = await F.preview(snapshot, alive);
+        if (!alive()) return;
+        if (guidePreviewPage) F.release(guidePreviewPage);
+        guidePreviewPage = page;
+        page = null;
+        paintGuidePreview();
+        $('[data-bc-preview-status]').textContent =
+          'Preview ready. Full exports include all steps and continuation pages.';
+      } catch (err) {
+        if (alive())
+          $('[data-bc-preview-status]').textContent = 'Preview unavailable: ' + err.message;
+      } finally {
+        if (page) F.release(page);
+        guidePreviewRunning = false;
+        if (guidePreviewPending) {
+          guidePreviewPending = false;
+          scheduleGuidePreview(0);
+        }
+      }
     }
     async function addLogo(file) {
       guard();
@@ -172,12 +337,14 @@
     function changed() {
       revision++;
       clearUrls();
+      scheduleGuidePreview();
     }
     function close() {
       if (paintFrame) root.cancelAnimationFrame(paintFrame);
       paintFrame = 0;
       loadId++;
       changed();
+      cancelGuidePreview();
       drag = null;
       pan = null;
       image = null;
@@ -330,6 +497,10 @@
     function controls() {
       const s = step();
       if (!room) return;
+      for (const el of room.querySelectorAll('[data-needs-logo]'))
+        el.disabled = busy || !project().footer.logo;
+      for (const el of room.querySelectorAll('[data-needs-steps]'))
+        el.disabled = busy || !project().steps.length;
       $('[data-bc="undo"]').disabled = !s || !histories.get(s.id)?.length;
       $('[data-bc="redo"]').disabled = !s || !redo.get(s.id)?.length;
       for (const el of room.querySelectorAll('[data-needs-image]')) el.disabled = !s || !image;
@@ -605,7 +776,7 @@
           if (!alive()) return;
         }
         if (data.footer.logo) {
-          await F.loadImage(data.footer.logo, alive, 600);
+          await F.loadImage(data.footer.logo, alive, 1600, 600);
           if (!alive()) return;
         }
         projects.guide = data;
@@ -778,11 +949,15 @@
           updateBranding();
         }
         if (el.matches('[data-bc-footer-align],[data-bc-footer-size]')) {
-          project().footer[el.matches('[data-bc-footer-align]') ? 'align' : 'size'] = el.matches(
-            '[data-bc-footer-size]'
-          )
-            ? +el.value
-            : el.value;
+          const f = project().footer;
+          if (el.matches('[data-bc-footer-align]')) {
+            f.align = el.value;
+            delete f.xPct;
+          } else if (el.value === 'custom') f.widthPct = E.logoLayout(f)?.widthPct || 10;
+          else {
+            f.size = +el.value;
+            delete f.widthPct;
+          }
           changed();
           updateBranding();
         }
@@ -816,6 +991,16 @@
           changed();
           updateBranding();
         }
+        for (const [key, field] of [
+          ['width', 'widthPct'],
+          ['x', 'xPct'],
+          ['y', 'yPct'],
+        ])
+          if (el.matches('[data-bc-logo-' + key + ']')) {
+            project().footer[field] = +el.value;
+            changed();
+            updateBranding();
+          }
         if (el.matches('[data-bc-accent],[data-bc-paper]')) {
           project().colours[el.matches('[data-bc-accent]') ? 'accent' : 'paper'] = el.value;
           changed();
@@ -951,6 +1136,10 @@
         }
       });
       document.body.append(room);
+      room.querySelector('.bc-branding')?.addEventListener('toggle', event => {
+        if (event.target.open) scheduleGuidePreview(0);
+        else cancelGuidePreview();
+      });
       document.body.classList.add('bc-room-open');
       room.showModal();
       updateBranding();
@@ -972,6 +1161,25 @@
       }
       if (busy) return;
       const s = step();
+      if (action === 'refresh-preview') {
+        scheduleGuidePreview(0);
+        return;
+      }
+      if (action === 'preview-page' || action === 'preview-footer') {
+        guidePreviewView = action === 'preview-page' ? 'page' : 'footer';
+        paintGuidePreview();
+        return;
+      }
+      if (action === 'reset-logo-layout') {
+        const f = project().footer;
+        f.size = 180;
+        f.align = 'center';
+        delete f.widthPct;
+        delete f.xPct;
+        delete f.yPct;
+        changed();
+        updateBranding();
+      }
       if (action === 'remove-logo') {
         project().footer.logo = null;
         changed();
@@ -1073,6 +1281,7 @@
       close,
       add,
       addLogo,
+      preview: renderGuidePreview,
       select,
       prepare,
       importGuide,

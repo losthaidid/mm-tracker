@@ -346,6 +346,14 @@ body.bc-room-open {
   gap: 24px;
   padding: 0 16px 18px;
 }
+.bc-branding-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.9fr);
+  align-items: start;
+}
+.bc-branding-content > .bc-branding-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
 .bc-branding fieldset {
   min-width: 0;
   margin: 0;
@@ -400,6 +408,57 @@ body.bc-room-open {
 .bc-logo-preview img {
   max-width: 100%;
   max-height: 64px;
+}
+.bc-logo-placement {
+  margin-top: 12px;
+  padding-top: 4px;
+  border-top: 1px solid var(--bc-line);
+}
+.bc-guide-preview {
+  padding: 16px;
+  border-top: 1px solid var(--bc-line);
+  position: sticky;
+  top: 16px;
+}
+.bc-guide-preview-head,
+.bc-preview-views {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.bc-guide-preview h3 {
+  margin: 0;
+  font-size: 16px;
+}
+[data-bc-preview-status] {
+  font-size: 11px;
+  color: var(--bc-muted);
+}
+.bc-page-sheet {
+  width: min(100%, 620px);
+  margin: 12px auto;
+  border: 1px solid var(--bc-line);
+  box-shadow: 0 5px 20px #183b3514;
+  overflow: hidden;
+  line-height: 0;
+}
+.bc-page-sheet canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.bc-page-sheet[data-view='page'] {
+  max-width: 380px;
+}
+@media (max-width: 1000px) {
+  .bc-branding-content {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bc-guide-preview {
+    position: static;
+  }
 }
 .bc-step-strip {
   display: flex;

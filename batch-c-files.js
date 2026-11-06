@@ -93,15 +93,15 @@
       image.src = src;
     });
   }
-  async function loadImage(image, alive, maxEdge = 2400) {
+  async function loadImage(image, alive, maxEdge = 2400, maxHeight = maxEdge) {
     check(alive);
     const comma = image.src.indexOf(','),
       raw = root.atob(image.src.slice(comma + 1)),
       bytes = Uint8Array.from(raw, c => c.charCodeAt(0)),
       size = dimensions(bytes);
-    if (Math.max(size.width, size.height) > maxEdge || size.width * size.height > 12000000)
+    if (size.width > maxEdge || size.height > maxHeight || size.width * size.height > 12000000)
       throw Error(
-        maxEdge === 600
+        maxEdge < 2400
           ? 'This guide contains an oversized footer logo. Choose the logo again.'
           : 'This guide contains an oversized image. Open the original screenshot through Add screenshots first.'
       );
@@ -111,7 +111,7 @@
       throw Error('The guide image dimensions do not match its file.');
     return img;
   }
-  async function imageFromFile(file, alive, maxEdge = 1800) {
+  async function imageFromFile(file, alive, maxEdge = 1800, maxHeight = maxEdge) {
     if (
       !file ||
       file.size > 8 * 1024 * 1024 ||
@@ -125,7 +125,7 @@
     dimensions(Uint8Array.from(raw, c => c.charCodeAt(0)));
     const img = await decode(src);
     check(alive);
-    const scale = Math.min(1, maxEdge / Math.max(img.naturalWidth, img.naturalHeight)),
+    const scale = Math.min(1, maxEdge / img.naturalWidth, maxHeight / img.naturalHeight),
       c = canvas(
         Math.max(1, Math.round(img.naturalWidth * scale)),
         Math.max(1, Math.round(img.naturalHeight * scale))
@@ -140,7 +140,7 @@
   async function logoFromFile(file, alive) {
     if (!file || file.size > 2 * 1024 * 1024 || !['image/png', 'image/webp'].includes(file.type))
       throw Error('Choose a transparent PNG or WebP logo up to 2 MB.');
-    return imageFromFile(file, alive, 600);
+    return imageFromFile(file, alive, 1600, 600);
   }
   function draw(c, step, img, original = false) {
     c.width = step.image.width;
@@ -254,22 +254,14 @@
       ink = contrast('#17232d') > contrast('#fffdf7') ? '#17232d' : '#fffdf7';
     return { paper, accent: contrast(accent) >= 4.5 ? accent : ink, ink, body: ink, muted: ink };
   }
-  function drawFooter(ctx, footer, logo, colour) {
+  function drawFooter(ctx, footer, logo, colour, layout) {
     if (!logo && !footer.text.trim()) return;
     const x = width =>
       footer.align === 'left' ? 70 : footer.align === 'right' ? 1170 - width : (1240 - width) / 2;
     ctx.save();
     ctx.globalAlpha = footer.opacity;
     if (logo) {
-      const height = { 100: 32, 180: 48, 260: 64 }[footer.size],
-        scale = Math.min(footer.size / logo.naturalWidth, height / logo.naturalHeight);
-      ctx.drawImage(
-        logo,
-        x(logo.naturalWidth * scale),
-        1560,
-        logo.naturalWidth * scale,
-        logo.naturalHeight * scale
-      );
+      ctx.drawImage(logo, layout.x, layout.y, layout.width, layout.height);
     }
     ctx.font = '16px system-ui, sans-serif';
     ctx.fillStyle = colour.accent;
@@ -280,8 +272,9 @@
   async function* pages(guide, alive) {
     const footer = E.footer(guide.footer),
       colour = palette(guide.colours),
-      logo = footer.logo ? await loadImage(footer.logo, alive, 600) : null,
-      contentBottom = logo || footer.text.trim() ? 1510 : 1620;
+      logo = footer.logo ? await loadImage(footer.logo, alive, 1600, 600) : null,
+      layout = E.logoLayout(footer),
+      contentBottom = logo ? Math.min(1510, layout.y - 40) : footer.text.trim() ? 1510 : 1620;
     let pageNo = 0;
     for (let i = 0; i < guide.steps.length; i++) {
       check(alive);
@@ -351,7 +344,7 @@
             ctx.fillText(line, 70, y);
             y += 35;
           }
-          drawFooter(ctx, footer, logo, colour);
+          drawFooter(ctx, footer, logo, colour, layout);
           ctx.fillStyle = colour.muted;
           ctx.font = '19px system-ui, sans-serif';
           ctx.fillText('Step ' + (i + 1) + ' of ' + guide.steps.length, 70, 1695);
@@ -363,6 +356,25 @@
       } finally {
         release(screenshot);
       }
+    }
+  }
+  async function preview(value, alive) {
+    const guide = E.guide(value);
+    if (!guide.steps.length) throw Error('Add a screenshot to preview your guide.');
+    await document.fonts?.ready;
+    check(alive);
+    const iterator = pages(guide, alive);
+    let page;
+    try {
+      const result = await iterator.next();
+      page = result.value;
+      check(alive);
+      return page;
+    } catch (err) {
+      if (page) release(page);
+      throw err;
+    } finally {
+      await iterator.return();
     }
   }
   async function exportFile(value, format, alive) {
@@ -448,6 +460,7 @@
     raster,
     wrap,
     pages,
+    preview,
     export: exportFile,
   };
 })(window);

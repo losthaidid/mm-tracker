@@ -115,20 +115,61 @@
         !Number.isInteger(logo.height) ||
         logo.width < 1 ||
         logo.height < 1 ||
-        logo.width > 600 ||
+        logo.width > 1600 ||
         logo.height > 600 ||
-        !str(logo.src, 2000000) ||
+        !str(logo.src, 6000000) ||
         !/^data:image\/(png|webp);base64,[a-zA-Z0-9+/]+={0,2}$/.test(logo.src))
     )
-      throw Error('Choose a valid embedded PNG or WebP footer logo up to 600 pixels.');
+      throw Error('Choose a valid embedded PNG or WebP footer logo up to 1600 × 600 pixels.');
     if (logo !== null && (!logo || typeof logo !== 'object'))
       throw Error('Choose a valid footer logo.');
+    const placement = {};
+    for (const key of ['widthPct', 'xPct', 'yPct'])
+      if (value[key] !== undefined) {
+        if (
+          !Number.isFinite(value[key]) ||
+          value[key] < (key === 'widthPct' ? 0.01 : 0) ||
+          value[key] > 100
+        )
+          throw Error('Choose a logo width and position within the footer area.');
+        placement[key] = value[key];
+      }
     return {
       text,
       align,
       opacity,
       size,
       logo: logo ? { src: logo.src, width: logo.width, height: logo.height } : null,
+      ...placement,
+    };
+  }
+  function logoLayout(value) {
+    const f = footer(value);
+    if (!f.logo) return null;
+    const maxWidthPct = Math.min(100, (240 * f.logo.width) / f.logo.height / 11),
+      scale =
+        f.widthPct === undefined
+          ? Math.min(f.size / f.logo.width, { 100: 32, 180: 48, 260: 64 }[f.size] / f.logo.height)
+          : Math.min((11 * f.widthPct) / f.logo.width, 240 / f.logo.height),
+      width = f.logo.width * scale,
+      height = f.logo.height * scale,
+      xPct = f.xPct === undefined ? { left: 0, center: 50, right: 100 }[f.align] : f.xPct,
+      yPct =
+        f.yPct === undefined
+          ? 240 === height
+            ? 50
+            : ((Math.min(1560, 1630 - height) - 1390) / (240 - height)) * 100
+          : f.yPct;
+    return {
+      width,
+      height,
+      x: 70 + ((1100 - width) * xPct) / 100,
+      y:
+        f.yPct === undefined ? Math.min(1560, 1630 - height) : 1390 + ((240 - height) * yPct) / 100,
+      xPct,
+      yPct,
+      widthPct: width / 11,
+      maxWidthPct,
     };
   }
   function guide(value) {
@@ -231,6 +272,7 @@
     DEFAULT_GUIDE_HEADING,
     GUIDE_PALETTES,
     footer,
+    logoLayout,
     colours,
     LIMITS,
     tokens,
