@@ -227,9 +227,9 @@ test('three designed layouts pack steps, place split instructions beside screens
  for(const layout of ['walkthrough','split','compact']){
   calls.length=0;const pages=[];for await(const page of F.pages({...guide(),layout},()=>true)){pages.push({width:page.width,height:page.height});F.release(page);}
   assert.equal(pages.length,1,layout+' packs short steps together');heights[layout]=pages[0].height;
-  const text=calls.find(c=>c[0]==='text'&&c[1]==='A clear instruction.');assert.equal(text[2],layout==='split'?712:90);
-  const titles=calls.filter(c=>c[0]==='text'&&/^0[12] +/.test(c[1]));assert.equal(titles.length,2);
-  assert.equal(titles[1][2],layout==='compact'?656:90);
+  const text=calls.find(c=>c[0]==='text'&&c[1]==='A clear instruction.');assert.ok(layout==='split'?text[2]>650:text[2]<150);
+  const titles=calls.filter(c=>c[0]==='text'&&/^Step [ab]$/.test(c[1]));assert.equal(titles.length,2);assert.ok(calls.some(c=>c[0]==='text'&&c[1]==='01'));assert.ok(calls.some(c=>c[0]==='text'&&c[1]==='02'));
+  assert.ok(layout==='compact'?titles[1][2]>600:titles[1][2]===titles[0][2]);
  }
  assert.equal(heights.walkthrough,1754);assert.equal(heights.split,1754);assert.ok(heights.compact<1200);
 });
@@ -333,7 +333,7 @@ test('continuous numbering, renumbering and linked instructions persist and reac
  const second=c.d.querySelectorAll('[data-bc="select"]')[1].dataset.id;await c.module.select(second);c.d.querySelector('[data-bc-tool="number"]').click();c.pointer('pointerdown',.4,.4);c.pointer('pointerup',.4,.4);let g=await c.saved();assert.equal(g.steps[1].marks[0].number,6);assert.match(E.caption(g.steps[0],true),/5\. Select Save/);
  c.set('[data-bc-number-start]',20);await c.click('renumber');g=await c.saved();assert.deepEqual(g.steps.map(s=>s.marks[0].number),[20,21]);
  await c.module.importGuide({size:100,text:async()=>JSON.stringify(g)});assert.equal(c.d.querySelector('[data-bc-number-mode]').value,'guide');assert.equal(c.d.querySelector('[data-bc-linked]').checked,true);
- const {F,calls}=fileFixture();for(const layout of ['classic','walkthrough','split','compact']){calls.length=0;for await(const page of F.pages({...g,layout},()=>true))F.release(page);assert.ok(calls.some(v=>v[0]==='text'&&v[1].includes('20. Select Save')));}
+ const {F,calls}=fileFixture();for(const layout of ['classic','walkthrough','split','compact']){calls.length=0;for await(const page of F.pages({...g,layout},()=>true))F.release(page);assert.ok(layout==='classic'?calls.some(v=>v[0]==='text'&&v[1].includes('20. Select Save')):calls.some(v=>v[0]==='text'&&v[1]==='Select Save')&&calls.some(v=>v[0]==='text'&&v[1]==='20'));}
 });
 test('saved styles apply to the current tool and selected object and remain in editable files',async t=>{
  const c=await objects(t,[shape()]);c.d.querySelector('[data-bc-color]').value='#123456';c.d.querySelector('[data-bc-size]').value=40;c.d.querySelector('[data-bc-style-name]').value='Review style';await c.click('save-style');c.d.querySelector('[data-bc-style]').value='0';await c.pick(0);await c.click('apply-style');let g=await c.saved();assert.equal(g.styles[0].name,'Review style');assert.equal(g.steps[0].marks[0].color,'#123456');assert.equal(g.steps[0].marks[0].size,.025);
@@ -351,4 +351,26 @@ test('native zoom pixels keep privacy covers applied even above the zoom in laye
 });
 test('editing only an object colour preserves exact geometry and stroke at the image edge',async t=>{
  const original=shape('rectangle',{size:.01234567,points:[[.33135,.2],[1,.7]]}),c=await objects(t,[original]);await c.pick(0);c.d.querySelector('[data-bc-object-color]').value='#123456';await c.click('apply-object');const saved=await c.saved();assert.deepEqual(saved.steps[0].marks[0].points,original.points);assert.equal(saved.steps[0].marks[0].size,original.size);assert.equal(saved.steps[0].marks[0].color,'#123456');
+});
+test('polished walkthrough packs wide illustrated steps with linked instructions and a footer onto one page',async()=>{
+ const {F,calls}=fileFixture(),g=guide();g.layout='walkthrough';g.linkedInstructions=true;g.footer={text:'Team / Internal'};
+ for(const s of g.steps){s.image={src:'data:image/png;base64,'+png(1200,420).toString('base64'),width:1200,height:420};s.caption='Review the details and confirm the status before saving.\n\n';s.marks=[{type:'number',number:1,instruction:'Confirm before saving.',color:'#b93636',size:.04,points:[[.5,.5],[.5,.5]]}];}
+ const pages=[];for await(const page of F.pages(g,()=>true)){pages.push([page.width,page.height]);F.release(page);}
+ assert.equal(pages.length,1);assert.equal(calls.filter(c=>c[0]==='text'&&c[1]==='Confirm before saving.').length,2);assert.equal(calls.filter(c=>c[0]==='text'&&c[1]==='WHAT TO DO').length,2);
+});
+test('polished layouts preserve wide, square and portrait screenshot aspect ratios inside their page frames',async()=>{
+ for(const layout of ['walkthrough','split','compact']){
+  const {F,calls}=fileFixture(),g=guide();g.layout=layout;g.steps=[[1200,200],[600,600],[160,800]].map(([w,h],i)=>({...step(String(i)),image:{src:'data:image/png;base64,'+png(w,h).toString('base64'),width:w,height:h}}));
+  for await(const page of F.pages(g,()=>true))F.release(page);
+  const screenshots=calls.filter(c=>c[0]==='draw'&&c.length===6&&c[1]?.getContext&&c[4]>1&&c[5]>1);
+  assert.equal(screenshots.length,3);screenshots.forEach((c,i)=>{assert.ok(Math.abs(c[4]/c[5]-g.steps[i].image.width/g.steps[i].image.height)<1e-8);assert.ok(c[2]>=70&&c[2]+c[4]<=1170&&c[3]+c[5]<=1620);});
+ }
+});
+test('custom middle-tone paper keeps body and accent text above 4.5 contrast',()=>{
+ const {F}=fileFixture(),lum=hex=>{const c=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255).map(x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4);return c[0]*.2126+c[1]*.7152+c[2]*.0722;};
+ for(const paper of ['#777777','#888888','#8a653b','#ffffff','#000000']){const p=F.palette({paper,accent:paper});for(const ink of [p.ink,p.accent]){const a=lum(paper),b=lum(ink);assert.ok((Math.max(a,b)+.05)/(Math.min(a,b)+.05)>=4.5);}}
+});
+test('polished pagination enforces the page limit without returning a partial export',async()=>{
+ const {F}=fileFixture(),g=guide();g.layout='walkthrough';g.steps.forEach(s=>s.caption='X\n'.repeat(4000));let count=0;
+ await assert.rejects(async()=>{for await(const page of F.pages(g,()=>true)){count++;F.release(page);}},/120 pages/);assert.ok(count<=120);
 });

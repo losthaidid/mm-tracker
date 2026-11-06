@@ -365,7 +365,13 @@
           b = luminance(paper);
         return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
       },
-      ink = contrast('#17232d') > contrast('#fffdf7') ? '#17232d' : '#fffdf7';
+      preferred = contrast('#17232d') > contrast('#fffdf7') ? '#17232d' : '#fffdf7',
+      ink =
+        contrast(preferred) >= 4.5
+          ? preferred
+          : contrast('#000000') > contrast('#ffffff')
+            ? '#000000'
+            : '#ffffff';
     return { paper, accent: contrast(accent) >= 4.5 ? accent : ink, ink, body: ink, muted: ink };
   }
   function drawFooter(ctx, footer, logo, colour, layout, offset = 0) {
@@ -482,7 +488,30 @@
       logoBox = E.logoLayout(footer),
       bottom = logo ? Math.min(1510, logoBox.y - 40) : footer.text.trim() ? 1510 : 1620,
       cardWidth = compact ? 534 : 1100,
-      lineHeight = compact ? 32 : 35;
+      gap = 20,
+      textSize = compact ? 22 : 23,
+      lineHeight = compact ? 30 : 32,
+      planned = new Map();
+    const blend = (base, ink, amount) =>
+      '#' +
+      [1, 3, 5]
+        .map(i =>
+          Math.round(
+            parseInt(base.slice(i, i + 2), 16) * (1 - amount) +
+              parseInt(ink.slice(i, i + 2), 16) * amount
+          )
+            .toString(16)
+            .padStart(2, '0')
+        )
+        .join('');
+    const cardFill = blend(colour.paper, colour.ink, 0.025),
+      line = blend(colour.paper, colour.ink, 0.15),
+      soft = blend(colour.paper, colour.accent, 0.065),
+      cardInk = palette({ paper: cardFill, accent: colour.accent }).ink,
+      cardAccent = palette({ paper: cardFill, accent: colour.accent }).accent,
+      linkedInk = palette({ paper: soft, accent: colour.accent }).ink,
+      softAccent = palette({ paper: soft, accent: colour.accent }).accent,
+      onAccent = palette({ paper: colour.accent, accent: colour.paper }).ink;
     let c = null,
       ctx,
       y = 0,
@@ -494,9 +523,25 @@
       firstStep = 0,
       lastStep = 0;
     const font = (size, bold = false) => {
-      ctx.font = (bold ? '600 ' : '') + size + 'px system-ui, sans-serif';
+      ctx.font = (bold ? '600 ' : '') + size + 'px Arial, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
     };
-    const newPage = () => {
+    const box = (context, x, top, w, h, fill, stroke = null, radius = 8) => {
+      context.beginPath();
+      if (context.roundRect) context.roundRect(x, top, w, h, radius);
+      else context.rect(x, top, w, h);
+      if (fill) {
+        context.fillStyle = fill;
+        context.fill();
+      }
+      if (stroke) {
+        context.strokeStyle = stroke;
+        context.lineWidth = 1.5;
+        context.stroke();
+      }
+    };
+    function newPage() {
       if (++pageNo > 120)
         throw Error(
           'This guide exceeds 120 pages. Shorten captions or split it into smaller guides.'
@@ -504,40 +549,44 @@
       c = canvas(1240, 1754);
       ctx = c.getContext('2d');
       ctx.fillStyle = colour.paper;
-      ctx.fillRect(0, 0, c.width, c.height);
-      ctx.fillStyle = colour.accent;
-      font(19, true);
-      let top = 68;
+      ctx.fillRect(0, 0, 1240, 1754);
       const heading = (guide.exportHeading ?? E.DEFAULT_GUIDE_HEADING).replace(/\s+/g, ' ').trim();
-      if (heading)
-        for (const line of wrap(ctx, heading, 1100)) {
-          ctx.fillText(line, 70, top);
-          top += 25;
-        }
-      top = heading ? Math.max(120, top + 20) : 84;
-      ctx.fillStyle = colour.ink;
-      font(34, true);
-      for (const line of wrap(ctx, guide.title || 'Screenshot guide', 1100)) {
-        ctx.fillText(line, 70, top);
-        top += 43;
+      font(17, true);
+      const headings = heading ? wrap(ctx, heading, 970) : [],
+        band = headings.length ? Math.max(86, 30 + headings.length * 23) : 12;
+      ctx.fillStyle = colour.accent;
+      ctx.fillRect(0, 0, 1240, band);
+      if (headings.length) {
+        ctx.fillStyle = onAccent;
+        headings.forEach((s, i) => ctx.fillText(s, 70, 34 + i * 23));
+        box(ctx, 1072, 24, 100, 36, blend(colour.accent, onAccent, 0.12), null, 5);
+        font(14, true);
+        ctx.fillStyle = onAccent;
+        ctx.fillText('PAGE ' + String(pageNo).padStart(2, '0'), 1084, 47);
       }
-      font(18);
-      ctx.fillStyle = colour.muted;
+      let top = band + 48;
+      font(compact ? 35 : 38, true);
+      ctx.fillStyle = colour.ink;
+      for (const title of wrap(ctx, guide.title || 'Screenshot guide', 1100)) {
+        ctx.fillText(title, 70, top);
+        top += 45;
+      }
+      font(17);
+      ctx.fillStyle = colour.body;
       ctx.fillText(
-        E.GUIDE_LAYOUTS[guide.layout].label + ' · ' + guide.steps.length + ' steps',
+        guide.steps.length + ' illustrated ' + (guide.steps.length === 1 ? 'step' : 'steps'),
         70,
         top + 5
       );
-      ctx.fillStyle = colour.accent;
-      ctx.fillRect(70, top + 24, 1100, 3);
-      bodyTop = y = top + 52;
+      ctx.fillStyle = line;
+      ctx.fillRect(70, top + 25, 1100, 1);
+      bodyTop = y = top + 46;
       usedBottom = y;
       column = 0;
       rowBottom = y;
       firstStep = lastStep = 0;
-    };
-    const finishPage = () => {
-      // Compact cards trim the unused body, retaining the entire footer region.
+    }
+    function finishPage() {
       const height = compact
         ? Math.min(1754, Math.max(550, Math.ceil(usedBottom + 30 + 1754 - bottom)))
         : 1754;
@@ -550,8 +599,10 @@
       const context = out.getContext('2d'),
         offset = height - 1754;
       drawFooter(context, footer, logo, colour, logoBox, offset);
-      context.fillStyle = colour.muted;
-      context.font = '19px system-ui, sans-serif';
+      context.fillStyle = line;
+      context.fillRect(70, 1686 + offset, 1100, 1);
+      context.font = '16px Arial, sans-serif';
+      context.fillStyle = colour.body;
       context.fillText(
         'Steps ' +
           firstStep +
@@ -559,13 +610,167 @@
           ' of ' +
           guide.steps.length,
         70,
-        1695 + offset
+        1716 + offset
       );
-      const label = 'Page ' + pageNo;
-      context.fillText(label, 1170 - context.measureText(label).width, 1695 + offset);
+      box(context, 1086, 1698 + offset, 84, 29, soft, null, 5);
+      context.font = '600 15px Arial, sans-serif';
+      context.fillStyle = softAccent;
+      context.fillText('Page ' + pageNo, 1096, 1718 + offset);
       c = null;
       return out;
-    };
+    }
+    function advance() {
+      if (compact && column === 0) {
+        column = 1;
+        return null;
+      }
+      if (pageNo >= 120)
+        throw Error(
+          'This guide exceeds 120 pages. Shorten captions or split it into smaller guides.'
+        );
+      const page = finishPage();
+      newPage();
+      return page;
+    }
+    function rowsFor(step, width) {
+      const rows = [];
+      font(textSize);
+      if (step.caption.trim()) {
+        rows.push({ kind: 'label', text: 'WHAT TO DO', h: 24 });
+        for (const text of wrap(ctx, step.caption.trimEnd(), width))
+          rows.push({ kind: text ? 'body' : 'space', text, h: text ? lineHeight : 10 });
+      }
+      const links = guide.linkedInstructions
+        ? step.marks
+            .filter(m => m.type === 'number' && m.instruction?.trim())
+            .sort((a, b) => a.number - b.number)
+        : [];
+      if (links.length) {
+        if (rows.length) rows.push({ kind: 'space', h: 12 });
+        rows.push({ kind: 'label', text: 'FOLLOW THE NUMBERED MARKERS', h: 24 });
+        for (const mark of links) {
+          const lines = wrap(ctx, mark.instruction.trim(), width - 42);
+          lines.forEach((text, i) =>
+            rows.push({ kind: 'linked', text, number: i === 0 ? mark.number : null, h: lineHeight })
+          );
+        }
+      }
+      return rows;
+    }
+    function plan(step, dims, first = true) {
+      font(compact ? 24 : 28, true);
+      const titles = wrap(
+          ctx,
+          (step.title || 'Step') + (first ? '' : ' · continued'),
+          cardWidth - 122
+        ),
+        header = Math.max(56, titles.length * (compact ? 31 : 34) + 16),
+        textWidth = split ? 420 : cardWidth - 48,
+        rows = rowsFor(step, textWidth),
+        imageWidth = split ? 580 : cardWidth - 72,
+        cap = compact ? 260 : split ? 570 : dims.width / dims.height < 0.9 ? 820 : 580,
+        scale = Math.min(imageWidth / dims.width, cap / dims.height);
+      return {
+        titles,
+        header,
+        textWidth,
+        rows,
+        scale,
+        imageH: first ? dims.height * scale : 0,
+        imageW: first ? dims.width * scale : 0,
+      };
+    }
+    const rowTotal = rows => rows.reduce((n, r) => n + r.h, 0);
+    const cardHeight = (p, rowsHeight) =>
+      20 +
+      p.header +
+      14 +
+      (split
+        ? Math.max(p.imageH ? p.imageH + 24 : 0, rowsHeight)
+        : (p.imageH ? p.imageH + 24 : 0) + (rowsHeight && p.imageH ? 18 : 0) + rowsHeight) +
+      20;
+    function dimsOf(step) {
+      return {
+        width: Math.max(1, Math.round(step.image.width * (step.crop?.w || 1))),
+        height: Math.max(1, Math.round(step.image.height * (step.crop?.h || 1))),
+      };
+    }
+    function firstRows(rows, start) {
+      let h = 0;
+      for (let i = start; i < rows.length; i++) {
+        h += rows[i].h;
+        if (!['label', 'space'].includes(rows[i].kind)) break;
+      }
+      return h;
+    }
+    function paintCard(p, screenshot, stepIndex, first, shown, height) {
+      const x = 70 + (compact ? column * 566 : 0),
+        top = y,
+        contentY = top + 20 + p.header + 14;
+      box(ctx, x, top, cardWidth, height, cardFill, line, 10);
+      box(ctx, x + 22, top + 22, 48, 48, colour.accent, null, 8);
+      font(22, true);
+      ctx.fillStyle = onAccent;
+      const number = String(stepIndex + 1).padStart(2, '0');
+      ctx.fillText(number, x + 46 - ctx.measureText(number).width / 2, top + 54);
+      font(compact ? 24 : 28, true);
+      ctx.fillStyle = cardInk;
+      p.titles.forEach((title, i) =>
+        ctx.fillText(title, x + 86, top + 43 + i * (compact ? 31 : 34))
+      );
+      if (first) {
+        const frameX = x + 24,
+          frameW = split ? 604 : cardWidth - 48;
+        ctx.save();
+        ctx.shadowColor = '#10243a16';
+        ctx.shadowBlur = 9;
+        ctx.shadowOffsetY = 3;
+        box(ctx, frameX, contentY, frameW, p.imageH + 24, colour.paper, null, 6);
+        ctx.restore();
+        box(ctx, frameX, contentY, frameW, p.imageH + 24, null, line, 6);
+        ctx.drawImage(
+          screenshot,
+          frameX + (frameW - p.imageW) / 2,
+          contentY + 12,
+          p.imageW,
+          p.imageH
+        );
+      }
+      const textX = split ? x + 656 : x + 24;
+      let rowY = split
+        ? contentY
+        : contentY + (first ? p.imageH + 24 : 0) + (first && shown.length ? 18 : 0);
+      for (const row of shown) {
+        if (row.kind === 'space') {
+          rowY += row.h;
+          continue;
+        }
+        if (row.kind === 'label') {
+          font(12, true);
+          ctx.fillStyle = cardAccent;
+          ctx.fillText(row.text, textX, rowY + 14);
+        } else if (row.kind === 'linked') {
+          ctx.fillStyle = soft;
+          ctx.fillRect(textX - 6, rowY - 2, p.textWidth + 12, row.h + 4);
+          if (row.number !== null) {
+            box(ctx, textX + 1, rowY + 2, 28, 26, colour.accent, null, 5);
+            font(13, true);
+            ctx.fillStyle = onAccent;
+            const n = String(row.number);
+            ctx.fillText(n, textX + 15 - ctx.measureText(n).width / 2, rowY + 20);
+          }
+          font(textSize);
+          ctx.fillStyle = linkedInk;
+          ctx.fillText(row.text, textX + 42, rowY + 23);
+        } else {
+          font(textSize);
+          ctx.fillStyle = cardInk;
+          ctx.fillText(row.text, textX, rowY + 23);
+        }
+        rowY += row.h;
+      }
+      return top + height;
+    }
     try {
       for (let i = 0; i < guide.steps.length; i++) {
         check(alive);
@@ -573,73 +778,81 @@
           screenshot = await raster(step, alive);
         try {
           if (!c) newPage();
-          const captionWidth = split ? 438 : cardWidth - 40;
-          font(compact ? 22 : 24);
-          const text = E.caption(step, guide.linkedInstructions),
-            lines = text.trim() ? wrap(ctx, text, captionWidth) : [];
-          let first = true;
+          const full = plan(step, screenshot),
+            rows = full.rows;
+          let cursor = 0,
+            first = true;
           do {
             check(alive);
-            font(compact ? 25 : 28, true);
-            const titles = wrap(
-                ctx,
-                String(i + 1).padStart(2, '0') +
-                  '  ' +
-                  (step.title || 'Step ' + (i + 1)) +
-                  (first ? '' : ' · continued'),
-                cardWidth - 40
-              ),
-              scale = Math.min(
-                (split ? 590 : cardWidth - 40) / screenshot.width,
-                (compact ? 270 : split ? 560 : 440) / screenshot.height
-              ),
-              imageHeight = first ? screenshot.height * scale : 0,
-              minimum =
-                titles.length * 36 +
-                40 +
-                (split
-                  ? Math.max(imageHeight, lines.length ? lineHeight + 46 : 0)
-                  : imageHeight + (imageHeight ? 24 : 0) + (lines.length ? lineHeight + 46 : 0)) +
-                24;
-            if (y + minimum > bottom && usedBottom > bodyTop) {
-              if (compact && column === 0) column = 1;
-              else {
-                const page = finishPage();
+            const p = plan(step, screenshot, first),
+              remaining = rows.slice(cursor),
+              allRows = rowTotal(remaining);
+            if (first && !compact && !split && !planned.has(i) && i + 1 < guide.steps.length) {
+              const other = plan(guide.steps[i + 1], dimsOf(guide.steps[i + 1])),
+                sum = p.imageH + other.imageH,
+                bases =
+                  cardHeight({ ...p, imageH: 0 }, allRows) +
+                  (allRows ? 18 + 24 : 24) +
+                  cardHeight({ ...other, imageH: 0 }, rowTotal(other.rows)) +
+                  (other.rows.length ? 18 + 24 : 24),
+                factor = Math.min(1, (bottom - y - gap - bases) / sum);
+              if (factor >= 0.8) {
+                planned.set(i, factor);
+                planned.set(i + 1, factor);
+              }
+            }
+            const factor = first ? planned.get(i) || 1 : 1;
+            p.imageH *= factor;
+            p.imageW *= factor;
+            const whole = cardHeight(p, allRows),
+              fresh = bottom - bodyTop;
+            if (whole > bottom - y && whole <= fresh && usedBottom > bodyTop) {
+              const page = advance();
+              if (page) {
                 check(alive);
                 yield page;
-                newPage();
               }
               continue;
             }
-            const x = 70 + (compact ? column * 566 : 0),
-              textX = split ? x + 642 : x + 20;
-            let top = y + 30;
-            ctx.fillStyle = colour.accent;
-            ctx.fillRect(x, y, compact ? 50 : 64, 4);
-            ctx.fillStyle = colour.ink;
-            font(compact ? 25 : 28, true);
-            for (const title of titles) {
-              ctx.fillText(title, x + 20, top);
-              top += 36;
-            }
-            top += 10;
-            if (first)
-              ctx.drawImage(screenshot, x + 20, top, screenshot.width * scale, imageHeight);
-            let captionY = split ? top : top + imageHeight + (imageHeight ? 24 : 0);
-            if (lines.length) {
-              font(16, true);
-              ctx.fillStyle = colour.accent;
-              ctx.fillText('INSTRUCTIONS' + (first ? '' : ' · CONTINUED'), textX, captionY + 16);
-              captionY += 46;
-              font(compact ? 22 : 24);
-              ctx.fillStyle = colour.body;
-              const capacity = Math.max(1, Math.floor((bottom - 24 - captionY) / lineHeight));
-              for (const line of lines.splice(0, capacity)) {
-                ctx.fillText(line, textX, captionY);
-                captionY += lineHeight;
+            let minimum = cardHeight(p, firstRows(rows, cursor));
+            if (minimum > bottom - y && usedBottom > bodyTop) {
+              const page = advance();
+              if (page) {
+                check(alive);
+                yield page;
               }
+              continue;
             }
-            const end = Math.max(top + imageHeight, captionY) + 24;
+            if (minimum > fresh && first) {
+              const maxH = Math.max(1, p.imageH - (minimum - fresh)),
+                ratio = maxH / Math.max(1, p.imageH);
+              p.imageH = maxH;
+              p.imageW *= ratio;
+              minimum = cardHeight(p, firstRows(rows, cursor));
+            }
+            const bodyStart =
+                20 +
+                p.header +
+                14 +
+                (split ? 0 : (first ? p.imageH + 24 : 0) + (first && remaining.length ? 18 : 0)),
+              capacity = bottom - y - bodyStart - 20;
+            let used = 0,
+              take = 0;
+            while (cursor + take < rows.length && used + rows[cursor + take].h <= capacity) {
+              used += rows[cursor + take].h;
+              take++;
+            }
+            while (take && ['label', 'space'].includes(rows[cursor + take - 1].kind)) {
+              take--;
+              used -= rows[cursor + take].h;
+            }
+            if (!take && remaining.length)
+              throw Error(
+                'This page cannot fit an instruction. Shorten the guide heading or step title.'
+              );
+            const shown = rows.slice(cursor, cursor + take),
+              height = cardHeight(p, used),
+              end = paintCard(p, screenshot, i, first, shown, height);
             usedBottom = Math.max(usedBottom, end);
             if (!firstStep) firstStep = i + 1;
             lastStep = i + 1;
@@ -647,12 +860,13 @@
               rowBottom = end;
               column = 1;
             } else {
-              y = Math.max(end, compact ? rowBottom : 0) + 28;
+              y = Math.max(end, compact ? rowBottom : 0) + gap;
               rowBottom = y;
               column = 0;
             }
+            cursor += take;
             first = false;
-          } while (lines.length || first);
+          } while (cursor < rows.length || first);
         } finally {
           release(screenshot);
         }
