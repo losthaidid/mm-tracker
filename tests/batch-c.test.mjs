@@ -349,3 +349,6 @@ test('native zoom pixels keep privacy covers applied even above the zoom in laye
  assert.deepEqual(Array.from(c.getContext('2d').getImageData(300,180,1,1).data),[0,0,0,255]);F.release(c);
  const original=F.draw(F.canvas(1,1),s,await F.loadImage(s.image),true);assert.deepEqual(Array.from(original.getContext('2d').getImageData(80,80,1,1).data),[255,255,255,255]);F.release(original);
 });
+test('editing only an object colour preserves exact geometry and stroke at the image edge',async t=>{
+ const original=shape('rectangle',{size:.01234567,points:[[.33135,.2],[1,.7]]}),c=await objects(t,[original]);await c.pick(0);c.d.querySelector('[data-bc-object-color]').value='#123456';await c.click('apply-object');const saved=await c.saved();assert.deepEqual(saved.steps[0].marks[0].points,original.points);assert.equal(saved.steps[0].marks[0].size,original.size);assert.equal(saved.steps[0].marks[0].color,'#123456');
+});

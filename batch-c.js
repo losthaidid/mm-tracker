@@ -182,6 +182,8 @@
         $('[data-bc-object-number]').value = m.number || 1;
         $('[data-bc-object-instruction]').value = m.instruction || '';
         $('[data-bc-object-opacity]').value = Math.round((m.opacity || 0.55) * 100);
+        for (const input of $('[data-bc-object-properties]').querySelectorAll('input,textarea'))
+          input.dataset.current = input.value;
       }
       objectRef = m || null;
       for (const [part, show] of [
@@ -263,19 +265,20 @@
       const b = Object.fromEntries(
         ['x', 'y', 'w', 'h'].map(k => [k, +$('[data-bc-object-' + k + ']').value / 100])
       );
-      let next = E.transformMark(m, s.image, b);
+      const edited = key => {
+        const input = $('[data-bc-object-' + key + ']');
+        return input.value !== input.dataset.current;
+      };
+      let next = ['x', 'y', 'w', 'h'].some(edited) ? E.transformMark(m, s.image, b) : { ...m };
       next.color = $('[data-bc-object-color]').value;
-      if (
-        m.type !== 'number' ||
-        Math.abs(+$('[data-bc-object-size]').value - m.size * s.image.width) > 0.01
-      )
-        next.size = +$('[data-bc-object-size]').value / s.image.width;
+      if (edited('size')) next.size = +$('[data-bc-object-size]').value / s.image.width;
       if (['text', 'callout'].includes(m.type)) next.text = $('[data-bc-object-text]').value;
       if (m.type === 'number') {
         next.number = +$('[data-bc-object-number]').value;
         next.instruction = $('[data-bc-object-instruction]').value;
       }
-      if (m.type === 'spotlight') next.opacity = +$('[data-bc-object-opacity]').value / 100;
+      if (m.type === 'spotlight' && edited('opacity'))
+        next.opacity = +$('[data-bc-object-opacity]').value / 100;
       commitMarks(s.marks.map((o, i) => (i === objectIndex ? next : o)));
     }
     function editObject(action) {
