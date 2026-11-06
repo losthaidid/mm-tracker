@@ -1,6 +1,7 @@
 /** Batch C: deterministic ticket discovery and bounded local screenshot-guide documents. */
 (function (root) {
   'use strict';
+  const DEFAULT_GUIDE_HEADING = 'WORKHUB  /  SCREENSHOT GUIDE';
   const LIMITS = { steps: 24, pixels: 12000000, imageChars: 18000000, marks: 200, points: 1200 };
   const stop = new Set(
     'a an the and or but for to of in on at by is are was were be been being with without from this that these those it its as i we you they our your their please issue error problem when after before cannot unable not have has had can could should would will do does did no yes need check ticket test system user request failed failure'.split(
@@ -91,6 +92,8 @@
       value.steps.length > LIMITS.steps
     )
       throw Error('Choose a valid WorkHub guide file with up to 24 steps.');
+    if (value.exportHeading !== undefined && !str(value.exportHeading, 180))
+      throw Error('Use an export heading up to 180 characters.');
     const ids = new Set();
     let pixels = 0,
       chars = 0;
@@ -146,7 +149,14 @@
     });
     if (pixels > LIMITS.pixels || chars > LIMITS.imageChars)
       throw Error('This guide is too large. Use fewer or smaller screenshots.');
-    return { kind: value.kind, version: 1, title: value.title, steps };
+    return {
+      kind: value.kind,
+      version: 1,
+      title: value.title,
+      exportHeading:
+        value.exportHeading === undefined ? DEFAULT_GUIDE_HEADING : value.exportHeading,
+      steps,
+    };
   }
   const bounds = points => {
     const [a, b] = [points[0], points.at(-1)];
@@ -164,5 +174,14 @@
       .trim()
       .replace(/\s+/g, '-')
       .slice(0, 90) || 'screenshot-guide';
-  root.WorkHubBatchCEngine = { LIMITS, tokens, ticketIndex, twins, guide, bounds, filename };
+  root.WorkHubBatchCEngine = {
+    DEFAULT_GUIDE_HEADING,
+    LIMITS,
+    tokens,
+    ticketIndex,
+    twins,
+    guide,
+    bounds,
+    filename,
+  };
 })(window);

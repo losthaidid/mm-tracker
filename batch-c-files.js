@@ -66,11 +66,12 @@
   const release = c => {
     c.width = c.height = 1;
   };
-  const blob = c =>
+  const blob = (c, type = 'image/png') =>
     new Promise((resolve, reject) =>
       c.toBlob(
         b => (b ? resolve(b) : reject(Error('The image could not be exported.'))),
-        'image/png'
+        type,
+        type === 'image/jpeg' ? 0.92 : undefined
       )
     );
   function read(file) {
@@ -249,10 +250,18 @@
           ctx.fillRect(0, 0, c.width, c.height);
           ctx.fillStyle = '#285b4d';
           ctx.font = '600 19px system-ui, sans-serif';
-          ctx.fillText('WORKHUB  /  SCREENSHOT GUIDE', 70, 68);
+          const heading = (guide.exportHeading ?? E.DEFAULT_GUIDE_HEADING)
+            .replace(/\s+/g, ' ')
+            .trim();
+          let y = 68;
+          if (heading)
+            for (const line of wrap(ctx, heading, 1100)) {
+              ctx.fillText(line, 70, y);
+              y += 25;
+            }
+          y = heading ? Math.max(120, y + 25) : 84;
           ctx.fillStyle = '#172f2c';
           ctx.font = '600 27px system-ui, sans-serif';
-          let y = 120;
           for (const line of wrap(ctx, guide.title || 'Screenshot guide', 1100)) {
             ctx.fillText(line, 70, y);
             y += 35;
@@ -320,7 +329,8 @@
     }
     let pdf = null,
       zip = null;
-    if (format === 'images') {
+    const jpeg = format === 'jpg-images';
+    if (format === 'images' || jpeg) {
       if (!root.JSZip) throw Error('The ZIP library is unavailable. Refresh and try again.');
       zip = new root.JSZip();
     } else {
@@ -336,11 +346,12 @@
     let n = 0;
     for await (const page of pages(guide, alive)) {
       try {
-        const png = await blob(page);
+        const rendered = await blob(page, jpeg ? 'image/jpeg' : 'image/png');
         check(alive);
-        const bytes = await png.arrayBuffer();
+        const bytes = await rendered.arrayBuffer();
         check(alive);
-        if (zip) zip.file(String(++n).padStart(3, '0') + '-guide-page.png', bytes);
+        if (zip)
+          zip.file(String(++n).padStart(3, '0') + '-guide-page.' + (jpeg ? 'jpg' : 'png'), bytes);
         else {
           const image = await pdf.embedPng(bytes),
             p = pdf.addPage([595.28, 841.89]);

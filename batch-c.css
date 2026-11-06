@@ -312,10 +312,21 @@ body.bc-room-open {
 .bc-room textarea {
   resize: vertical;
 }
+.bc-guide-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 24px;
+  margin: 6px 0 16px;
+  max-width: 1200px;
+}
 .bc-guide-name {
   display: block;
-  margin: 6px 0 16px;
-  max-width: 700px;
+}
+.bc-guide-heading-help {
+  margin: 6px 0 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--bc-muted);
 }
 .bc-step-strip {
   display: flex;
@@ -521,6 +532,9 @@ body.bc-room-open {
   color: #9b402e;
 }
 @media (max-width: 800px) {
+  .bc-guide-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
   .bc-layout {
     grid-template-columns: minmax(0, 1fr);
   }

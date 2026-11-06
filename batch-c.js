@@ -11,7 +11,13 @@
   const uid = () =>
     root.crypto?.randomUUID?.() ||
     's' + Date.now().toString(36) + Math.random().toString(36).slice(2);
-  const blank = () => ({ kind: 'workhub-screenshot-guide', version: 1, title: '', steps: [] });
+  const blank = () => ({
+    kind: 'workhub-screenshot-guide',
+    version: 1,
+    title: '',
+    exportHeading: E.DEFAULT_GUIDE_HEADING,
+    steps: [],
+  });
   const button = (action, label, extra = '') =>
     '<button type="button" data-bc="' + action + '" ' + extra + '>' + label + '</button>';
   function install(a) {
@@ -105,7 +111,7 @@
       return (
         '<section class="bc-launch"><div><span class="bc-eyebrow">MAKE IT CLEAR. MAKE IT SHAREABLE.</span><h3>A little studio for your screenshots.</h3><p>Prepare a clean image or turn a collection into a useful walkthrough. Files stay on your device.</p></div><div class="bc-launch-grid"><article><span class="bc-launch-icon" aria-hidden="true">▧</span><h3>Screenshot privacy</h3><p>Cover private details, crop the frame and add an arrow. Download a flattened PNG.</p>' +
         button('privacy', 'Open privacy editor ↗') +
-        '</article><article><span class="bc-launch-icon" aria-hidden="true">▤</span><h3>Screenshot guide builder</h3><p>Arrange numbered steps, write captions and export a polished PDF or PNG page collection.</p>' +
+        '</article><article><span class="bc-launch-icon" aria-hidden="true">▤</span><h3>Screenshot guide builder</h3><p>Arrange numbered steps, write captions, customise the export heading and prepare a PDF, JPG or PNG page collection.</p>' +
         button('guide', 'Build a screenshot guide ↗') +
         '</article></div><p class="bc-local-note">Local editing · No AI · No image uploads or database storage. Save an editable guide file to continue on another day.</p></section>'
       );
@@ -434,19 +440,25 @@
           link(
             file,
             E.filename(snapshot.title || snapshot.steps[0].title) +
-              (kind === 'images' ? '-pages.zip' : kind === 'pdf-zip' ? '.pdf.zip' : '.' + kind),
-            kind === 'images'
-              ? 'Download PNG pages ZIP'
-              : kind === 'pdf-zip'
-                ? 'Download PDF ZIP'
-                : kind === 'png'
-                  ? 'Download edited PNG'
-                  : 'Download guide PDF'
+              (kind === 'images' || kind === 'jpg-images'
+                ? '-pages.zip'
+                : kind === 'pdf-zip'
+                  ? '.pdf.zip'
+                  : '.' + kind),
+            kind === 'jpg-images'
+              ? 'Download JPG pages ZIP'
+              : kind === 'images'
+                ? 'Download PNG pages ZIP'
+                : kind === 'pdf-zip'
+                  ? 'Download PDF ZIP'
+                  : kind === 'png'
+                    ? 'Download edited PNG'
+                    : 'Download guide PDF'
           );
         }
         status(
           format === 'editable'
-            ? 'Editable files include original screenshots and annotations. Use PDF / PNG for sharing.'
+            ? 'Editable files include original screenshots and annotations. Use PDF / JPG / PNG for sharing.'
             : 'Ready. Select the download link to save your exported file.'
         );
       } finally {
@@ -530,9 +542,11 @@
           : '') +
         '<span data-bc-count></span><span class="bc-local-badge">LOCAL FILES · NO UPLOADS</span></div>' +
         (guideMode
-          ? '<label class="bc-guide-name">Guide title<input data-bc-title maxlength="180" placeholder="e.g. How to submit a support request" value="' +
+          ? '<div class="bc-guide-fields"><label class="bc-guide-name">Guide title<input data-bc-title maxlength="180" placeholder="e.g. How to submit a support request" value="' +
             esc(project().title) +
-            '"></label>'
+            '"></label><div><label class="bc-guide-name">Export heading<input data-bc-export-heading maxlength="180" aria-describedby="bcExportHeadingHelp" placeholder="e.g. MY COMPANY / USER GUIDE" value="' +
+            esc(project().exportHeading) +
+            '"></label><p id="bcExportHeadingHelp" class="bc-guide-heading-help">Shown at the top of every PDF, JPG and PNG page. Leave blank to hide. Saved with your editable guide.</p></div></div>'
           : '') +
         '<nav class="bc-step-strip" data-bc-steps aria-label="Guide steps"' +
         (guideMode ? '' : ' hidden') +
@@ -577,9 +591,9 @@
             '</div>'
           : '<p>Solid cover replaces selected pixels in the exported PNG. Use Compare original to review what changed.</p>' +
             button('to-guide', 'Add edited image to a guide ↗', 'data-needs-image')) +
-        '<p class="bc-draft-note">Drafts stay in this tab while signed in. Save an editable guide file to continue later. Editable files retain original images; exported PDF / PNG files contain your finished edits.</p></aside></div><footer class="bc-footer"><div class="bc-export-actions">' +
+        '<p class="bc-draft-note">Drafts stay in this tab while signed in. Save an editable guide file to continue later. Editable files retain original images; exported PDF / JPG / PNG files contain your finished edits.</p></aside></div><footer class="bc-footer"><div class="bc-export-actions">' +
         (guideMode
-          ? '<label>Export format<select data-bc-format><option value="pdf">PDF guide</option><option value="images">PNG pages in ZIP</option><option value="pdf-zip">PDF in ZIP</option></select></label>'
+          ? '<label>Export format<select data-bc-format><option value="pdf">PDF guide</option><option value="jpg-images">JPG pages in ZIP</option><option value="images">PNG pages in ZIP</option><option value="pdf-zip">PDF in ZIP</option></select></label>'
           : '') +
         button('export', guideMode ? 'Prepare guide' : 'Prepare edited PNG', 'class="bc-primary"') +
         button('editable', 'Save editable guide') +
@@ -646,6 +660,10 @@
           s = step();
         if (el.matches('[data-bc-title]')) {
           project().title = el.value;
+          changed();
+        }
+        if (el.matches('[data-bc-export-heading]')) {
+          project().exportHeading = el.value;
           changed();
         }
         if (s && el.matches('[data-bc-step-title],[data-bc-caption]')) {
