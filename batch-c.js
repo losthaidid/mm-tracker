@@ -57,6 +57,12 @@
     const project = () => projects[mode],
       step = () => project().steps.find(s => s.id === selected),
       $ = selector => room?.querySelector(selector);
+    const nextNumber = () =>
+      1 +
+      (step()?.marks || []).reduce(
+        (n, mark) => (mark.type === 'number' ? Math.max(n, mark.number) : n),
+        0
+      );
     function brandingFields() {
       const f = project().footer,
         c = project().colours;
@@ -536,6 +542,12 @@
         : 'Compare original';
       for (const el of room.querySelectorAll('[data-bc-tool]'))
         el.setAttribute('aria-pressed', String(el.dataset.bcTool === tool));
+      $('[data-bc-brush-control]').hidden = tool === 'number';
+      $('[data-bc-number-control]').hidden = tool !== 'number';
+      $('[data-bc-next-number]').hidden = tool !== 'number';
+      $('[data-bc-next-number]').textContent = 'Next number: ' + nextNumber();
+      $('[data-bc-size-label]').textContent =
+        tool === 'rectangle' ? 'Border thickness' : 'Brush size';
       $('[data-bc-canvas]').style.touchAction = tool === 'move' ? 'auto' : 'none';
       $('[data-bc-canvas]').style.cursor = tool === 'move' ? 'grab' : 'crosshair';
     }
@@ -874,6 +886,8 @@
           ['brush', '✎ Cover brush'],
           ['blur', '▧ Blur'],
           ['arrow', '↗ Arrow'],
+          ['number', '① Numbers'],
+          ['rectangle', '□ Rectangle outline'],
           ['crop', '⌗ Crop'],
           ['move', '✥ Move'],
         ]
@@ -888,7 +902,8 @@
               '</button>'
           )
           .join('') +
-        '</div><div class="bc-tool-options"><label>Colour<input type="color" data-bc-color value="#183b35"></label><label>Brush size<input type="range" data-bc-size min="2" max="80" value="24" aria-label="Brush size"></label>' +
+        '</div><div class="bc-tool-options"><label>Colour<input type="color" data-bc-color value="#183b35"></label><label data-bc-brush-control><span data-bc-size-label>Brush size</span><input type="range" data-bc-size min="2" max="80" value="24" aria-label="Brush or border thickness"></label>' +
+        '<label data-bc-number-control hidden>Marker size<input type="range" data-bc-marker-size min="16" max="160" value="60" aria-label="Number marker size"></label><span data-bc-next-number hidden></span>' +
         button('undo', 'Undo') +
         button('redo', 'Redo') +
         button('reset', 'Reset edits', 'data-needs-image') +
@@ -1084,6 +1099,13 @@
         event.preventDefault();
         original = false;
         const p = point(event);
+        if (tool === 'number' && nextNumber() > 999) {
+          status(
+            'This screenshot has reached number 999. Undo or reset markers to continue.',
+            true
+          );
+          return;
+        }
         drag = {
           pointerId: event.pointerId,
           kind: tool,
@@ -1092,9 +1114,12 @@
             color: $('[data-bc-color]').value,
             size: Math.min(
               0.2,
-              +$('[data-bc-size]').value / (tool === 'arrow' ? 4 : 1) / step().image.width
+              +$(tool === 'number' ? '[data-bc-marker-size]' : '[data-bc-size]').value /
+                (['arrow', 'rectangle'].includes(tool) ? 4 : 1) /
+                step().image.width
             ),
             points: [p, p],
+            ...(tool === 'number' ? { number: nextNumber() } : {}),
           },
         };
         c.setPointerCapture(event.pointerId);
@@ -1109,7 +1134,8 @@
         }
         if (!drag || drag.pointerId !== event.pointerId) return;
         const p = point(event);
-        if (tool === 'brush') {
+        if (drag.kind === 'number') drag.mark.points = [p, p];
+        else if (drag.kind === 'brush') {
           if (drag.mark.points.length < E.LIMITS.points) drag.mark.points.push(p);
         } else drag.mark.points[1] = p;
         if (!paintFrame)
@@ -1124,7 +1150,9 @@
           return;
         }
         if (!drag || drag.pointerId !== event.pointerId) return;
-        if (drag.kind === 'brush') drag.mark.points[drag.mark.points.length - 1] = point(event);
+        if (drag.kind === 'number') drag.mark.points = [point(event), point(event)];
+        else if (drag.kind === 'brush')
+          drag.mark.points[drag.mark.points.length - 1] = point(event);
         else drag.mark.points[1] = point(event);
         const gesture = drag,
           area = E.bounds(gesture.mark.points),
@@ -1132,9 +1160,11 @@
         drag = null;
         if (
           s &&
-          (gesture.kind === 'brush' || area.w * s.image.width >= 3 || area.h * s.image.height >= 3)
+          (['brush', 'number'].includes(gesture.kind) ||
+            area.w * s.image.width >= 3 ||
+            area.h * s.image.height >= 3)
         ) {
-          if (gesture.kind === 'crop' && (!area.w || !area.h)) {
+          if (['crop', 'rectangle'].includes(gesture.kind) && (!area.w || !area.h)) {
             paint();
             return;
           }
@@ -1291,9 +1321,19 @@
       if (el.hasAttribute('data-bc-tool')) {
         if (!busy) {
           tool = el.dataset.bcTool;
+          drag = null;
+          pan = null;
           original = false;
           paint();
           controls();
+          if (tool === 'number')
+            status(
+              'Click to place numbered markers. Drag before releasing to adjust placement. Numbers restart for each screenshot; Undo/Redo are available.'
+            );
+          if (tool === 'rectangle')
+            status(
+              'Drag a rectangle around the area to highlight. Colour and Border thickness control its outline; the centre stays transparent.'
+            );
         }
       } else
         void handle(el).catch(err => {

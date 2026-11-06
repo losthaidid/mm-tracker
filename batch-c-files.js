@@ -158,7 +158,37 @@
       ctx.strokeStyle = ctx.fillStyle = mark.color;
       ctx.lineWidth = Math.max(2, mark.size * w);
       ctx.lineJoin = ctx.lineCap = 'round';
-      if (mark.type === 'cover') ctx.fillRect(area.x * w, area.y * h, area.w * w, area.h * h);
+      if (mark.type === 'number') {
+        const diameter = Math.min(Math.max(12, mark.size * w), w, h),
+          radius = diameter / 2,
+          x = Math.max(radius, Math.min(w - radius, a[0])),
+          y = Math.max(radius, Math.min(h - radius, a[1])),
+          ink = palette({ accent: mark.color, paper: mark.color }).ink;
+        ctx.lineWidth = Math.min(3, diameter / 16);
+        ctx.strokeStyle = ink;
+        ctx.beginPath();
+        ctx.arc(x, y, Math.max(0.1, radius - ctx.lineWidth / 2), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = ink;
+        ctx.font =
+          '700 ' +
+          diameter * (mark.number < 10 ? 0.57 : mark.number < 100 ? 0.48 : 0.38) +
+          'px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(String(mark.number), x, y);
+      } else if (mark.type === 'rectangle') {
+        ctx.lineWidth = Math.min(ctx.lineWidth, Math.max(1, Math.min(area.w * w, area.h * h) / 2));
+        const inset = ctx.lineWidth / 2;
+        ctx.strokeRect(
+          area.x * w + inset,
+          area.y * h + inset,
+          Math.max(0, area.w * w - ctx.lineWidth),
+          Math.max(0, area.h * h - ctx.lineWidth)
+        );
+      } else if (mark.type === 'cover')
+        ctx.fillRect(area.x * w, area.y * h, area.w * w, area.h * h);
       else if (mark.type === 'blur') {
         // Downsample then smooth back into the selected area. Unlike canvas.filter,
         // this also works when iPhone browsers do not expose native canvas filters.
