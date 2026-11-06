@@ -29,6 +29,11 @@ test('guide validation bounds images, annotations and text, rejects external con
  for(const change of [g=>g.steps[0].image.src='https://example.com/private.png',g=>g.steps[0].image.src='data:image/svg+xml;base64,PHN2Zz4=',g=>g.steps[0].id=g.steps[1].id,g=>g.steps[0].marks[0].points[0][0]=-1,g=>g.steps[0].crop={x:.9,y:0,w:.5,h:1},g=>g.steps[0].caption='x'.repeat(8001),g=>g.steps=Array.from({length:25},(_,i)=>step(String(i))),g=>g.steps[0].marks=Array(201).fill(g.steps[0].marks[0])]){const bad=copy(g);change(bad);assert.throws(()=>E.guide(bad));}
  const tooBig=guide();tooBig.steps[0].image.width=2400;tooBig.steps[0].image.height=2400;tooBig.steps[1].image.width=2400;tooBig.steps[1].image.height=2400;tooBig.steps.push({...step('c'),image:{...image,width:2400,height:2400}});assert.throws(()=>E.guide(tooBig),/large/);
 });
+test('guide export headings retain custom Unicode and intentional blanks while legacy files get the original heading',()=>{
+ const old=guide();assert.equal(E.guide(old).exportHeading,E.DEFAULT_GUIDE_HEADING);assert.equal(Object.hasOwn(old,'exportHeading'),false);
+ for(const exportHeading of ['OPERATIONS / Panduan pengguna — 测试','', 'W'.repeat(180)])assert.equal(E.guide({...old,exportHeading}).exportHeading,exportHeading);
+ for(const exportHeading of [null,42,{},'x'.repeat(181)])assert.throws(()=>E.guide({...old,exportHeading}),/heading/);
+});
 function ui(t){
  const dom=new JSDOM('<button id="launch">Studio</button><div id="host"></div>',{url:'https://losthaidid.github.io/mm-tracker/',runScripts:'outside-only',pretendToBeVisual:true});t.after(()=>dom.window.close());const w=dom.window,d=w.document;let owner='one';const blobs=[],revoked=[],renders=[],exports=[];
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;};w.HTMLCanvasElement.prototype.getContext=()=>({fillRect(){},strokeRect(){}});w.HTMLCanvasElement.prototype.setPointerCapture=function(){};w.HTMLCanvasElement.prototype.toDataURL=()=>image.src;
@@ -51,6 +56,19 @@ test('guide builder keeps captions, reorders/removes/restores steps, and round-t
  await c.click('remove');assert.equal(c.d.querySelectorAll('[data-bc="select"]').length,1);await c.click('undo-remove');assert.equal(c.d.querySelectorAll('[data-bc="select"]').length,2);assert.ok(c.revoked.length);
  c.module.close();c.module.open('guide');await settle();assert.equal(c.d.querySelectorAll('[data-bc="select"]').length,2);
  await c.module.importGuide({size:JSON.stringify(saved).length,text:async()=>JSON.stringify(saved)});await settle();await c.module.prepare('editable');assert.deepEqual(await c.last(),saved);
+});
+test('guide heading edits update PDF/JPG exports, invalidate downloads, survive save/open and reset for another account',async t=>{
+ const c=ui(t);c.module.open('guide');await c.module.add([{name:'sample.png'}]);
+ const heading=c.d.querySelector('[data-bc-export-heading]');assert.equal(heading.value,E.DEFAULT_GUIDE_HEADING);
+ const custom='MY TEAM / <img src=x onerror=alert(1)> — Guide';heading.value=custom;heading.dispatchEvent(new c.w.Event('input',{bubbles:true}));
+ await c.module.prepare('pdf');assert.equal(c.exports.at(-1).g.exportHeading,custom);assert.ok(c.d.querySelector('[data-bc-ready] a'));
+ heading.value='';heading.dispatchEvent(new c.w.Event('input',{bubbles:true}));assert.equal(c.d.querySelector('[data-bc-ready] a'),null);
+ c.d.querySelector('[data-bc-format]').value='jpg-images';await c.click('export');assert.equal(c.exports.at(-1).format,'jpg-images');assert.equal(c.exports.at(-1).g.exportHeading,'');assert.match(c.d.querySelector('[data-bc-ready] a').download,/-pages\.zip$/);assert.equal(c.d.querySelector('[data-bc-ready] a').textContent,'Download JPG pages ZIP');
+ heading.value=custom;heading.dispatchEvent(new c.w.Event('input',{bubbles:true}));await c.module.prepare('editable');const saved=await c.last();assert.equal(saved.exportHeading,custom);
+ c.module.close();c.module.open('guide');assert.equal(c.d.querySelector('[data-bc-export-heading]').value,custom);assert.equal(c.d.querySelector('.bc-guide-fields img'),null);
+ await c.module.importGuide({size:100,text:async()=>JSON.stringify(guide())});assert.equal(c.d.querySelector('[data-bc-export-heading]').value,E.DEFAULT_GUIDE_HEADING);
+ await c.module.importGuide({size:JSON.stringify(saved).length,text:async()=>JSON.stringify(saved)});assert.equal(c.d.querySelector('[data-bc-export-heading]').value,custom);assert.equal(c.d.querySelector('.bc-guide-fields img'),null);
+ c.account('another');c.module.open('guide');assert.equal(c.d.querySelector('[data-bc-export-heading]').value,E.DEFAULT_GUIDE_HEADING);
 });
 test('pointer edits, crop, original comparison and undo/redo never change the original image',async t=>{
  const c=ui(t);c.module.open('privacy');await c.module.add([{name:'private.png'}]);const canvas=c.d.querySelector('canvas');canvas.getBoundingClientRect=()=>({left:0,top:0,width:100,height:100});const pointer=(name,x,y)=>{const e=new c.w.Event(name,{bubbles:true,cancelable:true});Object.assign(e,{pointerId:1,clientX:x,clientY:y,button:0,isPrimary:true});canvas.dispatchEvent(e);};
@@ -75,8 +93,8 @@ test('adding a privacy-edited image to the guide uses a flattened image and leav
 function fileFixture(){
  const calls=[],w={WorkHubBatchCEngine:E,atob:s=>Buffer.from(s,'base64').toString('binary')};
  w.Image=class{set src(value){const size=w.WorkHubBatchCFiles.dimensions(new Uint8Array(Buffer.from(value.split(',')[1],'base64')));this.naturalWidth=size.width;this.naturalHeight=size.height;queueMicrotask(()=>this.onload());}};
- const context={fillRect(...args){calls.push(['fill',this.fillStyle,...args]);},drawImage(...args){calls.push(['draw',...args]);},save(){},restore(){},beginPath(){},rect(){},clip(){},moveTo(){},lineTo(){},stroke(){calls.push(['stroke']);},measureText:t=>({width:String(t).length*14}),fillText(text){calls.push(['text',text]);}};
- const document={baseURI:new URL('../index.html',import.meta.url).href,createElement:()=>({width:1,height:1,getContext:()=>context,toBlob(callback){callback(new Blob([png(this.width,this.height)],{type:'image/png'}));}})};
+ const context={fillRect(...args){calls.push(['fill',this.fillStyle,...args]);},drawImage(...args){calls.push(['draw',...args]);},save(){},restore(){},beginPath(){},rect(){},clip(){},moveTo(){},lineTo(){},stroke(){calls.push(['stroke']);},measureText:t=>({width:String(t).length*14}),fillText(text,x,y){calls.push(['text',text,x,y,this.font]);}};
+ const document={baseURI:new URL('../index.html',import.meta.url).href,createElement:()=>({width:1,height:1,getContext:()=>context,toBlob(callback,type,quality){calls.push(['encode',type,quality]);callback(new Blob([png(this.width,this.height)],{type}));}})};
  new Function('window','document',source('batch-c-files.js'))(w,document);new Function('window','module','exports',source('vendor/jszip.min.js'))(w,undefined,undefined);
  return {F:w.WorkHubBatchCFiles,w,calls,document};
 }
@@ -92,6 +110,22 @@ test('guide PDFs and PNG ZIPs include all numbered steps and long captions pagin
  const {F,calls}=fileFixture(),g=guide();g.steps[0].caption=Array.from({length:180},(_,i)=>'Line '+i+' — useful instruction.').join('\n');const pdf=await F.export(g,'pdf',()=>true),task=pdfjs.getDocument({data:new Uint8Array(await pdf.arrayBuffer()),useSystemFonts:true});try{const parsed=await task.promise;assert.ok(parsed.numPages>3);assert.ok(calls.some(c=>c[0]==='text'&&c[1].includes('Line 179')));}finally{await task.destroy();}
  const zip=await F.export(guide(),'images',()=>true);const bytes=Buffer.from(await zip.arrayBuffer());assert.equal(bytes.subarray(0,2).toString(),'PK');assert.ok(bytes.includes(Buffer.from('001-guide-page.png')));assert.ok(bytes.includes(Buffer.from('002-guide-page.png')));
  const zippedPdf=Buffer.from(await (await F.export(guide(),'pdf-zip',()=>true)).arrayBuffer());assert.ok(zippedPdf.includes(Buffer.from('screenshot-guide.pdf')));await assert.rejects(()=>F.export(g,'pdf',()=>false),/cancelled/);
+});
+test('every continued guide page wraps a long export heading above the title, and blank headings draw no banner',async()=>{
+ const {F,calls}=fileFixture(),g=guide();g.exportHeading='W'.repeat(180);g.steps[0].caption=Array.from({length:70},(_,i)=>'Instruction '+i).join('\n');let pages=0,previous=0;
+ for await(const page of F.pages(E.guide(g),()=>true)){const texts=calls.slice(previous).filter(c=>c[0]==='text'),headings=texts.filter(c=>c[4]==='600 19px system-ui, sans-serif'),title=texts.find(c=>c[4]==='600 27px system-ui, sans-serif');assert.ok(headings.length>1);assert.equal(headings.map(c=>c[1]).join('').replace(/\s/g,''),g.exportHeading);assert.ok(headings.at(-1)[3]+25<=title[3]);assert.ok(headings.every(c=>c[1].length*14<=1100));previous=calls.length;pages++;F.release(page);}
+ assert.ok(pages>2);assert.ok(calls.some(c=>c[0]==='text'&&c[1]==='Instruction 69'));
+ calls.length=0;for await(const page of F.pages(E.guide({...guide(),exportHeading:''}),()=>true))F.release(page);assert.equal(calls.filter(c=>c[0]==='text'&&c[4]==='600 19px system-ui, sans-serif').length,0);
+});
+test('JPG guide pages use JPEG encoding and numbered JPG entries while PNG exports retain their format',async()=>{
+ const {F,calls}=fileFixture();const jpg=Buffer.from(await(await F.export({...guide(),exportHeading:'TEAM / USER GUIDE'},'jpg-images',()=>true)).arrayBuffer());assert.ok(jpg.includes(Buffer.from('001-guide-page.jpg')));assert.ok(jpg.includes(Buffer.from('002-guide-page.jpg')));assert.equal(jpg.includes(Buffer.from('guide-page.png')),false);assert.equal(calls.filter(c=>c[0]==='encode'&&c[1]==='image/jpeg'&&c[2]===.92).length,2);assert.equal(calls.filter(c=>c[0]==='text'&&c[1]==='TEAM / USER GUIDE').length,2);
+ calls.length=0;await F.export(guide(),'images',()=>true);assert.equal(calls.filter(c=>c[0]==='encode'&&c[1]==='image/png').length,2);
+ await assert.rejects(()=>F.export(guide(),'jpg-images',()=>false),/cancelled/);
+});
+test('line breaks in imported export headings cannot consume the screenshot area or force oversized headers',async()=>{
+ const {F,calls}=fileFixture(),g={...guide(),exportHeading:'TEAM\n'.repeat(30)};
+ for await(const page of F.pages(E.guide(g),()=>true))F.release(page);
+ const titles=calls.filter(c=>c[0]==='text'&&c[4]==='600 27px system-ui, sans-serif');assert.equal(titles.length,2);assert.ok(titles.every(c=>c[3]<250));
 });
 test('blur renders through bounded image resampling without depending on canvas filter support',async()=>{
  const {F,calls}=fileFixture(),s=step('blur');s.marks=[{type:'blur',color:'#123456',size:.1,points:[[0,0],[1,1]]}];await F.raster(s);const resamples=calls.filter(c=>c[0]==='draw'&&c.length===10);assert.equal(resamples.length,2);assert.equal(resamples[0].at(-2),1);assert.equal(resamples[0].at(-1),1);
