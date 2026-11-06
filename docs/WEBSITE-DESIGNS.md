@@ -9,7 +9,7 @@ Open **Settings → Website design**, select a card to preview, and choose **Use
 | Modern Hub  | Compact labelled rail, spacious panels and rounded cards                                     | Bottom dock for My day, Tasks, Schedule and Projects; grouped section picker for the other sections |
 | Editorial   | Grouped index sidebar, magazine-style headings and divided panels                            | Top section picker and stacked reading panels                                                       |
 | Canvas      | Floating section launcher, open workspace and dashboard tiles; three columns on wide screens | Floating launcher with a scrollable section menu                                                    |
-| Fiori Workspace | SAP Fiori-inspired shell navigation, object headers, structured sections and clear status cues | Top section picker, stacked forms and responsive cards |
+| Fiori Workspace | Deep-blue shell, grouped side navigation, flat work panels and structured object headers | Top section picker, stacked forms and responsive cards |
 | Compact Pro | Grouped collapsible navigation, compact toolbars and denser tables                           | Top section picker and larger touch controls                                                        |
 
 My day keeps its full-colour scenery, readable scenic foreground and responsive landscape spacing in every design. Design changes style its frame without fading the artwork or replacing its contrast shade and metric layout.
@@ -45,3 +45,9 @@ Synthetic preview screenshots of the earlier designs:
 ![Canvas](images/canvas.jpg)
 
 ![Compact Pro](images/compact-pro.jpg)
+
+## Fiori Workspace refresh
+
+Fiori now has its own desktop navigation arrangement: all fifteen original route buttons appear in a persistent grouped side navigation, rather than the Clear Desk top bar. The deep-blue shell has readable branding/actions, with flatter surfaces, compact controls, sharper corners and clear object-page headers. The chooser miniature and description show the revised layout. Phone widths retain the existing accessible section picker, including keyboard dismissal. Theme colours still apply to content and controls; the deep-blue shell is the Fiori identity. My day scenery retains its own artwork, contrast shade and responsive spacing. Presentation mode retains a full-width workspace.
+
+All 42 focused design/theme/My day/animation/source-layout checks and nine Batch C/design application integrations passed (four source-layout checks are shared with the screenshot suite). Checks include original navigation-node identity, distinct Clear Desk/Fiori arrangements, repeated desktop/phone regrouping, permissions, typed drafts, live project cells, validation uploads, palette settings and all section routes. Browser visual layout review remains blocked by the existing access restriction, so CSS geometry has not been visually verified in a browser. No runtime, animation loop, network call or database change is introduced.

@@ -1,253 +1,367 @@
-/* Fiori-inspired shell. Theme tokens retain personal palettes and dark mode. */
+/* Fiori Workspace: a distinct shell, side navigation and structured object pages. */
 .wd-mini-fiori .wd-mini-head {
-  height: 23px;
-  background: var(--hub-link);
+  height: 22px;
+  background: #12395d;
   border: 0;
+  border-radius: 0;
 }
 .wd-mini-fiori .wd-mini-nav {
-  top: 23px;
-  bottom: auto;
-  height: 19px;
-  width: 100%;
+  top: 22px;
+  bottom: 0;
+  width: 48px;
   background: var(--hub-surface);
-  border-width: 0 0 1px;
+  border-width: 0 1px 0 0;
+  border-radius: 0;
 }
 .wd-mini-fiori .wd-mini-nav:after {
-  margin: 8px 12px;
-  width: 23px;
-  height: 3px;
-  box-shadow: 34px 0 0 var(--hub-border), 68px 0 0 var(--hub-border);
+  margin: 12px 8px;
+  width: 29px;
+  height: 4px;
+  background: var(--hub-link);
+  box-shadow:
+    0 14px 0 var(--hub-border),
+    0 28px 0 var(--hub-border),
+    0 42px 0 var(--hub-border);
+  border-radius: 0;
 }
 .wd-mini-fiori .wd-mini-title {
-  top: 52px;
-  left: 13px;
-  right: 13px;
-  height: 27px;
+  top: 33px;
+  left: 60px;
+  right: 12px;
+  height: 23px;
   background: var(--hub-surface);
+  border-radius: 0;
+  border-width: 0 0 2px;
+  border-color: var(--hub-link);
 }
-.wd-mini-fiori .wd-mini-one,
-.wd-mini-fiori .wd-mini-two {
-  top: 90px;
-  height: 49px;
-  border-radius: 7px;
+.wd-chooser .wd-mini-fiori .wd-mini-one,
+.wd-chooser .wd-mini-fiori .wd-mini-two {
+  top: 68px;
+  height: 40px;
+  border-radius: 3px;
 }
-.wd-mini-fiori .wd-mini-one {
-  left: 13px;
-  width: calc((100% - 38px) / 2);
+.wd-chooser .wd-mini-fiori .wd-mini-one {
+  left: 60px;
+  width: calc((100% - 84px) / 2);
 }
-.wd-mini-fiori .wd-mini-two {
-  left: calc(50% + 5px);
-  right: 13px;
+.wd-chooser .wd-mini-fiori .wd-mini-two {
+  left: calc(50% + 30px);
+  right: 12px;
+}
+.wd-mini-fiori .wd-mini-three {
+  display: none;
 }
 body[data-hub-design='fiori'] {
-  --fi-shell: color-mix(in srgb, var(--hub-surface) 93%, var(--hub-accent));
-  --fi-shadow: 0 2px 8px #10243a0d;
+  --fi-shell: #12395d;
+  --fi-shell-ink: #f4f8ff;
+  --fi-line: var(--hub-border);
+  --fi-nav: color-mix(in srgb, var(--hub-surface) 96%, var(--hub-link));
 }
 body[data-hub-design='fiori'] #hubHeader {
   position: relative;
   top: auto;
-  min-height: 64px;
-  padding: 14px 28px;
+  min-height: 66px;
+  margin: 0;
+  padding: 12px 24px;
   border: 0;
-  border-bottom: 3px solid var(--hub-link);
+  border-bottom: 3px solid #70b7ff;
   border-radius: 0;
-  box-shadow: none;
+  box-shadow: 0 2px 5px #10243a18;
   background: var(--fi-shell);
+  color: var(--fi-shell-ink);
   z-index: 120;
 }
 body[data-hub-design='fiori'] #hubHeader h1 {
   margin: 0;
-  font: 750 24px / 1.2 var(--hub-font);
-  letter-spacing: -0.035em;
+  color: var(--fi-shell-ink);
+  font: 650 22px/1.25 var(--hub-font);
+  letter-spacing: -0.025em;
+}
+body[data-hub-design='fiori'] #hubHeader .brand-title-letters > span {
+  color: var(--fi-shell-ink);
+  text-shadow: none;
 }
 body[data-hub-design='fiori'] #hubHeader p {
-  margin-top: 5px;
+  margin-top: 4px;
+  color: #d8e7f6;
   font-size: 11px;
-  color: var(--hub-muted);
+}
+body[data-hub-design='fiori'] #hubHeader .hub-brand-mark {
+  border-radius: 7px;
+  box-shadow: none;
+  border-color: #ffffff40;
+}
+body[data-hub-design='fiori'] #hubHeader .header-actions > button,
+body[data-hub-design='fiori'] #hubHeader .settings-menu > summary {
+  background: #ffffff12;
+  color: var(--fi-shell-ink);
+  border: 1px solid #ffffff45;
+  border-radius: 4px;
+  box-shadow: none;
+}
+body[data-hub-design='fiori'] #hubHeader .header-actions > button:hover,
+body[data-hub-design='fiori'] #hubHeader .settings-menu > summary:hover {
+  background: #ffffff26;
+}
+body[data-hub-design='fiori'] #hubHeader .header-actions > button.primary {
+  background: #ecf5ff;
+  color: #12395d;
+  border-color: #ecf5ff;
 }
 body[data-hub-design='fiori'] #hubShell {
-  display: block;
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  align-items: start;
+}
+body[data-hub-design='fiori'] #hubShell[data-ready='false'] {
+  grid-template-columns: minmax(0, 1fr);
 }
 body[data-hub-design='fiori'] #hubSidebar {
   display: flex;
-  gap: 18px;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
   position: sticky;
   top: 0;
   z-index: 85;
-  width: 100%;
-  height: auto;
-  min-height: 0;
-  padding: 0 28px;
+  width: auto;
+  min-height: calc(100vh - 82px);
+  max-height: 100vh;
+  max-height: 100dvh;
+  overflow-y: auto;
+  padding: 0 12px 16px;
   border: 0;
-  border-bottom: 1px solid var(--hub-border);
-  background: var(--hub-surface);
+  border-right: 1px solid var(--fi-line);
+  border-radius: 0;
+  background: var(--fi-nav);
 }
 body[data-hub-design='fiori'] #hubSidebar[hidden] {
   display: none;
 }
-body[data-hub-design='fiori'] #hubSidebar .hub-side-intro,
+body[data-hub-design='fiori'] #hubSidebar .hub-side-intro {
+  display: block;
+  padding: 20px 12px 16px;
+  margin: 0 0 8px;
+  border-bottom: 1px solid var(--fi-line);
+}
+body[data-hub-design='fiori'] #hubSidebar .hub-side-intro p {
+  margin: 6px 0 0;
+  font-size: 11px;
+  line-height: 1.6;
+}
 body[data-hub-design='fiori'] #hubSidebar .hub-side-note {
   display: none;
 }
 body[data-hub-design='fiori'] #tabs {
   display: flex;
   flex: 1;
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
   min-width: 0;
-  padding: 8px 0;
+  padding: 0;
   gap: 14px;
   overflow: visible;
 }
-body[data-hub-design='fiori'] #tabs .wd-primary-nav > button {
-  width: auto;
-  padding: 11px 15px;
-  gap: 9px;
-  min-height: 44px;
+body[data-hub-design='fiori'] #tabs .wd-nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+}
+body[data-hub-design='fiori'] #tabs .wd-nav-group > strong {
+  padding: 12px 12px 7px;
+  color: var(--hub-muted);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+body[data-hub-design='fiori'] #tabs button[data-tab] {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  margin: 0;
+  padding: 9px 11px;
+  border: 0;
+  border-left: 3px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--hub-text);
   font-size: 12px;
-  border-radius: 8px;
-  border: 1px solid transparent;
+  text-align: left;
   box-shadow: none;
 }
-body[data-hub-design='fiori'] #tabs button.active {
-  color: var(--hub-link);
+body[data-hub-design='fiori'] #tabs button[data-tab]:hover {
+  background: var(--hub-surface-soft);
+}
+body[data-hub-design='fiori'] #tabs button[data-tab].active {
   background: var(--hub-blue-soft);
-  border-color: var(--hub-link);
-  box-shadow: inset 0 -3px 0 var(--hub-link);
+  color: var(--hub-link);
+  border-left-color: var(--hub-link);
+  font-weight: 700;
+  box-shadow: none;
 }
 body[data-hub-design='fiori'] #tabs .hub-nav-icon {
-  width: 20px;
-  height: 20px;
-  flex-basis: 20px;
+  width: 18px;
+  height: 18px;
+  flex-basis: 18px;
+}
+body[data-hub-design='fiori'] #tabs .hub-nav-label {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 body[data-hub-design='fiori'] #hubSidebar #hubAtmosphereCard {
-  min-width: 90px;
-  max-width: 140px;
-  min-height: 38px;
-  margin: 0;
-  padding: 7px 10px;
-  border-radius: 7px;
+  min-height: 0;
+  max-width: none;
+  width: 100%;
+  margin: 18px 0 0;
+  padding: 10px 12px;
+  border-radius: 4px;
+  border: 1px solid var(--fi-line);
+  background: var(--hub-surface);
   font-size: 10px;
-  background: var(--hub-surface-soft);
 }
 body[data-hub-design='fiori'] #hubAtmosphereCard svg,
 body[data-hub-design='fiori'] #hubAtmosphereCard .hub-atmosphere-window {
   display: none;
 }
-body[data-hub-design='fiori'] .wd-section-menu > summary {
-  min-height: 44px;
-  border-radius: 8px;
-}
-body[data-hub-design='fiori'] .wd-section-popover {
-  border-radius: 12px;
-  box-shadow: 0 8px 32px #10243a26;
-}
 body[data-hub-design='fiori'] #hubShell > main.page {
   min-width: 0;
   width: 100%;
-  max-width: 1920px;
-  margin: auto;
-  padding: 24px 32px 110px;
+  max-width: none;
+  margin: 0;
+  padding: 24px 28px 110px;
 }
 body[data-hub-design='fiori'] #wdWorkspaceBar {
-  padding: 4px 0 20px;
-  margin-bottom: 18px;
-  border-bottom: 1px solid var(--hub-border);
+  padding: 22px 28px 18px;
+  margin: -24px -28px 18px;
+  border: 0;
+  border-bottom: 1px solid var(--fi-line);
+  background: var(--hub-surface);
 }
 body[data-hub-design='fiori'] .wd-context-eyebrow {
   letter-spacing: 0.09em;
 }
 body[data-hub-design='fiori'] #wdSectionTitle {
-  font: 750 clamp(24px, 3vw, 32px) / 1.2 var(--hub-font);
+  font: 650 clamp(24px, 2.5vw, 30px) / 1.25 var(--hub-font);
+  letter-spacing: -0.025em;
 }
 body[data-hub-design='fiori'] #wdWorkspaceBar > button {
-  border-radius: 8px;
+  border-radius: 4px;
 }
 body[data-hub-design='fiori'] #hubToolbar {
   min-width: 0;
   gap: 8px;
-  margin: 0 0 24px;
-  padding: 12px 14px;
-  border: 1px solid var(--hub-border);
-  border-radius: 10px;
+  margin: 0 0 20px;
+  padding: 10px 12px;
+  border: 1px solid var(--fi-line);
+  border-radius: 4px;
   background: var(--hub-surface);
-  box-shadow: var(--fi-shadow);
+  box-shadow: none;
 }
-body[data-hub-design='fiori'] #view :is(
-  .hub-card, .panel, .df-panel, .item-card, .ticket-folio, .project-banner,
-  .pi-main, .project-items-workspace, .val-panel, .val-mode-card, .val-profile-card,
-  .val-setup-card, .ho-ready, .wl-panel, .wl-card, .nt-card, .md-widget,
-  .task-main-card, .ticket-card, .nt-editor, .nt-sidebar
-) {
-  border-radius: 12px;
-  border-color: var(--hub-border);
-  box-shadow: var(--fi-shadow);
+body[data-hub-design='fiori']
+  #view
+  :is(
+    .hub-card,
+    .panel,
+    .df-panel,
+    .item-card,
+    .ticket-folio,
+    .project-banner,
+    .pi-main,
+    .project-items-workspace,
+    .val-panel,
+    .val-mode-card,
+    .val-profile-card,
+    .val-setup-card,
+    .ho-ready,
+    .wl-panel,
+    .wl-card,
+    .nt-card,
+    .md-widget,
+    .task-main-card,
+    .ticket-card,
+    .nt-editor,
+    .nt-sidebar
+  ) {
+  border-radius: 5px;
+  border-color: var(--fi-line);
+  box-shadow: none;
 }
-body[data-hub-design='fiori'] #view :is(
-  .hub-head:not(.mv-hero), .workspace-heading, .df-hero, .wl-hero, .val-head
-) {
+body[data-hub-design='fiori']
+  #view
+  :is(.hub-head:not(.mv-hero), .workspace-heading, .df-hero, .wl-hero, .val-head) {
   min-height: 0;
-  padding: 24px 28px;
-  border: 1px solid var(--hub-border);
-  border-radius: 12px;
+  padding: 22px 26px;
+  border: 1px solid var(--fi-line);
+  border-left: 4px solid var(--hub-link);
+  border-radius: 4px;
   background: var(--hub-surface);
-  box-shadow: var(--fi-shadow);
+  box-shadow: none;
 }
-body[data-hub-design='fiori'] #view :is(
-  .hub-head:not(.mv-hero), .workspace-heading, .df-hero, .wl-hero, .val-head
-) h2 {
-  font: 750 clamp(26px, 3vw, 36px) / 1.2 var(--hub-font);
-  letter-spacing: -0.035em;
+body[data-hub-design='fiori']
+  #view
+  :is(.hub-head:not(.mv-hero), .workspace-heading, .df-hero, .wl-hero, .val-head)
+  h2 {
+  font: 650 clamp(24px, 2.5vw, 32px) / 1.25 var(--hub-font);
+  letter-spacing: -0.025em;
   color: var(--hub-text);
 }
 body[data-hub-design='fiori'] #view .df-hero-symbol {
-  width: 94px;
-  height: 94px;
-  font-size: 44px;
-  border-radius: 18px;
+  width: 68px;
+  height: 68px;
+  font-size: 32px;
+  border-radius: 6px;
   background: var(--hub-blue-soft);
   color: var(--hub-link);
   transform: none;
   box-shadow: none;
 }
 body[data-hub-design='fiori'] #view :is(.df-stats, .val-metrics) {
-  gap: 16px;
+  gap: 12px;
 }
 body[data-hub-design='fiori'] #view .df-stats > div {
-  padding: 22px;
-  border: 1px solid var(--hub-border);
-  border-radius: 12px;
+  padding: 18px;
+  border: 1px solid var(--fi-line);
+  border-top: 3px solid var(--hub-link);
+  border-radius: 4px;
   background: var(--hub-surface);
-  box-shadow: var(--fi-shadow);
+  box-shadow: none;
 }
 body[data-hub-design='fiori'] #view .hub-layout {
-  gap: 20px;
+  gap: 18px;
 }
 body[data-hub-design='fiori'] :is(#view, #modal, #hubToolbar) button,
 body[data-hub-design='fiori'] #modal .modal-actions button {
-  border-radius: 8px;
+  border-radius: 4px;
 }
 body[data-hub-design='fiori'] :is(#view, #modal) :is(input, select, textarea) {
-  border-radius: 6px;
+  border-radius: 3px;
 }
-body[data-hub-design='fiori'] :is(#view, #modal) :is(
-  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']),
-  select
-) {
+body[data-hub-design='fiori']
+  :is(#view, #modal)
+  :is(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']),
+    select
+  ) {
   min-height: 38px;
 }
-body[data-hub-design='fiori'] :is(#view, #modal) :is(
-  button, input, select, textarea, summary, a
-):focus-visible {
+body[data-hub-design='fiori']
+  :is(#view, #modal, #tabs, #hubHeader)
+  :is(button, input, select, textarea, summary, a):focus-visible {
   outline: 2px solid var(--hub-link);
   outline-offset: 3px;
 }
 body[data-hub-design='fiori'] #view :is(th, td) {
-  padding-top: 12px;
-  padding-bottom: 12px;
-  border-color: var(--hub-border);
+  padding-top: 11px;
+  padding-bottom: 11px;
+  border-color: var(--fi-line);
 }
 body[data-hub-design='fiori'] #view th {
   background: var(--hub-surface-soft);
@@ -255,36 +369,66 @@ body[data-hub-design='fiori'] #view th {
   font-weight: 700;
 }
 body[data-hub-design='fiori'] #modal {
-  border: 1px solid var(--hub-border);
-  border-radius: 14px;
+  border: 1px solid var(--fi-line);
+  border-radius: 7px;
   background: var(--hub-surface);
   box-shadow: 0 20px 64px #10243a30;
 }
 body[data-hub-design='fiori'].hub-present #wdWorkspaceBar {
   display: none;
 }
+body[data-hub-design='fiori'].hub-present #hubShell {
+  display: block;
+}
+body[data-hub-design='fiori'] #hubHeader .header-actions > button:focus-visible,
+body[data-hub-design='fiori'] #hubHeader .settings-menu > summary:focus-visible,
+body[data-hub-design='fiori'] #hubHeader [data-brand-home]:focus-visible {
+  outline-color: #ffffff;
+}
+/* Scenery retains its own artwork, foreground colours and shade. */
+body[data-hub-design='fiori'] #view .my-day-page .md-day-intro.mv-hero {
+  border-radius: 8px;
+}
 @media (min-width: 901px) and (max-width: 1150px) {
-  body[data-hub-design='fiori'] #hubSidebar {
-    padding-inline: 18px;
-    gap: 10px;
+  body[data-hub-design='fiori'] #hubShell {
+    grid-template-columns: 196px minmax(0, 1fr);
   }
-  body[data-hub-design='fiori'] #tabs .wd-primary-nav > button {
-    padding-inline: 9px;
-    gap: 5px;
+  body[data-hub-design='fiori'] #hubShell > main.page {
+    padding-inline: 20px;
   }
-  body[data-hub-design='fiori'] #hubSidebar #hubAtmosphereCard {
-    max-width: 100px;
+  body[data-hub-design='fiori'] #wdWorkspaceBar {
+    margin-inline: -20px;
+    padding-inline: 20px;
   }
 }
 @media (max-width: 900px) {
   body[data-hub-design='fiori'] #hubHeader {
-    padding: 16px 18px;
+    padding: 14px 16px;
+  }
+  body[data-hub-design='fiori'] #hubHeader h1 {
+    font-size: 20px;
+  }
+  body[data-hub-design='fiori'] #hubShell {
+    display: block;
   }
   body[data-hub-design='fiori'] #hubSidebar {
-    padding: 0 18px;
+    flex-direction: row;
+    width: 100%;
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
+    padding: 0 16px;
+    border: 0;
+    border-bottom: 1px solid var(--fi-line);
+    background: var(--hub-surface);
+  }
+  body[data-hub-design='fiori'] #hubSidebar :is(.hub-side-intro, #hubAtmosphereCard) {
+    display: none;
   }
   body[data-hub-design='fiori'] #tabs {
-    padding: 9px 0;
+    flex-direction: row;
+    align-items: center;
+    padding: 8px 0;
     width: 100%;
   }
   body[data-hub-design='fiori'] #tabs .wd-primary-nav:empty {
@@ -292,22 +436,38 @@ body[data-hub-design='fiori'].hub-present #wdWorkspaceBar {
   }
   body[data-hub-design='fiori'] .wd-section-menu {
     flex: 1;
+    width: 100%;
   }
   body[data-hub-design='fiori'] .wd-section-menu > summary {
     width: 100%;
+    min-height: 44px;
     justify-content: space-between;
+    border-radius: 4px;
+  }
+  body[data-hub-design='fiori'] .wd-section-popover {
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-width: none;
+    max-height: 70vh;
+    overflow-y: auto;
+    border-radius: 5px;
   }
   body[data-hub-design='fiori'] #hubShell > main.page {
-    padding: 20px 18px 110px;
+    padding: 20px 16px 110px;
   }
-  body[data-hub-design='fiori'] #view :is(
-    .hub-head:not(.mv-hero), .workspace-heading, .df-hero, .wl-hero, .val-head
-  ) {
-    padding: 22px;
+  body[data-hub-design='fiori'] #wdWorkspaceBar {
+    margin: -20px -16px 16px;
+    padding: 18px 16px;
   }
-    }
-
-/* My day owns its scenic contrast and responsive spacing in every design. */
-body[data-hub-design='fiori'] #view .my-day-page .md-day-intro.mv-hero {
-  border-radius: 12px;
+  body[data-hub-design='fiori']
+    #view
+    :is(.hub-head:not(.mv-hero), .workspace-heading, .df-hero, .wl-hero, .val-head) {
+    padding: 18px;
+  }
+}
+@media (pointer: coarse) {
+  body[data-hub-design='fiori'] #tabs button[data-tab] {
+    min-height: 44px;
+  }
 }

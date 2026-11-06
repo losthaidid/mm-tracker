@@ -25,6 +25,107 @@
     charcoal: { label: 'Charcoal', accent: '#3c4652', paper: '#ffffff' },
   };
   const LIMITS = { steps: 24, pixels: 12000000, imageChars: 18000000, marks: 200, points: 1200 };
+  const MARK_TYPES = [
+    'cover',
+    'blur',
+    'brush',
+    'arrow',
+    'number',
+    'rectangle',
+    'ellipse',
+    'text',
+    'callout',
+    'spotlight',
+    'inset',
+  ];
+  function numbering(value = {}) {
+    const mode = value?.mode ?? 'screenshot',
+      start = value?.start ?? 1;
+    if (
+      !value ||
+      !['screenshot', 'guide'].includes(mode) ||
+      !Number.isInteger(start) ||
+      start < 1 ||
+      start > 999
+    )
+      throw Error('Choose a numbering scope and starting number from 1 to 999.');
+    return { mode, start };
+  }
+  function styles(value = []) {
+    if (!Array.isArray(value) || value.length > 12) throw Error('Save up to 12 annotation styles.');
+    const names = new Set();
+    return value.map(s => {
+      if (
+        !s ||
+        !str(s.name, 40) ||
+        !s.name.trim() ||
+        names.has(s.name) ||
+        !/^#[0-9a-f]{6}$/i.test(s.color) ||
+        !Number.isFinite(s.stroke) ||
+        s.stroke < 2 ||
+        s.stroke > 80 ||
+        !Number.isFinite(s.marker) ||
+        s.marker < 16 ||
+        s.marker > 160 ||
+        !Number.isFinite(s.text) ||
+        s.text < 10 ||
+        s.text > 120 ||
+        !Number.isFinite(s.opacity) ||
+        s.opacity < 0.1 ||
+        s.opacity > 0.85
+      )
+        throw Error('Check the saved annotation style.');
+      names.add(s.name);
+      return {
+        name: s.name,
+        color: s.color.toLowerCase(),
+        stroke: s.stroke,
+        marker: s.marker,
+        text: s.text,
+        opacity: s.opacity,
+      };
+    });
+  }
+  function nextNumber(g, id) {
+    const n = numbering(g.numbering),
+      steps = n.mode === 'guide' ? g.steps : g.steps.filter(s => s.id === id);
+    return Math.max(
+      n.start,
+      1 +
+        steps.reduce(
+          (a, s) => s.marks.reduce((v, m) => (m.type === 'number' ? Math.max(v, m.number) : v), a),
+          0
+        )
+    );
+  }
+  function renumber(g, id) {
+    const n = numbering(g.numbering);
+    let value = n.start;
+    const steps = g.steps.map(s => {
+      if (n.mode !== 'guide' && s.id !== id) return s;
+      const numbers = s.marks
+          .map((m, i) => ({ m, i }))
+          .filter(x => x.m.type === 'number')
+          .sort((a, b) => a.m.number - b.m.number || a.i - b.i),
+        mapped = new Map();
+      for (const { m, i } of numbers) {
+        if (value > 999)
+          throw Error('This sequence exceeds 999. Restart numbering for each screenshot.');
+        mapped.set(i, { ...m, number: value++ });
+      }
+      return { ...s, marks: s.marks.map((m, i) => mapped.get(i) || m) };
+    });
+    return guide({ ...g, steps });
+  }
+  function caption(step, linked = false) {
+    const list = linked
+      ? step.marks
+          .filter(m => m.type === 'number' && m.instruction?.trim())
+          .sort((a, b) => a.number - b.number)
+          .map(m => m.number + '. ' + m.instruction.trim())
+      : [];
+    return step.caption + (list.length ? '\n\nNumbered instructions\n' + list.join('\n') : '');
+  }
   const stop = new Set(
     'a an the and or but for to of in on at by is are was were be been being with without from this that these those it its as i we you they our your their please issue error problem when after before cannot unable not have has had can could should would will do does did no yes need check ticket test system user request failed failure'.split(
       ' '
@@ -200,6 +301,8 @@
       throw Error('Choose a valid WorkHub guide file with up to 24 steps.');
     if (value.exportHeading !== undefined && !str(value.exportHeading, 180))
       throw Error('Use an export heading up to 180 characters.');
+    if (value.linkedInstructions !== undefined && typeof value.linkedInstructions !== 'boolean')
+      throw Error('Choose whether to include linked numbered instructions.');
     const layout = value.layout === undefined ? 'classic' : value.layout;
     if (
       typeof layout !== 'string' ||
@@ -239,7 +342,7 @@
       const marks = s.marks.map(m => {
         if (
           !m ||
-          !['cover', 'blur', 'brush', 'arrow', 'number', 'rectangle'].includes(m.type) ||
+          !MARK_TYPES.includes(m.type) ||
           !/^#[0-9a-f]{6}$/i.test(m.color) ||
           !unit(m.size) ||
           m.size <= 0 ||
@@ -259,14 +362,45 @@
             m.points[0].some((v, i) => v !== m.points[1][i]))
         )
           throw Error('Check the numbered screenshot markers (1–999).');
+        if (
+          (m.locked !== undefined && typeof m.locked !== 'boolean') ||
+          (m.instruction !== undefined && !str(m.instruction, 300)) ||
+          (['text', 'callout'].includes(m.type) && (!str(m.text, 500) || !m.text.trim())) ||
+          (m.type === 'inset' && !rect(m.source)) ||
+          (m.type === 'spotlight' &&
+            (!Number.isFinite(m.opacity) || m.opacity < 0.1 || m.opacity > 0.85))
+        )
+          throw Error('Check the object text, zoom source, lock and spotlight opacity.');
+        if (
+          ['rectangle', 'ellipse', 'text', 'callout', 'spotlight', 'inset'].includes(m.type) &&
+          !rect(bounds(m.points))
+        )
+          throw Error('Draw an object with a visible width and height.');
         return {
           type: m.type,
           color: m.color,
           size: m.size,
           points: m.points.map(p => [...p]),
           ...(m.type === 'number' ? { number: m.number } : {}),
+          ...(m.type === 'number' && m.instruction !== undefined
+            ? { instruction: m.instruction }
+            : {}),
+          ...(['text', 'callout'].includes(m.type) ? { text: m.text } : {}),
+          ...(m.type === 'inset'
+            ? { source: { x: m.source.x, y: m.source.y, w: m.source.w, h: m.source.h } }
+            : {}),
+          ...(m.type === 'spotlight' ? { opacity: m.opacity } : {}),
+          ...(m.locked !== undefined ? { locked: m.locked } : {}),
         };
       });
+      if (
+        s.caption.length +
+          marks.reduce((n, m) => n + (m.instruction?.length || 0) + (m.text?.length || 0), 0) >
+        12000
+      )
+        throw Error(
+          'Shorten the text on this screenshot (up to 12,000 characters including captions and objects).'
+        );
       return {
         id: s.id,
         title: s.title,
@@ -287,6 +421,9 @@
         value.exportHeading === undefined ? DEFAULT_GUIDE_HEADING : value.exportHeading,
       footer: branding,
       colours: appearance,
+      numbering: numbering(value.numbering),
+      styles: styles(value.styles),
+      linkedInstructions: value.linkedInstructions === undefined ? false : value.linkedInstructions,
       steps,
     };
   }
@@ -299,6 +436,57 @@
       h: Math.abs(b[1] - a[1]),
     };
   };
+  function markBounds(m, image) {
+    const w = image.width,
+      h = image.height;
+    if (m.type === 'number') {
+      const d = Math.min(Math.max(12, m.size * w), w, h),
+        r = d / 2,
+        x = Math.max(r, Math.min(w - r, m.points[0][0] * w)),
+        y = Math.max(r, Math.min(h - r, m.points[0][1] * h));
+      return { x: (x - r) / w, y: (y - r) / h, w: d / w, h: d / h };
+    }
+    const xs = m.points.map(p => p[0]),
+      ys = m.points.map(p => p[1]),
+      x = Math.min(...xs),
+      y = Math.min(...ys);
+    const width = Math.max(1 / w, Math.max(...xs) - x),
+      height = Math.max(1 / h, Math.max(...ys) - y);
+    return { x: Math.min(x, 1 - width), y: Math.min(y, 1 - height), w: width, h: height };
+  }
+  function transformMark(m, image, target) {
+    if (!rect(target)) throw Error('Keep the object inside the screenshot.');
+    const old = markBounds(m, image);
+    if (m.type === 'number') {
+      const d = Math.min(target.w * image.width, target.h * image.height),
+        p = [target.x + target.w / 2, target.y + target.h / 2];
+      return { ...m, size: Math.max(0.00001, Math.min(0.2, d / image.width)), points: [p, [...p]] };
+    }
+    return {
+      ...m,
+      points: m.points.map(p => [
+        Math.max(0, Math.min(1, target.x + ((p[0] - old.x) * target.w) / old.w)),
+        Math.max(0, Math.min(1, target.y + ((p[1] - old.y) * target.h) / old.h)),
+      ]),
+    };
+  }
+  function moveMark(m, image, dx, dy) {
+    const b = markBounds(m, image);
+    return transformMark(m, image, {
+      ...b,
+      x: Math.max(0, Math.min(1 - b.w, b.x + dx)),
+      y: Math.max(0, Math.min(1 - b.h, b.y + dy)),
+    });
+  }
+  function hitMark(m, image, p, tolerance = 0.01) {
+    const b = markBounds(m, image);
+    return (
+      p[0] >= b.x - tolerance &&
+      p[0] <= b.x + b.w + tolerance &&
+      p[1] >= b.y - tolerance &&
+      p[1] <= b.y + b.h + tolerance
+    );
+  }
   const filename = s =>
     String(s || 'screenshot-guide')
       .normalize('NFKC')
@@ -310,6 +498,16 @@
     DEFAULT_GUIDE_HEADING,
     GUIDE_LAYOUTS,
     GUIDE_PALETTES,
+    MARK_TYPES,
+    numbering,
+    styles,
+    nextNumber,
+    renumber,
+    caption,
+    markBounds,
+    transformMark,
+    moveMark,
+    hitMark,
     footer,
     logoLayout,
     colours,
