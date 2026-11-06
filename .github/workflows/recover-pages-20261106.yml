@@ -1,0 +1,50 @@
+name: Recover stalled Pages deployment
+on:
+  push:
+    branches: [codex/pages-recovery-20261106]
+    paths: [.github/workflows/recover-pages-20261106.yml]
+permissions:
+  contents: read
+  pages: write
+concurrency:
+  group: pages-recovery-20261106
+  cancel-in-progress: false
+jobs:
+  cancel-stalled-deployment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Cancel only the stalled deployment and check its status
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const params = {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pages_deployment_id: '3e6c17dcb566d376616df8ad7bb045523c18ae1f'
+            };
+            const read = async () => {
+              const result = await github.request('GET /repos/{owner}/{repo}/pages/deployments/{pages_deployment_id}', params);
+              core.info('Deployment status: ' + result.data.status);
+              return String(result.data.status);
+            };
+            let before;
+            try { before = await read(); }
+            catch (error) {
+              if (error.status === 404) { core.notice('The stalled deployment no longer exists.'); return; }
+              throw error;
+            }
+            if (before === 'succeed') { core.notice('The deployment has already finished successfully.'); return; }
+            const result = await github.request('POST /repos/{owner}/{repo}/pages/deployments/{pages_deployment_id}/cancel', params);
+            core.info('Cancellation response: ' + result.status);
+            for (let i = 0; i < 24; i++) {
+              await new Promise(resolve => setTimeout(resolve, 5000));
+              const state = await read();
+              if (state === 'succeed' || /cancel|fail|error/.test(state)) {
+                core.notice('The stalled deployment is in a terminal state: ' + state);
+                const site = await github.request('GET /repos/{owner}/{repo}/pages', context.repo);
+                core.info('Pages site status: ' + site.data.status);
+                return;
+              }
+            }
+            core.setFailed('Pages has acknowledged cancellation but has not cleared the deployment state.');
