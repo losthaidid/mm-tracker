@@ -1237,7 +1237,7 @@
             '"></label><p id="bcExportHeadingHelp" class="bc-guide-heading-help">Shown at the top of every PDF, JPG and PNG page. Leave blank to hide. Saved with your editable guide.</p></div></div>' +
             '<div class="bc-guide-layout"><label class="bc-guide-name">Export layout<select data-bc-layout aria-describedby="bcLayoutHelp">' +
             (project().layout === 'classic'
-              ? '<option value="classic">Original layout (saved guide)</option>'
+              ? '<option value="classic">Original layout (minimal)</option>'
               : '') +
             Object.entries(E.GUIDE_LAYOUTS)
               .map(

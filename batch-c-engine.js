@@ -5,17 +5,18 @@
   const GUIDE_LAYOUTS = {
     walkthrough: {
       label: 'Guided walkthrough',
-      description: 'Numbered steps with full-width screenshots. Short steps share a page.',
+      description:
+        'Branded headers, numbered step cards and framed screenshots. Short steps share a page.',
     },
     split: {
       label: 'Split view',
       description:
-        'Screenshots on the left, instructions on the right. Best for detailed explanations.',
+        'Framed screenshots beside clear instruction panels. Best for detailed explanations.',
     },
     compact: {
       label: 'Quick reference card',
       description:
-        'Two-column step cards with unused space trimmed. Best for sharing as JPG or PNG.',
+        'Branded two-column step cards, trimmed to their content. Best for sharing as JPG or PNG.',
     },
   };
   const GUIDE_PALETTES = {
