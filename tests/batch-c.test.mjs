@@ -37,12 +37,12 @@ test('guide export headings retain custom Unicode and intentional blanks while l
 test('guide branding defaults preserve legacy exports and reject malformed logo, footer and colour values',()=>{
  const old=E.guide(guide());assert.deepEqual(copy(old.footer),{text:'',align:'center',size:180,opacity:1,logo:null});assert.deepEqual(copy(old.colours),{accent:'#285b4d',paper:'#f8f7f1'});
  const logo=copy(image),footer={text:'My team',align:'right',size:260,opacity:.2,logo};const g=E.guide({...guide(),footer,colours:{accent:'#336699',paper:'#fffaff'}});assert.deepEqual(copy(g.footer),footer);assert.equal(g.colours.accent,'#336699');
- for(const change of [f=>f.text='x'.repeat(121),f=>f.align='top',f=>f.opacity=0,f=>f.opacity=1.1,f=>f.size=999,f=>f.logo.src='https://example.com/logo.png',f=>f.logo.src='data:image/svg+xml;base64,PHN2Zz4=',f=>f.logo.width=601,f=>f.logo=false]){const f=copy(footer);change(f);assert.throws(()=>E.guide({...guide(),footer:f}));}
+ for(const change of [f=>f.text='x'.repeat(121),f=>f.align='top',f=>f.opacity=0,f=>f.opacity=1.1,f=>f.size=999,f=>f.logo.src='https://example.com/logo.png',f=>f.logo.src='data:image/svg+xml;base64,PHN2Zz4=',f=>f.logo.width=1601,f=>f.logo=false]){const f=copy(footer);change(f);assert.throws(()=>E.guide({...guide(),footer:f}));}
  for(const colours of [null,{}, {accent:'red',paper:'#ffffff'}, {accent:'#123456',paper:'url(example.com)'}])assert.throws(()=>E.guide({...guide(),colours}),/colour/);
 });
 function ui(t){
  const dom=new JSDOM('<button id="launch">Studio</button><div id="host"></div>',{url:'https://losthaidid.github.io/mm-tracker/',runScripts:'outside-only',pretendToBeVisual:true});t.after(()=>dom.window.close());const w=dom.window,d=w.document;let owner='one';const blobs=[],revoked=[],renders=[],exports=[];
- w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;};w.HTMLCanvasElement.prototype.getContext=()=>({fillRect(){},strokeRect(){}});w.HTMLCanvasElement.prototype.setPointerCapture=function(){};w.HTMLCanvasElement.prototype.toDataURL=()=>image.src;
+ w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;};w.HTMLCanvasElement.prototype.getContext=()=>({fillRect(){},strokeRect(){},drawImage(){}});w.HTMLCanvasElement.prototype.setPointerCapture=function(){};w.HTMLCanvasElement.prototype.toDataURL=()=>image.src;
  w.URL.createObjectURL=blob=>{blobs.push(blob);return 'blob:local-'+blobs.length;};w.URL.revokeObjectURL=url=>revoked.push(url);w.Blob=Blob;
  w.eval(source('batch-c-engine.js'));
  w.WorkHubBatchCFiles={imageFromFile:async()=>copy(image),logoFromFile:async()=>copy(image),loadImage:async()=>({}),draw:(c,s,img,original)=>renders.push({s:copy(s),original}),release(){},raster:async()=>({width:8,height:6,toDataURL:()=>image.src}),export:async(g,format,alive)=>{exports.push({g:copy(g),format,alive});return new Blob(['clean export']);}};
@@ -168,6 +168,34 @@ test('footer size controls resize tall/square logos instead of only changing the
  const {F,calls}=fileFixture(),heights=[];
  for(const size of [100,180,260]){calls.length=0;for await(const page of F.pages(E.guide({...guide(),footer:{logo:copy(image),size}}),()=>true))F.release(page);heights.push(calls.find(c=>c[0]==='alpha-draw'&&c[4]===1560)[6]);}
  assert.deepEqual(heights,[32,48,64]);
+});
+test('fine logo placement preserves legacy positions, supports full-width banners and stays in the reserved footer',()=>{
+ const legacy=E.logoLayout({logo:copy(image)});assert.equal(legacy.y,1560);assert.equal(legacy.height,48);
+ const wide={...copy(image),width:1600,height:100};
+ for(const widthPct of [.1,20,100])for(const xPct of [0,50,100])for(const yPct of [0,50,100]){const layout=E.logoLayout({logo:wide,widthPct,xPct,yPct});assert.ok(layout.x>=70-1e-9);assert.ok(layout.x+layout.width<=1170+1e-9);assert.ok(layout.y>=1390-1e-9);assert.ok(layout.y+layout.height<=1630+1e-9);assert.ok(Math.abs(layout.width/layout.height-16)<1e-8);}
+ const full=E.logoLayout({logo:wide,widthPct:100});assert.equal(full.width,1100);assert.equal(full.x,70);
+ for(const [key,value]of [['widthPct',0],['widthPct',101],['xPct',-1],['yPct',101],['xPct',null]])assert.throws(()=>E.footer({[key]:value}),/position/);
+});
+test('fine logo adjustments persist through save/open and reset without changing other branding',async t=>{
+ const c=ui(t);c.module.open('guide');await c.module.add([{name:'sample.png'}]);await c.module.addLogo({});
+ const edit=(key,value)=>{const el=c.d.querySelector('[data-bc-logo-'+key+']');el.value=value;el.dispatchEvent(new c.w.Event('input',{bubbles:true}));};
+ edit('width','18.5');edit('x','72.5');edit('y','15.1');await c.module.prepare('editable');const saved=await c.last();assert.equal(saved.footer.widthPct,18.5);assert.equal(saved.footer.xPct,72.5);assert.equal(saved.footer.yPct,15.1);
+ await c.module.importGuide({size:100,text:async()=>JSON.stringify(saved)});assert.equal(c.d.querySelector('[data-bc-footer-size]').value,'custom');assert.equal(+c.d.querySelector('[data-bc-logo-x]').value,72.5);
+ await c.click('reset-logo-layout');await c.module.prepare('editable');const reset=await c.last();assert.equal(reset.footer.widthPct,undefined);assert.equal(reset.footer.xPct,undefined);assert.equal(reset.footer.yPct,undefined);assert.equal(reset.footer.logo.src,image.src);
+});
+test('live page preview is read-only, supports both views and releases stale work after an account change',async t=>{
+ const c=ui(t);c.module.open('guide');await c.module.add([{name:'sample.png'}]);await c.module.prepare('editable');const before=await c.last();const frames=[],released=[];
+ c.w.WorkHubBatchCFiles.preview=async(g,alive)=>{frames.push(copy(g));assert.ok(alive());return {width:1240,height:1754};};c.w.WorkHubBatchCFiles.release=page=>released.push(page);
+ c.d.querySelector('.bc-branding').open=true;await c.module.preview();assert.equal(c.d.querySelector('[data-bc-page-sheet]').hidden,false);assert.equal(c.d.querySelector('[data-bc-page-preview]').height,207);await c.click('preview-page');assert.equal(c.d.querySelector('[data-bc-page-preview]').height,877);assert.equal(c.exports.length,0);await c.module.prepare('editable');assert.deepEqual(await c.last(),before);
+ let finish;c.w.WorkHubBatchCFiles.preview=()=>new Promise(resolve=>finish=resolve);const pending=c.module.preview();await settle();c.account('other');finish({width:1240,height:1754});await pending;c.module.open('guide');assert.equal(c.d.querySelector('[data-bc-page-sheet]').hidden,true);assert.ok(released.length>=2);
+});
+test('preview renders only the first export page and raised logos reserve caption space on every continuation',async()=>{
+ const {F,calls}=fileFixture(),g=guide();g.footer={logo:copy(image),widthPct:80,xPct:100,yPct:0};g.steps[0].caption=Array.from({length:80},(_,i)=>'Caption '+i).join('\n');
+ const preview=await F.preview(g,()=>true);assert.equal(preview.width,1240);assert.equal(preview.height,1754);assert.equal(calls.some(c=>c[0]==='text'&&c[1].startsWith('02')),false);
+ const firstLogo=calls.find(c=>c[0]==='alpha-draw'&&c[4]>=1390);F.release(preview);calls.length=0;
+ for await(const page of F.pages(E.guide(g),()=>true))F.release(page);
+ const logos=calls.filter(c=>c[0]==='alpha-draw'&&c[4]>=1390);assert.ok(logos.length>2);assert.deepEqual(logos[0].slice(3),firstLogo.slice(3));assert.ok(calls.filter(c=>c[0]==='text'&&/^Caption/.test(c[1])).every(c=>c[3]<=1350));assert.ok(calls.some(c=>c[0]==='text'&&c[1]==='Caption 79'));
+ await assert.rejects(()=>F.preview(g,()=>false),/cancelled/);
 });
 test('blur renders through bounded image resampling without depending on canvas filter support',async()=>{
  const {F,calls}=fileFixture(),s=step('blur');s.marks=[{type:'blur',color:'#123456',size:.1,points:[[0,0],[1,1]]}];await F.raster(s);const resamples=calls.filter(c=>c[0]==='draw'&&c.length===10);assert.equal(resamples.length,2);assert.equal(resamples[0].at(-2),1);assert.equal(resamples[0].at(-1),1);
