@@ -12,6 +12,8 @@ Open **Settings → Website design**, select a card to preview, and choose **Use
 | Fiori Workspace | SAP Fiori-inspired shell navigation, object headers, structured sections and clear status cues | Top section picker, stacked forms and responsive cards |
 | Compact Pro | Grouped collapsible navigation, compact toolbars and denser tables                           | Top section picker and larger touch controls                                                        |
 
+My day keeps its full-colour scenery, readable scenic foreground and responsive landscape spacing in every design. Design changes style its frame without fading the artwork or replacing its contrast shade and metric layout.
+
 Colour palettes, custom colours, motion preferences and companion settings remain separate from the design choice. All 15 existing sections use their original navigation controls and feature modules. Navigation groups respect existing access restrictions.
 
 ## Preference and save behaviour
@@ -23,6 +25,8 @@ Preview changes presentation only and never writes records. Saving a design upda
 `website-designs.js` owns the chooser, account context, navigation grouping and context bar. It moves the real navigation buttons rather than cloning routes. Grouping runs only when the layout, breakpoint or navigation nodes change. `website-designs.css`, `website-designs-extra.css` and `website-fiori.css` scope alternate layouts to the body design attribute and use existing theme tokens. There are no additional animation loops, polling timers or network requests.
 
 ## Verification
+
+The My day scenery fix was checked in a browser using the real styles and synthetic counts across all seven designs at 390, 900 and 1200 pixels, in lavender/day and dark/night settings (42 combinations). The landscape and contrast shade remain fully visible, scenic headings keep their light foreground, metric buttons stay inside the header without overlapping its content, and the page has no horizontal overflow. All 40 focused design, theme, My day, animation-performance and source-layout checks passed.
 
 The design tests cover preview/cancel, save/reload/backup, account and permission changes, save conflicts, navigation identity, all 15 sections in all seven designs, live project editing, retained validation uploads including `001` and `6.00007`, and colour preview compatibility. A local database test verifies the existing personal settings permission path and legacy records. Compact Pro’s menu collapse is a local view state; it does not write records, and resets when the account changes. Earlier browser review of the first six designs covers desktop and 390-pixel phone layouts, section pickers, dark colours and Process Hub fullscreen/return.
 
