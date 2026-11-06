@@ -2,6 +2,12 @@
 (function (root) {
   'use strict';
   const DEFAULT_GUIDE_HEADING = 'WORKHUB  /  SCREENSHOT GUIDE';
+  const GUIDE_PALETTES = {
+    green: { label: 'Green', accent: '#285b4d', paper: '#f8f7f1' },
+    blue: { label: 'Blue', accent: '#245e9a', paper: '#f5f8fc' },
+    purple: { label: 'Purple', accent: '#70459b', paper: '#faf7fd' },
+    charcoal: { label: 'Charcoal', accent: '#3c4652', paper: '#ffffff' },
+  };
   const LIMITS = { steps: 24, pixels: 12000000, imageChars: 18000000, marks: 200, points: 1200 };
   const stop = new Set(
     'a an the and or but for to of in on at by is are was were be been being with without from this that these those it its as i we you they our your their please issue error problem when after before cannot unable not have has had can could should would will do does did no yes need check ticket test system user request failed failure'.split(
@@ -82,6 +88,49 @@
     p.h > 0 &&
     p.x + p.w <= 1.000001 &&
     p.y + p.h <= 1.000001;
+  function colours(value = GUIDE_PALETTES.green) {
+    if (!value || !['accent', 'paper'].every(k => /^#[0-9a-f]{6}$/i.test(value[k])))
+      throw Error('Choose valid accent and page background colours.');
+    return { accent: value.accent.toLowerCase(), paper: value.paper.toLowerCase() };
+  }
+  function footer(value = {}) {
+    if (!value || typeof value !== 'object') throw Error('Check the guide footer.');
+    const text = value.text === undefined ? '' : value.text,
+      align = value.align === undefined ? 'center' : value.align,
+      opacity = value.opacity === undefined ? 1 : value.opacity,
+      size = value.size === undefined ? 180 : value.size,
+      logo = value.logo === undefined ? null : value.logo;
+    if (
+      !str(text, 120) ||
+      !['left', 'center', 'right'].includes(align) ||
+      !Number.isFinite(opacity) ||
+      opacity < 0.05 ||
+      opacity > 1 ||
+      ![100, 180, 260].includes(size)
+    )
+      throw Error('Check the footer text, alignment, size and opacity.');
+    if (
+      logo &&
+      (!Number.isInteger(logo.width) ||
+        !Number.isInteger(logo.height) ||
+        logo.width < 1 ||
+        logo.height < 1 ||
+        logo.width > 600 ||
+        logo.height > 600 ||
+        !str(logo.src, 2000000) ||
+        !/^data:image\/(png|webp);base64,[a-zA-Z0-9+/]+={0,2}$/.test(logo.src))
+    )
+      throw Error('Choose a valid embedded PNG or WebP footer logo up to 600 pixels.');
+    if (logo !== null && (!logo || typeof logo !== 'object'))
+      throw Error('Choose a valid footer logo.');
+    return {
+      text,
+      align,
+      opacity,
+      size,
+      logo: logo ? { src: logo.src, width: logo.width, height: logo.height } : null,
+    };
+  }
   function guide(value) {
     if (
       !value ||
@@ -94,9 +143,11 @@
       throw Error('Choose a valid WorkHub guide file with up to 24 steps.');
     if (value.exportHeading !== undefined && !str(value.exportHeading, 180))
       throw Error('Use an export heading up to 180 characters.');
-    const ids = new Set();
-    let pixels = 0,
-      chars = 0;
+    const branding = footer(value.footer),
+      appearance = colours(value.colours),
+      ids = new Set();
+    let pixels = branding.logo ? branding.logo.width * branding.logo.height : 0,
+      chars = branding.logo?.src.length || 0;
     const steps = value.steps.map(s => {
       if (
         !s ||
@@ -155,6 +206,8 @@
       title: value.title,
       exportHeading:
         value.exportHeading === undefined ? DEFAULT_GUIDE_HEADING : value.exportHeading,
+      footer: branding,
+      colours: appearance,
       steps,
     };
   }
@@ -176,6 +229,9 @@
       .slice(0, 90) || 'screenshot-guide';
   root.WorkHubBatchCEngine = {
     DEFAULT_GUIDE_HEADING,
+    GUIDE_PALETTES,
+    footer,
+    colours,
     LIMITS,
     tokens,
     ticketIndex,

@@ -16,6 +16,8 @@
     version: 1,
     title: '',
     exportHeading: E.DEFAULT_GUIDE_HEADING,
+    footer: E.footer(),
+    colours: E.colours(),
     steps: [],
   });
   const button = (action, label, extra = '') =>
@@ -48,6 +50,120 @@
     const project = () => projects[mode],
       step = () => project().steps.find(s => s.id === selected),
       $ = selector => room?.querySelector(selector);
+    function brandingFields() {
+      const f = project().footer,
+        c = project().colours;
+      return (
+        '<details class="bc-branding"><summary>Export colours, footer logo &amp; watermark</summary>' +
+        '<div class="bc-branding-grid"><fieldset><legend>Export colours</legend>' +
+        '<label>Colour preset<select data-bc-palette>' +
+        Object.entries(E.GUIDE_PALETTES)
+          .map(([id, p]) => '<option value="' + id + '">' + esc(p.label) + '</option>')
+          .join('') +
+        '<option value="custom">Custom</option></select></label><div class="bc-colour-fields">' +
+        '<label>Accent colour<input type="color" data-bc-accent value="' +
+        esc(c.accent) +
+        '"></label>' +
+        '<label>Page background<input type="color" data-bc-paper value="' +
+        esc(c.paper) +
+        '"></label></div>' +
+        '<p class="bc-guide-heading-help">Applied to every PDF, JPG and PNG guide page. Text adjusts for readability; logo colours stay unchanged.</p></fieldset>' +
+        '<fieldset><legend>Footer logo &amp; watermark</legend><div class="bc-logo-controls">' +
+        '<label class="bc-file-label secondary">Choose transparent logo<input type="file" data-bc-logo accept="image/png,image/webp"></label>' +
+        button('remove-logo', 'Remove logo', f.logo ? '' : 'hidden') +
+        '</div>' +
+        '<div class="bc-logo-preview" data-bc-footer-preview-box hidden><img data-bc-footer-preview alt="Footer logo transparency preview"></div>' +
+        '<p class="bc-guide-heading-help">Transparent PNG or WebP, up to 2 MB. Transparency is preserved; existing image backgrounds are kept.</p>' +
+        '<label>Footer text<input data-bc-footer-text maxlength="120" placeholder="Optional team, company or document note" value="' +
+        esc(f.text) +
+        '"></label>' +
+        '<div class="bc-footer-options"><label>Footer alignment<select data-bc-footer-align>' +
+        ['left', 'center', 'right']
+          .map(
+            x =>
+              '<option value="' +
+              x +
+              '"' +
+              (f.align === x ? ' selected' : '') +
+              '>' +
+              x[0].toUpperCase() +
+              x.slice(1) +
+              '</option>'
+          )
+          .join('') +
+        '</select></label><label>Logo size<select data-bc-footer-size>' +
+        [
+          [100, 'Small'],
+          [180, 'Medium'],
+          [260, 'Large'],
+        ]
+          .map(
+            ([v, name]) =>
+              '<option value="' +
+              v +
+              '"' +
+              (f.size === v ? ' selected' : '') +
+              '>' +
+              name +
+              '</option>'
+          )
+          .join('') +
+        '</select></label></div><label>Footer opacity <span data-bc-footer-opacity-value></span>' +
+        '<input type="range" data-bc-footer-opacity min="5" max="100" value="' +
+        Math.round(f.opacity * 100) +
+        '"></label>' +
+        '<p class="bc-guide-heading-help">Lower opacity creates a faint footer watermark. No background box is added. Footer space is reserved above page numbering.</p>' +
+        '</fieldset></div></details>'
+      );
+    }
+    function updateBranding() {
+      if (mode !== 'guide' || !room) return;
+      const f = project().footer,
+        c = project().colours,
+        preview = $('[data-bc-footer-preview]');
+      const preset = Object.entries(E.GUIDE_PALETTES).find(
+        ([, p]) => p.accent === c.accent && p.paper === c.paper
+      );
+      $('[data-bc-palette]').value = preset?.[0] || 'custom';
+      $('[data-bc-accent]').value = c.accent;
+      $('[data-bc-paper]').value = c.paper;
+      $('[data-bc-footer-opacity-value]').textContent = Math.round(f.opacity * 100) + '%';
+      $('[data-bc="remove-logo"]').hidden = !f.logo;
+      $('[data-bc-footer-preview-box]').hidden = !f.logo;
+      if (f.logo) {
+        if (preview.getAttribute('src') !== f.logo.src) preview.src = f.logo.src;
+        preview.style.opacity = f.opacity;
+      } else preview.removeAttribute('src');
+    }
+    async function addLogo(file) {
+      guard();
+      if (busy || mode !== 'guide' || !file) return;
+      const dialog = room,
+        current = owner,
+        version = revision,
+        job = ++loadId,
+        alive = () =>
+          room === dialog &&
+          a.ready() &&
+          a.owner() === current &&
+          mode === 'guide' &&
+          version === revision &&
+          job === loadId;
+      setBusy(true);
+      status('Preparing your logo locally…');
+      try {
+        const logo = await F.logoFromFile(file, alive);
+        if (!alive()) return;
+        projects.guide = E.guide({ ...project(), footer: { ...project().footer, logo } });
+        changed();
+        updateBranding();
+        status('Logo ready. Prepare the guide to include your footer.');
+      } catch (err) {
+        if (alive()) throw err;
+      } finally {
+        if (room === dialog) setBusy(false);
+      }
+    }
     function clearUrls() {
       for (const url of urls) URL.revokeObjectURL(url);
       urls = [];
@@ -488,6 +604,10 @@
           await F.loadImage(s.image, alive);
           if (!alive()) return;
         }
+        if (data.footer.logo) {
+          await F.loadImage(data.footer.logo, alive, 600);
+          if (!alive()) return;
+        }
         projects.guide = data;
         mode = 'guide';
         histories.clear();
@@ -546,7 +666,8 @@
             esc(project().title) +
             '"></label><div><label class="bc-guide-name">Export heading<input data-bc-export-heading maxlength="180" aria-describedby="bcExportHeadingHelp" placeholder="e.g. MY COMPANY / USER GUIDE" value="' +
             esc(project().exportHeading) +
-            '"></label><p id="bcExportHeadingHelp" class="bc-guide-heading-help">Shown at the top of every PDF, JPG and PNG page. Leave blank to hide. Saved with your editable guide.</p></div></div>'
+            '"></label><p id="bcExportHeadingHelp" class="bc-guide-heading-help">Shown at the top of every PDF, JPG and PNG page. Leave blank to hide. Saved with your editable guide.</p></div></div>' +
+            brandingFields()
           : '') +
         '<nav class="bc-step-strip" data-bc-steps aria-label="Guide steps"' +
         (guideMode ? '' : ' hidden') +
@@ -645,6 +766,26 @@
         }
       });
       room.addEventListener('change', event => {
+        if (busy) return;
+        const el = event.target;
+        if (el.matches('[data-bc-logo]')) {
+          void addLogo(el.files[0]).catch(err => status(err.message, true));
+          el.value = '';
+        }
+        if (el.matches('[data-bc-palette]') && E.GUIDE_PALETTES[el.value]) {
+          project().colours = E.colours(E.GUIDE_PALETTES[el.value]);
+          changed();
+          updateBranding();
+        }
+        if (el.matches('[data-bc-footer-align],[data-bc-footer-size]')) {
+          project().footer[el.matches('[data-bc-footer-align]') ? 'align' : 'size'] = el.matches(
+            '[data-bc-footer-size]'
+          )
+            ? +el.value
+            : el.value;
+          changed();
+          updateBranding();
+        }
         if (event.target.matches('[data-bc-files]')) {
           void add(event.target.files).catch(err => status(err.message, true));
           event.target.value = '';
@@ -665,6 +806,20 @@
         if (el.matches('[data-bc-export-heading]')) {
           project().exportHeading = el.value;
           changed();
+        }
+        if (el.matches('[data-bc-footer-text],[data-bc-footer-opacity]')) {
+          project().footer[el.matches('[data-bc-footer-text]') ? 'text' : 'opacity'] = el.matches(
+            '[data-bc-footer-opacity]'
+          )
+            ? +el.value / 100
+            : el.value;
+          changed();
+          updateBranding();
+        }
+        if (el.matches('[data-bc-accent],[data-bc-paper]')) {
+          project().colours[el.matches('[data-bc-accent]') ? 'accent' : 'paper'] = el.value;
+          changed();
+          updateBranding();
         }
         if (s && el.matches('[data-bc-step-title],[data-bc-caption]')) {
           s[el.matches('[data-bc-caption]') ? 'caption' : 'title'] = el.value;
@@ -798,6 +953,7 @@
       document.body.append(room);
       document.body.classList.add('bc-room-open');
       room.showModal();
+      updateBranding();
       thumbs();
       controls();
       void select(project().steps[0]?.id || '');
@@ -816,6 +972,11 @@
       }
       if (busy) return;
       const s = step();
+      if (action === 'remove-logo') {
+        project().footer.logo = null;
+        changed();
+        updateBranding();
+      }
       if (action === 'select') await select(el.dataset.id);
       if (action === 'undo' || action === 'redo') undoEdit(action === 'redo');
       if (action === 'compare') {
@@ -904,7 +1065,19 @@
       histories.clear();
       redo.clear();
     });
-    return { cards, decorateModal, sync, open, close, add, select, prepare, importGuide, handle };
+    return {
+      cards,
+      decorateModal,
+      sync,
+      open,
+      close,
+      add,
+      addLogo,
+      select,
+      prepare,
+      importGuide,
+      handle,
+    };
   }
   root.WorkHubBatchC = { install };
 })(window);

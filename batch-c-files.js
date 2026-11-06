@@ -93,15 +93,17 @@
       image.src = src;
     });
   }
-  async function loadImage(image, alive) {
+  async function loadImage(image, alive, maxEdge = 2400) {
     check(alive);
     const comma = image.src.indexOf(','),
       raw = root.atob(image.src.slice(comma + 1)),
       bytes = Uint8Array.from(raw, c => c.charCodeAt(0)),
       size = dimensions(bytes);
-    if (Math.max(size.width, size.height) > 2400 || size.width * size.height > 12000000)
+    if (Math.max(size.width, size.height) > maxEdge || size.width * size.height > 12000000)
       throw Error(
-        'This guide contains an oversized image. Open the original screenshot through Add screenshots first.'
+        maxEdge === 600
+          ? 'This guide contains an oversized footer logo. Choose the logo again.'
+          : 'This guide contains an oversized image. Open the original screenshot through Add screenshots first.'
       );
     const img = await decode(image.src);
     check(alive);
@@ -109,7 +111,7 @@
       throw Error('The guide image dimensions do not match its file.');
     return img;
   }
-  async function imageFromFile(file, alive) {
+  async function imageFromFile(file, alive, maxEdge = 1800) {
     if (
       !file ||
       file.size > 8 * 1024 * 1024 ||
@@ -123,7 +125,7 @@
     dimensions(Uint8Array.from(raw, c => c.charCodeAt(0)));
     const img = await decode(src);
     check(alive);
-    const scale = Math.min(1, 1800 / Math.max(img.naturalWidth, img.naturalHeight)),
+    const scale = Math.min(1, maxEdge / Math.max(img.naturalWidth, img.naturalHeight)),
       c = canvas(
         Math.max(1, Math.round(img.naturalWidth * scale)),
         Math.max(1, Math.round(img.naturalHeight * scale))
@@ -134,6 +136,11 @@
     } finally {
       release(c);
     }
+  }
+  async function logoFromFile(file, alive) {
+    if (!file || file.size > 2 * 1024 * 1024 || !['image/png', 'image/webp'].includes(file.type))
+      throw Error('Choose a transparent PNG or WebP logo up to 2 MB.');
+    return imageFromFile(file, alive, 600);
   }
   function draw(c, step, img, original = false) {
     c.width = step.image.width;
@@ -229,7 +236,52 @@
     }
     return out;
   }
+  function palette(value) {
+    const { accent, paper } = E.colours(value);
+    if (accent === '#285b4d' && paper === '#f8f7f1')
+      return { accent, paper, ink: '#172f2c', body: '#354944', muted: '#657d73' };
+    const luminance = hex => {
+        const c = [1, 3, 5]
+          .map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
+          .map(x => (x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4));
+        return c[0] * 0.2126 + c[1] * 0.7152 + c[2] * 0.0722;
+      },
+      contrast = hex => {
+        const a = luminance(hex),
+          b = luminance(paper);
+        return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+      },
+      ink = contrast('#17232d') > contrast('#fffdf7') ? '#17232d' : '#fffdf7';
+    return { paper, accent: contrast(accent) >= 4.5 ? accent : ink, ink, body: ink, muted: ink };
+  }
+  function drawFooter(ctx, footer, logo, colour) {
+    if (!logo && !footer.text.trim()) return;
+    const x = width =>
+      footer.align === 'left' ? 70 : footer.align === 'right' ? 1170 - width : (1240 - width) / 2;
+    ctx.save();
+    ctx.globalAlpha = footer.opacity;
+    if (logo) {
+      const height = { 100: 32, 180: 48, 260: 64 }[footer.size],
+        scale = Math.min(footer.size / logo.naturalWidth, height / logo.naturalHeight);
+      ctx.drawImage(
+        logo,
+        x(logo.naturalWidth * scale),
+        1560,
+        logo.naturalWidth * scale,
+        logo.naturalHeight * scale
+      );
+    }
+    ctx.font = '16px system-ui, sans-serif';
+    ctx.fillStyle = colour.accent;
+    for (const [i, line] of wrap(ctx, footer.text.replace(/\s+/g, ' ').trim(), 1100).entries())
+      ctx.fillText(line, x(ctx.measureText(line).width), 1650 + i * 20);
+    ctx.restore();
+  }
   async function* pages(guide, alive) {
+    const footer = E.footer(guide.footer),
+      colour = palette(guide.colours),
+      logo = footer.logo ? await loadImage(footer.logo, alive, 600) : null,
+      contentBottom = logo || footer.text.trim() ? 1510 : 1620;
     let pageNo = 0;
     for (let i = 0; i < guide.steps.length; i++) {
       check(alive);
@@ -246,9 +298,9 @@
             );
           const c = canvas(1240, 1754),
             ctx = c.getContext('2d');
-          ctx.fillStyle = '#f8f7f1';
+          ctx.fillStyle = colour.paper;
           ctx.fillRect(0, 0, c.width, c.height);
-          ctx.fillStyle = '#285b4d';
+          ctx.fillStyle = colour.accent;
           ctx.font = '600 19px system-ui, sans-serif';
           const heading = (guide.exportHeading ?? E.DEFAULT_GUIDE_HEADING)
             .replace(/\s+/g, ' ')
@@ -260,7 +312,7 @@
               y += 25;
             }
           y = heading ? Math.max(120, y + 25) : 84;
-          ctx.fillStyle = '#172f2c';
+          ctx.fillStyle = colour.ink;
           ctx.font = '600 27px system-ui, sans-serif';
           for (const line of wrap(ctx, guide.title || 'Screenshot guide', 1100)) {
             ctx.fillText(line, 70, y);
@@ -284,22 +336,23 @@
             const scale = Math.min(
               1100 / screenshot.width,
               880 / screenshot.height,
-              (1550 - y) / screenshot.height
+              (contentBottom - 70 - y) / screenshot.height
             );
             y += 20;
             ctx.drawImage(screenshot, 70, y, screenshot.width * scale, screenshot.height * scale);
             y += screenshot.height * scale + 35;
           }
           ctx.font = '24px system-ui, sans-serif';
-          ctx.fillStyle = '#354944';
+          ctx.fillStyle = colour.body;
           if (!lines) lines = wrap(ctx, step.caption, 1100);
-          const capacity = Math.max(1, Math.floor((1620 - y) / 35)),
+          const capacity = Math.max(1, Math.floor((contentBottom - y) / 35)),
             showing = lines.splice(0, capacity);
           for (const line of showing) {
             ctx.fillText(line, 70, y);
             y += 35;
           }
-          ctx.fillStyle = '#657d73';
+          drawFooter(ctx, footer, logo, colour);
+          ctx.fillStyle = colour.muted;
           ctx.font = '19px system-ui, sans-serif';
           ctx.fillText('Step ' + (i + 1) + ' of ' + guide.steps.length, 70, 1695);
           ctx.fillText('Page ' + pageNo, 1070, 1695);
@@ -388,6 +441,8 @@
     decode,
     loadImage,
     imageFromFile,
+    logoFromFile,
+    palette,
     draw,
     cropped,
     raster,
