@@ -563,14 +563,14 @@ body[data-hub-design='clear-desk']
 }
 body[data-hub-design='clear-desk']
   #view
-  :is(.hub-head, .workspace-heading, .df-hero, .wl-hero, .val-head) {
+  :is(.hub-head:not(.mv-hero), .workspace-heading, .df-hero, .wl-hero, .val-head) {
   padding: 20px 24px;
   border-radius: 10px;
   box-shadow: none;
 }
 body[data-hub-design='clear-desk']
   #view
-  :is(.hub-head, .workspace-heading, .df-hero, .val-head)
+  :is(.hub-head:not(.mv-hero), .workspace-heading, .df-hero, .val-head)
   h2 {
   font-family: var(--hub-font);
   font-size: 28px;
@@ -596,63 +596,6 @@ body[data-hub-design='clear-desk'] #view .hub-layout {
 body[data-hub-design='clear-desk'] #view :is(th, td) {
   padding-top: 10px;
   padding-bottom: 10px;
-}
-body[data-hub-design='clear-desk'] #view .my-day-page .md-day-intro.mv-hero {
-  min-height: 0;
-  padding: 28px;
-  border-radius: 12px;
-  background: var(--hub-surface);
-  color: var(--hub-text);
-  box-shadow: none;
-  border: 1px solid var(--hub-border);
-}
-body[data-hub-design='clear-desk'] #view .mv-hero .mv-scene {
-  opacity: 0.075;
-}
-body[data-hub-design='clear-desk'] #view .mv-hero .mv-hero-shade {
-  opacity: 0.05;
-}
-body[data-hub-design='clear-desk'] #view .mv-hero .mv-hero-content {
-  max-width: none;
-}
-body[data-hub-design='clear-desk'] #view .mv-hero h2 {
-  font: 700 clamp(27px, 3vw, 40px) / 1.15 var(--hub-font);
-  color: var(--hub-text);
-  margin: 14px 0;
-}
-body[data-hub-design='clear-desk'] #view .mv-hero h2 em {
-  color: var(--hub-link);
-  font-style: normal;
-}
-body[data-hub-design='clear-desk']
-  #view
-  .mv-hero
-  :is(.mv-welcome, .mv-day-label, .mv-hero-eyebrow, .mv-hero-metric small, .mv-hero-metric em) {
-  color: var(--hub-muted);
-}
-body[data-hub-design='clear-desk'] #view .mv-hero-metrics {
-  position: relative;
-  inset: auto;
-  margin: 26px 0 0;
-  padding: 0;
-  gap: 12px;
-  border: 0;
-  background: transparent;
-}
-body[data-hub-design='clear-desk'] #view .mv-hero .mv-hero-metric {
-  padding: 15px;
-  border: 1px solid var(--hub-border);
-  border-radius: 9px;
-  background: var(--hub-surface-soft);
-}
-body[data-hub-design='clear-desk'] #view .mv-hero .mv-hero-metric strong {
-  color: var(--hub-text);
-  font-size: 26px;
-}
-body[data-hub-design='clear-desk'] #view .mv-hero .mv-metric-icon {
-  border-color: var(--hub-border);
-  color: var(--hub-link);
-  background: var(--hub-surface);
 }
 /* Modern Hub: a compact labelled rail and a spacious, card-led workspace. */
 body[data-hub-design='modern-hub'] #hubHeader {
@@ -779,14 +722,14 @@ body[data-hub-design='modern-hub']
 }
 body[data-hub-design='modern-hub']
   #view
-  :is(.hub-head, .workspace-heading, .df-hero, .wl-hero, .val-head) {
+  :is(.hub-head:not(.mv-hero), .workspace-heading, .df-hero, .wl-hero, .val-head) {
   padding: 30px;
   border-radius: 24px;
   box-shadow: none;
 }
 body[data-hub-design='modern-hub']
   #view
-  :is(.hub-head, .workspace-heading, .df-hero, .val-head)
+  :is(.hub-head:not(.mv-hero), .workspace-heading, .df-hero, .val-head)
   h2 {
   font-family: var(--hub-font);
   font-size: clamp(28px, 3vw, 40px);
@@ -806,11 +749,6 @@ body[data-hub-design='modern-hub'] #view .df-stats > div {
 }
 body[data-hub-design='modern-hub'] #view .hub-layout {
   gap: 24px;
-}
-body[data-hub-design='modern-hub'] #view .my-day-page .md-day-intro.mv-hero {
-  min-height: 430px;
-  padding: 32px 36px 118px;
-  border-radius: 28px;
 }
 body.hub-present #wdWorkspaceBar {
   display: none;
@@ -1009,19 +947,9 @@ body.hub-present #wdWorkspaceBar {
   #wdWorkspaceBar > button {
     max-width: 115px;
   }
-  body[data-hub-design='clear-desk'] #view .mv-hero-metrics {
-    grid-template-columns: 1fr;
-  }
-  body[data-hub-design='clear-desk'] #view .my-day-page .md-day-intro.mv-hero {
-    padding: 22px;
-  }
-  body[data-hub-design='modern-hub'] #view .my-day-page .md-day-intro.mv-hero {
-    min-height: 440px;
-    padding: 28px 24px 160px;
-  }
-  body[data-hub-design='modern-hub']
+        body[data-hub-design='modern-hub']
     #view
-    :is(.hub-head, .workspace-heading, .df-hero, .wl-hero, .val-head) {
+    :is(.hub-head:not(.mv-hero), .workspace-heading, .df-hero, .wl-hero, .val-head) {
     padding: 24px;
   }
   .wd-appearance-entry {
@@ -1072,9 +1000,6 @@ body[data-hub-design='modern-hub'] #tabs {
   align-items: stretch;
   overflow: visible;
 }
-body[data-hub-design='clear-desk'] #view .mv-hero .mv-hero-content {
-  width: 100%;
-}
 @media (max-width: 900px) {
   body[data-hub-design='modern-hub'] #tabs {
     flex-direction: row;
@@ -1112,18 +1037,11 @@ body[data-hub-design='modern-hub']
   border-color: var(--hub-border);
   box-shadow: 0 7px 28px #18304b09;
 }
+
+/* My day owns its scenic contrast and responsive spacing in every design. */
 body[data-hub-design='clear-desk'] #view .my-day-page .md-day-intro.mv-hero {
-  --hub-scenic-text: var(--hub-text);
-  --hub-scenic-muted: var(--hub-muted);
-  --hub-scenic-accent: var(--hub-link);
+  border-radius: 12px;
 }
-body[data-hub-design='clear-desk']
-  #view
-  .my-day-page
-  .mv-hero
-  :is(.mv-hero-eyebrow, .mv-edition, .mv-ribbon) {
-  color: var(--hub-muted);
-}
-body[data-hub-design='clear-desk'] #view .my-day-page .mv-hero .mv-hero-metric strong span {
-  color: var(--hub-muted);
+body[data-hub-design='modern-hub'] #view .my-day-page .md-day-intro.mv-hero {
+  border-radius: 28px;
 }

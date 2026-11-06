@@ -186,7 +186,7 @@ body[data-hub-design='fiori'] #view :is(
   box-shadow: var(--fi-shadow);
 }
 body[data-hub-design='fiori'] #view :is(
-  .hub-head, .workspace-heading, .df-hero, .wl-hero, .val-head
+  .hub-head:not(.mv-hero), .workspace-heading, .df-hero, .wl-hero, .val-head
 ) {
   min-height: 0;
   padding: 24px 28px;
@@ -196,7 +196,7 @@ body[data-hub-design='fiori'] #view :is(
   box-shadow: var(--fi-shadow);
 }
 body[data-hub-design='fiori'] #view :is(
-  .hub-head, .workspace-heading, .df-hero, .wl-hero, .val-head
+  .hub-head:not(.mv-hero), .workspace-heading, .df-hero, .wl-hero, .val-head
 ) h2 {
   font: 750 clamp(26px, 3vw, 36px) / 1.2 var(--hub-font);
   letter-spacing: -0.035em;
@@ -260,65 +260,6 @@ body[data-hub-design='fiori'] #modal {
   background: var(--hub-surface);
   box-shadow: 0 20px 64px #10243a30;
 }
-body[data-hub-design='fiori'] #view .my-day-page .md-day-intro.mv-hero {
-  min-height: 0;
-  padding: 28px;
-  border-radius: 12px;
-  border: 1px solid var(--hub-border);
-  background: var(--hub-surface);
-  color: var(--hub-text);
-  box-shadow: var(--fi-shadow);
-  --hub-scenic-text: var(--hub-text);
-  --hub-scenic-muted: var(--hub-muted);
-  --hub-scenic-accent: var(--hub-link);
-}
-body[data-hub-design='fiori'] #view .mv-hero :is(.mv-scene, .mv-hero-shade) {
-  opacity: 0.04;
-}
-body[data-hub-design='fiori'] #view .mv-hero .mv-hero-content {
-  width: 100%;
-  max-width: none;
-}
-body[data-hub-design='fiori'] #view .mv-hero h2 {
-  font: 750 clamp(28px, 3.5vw, 42px) / 1.15 var(--hub-font);
-  color: var(--hub-text);
-  margin: 14px 0;
-}
-body[data-hub-design='fiori'] #view .mv-hero h2 em {
-  color: var(--hub-link);
-  font-style: normal;
-}
-body[data-hub-design='fiori'] #view .mv-hero :is(
-  .mv-welcome, .mv-day-label, .mv-hero-eyebrow, .mv-hero-metric small,
-  .mv-hero-metric em, .mv-edition, .mv-ribbon
-) {
-  color: var(--hub-muted);
-}
-body[data-hub-design='fiori'] #view .mv-hero-metrics {
-  position: relative;
-  inset: auto;
-  padding: 20px 0 0;
-  margin: 20px 0 0;
-  border: 0;
-  border-top: 1px solid var(--hub-border);
-  background: transparent;
-  gap: 14px;
-}
-body[data-hub-design='fiori'] #view .mv-hero .mv-hero-metric {
-  padding: 15px;
-  border: 1px solid var(--hub-border);
-  border-radius: 9px;
-  background: var(--hub-surface-soft);
-}
-body[data-hub-design='fiori'] #view .mv-hero-metric strong,
-body[data-hub-design='fiori'] #view .mv-hero-metric strong span {
-  color: var(--hub-text);
-}
-body[data-hub-design='fiori'] #view .mv-metric-icon {
-  background: var(--hub-surface);
-  border-color: var(--hub-border);
-  color: var(--hub-link);
-}
 body[data-hub-design='fiori'].hub-present #wdWorkspaceBar {
   display: none;
 }
@@ -360,14 +301,13 @@ body[data-hub-design='fiori'].hub-present #wdWorkspaceBar {
     padding: 20px 18px 110px;
   }
   body[data-hub-design='fiori'] #view :is(
-    .hub-head, .workspace-heading, .df-hero, .wl-hero, .val-head
+    .hub-head:not(.mv-hero), .workspace-heading, .df-hero, .wl-hero, .val-head
   ) {
     padding: 22px;
   }
-  body[data-hub-design='fiori'] #view .my-day-page .md-day-intro.mv-hero {
-    padding: 22px;
-  }
-  body[data-hub-design='fiori'] #view .mv-hero-metrics {
-    grid-template-columns: 1fr;
-  }
+    }
+
+/* My day owns its scenic contrast and responsive spacing in every design. */
+body[data-hub-design='fiori'] #view .my-day-page .md-day-intro.mv-hero {
+  border-radius: 12px;
 }
