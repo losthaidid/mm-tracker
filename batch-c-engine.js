@@ -239,7 +239,7 @@
       const marks = s.marks.map(m => {
         if (
           !m ||
-          !['cover', 'blur', 'brush', 'arrow'].includes(m.type) ||
+          !['cover', 'blur', 'brush', 'arrow', 'number', 'rectangle'].includes(m.type) ||
           !/^#[0-9a-f]{6}$/i.test(m.color) ||
           !unit(m.size) ||
           m.size <= 0 ||
@@ -250,7 +250,22 @@
           !m.points.every(point)
         )
           throw Error('Check the screenshot annotations.');
-        return { type: m.type, color: m.color, size: m.size, points: m.points.map(p => [...p]) };
+        if (
+          m.type === 'number' &&
+          (!Number.isInteger(m.number) ||
+            m.number < 1 ||
+            m.number > 999 ||
+            m.points.length !== 2 ||
+            m.points[0].some((v, i) => v !== m.points[1][i]))
+        )
+          throw Error('Check the numbered screenshot markers (1–999).');
+        return {
+          type: m.type,
+          color: m.color,
+          size: m.size,
+          points: m.points.map(p => [...p]),
+          ...(m.type === 'number' ? { number: m.number } : {}),
+        };
       });
       return {
         id: s.id,

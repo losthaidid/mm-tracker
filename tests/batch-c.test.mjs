@@ -115,7 +115,7 @@ test('adding a privacy-edited image to the guide uses a flattened image and leav
 function fileFixture(){
  const calls=[],w={WorkHubBatchCEngine:E,atob:s=>Buffer.from(s,'base64').toString('binary')};
  w.Image=class{set src(value){const size=w.WorkHubBatchCFiles.dimensions(new Uint8Array(Buffer.from(value.split(',')[1],'base64')));this.naturalWidth=size.width;this.naturalHeight=size.height;queueMicrotask(()=>this.onload());}};
- const stack=[],context={globalAlpha:1,fillRect(...args){calls.push(['fill',this.fillStyle,...args]);},drawImage(...args){calls.push(['draw',...args],['alpha-draw',this.globalAlpha,...args]);},save(){stack.push({globalAlpha:this.globalAlpha,font:this.font,fillStyle:this.fillStyle});},restore(){Object.assign(this,stack.pop());},beginPath(){},rect(){},clip(){},moveTo(){},lineTo(){},stroke(){calls.push(['stroke']);},measureText:t=>({width:String(t).length*14}),fillText(text,x,y){calls.push(['text',text,x,y,this.font,this.fillStyle,this.globalAlpha]);}};
+ const stack=[],context={globalAlpha:1,fillRect(...args){calls.push(['fill',this.fillStyle,...args]);},drawImage(...args){calls.push(['draw',...args],['alpha-draw',this.globalAlpha,...args]);},save(){stack.push({globalAlpha:this.globalAlpha,font:this.font,fillStyle:this.fillStyle,textAlign:this.textAlign,textBaseline:this.textBaseline});},restore(){Object.assign(this,stack.pop());},beginPath(){},rect(){},clip(){},moveTo(){},lineTo(){},arc(...args){calls.push(['arc',...args]);},fill(){calls.push(['shape-fill',this.fillStyle]);},strokeRect(...args){calls.push(['outline',this.strokeStyle,this.lineWidth,...args]);},stroke(){calls.push(['stroke']);},measureText:t=>({width:String(t).length*14}),fillText(text,x,y){calls.push(['text',text,x,y,this.font,this.fillStyle,this.globalAlpha]);}};
  const document={baseURI:new URL('../index.html',import.meta.url).href,createElement:()=>({width:1,height:1,getContext:()=>context,toBlob(callback,type,quality){calls.push(['encode',type,quality]);callback(new Blob([png(this.width,this.height)],{type}));}})};
  new Function('window','document',source('batch-c-files.js'))(w,document);new Function('window','module','exports',source('vendor/jszip.min.js'))(w,undefined,undefined);
  return {F:w.WorkHubBatchCFiles,w,calls,document};
@@ -250,4 +250,39 @@ test('compact PDFs match their trimmed image proportions and the preview uses th
  const preview=await F.preview(g,()=>true);assert.ok(preview.height<1754);
  const task=pdfjs.getDocument({data:new Uint8Array(await(await F.export(g,'pdf',()=>true)).arrayBuffer()),useSystemFonts:true});
  try{const doc=await task.promise,page=await doc.getPage(1),box=page.getViewport({scale:1});assert.ok(Math.abs(box.height/box.width-preview.height/preview.width)<.00001);}finally{await task.destroy();F.release(preview);}
+});
+test('number markers and transparent rectangles validate and round-trip without accepting unsafe labels',()=>{
+ const g=guide(),number={type:'number',number:1,color:'#ee3300',size:.08,points:[[.5,.5],[.5,.5]]};
+ g.steps[0].marks=[number,{type:'rectangle',color:'#ff0000',size:.01,points:[[.1,.2],[.8,.9]],number:'ignored'}];
+ const saved=E.guide(g);assert.equal(saved.steps[0].marks[0].number,1);assert.equal(saved.steps[0].marks[1].number,undefined);assert.deepEqual(copy(E.guide(saved)),copy(saved));
+ for(const bad of [0,1000,1.5,'1','<script>',null])assert.throws(()=>E.guide({...g,steps:[{...g.steps[0],marks:[{...number,number:bad}]}]}),/numbered/);
+ assert.throws(()=>E.guide({...g,steps:[{...g.steps[0],marks:[{...number,points:[[.5,.5],[.9,.5]]}]}]}),/numbered/);
+});
+test('number clicks sequence per screenshot, support cancelled placement and undo/redo, and persist into preview and every export',async t=>{
+ const c=ui(t),before=copy(c.state);c.module.open('guide');await c.module.add([{name:'first.png'},{name:'second.png'}]);const canvas=c.d.querySelector('[data-bc-canvas]');canvas.getBoundingClientRect=()=>({left:0,top:0,width:100,height:100});
+ const pointer=(name,x,y)=>{const e=new c.w.Event(name,{bubbles:true,cancelable:true});Object.assign(e,{pointerId:1,clientX:x,clientY:y,button:0,isPrimary:true});canvas.dispatchEvent(e);};
+ c.d.querySelector('[data-bc-tool="number"]').click();assert.equal(c.d.querySelector('[data-bc-number-control]').hidden,false);
+ pointer('pointerdown',20,30);pointer('pointerup',20,30);pointer('pointerdown',40,50);pointer('pointermove',50,60);pointer('pointerup',50,60);
+ assert.match(c.d.querySelector('[data-bc-next-number]').textContent,/3/);pointer('pointerdown',70,70);pointer('pointercancel',70,70);
+ await c.module.prepare('editable');const saved=await c.last();assert.deepEqual(saved.steps[0].marks.map(m=>m.number),[1,2]);assert.deepEqual(saved.steps[0].marks[1].points,[[.5,.6],[.5,.6]]);
+ await c.click('undo');assert.match(c.d.querySelector('[data-bc-next-number]').textContent,/2/);await c.click('redo');assert.match(c.d.querySelector('[data-bc-next-number]').textContent,/3/);
+ const frames=[];c.w.WorkHubBatchCFiles.preview=async g=>{frames.push(copy(g));return {width:1240,height:1754};};c.d.querySelector('.bc-branding').open=true;await c.module.preview();assert.deepEqual(frames.at(-1).steps[0].marks.map(m=>m.number),[1,2]);
+ for(const format of ['pdf','images','jpg-images']){await c.module.prepare(format);assert.deepEqual(c.exports.at(-1).g.steps[0].marks.map(m=>m.number),[1,2]);}
+ const second=c.d.querySelectorAll('[data-bc="select"]')[1].dataset.id;await c.module.select(second);assert.match(c.d.querySelector('[data-bc-next-number]').textContent,/1/);pointer('pointerdown',25,25);pointer('pointerup',25,25);assert.equal(c.d.querySelector('[data-bc-ready] a'),null);
+ await c.module.importGuide({size:100,text:async()=>JSON.stringify(saved)});assert.match(c.d.querySelector('[data-bc-next-number]').textContent,/3/);
+ c.account('other');c.module.open('guide');assert.match(c.d.querySelector('[data-bc-next-number]').textContent,/1/);assert.deepEqual(c.state,before);
+});
+test('rectangle outlines drag in either direction and survive undo/redo without creating filled covers',async t=>{
+ const c=ui(t);c.module.open('privacy');await c.module.add([{name:'sample.png'}]);const canvas=c.d.querySelector('[data-bc-canvas]');canvas.getBoundingClientRect=()=>({left:0,top:0,width:100,height:100});
+ const pointer=(name,x,y)=>{const e=new c.w.Event(name,{bubbles:true,cancelable:true});Object.assign(e,{pointerId:7,clientX:x,clientY:y,button:0,isPrimary:true});canvas.dispatchEvent(e);};
+ c.d.querySelector('[data-bc-tool="rectangle"]').click();assert.equal(c.d.querySelector('[data-bc-size-label]').textContent,'Border thickness');
+ c.d.querySelector('[data-bc-color]').value='#ff0000';pointer('pointerdown',90,80);pointer('pointerup',10,20);await c.module.prepare('editable');const saved=await c.last();assert.equal(saved.steps[0].marks[0].type,'rectangle');assert.equal(saved.steps[0].marks[0].color,'#ff0000');
+ await c.click('undo');await c.module.prepare('editable');assert.equal((await c.last()).steps[0].marks.length,0);await c.click('redo');await c.module.prepare('png');assert.equal(c.exports.at(-1).g.steps[0].marks[0].type,'rectangle');
+});
+test('rendered numbers contrast with marker fills, stay inside image edges, and rectangles leave their centres unfilled',async()=>{
+ const {F,calls}=fileFixture(),s=step('markers');s.image={src:'data:image/png;base64,'+png(400,300).toString('base64'),width:400,height:300};
+ s.marks=[{type:'number',number:12,color:'#ffffff',size:.15,points:[[0,0],[0,0]]},{type:'number',number:3,color:'#000000',size:.15,points:[[1,1],[1,1]]},{type:'rectangle',color:'#ff0000',size:.02,points:[[.2,.2],[.8,.8]]}];
+ const rendered=await F.raster(s);assert.equal(calls.filter(c=>c[0]==='arc').length,2);const numbers=calls.filter(c=>c[0]==='text');assert.deepEqual(numbers.map(c=>c[1]),['12','3']);assert.equal(numbers[0][5],'#17232d');assert.equal(numbers[1][5],'#fffdf7');assert.ok(numbers.every(c=>c[2]>=30&&c[2]<=370&&c[3]>=30&&c[3]<=270));
+ assert.equal(calls.filter(c=>c[0]==='outline').length,1);assert.equal(calls.filter(c=>c[0]==='fill').length,0);F.release(rendered);
+ calls.length=0;F.draw(F.canvas(1,1),s,{},true);assert.equal(calls.filter(c=>['arc','outline','text'].includes(c[0])).length,0);
 });
