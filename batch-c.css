@@ -334,6 +334,14 @@ body.bc-room-open {
   border-radius: 12px;
   background: #fffef980;
 }
+.bc-guide-layout {
+  margin-bottom: 18px;
+}
+.bc-guide-layout select {
+  display: block;
+  width: min(100%, 440px);
+  margin-top: 6px;
+}
 .bc-branding > summary {
   cursor: pointer;
   padding: 13px 16px;

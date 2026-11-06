@@ -186,7 +186,7 @@ test('fine logo adjustments persist through save/open and reset without changing
 test('live page preview is read-only, supports both views and releases stale work after an account change',async t=>{
  const c=ui(t);c.module.open('guide');await c.module.add([{name:'sample.png'}]);await c.module.prepare('editable');const before=await c.last();const frames=[],released=[];
  c.w.WorkHubBatchCFiles.preview=async(g,alive)=>{frames.push(copy(g));assert.ok(alive());return {width:1240,height:1754};};c.w.WorkHubBatchCFiles.release=page=>released.push(page);
- c.d.querySelector('.bc-branding').open=true;await c.module.preview();assert.equal(c.d.querySelector('[data-bc-page-sheet]').hidden,false);assert.equal(c.d.querySelector('[data-bc-page-preview]').height,207);await c.click('preview-page');assert.equal(c.d.querySelector('[data-bc-page-preview]').height,877);assert.equal(c.exports.length,0);await c.module.prepare('editable');assert.deepEqual(await c.last(),before);
+ c.d.querySelector('.bc-branding').open=true;await c.module.preview();assert.equal(c.d.querySelector('[data-bc-page-sheet]').hidden,false);assert.equal(c.d.querySelector('[data-bc-page-preview]').height,877);await c.click('preview-footer');assert.equal(c.d.querySelector('[data-bc-page-preview]').height,207);assert.equal(c.exports.length,0);await c.module.prepare('editable');assert.deepEqual(await c.last(),before);
  let finish;c.w.WorkHubBatchCFiles.preview=()=>new Promise(resolve=>finish=resolve);const pending=c.module.preview();await settle();c.account('other');finish({width:1240,height:1754});await pending;c.module.open('guide');assert.equal(c.d.querySelector('[data-bc-page-sheet]').hidden,true);assert.ok(released.length>=2);
 });
 test('preview renders only the first export page and raised logos reserve caption space on every continuation',async()=>{
@@ -199,4 +199,55 @@ test('preview renders only the first export page and raised logos reserve captio
 });
 test('blur renders through bounded image resampling without depending on canvas filter support',async()=>{
  const {F,calls}=fileFixture(),s=step('blur');s.marks=[{type:'blur',color:'#123456',size:.1,points:[[0,0],[1,1]]}];await F.raster(s);const resamples=calls.filter(c=>c[0]==='draw'&&c.length===10);assert.equal(resamples.length,2);assert.equal(resamples[0].at(-2),1);assert.equal(resamples[0].at(-1),1);
+});
+test('layout choices validate, round-trip and preserve original saved guides',()=>{
+ assert.equal(E.guide(guide()).layout,'classic');
+ for(const layout of ['walkthrough','split','compact'])assert.equal(E.guide({...guide(),layout}).layout,layout);
+ for(const layout of [null,{},42,'__proto__','unknown'])assert.throws(()=>E.guide({...guide(),layout}),/layout/);
+});
+test('layout selection opens the full-page live preview, invalidates downloads and survives save/open',async t=>{
+ const c=ui(t),before=copy(c.state),frames=[];c.module.open('guide');await c.module.add([{name:'a.png'},{name:'b.png'}]);
+ c.w.WorkHubBatchCFiles.preview=async g=>{frames.push(copy(g));return {width:1240,height:g.layout==='compact'?900:1754};};
+ const select=c.d.querySelector('[data-bc-layout]');assert.equal(select.options.length,3);assert.equal(select.value,'walkthrough');
+ await c.module.addLogo({});
+ for(const layout of ['split','compact','walkthrough']){
+  await c.module.prepare('pdf');assert.ok(c.d.querySelector('[data-bc-ready] a'));
+  select.value=layout;select.dispatchEvent(new c.w.Event('change',{bubbles:true}));
+  assert.equal(c.d.querySelector('[data-bc-ready] a'),null);assert.equal(c.d.querySelector('.bc-branding').open,true);
+  await c.module.preview();assert.equal(frames.at(-1).layout,layout);assert.equal(c.d.querySelector('[data-bc-page-preview]').height,layout==='compact'?450:877);
+  for(const format of ['pdf','jpg-images','images']){await c.module.prepare(format);assert.equal(c.exports.at(-1).g.layout,layout);assert.equal(c.exports.at(-1).g.footer.logo.src,image.src);}
+ }
+ select.value='compact';select.dispatchEvent(new c.w.Event('change',{bubbles:true}));await c.module.prepare('editable');const saved=await c.last();assert.equal(saved.layout,'compact');
+ await c.module.importGuide({size:100,text:async()=>JSON.stringify(saved)});assert.equal(c.d.querySelector('[data-bc-layout]').value,'compact');
+ await c.module.importGuide({size:100,text:async()=>JSON.stringify(guide())});assert.equal(c.d.querySelector('[data-bc-layout]').value,'classic');
+ c.account('next');c.module.open('guide');assert.equal(c.d.querySelector('[data-bc-layout]').value,'walkthrough');assert.deepEqual(c.state,before);
+});
+test('three designed layouts pack steps, place split instructions beside screenshots and trim compact pages',async()=>{
+ const {F,calls}=fileFixture(),heights={};
+ for(const layout of ['walkthrough','split','compact']){
+  calls.length=0;const pages=[];for await(const page of F.pages({...guide(),layout},()=>true)){pages.push({width:page.width,height:page.height});F.release(page);}
+  assert.equal(pages.length,1,layout+' packs short steps together');heights[layout]=pages[0].height;
+  const text=calls.find(c=>c[0]==='text'&&c[1]==='A clear instruction.');assert.equal(text[2],layout==='split'?712:90);
+  const titles=calls.filter(c=>c[0]==='text'&&/^0[12] +/.test(c[1]));assert.equal(titles.length,2);
+  assert.equal(titles[1][2],layout==='compact'?656:90);
+ }
+ assert.equal(heights.walkthrough,1754);assert.equal(heights.split,1754);assert.ok(heights.compact<1200);
+});
+test('all layouts preserve long captions across bounded pages and keep raised footer logos clear',async()=>{
+ for(const layout of ['walkthrough','split','compact']){
+  const {F,calls}=fileFixture(),g={...guide(),layout,footer:{logo:copy(image),text:'My team',widthPct:20,yPct:0}};
+  g.exportHeading='Long heading '.repeat(12);g.title='A maintained guide title '.repeat(6);g.steps[0].title='Detailed step title '.repeat(8);
+  g.steps[0].caption=Array.from({length:100},(_,i)=>'Unique line '+i).join('\n');let count=0;
+  for await(const page of F.pages(g,()=>true)){assert.ok(page.height<=1754);F.release(page);count++;}
+  assert.ok(count>2);const lines=calls.filter(c=>c[0]==='text'&&/^Unique line/.test(c[1]));assert.equal(lines.length,100);assert.equal(lines.at(-1)[1],'Unique line 99');assert.ok(lines.every(c=>c[3]<=1326));
+  assert.equal(calls.filter(c=>c[0]==='text'&&c[1]==='My team').length,count);
+  assert.ok(calls.some(c=>c[0]==='text'&&c[1].includes('continued')));
+  await assert.rejects(()=>F.preview(g,()=>false),/cancelled/);
+ }
+});
+test('compact PDFs match their trimmed image proportions and the preview uses that same page',async()=>{
+ const {F}=fileFixture(),g={...guide(),layout:'compact'};
+ const preview=await F.preview(g,()=>true);assert.ok(preview.height<1754);
+ const task=pdfjs.getDocument({data:new Uint8Array(await(await F.export(g,'pdf',()=>true)).arrayBuffer()),useSystemFonts:true});
+ try{const doc=await task.promise,page=await doc.getPage(1),box=page.getViewport({scale:1});assert.ok(Math.abs(box.height/box.width-preview.height/preview.width)<.00001);}finally{await task.destroy();F.release(preview);}
 });

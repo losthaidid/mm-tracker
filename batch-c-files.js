@@ -254,22 +254,22 @@
       ink = contrast('#17232d') > contrast('#fffdf7') ? '#17232d' : '#fffdf7';
     return { paper, accent: contrast(accent) >= 4.5 ? accent : ink, ink, body: ink, muted: ink };
   }
-  function drawFooter(ctx, footer, logo, colour, layout) {
+  function drawFooter(ctx, footer, logo, colour, layout, offset = 0) {
     if (!logo && !footer.text.trim()) return;
     const x = width =>
       footer.align === 'left' ? 70 : footer.align === 'right' ? 1170 - width : (1240 - width) / 2;
     ctx.save();
     ctx.globalAlpha = footer.opacity;
     if (logo) {
-      ctx.drawImage(logo, layout.x, layout.y, layout.width, layout.height);
+      ctx.drawImage(logo, layout.x, layout.y + offset, layout.width, layout.height);
     }
     ctx.font = '16px system-ui, sans-serif';
     ctx.fillStyle = colour.accent;
     for (const [i, line] of wrap(ctx, footer.text.replace(/\s+/g, ' ').trim(), 1100).entries())
-      ctx.fillText(line, x(ctx.measureText(line).width), 1650 + i * 20);
+      ctx.fillText(line, x(ctx.measureText(line).width), 1650 + offset + i * 20);
     ctx.restore();
   }
-  async function* pages(guide, alive) {
+  async function* classicPages(guide, alive) {
     const footer = E.footer(guide.footer),
       colour = palette(guide.colours),
       logo = footer.logo ? await loadImage(footer.logo, alive, 1600, 600) : null,
@@ -358,6 +358,203 @@
       }
     }
   }
+  // The same page iterator drives previews and every finished file format.
+  async function* designedPages(guide, alive) {
+    const compact = guide.layout === 'compact',
+      split = guide.layout === 'split',
+      footer = E.footer(guide.footer),
+      colour = palette(guide.colours),
+      logo = footer.logo ? await loadImage(footer.logo, alive, 1600, 600) : null,
+      logoBox = E.logoLayout(footer),
+      bottom = logo ? Math.min(1510, logoBox.y - 40) : footer.text.trim() ? 1510 : 1620,
+      cardWidth = compact ? 534 : 1100,
+      lineHeight = compact ? 32 : 35;
+    let c = null,
+      ctx,
+      y = 0,
+      bodyTop = 0,
+      usedBottom = 0,
+      column = 0,
+      rowBottom = 0,
+      pageNo = 0,
+      firstStep = 0,
+      lastStep = 0;
+    const font = (size, bold = false) => {
+      ctx.font = (bold ? '600 ' : '') + size + 'px system-ui, sans-serif';
+    };
+    const newPage = () => {
+      if (++pageNo > 120)
+        throw Error(
+          'This guide exceeds 120 pages. Shorten captions or split it into smaller guides.'
+        );
+      c = canvas(1240, 1754);
+      ctx = c.getContext('2d');
+      ctx.fillStyle = colour.paper;
+      ctx.fillRect(0, 0, c.width, c.height);
+      ctx.fillStyle = colour.accent;
+      font(19, true);
+      let top = 68;
+      const heading = (guide.exportHeading ?? E.DEFAULT_GUIDE_HEADING).replace(/\s+/g, ' ').trim();
+      if (heading)
+        for (const line of wrap(ctx, heading, 1100)) {
+          ctx.fillText(line, 70, top);
+          top += 25;
+        }
+      top = heading ? Math.max(120, top + 20) : 84;
+      ctx.fillStyle = colour.ink;
+      font(34, true);
+      for (const line of wrap(ctx, guide.title || 'Screenshot guide', 1100)) {
+        ctx.fillText(line, 70, top);
+        top += 43;
+      }
+      font(18);
+      ctx.fillStyle = colour.muted;
+      ctx.fillText(
+        E.GUIDE_LAYOUTS[guide.layout].label + ' · ' + guide.steps.length + ' steps',
+        70,
+        top + 5
+      );
+      ctx.fillStyle = colour.accent;
+      ctx.fillRect(70, top + 24, 1100, 3);
+      bodyTop = y = top + 52;
+      usedBottom = y;
+      column = 0;
+      rowBottom = y;
+      firstStep = lastStep = 0;
+    };
+    const finishPage = () => {
+      // Compact cards trim the unused body, retaining the entire footer region.
+      const height = compact
+        ? Math.min(1754, Math.max(550, Math.ceil(usedBottom + 30 + 1754 - bottom)))
+        : 1754;
+      let out = c;
+      if (height !== 1754) {
+        out = canvas(1240, height);
+        out.getContext('2d').drawImage(c, 0, 0, 1240, height, 0, 0, 1240, height);
+        release(c);
+      }
+      const context = out.getContext('2d'),
+        offset = height - 1754;
+      drawFooter(context, footer, logo, colour, logoBox, offset);
+      context.fillStyle = colour.muted;
+      context.font = '19px system-ui, sans-serif';
+      context.fillText(
+        'Steps ' +
+          firstStep +
+          (lastStep === firstStep ? '' : '–' + lastStep) +
+          ' of ' +
+          guide.steps.length,
+        70,
+        1695 + offset
+      );
+      const label = 'Page ' + pageNo;
+      context.fillText(label, 1170 - context.measureText(label).width, 1695 + offset);
+      c = null;
+      return out;
+    };
+    try {
+      for (let i = 0; i < guide.steps.length; i++) {
+        check(alive);
+        const step = guide.steps[i],
+          screenshot = await raster(step, alive);
+        try {
+          if (!c) newPage();
+          const captionWidth = split ? 438 : cardWidth - 40;
+          font(compact ? 22 : 24);
+          const lines = step.caption.trim() ? wrap(ctx, step.caption, captionWidth) : [];
+          let first = true;
+          do {
+            check(alive);
+            font(compact ? 25 : 28, true);
+            const titles = wrap(
+                ctx,
+                String(i + 1).padStart(2, '0') +
+                  '  ' +
+                  (step.title || 'Step ' + (i + 1)) +
+                  (first ? '' : ' · continued'),
+                cardWidth - 40
+              ),
+              scale = Math.min(
+                (split ? 590 : cardWidth - 40) / screenshot.width,
+                (compact ? 270 : split ? 560 : 440) / screenshot.height
+              ),
+              imageHeight = first ? screenshot.height * scale : 0,
+              minimum =
+                titles.length * 36 +
+                40 +
+                (split
+                  ? Math.max(imageHeight, lines.length ? lineHeight + 46 : 0)
+                  : imageHeight + (imageHeight ? 24 : 0) + (lines.length ? lineHeight + 46 : 0)) +
+                24;
+            if (y + minimum > bottom && usedBottom > bodyTop) {
+              if (compact && column === 0) column = 1;
+              else {
+                const page = finishPage();
+                check(alive);
+                yield page;
+                newPage();
+              }
+              continue;
+            }
+            const x = 70 + (compact ? column * 566 : 0),
+              textX = split ? x + 642 : x + 20;
+            let top = y + 30;
+            ctx.fillStyle = colour.accent;
+            ctx.fillRect(x, y, compact ? 50 : 64, 4);
+            ctx.fillStyle = colour.ink;
+            font(compact ? 25 : 28, true);
+            for (const title of titles) {
+              ctx.fillText(title, x + 20, top);
+              top += 36;
+            }
+            top += 10;
+            if (first)
+              ctx.drawImage(screenshot, x + 20, top, screenshot.width * scale, imageHeight);
+            let captionY = split ? top : top + imageHeight + (imageHeight ? 24 : 0);
+            if (lines.length) {
+              font(16, true);
+              ctx.fillStyle = colour.accent;
+              ctx.fillText('INSTRUCTIONS' + (first ? '' : ' · CONTINUED'), textX, captionY + 16);
+              captionY += 46;
+              font(compact ? 22 : 24);
+              ctx.fillStyle = colour.body;
+              const capacity = Math.max(1, Math.floor((bottom - 24 - captionY) / lineHeight));
+              for (const line of lines.splice(0, capacity)) {
+                ctx.fillText(line, textX, captionY);
+                captionY += lineHeight;
+              }
+            }
+            const end = Math.max(top + imageHeight, captionY) + 24;
+            usedBottom = Math.max(usedBottom, end);
+            if (!firstStep) firstStep = i + 1;
+            lastStep = i + 1;
+            if (compact && column === 0) {
+              rowBottom = end;
+              column = 1;
+            } else {
+              y = Math.max(end, compact ? rowBottom : 0) + 28;
+              rowBottom = y;
+              column = 0;
+            }
+            first = false;
+          } while (lines.length || first);
+        } finally {
+          release(screenshot);
+        }
+      }
+      if (c) {
+        const page = finishPage();
+        check(alive);
+        yield page;
+      }
+    } finally {
+      if (c) release(c);
+    }
+  }
+  async function* pages(value, alive) {
+    const guide = E.guide(value);
+    yield* guide.layout === 'classic' ? classicPages(guide, alive) : designedPages(guide, alive);
+  }
   async function preview(value, alive) {
     const guide = E.guide(value);
     if (!guide.steps.length) throw Error('Add a screenshot to preview your guide.');
@@ -419,7 +616,10 @@
           zip.file(String(++n).padStart(3, '0') + '-guide-page.' + (jpeg ? 'jpg' : 'png'), bytes);
         else {
           const image = await pdf.embedPng(bytes),
-            p = pdf.addPage([595.28, 841.89]);
+            p = pdf.addPage([
+              595.28,
+              page.height === 1754 ? 841.89 : (595.28 * page.height) / page.width,
+            ]);
           p.drawImage(image, { x: 0, y: 0, width: p.getWidth(), height: p.getHeight() });
         }
       } finally {
