@@ -60,7 +60,14 @@ test('Website designs: all three new mobile layouts retain every original sectio
 
 test('Website designs: Fiori uses existing navigation controls and preserves a typed draft on desktop, mobile and cancellation',t=>{
  const x=fixture(t),nodes=[...x.d.querySelectorAll('#tabs button')],editor=x.d.getElementById('editor'),before=structuredClone(x.state());
- editor.value='Typed exact 001 / 6.00007';x.ui.open();x.select('fiori');assert.equal(x.ui.snapshot().design,'fiori');assert.equal(x.d.querySelectorAll('#tabs .wd-primary-nav button').length,5);assert.ok(nodes.every(n=>n.isConnected));assert.equal(x.d.getElementById('editor'),editor);
+ editor.value='Typed exact 001 / 6.00007';x.ui.open();x.select('fiori');assert.equal(x.ui.snapshot().design,'fiori');assert.equal(x.d.querySelectorAll('#tabs > .wd-nav-group').length,3);assert.equal(x.d.querySelectorAll('#tabs .wd-nav-group button').length,15);assert.equal(x.d.getElementById('wdSectionMenu'),null);assert.ok(nodes.every(n=>n.isConnected));assert.equal(x.d.getElementById('editor'),editor);
  x.mobile(true);assert.equal(x.d.querySelectorAll('#wdSectionMenu button').length,15);assert.equal(editor.value,'Typed exact 001 / 6.00007');x.ui.close();assert.equal(x.ui.snapshot().design,'current');assert.deepEqual(x.state(),before);assert.equal(x.writes(),0);
  x.ui.open();x.select('fiori');x.submit();assert.equal(x.ui.snapshot().saved,'fiori');assert.equal(x.writes(),1);x.signOut();assert.equal(x.ui.snapshot().design,'current');
+});
+test('Website designs: Fiori side navigation is distinct from Clear Desk and keeps permissions and route identity through breakpoints',t=>{
+ const x=fixture(t),nodes=[...x.d.querySelectorAll('#tabs button')];x.saved('clear-desk');assert.ok(x.d.getElementById('wdSectionMenu'));assert.equal(x.d.querySelectorAll('#tabs > .wd-nav-group').length,0);
+ x.saved('fiori');assert.equal(x.d.getElementById('wdSectionMenu'),null);assert.equal(x.d.querySelectorAll('#tabs > .wd-nav-group').length,3);assert.ok(nodes.every(n=>n.isConnected));
+ const tools=nodes.filter(n=>['studio','lab','validator','snippets'].includes(n.dataset.tab));tools.forEach(n=>n.hidden=true);x.ui.mount();assert.equal(x.d.querySelectorAll('#tabs > .wd-nav-group')[2].hidden,true);
+ for(let i=0;i<3;i++){x.mobile(true);assert.equal(x.d.querySelectorAll('#wdSectionMenu button').length,15);x.mobile(false);assert.equal(x.d.querySelectorAll('#tabs > .wd-nav-group').length,3);assert.equal(x.d.querySelectorAll('#tabs button').length,15);assert.ok(nodes.every(n=>n.isConnected));}
+ assert.equal(x.writes(),0);
 });

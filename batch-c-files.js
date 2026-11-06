@@ -150,80 +150,164 @@
       h = c.height;
     ctx.drawImage(img, 0, 0, w, h);
     if (original) return c;
-    for (const mark of step.marks) {
-      const points = mark.points.map(p => [p[0] * w, p[1] * h]),
-        area = E.bounds(mark.points),
-        [a, b] = [points[0], points.at(-1)];
-      ctx.save();
-      ctx.strokeStyle = ctx.fillStyle = mark.color;
-      ctx.lineWidth = Math.max(2, mark.size * w);
-      ctx.lineJoin = ctx.lineCap = 'round';
-      if (mark.type === 'number') {
-        const diameter = Math.min(Math.max(12, mark.size * w), w, h),
-          radius = diameter / 2,
-          x = Math.max(radius, Math.min(w - radius, a[0])),
-          y = Math.max(radius, Math.min(h - radius, a[1])),
-          ink = palette({ accent: mark.color, paper: mark.color }).ink;
-        ctx.lineWidth = Math.min(3, diameter / 16);
-        ctx.strokeStyle = ink;
-        ctx.beginPath();
-        ctx.arc(x, y, Math.max(0.1, radius - ctx.lineWidth / 2), 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        ctx.fillStyle = ink;
-        ctx.font =
-          '700 ' +
-          diameter * (mark.number < 10 ? 0.57 : mark.number < 100 ? 0.48 : 0.38) +
-          'px system-ui, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(String(mark.number), x, y);
-      } else if (mark.type === 'rectangle') {
-        ctx.lineWidth = Math.min(ctx.lineWidth, Math.max(1, Math.min(area.w * w, area.h * h) / 2));
-        const inset = ctx.lineWidth / 2;
-        ctx.strokeRect(
-          area.x * w + inset,
-          area.y * h + inset,
-          Math.max(0, area.w * w - ctx.lineWidth),
-          Math.max(0, area.h * h - ctx.lineWidth)
-        );
-      } else if (mark.type === 'cover')
-        ctx.fillRect(area.x * w, area.y * h, area.w * w, area.h * h);
-      else if (mark.type === 'blur') {
-        // Downsample then smooth back into the selected area. Unlike canvas.filter,
-        // this also works when iPhone browsers do not expose native canvas filters.
-        const sw = Math.round(area.w * w),
-          sh = Math.round(area.h * h),
-          radius = Math.max(8, mark.size * w);
-        if (sw && sh) {
-          const small = canvas(
-              Math.max(1, Math.ceil(sw / radius)),
-              Math.max(1, Math.ceil(sh / radius))
-            ),
-            sample = small.getContext('2d');
-          sample.imageSmoothingEnabled = ctx.imageSmoothingEnabled = true;
-          sample.imageSmoothingQuality = ctx.imageSmoothingQuality = 'high';
-          sample.drawImage(c, area.x * w, area.y * h, sw, sh, 0, 0, small.width, small.height);
-          ctx.drawImage(small, 0, 0, small.width, small.height, area.x * w, area.y * h, sw, sh);
-          release(small);
-        }
-      } else {
-        ctx.beginPath();
-        ctx.moveTo(...a);
-        for (const p of points.slice(1)) ctx.lineTo(...p);
-        ctx.stroke();
-        if (mark.type === 'arrow') {
-          const angle = Math.atan2(b[1] - a[1], b[0] - a[0]),
-            length = Math.max(14, ctx.lineWidth * 3);
+    // Zooms always sample a source with every privacy edit applied, irrespective of layer order.
+    const protectedSource = step.marks.some(m => m.type === 'inset')
+      ? draw(
+          canvas(1, 1),
+          { ...step, marks: step.marks.filter(m => ['cover', 'brush', 'blur'].includes(m.type)) },
+          img
+        )
+      : null;
+    try {
+      for (const mark of step.marks) {
+        const points = mark.points.map(p => [p[0] * w, p[1] * h]),
+          area = E.bounds(mark.points),
+          [a, b] = [points[0], points.at(-1)];
+        ctx.save();
+        ctx.strokeStyle = ctx.fillStyle = mark.color;
+        ctx.lineWidth = Math.max(2, mark.size * w);
+        ctx.lineJoin = ctx.lineCap = 'round';
+        if (mark.type === 'number') {
+          const diameter = Math.min(Math.max(12, mark.size * w), w, h),
+            radius = diameter / 2,
+            x = Math.max(radius, Math.min(w - radius, a[0])),
+            y = Math.max(radius, Math.min(h - radius, a[1])),
+            ink = palette({ accent: mark.color, paper: mark.color }).ink;
+          ctx.lineWidth = Math.min(3, diameter / 16);
+          ctx.strokeStyle = ink;
           ctx.beginPath();
-          ctx.moveTo(...b);
-          ctx.lineTo(b[0] - length * Math.cos(angle - 0.5), b[1] - length * Math.sin(angle - 0.5));
-          ctx.moveTo(...b);
-          ctx.lineTo(b[0] - length * Math.cos(angle + 0.5), b[1] - length * Math.sin(angle + 0.5));
+          ctx.arc(x, y, Math.max(0.1, radius - ctx.lineWidth / 2), 0, Math.PI * 2);
+          ctx.fill();
           ctx.stroke();
+          ctx.fillStyle = ink;
+          ctx.font =
+            '700 ' +
+            diameter * (mark.number < 10 ? 0.57 : mark.number < 100 ? 0.48 : 0.38) +
+            'px system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(String(mark.number), x, y);
+        } else if (mark.type === 'ellipse') {
+          const thickness = Math.min(ctx.lineWidth, Math.min(area.w * w, area.h * h) / 2);
+          ctx.lineWidth = thickness;
+          ctx.beginPath();
+          ctx.ellipse(
+            (area.x + area.w / 2) * w,
+            (area.y + area.h / 2) * h,
+            Math.max(0.1, (area.w * w - thickness) / 2),
+            Math.max(0.1, (area.h * h - thickness) / 2),
+            0,
+            0,
+            Math.PI * 2
+          );
+          ctx.stroke();
+        } else if (mark.type === 'spotlight') {
+          ctx.globalAlpha = mark.opacity;
+          ctx.fillRect(0, 0, w, area.y * h);
+          ctx.fillRect(0, (area.y + area.h) * h, w, (1 - area.y - area.h) * h);
+          ctx.fillRect(0, area.y * h, area.x * w, area.h * h);
+          ctx.fillRect((area.x + area.w) * w, area.y * h, (1 - area.x - area.w) * w, area.h * h);
+        } else if (mark.type === 'inset') {
+          const s = mark.source,
+            dx = area.x * w,
+            dy = area.y * h,
+            dw = area.w * w,
+            dh = area.h * h;
+          ctx.lineWidth = Math.max(2, mark.size * w);
+          ctx.beginPath();
+          const right = dx > (s.x + s.w / 2) * w;
+          ctx.moveTo((right ? s.x + s.w : s.x) * w, (s.y + s.h / 2) * h);
+          ctx.lineTo(right ? dx : dx + dw, dy + dh / 2);
+          ctx.stroke();
+          ctx.drawImage(protectedSource, s.x * w, s.y * h, s.w * w, s.h * h, dx, dy, dw, dh);
+          ctx.strokeRect(dx, dy, dw, dh);
+          ctx.strokeRect(s.x * w, s.y * h, s.w * w, s.h * h);
+        } else if (['text', 'callout'].includes(mark.type)) {
+          const x = area.x * w,
+            y = area.y * h,
+            width = area.w * w,
+            height = area.h * h,
+            callout = mark.type === 'callout',
+            fontSize = Math.max(10, mark.size * w),
+            padding = callout ? Math.min(12, width / 10) : 0,
+            bodyHeight = height * (callout ? 0.8 : 1);
+          if (callout) {
+            ctx.fillRect(x, y, width, bodyHeight);
+            ctx.beginPath();
+            ctx.moveTo(x + width * 0.18, y + bodyHeight);
+            ctx.lineTo(x + width * 0.18, y + height);
+            ctx.lineTo(x + width * 0.36, y + bodyHeight);
+            ctx.fill();
+            ctx.fillStyle = palette({ accent: mark.color, paper: mark.color }).ink;
+          }
+          ctx.beginPath();
+          ctx.rect(x, y, width, bodyHeight);
+          ctx.clip();
+          ctx.font = '500 ' + fontSize + 'px system-ui, sans-serif';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'top';
+          const lines = wrap(ctx, mark.text, Math.max(1, width - 2 * padding)),
+            lineHeight = fontSize * 1.25;
+          for (let i = 0; i < lines.length && padding + (i + 1) * lineHeight <= bodyHeight; i++)
+            ctx.fillText(lines[i], x + padding, y + padding + i * lineHeight);
+        } else if (mark.type === 'rectangle') {
+          ctx.lineWidth = Math.min(
+            ctx.lineWidth,
+            Math.max(1, Math.min(area.w * w, area.h * h) / 2)
+          );
+          const inset = ctx.lineWidth / 2;
+          ctx.strokeRect(
+            area.x * w + inset,
+            area.y * h + inset,
+            Math.max(0, area.w * w - ctx.lineWidth),
+            Math.max(0, area.h * h - ctx.lineWidth)
+          );
+        } else if (mark.type === 'cover')
+          ctx.fillRect(area.x * w, area.y * h, area.w * w, area.h * h);
+        else if (mark.type === 'blur') {
+          // Downsample then smooth back into the selected area. Unlike canvas.filter,
+          // this also works when iPhone browsers do not expose native canvas filters.
+          const sw = Math.round(area.w * w),
+            sh = Math.round(area.h * h),
+            radius = Math.max(8, mark.size * w);
+          if (sw && sh) {
+            const small = canvas(
+                Math.max(1, Math.ceil(sw / radius)),
+                Math.max(1, Math.ceil(sh / radius))
+              ),
+              sample = small.getContext('2d');
+            sample.imageSmoothingEnabled = ctx.imageSmoothingEnabled = true;
+            sample.imageSmoothingQuality = ctx.imageSmoothingQuality = 'high';
+            sample.drawImage(c, area.x * w, area.y * h, sw, sh, 0, 0, small.width, small.height);
+            ctx.drawImage(small, 0, 0, small.width, small.height, area.x * w, area.y * h, sw, sh);
+            release(small);
+          }
+        } else {
+          ctx.beginPath();
+          ctx.moveTo(...a);
+          for (const p of points.slice(1)) ctx.lineTo(...p);
+          ctx.stroke();
+          if (mark.type === 'arrow') {
+            const angle = Math.atan2(b[1] - a[1], b[0] - a[0]),
+              length = Math.max(14, ctx.lineWidth * 3);
+            ctx.beginPath();
+            ctx.moveTo(...b);
+            ctx.lineTo(
+              b[0] - length * Math.cos(angle - 0.5),
+              b[1] - length * Math.sin(angle - 0.5)
+            );
+            ctx.moveTo(...b);
+            ctx.lineTo(
+              b[0] - length * Math.cos(angle + 0.5),
+              b[1] - length * Math.sin(angle + 0.5)
+            );
+            ctx.stroke();
+          }
         }
+        ctx.restore();
       }
-      ctx.restore();
+    } finally {
+      if (protectedSource) release(protectedSource);
     }
     return c;
   }
@@ -367,7 +451,7 @@
           }
           ctx.font = '24px system-ui, sans-serif';
           ctx.fillStyle = colour.body;
-          if (!lines) lines = wrap(ctx, step.caption, 1100);
+          if (!lines) lines = wrap(ctx, E.caption(step, guide.linkedInstructions), 1100);
           const capacity = Math.max(1, Math.floor((contentBottom - y) / 35)),
             showing = lines.splice(0, capacity);
           for (const line of showing) {
@@ -491,7 +575,8 @@
           if (!c) newPage();
           const captionWidth = split ? 438 : cardWidth - 40;
           font(compact ? 22 : 24);
-          const lines = step.caption.trim() ? wrap(ctx, step.caption, captionWidth) : [];
+          const text = E.caption(step, guide.linkedInstructions),
+            lines = text.trim() ? wrap(ctx, text, captionWidth) : [];
           let first = true;
           do {
             check(alive);

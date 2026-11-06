@@ -19,6 +19,9 @@
     exportHeading: E.DEFAULT_GUIDE_HEADING,
     footer: E.footer(),
     colours: E.colours(),
+    numbering: E.numbering(),
+    styles: [],
+    linkedInstructions: false,
     steps: [],
   });
   const button = (action, label, extra = '') =>
@@ -54,15 +57,332 @@
       urls = [],
       tool = 'cover',
       zoom = 1;
+    let objectIndex = -1,
+      objectRef = null,
+      objectListKey = '',
+      clipboard = [];
     const project = () => projects[mode],
       step = () => project().steps.find(s => s.id === selected),
       $ = selector => room?.querySelector(selector);
-    const nextNumber = () =>
-      1 +
-      (step()?.marks || []).reduce(
-        (n, mark) => (mark.type === 'number' ? Math.max(n, mark.number) : n),
-        0
+    const nextNumber = () => E.nextNumber(project(), selected),
+      clone = value => JSON.parse(JSON.stringify(value)),
+      activeObject = () => step()?.marks[objectIndex];
+    function objectFields() {
+      return (
+        '<section class="bc-objects" aria-label="Screenshot objects"><h3>Objects &amp; instructions</h3><label>Object<select data-bc-object><option value="-1">Choose an object</option></select></label><p class="bc-guide-heading-help">Use Select objects, drag to move, or drag a corner to resize. Locked objects can be selected from this list.</p>' +
+        '<div class="bc-object-actions">' +
+        [
+          ['delete-object', 'Delete'],
+          ['duplicate-object', 'Duplicate'],
+          ['front-object', 'Bring to front'],
+          ['back-object', 'Send to back'],
+          ['lock-object', 'Lock object'],
+          ['copy-object', 'Copy selected'],
+          ['copy-all', 'Copy all'],
+          ['paste-objects', 'Paste objects'],
+        ]
+          .map(([id, label]) => button(id, label))
+          .join('') +
+        '</div>' +
+        '<div data-bc-object-properties hidden><div class="bc-object-grid">' +
+        [
+          ['x', 'Left (%)'],
+          ['y', 'Top (%)'],
+          ['w', 'Width (%)'],
+          ['h', 'Height (%)'],
+        ]
+          .map(
+            ([id, label]) =>
+              '<label>' +
+              label +
+              '<input type="number" min="0" max="100" step="0.1" data-bc-object-' +
+              id +
+              '></label>'
+          )
+          .join('') +
+        '</div>' +
+        '<label>Object colour<input type="color" data-bc-object-color></label><label data-bc-object-size-label>Size / stroke (pixels)<input type="number" min="0.1" step="0.1" data-bc-object-size></label>' +
+        '<label data-bc-object-text-label hidden>Text<textarea maxlength="500" rows="3" data-bc-object-text></textarea><small>Resize the box or reduce its text size until the label fits.</small></label><label data-bc-object-number-label hidden>Number<input type="number" min="1" max="999" data-bc-object-number></label><label data-bc-object-instruction-label hidden>Linked instruction<textarea maxlength="300" rows="3" data-bc-object-instruction placeholder="What should the reader do at this marker?"></textarea></label>' +
+        '<label data-bc-object-opacity-label hidden>Dim opacity<input type="range" min="10" max="85" data-bc-object-opacity></label>' +
+        button('apply-object', 'Apply object changes') +
+        '</div>' +
+        (mode === 'guide'
+          ? '<label class="bc-object-check"><input type="checkbox" data-bc-linked>Include numbered instructions in exports</label><div data-bc-linked-list></div>'
+          : '') +
+        '<details><summary>Numbering options</summary><label>Sequence<select data-bc-number-mode><option value="screenshot">Restart for each screenshot</option><option value="guide">Continue across screenshots</option></select></label><label>Start at<input type="number" min="1" max="999" data-bc-number-start></label>' +
+        button('renumber', 'Renumber existing markers') +
+        '</details>' +
+        '<details><summary>Saved annotation styles</summary><label>Style<select data-bc-style><option value="">Choose a style</option></select></label><div class="bc-object-actions">' +
+        button('apply-style', 'Apply style') +
+        button('delete-style', 'Delete style') +
+        '</div><label>Style name<input maxlength="40" data-bc-style-name placeholder="e.g. Review highlights"></label>' +
+        button('save-style', 'Save current style') +
+        '<p class="bc-guide-heading-help">Styles are saved in your editable guide. Applying a style updates the current tool and the selected unlocked object.</p></details></section>'
       );
+    }
+    function updateObjects() {
+      const s = step(),
+        marks = s?.marks || [],
+        m = activeObject(),
+        select = $('[data-bc-object]');
+      if (!select) return;
+      const key = JSON.stringify(
+        marks.map(o => [o.type, o.number, o.text?.slice(0, 28), o.locked])
+      );
+      if (key !== objectListKey) {
+        select.innerHTML =
+          '<option value="-1">Choose an object</option>' +
+          marks
+            .map((o, i) => ({ o, i }))
+            .reverse()
+            .map(
+              ({ o, i }) =>
+                '<option value="' +
+                i +
+                '">' +
+                esc(
+                  i +
+                    1 +
+                    '. ' +
+                    o.type +
+                    (o.type === 'number' ? ' ' + o.number : '') +
+                    (o.text ? ' · ' + o.text.slice(0, 28) : '') +
+                    (o.locked ? ' · locked' : '')
+                ) +
+                '</option>'
+            )
+            .join('');
+        objectListKey = key;
+      }
+      select.value = m ? String(objectIndex) : '-1';
+      $('[data-bc-object-properties]').hidden = !m;
+      for (const action of [
+        'delete-object',
+        'duplicate-object',
+        'front-object',
+        'back-object',
+        'apply-object',
+      ])
+        $('[data-bc="' + action + '"]').disabled = busy || !m || !!m.locked;
+      for (const action of ['lock-object', 'copy-object'])
+        $('[data-bc="' + action + '"]').disabled = busy || !m;
+      $('[data-bc="copy-all"]').disabled = busy || !marks.length;
+      $('[data-bc="paste-objects"]').disabled = busy || !s || !clipboard.length;
+      $('[data-bc="lock-object"]').textContent = m?.locked ? 'Unlock object' : 'Lock object';
+      for (const el of $('[data-bc-object-properties]').querySelectorAll('input,textarea'))
+        el.disabled = busy || !m || !!m.locked;
+      if (m && objectRef !== m) {
+        const b = E.markBounds(m, s.image);
+        for (const k of ['x', 'y', 'w', 'h'])
+          $('[data-bc-object-' + k + ']').value = (b[k] * 100).toFixed(2);
+        $('[data-bc-object-color]').value = m.color;
+        $('[data-bc-object-size]').max = s.image.width * 0.2;
+        $('[data-bc-object-size]').value = (m.size * s.image.width).toFixed(2);
+        $('[data-bc-object-text]').value = m.text || '';
+        $('[data-bc-object-number]').value = m.number || 1;
+        $('[data-bc-object-instruction]').value = m.instruction || '';
+        $('[data-bc-object-opacity]').value = Math.round((m.opacity || 0.55) * 100);
+        for (const input of $('[data-bc-object-properties]').querySelectorAll('input,textarea'))
+          input.dataset.current = input.value;
+      }
+      objectRef = m || null;
+      for (const [part, show] of [
+        ['text', ['text', 'callout'].includes(m?.type)],
+        ['number', m?.type === 'number'],
+        ['instruction', m?.type === 'number'],
+        ['opacity', m?.type === 'spotlight'],
+      ])
+        $('[data-bc-object-' + part + '-label]').hidden = !show;
+      $('[data-bc-object-size-label]').hidden = m?.type === 'spotlight';
+      if (mode === 'guide') {
+        $('[data-bc-linked]').checked = project().linkedInstructions;
+        const list = $('[data-bc-linked-list]'),
+          key = String(project().linkedInstructions) + '|' + revision + '|' + selected;
+        if (list.dataset.key !== key) {
+          list.dataset.key = key;
+          $('[data-bc-linked-list]').innerHTML = project().linkedInstructions
+            ? marks
+                .map((o, i) => ({ o, i }))
+                .filter(x => x.o.type === 'number' && x.o.instruction?.trim())
+                .sort((a, b) => a.o.number - b.o.number)
+                .map(
+                  ({ o, i }) =>
+                    '<p>' +
+                    button(
+                      'choose-object',
+                      esc(o.number + '. ' + o.instruction),
+                      'data-index="' + i + '"'
+                    ) +
+                    '</p>'
+                )
+                .join('')
+            : '';
+        }
+      }
+      $('[data-bc-number-mode]').value = project().numbering.mode;
+      if (document.activeElement !== $('[data-bc-number-start]'))
+        $('[data-bc-number-start]').value = project().numbering.start;
+      const styles = $('[data-bc-style]'),
+        styleKey = JSON.stringify(project().styles);
+      if (styles.dataset.key !== styleKey) {
+        const value = styles.value;
+        styles.innerHTML =
+          '<option value="">Choose a style</option>' +
+          project()
+            .styles.map((s, i) => '<option value="' + i + '">' + esc(s.name) + '</option>')
+            .join('');
+        styles.dataset.key = styleKey;
+        styles.value = value;
+      }
+    }
+    function commitMarks(marks, index = objectIndex) {
+      const s = step();
+      if (!s) return;
+      const checked = E.guide({
+        ...project(),
+        steps: project().steps.map(t => (t === s ? { ...t, marks } : t)),
+      }).steps.find(t => t.id === s.id);
+      remember();
+      s.marks = checked.marks;
+      objectIndex = index;
+      objectRef = null;
+      original = false;
+      changed();
+      paint();
+    }
+    function chooseObject(index) {
+      objectIndex = step()?.marks[index] ? index : -1;
+      objectRef = null;
+      tool = 'object';
+      original = false;
+      drag = null;
+      paint();
+    }
+    function applyObject() {
+      const m = activeObject(),
+        s = step();
+      if (!m || m.locked) return;
+      const b = Object.fromEntries(
+        ['x', 'y', 'w', 'h'].map(k => [k, +$('[data-bc-object-' + k + ']').value / 100])
+      );
+      const edited = key => {
+        const input = $('[data-bc-object-' + key + ']');
+        return input.value !== input.dataset.current;
+      };
+      let next = ['x', 'y', 'w', 'h'].some(edited) ? E.transformMark(m, s.image, b) : { ...m };
+      next.color = $('[data-bc-object-color]').value;
+      if (edited('size')) next.size = +$('[data-bc-object-size]').value / s.image.width;
+      if (['text', 'callout'].includes(m.type)) next.text = $('[data-bc-object-text]').value;
+      if (m.type === 'number') {
+        next.number = +$('[data-bc-object-number]').value;
+        next.instruction = $('[data-bc-object-instruction]').value;
+      }
+      if (m.type === 'spotlight' && edited('opacity'))
+        next.opacity = +$('[data-bc-object-opacity]').value / 100;
+      commitMarks(s.marks.map((o, i) => (i === objectIndex ? next : o)));
+    }
+    function editObject(action) {
+      const s = step(),
+        m = activeObject();
+      if (!s) return;
+      if (action === 'copy-all' || action === 'copy-object') {
+        clipboard = clone(action === 'copy-all' ? s.marks : m ? [m] : []);
+        controls();
+        status(
+          clipboard.length + ' objects copied. Select another screenshot and choose Paste objects.'
+        );
+        return;
+      }
+      if (action === 'paste-objects') {
+        let number = nextNumber();
+        const additions = clipboard.map(o => ({
+          ...clone(o),
+          locked: false,
+          ...(o.type === 'number' ? { number: number++ } : {}),
+        }));
+        commitMarks([...s.marks, ...additions], s.marks.length);
+        return;
+      }
+      if (!m) return;
+      if (action === 'lock-object') {
+        commitMarks(s.marks.map((o, i) => (i === objectIndex ? { ...o, locked: !o.locked } : o)));
+        return;
+      }
+      if (m.locked) throw Error('Unlock this object before changing it.');
+      if (action === 'delete-object') {
+        commitMarks(
+          s.marks.filter((_, i) => i !== objectIndex),
+          -1
+        );
+        return;
+      }
+      if (action === 'duplicate-object') {
+        const copy = E.moveMark(clone(m), s.image, 0.02, 0.02);
+        if (copy.type === 'number') copy.number = nextNumber();
+        commitMarks([...s.marks, copy], s.marks.length);
+        return;
+      }
+      if (['front-object', 'back-object'].includes(action)) {
+        const list = s.marks.filter((_, i) => i !== objectIndex);
+        if (action === 'front-object') list.push(m);
+        else list.unshift(m);
+        commitMarks(list, action === 'front-object' ? list.length - 1 : 0);
+      }
+    }
+    function saveStyle() {
+      const style = {
+          name: $('[data-bc-style-name]').value.trim(),
+          color: $('[data-bc-color]').value,
+          stroke: +$('[data-bc-size]').value,
+          marker: +$('[data-bc-marker-size]').value,
+          text: +$('[data-bc-text-size]').value,
+          opacity: +$('[data-bc-dim-opacity]').value / 100,
+        },
+        existing = project().styles.filter(s => s.name !== style.name);
+      project().styles = E.styles([...existing, style]);
+      changed();
+      controls();
+      status('Annotation style saved with this editable guide.');
+    }
+    function applyStyle() {
+      const style = project().styles[+$('[data-bc-style]').value];
+      if (!style || $('[data-bc-style]').value === '') return;
+      for (const [key, value] of [
+        ['color', style.color],
+        ['size', style.stroke],
+        ['marker-size', style.marker],
+        ['text-size', style.text],
+        ['dim-opacity', style.opacity * 100],
+      ])
+        $('[data-bc-' + key + ']').value = value;
+      const m = activeObject(),
+        s = step();
+      if (m && !m.locked) {
+        const size =
+          (m.type === 'number'
+            ? style.marker
+            : ['text', 'callout'].includes(m.type)
+              ? style.text
+              : ['rectangle', 'ellipse', 'arrow', 'inset'].includes(m.type)
+                ? style.stroke / 4
+                : style.stroke) / s.image.width;
+        commitMarks(
+          s.marks.map((o, i) =>
+            i === objectIndex
+              ? {
+                  ...o,
+                  color: style.color,
+                  size: Math.min(0.2, size),
+                  ...(o.type === 'spotlight' ? { opacity: style.opacity } : {}),
+                }
+              : o
+          )
+        );
+      }
+      status(
+        'Style applied to the current tool' + (m && !m.locked ? ' and selected object.' : '.')
+      );
+    }
     function brandingFields() {
       const f = project().footer,
         c = project().colours;
@@ -387,6 +707,10 @@
         projects = { privacy: blank(), guide: blank() };
         histories.clear();
         redo.clear();
+        clipboard = [];
+        objectIndex = -1;
+        objectRef = null;
+        objectListKey = '';
         removed = null;
         index = indexed = ticketForm = null;
         clearTimeout(twinTimer);
@@ -542,14 +866,26 @@
         : 'Compare original';
       for (const el of room.querySelectorAll('[data-bc-tool]'))
         el.setAttribute('aria-pressed', String(el.dataset.bcTool === tool));
-      $('[data-bc-brush-control]').hidden = tool === 'number';
+      $('[data-bc-brush-control]').hidden = [
+        'number',
+        'object',
+        'text',
+        'callout',
+        'spotlight',
+      ].includes(tool);
       $('[data-bc-number-control]').hidden = tool !== 'number';
       $('[data-bc-next-number]').hidden = tool !== 'number';
       $('[data-bc-next-number]').textContent = 'Next number: ' + nextNumber();
-      $('[data-bc-size-label]').textContent =
-        tool === 'rectangle' ? 'Border thickness' : 'Brush size';
+      $('[data-bc-size-label]').textContent = ['rectangle', 'ellipse', 'inset'].includes(tool)
+        ? 'Border thickness'
+        : 'Brush size';
+      $('[data-bc-new-text-control]').hidden = !['text', 'callout'].includes(tool);
+      $('[data-bc-text-size-control]').hidden = !['text', 'callout'].includes(tool);
+      $('[data-bc-dim-control]').hidden = tool !== 'spotlight';
       $('[data-bc-canvas]').style.touchAction = tool === 'move' ? 'auto' : 'none';
-      $('[data-bc-canvas]').style.cursor = tool === 'move' ? 'grab' : 'crosshair';
+      $('[data-bc-canvas]').style.cursor =
+        tool === 'move' ? 'grab' : tool === 'object' ? 'move' : 'crosshair';
+      updateObjects();
     }
     function thumbs() {
       $('[data-bc-steps]').innerHTML = project()
@@ -574,12 +910,19 @@
         controls();
         return;
       }
-      F.draw(
-        c,
-        drag && drag.kind !== 'crop' ? { ...s, marks: [...s.marks, drag.mark] } : s,
-        image,
-        original
-      );
+      const preview =
+        drag?.kind === 'object'
+          ? { ...s, marks: s.marks.map((m, i) => (i === drag.index ? drag.mark : m)) }
+          : drag && drag.kind !== 'crop'
+            ? {
+                ...s,
+                marks: [
+                  ...s.marks,
+                  drag.kind === 'inset' ? { ...drag.mark, type: 'rectangle' } : drag.mark,
+                ],
+              }
+            : s;
+      F.draw(c, preview, image, original);
       const crop = drag?.kind === 'crop' ? E.bounds(drag.mark.points) : s.crop;
       if (crop && !original) {
         const ctx = c.getContext('2d'),
@@ -595,6 +938,29 @@
         ctx.strokeStyle = '#e4b54f';
         ctx.lineWidth = 3;
         ctx.strokeRect(x, y, w, h);
+      }
+      if (tool === 'object' && !original && preview.marks[objectIndex]) {
+        const b = E.markBounds(preview.marks[objectIndex], s.image),
+          ctx = c.getContext('2d'),
+          size = 6 / Math.max(0.1, zoom);
+        ctx.save();
+        ctx.strokeStyle = '#245e9a';
+        ctx.fillStyle = '#ffffff';
+        ctx.lineWidth = 2 / Math.max(0.1, zoom);
+        ctx.setLineDash?.([6 / zoom, 4 / zoom]);
+        ctx.strokeRect(b.x * c.width, b.y * c.height, b.w * c.width, b.h * c.height);
+        ctx.setLineDash?.([]);
+        if (!preview.marks[objectIndex].locked)
+          for (const [x, y] of [
+            [b.x, b.y],
+            [b.x + b.w, b.y],
+            [b.x, b.y + b.h],
+            [b.x + b.w, b.y + b.h],
+          ]) {
+            ctx.fillRect(x * c.width - size / 2, y * c.height - size / 2, size, size);
+            ctx.strokeRect(x * c.width - size / 2, y * c.height - size / 2, size, size);
+          }
+        ctx.restore();
       }
       c.style.width = Math.round(s.image.width * zoom) + 'px';
       c.style.height = 'auto';
@@ -619,6 +985,9 @@
     }
     async function select(id) {
       selected = id;
+      objectIndex = -1;
+      objectRef = null;
+      objectListKey = '';
       original = false;
       image = null;
       drag = null;
@@ -890,6 +1259,12 @@
           ['rectangle', '□ Rectangle outline'],
           ['crop', '⌗ Crop'],
           ['move', '✥ Move'],
+          ['object', 'Select objects'],
+          ['ellipse', '○ Oval outline'],
+          ['text', 'Text label'],
+          ['callout', 'Callout bubble'],
+          ['spotlight', 'Spotlight'],
+          ['inset', 'Zoom detail'],
         ]
           .map(
             ([id, name]) =>
@@ -904,6 +1279,7 @@
           .join('') +
         '</div><div class="bc-tool-options"><label>Colour<input type="color" data-bc-color value="#183b35"></label><label data-bc-brush-control><span data-bc-size-label>Brush size</span><input type="range" data-bc-size min="2" max="80" value="24" aria-label="Brush or border thickness"></label>' +
         '<label data-bc-number-control hidden>Marker size<input type="range" data-bc-marker-size min="16" max="160" value="60" aria-label="Number marker size"></label><span data-bc-next-number hidden></span>' +
+        '<label data-bc-new-text-control hidden>Label text<input data-bc-new-text maxlength="500" placeholder="Type your label before drawing"></label><label data-bc-text-size-control hidden>Text size<input type="range" data-bc-text-size min="10" max="120" value="24"></label><label data-bc-dim-control hidden>Dim opacity<input type="range" data-bc-dim-opacity min="10" max="85" value="55"></label>' +
         button('undo', 'Undo') +
         button('redo', 'Redo') +
         button('reset', 'Reset edits', 'data-needs-image') +
@@ -915,6 +1291,7 @@
         '</span><h3>' +
         (guideMode ? 'Explain this step.' : 'Keep the detail you need.') +
         '</h3><label>Step title<input data-bc-step-title maxlength="180" placeholder="Give this step a clear name" data-needs-image></label><label>Caption<textarea data-bc-caption maxlength="8000" rows="6" placeholder="What should the reader do or notice?" data-needs-image></textarea></label>' +
+        objectFields() +
         (guideMode
           ? '<div class="bc-step-actions">' +
             button('up', '↑ Move step up') +
@@ -980,6 +1357,25 @@
       room.addEventListener('change', event => {
         if (busy) return;
         const el = event.target;
+        if (el.matches('[data-bc-object]')) chooseObject(+el.value);
+        if (el.matches('[data-bc-number-mode],[data-bc-number-start]')) {
+          try {
+            project().numbering = E.numbering({
+              mode: $('[data-bc-number-mode]').value,
+              start: +$('[data-bc-number-start]').value,
+            });
+            changed();
+            controls();
+          } catch (err) {
+            status(err.message, true);
+            controls();
+          }
+        }
+        if (el.matches('[data-bc-linked]')) {
+          project().linkedInstructions = el.checked;
+          changed();
+          controls();
+        }
         if (el.matches('[data-bc-layout]')) {
           project().layout = el.value;
           guidePreviewView = 'page';
@@ -1073,6 +1469,28 @@
             Math.max(0, Math.min(1, (event.clientY - r.top) / r.height)),
           ];
         };
+      function moveObjectGesture(p) {
+        if (drag?.kind !== 'object') return;
+        const { base, origin, box, handle } = drag,
+          s = step();
+        if (!handle) drag.mark = E.moveMark(base, s.image, p[0] - origin[0], p[1] - origin[1]);
+        else {
+          let left = box.x,
+            top = box.y,
+            right = box.x + box.w,
+            bottom = box.y + box.h;
+          if (handle.includes('w')) left = Math.max(0, Math.min(right - 1 / s.image.width, p[0]));
+          if (handle.includes('e')) right = Math.min(1, Math.max(left + 1 / s.image.width, p[0]));
+          if (handle.includes('n')) top = Math.max(0, Math.min(bottom - 1 / s.image.height, p[1]));
+          if (handle.includes('s')) bottom = Math.min(1, Math.max(top + 1 / s.image.height, p[1]));
+          drag.mark = E.transformMark(base, s.image, {
+            x: left,
+            y: top,
+            w: right - left,
+            h: bottom - top,
+          });
+        }
+      }
       c.addEventListener('pointerdown', event => {
         if (
           !busy &&
@@ -1099,6 +1517,56 @@
         event.preventDefault();
         original = false;
         const p = point(event);
+        if (tool === 'object') {
+          const s = step(),
+            m = activeObject(),
+            r = c.getBoundingClientRect(),
+            tolerance = event.pointerType === 'touch' ? 14 : 8;
+          let handle = '';
+          if (m && !m.locked) {
+            const b = E.markBounds(m, s.image);
+            for (const [name, x, y] of [
+              ['nw', b.x, b.y],
+              ['ne', b.x + b.w, b.y],
+              ['sw', b.x, b.y + b.h],
+              ['se', b.x + b.w, b.y + b.h],
+            ])
+              if (
+                Math.abs(p[0] - x) <= tolerance / r.width &&
+                Math.abs(p[1] - y) <= tolerance / r.height
+              ) {
+                handle = name;
+                break;
+              }
+          }
+          if (!handle)
+            objectIndex =
+              s.marks
+                .map((o, i) => ({ o, i }))
+                .reverse()
+                .find(({ o }) => !o.locked && E.hitMark(o, s.image, p, 4 / r.width))?.i ?? -1;
+          objectRef = null;
+          const target = activeObject();
+          if (target && !target.locked) {
+            drag = {
+              kind: 'object',
+              pointerId: event.pointerId,
+              index: objectIndex,
+              base: target,
+              mark: clone(target),
+              origin: p,
+              box: E.markBounds(target, s.image),
+              handle,
+            };
+            c.setPointerCapture(event.pointerId);
+          }
+          paint();
+          return;
+        }
+        if (['text', 'callout'].includes(tool) && !$('[data-bc-new-text]').value.trim()) {
+          status('Type your label text, then draw a box for it.', true);
+          return;
+        }
         if (tool === 'number' && nextNumber() > 999) {
           status(
             'This screenshot has reached number 999. Undo or reset markers to continue.',
@@ -1114,12 +1582,22 @@
             color: $('[data-bc-color]').value,
             size: Math.min(
               0.2,
-              +$(tool === 'number' ? '[data-bc-marker-size]' : '[data-bc-size]').value /
-                (['arrow', 'rectangle'].includes(tool) ? 4 : 1) /
+              +$(
+                tool === 'number'
+                  ? '[data-bc-marker-size]'
+                  : ['text', 'callout'].includes(tool)
+                    ? '[data-bc-text-size]'
+                    : '[data-bc-size]'
+              ).value /
+                (['arrow', 'rectangle', 'ellipse', 'inset'].includes(tool) ? 4 : 1) /
                 step().image.width
             ),
             points: [p, p],
             ...(tool === 'number' ? { number: nextNumber() } : {}),
+            ...(['text', 'callout'].includes(tool)
+              ? { text: $('[data-bc-new-text]').value.trim() }
+              : {}),
+            ...(tool === 'spotlight' ? { opacity: +$('[data-bc-dim-opacity]').value / 100 } : {}),
           },
         };
         c.setPointerCapture(event.pointerId);
@@ -1134,7 +1612,8 @@
         }
         if (!drag || drag.pointerId !== event.pointerId) return;
         const p = point(event);
-        if (drag.kind === 'number') drag.mark.points = [p, p];
+        if (drag.kind === 'object') moveObjectGesture(p);
+        else if (drag.kind === 'number') drag.mark.points = [p, p];
         else if (drag.kind === 'brush') {
           if (drag.mark.points.length < E.LIMITS.points) drag.mark.points.push(p);
         } else drag.mark.points[1] = p;
@@ -1150,6 +1629,26 @@
           return;
         }
         if (!drag || drag.pointerId !== event.pointerId) return;
+        if (drag.kind === 'object') {
+          moveObjectGesture(point(event));
+          const gesture = drag;
+          drag = null;
+          if (
+            step()?.marks[gesture.index] === gesture.base &&
+            JSON.stringify(gesture.mark) !== JSON.stringify(gesture.base)
+          ) {
+            try {
+              commitMarks(
+                step().marks.map((m, i) => (i === gesture.index ? gesture.mark : m)),
+                gesture.index
+              );
+            } catch (err) {
+              status(err.message, true);
+            }
+          }
+          paint();
+          return;
+        }
         if (drag.kind === 'number') drag.mark.points = [point(event), point(event)];
         else if (drag.kind === 'brush')
           drag.mark.points[drag.mark.points.length - 1] = point(event);
@@ -1158,13 +1657,44 @@
           area = E.bounds(gesture.mark.points),
           s = step();
         drag = null;
+        if (s && ['text', 'callout'].includes(gesture.kind) && (!area.w || !area.h)) {
+          const x = Math.min(0.65, gesture.mark.points[0][0]),
+            y = Math.min(0.78, gesture.mark.points[0][1]);
+          gesture.mark.points = [
+            [x, y],
+            [x + 0.35, y + 0.2],
+          ];
+        }
+        if (s && gesture.kind === 'inset' && area.w && area.h) {
+          const scale = Math.min(2, 0.45 / area.w, 0.4 / area.h);
+          if (scale <= 1) {
+            status(
+              'Choose a smaller area for a zoom detail (less than 45% width and 40% height).',
+              true
+            );
+            paint();
+            return;
+          }
+          const w = area.w * scale,
+            h = area.h * scale,
+            x = area.x < 0.5 ? 1 - w - 0.02 : 0.02,
+            y = area.y < 0.5 ? 1 - h - 0.02 : 0.02;
+          gesture.mark.source = area;
+          gesture.mark.points = [
+            [x, y],
+            [x + w, y + h],
+          ];
+        }
         if (
           s &&
-          (['brush', 'number'].includes(gesture.kind) ||
+          (['brush', 'number', 'text', 'callout'].includes(gesture.kind) ||
             area.w * s.image.width >= 3 ||
             area.h * s.image.height >= 3)
         ) {
-          if (['crop', 'rectangle'].includes(gesture.kind) && (!area.w || !area.h)) {
+          if (
+            ['crop', 'rectangle', 'ellipse', 'spotlight', 'inset'].includes(gesture.kind) &&
+            (!area.w || !area.h)
+          ) {
             paint();
             return;
           }
@@ -1176,10 +1706,16 @@
             paint();
             return;
           }
-          remember();
-          if (gesture.kind === 'crop') s.crop = area;
-          else s.marks = [...s.marks, gesture.mark];
-          changed();
+          if (gesture.kind === 'crop') {
+            remember();
+            s.crop = area;
+            changed();
+          } else
+            try {
+              commitMarks([...s.marks, gesture.mark], s.marks.length);
+            } catch (err) {
+              status(err.message, true);
+            }
         }
         paint();
       });
@@ -1190,9 +1726,43 @@
       });
       room.addEventListener('keydown', event => {
         if (
+          !busy &&
+          activeObject() &&
+          !event.target.matches('input,textarea,select') &&
+          !event.target.isContentEditable
+        ) {
+          if (['Delete', 'Backspace'].includes(event.key)) {
+            event.preventDefault();
+            try {
+              editObject('delete-object');
+            } catch (err) {
+              status(err.message, true);
+            }
+            return;
+          }
+          if (
+            ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key) &&
+            !activeObject().locked
+          ) {
+            event.preventDefault();
+            const amount = event.shiftKey ? 10 : 1,
+              s = step(),
+              dx = event.key === 'ArrowLeft' ? -amount : event.key === 'ArrowRight' ? amount : 0,
+              dy = event.key === 'ArrowUp' ? -amount : event.key === 'ArrowDown' ? amount : 0;
+            commitMarks(
+              s.marks.map((m, i) =>
+                i === objectIndex
+                  ? E.moveMark(m, s.image, dx / s.image.width, dy / s.image.height)
+                  : m
+              )
+            );
+            return;
+          }
+        }
+        if (
           (event.ctrlKey || event.metaKey) &&
           event.key.toLowerCase() === 'z' &&
-          !event.target.matches('input,textarea') &&
+          !event.target.matches('input,textarea,select') &&
           !busy
         ) {
           event.preventDefault();
@@ -1225,6 +1795,64 @@
       }
       if (busy) return;
       const s = step();
+      if (action === 'choose-object') {
+        chooseObject(+el.dataset.index);
+        return;
+      }
+      if (action === 'apply-object') {
+        applyObject();
+        return;
+      }
+      if (
+        [
+          'delete-object',
+          'duplicate-object',
+          'front-object',
+          'back-object',
+          'lock-object',
+          'copy-object',
+          'copy-all',
+          'paste-objects',
+        ].includes(action)
+      ) {
+        editObject(action);
+        return;
+      }
+      if (action === 'save-style') {
+        saveStyle();
+        return;
+      }
+      if (action === 'apply-style') {
+        applyStyle();
+        return;
+      }
+      if (action === 'delete-style') {
+        const value = $('[data-bc-style]').value;
+        if (value !== '') {
+          project().styles = project().styles.filter((_, i) => i !== +value);
+          changed();
+          controls();
+        }
+        return;
+      }
+      if (action === 'renumber') {
+        const next = E.renumber(project(), selected);
+        for (const old of project().steps) {
+          const changedStep = next.steps.find(t => t.id === old.id);
+          if (JSON.stringify(old.marks) !== JSON.stringify(changedStep.marks)) {
+            const history = histories.get(old.id) || [];
+            history.push({ marks: old.marks, crop: old.crop });
+            histories.set(old.id, history.slice(-30));
+            redo.set(old.id, []);
+          }
+        }
+        projects[mode] = next;
+        objectRef = null;
+        changed();
+        paint();
+        status('Markers renumbered. Undo is available on each affected screenshot.');
+        return;
+      }
       if (action === 'refresh-preview') {
         scheduleGuidePreview(0);
         return;
@@ -1328,11 +1956,23 @@
           controls();
           if (tool === 'number')
             status(
-              'Click to place numbered markers. Drag before releasing to adjust placement. Numbers restart for each screenshot; Undo/Redo are available.'
+              'Click to place numbered markers. Use Numbering options for the starting number and sequence. Add a linked instruction in Objects & instructions.'
             );
           if (tool === 'rectangle')
             status(
               'Drag a rectangle around the area to highlight. Colour and Border thickness control its outline; the centre stays transparent.'
+            );
+          if (tool === 'object')
+            status(
+              'Select an object to move it, drag a corner to resize, or edit its properties. Arrow keys nudge; Delete removes an unlocked selection.'
+            );
+          if (tool === 'inset')
+            status(
+              'Drag a small area to magnify. A zoom detail box is created opposite it; use Select objects to move or resize the box. Privacy covers and blur remain applied.'
+            );
+          if (['text', 'callout'].includes(tool))
+            status(
+              'Type Label text, then draw a box or click to place it. Use Select objects to edit its text and size.'
             );
         }
       } else
@@ -1346,6 +1986,7 @@
       projects = { privacy: blank(), guide: blank() };
       histories.clear();
       redo.clear();
+      clipboard = [];
     });
     return {
       cards,

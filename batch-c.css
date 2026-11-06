@@ -623,6 +623,72 @@ body.bc-room-open {
   font-size: 11px;
   color: var(--bc-muted);
 }
+.bc-objects {
+  margin: 18px 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--bc-line);
+}
+.bc-objects h3 {
+  margin: 0 0 10px;
+}
+.bc-objects select,
+.bc-objects input,
+.bc-objects textarea {
+  width: 100%;
+  min-width: 0;
+}
+.bc-objects input[type='color'] {
+  height: 34px;
+  padding: 3px;
+}
+.bc-object-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.bc-object-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+.bc-object-actions button {
+  font-size: 11px;
+  min-height: 34px;
+  padding: 6px 8px;
+}
+.bc-object-check {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+}
+.bc-objects .bc-object-check input {
+  width: auto;
+}
+.bc-objects details {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--bc-line);
+}
+.bc-objects summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+.bc-objects [data-bc-linked-list] button {
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.bc-tool-options [data-bc-new-text] {
+  width: min(220px, 55vw);
+  min-width: 100px;
+}
+@media (pointer: coarse) {
+  .bc-object-actions button {
+    min-height: 44px;
+  }
+}
 .bc-step-actions {
   display: flex;
   flex-wrap: wrap;

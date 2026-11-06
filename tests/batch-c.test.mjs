@@ -42,7 +42,7 @@ test('guide branding defaults preserve legacy exports and reject malformed logo,
 });
 function ui(t){
  const dom=new JSDOM('<button id="launch">Studio</button><div id="host"></div>',{url:'https://losthaidid.github.io/mm-tracker/',runScripts:'outside-only',pretendToBeVisual:true});t.after(()=>dom.window.close());const w=dom.window,d=w.document;let owner='one';const blobs=[],revoked=[],renders=[],exports=[];
- w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;};w.HTMLCanvasElement.prototype.getContext=()=>({fillRect(){},strokeRect(){},drawImage(){}});w.HTMLCanvasElement.prototype.setPointerCapture=function(){};w.HTMLCanvasElement.prototype.toDataURL=()=>image.src;
+ w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;};w.HTMLCanvasElement.prototype.getContext=()=>({fillRect(){},strokeRect(){},drawImage(){},save(){},restore(){},setLineDash(){}});w.HTMLCanvasElement.prototype.setPointerCapture=function(){};w.HTMLCanvasElement.prototype.toDataURL=()=>image.src;
  w.URL.createObjectURL=blob=>{blobs.push(blob);return 'blob:local-'+blobs.length;};w.URL.revokeObjectURL=url=>revoked.push(url);w.Blob=Blob;
  w.eval(source('batch-c-engine.js'));
  w.WorkHubBatchCFiles={imageFromFile:async()=>copy(image),logoFromFile:async()=>copy(image),loadImage:async()=>({}),draw:(c,s,img,original)=>renders.push({s:copy(s),original}),release(){},raster:async()=>({width:8,height:6,toDataURL:()=>image.src}),export:async(g,format,alive)=>{exports.push({g:copy(g),format,alive});return new Blob(['clean export']);}};
@@ -115,7 +115,7 @@ test('adding a privacy-edited image to the guide uses a flattened image and leav
 function fileFixture(){
  const calls=[],w={WorkHubBatchCEngine:E,atob:s=>Buffer.from(s,'base64').toString('binary')};
  w.Image=class{set src(value){const size=w.WorkHubBatchCFiles.dimensions(new Uint8Array(Buffer.from(value.split(',')[1],'base64')));this.naturalWidth=size.width;this.naturalHeight=size.height;queueMicrotask(()=>this.onload());}};
- const stack=[],context={globalAlpha:1,fillRect(...args){calls.push(['fill',this.fillStyle,...args]);},drawImage(...args){calls.push(['draw',...args],['alpha-draw',this.globalAlpha,...args]);},save(){stack.push({globalAlpha:this.globalAlpha,font:this.font,fillStyle:this.fillStyle,textAlign:this.textAlign,textBaseline:this.textBaseline});},restore(){Object.assign(this,stack.pop());},beginPath(){},rect(){},clip(){},moveTo(){},lineTo(){},arc(...args){calls.push(['arc',...args]);},fill(){calls.push(['shape-fill',this.fillStyle]);},strokeRect(...args){calls.push(['outline',this.strokeStyle,this.lineWidth,...args]);},stroke(){calls.push(['stroke']);},measureText:t=>({width:String(t).length*14}),fillText(text,x,y){calls.push(['text',text,x,y,this.font,this.fillStyle,this.globalAlpha]);}};
+ const stack=[],context={globalAlpha:1,fillRect(...args){calls.push(['fill',this.fillStyle,...args]);},drawImage(...args){calls.push(['draw',...args],['alpha-draw',this.globalAlpha,...args]);},save(){stack.push({globalAlpha:this.globalAlpha,font:this.font,fillStyle:this.fillStyle,textAlign:this.textAlign,textBaseline:this.textBaseline});},restore(){Object.assign(this,stack.pop());},beginPath(){},rect(){},clip(){},moveTo(){},lineTo(){},ellipse(...args){calls.push(['ellipse',...args]);},arc(...args){calls.push(['arc',...args]);},fill(){calls.push(['shape-fill',this.fillStyle]);},strokeRect(...args){calls.push(['outline',this.strokeStyle,this.lineWidth,...args]);},stroke(){calls.push(['stroke']);},measureText:t=>({width:String(t).length*14}),fillText(text,x,y){calls.push(['text',text,x,y,this.font,this.fillStyle,this.globalAlpha]);}};
  const document={baseURI:new URL('../index.html',import.meta.url).href,createElement:()=>({width:1,height:1,getContext:()=>context,toBlob(callback,type,quality){calls.push(['encode',type,quality]);callback(new Blob([png(this.width,this.height)],{type}));}})};
  new Function('window','document',source('batch-c-files.js'))(w,document);new Function('window','module','exports',source('vendor/jszip.min.js'))(w,undefined,undefined);
  return {F:w.WorkHubBatchCFiles,w,calls,document};
@@ -285,4 +285,70 @@ test('rendered numbers contrast with marker fills, stay inside image edges, and 
  const rendered=await F.raster(s);assert.equal(calls.filter(c=>c[0]==='arc').length,2);const numbers=calls.filter(c=>c[0]==='text');assert.deepEqual(numbers.map(c=>c[1]),['12','3']);assert.equal(numbers[0][5],'#17232d');assert.equal(numbers[1][5],'#fffdf7');assert.ok(numbers.every(c=>c[2]>=30&&c[2]<=370&&c[3]>=30&&c[3]<=270));
  assert.equal(calls.filter(c=>c[0]==='outline').length,1);assert.equal(calls.filter(c=>c[0]==='fill').length,0);F.release(rendered);
  calls.length=0;F.draw(F.canvas(1,1),s,{},true);assert.equal(calls.filter(c=>['arc','outline','text'].includes(c[0])).length,0);
+});
+const shape=(type='rectangle',extra={})=>({type,color:'#b93636',size:.02,points:[[.2,.2],[.5,.5]],...extra});
+async function objects(t,marks=[]){
+ const c=ui(t),g=guide();g.layout='walkthrough';g.steps.forEach(s=>{s.image={src:'data:image/png;base64,'+png(400,300).toString('base64'),width:400,height:300};});g.steps[0].marks=marks;
+ c.module.open('guide');await c.module.importGuide({size:100,text:async()=>JSON.stringify(g)});await settle();
+ const canvas=c.d.querySelector('[data-bc-canvas]');canvas.getBoundingClientRect=()=>({left:0,top:0,width:400,height:300});
+ c.pointer=(name,x,y)=>{const e=new c.w.Event(name,{bubbles:true,cancelable:true});Object.assign(e,{pointerId:3,clientX:x*400,clientY:y*300,button:0,isPrimary:true});canvas.dispatchEvent(e);};
+ c.pick=async index=>c.click('choose-object',{index:String(index)});c.saved=async()=>{await c.module.prepare('editable');return c.last();};c.set=(selector,value,event='change')=>{const el=c.d.querySelector(selector);if(el.type==='checkbox')el.checked=value;else el.value=value;el.dispatchEvent(new c.w.Event(event,{bubbles:true}));};return c;
+}
+test('advanced object documents validate text, source rectangles, style presets and numbering without mutating old files',()=>{
+ const g=guide();g.steps[0].marks=[shape('ellipse'),shape('text',{text:'Check <this> literally'}),shape('callout',{text:'Confirm'}),shape('spotlight',{opacity:.55}),shape('inset',{source:{x:.1,y:.1,w:.1,h:.1}})];
+ const saved=E.guide(g);assert.equal(saved.numbering.mode,'screenshot');assert.equal(saved.styles.length,0);assert.deepEqual(copy(E.guide(saved)),copy(saved));
+ for(const mark of [shape('text',{text:''}),shape('text',{text:'a'.repeat(501)}),shape('inset',{source:{x:.9,y:0,w:.2,h:.2}}),shape('spotlight',{opacity:1}),shape('rectangle',{locked:'yes'})])assert.throws(()=>E.guide({...g,steps:[{...g.steps[0],marks:[mark]}]}));
+ for(const numbering of [null,{mode:'all',start:1},{mode:'guide',start:1000},{mode:'guide',start:1.5}])assert.throws(()=>E.guide({...g,numbering}));
+ assert.throws(()=>E.guide({...g,linkedInstructions:'yes'}));assert.throws(()=>E.styles([{name:'Bad',color:'red'}]));
+});
+test('object movement, resize and cancellation are bounded and undoable without affecting source images',async t=>{
+ const c=await objects(t,[shape()]),initial=await c.saved();await c.pick(0);
+ c.pointer('pointerdown',.35,.35);c.pointer('pointermove',.45,.45);c.pointer('pointerup',.45,.45);let g=await c.saved();assert.ok(Math.abs(g.steps[0].marks[0].points[0][0]-.3)<1e-8);
+ c.pointer('pointerdown',.6,.6);c.pointer('pointerup',.8,.8);g=await c.saved();assert.ok(Math.abs(E.markBounds(g.steps[0].marks[0],g.steps[0].image).w-.5)<1e-8);
+ const before=copy(g);c.pointer('pointerdown',.5,.5);c.pointer('pointermove',.1,.1);c.pointer('pointercancel',.1,.1);assert.deepEqual(await c.saved(),before);
+ await c.click('undo');await c.click('undo');assert.deepEqual((await c.saved()).steps,initial.steps);await c.click('redo');assert.equal((await c.saved()).steps[0].image.src,initial.steps[0].image.src);
+ c.set('[data-bc-object-x]','95','input');await assert.rejects(()=>c.click('apply-object'),/inside/);assert.deepEqual((await c.saved()).steps[0].image,initial.steps[0].image);
+});
+test('object locking, deletion, duplication and layer order work independently of the screenshot and keyboard text fields',async t=>{
+ const c=await objects(t,[shape(),shape('ellipse')]);await c.pick(0);await c.click('front-object');let g=await c.saved();assert.equal(g.steps[0].marks.at(-1).type,'rectangle');
+ await c.click('back-object');assert.equal((await c.saved()).steps[0].marks[0].type,'rectangle');await c.click('duplicate-object');assert.equal((await c.saved()).steps[0].marks.length,3);
+ await c.click('lock-object');assert.equal(c.d.querySelector('[data-bc="delete-object"]').disabled,true);await assert.rejects(()=>c.click('delete-object'),/Unlock/);
+ await c.click('lock-object');const text=c.d.querySelector('[data-bc-caption]');text.dispatchEvent(new c.w.KeyboardEvent('keydown',{key:'Delete',bubbles:true}));assert.equal((await c.saved()).steps[0].marks.length,3);
+ c.d.querySelector('[data-bc-canvas]').dispatchEvent(new c.w.KeyboardEvent('keydown',{key:'Delete',bubbles:true,cancelable:true}));assert.equal((await c.saved()).steps[0].marks.length,2);await c.click('undo');assert.equal((await c.saved()).steps[0].marks.length,3);
+});
+test('copying annotations across screenshots preserves normalized geometry and clears the clipboard on account changes',async t=>{
+ const number=shape('number',{number:1,points:[[.4,.4],[.4,.4]]}),c=await objects(t,[shape(),number]);await c.click('copy-all');const second=c.d.querySelectorAll('[data-bc="select"]')[1].dataset.id;await c.module.select(second);await c.click('paste-objects');
+ const g=await c.saved();assert.equal(g.steps[1].marks.length,2);assert.deepEqual(g.steps[1].marks[0].points,g.steps[0].marks[0].points);assert.equal(g.steps[1].marks[1].number,1);await c.click('paste-objects');assert.equal((await c.saved()).steps[1].marks.at(-1).number,2);
+ c.account('next');c.module.open('guide');assert.equal(c.d.querySelector('[data-bc="paste-objects"]').disabled,true);
+});
+test('text, bubble, oval, spotlight and zoom tools produce editable objects with valid export geometry',async t=>{
+ const c=await objects(t);c.d.querySelector('[data-bc-new-text]').value='Review <status> & save';
+ for(const type of ['text','callout','ellipse','spotlight','inset']){c.d.querySelector('[data-bc-tool="'+type+'"]').click();c.pointer('pointerdown',.1,.1);c.pointer('pointerup',.25,.25);}
+ const g=await c.saved();assert.deepEqual(g.steps[0].marks.map(m=>m.type),['text','callout','ellipse','spotlight','inset']);assert.equal(g.steps[0].marks[0].text,'Review <status> & save');assert.deepEqual(g.steps[0].marks.at(-1).source,{x:.1,y:.1,w:.15,h:.15});assert.equal(c.d.querySelector('.bc-objects script'),null);
+ await c.pick(0);c.d.querySelector('[data-bc-object-text]').value='Revised label';await c.click('apply-object');assert.equal((await c.saved()).steps[0].marks[0].text,'Revised label');
+});
+test('continuous numbering, renumbering and linked instructions persist and reach every layout caption',async t=>{
+ const c=await objects(t);c.set('[data-bc-number-start]',5);c.set('[data-bc-number-mode]','guide');c.d.querySelector('[data-bc-tool="number"]').click();c.pointer('pointerdown',.3,.3);c.pointer('pointerup',.3,.3);
+ c.d.querySelector('[data-bc-object-instruction]').value='Select Save';await c.click('apply-object');c.set('[data-bc-linked]',true);
+ const second=c.d.querySelectorAll('[data-bc="select"]')[1].dataset.id;await c.module.select(second);c.d.querySelector('[data-bc-tool="number"]').click();c.pointer('pointerdown',.4,.4);c.pointer('pointerup',.4,.4);let g=await c.saved();assert.equal(g.steps[1].marks[0].number,6);assert.match(E.caption(g.steps[0],true),/5\. Select Save/);
+ c.set('[data-bc-number-start]',20);await c.click('renumber');g=await c.saved();assert.deepEqual(g.steps.map(s=>s.marks[0].number),[20,21]);
+ await c.module.importGuide({size:100,text:async()=>JSON.stringify(g)});assert.equal(c.d.querySelector('[data-bc-number-mode]').value,'guide');assert.equal(c.d.querySelector('[data-bc-linked]').checked,true);
+ const {F,calls}=fileFixture();for(const layout of ['classic','walkthrough','split','compact']){calls.length=0;for await(const page of F.pages({...g,layout},()=>true))F.release(page);assert.ok(calls.some(v=>v[0]==='text'&&v[1].includes('20. Select Save')));}
+});
+test('saved styles apply to the current tool and selected object and remain in editable files',async t=>{
+ const c=await objects(t,[shape()]);c.d.querySelector('[data-bc-color]').value='#123456';c.d.querySelector('[data-bc-size]').value=40;c.d.querySelector('[data-bc-style-name]').value='Review style';await c.click('save-style');c.d.querySelector('[data-bc-style]').value='0';await c.pick(0);await c.click('apply-style');let g=await c.saved();assert.equal(g.styles[0].name,'Review style');assert.equal(g.steps[0].marks[0].color,'#123456');assert.equal(g.steps[0].marks[0].size,.025);
+ await c.module.importGuide({size:100,text:async()=>JSON.stringify(g)});assert.equal(c.d.querySelector('[data-bc-style]').options.length,2);c.d.querySelector('[data-bc-style]').value='0';await c.click('delete-style');assert.equal((await c.saved()).styles.length,0);
+});
+test('pasting beyond the annotation limit fails atomically and leaves undo history and existing marks intact',async t=>{
+ const c=await objects(t,Array.from({length:101},()=>shape()));await c.click('copy-all');const before=await c.saved();await assert.rejects(()=>c.click('paste-objects'),/images|annotations/);assert.deepEqual(await c.saved(),before);assert.equal(c.d.querySelector('[data-bc="undo"]').disabled,true);
+});
+test('native zoom pixels keep privacy covers applied even above the zoom in layer order',async()=>{
+ const {createCanvas,Image}=await import('@napi-rs/canvas'),shot=createCanvas(400,300),ctx=shot.getContext('2d');ctx.fillStyle='#ffffff';ctx.fillRect(0,0,400,300);
+ const s={...step('safe'),image:{src:shot.toDataURL('image/png'),width:400,height:300},marks:[shape('inset',{source:{x:.1,y:.1,w:.2,h:.2},points:[[.6,.4],[.9,.8]]}),shape('cover',{color:'#000000',points:[[.09,.09],[.31,.31]]})]},w={WorkHubBatchCEngine:E,Image,atob:s=>Buffer.from(s,'base64').toString('binary')},document={baseURI:new URL('../index.html',import.meta.url).href,createElement:()=>createCanvas(1,1)};
+ new Function('window','document',source('batch-c-files.js'))(w,document);const F=w.WorkHubBatchCFiles,c=await F.raster(s,()=>true);
+ assert.deepEqual(Array.from(c.getContext('2d').getImageData(300,180,1,1).data),[0,0,0,255]);F.release(c);
+ const original=F.draw(F.canvas(1,1),s,await F.loadImage(s.image),true);assert.deepEqual(Array.from(original.getContext('2d').getImageData(80,80,1,1).data),[255,255,255,255]);F.release(original);
+});
+test('editing only an object colour preserves exact geometry and stroke at the image edge',async t=>{
+ const original=shape('rectangle',{size:.01234567,points:[[.33135,.2],[1,.7]]}),c=await objects(t,[original]);await c.pick(0);c.d.querySelector('[data-bc-object-color]').value='#123456';await c.click('apply-object');const saved=await c.saved();assert.deepEqual(saved.steps[0].marks[0].points,original.points);assert.equal(saved.steps[0].marks[0].size,original.size);assert.equal(saved.steps[0].marks[0].color,'#123456');
 });

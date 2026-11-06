@@ -37,8 +37,8 @@
       name: 'Fiori Workspace',
       eyebrow: 'CLEAR & ACTIONABLE',
       description:
-        'A SAP Fiori-inspired shell with object headers, structured sections and clear status cues.',
-      layout: 'Shell navigation · structured work pages',
+        'A deep-blue shell, grouped side navigation and crisp object pages for focused work.',
+      layout: 'Grouped side navigation · object pages',
     },
     'compact-pro': {
       name: 'Compact Pro',
@@ -134,7 +134,8 @@
       const nodes = [...nav.querySelectorAll('button[data-tab]')];
       const mobile = !!media?.matches;
       let kind = 'flat';
-      if (id === 'clear-desk' || id === 'fiori') kind = mobile ? 'top-mobile' : 'top';
+      if (id === 'clear-desk') kind = mobile ? 'top-mobile' : 'top';
+      if (id === 'fiori') kind = mobile ? 'top-mobile' : 'fiori-side';
       if (id === 'modern-hub' && mobile) kind = 'dock';
       if (id === 'editorial') kind = mobile ? 'top-mobile' : 'index';
       if (id === 'canvas') kind = 'launcher';
@@ -166,7 +167,7 @@
             if (group.querySelector('button')) host.append(group);
           }
         };
-        if (kind === 'index' || kind === 'compact') appendGroups(nav);
+        if (kind === 'index' || kind === 'compact' || kind === 'fiori-side') appendGroups(nav);
         else if (kind !== 'flat') {
           const primary =
             kind === 'top'
