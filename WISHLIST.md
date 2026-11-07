@@ -14,6 +14,10 @@ Kept from the website design and functionality ideas in this discussion. The num
 | 19 | Animated navigation icons | Add brief, lightweight icon movements on hover and section selection. Respect Motion off and reduced-motion preferences. |
 | 20 | Custom website icon | Choose a logo or initials for the header and browser-tab icon, matching the website colours. Preserve the editable website name and its existing motion. |
 
+| 31 | Drag-and-drop file launcher | Drop a file from any website page, preview its name/type and choose a compatible available tool. Open the chosen tool with the file ready, preserve local processing where supported and ask before leaving an unfinished editor. Drive uploads use the existing explicit upload flow. |
+| 34 | Shareable summary cards | Turn selected tickets, tasks or project information into neatly designed images for sharing, with a preview before export. |
+| 40 | Selectable loading-screen styles | Choose minimal, illustrated or animated loading designs that follow the selected website theme. Preserve the maintained website name, actual startup status and motion preferences. |
+
 These are wishlist selections only; implementation has not been requested. No batch assigned.
 
 ## Latest wishlist batch
