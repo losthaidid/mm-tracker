@@ -568,3 +568,61 @@ body[data-motion='off'] .er-workspace *::after {
     margin: 0;
   }
 }
+
+/* Make worksheet-wide controls distinct from search-specific selection. */
+.er-column-bulk,
+.er-column-search-actions,
+.er-column-view-bar,
+.er-column-views {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.er-column-bulk {
+  margin: 16px 0 18px;
+}
+.er-column-search-actions {
+  margin: 10px 0 0;
+}
+.er-column-bulk small,
+.er-column-search-actions small,
+.er-column-view-bar > small {
+  color: var(--er-muted);
+  font-size: 0.75rem;
+}
+.er-column-view-bar {
+  justify-content: space-between;
+  gap: 10px;
+  margin: 16px 0 10px;
+}
+.er-column-views {
+  padding: 4px;
+  border: 1px solid var(--er-border);
+  border-radius: 11px;
+  background: var(--er-soft);
+}
+.er-column-views .val-btn {
+  padding: 7px 10px;
+  border: 0;
+  box-shadow: none;
+  font-size: 0.76rem;
+}
+.er-column-views .val-btn.is-active {
+  background: var(--hub-card, #fff);
+  color: var(--hub-link, #3868e9);
+  box-shadow: 0 2px 7px #1a356814;
+}
+.er-column-views .val-btn span {
+  margin-left: 3px;
+  font-size: 0.7rem;
+  opacity: 0.75;
+}
+.er-column-option.is-selected {
+  border-color: color-mix(in srgb, var(--hub-accent, #3868e9) 40%, var(--er-border));
+  background: color-mix(in srgb, var(--hub-accent, #3868e9) 6%, var(--er-soft));
+}
+.er-column-option:focus-within {
+  outline: 2px solid var(--hub-accent, #3868e9);
+  outline-offset: 2px;
+}

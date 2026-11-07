@@ -174,3 +174,55 @@ test('Excel Report cancels an old account read without clearing a newer read', a
   assert.equal(ui.snapshot().busy,false);
   assert.doesNotMatch(d.body.textContent,/secret|Private old/);
 });
+
+test('Excel Report checks and unchecks all columns regardless of search and page', async t => {
+  const x = fixture(t), {w,d,ui,input} = x;
+  const names=Array.from({length:130},(_,i)=>'Group '+(i%2?'B ':'A ')+String(i+1).padStart(3,'0'));
+  const book=w.XLSX.utils.book_new();
+  w.XLSX.utils.book_append_sheet(book,w.XLSX.utils.aoa_to_sheet([names,names.map((_,i)=>'value-'+i)]),'Wide');
+  await ui.loadFile(x.file(w.XLSX.write(book,{bookType:'xlsx',type:'array'})));
+  assert.equal(ui.snapshot().selected.length,130);
+  assert.equal(d.querySelectorAll('[data-er-column]').length,60);
+  assert.ok(d.querySelector('[data-er="select-all-columns"]').disabled);
+  input('erColumnSearch','Group A');
+  assert.equal(d.querySelectorAll('[data-er-column]').length,60);
+  assert.match(d.querySelector('.er-column-search-actions').textContent,/65 matching columns, across pages/);
+  d.querySelector('[data-er="uncheck-all-columns"]').click();
+  assert.equal(ui.snapshot().selected.length,0);
+  assert.equal(d.querySelectorAll('[data-er-column]:checked').length,0);
+  assert.match(d.querySelector('.er-report-card').textContent,/Select at least one display column/);
+  d.querySelector('[data-er="select-shown"]').click();
+  assert.deepEqual(copy(ui.snapshot().selected).sort((a,b)=>a-b),Array.from({length:65},(_,i)=>i*2));
+  d.querySelector('[data-er="select-all-columns"]').click();
+  assert.equal(ui.snapshot().selected.length,130);
+  d.querySelector('[data-er="clear-shown"]').click();
+  assert.deepEqual(copy(ui.snapshot().selected).sort((a,b)=>a-b),Array.from({length:65},(_,i)=>i*2+1));
+  input('erColumnSearch','');
+  d.querySelector('[data-er="column-view"][data-view="selected"]').click();
+  assert.equal(d.querySelector('[data-er="column-view"][data-view="selected"]').getAttribute('aria-pressed'),'true');
+  assert.equal(d.querySelectorAll('[data-er-column]').length,60);
+  const first=d.querySelector('[data-er-column]');first.focus();first.checked=false;first.dispatchEvent(new w.Event('change',{bubbles:true}));
+  assert.equal(ui.snapshot().selected.length,64);
+  assert.equal(d.activeElement.dataset.erColumn,'3');
+  d.querySelector('[data-er="column-view"][data-view="unselected"]').click();
+  assert.equal(d.querySelectorAll('[data-er-column]:checked').length,0);
+  assert.match(d.querySelector('.er-column-view-bar').textContent,/66 in this view/);
+  d.querySelector('[data-er="uncheck-all-columns"]').click();
+  assert.equal(ui.snapshot().selected.length,0);
+  assert.equal(d.querySelector('[data-er="column-view"][data-view="all"]').getAttribute('aria-pressed'),'true');
+  d.querySelector('[data-er="select-all-columns"]').click();
+  assert.equal(ui.snapshot().selected.length,130);
+});
+
+test('Excel Report exports only the manually selected columns after unchecking all', async t => {
+  const x=fixture(t),{w,d,ui,input}=x;
+  await ui.loadFile(x.workbook());input('erHeaderRow','2','change');
+  d.querySelector('[data-er="uncheck-all-columns"]').click();
+  await assert.rejects(ui.prepareExport(),/Select at least one/);
+  const customer=d.getElementById('erColumn-1');customer.checked=true;customer.dispatchEvent(new w.Event('change',{bubbles:true}));
+  assert.deepEqual(copy(ui.snapshot().selected),[1]);
+  await ui.prepareExport();
+  const result=await w.WorkHubValidatorFiles.read(x.file(new Uint8Array(await x.blobs[0].arrayBuffer()),'result.xlsx'),{displayValues:true});
+  assert.deepEqual(copy(result.sheets[0].rows),[['Customer'],['Alpha'],['Beta'],['Gamma']]);
+  assert.equal(x.writes(),0);
+});
