@@ -4344,7 +4344,7 @@ function renderProjectOverview(m) {
     statuses = [...new Set([...OPTIONS.specStatus, ...m.items.map(s => s.status)])],
     attention = m.overdue.slice(0, 5),
     gateDone = m.gates.filter(g => g.status !== 'Pending').length;
-  return `<div class="dashboard-grid">${hub?.standup?.card(p.id) || ''}${hub?.people?.card(p.id) || ''}${hub?.solution?.card(p.id) || ''}<section class="panel box"><h2>Project overview</h2><div class="view-details" style="margin-top:16px"><div><div class="detail-label">Current phase</div><div class="detail-value">${esc(p.phase)} · ${projectPhasePercent(p)}%</div></div><div><div class="detail-label">Health · automatic</div><div class="detail-value">${healthBadge(health)}<small class="health-summary">${esc(health.summary)}</small></div></div><div><div class="detail-label">Go-Live</div><div class="detail-value">${goLiveInfo(p)}</div></div><div class="wide"><div class="detail-label">Next milestone</div><div class="detail-value">${esc(p.nextMilestone) || 'Not set'}</div></div></div>${projectAlerts(p, m)}<h3 class="section-label">Project item progress</h3><div class="status-breakdown">${
+  return `<div class="dashboard-grid">${hub?.standup?.card(p.id) || ''}${hub?.people?.card(p.id) || ''}${hub?.goLiveIssues?.card(p.id) || ''}${hub?.solution?.card(p.id) || ''}<section class="panel box"><h2>Project overview</h2><div class="view-details" style="margin-top:16px"><div><div class="detail-label">Current phase</div><div class="detail-value">${esc(p.phase)} · ${projectPhasePercent(p)}%</div></div><div><div class="detail-label">Health · automatic</div><div class="detail-value">${healthBadge(health)}<small class="health-summary">${esc(health.summary)}</small></div></div><div><div class="detail-label">Go-Live</div><div class="detail-value">${goLiveInfo(p)}</div></div><div class="wide"><div class="detail-label">Next milestone</div><div class="detail-value">${esc(p.nextMilestone) || 'Not set'}</div></div></div>${projectAlerts(p, m)}<h3 class="section-label">Project item progress</h3><div class="status-breakdown">${
     statuses
       .map(s => {
         const n = m.items.filter(i => i.status === s).length;
@@ -5254,6 +5254,7 @@ function renderProjectDashboard() {
     ['solution', 'Solution Studio'],
     ['gates', 'Phase gates'],
     ['feedback', 'Phase Feedback'],
+    ['go-live-issues', 'Go-Live issues'],
   ]
     .map(
       ([v, l]) =>
@@ -5261,7 +5262,7 @@ function renderProjectDashboard() {
     )
     .join(
       ''
-    )}</div><button class="primary" data-action="new-plan">Plan activity</button></div>${projectView === 'calendar' ? renderProjectCalendar() : projectView === 'items' ? renderProjectSpecs() : projectView === 'companies' ? renderProjectCompanies() : projectView === 'people' ? hub?.people?.render(p.id) || '' : projectView === 'solution' ? hub?.solution?.render(p.id) || '' : projectView === 'gates' ? renderPhaseGates() : projectView === 'feedback' ? renderPhaseFeedback() : renderProjectOverview(m) + watchlistPanel()}`;
+    )}</div><button class="primary" data-action="new-plan">Plan activity</button></div>${projectView === 'calendar' ? renderProjectCalendar() : projectView === 'items' ? renderProjectSpecs() : projectView === 'companies' ? renderProjectCompanies() : projectView === 'people' ? hub?.people?.render(p.id) || '' : projectView === 'solution' ? hub?.solution?.render(p.id) || '' : projectView === 'gates' ? renderPhaseGates() : projectView === 'feedback' ? renderPhaseFeedback() : projectView === 'go-live-issues' ? hub?.goLiveIssues?.render(p.id) || '' : renderProjectOverview(m) + watchlistPanel()}`;
 }
 
 function gateDueState(g) {
@@ -6173,7 +6174,7 @@ async function deleteProject(id) {
     feedback = state.projectFeedback.filter(f => f.projectId === id).length;
   if (
     !(await window.WorkHubDialogs.confirm(
-      `Delete project "${p.name}"? This removes ${items} project items, ${plans} planned activities, ${companies} companies, all gates, mappings, and ${feedback} feedback records. Linked tasks will be kept as Custom tasks. Download a backup first if needed.`
+      `Delete project "${p.name}"? This removes ${items} project items, ${plans} planned activities, ${companies} companies, all gates, mappings, ${feedback} feedback records, and ${(p.goLiveIssues || []).length} Go-Live issues. Linked tasks will be kept as Custom tasks. Download a backup first if needed.`
     ))
   )
     return;

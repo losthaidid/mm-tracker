@@ -119,3 +119,19 @@ test('Access database: website design uses the existing personal settings path a
  await sign();permissions.workspace=C.preset().workspace;await command('permissions',member,{version:2,permissions});await sign(member);await save(db,denied,2);const loaded=(await db.query('select * from public.load_mm_tracker()')).rows[0].document;assert.deepEqual(loaded.data.tasks,edited.data.tasks);assert.deepEqual(loaded.data.workhub.preferences,{theme:'forest',design:'clear-desk'});
  let revision=3;for(const design of ['editorial','canvas','compact-pro']){const next=structuredClone(denied);next.data.workhub.preferences.design=design;await save(db,next,revision++);const current=(await db.query('select * from public.load_mm_tracker()')).rows[0].document;assert.deepEqual(current.data.tasks,edited.data.tasks);assert.deepEqual(current.data.workhub.preferences,{theme:'forest',design});}
 });
+
+test('Access database: Go-Live issues follow project edit and visibility permissions',async t=>{
+ const {db,sign,command,add}=await setup(t);await add();
+ const before=doc({});await save(db,before,0);
+ await sign();const perms=C.preset('view');perms.specs={mode:'use',create:false,edit:true,delete:false,export:true};
+ await command('permissions',member,{version:1,permissions:perms});await sign(member);
+ const changed=structuredClone(before);changed.data.projects[0].goLiveIssues=[{id:'i1',title:'PRIVATE_ISSUE',extras:[{header:'Site',value:'North'}]}];
+ C.assertChange({role:'member',status:'active',permissions:perms},before.data,changed.data);
+ await save(db,changed,1);
+ await sign();perms.specs={mode:'view'};await command('permissions',member,{version:2,permissions:perms});await sign(member);
+ const readonly=structuredClone(changed);readonly.data.projects[0].goLiveIssues[0].title='Unauthorized edit';
+ await assert.rejects(save(db,readonly,2),e=>e.code==='42501');
+ await sign();perms.specs={mode:'hidden'};await command('permissions',member,{version:3,permissions:perms});await sign(member);
+ const projected=(await db.query('select * from public.load_mm_tracker()')).rows[0].document;
+ assert.doesNotMatch(JSON.stringify(projected),/PRIVATE_ISSUE|North|goLiveIssues/);
+});

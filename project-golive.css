@@ -1,0 +1,601 @@
+/* Go-Live issue register */
+.gli-workspace {
+  display: grid;
+  gap: 18px;
+  margin: 18px 0 28px;
+  --gli-ink: #173c40;
+  --gli-teal: #138f7b;
+  --gli-border: color-mix(in srgb, var(--gli-ink) 15%, transparent);
+}
+.gli-workspace * {
+  box-sizing: border-box;
+}
+.gli-hero {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 30px;
+  padding: 30px 34px;
+  border-radius: 22px;
+  color: #fff;
+  background: linear-gradient(110deg, #112e39, #145753 68%, #267d70);
+  box-shadow: 0 18px 44px rgba(20, 74, 70, 0.16);
+}
+.gli-hero:after {
+  content: '';
+  position: absolute;
+  right: -90px;
+  top: -140px;
+  width: 370px;
+  height: 370px;
+  border: 1px solid #ffffff22;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 55px #ffffff09,
+    0 0 0 110px #ffffff08;
+  pointer-events: none;
+}
+.gli-eyebrow {
+  display: block;
+  color: #17947e;
+  font-size: 0.71rem;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+}
+.gli-hero .gli-eyebrow {
+  color: #a7f3df;
+}
+.gli-hero h2 {
+  color: #fff;
+  font-size: clamp(1.8rem, 3.2vw, 2.8rem);
+  line-height: 1.08;
+  margin: 10px 0;
+}
+.gli-hero p {
+  color: #d4eeea;
+  max-width: 580px;
+  margin: 0 0 20px;
+  line-height: 1.5;
+}
+.gli-hero-mark {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  width: 140px;
+  height: 140px;
+  border: 1px solid #ffffff4b;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  animation: gli-float 5s ease-in-out infinite;
+}
+.gli-hero-mark span {
+  width: 65px;
+  height: 65px;
+  border-radius: 21px;
+  background: #b1f2db;
+  color: #165e53;
+  display: grid;
+  place-items: center;
+  font-size: 2rem;
+  font-weight: 800;
+  box-shadow: 0 12px 25px #082a2460;
+}
+.gli-hero-mark i {
+  position: absolute;
+  inset: 12px;
+  border: 1px dashed #ffffff5f;
+  border-radius: 50%;
+  animation: gli-spin 22s linear infinite;
+}
+.gli-hero-mark b {
+  position: absolute;
+  font-size: 0.65rem;
+  color: #d8fff2;
+  background: #267c70;
+  border: 1px solid #a3f5d688;
+  border-radius: 50%;
+  padding: 8px;
+}
+.gli-hero-mark b:nth-of-type(1) {
+  top: -8px;
+  right: 24px;
+}
+.gli-hero-mark b:nth-of-type(2) {
+  bottom: 5px;
+  right: -4px;
+}
+.gli-hero-mark b:nth-of-type(3) {
+  bottom: 5px;
+  left: -4px;
+}
+.gli-actions {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.gli-button {
+  border: 1px solid var(--gli-border);
+  background: transparent;
+  color: inherit;
+  border-radius: 10px;
+  padding: 9px 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 0.18s,
+    box-shadow 0.18s;
+}
+.gli-button:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 7px 15px #0b5d4b1b;
+}
+.gli-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.gli-button.gli-primary {
+  background: #147d6c;
+  color: #fff;
+  border-color: #147d6c;
+}
+.gli-hero .gli-button.gli-primary {
+  background: #bdf8e2;
+  color: #174e46;
+  border-color: #bdf8e2;
+}
+.gli-button.gli-light {
+  border-color: #ffffff70;
+  color: #fff;
+}
+.gli-button.gli-secondary {
+  background: #e8f5f2;
+  color: #146d60;
+  border-color: #c5e8df;
+}
+.gli-button.gli-quiet {
+  background: transparent;
+  color: inherit;
+}
+.gli-button.gli-danger {
+  color: #aa4a4a;
+}
+.gli-stats {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+}
+.gli-stats > div {
+  display: grid;
+  gap: 5px;
+  padding: 17px 18px;
+  background: var(--card, #fff);
+  border: 1px solid var(--gli-border);
+  border-radius: 15px;
+  min-width: 0;
+}
+.gli-stats span {
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  font-weight: 800;
+  opacity: 0.7;
+}
+.gli-stats strong {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+.gli-stats small {
+  opacity: 0.66;
+}
+.gli-panel {
+  border: 1px solid var(--gli-border);
+  background: var(--card, #fff);
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: 0 12px 35px #165f5310;
+}
+.gli-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.gli-panel-head h3,
+.gli-panel-head h4 {
+  margin: 7px 0 4px;
+}
+.gli-panel-head h3 {
+  font-size: 1.3rem;
+}
+.gli-panel-head p,
+.gli-import-upload p {
+  margin: 0;
+  opacity: 0.72;
+  line-height: 1.5;
+}
+.gli-hint {
+  font-size: 0.8rem;
+  opacity: 0.7;
+  line-height: 1.4;
+}
+.gli-notice {
+  border: 1px solid #98dbc8;
+  background: #e9faf3;
+  color: #17574b;
+  padding: 12px 16px;
+  border-radius: 12px;
+}
+.gli-notice.is-error {
+  background: #fff2f0;
+  color: #843d38;
+  border-color: #efb8b2;
+}
+.gli-toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 20px 0;
+}
+.gli-toolbar label:first-child {
+  flex: 1;
+}
+.gli-toolbar strong {
+  white-space: nowrap;
+  font-size: 0.82rem;
+  opacity: 0.7;
+}
+.gli-workspace input:not([type='checkbox']),
+.gli-workspace select,
+.gli-workspace textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--gli-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: inherit;
+  background: var(--input-bg, var(--card, #fff));
+  font: inherit;
+}
+.gli-workspace textarea {
+  resize: vertical;
+}
+.gli-field {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+.gli-field > span {
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.gli-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 14px 0;
+}
+.gli-wide {
+  grid-column: 1/-1;
+}
+.gli-editor .gli-actions {
+  margin-top: 16px;
+}
+.gli-import-grid {
+  display: grid;
+  grid-template-columns: minmax(200px, 0.7fr) minmax(0, 1.3fr);
+  gap: 22px;
+}
+.gli-import-grid > div:last-child {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+.gli-import-upload {
+  display: grid;
+  justify-items: start;
+  align-content: center;
+  gap: 10px;
+  padding: 20px;
+  background: #e8f5f2;
+  color: #164d45;
+  border: 1px dashed #a5d4c8;
+  border-radius: 15px;
+}
+.gli-upload-symbol {
+  display: grid;
+  place-items: center;
+  background: #d1ece4;
+  color: #157d69;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  font-size: 1.5rem;
+}
+.gli-review {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--gli-border);
+}
+.gli-preview-table {
+  overflow: auto;
+  border: 1px solid var(--gli-border);
+  border-radius: 12px;
+}
+.gli-preview-table table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.8rem;
+}
+.gli-preview-table th,
+.gli-preview-table td {
+  padding: 10px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--gli-border);
+  min-width: 120px;
+  max-width: 260px;
+  overflow-wrap: anywhere;
+}
+.gli-preview-table th {
+  background: #e8f5f2;
+  color: #195e52;
+}
+.gli-issues {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.gli-issue {
+  min-width: 0;
+  border: 1px solid var(--gli-border);
+  border-radius: 15px;
+  padding: 18px;
+  background: color-mix(in srgb, var(--card, #fff) 95%, #98dacc);
+  animation: gli-arrive 0.35s ease both;
+  animation-delay: calc(var(--gli-order) * 30ms);
+}
+.gli-issue-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.gli-number {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  font-weight: 800;
+  color: #168873;
+  overflow-wrap: anywhere;
+}
+.gli-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.gli-status,
+.gli-priority {
+  font-size: 0.7rem;
+  font-weight: 750;
+  padding: 5px 9px;
+  border-radius: 30px;
+  background: #e6eef0;
+  color: #52666b;
+  overflow-wrap: anywhere;
+}
+.gli-status-open {
+  background: #fff0d9;
+  color: #855312;
+}
+.gli-status-progress {
+  background: #e6f2fc;
+  color: #285f87;
+}
+.gli-status-resolved {
+  background: #dcf4e9;
+  color: #17674d;
+}
+.gli-priority {
+  background: #f4ebee;
+  color: #8e5263;
+}
+.gli-issue h3 {
+  font-size: 1.05rem;
+  line-height: 1.4;
+  margin: 14px 0 10px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.gli-description,
+.gli-resolution p,
+.gli-extra p {
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 5px 0;
+}
+.gli-description {
+  opacity: 0.8;
+}
+.gli-meta {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 14px 0 0;
+  font-size: 0.78rem;
+  opacity: 0.72;
+  overflow-wrap: anywhere;
+}
+.gli-resolution,
+.gli-extra {
+  border-top: 1px solid var(--gli-border);
+  padding-top: 12px;
+  margin-top: 13px;
+  font-size: 0.82rem;
+}
+.gli-extra summary {
+  font-weight: 700;
+  cursor: pointer;
+}
+.gli-extra > div {
+  margin: 10px 0;
+}
+.gli-issue-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 5px;
+  margin-top: 12px;
+}
+.gli-empty {
+  grid-column: 1/-1;
+  text-align: center;
+  padding: 45px 12px;
+  opacity: 0.75;
+}
+.gli-empty span {
+  font-size: 2rem;
+  color: #198f79;
+}
+.gli-empty h4 {
+  margin: 8px;
+}
+.gli-empty p {
+  margin: 0;
+}
+.gli-paging {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+  margin-top: 20px;
+  font-size: 0.85rem;
+}
+.gli-overview-card {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  text-align: left;
+  padding: 20px;
+  border-radius: 18px;
+  background: linear-gradient(115deg, #dff6ed, #f3fbf8);
+  border: 1px solid #badfd3;
+  color: #1b5048;
+  cursor: pointer;
+}
+.gli-overview-card > span:nth-child(2) {
+  display: grid;
+  gap: 5px;
+  flex: 1;
+}
+.gli-overview-card small {
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
+  font-weight: 800;
+}
+.gli-overview-card strong {
+  font-size: 1.1rem;
+}
+.gli-overview-card span span {
+  font-size: 0.82rem;
+}
+.gli-overview-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 15px;
+  background: #bcebd8;
+  display: grid;
+  place-items: center;
+  font-size: 1.5rem;
+}
+.gli-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+@keyframes gli-float {
+  50% {
+    transform: translateY(-6px);
+  }
+}
+@keyframes gli-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes gli-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (max-width: 900px) {
+  .gli-stats {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .gli-hero-mark {
+    width: 110px;
+    height: 110px;
+  }
+  .gli-issues {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 600px) {
+  .gli-hero {
+    padding: 24px;
+  }
+  .gli-hero-mark {
+    display: none;
+  }
+  .gli-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .gli-panel {
+    padding: 18px;
+  }
+  .gli-toolbar {
+    flex-wrap: wrap;
+  }
+  .gli-toolbar label:first-child {
+    flex-basis: 100%;
+  }
+  .gli-toolbar label:nth-child(2) {
+    flex: 1;
+  }
+  .gli-import-grid,
+  .gli-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .gli-wide {
+    grid-column: auto;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gli-hero-mark,
+  .gli-hero-mark i,
+  .gli-issue {
+    animation: none !important;
+  }
+  .gli-button {
+    transition: none;
+  }
+}
+body[data-motion='off'] .gli-hero-mark,
+body[data-motion='off'] .gli-hero-mark i,
+body[data-motion='off'] .gli-issue,
+.hub-motion-paused .gli-hero-mark,
+.hub-motion-paused .gli-hero-mark i,
+.hub-motion-paused .gli-issue {
+  animation: none !important;
+}

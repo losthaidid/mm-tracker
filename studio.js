@@ -130,6 +130,7 @@
     root.WorkHubWorkLibraryEngine?.validate(d);
     root.WorkHubProjectStandupEngine?.validate(d);
     root.WorkHubProjectPeopleEngine?.validate(d);
+    root.WorkHubGoLiveIssuesEngine?.validate(d);
     root.WorkHubSolutionEngine?.validate(d);
     root.WorkHubRehearsalEngine?.validate(d);
     root.WorkHubExperienceEngine?.validate(d);
@@ -264,9 +265,15 @@
       !p ||
       !['name', 'workspace'].every(k => text(p[k], 200)) ||
       (p.design !== undefined &&
-        !['current', 'clear-desk', 'modern-hub', 'editorial', 'canvas', 'compact-pro', 'fiori'].includes(
-          p.design
-        )) ||
+        ![
+          'current',
+          'clear-desk',
+          'modern-hub',
+          'editorial',
+          'canvas',
+          'compact-pro',
+          'fiori',
+        ].includes(p.design)) ||
       ![...Object.keys(root.WorkHubAppearance.THEMES), 'custom'].includes(p.theme) ||
       !/^#[0-9a-f]{6}$/i.test(p.accent) ||
       ![6, 12, 16, 24].includes(p.radius) ||
@@ -304,6 +311,7 @@
       batchC = null,
       standup = null,
       people = null,
+      goLiveIssues = null,
       solution = null,
       rehearsal = null,
       tcodes = null,
@@ -2852,6 +2860,7 @@
       myDay?.sync();
       standup?.sync();
       people?.sync();
+      goLiveIssues?.sync();
       solution?.sync();
       if (tab !== 'studio' || currentTool !== 'theme') themePreview = null;
       if (sorting && !sorting.source.isConnected) clearSort();
@@ -4165,6 +4174,11 @@
       ready: () => a.cloud().ready,
       owner: () => a.cloud().user?.id || '',
     });
+    goLiveIssues = root.WorkHubGoLiveIssues?.install({
+      ...a,
+      ready: () => a.cloud().ready,
+      owner: () => a.cloud().user?.id || '',
+    });
     solution = root.WorkHubSolutionStudio?.install({
       ...a,
       ready: () => a.cloud().ready,
@@ -4192,8 +4206,7 @@
     taskCompletion = root.WorkHubTaskCompletion.install({
       ...a,
       today,
-      canEdit: () =>
-        !root.WorkHubCurrentAccess || root.WorkHubCurrentAccess.can('tasks', 'edit'),
+      canEdit: () => !root.WorkHubCurrentAccess || root.WorkHubCurrentAccess.can('tasks', 'edit'),
     });
     moments = root.WorkHubMomoMoments?.install({
       ...a,
@@ -4306,6 +4319,7 @@
       batchC,
       standup,
       people,
+      goLiveIssues,
       solution,
       rehearsal,
       tcodes,

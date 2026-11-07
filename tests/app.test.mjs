@@ -3727,3 +3727,37 @@ test('Task completion rollup: permission loss and rejected parent saves preserve
  const before=copy(api.state().tasks);api.editRecord('tasks',id);const form=document.getElementById('editForm');form.elements.done.checked=true;api.cloud.conflict=true;assert.throws(()=>api.saveEdit(form));assert.deepEqual(copy(api.state().tasks),before);api.cloud.conflict=false;api.closeModal();
  api.access.can=(feature,action='view')=>feature!=='tasks'||action==='view';api.showTab('tasks');assert.equal(document.getElementById('taskCompletionNotice'),null);assert.throws(()=>api.hub.taskCompletion.review(),/cannot complete/);assert.deepEqual(copy(api.state().tasks),before);
 });
+
+test('Go-Live issues integrate into Projects and survive save and backup', async t => {
+  const {api,document,window,db}=await app(t);
+  api.showTab('specs');
+  document.querySelector('[data-action="project-view"][data-view="go-live-issues"]').click(); await settle();
+  assert.ok(document.getElementById('gliWorkspace'));
+  document.querySelector('[data-gli="open-import"]').click();
+  const pasted=document.getElementById('gliPaste');
+  pasted.value='Issue\tStatus\tPlant\nLogin error\tOpen\t0007\nPrinter issue\tResolved\t0008';
+  pasted.dispatchEvent(new window.Event('input',{bubbles:true}));
+  document.querySelector('[data-gli="preview-paste"]').click(); await settle();
+  document.querySelector('[data-gli="commit-import"]').click(); await settle();
+  const project=api.state().projects.find(p=>p.id===api.state().activeProjectId);
+  assert.equal(project.goLiveIssues.length,2);
+  assert.equal(project.goLiveIssues[0].extras[0].value,'0007');
+  assert.equal(api.parseBackup(api.payload(api.state())).projects.find(p=>p.id===project.id).goLiveIssues[1].title,'Printer issue');
+  assert.ok(db.calls.length>0);
+});
+
+test('Excel Report opens inside Validation Studio and does not save uploaded data', async t => {
+  const {api,document,window,db}=await app(t);
+  api.showTab('validator'); await settle();
+  document.querySelector('[data-val="mode"][data-mode="excel-report"]').click(); await settle();
+  const ui=api.hub.validator.excelReport;
+  assert.ok(document.getElementById('valExcelReport'));
+  const blob=await window.WorkHubValidatorFiles.workbook([{name:'Example',rows:[['Code','Description'],['0001','Alpha'],['0002','Beta']],width:2,escapeText:true}]);
+  const calls=db.calls.length;
+  await ui.loadFile({name:'example.xlsx',size:blob.size,arrayBuffer:()=>blob.arrayBuffer()});
+  const area=document.getElementById('erList');area.value='0001\n0099';area.dispatchEvent(new window.Event('input',{bubbles:true}));
+  await ui.handle({dataset:{er:'apply-filter'}});
+  assert.deepEqual(copy(ui.snapshot().rows),[0]);
+  assert.deepEqual(copy(ui.snapshot().filters[0].values),[{value:'0001',count:1},{value:'0099',count:0}]);
+  assert.equal(db.calls.length,calls);
+});
