@@ -29,6 +29,7 @@
       report = null,
       selected = new Set(),
       columnSearch = '',
+      columnView = 'all',
       columnPage = 0,
       filterSearch = '',
       filterColumn = -1,
@@ -76,6 +77,7 @@
       headerRow = 1;
       selected = new Set();
       columnSearch = filterSearch = listText = notice = '';
+      columnView = 'all';
       columnPage = selectedFilter = valuePage = rowPage = tableColumnPage = 0;
       filterColumn = -1;
       liveColumn = 0;
@@ -134,6 +136,7 @@
       report = next;
       selected = new Set(next.columns.map(column => column.index));
       columnSearch = filterSearch = listText = '';
+      columnView = 'all';
       columnPage = selectedFilter = valuePage = rowPage = tableColumnPage = 0;
       filterColumn = next.columns[0]?.index ?? -1;
       liveColumn = 0;
@@ -248,14 +251,39 @@
       return `<div class="er-paging" aria-label="${esc(kind)} pages">${button(kind + '-prev', '← Previous', page ? '' : 'disabled', 'val-quiet')}<span>Page ${page + 1} of ${pages}</span>${button(kind + '-next', 'Next →', page + 1 < pages ? '' : 'disabled', 'val-quiet')}</div>`;
     }
     function columnChooser() {
-      const all = matches(report.columns, columnSearch),
+      const matching = matches(report.columns, columnSearch),
+        all = matching.filter(
+          c =>
+            columnView === 'all' ||
+            (columnView === 'selected' ? selected.has(c.index) : !selected.has(c.index))
+        ),
         pages = Math.max(1, Math.ceil(all.length / COLUMN_PAGE));
       columnPage = Math.min(columnPage, pages - 1);
       const visible = all.slice(columnPage * COLUMN_PAGE, (columnPage + 1) * COLUMN_PAGE);
-      return `<section class="er-card er-column-card"><div class="er-card-heading"><div><span class="er-step">02 · SHAPE YOUR REPORT</span><h3>Choose display columns</h3><p>Search by header or Excel column letter. Your filters can use any column.</p></div><strong class="er-count">${count(selected.size)} / ${count(report.columns.length)} selected</strong></div>
+      const empty = columnSearch.trim()
+        ? 'No columns match this search and view.'
+        : columnView === 'selected'
+          ? 'No columns are checked. Choose All or Unchecked to select columns.'
+          : 'No unchecked columns. Choose All or Checked to review your selection.';
+      return `<section class="er-card er-column-card"><div class="er-card-heading"><div><span class="er-step">02 · SHAPE YOUR REPORT</span><h3>Choose display columns</h3><p>Check the columns you want in the report. Your filters can use any column.</p></div><strong class="er-count" aria-live="polite">${count(selected.size)} / ${count(report.columns.length)} selected</strong></div>
+        <div class="er-column-bulk" role="group" aria-label="All worksheet columns">${button('select-all-columns', 'Check all columns', selected.size === report.columns.length ? 'disabled' : '', 'val-secondary')}${button('uncheck-all-columns', 'Uncheck all columns', selected.size === 0 ? 'disabled' : '', 'val-quiet')}<small>Applies to every column in this worksheet.</small></div>
         <label class="er-label" for="erColumnSearch">Search columns</label><input id="erColumnSearch" type="search" maxlength="200" value="${esc(columnSearch)}" placeholder="Type a column name or letter…">
-        <div class="er-inline-actions">${button('select-shown', 'Select search results', all.length ? '' : 'disabled', 'val-secondary')}${button('clear-shown', 'Clear search results', all.length ? '' : 'disabled', 'val-quiet')}</div>
-        <div class="er-column-grid">${visible.map(c => `<label class="er-column-option"><input id="erColumn-${c.index}" type="checkbox" data-er-column="${c.index}"${selected.has(c.index) ? ' checked' : ''}><span><b>${c.letter}</b><span>${esc(c.label)}</span></span></label>`).join('') || '<p class="er-empty">No columns match your search.</p>'}</div>${all.length > COLUMN_PAGE ? pageControls('column', columnPage, all.length, COLUMN_PAGE) : ''}</section>`;
+        ${columnSearch.trim() ? `<div class="er-column-search-actions">${button('select-shown', 'Check search results', matching.length ? '' : 'disabled', 'val-secondary')}${button('clear-shown', 'Uncheck search results', matching.length ? '' : 'disabled', 'val-quiet')}<small>Applies to all ${count(matching.length)} matching columns, across pages.</small></div>` : ''}
+        <div class="er-column-view-bar"><div class="er-column-views" role="group" aria-label="Show columns">${[
+          ['all', 'All', report.columns.length],
+          ['selected', 'Checked', selected.size],
+          ['unselected', 'Unchecked', report.columns.length - selected.size],
+        ]
+          .map(([view, label, number]) =>
+            button(
+              'column-view',
+              `${label} <span>${count(number)}</span>`,
+              `data-view="${view}" aria-pressed="${columnView === view}"`,
+              columnView === view ? 'is-active' : 'val-quiet'
+            )
+          )
+          .join('')}</div><small>${count(all.length)} in this view</small></div>
+        <div class="er-column-grid">${visible.map(c => `<label class="er-column-option${selected.has(c.index) ? ' is-selected' : ''}"><input id="erColumn-${c.index}" type="checkbox" data-er-column="${c.index}"${selected.has(c.index) ? ' checked' : ''}><span><b>${c.letter}</b><span>${esc(c.label)}</span></span></label>`).join('') || `<p class="er-empty">${empty}</p>`}</div>${all.length > COLUMN_PAGE ? pageControls('column', columnPage, all.length, COLUMN_PAGE) : ''}</section>`;
     }
     function filtersView() {
       const choices = matches(report.columns, filterSearch);
@@ -409,12 +437,21 @@
         return;
       }
       if (!report) throw Error('Upload an Excel workbook first.');
-      if (action === 'select-shown' || action === 'clear-shown') {
+      if (action === 'select-all-columns' || action === 'uncheck-all-columns') {
+        selected = new Set(action === 'select-all-columns' ? report.columns.map(c => c.index) : []);
+        columnView = 'all';
+        columnPage = tableColumnPage = 0;
+        invalidate();
+      } else if (action === 'select-shown' || action === 'clear-shown') {
         const columns = matches(report.columns, columnSearch);
         for (const c of columns)
           action === 'select-shown' ? selected.add(c.index) : selected.delete(c.index);
         invalidate();
-        tableColumnPage = 0;
+        columnPage = tableColumnPage = 0;
+      } else if (action === 'column-view') {
+        if (!['all', 'selected', 'unselected'].includes(el.dataset.view)) return;
+        columnView = el.dataset.view;
+        columnPage = 0;
       } else if (action === 'apply-filter') apply();
       else if (action === 'remove-filter') removeFilter(index);
       else if (action === 'clear-filters') {
@@ -492,6 +529,7 @@
       }
       try {
         ensure('run');
+        let disappearingColumn = null;
         if (el.id === 'erSheet') chooseSheet(Number(el.value), 1);
         else if (el.id === 'erHeaderRow') chooseSheet(sheetIndex, Number(el.value));
         else if (el.id === 'erLiveColumn') {
@@ -510,10 +548,27 @@
           const index = Number(el.dataset.erColumn);
           if (!report?.columns[index]) throw Error('Choose an available column.');
           el.checked ? selected.add(index) : selected.delete(index);
+          if (
+            (columnView === 'selected' && !el.checked) ||
+            (columnView === 'unselected' && el.checked)
+          )
+            disappearingColumn = index;
           invalidate();
           tableColumnPage = 0;
         } else return;
         paint();
+        if (disappearingColumn !== null) {
+          const choices = [...document.querySelectorAll('#valExcelReport [data-er-column]')];
+          const next =
+            choices.find(choice => Number(choice.dataset.erColumn) > disappearingColumn) ||
+            choices.at(-1);
+          (
+            next ||
+            document.querySelector(
+              `#valExcelReport [data-er="column-view"][data-view="${columnView}"]`
+            )
+          )?.focus({ preventScroll: true });
+        }
       } catch (error) {
         if (el.id === 'erHeaderRow') el.value = headerRow;
         if (el.id === 'erSheet') el.value = String(sheetIndex);
