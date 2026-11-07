@@ -1,5 +1,19 @@
 # Wishlist and ticket workspace
 
+## Selection shorthand
+
+**K** means keep the selected idea in the wishlist. **E** means explain the selected idea. Neither shorthand requests implementation.
+
+## Pending website experience enhancement · 8 November 2026
+
+Kept from the website design and functionality ideas in this discussion. The number below belongs to that discussion, separate from earlier batches.
+
+| Selection | Enhancement | Saved scope |
+| --- | --- | --- |
+| 10 | Richer Search & commands | Group results into pages, records and actions; add keyboard navigation and record previews. Preserve existing search behavior, assigned permissions and record actions. |
+
+This is a wishlist selection only; implementation has not been requested. No batch assigned.
+
 ## Latest wishlist batch
 
 The two prioritised items are implemented: **TNG PDF extraction and cropped evidence downloads**, and **continuous Troubleshooting Lab result animations with saved-result autoplay**. See [the usage guide](docs/TNG-AND-LAB.md).
