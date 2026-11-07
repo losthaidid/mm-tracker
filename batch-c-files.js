@@ -707,22 +707,23 @@
         );
       }
       let top = band + Math.max(42, 48 * headerScale);
-      font(compact ? 35 : 38, true);
+      font(pageNo === 1 ? (compact ? 35 : 38) : 24, true);
       ctx.fillStyle = colour.ink;
       for (const title of wrap(ctx, guide.title || 'Screenshot guide', width)) {
         ctx.fillText(title, margin, top);
-        top += 45;
+        top += pageNo === 1 ? 45 : 31;
       }
       font(17);
       ctx.fillStyle = colour.body;
-      ctx.fillText(
-        guide.steps.length + ' illustrated ' + (guide.steps.length === 1 ? 'step' : 'steps'),
-        margin,
-        top + 5
-      );
+      if (pageNo === 1)
+        ctx.fillText(
+          guide.steps.length + ' illustrated ' + (guide.steps.length === 1 ? 'step' : 'steps'),
+          margin,
+          top + 5
+        );
       ctx.fillStyle = line;
-      ctx.fillRect(margin, top + 20, width, 1);
-      bodyTop = y = top + 46 * headerScale;
+      ctx.fillRect(margin, top + (pageNo === 1 ? 20 : 4), width, 1);
+      bodyTop = y = top + (pageNo === 1 ? 46 * headerScale : 22);
       usedBottom = y;
       column = 0;
       rowBottom = y;
@@ -1124,7 +1125,19 @@
         top = Math.max(170, bandHeight + 46, (130 + headHeight) * headerScale + 30),
         detailsTop = bottom - details.height,
         available = detailsTop - (details.height ? 48 : 0) - top,
-        imageHeight = images.length ? Math.min(620, available - textHeight - 54) : 0;
+        naturalGalleryHeight = !images.length
+          ? 0
+          : images.length === 1
+            ? (1032 * cover.images[0].height) / cover.images[0].width + 28
+            : images.length === 2
+              ? Math.max(...cover.images.map(im => (490 * im.height) / im.width + 28))
+              : Math.max(
+                  (636 * cover.images[0].height) / cover.images[0].width + 28,
+                  ...cover.images.slice(1).map(im => 2 * ((344 * im.height) / im.width + 28) + 24)
+                ),
+        imageHeight = images.length
+          ? Math.min(620, Math.max(180, naturalGalleryHeight), available - textHeight - 54)
+          : 0;
       if (textHeight > available || (images.length && imageHeight < 160))
         throw Error(
           'The cover text does not fit at these sizes. Shorten the text, reduce its size or remove an image.'
@@ -1249,30 +1262,65 @@
       start();
       for (const [i, step] of guide.steps.entries()) {
         check(alive);
-        ctx.font = '600 22px Arial, sans-serif';
-        const lines = wrap(
-            ctx,
-            String(i + 1).padStart(2, '0') + '  ' + (step.title || 'Step ' + (i + 1)),
-            width - 110
-          ),
-          h = Math.max(50, lines.length * 29 + 20);
+        ctx.font = '600 23px Arial, sans-serif';
+        const textX = margin + 230,
+          textWidth = width - 330,
+          lines = wrap(ctx, step.title || 'Step ' + (i + 1), textWidth),
+          description = step.caption.replace(/\s+/g, ' ').trim(),
+          excerpt = [...description].slice(0, 140).join('');
+        ctx.font = '18px Arial, sans-serif';
+        const summary = wrap(ctx, excerpt, textWidth).slice(0, 2);
+        if (description.length > excerpt.length || wrap(ctx, excerpt, textWidth).length > 2) {
+          let last = summary.at(-1) || '';
+          while (last && ctx.measureText(last + '…').width > textWidth) last = last.slice(0, -1);
+          summary[summary.length - 1] = last + '…';
+        }
+        const h = Math.max(
+          128,
+          lines.length * 29 + (description ? summary.length * 25 + 12 : 0) + 32
+        );
         if (y + h > bottom) {
           yield finish();
           start();
-          ctx.font = '600 22px Arial, sans-serif';
+        }
+        ctx.save();
+        ctx.fillStyle = colour.ink;
+        ctx.globalAlpha = 0.035;
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(margin, y, width, h - 10, 12);
+        else ctx.rect(margin, y, width, h - 10);
+        ctx.fill();
+        ctx.restore();
+        ctx.fillStyle = colour.accent;
+        ctx.fillRect(margin + 16, y + 16, 40, 36);
+        ctx.fillStyle = palette({ paper: colour.accent, accent: colour.paper }).ink;
+        ctx.font = '600 16px Arial, sans-serif';
+        const number = String(i + 1).padStart(2, '0');
+        ctx.fillText(number, margin + 36 - ctx.measureText(number).width / 2, y + 40);
+        const shot = await raster(step, alive);
+        try {
+          check(alive);
+          const fit = contain(shot, { x: margin + 74, y: y + 14, w: 134, h: 90 });
+          ctx.drawImage(shot, fit.x, fit.y, fit.w, fit.h);
+        } finally {
+          release(shot);
         }
         ctx.fillStyle = colour.ink;
-        lines.forEach((line, row) => ctx.fillText(line, margin, y + 25 + row * 29));
+        ctx.font = '600 23px Arial, sans-serif';
+        lines.forEach((line, row) => ctx.fillText(line, textX, y + 34 + row * 29));
+        ctx.font = '18px Arial, sans-serif';
+        ctx.fillStyle = colour.body;
+        if (description)
+          summary.forEach((line, row) =>
+            ctx.fillText(line, textX, y + 46 + lines.length * 29 + row * 25)
+          );
         ctx.fillStyle = colour.accent;
         ctx.textAlign = 'right';
-        ctx.fillText(String((stepPages.get(step.id) ?? 0) + 1), 1240 - margin, y + 25);
+        ctx.font = '600 23px Arial, sans-serif';
+        ctx.fillText(String((stepPages.get(step.id) ?? 0) + 1), 1240 - margin - 20, y + 37);
         ctx.textAlign = 'left';
         links.push({ target: step.id, rect: { x: margin, y, w: width, h } });
         y += h;
-        ctx.fillStyle = colour.accent;
-        ctx.globalAlpha = 0.15;
-        ctx.fillRect(margin, y - 6, width, 1);
-        ctx.globalAlpha = 1;
       }
       if (c) yield finish();
     } finally {

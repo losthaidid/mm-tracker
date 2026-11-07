@@ -111,6 +111,29 @@ test('full document preview browses pages with thumbnails, page selection, foote
   await c.click('preview-footer'); assert.match(c.d.querySelector('[data-bc-page-preview]').getAttribute('aria-label'), /Footer/);
   await c.click('preview-steps'); await c.module.preview(); assert.equal(c.previews.at(-1).index, 2);
 });
+test('studio workspaces preserve the same canvas and fields, selected steps and ready downloads', async t => {
+  const c = fixture(t); await c.start(); await c.module.add([{ name: 'one.png' }, { name: 'two.png' }]);
+  c.set('[data-bc-caption]', 'Keep this unfinished instruction'); const canvas = c.d.querySelector('[data-bc-canvas]'), caption = c.d.querySelector('[data-bc-caption]'), before = await c.saved(), link = c.d.querySelector('[data-bc-ready] a');
+  assert.equal(c.d.querySelector('[data-bc-pane="edit"]').hidden, false);
+  await c.click('workspace', { workspace: 'design' });
+  assert.equal(c.d.querySelector('[data-bc-pane="edit"]').hidden, true); assert.equal(c.d.querySelector('[data-bc-pane="design"]').hidden, false); assert.ok(c.d.querySelector('[data-bc-preview-host="design"] .bc-guide-preview')); assert.equal(c.d.querySelector('.bc-branding .bc-guide-preview'), null);
+  await c.module.preview(); await c.click('workspace', { workspace: 'preview' });
+  assert.ok(c.d.querySelector('[data-bc-preview-host="preview"] .bc-guide-preview')); assert.equal(c.d.querySelector('[data-bc-pane="preview"]').hidden, false);
+  await c.click('workspace', { workspace: 'edit' });
+  assert.equal(c.d.querySelector('[data-bc-canvas]'), canvas); assert.equal(c.d.querySelector('[data-bc-caption]'), caption); assert.equal(caption.value, 'Keep this unfinished instruction'); assert.equal(c.d.querySelector('[data-bc-ready] a'), link); assert.deepEqual(await c.saved(), before);
+  await c.click('workspace', { workspace: 'preview' }); await c.module.add([{ name: 'extra.png' }]); assert.equal(c.d.querySelector('[data-bc-pane="edit"]').hidden, false); assert.equal((await c.saved()).steps[0].caption, 'Keep this unfinished instruction');
+});
+test('workspace keyboard navigation and the More tools menu never nudge selected objects', async t => {
+  const c = fixture(t); await c.start(); const g = guide(); g.steps[0].image = { ...image, width: 400, height: 300 }; g.steps[0].marks = [{ type: 'rectangle', color: '#ff0000', size: .01, points: [[.2, .2], [.5, .5]] }];
+  await c.module.importGuide({ size: 100, text: async () => JSON.stringify(g) }); await settle(); await c.click('choose-object', { index: '0' }); const before = await c.saved();
+  const editTab = c.d.querySelector('[data-bc-workspace-tab][data-workspace="edit"]'); editTab.dispatchEvent(new c.w.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })); assert.equal(c.d.querySelector('[data-bc-pane="design"]').hidden, false);
+  c.d.activeElement.dispatchEvent(new c.w.KeyboardEvent('keydown', { key: 'End', bubbles: true, cancelable: true })); assert.equal(c.d.querySelector('[data-bc-pane="preview"]').hidden, false); await c.click('workspace', { workspace: 'edit' });
+  const menu = c.d.querySelector('.bc-more-tools'); menu.open = true; const text = menu.querySelector('[data-bc-tool="text"]'); text.dispatchEvent(new c.w.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })); assert.deepEqual((await c.saved()).steps, before.steps);
+  text.click(); assert.equal(menu.open, false); assert.equal(text.getAttribute('aria-pressed'), 'true'); menu.open = true; menu.querySelector('summary').dispatchEvent(new c.w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); assert.equal(menu.open, false); assert.ok(c.d.querySelector('#batchCRoom'));
+});
+test('privacy editing keeps its existing tools and guide-only workspace controls stay absent', async t => {
+  const c = fixture(t); c.module.open('privacy'); await c.module.add([{ name: 'private.png' }]); assert.equal(c.d.querySelector('[role="tablist"]'), null); assert.equal(c.d.querySelector('.bc-more-tools'), null); assert.equal(c.d.querySelector('[data-bc-tool="cover"]').getAttribute('aria-pressed'), 'true'); assert.ok(c.d.querySelector('[data-bc-tool="blur"]'));
+});
 test('automatic recovery restores a closed guide with its screenshot, comparison and text only for the same account', async t => {
   const idb = memoryIDB(), first = fixture(t, idb); await first.start(); await first.module.add([{ name: 'Saved.png' }]); first.set('[data-bc-step="expected"]', 'Recovered result'); await first.module.addComparison({ name: 'after.png' }); await first.module.flushDraft(); const expected = await first.saved(); first.module.close(); await settle();
   const second = fixture(t, idb); await second.start(); await settle(); const actual = await second.saved(); assert.deepEqual(actual.steps, expected.steps); assert.equal(actual.steps[0].comparison.image.src, image.src);
@@ -159,6 +182,14 @@ test('rendered before-and-after comparisons keep both images and their arrangeme
   const n = await native(t); if (!n) return; const { F, imageOf } = n, s = { ...step('a'), image: imageOf('#ff0000'), comparison: E.comparison({ image: imageOf('#0000ff'), orientation: 'side' }) };
   let c = await F.raster(s, () => true); assert.ok(c.width > c.height); let ctx = c.getContext('2d'); assert.deepEqual(Array.from(ctx.getImageData(c.width / 4, c.height / 2, 1, 1).data), [255, 0, 0, 255]); assert.deepEqual(Array.from(ctx.getImageData(c.width * 3 / 4, c.height / 2, 1, 1).data), [0, 0, 255, 255]); F.release(c);
   s.comparison.orientation = 'stack'; c = await F.raster(s, () => true); ctx = c.getContext('2d'); assert.deepEqual(Array.from(ctx.getImageData(c.width / 2, c.height / 4, 1, 1).data), [255, 0, 0, 255]); assert.deepEqual(Array.from(ctx.getImageData(c.width / 2, c.height * 3 / 4, 1, 1).data), [0, 0, 255, 255]); F.release(c);
+});
+test('cover gallery frames fit wide screenshots and contents thumbnails retain privacy covers', async t => {
+  const n = await native(t); if (!n) return; const { F, imageOf } = n, wide = imageOf('#ffffff', 1000, 200), g = E.guide({ ...guide(), colours: E.GUIDE_PALETTES.blue, cover: { enabled: true, design: 'editorial', images: [wide, wide] } });
+  const cover = await F.previewPage(g, 0, () => true), ctx = cover.getContext('2d'); let run = 0, longest = 0;
+  for (let y = 0; y < cover.height; y++) { const p = ctx.getImageData(90, y, 1, 1).data; if (p[2] - p[0] > 35) { run++; longest = Math.max(longest, run); } else run = 0; }
+  assert.ok(longest > 150 && longest < 300); F.release(cover);
+  const shot = imageOf('#ff0000', 400, 300), hidden = { ...step('private'), image: shot, marks: [{ type: 'cover', color: '#000000', size: .01, points: [[.1, .1], [.4, .4]] }] }, toc = await F.previewPage({ ...guide(), contents: true, steps: [hidden] }, 0, () => true), row = toc.guideMeta.links[0].rect;
+  assert.deepEqual(Array.from(toc.getContext('2d').getImageData(row.x + 105, row.y + 32, 1, 1).data), [0, 0, 0, 255]); F.release(toc);
 });
 test('compact header height moves screenshot content upward without reducing the maintained screenshot width', async t => {
   const n = await native(t); if (!n) return; const { F, imageOf } = n, g = { ...guide(), steps: [{ ...step('a'), image: imageOf('#ff0000') }] }, positions = [];

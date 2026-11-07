@@ -81,12 +81,180 @@
       layerLoadJob = 0,
       layerLoadKey = '',
       coverImageRefs = [];
+    let workspace = 'edit';
     const project = () => projects[mode],
       step = () => project().steps.find(s => s.id === selected),
       $ = selector => room?.querySelector(selector);
     const nextNumber = () => E.nextNumber(project(), selected),
       clone = value => JSON.parse(JSON.stringify(value)),
       activeObject = () => step()?.marks[objectIndex];
+    function previewVisible() {
+      return (
+        mode === 'guide' &&
+        !!room &&
+        (workspace !== 'edit' || !!room.querySelector('.bc-branding')?.open)
+      );
+    }
+    function pauseGuidePreview() {
+      clearTimeout(guidePreviewTimer);
+      guidePreviewTimer = 0;
+      guidePreviewJob++;
+      guidePreviewPending = false;
+    }
+    function setWorkspace(value, focus = false) {
+      if (mode !== 'guide' || !room || !['edit', 'design', 'preview'].includes(value)) return;
+      workspace = value;
+      room.dataset.bcWorkspace = value;
+      const menu = room.querySelector('.bc-more-tools');
+      if (menu && value !== 'edit') menu.open = false;
+      for (const pane of room.querySelectorAll('[data-bc-pane]'))
+        pane.hidden = pane.dataset.bcPane !== value;
+      for (const tab of room.querySelectorAll('[data-bc-workspace-tab]')) {
+        const active = tab.dataset.workspace === value;
+        tab.setAttribute('aria-selected', String(active));
+        tab.tabIndex = active ? 0 : -1;
+        if (active && focus) tab.focus();
+      }
+      const preview = room.querySelector('.bc-guide-preview'),
+        host = $('[data-bc-preview-host="' + (value === 'preview' ? 'preview' : 'design') + '"]');
+      if (preview && host && preview.parentElement !== host) host.append(preview);
+      if (value === 'edit') {
+        room.querySelector('.bc-branding').open = false;
+        pauseGuidePreview();
+      } else if (guidePreviewPage && guidePreviewRevision === revision) paintGuidePreview();
+      else scheduleGuidePreview(0);
+    }
+    function revealGuidePreview() {
+      if (mode === 'guide' && workspace === 'edit') setWorkspace('design');
+    }
+    function mountGuideLayout() {
+      room.dataset.bcMode = mode;
+      if (mode !== 'guide') return;
+      room.classList.add('bc-guide-studio');
+      const shell = room.querySelector('.bc-shell'),
+        footer = room.querySelector('.bc-footer'),
+        tabs = document.createElement('nav'),
+        statusRow = document.createElement('div');
+      tabs.className = 'bc-workspace-tabs';
+      tabs.setAttribute('role', 'tablist');
+      tabs.setAttribute('aria-label', 'Guide workspace');
+      tabs.innerHTML = [
+        ['edit', '01', 'Edit screenshots'],
+        ['design', '02', 'Design & layout'],
+        ['preview', '03', 'Preview & export'],
+      ]
+        .map(([id, number, label]) =>
+          button(
+            'workspace',
+            '<span aria-hidden="true">' + number + '</span>' + esc(label),
+            'id="bcTab-' +
+              id +
+              '" role="tab" aria-controls="bcPane-' +
+              id +
+              '" data-bc-workspace-tab data-workspace="' +
+              id +
+              '"'
+          )
+        )
+        .join('');
+      shell.querySelector('.bc-file-bar').after(tabs);
+      statusRow.className = 'bc-studio-status';
+      const saving = $('[data-bc-save-status]'),
+        recovery = document.createElement('details');
+      recovery.className = 'bc-recovery-options';
+      recovery.innerHTML = '<summary>Recovery options</summary>';
+      recovery.append(room.querySelector('.bc-recovery'));
+      statusRow.append(saving, recovery);
+      tabs.after(statusRow);
+      const makePane = (id, label) => {
+        const pane = document.createElement('section');
+        pane.id = 'bcPane-' + id;
+        pane.dataset.bcPane = id;
+        pane.setAttribute('role', 'tabpanel');
+        pane.setAttribute('aria-labelledby', 'bcTab-' + id);
+        pane.setAttribute('aria-label', label);
+        shell.insertBefore(pane, footer);
+        return pane;
+      };
+      const edit = makePane('edit', 'Edit screenshots'),
+        design = makePane('design', 'Document design'),
+        preview = makePane('preview', 'Document preview'),
+        editGrid = document.createElement('div'),
+        designControls = document.createElement('div'),
+        designPreview = document.createElement('div'),
+        fullPreview = document.createElement('div');
+      editGrid.className = 'bc-edit-workspace';
+      editGrid.append(room.querySelector('.bc-step-strip'), room.querySelector('.bc-layout'));
+      edit.append(editGrid);
+      design.className = 'bc-design-workspace';
+      designControls.className = 'bc-design-controls';
+      designPreview.className = 'bc-design-preview';
+      designPreview.dataset.bcPreviewHost = 'design';
+      fullPreview.dataset.bcPreviewHost = 'preview';
+      for (const selector of [
+        '.bc-guide-fields',
+        '.bc-guide-layout',
+        '.bc-workspace-options',
+        '.bc-cover',
+        '.bc-branding',
+      ])
+        designControls.append(room.querySelector(selector));
+      design.append(designControls, designPreview);
+      preview.append(fullPreview);
+      room.querySelector('.bc-workspace-options').open = true;
+      const brandSummary = room.querySelector('.bc-branding > summary');
+      brandSummary.textContent = 'Colours, footer logo & watermark';
+      const title = room.querySelector('.bc-header h2'),
+        description = room.querySelector('.bc-header p');
+      title.textContent = 'Step-by-step guide';
+      description.dataset.bcDocumentName = '';
+      const toolbar = room.querySelector('.bc-toolbar'),
+        quick = document.createElement('div'),
+        more = document.createElement('details');
+      quick.className = 'bc-quick-tools';
+      more.className = 'bc-more-tools';
+      more.innerHTML =
+        '<summary>More tools <span aria-hidden="true">⌄</span></summary><div role="group" aria-label="More annotation tools"></div>';
+      const primary = new Set(['object', 'move', 'number', 'arrow', 'rectangle', 'crop']);
+      for (const item of [...toolbar.querySelectorAll('[data-bc-tool]')])
+        if (!primary.has(item.dataset.bcTool)) more.querySelector('div').append(item);
+      for (const key of ['object', 'move', 'number', 'arrow', 'rectangle', 'crop'])
+        quick.append(toolbar.querySelector('[data-bc-tool="' + key + '"]'));
+      const addImage = toolbar.querySelector('.bc-file-label'),
+        remove = toolbar.querySelector('[data-bc="delete-object"]');
+      toolbar.replaceChildren(quick, more, addImage);
+      more.addEventListener('toggle', () => {
+        if (!more.open) return;
+        const panel = more.querySelector('div');
+        panel.style.left = '0';
+        panel.style.right = 'auto';
+        if (panel.getBoundingClientRect().right > root.innerWidth - 12) {
+          panel.style.left = 'auto';
+          panel.style.right = '0';
+        }
+      });
+      const selection = $('[data-bc-selection-status]'),
+        selectionBar = document.createElement('div');
+      selectionBar.className = 'bc-selection-bar';
+      selection.before(selectionBar);
+      selectionBar.append(selection, remove);
+      tabs.addEventListener('keydown', event => {
+        if (busy) return;
+        const items = [...tabs.querySelectorAll('[role="tab"]')],
+          index = items.indexOf(event.target);
+        if (index < 0 || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const next =
+          event.key === 'Home'
+            ? 0
+            : event.key === 'End'
+              ? items.length - 1
+              : (index + (event.key === 'ArrowLeft' ? -1 : 1) + items.length) % items.length;
+        setWorkspace(items[next].dataset.workspace, true);
+      });
+      setWorkspace('edit');
+    }
     function objectFields() {
       return (
         '<section class="bc-objects" aria-label="Screenshot objects"><h3>Objects &amp; instructions</h3><label>Object<select data-bc-object><option value="-1">Choose an object</option></select></label><p class="bc-guide-heading-help">Choose an object here or use Select objects on the canvas. Drag to move or resize; Delete selected object removes it. Unlock a locked object first.</p>' +
@@ -477,6 +645,8 @@
       $('[data-bc-autosave]').checked = autoSave;
       $('[data-bc-autosave]').disabled = !store || !storageLoaded || busy;
       $('[data-bc-recovery]').hidden = !recoveryDraft;
+      const recoveryOptions = room.querySelector('.bc-recovery-options');
+      if (recoveryDraft && recoveryOptions) recoveryOptions.open = true;
       const select = $('[data-bc-template]'),
         value = select.value;
       select.innerHTML =
@@ -919,7 +1089,7 @@
         project().cover = E.cover({ ...project().cover, [key]: value });
         if (key === 'enabled') {
           guidePreviewView = 'page';
-          room.querySelector('.bc-branding').open = true;
+          revealGuidePreview();
         }
         changed();
         updateCover();
@@ -1320,7 +1490,7 @@
       clearTimeout(guidePreviewTimer);
       guidePreviewJob++;
       updatePreviewNavigation();
-      if (mode !== 'guide' || !room?.querySelector('.bc-branding')?.open) return;
+      if (!previewVisible()) return;
       if (project().steps.length || project().cover.enabled) {
         $('[data-bc-preview-status]').textContent = 'Updating preview…';
         guidePreviewTimer = setTimeout(() => {
@@ -1343,12 +1513,7 @@
         guidePreviewPending = true;
         return;
       }
-      if (
-        mode !== 'guide' ||
-        !room?.querySelector('.bc-branding')?.open ||
-        (!project().steps.length && !project().cover.enabled)
-      )
-        return;
+      if (!previewVisible() || (!project().steps.length && !project().cover.enabled)) return;
       const dialog = room,
         current = owner,
         version = revision,
@@ -1690,6 +1855,8 @@
       updateObjects();
       updateCover();
       updateWorkspace();
+      const name = $('[data-bc-document-name]');
+      if (name) name.textContent = project().title || 'Untitled guide';
     }
     function thumbs() {
       $('[data-bc-steps]').innerHTML = project()
@@ -1932,6 +2099,7 @@
           steps: mode === 'privacy' ? additions : [...target.steps, ...additions],
         });
         projects[mode] = next;
+        if (mode === 'guide') setWorkspace('edit');
         if (mode === 'privacy') {
           histories.clear();
           redo.clear();
@@ -2054,7 +2222,7 @@
       if (room) close();
       trigger = document.activeElement;
       mode = value === 'guide' ? 'guide' : 'privacy';
-      tool = 'cover';
+      tool = value === 'guide' ? 'object' : 'cover';
       original = false;
       removed = null;
       room = document.createElement('dialog');
@@ -2171,6 +2339,7 @@
         button('export', guideMode ? 'Prepare guide' : 'Prepare edited PNG', 'class="bc-primary"') +
         button('editable', 'Save editable guide') +
         '</div><div data-bc-ready class="bc-ready"></div><p data-bc-status role="status" aria-live="polite">Images and edits stay local to this browser. No records are changed.</p></footer></div>';
+      mountGuideLayout();
       room.addEventListener('cancel', event => {
         event.preventDefault();
         close();
@@ -2223,7 +2392,7 @@
         if (el.matches('[data-bc-quality],[data-bc-contents]')) {
           if (el.matches('[data-bc-quality]')) project().quality = el.value;
           else project().contents = el.checked;
-          room.querySelector('.bc-branding').open = true;
+          revealGuidePreview();
           changed();
           updateWorkspace();
         }
@@ -2295,7 +2464,7 @@
         if (el.matches('[data-bc-layout]')) {
           project().layout = el.value;
           guidePreviewView = 'page';
-          room.querySelector('.bc-branding').open = true;
+          revealGuidePreview();
           changed();
           updateBranding();
           paintGuidePreview();
@@ -2337,7 +2506,7 @@
           s = step();
         if (el.matches('[data-bc-page]')) {
           project().page = E.pageOptions({ ...project().page, [el.dataset.bcPage]: +el.value });
-          room.querySelector('.bc-branding').open = true;
+          revealGuidePreview();
           changed();
           updateWorkspace();
         }
@@ -2357,6 +2526,8 @@
           editCover(el);
         if (el.matches('[data-bc-title]')) {
           project().title = el.value;
+          const name = $('[data-bc-document-name]');
+          if (name) name.textContent = el.value || 'Untitled guide';
           changed();
         }
         if (el.matches('[data-bc-export-heading]')) {
@@ -2661,6 +2832,15 @@
         paint();
       });
       room.addEventListener('keydown', event => {
+        const menu = event.target.closest?.('.bc-more-tools');
+        if (event.key === 'Escape' && menu?.open) {
+          event.preventDefault();
+          event.stopPropagation();
+          menu.open = false;
+          menu.querySelector('summary').focus();
+          return;
+        }
+        if (menu?.open && event.key.startsWith('Arrow')) return;
         if (
           !busy &&
           activeObject() &&
@@ -2707,8 +2887,10 @@
       });
       document.body.append(room);
       room.querySelector('.bc-branding')?.addEventListener('toggle', event => {
-        if (event.target.open) scheduleGuidePreview(0);
-        else cancelGuidePreview();
+        if (event.target.open && workspace === 'edit') setWorkspace('design');
+        if (!previewVisible()) pauseGuidePreview();
+        else if (guidePreviewPage && guidePreviewRevision === revision) paintGuidePreview();
+        else scheduleGuidePreview(0);
       });
       document.body.classList.add('bc-room-open');
       room.showModal();
@@ -2731,6 +2913,10 @@
         return;
       }
       if (busy) return;
+      if (action === 'workspace') {
+        setWorkspace(el.dataset.workspace);
+        return;
+      }
       const s = step();
       if (['save-template', 'delete-template', 'apply-template'].includes(action)) {
         await templateAction(action);
@@ -2895,7 +3081,7 @@
       if (action === 'preview-cover') {
         guidePreviewView = 'page';
         guidePreviewIndex = 0;
-        room.querySelector('.bc-branding').open = true;
+        revealGuidePreview();
         scheduleGuidePreview(0);
         return;
       }
@@ -2997,11 +3183,15 @@
       }
     }
     document.addEventListener('click', event => {
+      const menu = room?.querySelector('.bc-more-tools');
+      if (menu?.open && !menu.contains(event.target)) menu.open = false;
       const el = event.target.closest?.('[data-bc],[data-bc-tool]');
       if (!el) return;
       event.preventDefault();
       if (el.hasAttribute('data-bc-tool')) {
         if (!busy) {
+          const menu = el.closest('.bc-more-tools');
+          if (menu) menu.open = false;
           tool = el.dataset.bcTool;
           drag = null;
           pan = null;
@@ -3057,7 +3247,11 @@
       addCoverImages,
       addComparison,
       flushDraft,
-      preview: renderGuidePreview,
+      preview: async () => {
+        if (mode === 'guide' && workspace === 'edit') setWorkspace('preview');
+        return renderGuidePreview();
+      },
+      workspace: setWorkspace,
       select,
       prepare,
       importGuide,
