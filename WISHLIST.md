@@ -4,22 +4,21 @@
 
 **K** means keep the selected idea in the wishlist. **E** means explain the selected idea. **N** means provide the next suggestions. These shorthands do not request implementation.
 
-## Pending website experience enhancements · 8 November 2026
+## Implemented website experience enhancements · 8 November 2026
 
-Kept from the website design and functionality ideas in this discussion. The numbers below belong to that discussion, separate from earlier batches.
+Kept from the website design and functionality ideas in this discussion, then approved for implementation. All seven are implemented; see [the usage guide](docs/KEPT-EXPERIENCE.md). The numbers below belong to that discussion, separate from earlier batches.
 
 | Selection | Enhancement | Saved scope |
 | --- | --- | --- |
 | 10 | Richer Search & commands | Group results into pages, records and actions; add keyboard navigation and record previews. Preserve existing search behavior, assigned permissions and record actions. |
 | 19 | Animated navigation icons | Add brief, lightweight icon movements on hover and section selection. Respect Motion off and reduced-motion preferences. |
 | 20 | Custom website icon | Choose a logo or initials for the header and browser-tab icon, matching the website colours. Preserve the editable website name and its existing motion. |
-
 | 31 | Drag-and-drop file launcher | Drop a file from any website page, preview its name/type and choose a compatible available tool. Open the chosen tool with the file ready, preserve local processing where supported and ask before leaving an unfinished editor. Drive uploads use the existing explicit upload flow. |
 | 34 | Shareable summary cards | Turn selected tickets, tasks or project information into neatly designed images for sharing, with a preview before export. |
 | 40 | Selectable loading-screen styles | Choose minimal, illustrated or animated loading designs that follow the selected website theme. Preserve the maintained website name, actual startup status and motion preferences. |
 | 59 | Create a theme from an image | Extract colour suggestions from a selected logo or picture and preview them across the website before applying a theme. Preserve the existing theme controls and readable text/control contrast. |
 
-These are wishlist selections only; implementation has not been requested. No batch assigned.
+Implemented after the later “proceed please” instruction. Other pending batches below keep their existing status.
 
 ## Latest wishlist batch
 

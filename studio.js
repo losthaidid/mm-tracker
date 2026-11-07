@@ -327,6 +327,10 @@
       tng = null,
       recipients = null,
       settingsPanel = null,
+      experienceAppearance = null,
+      commandPalette = null,
+      fileLauncher = null,
+      summaryCards = null,
       projectDates = null,
       processDeck = null,
       chromeUX = null,
@@ -451,6 +455,7 @@
         root.WorkHubAppearance.apply(p);
         paletteKey = key;
       }
+      experienceAppearance?.apply(p);
       root.WorkHubRenderProfile?.setMode(p.displayMode);
       dataValue(document.body, 'hubTheme', p.theme);
       dataValue(document.body, 'motion', p.motion);
@@ -1644,7 +1649,7 @@
           ]),
           ['custom', 'Custom colours', p.accent],
         ];
-      return `<div class="hub-theme-layout"><section class="hub-card hub-theme-controls"><div class="flex-title"><div><span class="hub-kicker">MAKE YOURSELF AT HOME</span><h3>Your space, your style</h3><p>Try a look, then save it to your account.</p></div><div class="actions">${btn('theme-export', 'Export')}${btn('theme-import', 'Import')}</div></div><form id="hubTheme">${root.WorkHubWebsiteDesigns?.launcher(p) || ''}<section class="hub-theme-section"><h4>Choose your colours</h4><input type="hidden" name="theme" value="${esc(p.theme)}"><div class="hub-palette-options" role="group" aria-label="Workspace colour palette">${palettes.map(([id, name, color]) => btn('theme-choice', '<span class="hub-palette-swatch" style="--palette:' + color + '"></span><span>' + name + '</span>', 'data-theme-choice="' + id + '" aria-pressed="' + (id === p.theme) + '"', 'hub-palette-choice')).join('')}</div><div class="form-grid">${field('accent', 'Your custom colour', p.accent, 'color')}${select('background', 'Page background', root.WorkHubAppearance.BACKGROUNDS, p.background, 'Choose background')}</div>${root.WorkHubAppearance.fields(p)}<div class="actions"><button type="button" data-photo="open">My background pictures</button></div></section><section class="hub-theme-section"><h4>Text & layout</h4><div class="form-grid">${select(
+      return `<div class="hub-theme-layout"><section class="hub-card hub-theme-controls"><div class="flex-title"><div><span class="hub-kicker">MAKE YOURSELF AT HOME</span><h3>Your space, your style</h3><p>Try a look, then save it to your account.</p></div><div class="actions">${btn('theme-export', 'Export')}${btn('theme-import', 'Import')}</div></div><form id="hubTheme">${root.WorkHubWebsiteDesigns?.launcher(p) || ''}${root.WorkHubExperienceAppearance?.fields(p) || ''}<section class="hub-theme-section"><h4>Choose your colours</h4><input type="hidden" name="theme" value="${esc(p.theme)}"><div class="hub-palette-options" role="group" aria-label="Workspace colour palette">${palettes.map(([id, name, color]) => btn('theme-choice', '<span class="hub-palette-swatch" style="--palette:' + color + '"></span><span>' + name + '</span>', 'data-theme-choice="' + id + '" aria-pressed="' + (id === p.theme) + '"', 'hub-palette-choice')).join('')}</div><div class="form-grid">${field('accent', 'Your custom colour', p.accent, 'color')}${select('background', 'Page background', root.WorkHubAppearance.BACKGROUNDS, p.background, 'Choose background')}</div>${root.WorkHubAppearance.fields(p)}<div class="actions"><button type="button" data-photo="open">My background pictures</button></div></section><section class="hub-theme-section"><h4>Text & layout</h4><div class="form-grid">${select(
         'font',
         'Typography',
         [
@@ -2637,74 +2642,98 @@
       timerEditor,
     });
     function commands(query = '') {
-      const q = query.toLowerCase().trim(),
-        s = a.state(),
+      const s = a.state(),
         rows = [
-          ['go:home', 'Open My day'],
-          ['go:tickets', 'Open Tickets'],
-          ['go:tasks', 'Open Tasks'],
-          ['go:schedule', 'Open Schedule'],
-          ['go:specs', 'Open Projects'],
-          ['go:notes', 'Open Notes'],
-          ['go:knowledge', 'Open Knowledge'],
-          ['go:processhub', 'Open Process Hub'],
-          ['go:waiting', 'Open Waiting on'],
-          ['go:studio', 'Open Studio'],
-          ['go:validator', 'Open Validation Studio'],
-          ['go:snippets', 'Open Snippets'],
-          ['new-task', 'Add task'],
-          ['new-ticket', 'Add ticket'],
-          ['note-edit', 'Add knowledge note'],
-          ['timer-new', 'Start work timer'],
-        ];
-      const results = [
-        ...rows.map(([id, title]) => ({ id, title, type: 'command' })),
-        ...s.tasks.map(t => ({ id: t.id, title: t.task, type: 'task-detail' })),
-        ...s.tickets.map(t => ({
-          id: t.id,
-          title: t.ticket + ' · ' + t.description,
-          type: 'ticket',
-        })),
-        ...s.projects.map(p => ({ id: p.id, title: p.name, type: 'project' })),
-        ...data().notes.map(n => ({
-          id: n.id,
-          title: n.title + ' ' + n.tcodes,
-          type: 'note-view',
-        })),
-        ...root.WorkHubRehearsalEngine.library(a.state()).map(p => ({
-          id: p.id,
-          title: p.name,
-          type: 'process-open',
-        })),
-      ]
-        .filter(
+          ...[
+            ['home', 'My day'],
+            ['tickets', 'Tickets'],
+            ['tasks', 'Tasks'],
+            ['schedule', 'Schedule'],
+            ['specs', 'Projects'],
+            ['notes', 'Notes'],
+            ['knowledge', 'Knowledge'],
+            ['processhub', 'Process Hub'],
+            ['files', 'Files'],
+            ['handover', 'Handover packs'],
+            ['waiting', 'Waiting on'],
+            ['studio', 'Studio'],
+            ['lab', 'Troubleshooting lab'],
+            ['validator', 'Validation Studio'],
+            ['snippets', 'Snippets'],
+          ].map(([id, name]) => ({
+            id: 'go:' + id,
+            title: 'Open ' + name,
+            type: 'command',
+            group: 'Pages',
+            detail: 'Navigate to ' + name + '.',
+            meta: 'Workspace page',
+          })),
+          ...[
+            ['new-task', 'Add task'],
+            ['new-ticket', 'Add ticket'],
+            ['note-edit', 'Add knowledge note'],
+            ['timer-new', 'Start work timer'],
+          ].map(([id, title]) => ({
+            id,
+            title,
+            type: 'command',
+            group: 'Actions',
+            detail: title + ' using the existing editor.',
+            meta: 'Create / start',
+          })),
+          ...s.tasks.map(t => ({
+            id: t.id,
+            title: t.task,
+            type: 'task-detail',
+            group: 'Records',
+            detail: t.remarks || t.notes || t.description || t.customLink || t.task,
+            meta: 'Task · ' + (t.done ? 'Completed' : BOARD[t.boardStatus] || t.status || 'To do'),
+          })),
+          ...s.tickets.map(t => ({
+            id: t.id,
+            title: t.ticket + ' · ' + t.description,
+            type: 'ticket',
+            group: 'Records',
+            detail: [t.description, a.latestHistory(t)].filter(Boolean).join(' · '),
+            meta: ['Ticket', t.status, t.pic].filter(Boolean).join(' · '),
+          })),
+          ...s.projects.map(p => ({
+            id: p.id,
+            title: p.name,
+            type: 'project',
+            group: 'Records',
+            detail: p.nextMilestone || p.description || 'Open project overview.',
+            meta: 'Project · ' + p.phase,
+          })),
+          ...data().notes.map(n => ({
+            id: n.id,
+            title: n.title + ' ' + n.tcodes,
+            type: 'note-view',
+            group: 'Records',
+            detail: n.notes || n.content || n.title,
+            meta: 'Knowledge note',
+          })),
+          ...root.WorkHubRehearsalEngine.library(s).map(p => ({
+            id: p.id,
+            title: p.name,
+            type: 'process-open',
+            group: 'Records',
+            detail: p.description || 'Open process and its steps.',
+            meta: 'Process',
+          })),
+        ].filter(
           x =>
             !root.WorkHubShortcutAccess ||
-            root.WorkHubShortcutAccess.allowedHub(
-              { hub: x.type === 'command' ? 'command' : x.type, id: x.id },
-              a.can || (() => true)
-            )
-        )
-        .filter(x => x.title.toLowerCase().includes(q))
-        .slice(0, 30);
-      return (
-        results
-          .map(r =>
-            btn(
-              r.type === 'command' ? 'command' : r.type,
-              esc(r.title),
-              'data-id="' + esc(r.id) + '"',
-              'hub-link-card'
-            )
-          )
-          .join('') || '<p>No matching records or commands.</p>'
-      );
+            root.WorkHubShortcutAccess.allowedHub({ hub: x.type, id: x.id }, a.can || (() => true))
+        );
+      return root.WorkHubCommandPalette.render(rows, query);
     }
     function openCommands() {
       a.openModal(
         'Search & commands',
-        `<label for="hubCommandQuery">Find a record or action</label><input id="hubCommandQuery" type="search" placeholder="Try a task, project, T-code, or Add task" autocomplete="off"><div id="hubCommandResults" class="hub-commands">${commands()}</div>`
+        `<label for="hubCommandQuery">Find a record, page or action</label><input id="hubCommandQuery" type="search" placeholder="Try a task, project, T-code, or Add task" autocomplete="off" aria-describedby="hubCommandHelp"><p id="hubCommandHelp">↑ ↓ to browse · Enter to open · Esc to close. Search titles, descriptions and status.</p><div id="hubCommandResults" class="hub-commands">${commands()}</div>`
       );
+      commandPalette?.mount();
       $('hubCommandQuery').focus();
     }
     function navigate(t) {
@@ -2721,8 +2750,20 @@
     }
     async function importTheme(file) {
       if (!file) return;
-      if (file.size > 20000) throw Error('Theme files must be smaller than 20 KB.');
+      const account = a.cloud().user?.id,
+        generation = a.cloud().generation;
+      const permitted = () =>
+        a.cloud().ready &&
+        account &&
+        a.cloud().user?.id === account &&
+        a.cloud().generation === generation &&
+        a.can('workspace', 'edit') &&
+        a.can('studio.theme', 'edit');
+      if (!permitted()) throw Error('Your account cannot import appearance settings.');
+      if (file.size > 150000) throw Error('Theme files must be smaller than 150 KB.');
       const x = JSON.parse(await file.text());
+      if (!permitted())
+        throw Error('Account or appearance permissions changed. Reopen the theme import.');
       if (x.app !== 'mm-tracker-theme' || x.version !== 1)
         throw Error('Choose a WorkHub theme file.');
       const d = copy(a.state());
@@ -2936,6 +2977,9 @@
       backgrounds?.mount();
       experience?.mount();
       settingsPanel?.mount();
+      experienceAppearance?.mount(themePreview || prefs());
+      fileLauncher?.sync();
+      summaryCards?.sync();
       rehearsal?.mount();
       tcodes?.mount();
     }
@@ -2996,9 +3040,12 @@
         ...prefs(),
         ...Object.fromEntries(new FormData(form)),
         ...root.WorkHubAppearance.values(form, prefs()),
+        ...root.WorkHubExperienceAppearance.values(form, prefs()),
         design: prefs().design,
       };
-      for (const k of Object.keys(v)) if (k.startsWith('color-')) delete v[k];
+      for (const k of Object.keys(v))
+        if (k.startsWith('color-') || ['brandMode', 'brandInitials', 'brandImage'].includes(k))
+          delete v[k];
       v.radius = Number(v.radius);
       for (const k of ['sounds', 'mascot', 'roaming', 'desk', 'hobbies'])
         v[k] = form.elements.namedItem(k)?.checked ?? prefs()[k];
@@ -3322,6 +3369,7 @@
       }
       if (action === 'privacy') {
         document.body.classList.toggle('hub-private');
+        summaryCards?.sync();
         syncViewModes();
         return;
       }
@@ -3905,7 +3953,10 @@
         input?.focus();
         input?.setSelectionRange(start, start);
       }
-      if (el.id === 'hubCommandQuery') $('hubCommandResults').innerHTML = commands(el.value);
+      if (el.id === 'hubCommandQuery') {
+        $('hubCommandResults').innerHTML = commands(el.value);
+        commandPalette?.mount();
+      }
       if (el.form?.id === 'hubTheme') {
         try {
           if (el.name === 'accent' || el.name.startsWith('color-'))
@@ -4327,7 +4378,56 @@
       ready: () => a.cloud().ready,
       owner: () => a.cloud().user?.id || '',
     });
+    experienceAppearance = root.WorkHubExperienceAppearance.install(a);
+    commandPalette = root.WorkHubCommandPalette.install();
+    const unfinished = () =>
+      !!document.querySelector(
+        '#modal[open] form,#batchCRoom,#hubThemeStatus[data-saved="false"]'
+      ) ||
+      !!validator?.launchContext().dirty ||
+      !!notes?.hasDraft() ||
+      !!goLiveIssues?.hasDraft();
+    summaryCards = root.WorkHubSummaryCards.install({ ...a, unfinished });
+    fileLauncher = root.WorkHubFileLauncher.install({
+      ...a,
+      unfinished,
+      templateReady: () => !!validator?.launchContext().templateReady,
+      activeProject: () => a.state().projects.some(p => p.id === a.state().activeProjectId),
+      driveReady: () => !!a.driveReady?.(),
+      async launch(id, file) {
+        if (id === 'excel-report') {
+          a.navigate('validator');
+          validator.handle({ dataset: { val: 'mode', mode: 'excel-report' } });
+          await validator.excelReport.loadFile(file);
+        } else if (id === 'validator') {
+          a.navigate('validator');
+          validator.handle({ dataset: { val: 'mode', mode: 'validate' } });
+          await validator.loadFile(file);
+        } else if (id === 'reader') {
+          currentTool = 'reader';
+          a.navigate('studio');
+          await reader.loadFile(file);
+        } else if (id === 'guide') {
+          currentTool = 'screenshots';
+          a.navigate('studio');
+          batchC.open('guide');
+          await batchC.add([file]);
+        } else if (id === 'issues') {
+          a.openGoLive();
+          await goLiveIssues.loadFile(file);
+        } else if (id === 'statement') {
+          tng.open();
+          await tng.loadFile(file);
+        } else if (id === 'drive') {
+          a.navigate('files');
+          a.openDriveUpload(file);
+        }
+      },
+    });
     return {
+      fileLauncher,
+      summaryCards,
+      experienceAppearance,
       myDay,
       experience,
       settingsPanel,

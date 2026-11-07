@@ -46,13 +46,21 @@
     if (!p || typeof p !== 'object') return;
     if (p.colors === undefined) p.colors = { ...COLORS };
     if (p.palettes === undefined) p.palettes = [];
+    root.WorkHubExperienceAppearance?.upgrade(p);
   }
   function appearanceValidate(p) {
+    root.WorkHubExperienceAppearance?.validate(p);
     if (
       (p.design !== undefined &&
-        !['current', 'clear-desk', 'modern-hub', 'editorial', 'canvas', 'compact-pro', 'fiori'].includes(
-          p.design
-        )) ||
+        ![
+          'current',
+          'clear-desk',
+          'modern-hub',
+          'editorial',
+          'canvas',
+          'compact-pro',
+          'fiori',
+        ].includes(p.design)) ||
       !p.colors ||
       Object.keys(COLORS).some(k => !color(p.colors[k])) ||
       !Array.isArray(p.palettes) ||

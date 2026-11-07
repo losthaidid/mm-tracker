@@ -180,6 +180,13 @@
       html[data-workhub-startup-state='error'] #workhubStartup .startup-scene, html[data-startup-motion='off'] #workhubStartup .startup-scene, #workhubStartup.is-leaving .startup-scene { will-change: auto; }
       html[data-startup-motion='off'] #workhubStartup .startup-touch-hint, html[data-startup-motion='off'] #workhubStartup .startup-spark-button { display: none; }
       html[data-startup-motion='off'] #workhubStartup .startup-card, html[data-startup-motion='off'] #workhubStartup { transition: none; }
+      html[data-startup-style='minimal'] #workhubStartup :is(.startup-surround,.startup-scene,.startup-touch-hint) { display: none; }
+      html[data-startup-style='minimal'] #workhubStartup .startup-card { max-width: 460px; }
+      html[data-startup-style='minimal'] #workhubStartup .startup-brand { margin-bottom: 25px; }
+      html:is([data-startup-style='minimal'],[data-startup-style='illustrated']) #workhubStartup *,
+      html:is([data-startup-style='minimal'],[data-startup-style='illustrated']) #workhubStartup *::before,
+      html:is([data-startup-style='minimal'],[data-startup-style='illustrated']) #workhubStartup *::after { animation: none !important; will-change: auto !important; }
+      html:is([data-startup-style='minimal'],[data-startup-style='illustrated']) #workhubStartup :is(.startup-touch-hint,.startup-spark-button) { display: none; }
       @media (prefers-reduced-motion: reduce) {
         #workhubStartup, #workhubStartup .startup-card { transition: none; }
         #workhubStartup *, #workhubStartup *::before, #workhubStartup *::after { animation: none !important; }
@@ -272,7 +279,7 @@
         ]
       }
     </script>
-    <script src="./startup.js?v=20261104-surround-patterns-1"></script>
+    <script src="./startup.js?v=20261108-kept-1"></script>
     <script src="./render-profile.js?v=20261104-smooth-motion-1"></script>
     <!-- Shared foundation first; feature styles follow; custom.css is your editing space. -->
     <link rel="stylesheet" href="./base.css?v=20261021-schedule-items-letter-1" />
@@ -339,6 +346,7 @@
     <link rel="stylesheet" href="./website-designs-extra.css?v=20261106-scenery-visibility-1" />
     <link rel="stylesheet" href="./website-fiori.css?v=20261106-object-editor-fiori-1" />
     <link rel="stylesheet" href="./workspace-redesign.css?v=20261107-pinned-sidebar-1" />
+    <link rel="stylesheet" href="./kept-experience.css?v=20261108-kept-1" />
     <link rel="stylesheet" href="./visual-refinement.css?v=20261107-visuals-1" />
     <link rel="stylesheet" href="./custom.css?v=20261019-source-1" />
   </head>
@@ -922,7 +930,11 @@
     <script src="./visual-refinement.js?v=20261107-visuals-1"></script>
     <script src="./website-designs.js?v=20261107-visuals-1"></script>
     <script src="./task-completion.js?v=20261106-handover-fiori-1"></script>
-    <script src="./workspace-upgrades.js?v=20261106-handover-fiori-1"></script>
+    <script src="./experience-appearance.js?v=20261108-kept-1"></script>
+    <script src="./command-palette.js?v=20261108-kept-1"></script>
+    <script src="./file-launcher.js?v=20261108-kept-1"></script>
+    <script src="./summary-cards.js?v=20261108-kept-1"></script>
+    <script src="./workspace-upgrades.js?v=20261108-kept-1"></script>
     <script src="./project-items-engine.js?v=20261104-project-workspace-1"></script>
     <script src="./project-items.js?v=20261104-project-workspace-1"></script>
     <script src="./workspace-features.js?v=20261023-leave-types-1"></script>
@@ -949,10 +961,10 @@
     <script src="./validator-reconcile-engine.js?v=20261103-validation-stability-1"></script>
     <script src="./validator-reconcile.js?v=20261103-matching-key-all-1"></script>
     <script src="./validator-corrections.js?v=20261103-bulk-fixes-1"></script>
-    <script src="./validator-studio.js?v=20261107-excel-report-1"></script>
+    <script src="./validator-studio.js?v=20261108-kept-1"></script>
     <!-- Personal Notes: engine before editor; records use the existing private save pipeline. -->
     <script src="./notes-engine.js?v=20261028-notes-1"></script>
-    <script src="./notes.js?v=20261028-notes-1"></script>
+    <script src="./notes.js?v=20261108-kept-1"></script>
     <script src="./data-reader-engine.js?v=20261028-reader-1"></script>
     <script src="./data-reader-files.js?v=20261028-reader-1"></script>
     <script src="./data-reader.js?v=20261028-reader-presentation-2"></script>
@@ -981,7 +993,7 @@
     <script src="./project-people.js?v=20261105-file-gallery-dialogs-1"></script>
     <script src="./project-golive-engine.js?v=20261107-golive-1"></script>
     <script src="./project-golive-files.js?v=20261107-golive-1"></script>
-    <script src="./project-golive.js?v=20261107-golive-1"></script>
+    <script src="./project-golive.js?v=20261108-kept-1"></script>
     <script src="./solution-materials.js?v=20261022-stock-1"></script>
     <script src="./solution-valuation.js?v=20261022-stock-1"></script>
     <script src="./solution-engine.js?v=20261022-stock-1"></script>
@@ -1026,7 +1038,7 @@
     <script src="./drive-files-engine.js?v=20261105-drive-handover-1"></script>
     <script src="./drive-files-api.js?v=20261105-file-gallery-dialogs-1"></script>
     <script src="./file-previews.js?v=20261105-file-gallery-dialogs-1"></script>
-    <script src="./files-library.js?v=20261105-file-gallery-dialogs-1"></script>
+    <script src="./files-library.js?v=20261108-kept-1"></script>
     <script src="./handover-engine.js?v=20261106-handover-fiori-1"></script>
     <script src="./handover-files.js?v=20261106-handover-fiori-1"></script>
     <script src="./handover.js?v=20261106-handover-fiori-1"></script>
@@ -1036,9 +1048,9 @@
     <script src="./work-schedule.js?v=20261027-day-execution-1"></script>
     <script src="./access-catalog.js?v=20261105-drive-handover-1"></script>
     <script src="./shortcut-access.js?v=20261108-shortcuts-1"></script>
-    <script src="./access-control.js?v=20261108-shortcuts-1"></script>
+    <script src="./access-control.js?v=20261108-kept-1"></script>
     <script src="./user-management.js?v=20261029-users-1"></script>
-    <script src="./studio.js?v=20261108-shortcuts-1"></script>
+    <script src="./studio.js?v=20261108-kept-1"></script>
     <!-- Empty starter records and default lists; this is not your saved account data. -->
     <script id="seedData" type="application/json">
       {
@@ -1233,6 +1245,6 @@
       }
     </script>
     <!-- Start the application after all feature modules and the empty seed defaults are ready. -->
-    <script src="./app.js?v=20261107-visuals-1"></script>
+    <script src="./app.js?v=20261108-kept-1"></script>
   </body>
 </html>

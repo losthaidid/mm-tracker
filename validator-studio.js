@@ -6510,6 +6510,7 @@
       recombinedComparison,
       csvConverter,
       excelReport,
+      launchContext: () => ({ templateReady: !!draft, dirty }),
       snapshot: () => ({
         draft: E.copy(draft),
         dirty,

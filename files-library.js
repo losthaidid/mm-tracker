@@ -280,7 +280,7 @@
           .join('')
       );
     }
-    function uploadDialog() {
+    function uploadDialog(file) {
       guard('create');
       if (!api.connected()) return setup();
       modal++;
@@ -296,6 +296,11 @@
             ''
           )}</select></label><label id="dfRecordLabel" hidden>Record<select name="recordId"><option value="">Choose a record</option></select></label><p id="dfStatus" role="status"></p><div class="modal-actions">${button('close', 'Cancel')}<button class="primary" type="submit" data-df-busy>Upload original file</button></div></form>`
       );
+      if (file) {
+        const transfer = new DataTransfer();
+        transfer.items.add(file);
+        document.querySelector('#dfUpload [name=file]').files = transfer.files;
+      }
     }
     async function saveGenerated(
       { blob, name, sourceType, source = null, projectId = '', scope = '', allowed = () => true },
@@ -657,7 +662,18 @@
         a.tell(e.message, true);
       }
     });
-    return { render, sync, setup, handle, submit, saveGenerated, fileDialog, api, previews };
+    return {
+      render,
+      sync,
+      setup,
+      handle,
+      submit,
+      saveGenerated,
+      fileDialog,
+      uploadDialog,
+      api,
+      previews,
+    };
   }
   root.WorkHubFilesLibrary = { install, matrix, drawQR };
 })(globalThis);

@@ -709,7 +709,17 @@
       sync();
       saveStatus();
     }, 1500);
-    return { render, patchRender, sync, mount, open, close, flush, handle };
+    return {
+      render,
+      patchRender,
+      sync,
+      mount,
+      open,
+      close,
+      flush,
+      handle,
+      hasDraft: () => !!editor?.dirty,
+    };
   }
   root.WorkHubNotes = { install };
 })(window);
