@@ -38,7 +38,27 @@
     'callout',
     'spotlight',
     'inset',
+    'image',
   ];
+  const COVER_DESIGNS = {
+    band: {
+      label: 'Accent band',
+      description: 'A bold accent panel with a spacious image gallery.',
+    },
+    editorial: {
+      label: 'Editorial',
+      description: 'A quiet title page with a fine rule and framed images.',
+    },
+    gallery: {
+      label: 'Image spotlight',
+      description: 'Images lead the page, with the title and details below.',
+    },
+  };
+  const GUIDE_FONTS = {
+    sans: { label: 'Sans serif', family: 'Arial, sans-serif' },
+    serif: { label: 'Serif', family: 'Georgia, serif' },
+    mono: { label: 'Monospace', family: '"Courier New", monospace' },
+  };
   function numbering(value = {}) {
     const mode = value?.mode ?? 'screenshot',
       start = value?.start ?? 1;
@@ -211,6 +231,66 @@
       throw Error('Choose valid accent and page background colours.');
     return { accent: value.accent.toLowerCase(), paper: value.paper.toLowerCase() };
   }
+  function embeddedImage(value) {
+    if (
+      !value ||
+      !Number.isInteger(value.width) ||
+      !Number.isInteger(value.height) ||
+      value.width < 1 ||
+      value.height < 1 ||
+      value.width > 2400 ||
+      value.height > 2400 ||
+      !str(value.src, LIMITS.imageChars) ||
+      !/^data:image\/(png|jpeg|webp);base64,[a-zA-Z0-9+/]+={0,2}$/.test(value.src)
+    )
+      throw Error('Choose a valid embedded PNG, JPEG or WebP image.');
+    return { src: value.src, width: value.width, height: value.height };
+  }
+  function cover(value = {}) {
+    if (!value || typeof value !== 'object' || Array.isArray(value))
+      throw Error('Check the front cover.');
+    const result = {
+      enabled: value.enabled ?? false,
+      design: value.design ?? 'band',
+      align: value.align ?? 'left',
+      title: value.title ?? '',
+      subtitle: value.subtitle ?? '',
+      details: value.details ?? '',
+      titleFont: value.titleFont ?? 'sans',
+      titleSize: value.titleSize ?? 76,
+      subtitleFont: value.subtitleFont ?? 'sans',
+      subtitleSize: value.subtitleSize ?? 30,
+      detailsFont: value.detailsFont ?? 'sans',
+      detailsSize: value.detailsSize ?? 22,
+      images: value.images ?? [],
+    };
+    if (
+      typeof result.enabled !== 'boolean' ||
+      !Object.hasOwn(COVER_DESIGNS, result.design) ||
+      !['left', 'center'].includes(result.align) ||
+      !str(result.title, 180) ||
+      !str(result.subtitle, 500) ||
+      !str(result.details, 800) ||
+      !Array.isArray(result.images) ||
+      result.images.length > 3
+    )
+      throw Error('Check the cover design, text and images (up to three).');
+    for (const [key, min, max] of [
+      ['title', 24, 100],
+      ['subtitle', 14, 44],
+      ['details', 12, 32],
+    ]) {
+      if (
+        !Object.hasOwn(GUIDE_FONTS, result[key + 'Font']) ||
+        !Number.isFinite(result[key + 'Size']) ||
+        result[key + 'Size'] < min ||
+        result[key + 'Size'] > max
+      )
+        throw Error('Choose a cover font and a text size within the shown range.');
+    }
+    result.images = result.images.map(embeddedImage);
+    return result;
+  }
   function footer(value = {}) {
     if (!value || typeof value !== 'object') throw Error('Check the guide footer.');
     const text = value.text === undefined ? '' : value.text,
@@ -311,10 +391,15 @@
     )
       throw Error('Choose a valid guide layout.');
     const branding = footer(value.footer),
+      frontCover = cover(value.cover),
       appearance = colours(value.colours),
       ids = new Set();
     let pixels = branding.logo ? branding.logo.width * branding.logo.height : 0,
       chars = branding.logo?.src.length || 0;
+    for (const img of frontCover.images) {
+      pixels += img.width * img.height;
+      chars += img.src.length;
+    }
     const steps = value.steps.map(s => {
       if (
         !s ||
@@ -373,10 +458,24 @@
         )
           throw Error('Check the object text, zoom source, lock and spotlight opacity.');
         if (
-          ['rectangle', 'ellipse', 'text', 'callout', 'spotlight', 'inset'].includes(m.type) &&
+          ['rectangle', 'ellipse', 'text', 'callout', 'spotlight', 'inset', 'image'].includes(
+            m.type
+          ) &&
           !rect(bounds(m.points))
         )
           throw Error('Draw an object with a visible width and height.');
+        let layer;
+        if (m.type === 'image') {
+          layer = embeddedImage(m.image);
+          if (
+            (m.name !== undefined && !str(m.name, 120)) ||
+            (m.opacity !== undefined &&
+              (!Number.isFinite(m.opacity) || m.opacity < 0.05 || m.opacity > 1))
+          )
+            throw Error('Check the image layer name and opacity (5–100%).');
+          pixels += layer.width * layer.height;
+          chars += layer.src.length;
+        }
         return {
           type: m.type,
           color: m.color,
@@ -391,6 +490,9 @@
             ? { source: { x: m.source.x, y: m.source.y, w: m.source.w, h: m.source.h } }
             : {}),
           ...(m.type === 'spotlight' ? { opacity: m.opacity } : {}),
+          ...(layer
+            ? { image: layer, name: m.name ?? 'Image layer', opacity: m.opacity ?? 1 }
+            : {}),
           ...(m.locked !== undefined ? { locked: m.locked } : {}),
         };
       });
@@ -412,7 +514,9 @@
       };
     });
     if (pixels > LIMITS.pixels || chars > LIMITS.imageChars)
-      throw Error('This guide is too large. Use fewer or smaller screenshots.');
+      throw Error(
+        'This guide is too large. Use fewer or smaller screenshots, image layers or cover images.'
+      );
     return {
       kind: value.kind,
       version: 1,
@@ -421,6 +525,7 @@
       exportHeading:
         value.exportHeading === undefined ? DEFAULT_GUIDE_HEADING : value.exportHeading,
       footer: branding,
+      cover: frontCover,
       colours: appearance,
       numbering: numbering(value.numbering),
       styles: styles(value.styles),
@@ -499,6 +604,8 @@
     DEFAULT_GUIDE_HEADING,
     GUIDE_LAYOUTS,
     GUIDE_PALETTES,
+    COVER_DESIGNS,
+    GUIDE_FONTS,
     MARK_TYPES,
     numbering,
     styles,
@@ -510,6 +617,7 @@
     moveMark,
     hitMark,
     footer,
+    cover,
     logoLayout,
     colours,
     LIMITS,

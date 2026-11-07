@@ -328,6 +328,101 @@ body.bc-room-open {
   line-height: 1.6;
   color: var(--bc-muted);
 }
+.bc-cover {
+  margin-bottom: 18px;
+  border: 1px solid var(--bc-line);
+  border-radius: 12px;
+  background: #fffef9;
+}
+.bc-cover > summary {
+  padding: 15px 20px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.bc-cover-inner {
+  padding: 0 20px 20px;
+}
+.bc-cover-text-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin: 18px 0;
+}
+.bc-cover fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--bc-line);
+  border-radius: 10px;
+}
+.bc-cover legend {
+  font-weight: 700;
+  padding: 0 5px;
+}
+.bc-cover label {
+  display: block;
+}
+.bc-cover .bc-object-check {
+  display: flex;
+}
+.bc-cover-design {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 12px;
+}
+.bc-cover-images {
+  margin: 20px 0;
+}
+.bc-cover-images h3 {
+  margin: 0 0 12px;
+}
+.bc-cover-images h3 span {
+  color: var(--bc-muted);
+  font-size: 12px;
+}
+[data-bc-cover-images] {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+[data-bc-cover-images] article {
+  min-width: 0;
+  border: 1px solid var(--bc-line);
+  border-radius: 10px;
+  padding: 12px;
+}
+[data-bc-cover-images] img {
+  display: block;
+  width: 100%;
+  height: 150px;
+  object-fit: contain;
+  margin-bottom: 12px;
+  background: repeating-conic-gradient(#e5e8e4 0% 25%, #fff 0% 50%) 50% / 16px 16px;
+}
+.bc-selection-help {
+  margin: 0;
+  padding: 8px 14px;
+  color: var(--bc-muted);
+  font-size: 11px;
+  border-bottom: 1px solid var(--bc-line);
+}
+.bc-room .bc-delete-object:not(:disabled) {
+  color: #923c34;
+  border-color: #d9aca6;
+  background: #fff4f1;
+}
+.bc-room .bc-file-label:has(input:disabled) {
+  opacity: 0.45;
+  cursor: default;
+}
+@media (max-width: 900px) {
+  .bc-cover-text-grid,
+  [data-bc-cover-images] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 .bc-branding {
   margin: 0 0 20px;
   border: 1px solid var(--bc-line);

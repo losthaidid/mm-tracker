@@ -142,7 +142,22 @@
       throw Error('Choose a transparent PNG or WebP logo up to 2 MB.');
     return imageFromFile(file, alive, 1600, 600);
   }
-  function draw(c, step, img, original = false) {
+  async function loadLayers(step, alive) {
+    const layers = new Map();
+    for (const mark of step.marks) {
+      if (mark.type === 'image' && !layers.has(mark.image.src))
+        layers.set(mark.image.src, await loadImage(mark.image, alive));
+    }
+    check(alive);
+    return layers;
+  }
+  function contain(image, box) {
+    const ratio = Math.min(box.w / image.width, box.h / image.height),
+      w = image.width * ratio,
+      h = image.height * ratio;
+    return { x: box.x + (box.w - w) / 2, y: box.y + (box.h - h) / 2, w, h };
+  }
+  function draw(c, step, img, original = false, layers = new Map()) {
     c.width = step.image.width;
     c.height = step.image.height;
     const ctx = c.getContext('2d'),
@@ -167,7 +182,20 @@
         ctx.strokeStyle = ctx.fillStyle = mark.color;
         ctx.lineWidth = Math.max(2, mark.size * w);
         ctx.lineJoin = ctx.lineCap = 'round';
-        if (mark.type === 'number') {
+        if (mark.type === 'image') {
+          const layer = layers.get(mark.image.src);
+          if (!layer)
+            throw Error('An image layer is not ready. Reopen the screenshot and try again.');
+          const box = contain(mark.image, {
+            x: area.x * w,
+            y: area.y * h,
+            w: area.w * w,
+            h: area.h * h,
+          });
+          ctx.globalAlpha = mark.opacity ?? 1;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(layer, box.x, box.y, box.w, box.h);
+        } else if (mark.type === 'number') {
           const diameter = Math.min(Math.max(12, mark.size * w), w, h),
             radius = diameter / 2,
             x = Math.max(radius, Math.min(w - radius, a[0])),
@@ -324,8 +352,15 @@
     return out;
   }
   async function raster(step, alive) {
-    const img = await loadImage(step.image, alive);
-    return cropped(draw(canvas(1, 1), step, img), step.crop);
+    const img = await loadImage(step.image, alive),
+      layers = await loadLayers(step, alive),
+      c = canvas(1, 1);
+    try {
+      return cropped(draw(c, step, img, false, layers), step.crop);
+    } catch (err) {
+      release(c);
+      throw err;
+    }
   }
   function wrap(ctx, text, width) {
     const out = [];
@@ -880,13 +915,151 @@
       if (c) release(c);
     }
   }
+  async function coverPage(guide, alive) {
+    const cover = guide.cover,
+      colour = palette(guide.colours),
+      footer = E.footer(guide.footer),
+      layout = E.logoLayout(footer),
+      bottom = footer.logo ? Math.min(1510, layout.y - 40) : footer.text.trim() ? 1510 : 1620,
+      c = canvas(1240, 1754),
+      ctx = c.getContext('2d');
+    try {
+      const images = [];
+      for (const image of cover.images) images.push(await loadImage(image, alive));
+      const logo = footer.logo ? await loadImage(footer.logo, alive, 1600, 600) : null;
+      check(alive);
+      ctx.fillStyle = colour.paper;
+      ctx.fillRect(0, 0, 1240, 1754);
+      const margin = 90,
+        width = 1060,
+        heading = guide.exportHeading.replace(/\s+/g, ' ').trim(),
+        accentInk = palette({ accent: colour.accent, paper: colour.accent }).ink;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.textBaseline = 'top';
+      ctx.font = '700 19px Arial, sans-serif';
+      const headings = heading ? wrap(ctx, heading, width) : [],
+        headHeight = headings.length * 26;
+      if (cover.design === 'band') {
+        ctx.fillStyle = colour.accent;
+        ctx.fillRect(0, 0, 1240, Math.max(150, 92 + headHeight));
+        ctx.fillStyle = accentInk;
+      } else {
+        ctx.fillStyle = colour.accent;
+        ctx.fillRect(margin, 58, cover.design === 'editorial' ? 90 : width, 6);
+      }
+      ctx.textAlign = cover.align;
+      const x = cover.align === 'center' ? 620 : margin;
+      for (const [i, line] of headings.entries()) ctx.fillText(line, x, 92 + i * 26);
+      const block = (text, key, bold = false) => {
+          const size = cover[key + 'Size'],
+            font =
+              (bold ? '700 ' : '400 ') + size + 'px ' + E.GUIDE_FONTS[cover[key + 'Font']].family;
+          ctx.font = font;
+          const lines = text.trim() ? wrap(ctx, text.trim(), width) : [];
+          return { lines, font, lineHeight: size * 1.28, height: lines.length * size * 1.28 };
+        },
+        title = block(
+          cover.title.trim() || guide.title.trim() || 'Screenshot guide',
+          'title',
+          true
+        ),
+        subtitle = block(cover.subtitle, 'subtitle'),
+        details = block(cover.details, 'details'),
+        textHeight = title.height + (subtitle.height ? 28 + subtitle.height : 0),
+        top = Math.max(222, 130 + headHeight),
+        detailsTop = bottom - details.height,
+        available = detailsTop - (details.height ? 48 : 0) - top,
+        imageHeight = images.length ? Math.min(620, available - textHeight - 54) : 0;
+      if (textHeight > available || (images.length && imageHeight < 160))
+        throw Error(
+          'The cover text does not fit at these sizes. Shorten the text, reduce its size or remove an image.'
+        );
+      const text = (b, y, ink) => {
+        ctx.font = b.font;
+        ctx.fillStyle = ink;
+        ctx.textAlign = cover.align;
+        ctx.textBaseline = 'top';
+        for (const [i, line] of b.lines.entries()) ctx.fillText(line, x, y + i * b.lineHeight);
+      };
+      const gallery = y => {
+        const boxes =
+          images.length === 1
+            ? [{ x: margin, y, w: width, h: imageHeight }]
+            : images.length === 2
+              ? [0, 1].map(i => ({
+                  x: margin + (i * (width + 24)) / 2,
+                  y,
+                  w: (width - 24) / 2,
+                  h: imageHeight,
+                }))
+              : [
+                  { x: margin, y, w: 664, h: imageHeight },
+                  { x: 778, y, w: 372, h: (imageHeight - 24) / 2 },
+                  { x: 778, y: y + (imageHeight + 24) / 2, w: 372, h: (imageHeight - 24) / 2 },
+                ];
+        for (const [i, box] of boxes.entries()) {
+          ctx.strokeStyle = colour.accent;
+          ctx.lineWidth = 1;
+          ctx.strokeRect(box.x, box.y, box.w, box.h);
+          const fit = contain(cover.images[i], {
+            x: box.x + 14,
+            y: box.y + 14,
+            w: box.w - 28,
+            h: box.h - 28,
+          });
+          ctx.drawImage(images[i], fit.x, fit.y, fit.w, fit.h);
+        }
+      };
+      let titleY = top;
+      if (cover.design === 'gallery' && images.length) {
+        gallery(top);
+        titleY += imageHeight + 54;
+      } else if (!images.length) titleY += Math.min(110, Math.max(0, (available - textHeight) / 3));
+      text(title, titleY, colour.ink);
+      text(subtitle, titleY + title.height + 28, colour.body);
+      if (cover.design !== 'gallery' && images.length) gallery(top + textHeight + 54);
+      if (cover.design === 'editorial') {
+        ctx.fillStyle = colour.accent;
+        ctx.fillRect(margin, titleY - 30, width, 2);
+      }
+      if (details.height) {
+        ctx.fillStyle = colour.accent;
+        ctx.fillRect(margin, detailsTop - 24, width, 1);
+        text(details, detailsTop, colour.muted);
+      }
+      ctx.textBaseline = 'alphabetic';
+      ctx.textAlign = 'left';
+      drawFooter(ctx, footer, logo, colour, layout);
+      return c;
+    } catch (err) {
+      release(c);
+      throw err;
+    }
+  }
   async function* pages(value, alive) {
     const guide = E.guide(value);
-    yield* guide.layout === 'classic' ? classicPages(guide, alive) : designedPages(guide, alive);
+    let count = 0;
+    if (guide.cover.enabled) {
+      yield await coverPage(guide, alive);
+      count++;
+    }
+    const content =
+      guide.layout === 'classic' ? classicPages(guide, alive) : designedPages(guide, alive);
+    for await (const page of content) {
+      if (++count > 120) {
+        release(page);
+        throw Error(
+          'This guide exceeds 120 pages including its cover. Shorten captions or split the guide.'
+        );
+      }
+      yield page;
+    }
   }
-  async function preview(value, alive) {
+  async function preview(value, alive, contentOnly = false) {
     const guide = E.guide(value);
-    if (!guide.steps.length) throw Error('Add a screenshot to preview your guide.');
+    if (contentOnly) guide.cover.enabled = false;
+    if (!guide.steps.length && !guide.cover.enabled)
+      throw Error('Add a screenshot to preview your guide.');
     await document.fonts?.ready;
     check(alive);
     const iterator = pages(guide, alive);
@@ -981,6 +1154,7 @@
     read,
     decode,
     loadImage,
+    loadLayers,
     imageFromFile,
     logoFromFile,
     palette,
