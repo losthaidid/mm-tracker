@@ -1,0 +1,744 @@
+/* One visual language for the existing workspace. Personal overrides still load last. */
+body[data-vs='ready'] {
+  --vs-radius: var(--wh-radius, 16px);
+  --vs-line: color-mix(in srgb, var(--hub-border) 78%, var(--hub-surface));
+  --vs-shadow:
+    0 2px 5px color-mix(in srgb, var(--hub-text) 3%, transparent),
+    0 14px 32px color-mix(in srgb, var(--hub-text) 4%, transparent);
+  --vs-raised:
+    0 5px 12px color-mix(in srgb, var(--hub-text) 5%, transparent),
+    0 18px 36px color-mix(in srgb, var(--hub-text) 7%, transparent);
+  --vs-focus: var(--hub-link, var(--hub-accent));
+  --vs-gap: clamp(16px, 1.6vw, 24px);
+  --vs-section-soft: var(--hub-blue-soft);
+}
+body[data-vs='ready'] #view {
+  min-width: 0;
+  font-variant-numeric: lining-nums;
+}
+body[data-vs='ready'] #view :where(h1, h2, h3, h4) {
+  text-wrap: balance;
+  letter-spacing: -0.025em;
+}
+body[data-vs='ready'] #view :where(p, label, .hint, .hub-meta) {
+  line-height: 1.65;
+}
+body[data-vs='ready']
+  #view
+  :is(
+    .panel,
+    .hub-card:not(.md-widget),
+    .df-panel,
+    .er-card,
+    .gli-panel,
+    .wl-panel,
+    .val-panel,
+    .pi-panel
+  ) {
+  border-color: var(--vs-line);
+  border-radius: var(--vs-radius);
+  box-shadow: var(--vs-shadow);
+}
+body[data-vs='ready'] #view :is(.panel, .df-panel, .er-card, .gli-panel, .wl-panel, .val-panel) {
+  background-color: var(--hub-surface);
+}
+body[data-vs='ready'] #view .gli-overview-card {
+  background: linear-gradient(115deg, var(--hub-mint), var(--hub-surface));
+  border-color: var(--vs-line);
+  border-radius: var(--vs-radius);
+  color: var(--hub-text);
+}
+body[data-vs='ready'] #view .gli-overview-icon {
+  background: color-mix(in srgb, var(--hub-success) 14%, var(--hub-surface));
+  color: var(--hub-success);
+}
+body[data-vs='ready']
+  #view
+  :is(.panel-top, .flex-title, .df-bar, .er-card-heading, .gli-panel-head) {
+  gap: 14px;
+}
+body[data-vs='ready'] #view :is(.stats, .df-stats, .dashboard-grid, .hub-grid) {
+  gap: var(--vs-gap);
+}
+body[data-vs='ready'] #view :is(.stat, .df-stats > div) {
+  border: 1px solid var(--vs-line);
+  border-radius: calc(var(--vs-radius) - 2px);
+  box-shadow: 0 2px 9px color-mix(in srgb, var(--hub-text) 3%, transparent);
+}
+body[data-vs='ready'] #view :is(.stat > span:first-child, .df-stats > div > small:first-child) {
+  color: var(--hub-muted);
+  font-size: 0.71rem;
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: 0.035em;
+}
+body[data-vs='ready']
+  #view
+  :is(.hub-kicker, .eyebrow, .val-eyebrow, .nt-eyebrow, .wl-eyebrow, .er-step, .gli-eyebrow) {
+  font-size: 0.65rem;
+  letter-spacing: 0.13em;
+  font-weight: 750;
+}
+
+/* The header identity for each section uses its own local SVG mark and a saved-theme tint. */
+body[data-vs='ready']
+  #view
+  :is(
+    .workspace-heading,
+    .project-banner,
+    .hub-head:not(.md-day-intro):not(.mv-hero),
+    .nt-hero,
+    .df-hero,
+    .val-heading,
+    .rehearsal-hero,
+    .lab-hero,
+    .wl-hero
+  ) {
+  border: 1px solid var(--vs-line);
+  border-radius: var(--vs-radius);
+  background: linear-gradient(
+    115deg,
+    var(--hub-surface) 44%,
+    color-mix(in srgb, var(--vs-section-soft) 65%, var(--hub-surface))
+  );
+  color: var(--hub-text);
+  padding: clamp(21px, 2.4vw, 32px);
+  box-shadow: var(--vs-shadow);
+  margin-bottom: var(--vs-gap);
+}
+body[data-vs='ready']
+  #view
+  :is(
+    .workspace-heading,
+    .project-banner,
+    .hub-head:not(.md-day-intro):not(.mv-hero),
+    .nt-hero,
+    .df-hero,
+    .val-heading,
+    .rehearsal-hero,
+    .lab-hero,
+    .wl-hero
+  )
+  :is(h1, h2) {
+  color: var(--hub-text);
+  font-size: clamp(1.5rem, 2.4vw, 2.05rem);
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 8px 0 10px;
+}
+body[data-vs='ready']
+  #view
+  :is(
+    .workspace-heading,
+    .project-banner,
+    .hub-head:not(.md-day-intro):not(.mv-hero),
+    .nt-hero,
+    .df-hero,
+    .val-heading,
+    .rehearsal-hero,
+    .lab-hero,
+    .wl-hero
+  )
+  :is(p, .project-kicker, .hub-kicker, .val-heading-note) {
+  color: var(--hub-muted);
+}
+body[data-vs='ready']
+  #view
+  :is(
+    .workspace-heading,
+    .project-banner,
+    .hub-head:not(.md-day-intro):not(.mv-hero),
+    .nt-hero,
+    .df-hero,
+    .rehearsal-hero,
+    .lab-hero,
+    .wl-hero
+  )
+  h2::before {
+  content: '';
+  display: inline-block;
+  width: 1.5em;
+  height: 1.5em;
+  margin: -0.2em 0.38em -0.3em -0.1em;
+  vertical-align: middle;
+  background: var(--vs-focus);
+  mask: var(--vs-glyph) center / contain no-repeat;
+  -webkit-mask: var(--vs-glyph) center / contain no-repeat;
+}
+body[data-vs='ready'] #view .val-brand-mark {
+  position: relative;
+  background: var(--vs-section-soft);
+  border: 1px solid var(--vs-line);
+  border-radius: 14px;
+}
+body[data-vs='ready'] #view .val-brand-mark > svg {
+  opacity: 0;
+}
+body[data-vs='ready'] #view .val-brand-mark::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  background: var(--vs-focus);
+  mask: var(--vs-glyph) center / contain no-repeat;
+  -webkit-mask: var(--vs-glyph) center / contain no-repeat;
+}
+body[data-vs='ready'] #view .project-banner .completion-ring {
+  color: var(--hub-text);
+  background: conic-gradient(var(--vs-focus) var(--completion), var(--hub-surface-soft) 0);
+}
+body[data-vs='ready'] #view .project-banner .completion-ring > div {
+  background: var(--hub-surface);
+  color: var(--hub-text);
+}
+body[data-vs='ready'] #view .project-banner .completion-ring span {
+  color: var(--hub-muted);
+}
+body[data-vs='ready'][data-hub-design='fiori']
+  #view
+  :is(
+    .workspace-heading,
+    .project-banner,
+    .hub-head:not(.md-day-intro):not(.mv-hero),
+    .df-hero,
+    .val-heading,
+    .wl-hero
+  ) {
+  background: var(--hub-surface);
+  box-shadow: 0 2px 0 var(--vs-line);
+}
+body[data-vs='ready'][data-hub-design='editorial']
+  #view
+  :is(.workspace-heading, .hub-head:not(.md-day-intro):not(.mv-hero), .nt-hero, .df-hero)
+  :is(h1, h2) {
+  font-family: Georgia, serif;
+  font-weight: 500;
+}
+
+/* The original route buttons keep their nodes and listeners. Only this accent moves. */
+#tabs.vs-nav-static {
+  position: relative;
+}
+.vs-nav-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 4px;
+  background: var(--hub-link, var(--hub-accent));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--hub-accent) 9%, transparent);
+  pointer-events: none;
+  z-index: 2;
+  transition:
+    transform 210ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    width 180ms,
+    height 180ms;
+}
+.vs-nav-indicator[hidden] {
+  display: none;
+}
+.vs-nav-indicator[data-motion='off'] {
+  transition: none;
+}
+body[data-vs='ready'] #tabs[data-vs-nav] button[data-tab].active {
+  box-shadow: none;
+}
+body[data-vs='ready'] #tabs button[data-tab] {
+  gap: 10px;
+  transition:
+    background-color 150ms,
+    color 150ms,
+    border-color 150ms;
+}
+body[data-vs='ready'] #tabs .hub-nav-icon {
+  border-radius: 9px;
+  transition:
+    color 150ms,
+    background-color 150ms;
+}
+body[data-vs='ready'] #tabs button.active .hub-nav-icon {
+  color: var(--hub-link);
+  background-color: color-mix(in srgb, var(--hub-accent) 10%, transparent);
+}
+
+/* Shared controls and readable work surfaces. */
+body[data-vs='ready']
+  :is(#view, #modal)
+  :is(
+    .actions button,
+    .val-btn,
+    .md-button,
+    .gli-button,
+    .pe-button,
+    .workspace-toolbar button,
+    .hub-toolbar button
+  ) {
+  border-radius: min(10px, var(--hub-radius));
+  font-weight: 650;
+}
+body[data-vs='ready'] :is(#view, #modal) :is(input, select, textarea) {
+  border-radius: min(10px, var(--hub-radius));
+  border-color: var(--vs-line);
+}
+body[data-vs='ready'] :is(#view, #modal) :is(input, textarea)::placeholder {
+  color: var(--hub-muted);
+  opacity: 0.85;
+}
+body[data-vs='ready']
+  :is(#view, #modal, #tabs)
+  :is(button, input, select, textarea, summary, a):focus-visible {
+  outline: 2px solid var(--vs-focus);
+  outline-offset: 3px;
+}
+body[data-vs='ready'] #view :is(.er-table-wrap, .df-table, .pi-table, .workspace-table) table {
+  font-variant-numeric: tabular-nums;
+}
+body[data-vs='ready'] #view :is(.er-table-wrap, .df-table, .pi-table, .workspace-table) thead th {
+  font-size: 0.73rem;
+  line-height: 1.45;
+  font-weight: 750;
+  padding-top: 13px;
+  padding-bottom: 13px;
+}
+
+/* The same semantic colours, with a readable text label and a small supporting dot. */
+body[data-vs='ready'] :is(#view, #modal) .tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--vs-line);
+  border-radius: 8px;
+  padding: 4px 8px;
+  line-height: 1.45;
+  font-size: 0.73rem;
+  font-weight: 700;
+  white-space: normal;
+  background: var(--hub-surface-soft);
+  color: var(--hub-text);
+}
+body[data-vs='ready'] :is(#view, #modal) .tag[data-vs-tone]::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  flex: 0 0 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+body[data-vs='ready'] :is(#view, #modal) .tag[data-vs-tone='positive'] {
+  color: var(--hub-success);
+  background: var(--hub-positive-bg);
+  border-color: color-mix(in srgb, var(--hub-success) 25%, var(--hub-border));
+}
+body[data-vs='ready'] :is(#view, #modal) .tag[data-vs-tone='progress'] {
+  color: var(--hub-link);
+  background: var(--hub-blue-soft);
+  border-color: color-mix(in srgb, var(--hub-link) 25%, var(--hub-border));
+}
+body[data-vs='ready'] :is(#view, #modal) .tag[data-vs-tone='caution'] {
+  color: var(--hub-warning);
+  background: var(--hub-caution-bg);
+  border-color: color-mix(in srgb, var(--hub-warning) 25%, var(--hub-border));
+}
+body[data-vs='ready'] :is(#view, #modal) .tag[data-vs-tone='negative'] {
+  color: var(--hub-danger);
+  background: var(--hub-negative-bg);
+  border-color: color-mix(in srgb, var(--hub-danger) 25%, var(--hub-border));
+}
+body[data-vs='ready'] :is(#view, #modal) .tag[data-vs-tone='quiet'] {
+  color: var(--hub-muted);
+}
+body[data-vs='ready'] :is(.er-badge, .gli-status, .subitem-chip) {
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+/* Purposeful empty states use a small, local section illustration. */
+body[data-vs='ready']
+  #view
+  :is(
+    .workspace-empty,
+    .hub-empty,
+    .df-empty,
+    .nt-empty,
+    .wl-empty,
+    .pi-empty,
+    .md-empty,
+    .governance-empty,
+    .gli-empty
+  ) {
+  padding: clamp(22px, 3vw, 40px);
+  border: 1px dashed var(--vs-line);
+  border-radius: var(--vs-radius);
+  background: color-mix(in srgb, var(--vs-section-soft) 18%, var(--hub-surface));
+  text-align: center;
+  color: var(--hub-text);
+}
+body[data-vs='ready']
+  #view
+  :is(
+    .workspace-empty,
+    .hub-empty,
+    .df-empty,
+    .nt-empty,
+    .wl-empty,
+    .pi-empty,
+    .md-empty,
+    .governance-empty,
+    .gli-empty
+  )::before {
+  content: '';
+  display: block;
+  width: 68px;
+  height: 68px;
+  margin: 0 auto 12px;
+  background: var(--hub-link);
+  mask: var(--vs-glyph) center / contain no-repeat;
+  -webkit-mask: var(--vs-glyph) center / contain no-repeat;
+  opacity: 0.8;
+}
+body[data-vs='ready'] #view :is(.df-empty, .gli-empty) > span[aria-hidden='true'] {
+  display: none;
+}
+body[data-vs='ready']
+  #view
+  :is(
+    .workspace-empty,
+    .hub-empty,
+    .df-empty,
+    .nt-empty,
+    .wl-empty,
+    .pi-empty,
+    .md-empty,
+    .governance-empty,
+    .gli-empty
+  )
+  :is(h3, h4, strong) {
+  font-size: 1rem;
+  line-height: 1.4;
+  color: var(--hub-text);
+}
+body[data-vs='ready']
+  #view
+  :is(
+    .workspace-empty,
+    .hub-empty,
+    .df-empty,
+    .nt-empty,
+    .wl-empty,
+    .pi-empty,
+    .md-empty,
+    .governance-empty,
+    .gli-empty
+  )
+  p {
+  color: var(--hub-muted);
+  max-width: 48ch;
+  margin: 8px auto 14px;
+}
+
+/* Clearer dashboard groups, with the existing saved widget order and widths. */
+body[data-vs='ready'] #view .mv-dashboard-nav {
+  padding: 18px 0;
+  margin: 26px 0 0;
+  border-top: 1px solid var(--vs-line);
+  border-bottom: 1px solid var(--vs-line);
+  gap: 16px;
+}
+body[data-vs='ready'] #view .mv-dashboard-nav h3 {
+  font-size: clamp(1.2rem, 2vw, 1.55rem);
+  font-weight: 700;
+}
+body[data-vs='ready'] #view .mv-view-switch {
+  padding: 4px;
+  background: var(--hub-surface-soft);
+  border: 1px solid var(--vs-line);
+  border-radius: 12px;
+  gap: 4px;
+}
+body[data-vs='ready'] #view .mv-view-switch button {
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+body[data-vs='ready'] #view .mv-view-switch button[aria-pressed='true'] {
+  background: var(--hub-surface);
+  color: var(--hub-link);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--hub-text) 8%, transparent);
+}
+body[data-vs='ready'] #view .mv-layout-caption {
+  padding: 10px 0 16px;
+  color: var(--hub-muted);
+}
+body[data-vs='ready'] #view .my-day-page .hub-layout {
+  gap: var(--vs-gap);
+}
+body[data-vs='ready'] #view .my-day-page .md-widget:not([data-widget='orb']) .mv-widget-shell {
+  border-radius: var(--vs-radius);
+  box-shadow: var(--vs-shadow);
+  border-color: var(--vs-line);
+  border-top-width: 3px;
+}
+body[data-vs='ready'] #view .my-day-page .md-widget[data-mv-phase='plan'] .mv-widget-shell {
+  border-top-color: color-mix(in srgb, var(--hub-link) 50%, var(--hub-border));
+}
+body[data-vs='ready']
+  #view
+  .my-day-page
+  .md-widget[data-mv-phase='work']:not([data-widget='orb'])
+  .mv-widget-shell {
+  border-top-color: color-mix(in srgb, var(--hub-success) 50%, var(--hub-border));
+}
+body[data-vs='ready'] #view .my-day-page .md-widget[data-mv-phase='reflect'] .mv-widget-shell {
+  border-top-color: color-mix(in srgb, var(--hub-warning) 45%, var(--hub-border));
+}
+body[data-vs='ready'] #view .my-day-page .hub-widget-head {
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+}
+body[data-vs='ready'] #view .my-day-page .hub-widget-head h3 {
+  font-size: 1rem;
+  line-height: 1.45;
+}
+body[data-vs='ready'] #view .my-day-page .hub-widget-symbol {
+  background: var(--hub-surface-soft);
+  border: 1px solid var(--vs-line);
+}
+
+/* Dialogs and forms share clear headers, field rhythm and a restrained backdrop. */
+body[data-vs='ready'] :is(#modal, .wh-confirm, .wd-chooser, .settings-room) {
+  border-color: var(--vs-line);
+  border-radius: var(--vs-radius);
+  box-shadow: 0 16px 70px color-mix(in srgb, var(--hub-text) 23%, transparent);
+}
+body[data-vs='ready'] :is(#modal, .wh-confirm, .wd-chooser, .settings-room)::backdrop {
+  background: #10243380;
+}
+body[data-vs='ready'] #modal:not(.process-presentation-modal) .modal-head {
+  padding: 20px 24px;
+  background: var(--hub-surface);
+  border-color: var(--vs-line);
+}
+body[data-vs='ready'] #modal .modal-head h2 {
+  font-size: 1.25rem;
+  letter-spacing: -0.025em;
+  line-height: 1.3;
+}
+body[data-vs='ready'] #modal:not(.process-presentation-modal) .modal-body {
+  padding: 24px;
+}
+body[data-vs='ready'] #modal .form-grid {
+  gap: 18px;
+}
+body[data-vs='ready'] #modal .ticket-editor-section > header {
+  background: transparent;
+  color: var(--hub-text);
+  padding: 0;
+  flex-direction: row;
+  justify-content: flex-start;
+}
+body[data-vs='ready'] #modal .ticket-editor-section > header h3 {
+  font-size: 0.95rem;
+}
+body[data-vs='ready'] #modal .ticket-editor-section > header p {
+  color: var(--hub-muted);
+  font-size: 0.78rem;
+}
+body[data-vs='ready'] #modal .ticket-section-number {
+  background: var(--vs-section-soft);
+  color: var(--vs-focus);
+}
+body[data-vs='ready'] #modal .form-grid label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.5;
+  margin-bottom: 7px;
+}
+body[data-vs='ready'] #modal .form-grid :is(input, select, textarea) {
+  padding: 10px 12px;
+}
+body[data-vs='ready'] #modal :is(.modal-actions, .hub-form-actions) {
+  padding-top: 18px;
+  margin-top: 20px;
+  border-top: 1px solid var(--vs-line);
+}
+body[data-vs='ready'] #modal details > summary {
+  padding: 12px 0;
+  font-weight: 650;
+}
+body[data-vs='ready'] :is(#modal, .wh-confirm, .wd-chooser)[open] {
+  animation: vs-dialog-in 160ms ease-out;
+}
+@keyframes vs-dialog-in {
+  from {
+    opacity: 0.45;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Short, pointer-only feedback; work surfaces and drag coordinates stay still. */
+@media (hover: hover) and (pointer: fine) {
+  body[data-vs='ready']
+    #view
+    :is(
+      .ticket-queue-card,
+      .task-main-card,
+      .hub-grid > article.hub-card,
+      .er-card,
+      .gli-issue,
+      .df-panel
+    ) {
+    transition:
+      border-color 160ms,
+      box-shadow 160ms;
+  }
+  body[data-vs='ready']
+    #view
+    :is(
+      .ticket-queue-card,
+      .task-main-card,
+      .hub-grid > article.hub-card,
+      .er-card,
+      .gli-issue,
+      .df-panel
+    ):hover {
+    border-color: color-mix(in srgb, var(--hub-link) 38%, var(--hub-border));
+    box-shadow: var(--vs-raised);
+  }
+  body[data-vs='ready']
+    #view
+    :is(.gli-overview-card, .pe-overview-card, .standup-overview-card, .ss-overview-card) {
+    transition:
+      transform 160ms,
+      box-shadow 160ms;
+  }
+  body[data-vs='ready']
+    #view
+    :is(.gli-overview-card, .pe-overview-card, .standup-overview-card, .ss-overview-card):hover {
+    transform: translateY(-2px);
+    box-shadow: var(--vs-raised);
+  }
+  body[data-vs='ready'] #view :is(.actions button, .val-btn, .gli-button):not(:disabled):hover {
+    border-color: var(--hub-link);
+  }
+}
+@media (max-width: 700px) {
+  body[data-vs='ready'] {
+    --vs-gap: 16px;
+  }
+  body[data-vs='ready']
+    #view
+    :is(
+      .workspace-heading,
+      .project-banner,
+      .hub-head:not(.md-day-intro):not(.mv-hero),
+      .nt-hero,
+      .df-hero,
+      .val-heading,
+      .rehearsal-hero,
+      .lab-hero,
+      .wl-hero
+    ) {
+    padding: 20px;
+  }
+  body[data-vs='ready'] #view .mv-view-switch {
+    width: 100%;
+  }
+  body[data-vs='ready'] #view .mv-view-switch button {
+    flex: 1 1 100px;
+  }
+  body[data-vs='ready'] #modal:not(.process-presentation-modal) .modal-body {
+    padding: 18px;
+  }
+  body[data-vs='ready'] #modal:not(.process-presentation-modal) .modal-head {
+    padding: 16px 18px;
+  }
+}
+@media (max-width: 480px) {
+  body[data-vs='ready']
+    #view
+    :is(
+      .workspace-heading,
+      .hub-head:not(.md-day-intro):not(.mv-hero),
+      .nt-hero,
+      .df-hero,
+      .rehearsal-hero,
+      .lab-hero,
+      .wl-hero
+    )
+    h2::before {
+    width: 1.25em;
+    height: 1.25em;
+  }
+  body[data-vs='ready'] #modal .form-grid {
+    gap: 14px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vs-nav-indicator {
+    transition: none !important;
+  }
+  body[data-vs='ready'] :is(#modal, .wh-confirm, .wd-chooser)[open] {
+    animation: none !important;
+  }
+  body[data-vs='ready']
+    #view
+    :is(
+      .ticket-queue-card,
+      .task-main-card,
+      .hub-grid > article.hub-card,
+      .er-card,
+      .gli-issue,
+      .df-panel,
+      .gli-overview-card,
+      .pe-overview-card,
+      .standup-overview-card,
+      .ss-overview-card
+    ) {
+    transition: none !important;
+    transform: none;
+  }
+}
+body[data-vs='ready']:is([data-motion='off'], .hub-motion-paused) .vs-nav-indicator {
+  transition: none !important;
+}
+body[data-vs='ready']:is([data-motion='off'], .hub-motion-paused)
+  :is(#modal, .wh-confirm, .wd-chooser)[open] {
+  animation: none !important;
+}
+body[data-vs='ready']:is([data-motion='off'], .hub-motion-paused)
+  #view
+  :is(
+    .ticket-queue-card,
+    .task-main-card,
+    .hub-grid > article.hub-card,
+    .er-card,
+    .gli-issue,
+    .df-panel,
+    .gli-overview-card,
+    .pe-overview-card,
+    .standup-overview-card,
+    .ss-overview-card
+  ) {
+  transition: none !important;
+  transform: none;
+}
+@media print {
+  .vs-nav-indicator {
+    display: none !important;
+  }
+  body[data-vs='ready']
+    #view
+    :is(
+      .workspace-empty,
+      .hub-empty,
+      .df-empty,
+      .nt-empty,
+      .wl-empty,
+      .pi-empty,
+      .md-empty,
+      .governance-empty,
+      .gli-empty
+    )::before {
+    display: none;
+  }
+}

@@ -152,6 +152,7 @@
       }
       const bar = $('wdWorkspaceBar');
       if (bar) bar.hidden = id === 'current' || !a.ready();
+      root.WorkHubVisualRefinement?.refreshNavigation();
     }
     function arrangeToolbar() {
       const bar = $('hubToolbar');

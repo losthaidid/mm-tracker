@@ -336,6 +336,7 @@
       backgrounds = null,
       workSchedule = null,
       websiteDesigns = null,
+      visualRefinement = null,
       taskCompletion = null;
     const reminders = root.WorkHubReminders?.install({
       ...a,
@@ -4193,6 +4194,11 @@
       },
     });
     chromeUX = root.WorkHubChromeUX.install({ prefs: () => themePreview || prefs() });
+    visualRefinement = root.WorkHubVisualRefinement?.install({
+      ready: () => a.cloud().ready,
+      owner: () => a.cloud().user?.id || '',
+      prefs: () => themePreview || prefs(),
+    });
     websiteDesigns = root.WorkHubWebsiteDesigns?.install({
       ready: () => a.cloud().ready,
       owner: () => a.cloud().user?.id || 'local',
@@ -4337,6 +4343,7 @@
       processDeck,
       chromeUX,
       websiteDesigns,
+      visualRefinement,
       taskCompletion,
       render,
       afterRender,
