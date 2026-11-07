@@ -4,7 +4,7 @@ The 2026-11-07 layout renewal covers the signed-in workspace across all fifteen 
 
 ## Shared layout
 
-- The brand header combines the saved site name, animated identity and live scenery with the existing save indicator, Excel report action and Settings.
+- Individual website-name letters have a staggered floating animation. Renaming the website rebuilds the animated letters from the saved name, preserving combined emoji and accented characters; ordinary renders keep existing letter nodes. The shorter, sticky brand header combines the saved site name and animated identity with the save indicator and Settings. Export Excel report is searchable in Settings → Backups & sync and closes Settings before opening the original report options. The left sidebar stays below the measured header; it scrolls independently when its controls exceed the viewport.
 - The command bar keeps Search, Quick add, Reminders, Focus mode and Break Terrarium directly accessible. Workspace tools groups secondary commands without cloning them or changing their handlers. Undo actions stay directly accessible. Escape closes the menu and restores focus to its summary.
 - Page introductions, summary tiles, task/ticket cards, tables, calendars, notes, file panels, validation cards and Studio tools share spacing, surface and heading rules. Compact density and navigation identities remain available.
 - My Day uses a responsive twelve-track widget grid: normal widgets occupy half the workspace, three columns on very wide displays, and one column on phones. Wide/expanded widgets retain full width. Saved order, sizes, visibility, drag handles and existing actions are unchanged.
@@ -18,18 +18,18 @@ Theme changes update CSS without replacing process nodes, draft forms, canvas co
 
 ## World window
 
-The existing `hubAtmosphereCard` is integrated into the brand header between the site identity and Export/Settings. A panoramic scene sits beside the live phase caption and local clock, with a subtle theme-coloured frame. The same scene SVG, labels, weather/scenery metadata, visitors and settings action are retained.
+The original `hubAtmosphereCard` is back in the left sidebar, after navigation and before the Small steps note. The same SVG, live caption, local clock, weather/scenery metadata, visitors and settings action are retained. No enlarged header scene or floating copy is created.
 
-- The window stays in the header; floating positioning, drag handles and movement controls have been removed.
 - Click the original scene to open Atmosphere & visitors, as before.
-- Wide view enlarges the same scene in a full-width row within the header. Compact view or Escape restores the smaller header card. It never overlays the workspace.
-- Tablet/phone layouts place the scene below the brand/actions and retain the complete SVG. The view resets for another account.
-- Atmosphere Off, sign-out and the existing privacy/focus/presentation modes hide it. Turning atmosphere back on reveals the same window.
+- Each website design retains its existing scenery visibility rules, including compact/mobile alternatives.
+- Atmosphere Off, sign-out and the existing privacy/focus/presentation modes keep their established behavior.
+
+The header height is measured on layout changes and resizing, so wrapped titles and responsive layouts cannot leave the sticky sidebar under the header. There is no scroll event handler.
 
 No new timers, rendering loops, dependencies, database fields or network calls are added.
 
 ## Source and verification
 
-`workspace-redesign.css` loads after feature/design sheets and before `custom.css`. `world-window.js` loads before `website-designs.js`; the design adapter docks the window in the header and groups commands while retaining their original DOM nodes. `process-workspace.css` defines the Process Hub palette through existing theme tokens.
+`workspace-redesign.css` loads after feature/design sheets and before `custom.css`. `world-window.js` loads before `website-designs.js`; the design adapter restores the sidebar scene, measures the header and groups commands while retaining their original DOM nodes. `process-workspace.css` defines the Process Hub palette through existing theme tokens.
 
-Header-window revision verification passed: 24 focused module/source-layout checks and 16 application integrations. Coverage includes docking the original scene between the brand and existing header actions, retained SVG/clock/metadata/listeners, inline wide view and keyboard return, Atmosphere Off and account isolation, all fifteen sections in all seven designs, retained My Day scenery/widgets, live weather/visitors and theme changes with unfinished work. Browser visual QA remains unavailable due to the existing browser access restriction; DOM, computed-style, engine and application checks provide the available verification.
+The focused module and application checks cover the restored scene placement, retained artwork/clock/listeners, Atmosphere Off and sign-out, Excel export from Settings, all website designs, theme changes, and unfinished editors. Browser QA uses an isolated account fixture with no real records or network saves; header and sidebar positions are checked before and after scrolling.

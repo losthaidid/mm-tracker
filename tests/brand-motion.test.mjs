@@ -12,4 +12,10 @@ test('Animated identity keeps maintained titles literal, supports keyboard/home 
  brand.querySelector('[data-epic-brand]').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));assert.equal(homes,2);
  w.WorkHubBrandMotion.mount(brand,title,()=>homes++);assert.equal(brand.querySelector('svg'),svg);assert.equal(title.querySelector('button'),button);
  title.textContent='Renamed space';title.dataset.brandTitle='Renamed space';w.WorkHubBrandMotion.mount(brand,title,()=>homes++);assert.equal(title.querySelector('button').getAttribute('aria-label'),'Renamed space · Go to My day');assert.equal(brand.querySelector('svg'),svg);
+ const renamed=title.querySelector('button');title.dataset.brandTitle='New 👨‍👩‍👧‍👦 Café';w.WorkHubBrandMotion.mount(brand,title,()=>homes++);
+ assert.equal(title.querySelector('button'),renamed);assert.equal(renamed.getAttribute('aria-label'),'New 👨‍👩‍👧‍👦 Café · Go to My day');
+ assert.equal(title.textContent,'New 👨‍👩‍👧‍👦 Café');assert.equal(title.querySelectorAll('.brand-title-letters > span').length,10);
+ assert.ok([...title.querySelectorAll('.brand-title-letters > span')].some(s=>s.textContent==='👨‍👩‍👧‍👦'));
+ assert.ok([...title.querySelectorAll('.brand-title-letters > span')].some(s=>s.textContent==='é'));
+ const letters=title.querySelector('.brand-title-letters');w.WorkHubBrandMotion.mount(brand,title,()=>homes++);assert.equal(title.querySelector('.brand-title-letters'),letters);
 });

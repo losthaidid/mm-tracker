@@ -131,6 +131,11 @@
       'Download a copy of your records.',
       'backup download export json save data',
     ],
+    exportButton: [
+      'data',
+      'Download your work records as an Excel report.',
+      'excel report spreadsheet xlsx export download',
+    ],
     workspaceResetButton: [
       'data',
       'Download every cloud record, check unfinished work and verify your password before clearing this account.',
