@@ -2,17 +2,19 @@
 
 ## Selection shorthand
 
-**K** means keep the selected idea in the wishlist. **E** means explain the selected idea. Neither shorthand requests implementation.
+**K** means keep the selected idea in the wishlist. **E** means explain the selected idea. **N** means provide the next suggestions. These shorthands do not request implementation.
 
-## Pending website experience enhancement · 8 November 2026
+## Pending website experience enhancements · 8 November 2026
 
-Kept from the website design and functionality ideas in this discussion. The number below belongs to that discussion, separate from earlier batches.
+Kept from the website design and functionality ideas in this discussion. The numbers below belong to that discussion, separate from earlier batches.
 
 | Selection | Enhancement | Saved scope |
 | --- | --- | --- |
 | 10 | Richer Search & commands | Group results into pages, records and actions; add keyboard navigation and record previews. Preserve existing search behavior, assigned permissions and record actions. |
+| 19 | Animated navigation icons | Add brief, lightweight icon movements on hover and section selection. Respect Motion off and reduced-motion preferences. |
+| 20 | Custom website icon | Choose a logo or initials for the header and browser-tab icon, matching the website colours. Preserve the editable website name and its existing motion. |
 
-This is a wishlist selection only; implementation has not been requested. No batch assigned.
+These are wishlist selections only; implementation has not been requested. No batch assigned.
 
 ## Latest wishlist batch
 
