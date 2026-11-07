@@ -168,6 +168,7 @@
       fixesCheckRunner = fixesRunner ? root.WorkHubValidatorRunner?.create() : null;
     const fileCompare = root.WorkHubValidatorCompare?.install({ ...a, render: paint });
     const csvConverter = root.WorkHubValidatorCSV?.install({ ...a, render: paint });
+    const excelReport = root.WorkHubExcelReport?.install({ ...a, render: paint });
     const recombinedComparison = root.WorkHubValidatorReconcile?.install({ ...a, render: paint });
     let owner = '',
       generation = 0,
@@ -1506,6 +1507,7 @@
     function sync() {
       fileCompare?.sync();
       csvConverter?.sync();
+      excelReport?.sync();
       recombinedComparison?.sync();
       const next = a.owner?.() || '';
       if (next !== owner) {
@@ -2093,6 +2095,7 @@
         btn('mode', 'Original vs Recombined', 'data-mode="recombined"', 'val-secondary') +
         btn('mode', 'Compare two files', 'data-mode="file-compare"', 'val-secondary') +
         btn('mode', 'Excel to CSV', 'data-mode="excel-csv"', 'val-secondary') +
+        btn('mode', 'Excel Report', 'data-mode="excel-report"', 'val-secondary') +
         '</div><div class="val-welcome-steps"><span>' +
         icon('columns') +
         'Design columns</span><span>' +
@@ -2137,6 +2140,7 @@
           ['recombined', 'Original vs Recombined', 'columns'],
           ['file-compare', 'Compare two files', 'columns'],
           ['excel-csv', 'Excel to CSV', 'file'],
+          ['excel-report', 'Excel Report', 'columns'],
           ['history', 'Versions & runs', 'history'],
         ]
           .map(([key, label, art]) =>
@@ -3412,6 +3416,7 @@
         btn('mode', 'Original vs Recombined', 'data-mode="recombined"', 'val-secondary') +
         btn('mode', 'Compare two files', 'data-mode="file-compare"', 'val-secondary') +
         btn('mode', 'Excel to CSV', 'data-mode="excel-csv"', 'val-secondary') +
+        btn('mode', 'Excel Report', 'data-mode="excel-report"', 'val-secondary') +
         '</div></section>'
       );
     }
@@ -4287,7 +4292,9 @@
       if (!draft && store().templates.length) selectTemplate(store().templates[0].id);
       return (
         '<section class="validation-studio' +
-        (['file-compare', 'excel-csv', 'recombined'].includes(mode) ? ' val-compare-wide' : '') +
+        (['file-compare', 'excel-csv', 'excel-report', 'recombined'].includes(mode)
+          ? ' val-compare-wide'
+          : '') +
         (roomyReview && mode === 'check' && rows.length ? ' val-review-wide' : '') +
         '" data-val-owner="' +
         esc(owner) +
@@ -4302,7 +4309,7 @@
         '<main class="val-main" data-val-section="' +
         esc(mode) +
         '">' +
-        (['file-compare', 'excel-csv', 'recombined'].includes(mode)
+        (['file-compare', 'excel-csv', 'excel-report', 'recombined'].includes(mode)
           ? '<nav class="val-tabs" aria-label="Validation workspace">' +
             btn('mode', icon('check', 17) + 'Validate', 'data-mode="check"', '') +
             btn(
@@ -4329,6 +4336,14 @@
                 '"',
               mode === 'excel-csv' ? 'is-active' : ''
             ) +
+            btn(
+              'mode',
+              icon('columns', 17) + 'Excel Report',
+              'data-mode="excel-report" aria-current="' +
+                (mode === 'excel-report' ? 'page' : 'false') +
+                '"',
+              mode === 'excel-report' ? 'is-active' : ''
+            ) +
             '</nav>' +
             (mode === 'recombined'
               ? recombinedComparison?.render() ||
@@ -4336,8 +4351,11 @@
               : mode === 'file-compare'
                 ? fileCompare?.render() ||
                   '<p>The file comparison tool is unavailable. Refresh the page.</p>'
-                : csvConverter?.render() ||
-                  '<p>The Excel-to-CSV tool is unavailable. Refresh the page.</p>')
+                : mode === 'excel-report'
+                  ? excelReport?.render() ||
+                    '<p>The Excel Report tool is unavailable. Refresh the page.</p>'
+                  : csvConverter?.render() ||
+                    '<p>The Excel-to-CSV tool is unavailable. Refresh the page.</p>')
           : draft
             ? header() +
               (message
@@ -4639,7 +4657,8 @@
       }
       if (
         action === 'mode' &&
-        (['file-compare', 'excel-csv', 'recombined'].includes(el.dataset.mode) || !draft)
+        (['file-compare', 'excel-csv', 'excel-report', 'recombined'].includes(el.dataset.mode) ||
+          !draft)
       ) {
         commitCurrent();
         mode = el.dataset.mode;
@@ -6490,6 +6509,7 @@
       fileComparison: fileCompare,
       recombinedComparison,
       csvConverter,
+      excelReport,
       snapshot: () => ({
         draft: E.copy(draft),
         dirty,
