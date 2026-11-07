@@ -3759,5 +3759,13 @@ test('Excel Report opens inside Validation Studio and does not save uploaded dat
   await ui.handle({dataset:{er:'apply-filter'}});
   assert.deepEqual(copy(ui.snapshot().rows),[0]);
   assert.deepEqual(copy(ui.snapshot().filters[0].values),[{value:'0001',count:1},{value:'0099',count:0}]);
+  assert.ok(document.querySelector('.er-live-card').nextElementSibling.classList.contains('er-report-card'));
+  let liveCallback;const previousTimer=window.setTimeout;
+  window.setTimeout=(callback,delay)=>{if(delay===100)liveCallback=callback;return 0;};
+  const search=document.getElementById('erLiveText');search.focus();search.value='0001';search.setSelectionRange(4,4);
+  search.dispatchEvent(new window.Event('input',{bubbles:true}));assert.equal(typeof liveCallback,'function');liveCallback();
+  assert.equal(document.activeElement,search);assert.equal(search.selectionStart,4);
+  assert.match(document.querySelector('.er-report-card').textContent,/1 matching rows/);
+  window.setTimeout=previousTimer;
   assert.equal(db.calls.length,calls);
 });

@@ -226,3 +226,12 @@ test('Excel Report exports only the manually selected columns after unchecking a
   assert.deepEqual(copy(result.sheets[0].rows),[['Customer'],['Alpha'],['Beta'],['Gamma']]);
   assert.equal(x.writes(),0);
 });
+
+test('Excel Report keeps live search immediately above the report even when list results appear', async t => {
+  const x=fixture(t),{d,ui,input}=x;
+  await ui.loadFile(x.workbook());input('erHeaderRow','2','change');
+  assert.ok(d.querySelector('.er-live-card').nextElementSibling.classList.contains('er-report-card'));
+  input('erList','000007\n000099');await ui.handle({dataset:{er:'apply-filter'}});
+  assert.ok(d.querySelector('.er-results-card').compareDocumentPosition(d.querySelector('.er-live-card')) & x.w.Node.DOCUMENT_POSITION_FOLLOWING);
+  assert.ok(d.querySelector('.er-live-card').nextElementSibling.classList.contains('er-report-card'));
+});
