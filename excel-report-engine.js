@@ -40,6 +40,133 @@
     if (values.some(value => value.length > 32000)) throw Error('A pasted value is too long.');
     return values;
   }
+  function pasteText(value) {
+    const text = String(value ?? '').replace(/^\uFEFF/, '');
+    if (text.length > LIMITS.listCharacters)
+      throw Error('The pasted table is too large. Use up to 2 million characters.');
+    if (!text.trim()) throw Error('Paste a list or table first.');
+    return text;
+  }
+  function pastedGrid(rows, format) {
+    if (!Array.isArray(rows) || !rows.length) throw Error('The pasted table has no rows.');
+    if (rows.length > LIMITS.values + 1)
+      throw Error('Use up to 25,000 pasted values and an optional header row.');
+    const width = rows.reduce((n, row) => Math.max(n, row.length), 0);
+    if (!width || width > 200) throw Error('Use a pasted table with 1 to 200 columns.');
+    return { rows, width, format };
+  }
+  function pipeCells(line) {
+    const text = line.trim(),
+      cells = [];
+    let cell = '',
+      i = 0;
+    while (i < text.length) {
+      if (text[i] === '\\') {
+        let end = i;
+        while (text[end] === '\\') end++;
+        const length = end - i;
+        if (text[end] === '|' && length % 2) {
+          cell += '\\'.repeat(length - 1) + '|';
+          i = end + 1;
+          continue;
+        }
+        cell += '\\'.repeat(length);
+        i = end;
+        continue;
+      }
+      if (text[i] === '|') {
+        cells.push(cell.trim());
+        cell = '';
+      } else cell += text[i];
+      i++;
+    }
+    cells.push(cell.trim());
+    if (text.startsWith('|')) cells.shift();
+    if (cells.at(-1) === '' && text.endsWith('|')) cells.pop();
+    return cells;
+  }
+  /** Inspect before extracting: every value stays text and header removal is an explicit choice. */
+  function parsePaste(input, format = 'auto') {
+    const text = pasteText(input),
+      lines = text.split(/\r\n|\n|\r/).filter(line => line.trim());
+    const delimited = delimiter => {
+      if (!root.WorkHubValidatorEngine?.parseCSV)
+        throw Error('The pasted table reader is unavailable. Refresh and retry.');
+      return root.WorkHubValidatorEngine.parseCSV(text, delimiter);
+    };
+    const pipes = () =>
+      lines.map(pipeCells).filter(row => !row.every(cell => /^:?-{3,}:?$/.test(cell)));
+    if (format === 'tabs') return pastedGrid(delimited('\t'), format);
+    if (format === 'csv') return pastedGrid(delimited(''), format);
+    if (format === 'pipes') return pastedGrid(pipes(), format);
+    if (format === 'spaces')
+      return pastedGrid(
+        lines.map(line => line.trim().split(/ {2,}/)),
+        format
+      );
+    if (format === 'lines')
+      return pastedGrid(
+        lines.map(line => [line]),
+        format
+      );
+    if (format !== 'auto') throw Error('Choose an available pasted table format.');
+    if (text.includes('\t')) return pastedGrid(delimited('\t'), 'tabs');
+    if (
+      lines.every(line => line.includes('|')) &&
+      (lines.length > 1 || lines[0].trim().startsWith('|'))
+    ) {
+      const rows = pipes();
+      if (rows.length && rows.every(row => row.length > 1)) return pastedGrid(rows, 'pipes');
+    }
+    if (lines.length > 1 && /[,;]/.test(lines[0])) {
+      try {
+        const rows = delimited('');
+        if (
+          rows.length > 1 &&
+          rows[0].length > 1 &&
+          rows.every(row => row.length === rows[0].length)
+        )
+          return pastedGrid(rows, 'csv');
+      } catch {
+        /* An ordinary list can contain quotes and commas. Explicit CSV mode reports errors. */
+      }
+    }
+    if (lines.length > 1) {
+      const rows = lines.map(line => line.trim().split(/ {2,}/));
+      if (rows.every(row => row.length > 1)) return pastedGrid(rows, 'spaces');
+    }
+    return pastedGrid(
+      lines.map(line => [line]),
+      'lines'
+    );
+  }
+  function extractPasteColumn(table, column, skipHeader = false) {
+    if (
+      !table ||
+      !Array.isArray(table.rows) ||
+      !Number.isInteger(column) ||
+      column < 0 ||
+      column >= table.width
+    )
+      throw Error('Choose a column from the pasted table.');
+    const values = [];
+    let skipped = 0;
+    for (const row of table.rows.slice(skipHeader ? 1 : 0)) {
+      const value = String(row[column] ?? '').trim();
+      if (!value) {
+        skipped++;
+        continue;
+      }
+      if (value.length > 32000 || /[\r\n\t]/.test(value))
+        throw Error(
+          'The selected column contains a long or multi-line cell. Choose a column containing one lookup value per cell.'
+        );
+      values.push(value);
+    }
+    if (!values.length) throw Error('The selected pasted column has no values to use.');
+    parseList(values.join('\n'));
+    return { values, skipped };
+  }
   /** A plain search matches anywhere; * matches any sequence and ? one character. */
   function wildcardContains(value, pattern, caseSensitive = false) {
     let text = String(value ?? ''),
@@ -117,6 +244,9 @@
     columnName,
     createReport,
     parseList,
+    parsePaste,
+    pastedGrid,
+    extractPasteColumn,
     normalize,
     wildcardContains,
     rowsFor,

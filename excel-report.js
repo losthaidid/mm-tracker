@@ -25,6 +25,7 @@
       filename = '',
       book = null,
       sheetIndex = 0,
+      sourceVersion = 0,
       headerRow = 1,
       report = null,
       selected = new Set(),
@@ -38,6 +39,8 @@
       liveCase = false,
       liveTimer = null,
       listText = '',
+      listPrepared = false,
+      pasteDraft = null,
       caseSensitive = false,
       filters = [],
       result = null,
@@ -70,6 +73,7 @@
       controller = null;
       activeJob = null;
       invalidate();
+      sourceVersion++;
       busy = false;
       filename = '';
       book = report = result = null;
@@ -77,6 +81,8 @@
       headerRow = 1;
       selected = new Set();
       columnSearch = filterSearch = listText = notice = '';
+      listPrepared = false;
+      pasteDraft = null;
       columnView = 'all';
       columnPage = selectedFilter = valuePage = rowPage = tableColumnPage = 0;
       filterColumn = -1;
@@ -131,11 +137,14 @@
         throw Error('Choose an available worksheet.');
       const next = E.createReport(book.sheets[index], row);
       invalidate();
+      sourceVersion++;
       sheetIndex = index;
       headerRow = row;
       report = next;
       selected = new Set(next.columns.map(column => column.index));
       columnSearch = filterSearch = listText = '';
+      listPrepared = false;
+      pasteDraft = null;
       columnView = 'all';
       columnPage = selectedFilter = valuePage = rowPage = tableColumnPage = 0;
       filterColumn = next.columns[0]?.index ?? -1;
@@ -205,9 +214,39 @@
       return report?.columns.filter(c => selected.has(c.index)) || [];
     }
     const live = () => ({ column: liveColumn, text: liveText, caseSensitive: liveCase });
+    function selectionChanged() {
+      clearTimeout(liveTimer);
+      const checked = selectedColumns(),
+        reviewed = result?.filters[selectedFilter]?.column;
+      const removed = filters.filter(f => !selected.has(f.column)).length;
+      filters = filters.filter(f => selected.has(f.column));
+      const clearedLive = !selected.has(liveColumn) && !!liveText;
+      if (!selected.has(liveColumn)) {
+        liveColumn = checked[0]?.index ?? -1;
+        liveText = '';
+      }
+      if (!checked.length) filterSearch = '';
+      const choices = matches(checked, filterSearch);
+      if (!choices.some(c => c.index === filterColumn)) filterColumn = choices[0]?.index ?? -1;
+      result = E.evaluate(report, filters, live());
+      selectedFilter = Math.max(
+        0,
+        filters.findIndex(f => f.column === reviewed)
+      );
+      rowPage = valuePage = tableColumnPage = 0;
+      invalidate();
+      if (removed || clearedLive) status('Filters using unchecked columns were cleared.');
+    }
     function apply() {
       ensure('run');
-      if (!report || !report.columns[filterColumn]) throw Error('Choose a column to filter.');
+      if (!report || !report.columns[filterColumn] || !selected.has(filterColumn))
+        throw Error('Choose a checked report column to filter.');
+      if (pasteDraft)
+        throw Error('Choose which pasted column to keep, or discard the preview first.');
+      if (!listPrepared && E.parsePaste(listText).width > 1) {
+        openPastePreview();
+        return;
+      }
       const values = E.parseList(listText);
       const entry = { column: filterColumn, values, caseSensitive };
       const index = filters.findIndex(f => f.column === filterColumn);
@@ -265,7 +304,7 @@
         : columnView === 'selected'
           ? 'No columns are checked. Choose All or Unchecked to select columns.'
           : 'No unchecked columns. Choose All or Checked to review your selection.';
-      return `<section class="er-card er-column-card"><div class="er-card-heading"><div><span class="er-step">02 · SHAPE YOUR REPORT</span><h3>Choose display columns</h3><p>Check the columns you want in the report. Your filters can use any column.</p></div><strong class="er-count" aria-live="polite">${count(selected.size)} / ${count(report.columns.length)} selected</strong></div>
+      return `<section class="er-card er-column-card"><div class="er-card-heading"><div><span class="er-step">02 · SHAPE YOUR REPORT</span><h3>Choose display columns</h3><p>Check the columns you want in the report. Checked columns are also available in Live Search and Check Your List.</p></div><strong class="er-count" aria-live="polite">${count(selected.size)} / ${count(report.columns.length)} selected</strong></div>
         <div class="er-column-bulk" role="group" aria-label="All worksheet columns">${button('select-all-columns', 'Check all columns', selected.size === report.columns.length ? 'disabled' : '', 'val-secondary')}${button('uncheck-all-columns', 'Uncheck all columns', selected.size === 0 ? 'disabled' : '', 'val-quiet')}<small>Applies to every column in this worksheet.</small></div>
         <label class="er-label" for="erColumnSearch">Search columns</label><input id="erColumnSearch" type="search" maxlength="200" value="${esc(columnSearch)}" placeholder="Type a column name or letter…">
         ${columnSearch.trim() ? `<div class="er-column-search-actions">${button('select-shown', 'Check search results', matching.length ? '' : 'disabled', 'val-secondary')}${button('clear-shown', 'Uncheck search results', matching.length ? '' : 'disabled', 'val-quiet')}<small>Applies to all ${count(matching.length)} matching columns, across pages.</small></div>` : ''}
@@ -285,8 +324,80 @@
           .join('')}</div><small>${count(all.length)} in this view</small></div>
         <div class="er-column-grid">${visible.map(c => `<label class="er-column-option${selected.has(c.index) ? ' is-selected' : ''}"><input id="erColumn-${c.index}" type="checkbox" data-er-column="${c.index}"${selected.has(c.index) ? ' checked' : ''}><span><b>${c.letter}</b><span>${esc(c.label)}</span></span></label>`).join('') || `<p class="er-empty">${empty}</p>`}</div>${all.length > COLUMN_PAGE ? pageControls('column', columnPage, all.length, COLUMN_PAGE) : ''}</section>`;
     }
+    function htmlPasteTable(html) {
+      if (!html) return null;
+      if (html.length > E.LIMITS.listCharacters)
+        throw Error('The copied table is too large. Copy fewer rows.');
+      const template = document.createElement('template');
+      template.innerHTML = html;
+      const tables = template.content.querySelectorAll('table');
+      if (!tables.length) return null;
+      if (tables.length !== 1)
+        throw Error('Copy one table at a time, or paste tab-separated cells.');
+      const table = tables[0];
+      const rows = [];
+      for (const row of table.querySelectorAll('tr')) {
+        if (row.closest('table') !== table) continue;
+        const cells = [...row.children].filter(cell => ['TD', 'TH'].includes(cell.tagName));
+        if (cells.some(cell => cell.colSpan !== 1 || cell.rowSpan !== 1))
+          throw Error(
+            'The copied table contains merged cells. Copy unmerged cells or paste a tab-separated table.'
+          );
+        if (cells.length) rows.push(cells.map(cell => cell.textContent.trim()));
+      }
+      return rows.length ? E.pastedGrid(rows, 'html') : null;
+    }
+    function readPastedSource(text, html, format = 'auto') {
+      if (format === 'html' || (!String(text).trim() && html)) {
+        const table = htmlPasteTable(html);
+        if (!table) throw Error('The clipboard does not contain a readable table.');
+        return table;
+      }
+      const table = E.parsePaste(text, format);
+      if (format === 'auto' && table.width === 1 && html) return htmlPasteTable(html) || table;
+      return table;
+    }
+    function openPastePreview(text = listText, html = '') {
+      ensure('run');
+      const table = readPastedSource(text, html);
+      pasteDraft = { text, html, format: 'auto', table, column: 0, skipHeader: false };
+      status('Choose the pasted column you want to keep, then apply your list filter.');
+    }
+    function pastePreviewView() {
+      if (!pasteDraft) return '';
+      const d = pasteDraft,
+        table = d.table,
+        start = Math.max(0, Math.min(d.column - 3, table.width - 8)),
+        columns = Array.from({ length: Math.min(8, table.width) }, (_, i) => start + i),
+        sample = table.rows.slice(0, 5);
+      let extracted = null,
+        error = '';
+      try {
+        extracted = E.extractPasteColumn(table, d.column, d.skipHeader);
+      } catch (e) {
+        error = e.message;
+      }
+      const short = value => String(value ?? '').slice(0, 160);
+      return `<section class="er-paste-preview" aria-label="Pasted table column preview"><div class="er-card-heading"><div><span class="er-step">PASTED TABLE</span><h4>Choose which column to keep</h4><p>${count(table.rows.length)} rows · ${count(table.width)} pasted columns. Use the column number from the copied table.</p></div>${button('discard-paste', 'Discard paste preview', '', 'val-quiet')}</div><div class="er-paste-options"><label>Paste format<select id="erPasteFormat">${[['auto', 'Automatic'], ['tabs', 'Excel / tab-separated'], ['pipes', 'Pipe / Markdown table'], ['csv', 'CSV / semicolon-separated'], ['spaces', 'Columns separated by 2+ spaces'], ['lines', 'One value per line'], ...(d.html ? [['html', 'Copied web table']] : [])].map(([value, label]) => option(value, label, d.format === value)).join('')}</select></label><label>Column to keep<select id="erPasteColumn">${Array.from({ length: table.width }, (_, i) => option(i, 'Column ' + (i + 1) + (table.rows[0]?.[i] ? ' · ' + short(table.rows[0][i]).slice(0, 60) : ''), d.column === i)).join('')}</select></label></div><label class="er-case"><input id="erPasteHeader" type="checkbox"${d.skipHeader ? ' checked' : ''}> First row contains headers — skip it</label><div class="er-table-wrap er-paste-table"><table><thead><tr><th>Pasted row</th>${columns.map(i => `<th class="${i === d.column ? 'is-kept' : ''}">${button('paste-column', 'Column ' + (i + 1), `data-index="${i}" aria-pressed="${i === d.column}"`, 'val-quiet')}</th>`).join('')}</tr></thead><tbody>${sample.map((row, i) => `<tr${i === 0 && d.skipHeader ? ' class="is-skipped"' : ''}><th scope="row">${i + 1}${i === 0 && d.skipHeader ? ' · header' : ''}</th>${columns.map(c => `<td${c === d.column ? ' class="is-kept"' : ''}>${esc(short(row[c]))}</td>`).join('')}</tr>`).join('')}</tbody></table></div><small>Preview: first 5 rows and columns ${start + 1}–${start + columns.length}. All rows are included when extracting. Values stay as text.</small><p class="er-paste-summary" role="status">${error ? esc(error) : `${count(extracted.values.length)} values will replace “Values to find”.${extracted.skipped ? ' ' + count(extracted.skipped) + ' blank cells skipped.' : ''}`}</p><div class="er-inline-actions">${button('use-paste-column', 'Use only column ' + (d.column + 1), error || busy ? 'disabled' : '', 'val-primary')}</div></section>`;
+    }
+    function usePasteColumn() {
+      ensure('run');
+      if (!pasteDraft) throw Error('Paste a table and choose a column first.');
+      const column = pasteDraft.column,
+        extracted = E.extractPasteColumn(pasteDraft.table, column, pasteDraft.skipHeader);
+      listText = extracted.values.join('\n');
+      listPrepared = true;
+      pasteDraft = null;
+      status(
+        count(extracted.values.length) +
+          ' values kept from pasted column ' +
+          (column + 1) +
+          '. Apply the list filter to check them.' +
+          (extracted.skipped ? ' ' + count(extracted.skipped) + ' blank cells skipped.' : '')
+      );
+    }
     function filtersView() {
-      const choices = matches(report.columns, filterSearch);
+      const choices = matches(selectedColumns(), filterSearch);
       const field = choices.some(c => c.index === filterColumn)
         ? filterColumn
         : (choices[0]?.index ?? -1);
@@ -296,10 +407,11 @@
             `<div class="er-filter-chip"><div><strong>${esc(report.columns[filter.column].letter + ' · ' + report.columns[filter.column].label)}</strong><small>${count(filter.found)} found · ${count(filter.missing)} not found${filter.caseSensitive ? ' · Case-sensitive' : ''}</small></div><div>${button('review-filter', 'View results', `data-index="${index}" aria-pressed="${selectedFilter === index}"`, 'val-quiet')}${button('edit-filter', 'Edit', `data-index="${index}"`, 'val-quiet')}${button('remove-filter', 'Remove', `data-index="${index}"`, 'val-quiet')}</div></div>`
         )
         .join('');
-      return `<section class="er-card er-filter-card"><div class="er-card-heading"><div><span class="er-step">03 · CHECK YOUR LIST</span><h3>Filter by pasted values</h3><p>Pick a column and paste one value per line, or paste cells copied from Excel.</p></div></div><div class="er-filter-grid"><div><label class="er-label" for="erFilterSearch">Find a filter column</label><input id="erFilterSearch" type="search" maxlength="200" value="${esc(filterSearch)}" placeholder="Search column names…"><label class="er-label" for="erFilterColumn">Column to check</label><select id="erFilterColumn">${choices.map(c => option(c.index, c.letter + ' · ' + c.label, c.index === field)).join('') || '<option value="">No matching columns</option>'}</select><label class="er-case"><input type="checkbox" id="erCase"${caseSensitive ? ' checked' : ''}> Match upper and lower case</label></div><div><label class="er-label" for="erList">Values to find</label><textarea id="erList" rows="6" spellcheck="false" placeholder="Paste values here, one per line…">${esc(listText)}</textarea><small>Spaces around values are ignored. Leading zeros are kept.</small><div class="er-inline-actions">${button('apply-filter', filters.some(f => f.column === field) ? 'Update column filter' : 'Apply list filter', field < 0 || busy || !can('run') ? 'disabled' : '', 'val-primary')}${filters.length ? button('clear-filters', 'Clear all filters', busy ? 'disabled' : '', 'val-quiet') : ''}</div></div></div>${chips ? `<div class="er-filter-chips"><h4>Active column filters</h4><p>Rows must match every active filter.</p>${chips}</div>` : ''}</section>`;
+      return `<section class="er-card er-filter-card" data-val-context="er-list-${sourceVersion}"><div class="er-card-heading"><div><span class="er-step">03 · CHECK YOUR LIST</span><h3>Filter by pasted values</h3><p>Pick a checked report column. Paste a list, or paste a table and choose one column to keep.</p></div></div><div class="er-filter-grid"><div><label class="er-label" for="erFilterSearch">Find a filter column</label><input id="erFilterSearch" type="search" maxlength="200" value="${esc(filterSearch)}" placeholder="Search column names…"><label class="er-label" for="erFilterColumn">Column to check</label><select id="erFilterColumn"${choices.length ? '' : ' disabled'}>${choices.map(c => option(c.index, c.letter + ' · ' + c.label, c.index === field)).join('') || '<option value="-1">' + (selected.size ? 'No checked columns match this search' : 'Check report columns first') + '</option>'}</select><label class="er-case"><input type="checkbox" id="erCase"${caseSensitive ? ' checked' : ''}> Match upper and lower case</label></div><div><label class="er-label" for="erList">Values to find</label><textarea id="erList" rows="6" spellcheck="false" placeholder="Paste values here, one per line…">${esc(listText)}</textarea><small>Spaces around values are ignored. Leading zeros are kept.</small><div class="er-inline-actions er-paste-trigger">${button('preview-paste', 'Extract a column from pasted table', busy ? 'disabled' : '', 'val-secondary')}</div><div class="er-inline-actions">${button('apply-filter', filters.some(f => f.column === field) ? 'Update column filter' : 'Apply list filter', field < 0 || busy || pasteDraft || !can('run') ? 'disabled' : '', 'val-primary')}${filters.length ? button('clear-filters', 'Clear all filters', busy ? 'disabled' : '', 'val-quiet') : ''}</div></div></div>${pastePreviewView()}${chips ? `<div class="er-filter-chips"><h4>Active column filters</h4><p>Rows must match every active filter. Unchecking a column clears its filter.</p>${chips}</div>` : ''}</section>`;
     }
     function liveView() {
-      return `<section class="er-card er-live-card"><div class="er-card-heading"><div><span class="er-step">LIVE SEARCH</span><h3>Find text as you type</h3><p>Search a column using text, <b>*</b> for any number of characters, or <b>?</b> for one character. Search matches anywhere in the cell.</p></div></div><div class="er-live-grid"><label>Column<select id="erLiveColumn">${report.columns.map(c => option(c.index, c.letter + ' · ' + c.label, c.index === liveColumn)).join('')}</select></label><label>Search text<input id="erLiveText" type="search" maxlength="200" value="${esc(liveText)}" placeholder="e.g. invoice*pending or A?01"></label><label class="er-case"><input id="erLiveCase" type="checkbox"${liveCase ? ' checked' : ''}> Match upper and lower case</label></div><small>The live search and pasted-list filters are combined. List results still check the complete source worksheet.</small></section>`;
+      const columns = selectedColumns();
+      return `<section class="er-card er-live-card" data-val-context="er-live-${sourceVersion}-${liveColumn}"><div class="er-card-heading"><div><span class="er-step">LIVE SEARCH</span><h3>Find text as you type</h3><p>Search a column using text, <b>*</b> for any number of characters, or <b>?</b> for one character. Search matches anywhere in the cell.</p></div></div><div class="er-live-grid"><label>Column<select id="erLiveColumn"${columns.length ? '' : ' disabled'}>${columns.map(c => option(c.index, c.letter + ' · ' + c.label, c.index === liveColumn)).join('') || '<option value="-1">Check report columns first</option>'}</select></label><label>Search text<input id="erLiveText" type="search" maxlength="200"${columns.length ? '' : ' disabled'} value="${esc(liveText)}" placeholder="e.g. invoice*pending or A?01"></label><label class="er-case"><input id="erLiveCase" type="checkbox"${columns.length ? '' : ' disabled'}${liveCase ? ' checked' : ''}> Match upper and lower case</label></div><small>Only checked report columns can be filtered. Live search and pasted-list filters are combined. List results still check the complete source worksheet.</small></section>`;
     }
     function refreshLive() {
       if (!report || !result) return;
@@ -441,17 +553,24 @@
         selected = new Set(action === 'select-all-columns' ? report.columns.map(c => c.index) : []);
         columnView = 'all';
         columnPage = tableColumnPage = 0;
-        invalidate();
+        selectionChanged();
       } else if (action === 'select-shown' || action === 'clear-shown') {
         const columns = matches(report.columns, columnSearch);
         for (const c of columns)
           action === 'select-shown' ? selected.add(c.index) : selected.delete(c.index);
-        invalidate();
+        selectionChanged();
         columnPage = tableColumnPage = 0;
       } else if (action === 'column-view') {
         if (!['all', 'selected', 'unselected'].includes(el.dataset.view)) return;
         columnView = el.dataset.view;
         columnPage = 0;
+      } else if (action === 'preview-paste') openPastePreview();
+      else if (action === 'discard-paste') pasteDraft = null;
+      else if (action === 'use-paste-column') usePasteColumn();
+      else if (action === 'paste-column') {
+        if (!pasteDraft || !Number.isInteger(index) || index < 0 || index >= pasteDraft.table.width)
+          throw Error('Choose an available pasted column.');
+        pasteDraft.column = index;
       } else if (action === 'apply-filter') apply();
       else if (action === 'remove-filter') removeFilter(index);
       else if (action === 'clear-filters') {
@@ -471,6 +590,8 @@
         filterSearch = '';
         filterColumn = f.column;
         listText = f.values.join('\n');
+        listPrepared = true;
+        pasteDraft = null;
         caseSensitive = f.caseSensitive;
       } else if (action === 'value-mode') {
         if (!['all', 'found', 'missing'].includes(el.dataset.mode)) return;
@@ -485,6 +606,10 @@
       else if (action.startsWith('value-')) valuePage = Math.max(0, valuePage + delta);
       else if (action.startsWith('row-')) rowPage = Math.max(0, rowPage + delta);
       paint();
+      if (action === 'use-paste-column')
+        document.getElementById('erList')?.focus({ preventScroll: true });
+      else if ((action === 'preview-paste' || action === 'apply-filter') && pasteDraft)
+        document.getElementById('erPasteColumn')?.focus();
     }
     document.addEventListener('click', event => {
       const el = event.target.closest?.('#valExcelReport [data-er]');
@@ -492,18 +617,54 @@
       event.preventDefault();
       void handle(el).catch(fail);
     });
+    document.addEventListener('paste', event => {
+      if (
+        event.target?.id !== 'erList' ||
+        !event.target.closest?.('#valExcelReport') ||
+        !event.clipboardData
+      )
+        return;
+      try {
+        ensure('run');
+        const text = event.clipboardData.getData('text/plain'),
+          html = event.clipboardData.getData('text/html');
+        if (!text.trim() && !html) return;
+        const table = readPastedSource(text, html);
+        if (table.width > 1) {
+          event.preventDefault();
+          openPastePreview(text, html);
+          paint();
+          document.getElementById('erPasteColumn')?.focus();
+        }
+      } catch (error) {
+        event.preventDefault();
+        fail(error);
+      }
+    });
     document.addEventListener('input', event => {
       const el = event.target;
       if (!el.closest?.('#valExcelReport')) return;
       if (el.id === 'erLiveText') {
-        liveText = el.value;
-        invalidate();
-        clearTimeout(liveTimer);
-        liveTimer = setTimeout(refreshLive, 100);
+        try {
+          ensure('run');
+          if (!selected.has(liveColumn))
+            throw Error('Check a report column before using Live Search.');
+          liveText = el.value;
+          invalidate();
+          clearTimeout(liveTimer);
+          liveTimer = setTimeout(refreshLive, 100);
+        } catch (error) {
+          fail(error);
+        }
         return;
       }
       if (el.id === 'erList') {
         listText = el.value;
+        listPrepared = false;
+        if (pasteDraft) {
+          pasteDraft = null;
+          paint();
+        }
         return;
       }
       if (el.id === 'erColumnSearch') {
@@ -513,7 +674,7 @@
       }
       if (el.id === 'erFilterSearch') {
         filterSearch = el.value;
-        const options = matches(report.columns, filterSearch);
+        const options = matches(selectedColumns(), filterSearch);
         if (!options.some(c => c.index === filterColumn)) filterColumn = options[0]?.index ?? -1;
         paint();
       }
@@ -533,6 +694,8 @@
         if (el.id === 'erSheet') chooseSheet(Number(el.value), 1);
         else if (el.id === 'erHeaderRow') chooseSheet(sheetIndex, Number(el.value));
         else if (el.id === 'erLiveColumn') {
+          if (!selected.has(Number(el.value)))
+            throw Error('Choose a checked report column for live search.');
           liveColumn = Number(el.value);
           invalidate();
           refreshLive();
@@ -542,8 +705,28 @@
           invalidate();
           refreshLive();
           return;
-        } else if (el.id === 'erFilterColumn') filterColumn = Number(el.value);
-        else if (el.id === 'erCase') caseSensitive = el.checked;
+        } else if (el.id === 'erPasteColumn') {
+          if (
+            !pasteDraft ||
+            !Number.isInteger(Number(el.value)) ||
+            Number(el.value) < 0 ||
+            Number(el.value) >= pasteDraft.table.width
+          )
+            throw Error('Choose an available pasted column.');
+          pasteDraft.column = Number(el.value);
+        } else if (el.id === 'erPasteHeader') {
+          if (pasteDraft) pasteDraft.skipHeader = el.checked;
+        } else if (el.id === 'erPasteFormat') {
+          if (!pasteDraft) return;
+          const table = readPastedSource(pasteDraft.text, pasteDraft.html, el.value);
+          pasteDraft.table = table;
+          pasteDraft.format = el.value;
+          pasteDraft.column = Math.min(pasteDraft.column, table.width - 1);
+        } else if (el.id === 'erFilterColumn') {
+          if (!selected.has(Number(el.value)))
+            throw Error('Choose a checked report column to check.');
+          filterColumn = Number(el.value);
+        } else if (el.id === 'erCase') caseSensitive = el.checked;
         else if (el.dataset.erColumn !== undefined) {
           const index = Number(el.dataset.erColumn);
           if (!report?.columns[index]) throw Error('Choose an available column.');
@@ -553,8 +736,7 @@
             (columnView === 'unselected' && el.checked)
           )
             disappearingColumn = index;
-          invalidate();
-          tableColumnPage = 0;
+          selectionChanged();
         } else return;
         paint();
         if (disappearingColumn !== null) {

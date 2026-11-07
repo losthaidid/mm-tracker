@@ -3769,3 +3769,27 @@ test('Excel Report opens inside Validation Studio and does not save uploaded dat
   window.setTimeout=previousTimer;
   assert.equal(db.calls.length,calls);
 });
+
+test('Excel Report selected-column filters and pasted extraction work in the integrated workspace', async t=>{
+ const {api,document,window,db}=await app(t);api.showTab('validator');await settle();document.querySelector('[data-val="mode"][data-mode="excel-report"]').click();await settle();
+ const ui=api.hub.validator.excelReport,blob=await window.WorkHubValidatorFiles.workbook([{name:'Data',width:3,rows:[['Code','Name','Status'],['0001','Alpha','Open'],['0002','Beta','Closed']]}]);
+ await ui.loadFile({name:'example.xlsx',size:blob.size,arrayBuffer:()=>blob.arrayBuffer()});
+ const calls=db.calls.length;
+ const input=(id,value,type='input')=>{const el=document.getElementById(id);el.value=value;el.dispatchEvent(new window.Event(type,{bubbles:true}));};
+ input('erLiveColumn','1','change');input('erLiveText','alpha'); // Uncheck before the debounced update renders.
+ const checkbox=document.getElementById('erColumn-1');checkbox.checked=false;checkbox.dispatchEvent(new window.Event('change',{bubbles:true}));
+ assert.equal(document.getElementById('erLiveText').value,'');
+ assert.deepEqual([...document.getElementById('erLiveColumn').options].map(o=>o.value),['0','2']);
+ assert.deepEqual([...document.getElementById('erFilterColumn').options].map(o=>o.value),['0','2']);
+ const paste=new window.Event('paste',{bubbles:true,cancelable:true});Object.defineProperty(paste,'clipboardData',{value:{getData:type=>type==='text/plain'?'North\tPlantA\t0001\nSouth\tPlantB\t0009':''}});
+ document.getElementById('erList').dispatchEvent(paste);assert.equal(paste.defaultPrevented,true);
+ input('erPasteColumn','2','change');document.querySelector('[data-er="use-paste-column"]').click();await settle();
+ assert.equal(document.getElementById('erList').value,'0001\n0009');
+ document.querySelector('[data-er="apply-filter"]').click();await settle();
+ assert.deepEqual(copy(ui.snapshot().filters[0].values),[{value:'0001',count:1},{value:'0009',count:0}]);
+ assert.deepEqual(copy(ui.snapshot().rows),[0]);
+ const first=document.getElementById('erColumn-0');first.checked=false;first.dispatchEvent(new window.Event('change',{bubbles:true}));
+ assert.equal(ui.snapshot().filters.length,0);assert.deepEqual(copy(ui.snapshot().rows),[0,1]);
+ assert.ok(document.querySelector('.er-live-card').nextElementSibling.classList.contains('er-report-card'));
+ assert.equal(db.calls.length,calls);
+});

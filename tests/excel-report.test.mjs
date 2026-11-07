@@ -8,6 +8,7 @@ const copy = value => JSON.parse(JSON.stringify(value));
 function engine(t) {
   const dom = new JSDOM('<body></body>', { runScripts: 'outside-only', url: 'https://example.test/' });
   t.after(() => dom.window.close());
+  dom.window.eval(source('validator-engine.js'));
   dom.window.eval(source('excel-report-engine.js'));
   return dom.window.WorkHubExcelReportEngine;
 }
@@ -234,4 +235,91 @@ test('Excel Report keeps live search immediately above the report even when list
   input('erList','000007\n000099');await ui.handle({dataset:{er:'apply-filter'}});
   assert.ok(d.querySelector('.er-results-card').compareDocumentPosition(d.querySelector('.er-live-card')) & x.w.Node.DOCUMENT_POSITION_FOLLOWING);
   assert.ok(d.querySelector('.er-live-card').nextElementSibling.classList.contains('er-report-card'));
+});
+
+test('Excel Report filter choices follow checked columns and cannot leave hidden active filters', async t => {
+  const x=fixture(t),{d,w,ui,input}=x;
+  await ui.loadFile(x.workbook());input('erHeaderRow','2','change');
+  input('erLiveColumn','1','change');input('erLiveText','alpha');
+  await new Promise(resolve=>setTimeout(resolve,130));
+  input('erFilterColumn','2','change');input('erList','Open');await ui.handle({dataset:{er:'apply-filter'}});
+  assert.deepEqual(copy(ui.snapshot().rows),[0]);
+  function check(index,value){const el=d.getElementById('erColumn-'+index);el.checked=value;el.dispatchEvent(new w.Event('change',{bubbles:true}));}
+  check(1,false);
+  assert.equal(ui.snapshot().live.text,'');assert.equal(ui.snapshot().live.column,0);
+  for(const id of ['erFilterColumn','erLiveColumn'])assert.deepEqual([...d.getElementById(id).options].map(o=>o.value),['0','2']);
+  assert.deepEqual(copy(ui.snapshot().rows),[0,2]);
+  check(2,false);
+  assert.equal(ui.snapshot().filters.length,0);assert.deepEqual(copy(ui.snapshot().rows),[0,1,2]);
+  input('erFilterSearch','Customer');assert.equal(d.getElementById('erFilterColumn').disabled,true);
+  input('erFilterSearch','');
+  await ui.handle({dataset:{er:'uncheck-all-columns'}});
+  assert.equal(d.getElementById('erLiveColumn').disabled,true);assert.equal(d.getElementById('erFilterColumn').disabled,true);assert.equal(d.getElementById('erLiveText').disabled,true);
+  check(1,true);
+  for(const id of ['erFilterColumn','erLiveColumn'])assert.deepEqual([...d.getElementById(id).options].map(o=>o.value),['1']);
+  input('erList','Alpha');await ui.handle({dataset:{er:'apply-filter'}});assert.deepEqual(copy(ui.snapshot().rows),[0]);
+  await ui.handle({dataset:{er:'uncheck-all-columns'}});assert.equal(ui.snapshot().filters.length,0);
+});
+
+test('Excel Report extracts a single pasted column from tab, CSV, spaced and Markdown tables without losing the first data row', t => {
+  const E=engine(t);
+  const text='| XX01 | QA01 | 9.10000001 | Example product A | 12 | EA | V1 | FALSE |\n| ---- | ---- | ---------- | ---- | --- | --- | --- | --- |\n| XX01 | QA00 | 9.10000002 | Example product B | 4 | EA | V1 | FALSE |\n| XX01 | QA00 | 9.10000003 | Example product C | 1 | EA | V1 | FALSE |\n| XX01 | QA00 | 9.10000004 | Example product D | 36 | EA | V1 | FALSE |\n| XX01 | QA00 | 9.10000005 | Example product E | 40 | EA | V1 | FALSE |';
+  const table=E.parsePaste(text);
+  assert.equal(table.width,8);assert.equal(table.rows.length,5);
+  assert.deepEqual(copy(E.extractPasteColumn(table,2).values),['9.10000001','9.10000002','9.10000003','9.10000004','9.10000005']);
+  const tabs=E.parsePaste('Plant\tName\tCode\nA\t"Two\nlines"\t000001\nB\tAnother\t000001\nC\tLast\t');
+  assert.equal(tabs.rows[1][1],'Two\nlines');
+  assert.deepEqual(copy(E.extractPasteColumn(tabs,2,true)),{values:['000001','000001'],skipped:1});
+  assert.throws(()=>E.extractPasteColumn(tabs,1,true),/multi-line/);
+  const csv=E.parsePaste('Plant,Name,Code\nA,"Example, quoted",000007\nB,Other,000008');
+  assert.deepEqual(copy(E.extractPasteColumn(csv,2,true).values),['000007','000008']);
+  const pipe=E.parsePaste('| A | Name \\| variant | 001 |\n| B | Other | 002 |');
+  assert.equal(pipe.width,3);assert.equal(pipe.rows[0][1],'Name | variant');
+  const spaced=E.parsePaste('A  Product one  00001\nB  Product two  00002');
+  assert.deepEqual(copy(E.extractPasteColumn(spaced,2).values),['00001','00002']);
+  assert.deepEqual(copy(E.extractPasteColumn(E.parsePaste('ACME, Inc\nBETA, Ltd','lines'),0).values),['ACME, Inc','BETA, Ltd']);
+  const large=E.parsePaste('A\tValue\n'+'B\t0001\n'.repeat(25000));
+  assert.throws(()=>E.extractPasteColumn(large,1),/25,000/);
+  assert.equal(E.extractPasteColumn(large,1,true).values.length,25000);
+});
+
+test('Excel Report reviews native table pastes, keeps only the chosen source column and exports its matches', async t => {
+  const x=fixture(t),{w,d,ui,input}=x;
+  await ui.loadFile(x.workbook());input('erHeaderRow','2','change');
+  await ui.handle({dataset:{er:'uncheck-all-columns'}});
+  const code=d.getElementById('erColumn-0');code.checked=true;code.dispatchEvent(new w.Event('change',{bubbles:true}));
+  input('erList','keep old list');
+  const event=new w.Event('paste',{bubbles:true,cancelable:true});
+  Object.defineProperty(event,'clipboardData',{value:{getData:type=>type==='text/plain'?'XX01\tOpen\t000007\nXX02\tClosed\t000008\nXX03\tPending\t000099':''}});
+  d.getElementById('erList').dispatchEvent(event);
+  assert.equal(event.defaultPrevented,true);assert.ok(d.getElementById('erPasteColumn'));
+  assert.equal(d.getElementById('erList').value,'keep old list');assert.equal(ui.snapshot().filters.length,0);
+  input('erPasteColumn','2','change');
+  assert.match(d.querySelector('.er-paste-summary').textContent,/3 values will replace/);
+  await ui.handle({dataset:{er:'use-paste-column'}});
+  assert.equal(d.getElementById('erList').value,'000007\n000008\n000099');
+  assert.equal(d.getElementById('erPasteColumn'),null);
+  await ui.handle({dataset:{er:'apply-filter'}});
+  assert.deepEqual(copy(ui.snapshot().rows),[0,1,2]);
+  assert.deepEqual(copy(ui.snapshot().filters[0].values),[{value:'000007',count:2},{value:'000008',count:1},{value:'000099',count:0}]);
+  await ui.prepareExport();
+  const saved=await w.WorkHubValidatorFiles.read(x.file(new Uint8Array(await x.blobs[0].arrayBuffer()),'out.xlsx'),{displayValues:true});
+  assert.deepEqual(copy(saved.sheets[0].rows),[['Code'],['000007'],['000008'],['000007']]);
+  assert.equal(saved.sheets[1].rows.length,4);assert.equal(x.writes(),0);
+});
+
+test('Excel Report handles copied web tables and an explicit header choice, and clears the preview on account changes', async t => {
+  const x=fixture(t),{w,d,ui,input}=x;
+  await ui.loadFile(x.workbook());input('erHeaderRow','2','change');
+  const event=new w.Event('paste',{bubbles:true,cancelable:true});
+  const html='<table><tr><th>Name</th><th>Code</th></tr><tr><td>Example</td><td>000007</td></tr></table><script>window.untrustedRan=true</script>';
+  Object.defineProperty(event,'clipboardData',{value:{getData:type=>type==='text/html'?html:''}});
+  d.getElementById('erList').dispatchEvent(event);
+  assert.equal(event.defaultPrevented,true);assert.equal(w.untrustedRan,undefined);
+  input('erPasteColumn','1','change');
+  const header=d.getElementById('erPasteHeader');header.checked=true;header.dispatchEvent(new w.Event('change',{bubbles:true}));
+  await ui.handle({dataset:{er:'use-paste-column'}});assert.equal(d.getElementById('erList').value,'000007');
+  input('erList','A\tB\nX\tY');await ui.handle({dataset:{er:'apply-filter'}});
+  assert.equal(ui.snapshot().filters.length,0);assert.ok(d.querySelector('.er-paste-preview'));
+  x.setOwner('other');assert.equal(d.querySelector('.er-paste-preview'),null);assert.equal(ui.snapshot().filename,'');
 });
