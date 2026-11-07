@@ -6,7 +6,7 @@
     walkthrough: {
       label: 'Guided walkthrough',
       description:
-        'Branded headers, numbered step cards and framed screenshots. Short steps share a page.',
+        'Numbered step cards and framed screenshots, with your chosen header. Short steps share a page.',
     },
     split: {
       label: 'Split view',
@@ -16,7 +16,7 @@
     compact: {
       label: 'Quick reference card',
       description:
-        'Branded two-column step cards, trimmed to their content. Best for sharing as JPG or PNG.',
+        'Two-column step cards with your chosen header, trimmed to their content. Best for sharing as JPG or PNG.',
     },
   };
   const GUIDE_PALETTES = {
@@ -43,11 +43,12 @@
   const COVER_DESIGNS = {
     band: {
       label: 'Accent band',
-      description: 'A bold accent panel with a spacious image gallery.',
+      description:
+        'A title-first cover with an optional accent header and a spacious image gallery.',
     },
     editorial: {
       label: 'Editorial',
-      description: 'A quiet title page with a fine rule and framed images.',
+      description: 'A quiet title page with an optional fine rule and borderless images.',
     },
     gallery: {
       label: 'Image spotlight',
@@ -64,6 +65,21 @@
     balanced: { label: 'Balanced', scale: 1, jpeg: 0.92 },
     print: { label: 'Print quality', scale: 1.5, jpeg: 0.97 },
   };
+  const GUIDE_HEADERS = {
+    band: {
+      label: 'Coloured header',
+      description: 'Use the selected accent colour and layout for the header.',
+    },
+    text: {
+      label: 'Text only',
+      description: 'Keep the heading and guide title as plain text on the page background.',
+    },
+    none: {
+      label: 'No header',
+      description:
+        'Start directly with the steps. Cover and contents titles stay visible. Your heading text is kept for later.',
+    },
+  };
   function pageOptions(value = {}) {
     if (!value || typeof value !== 'object') throw Error('Check the page layout.');
     const out = {
@@ -71,7 +87,10 @@
       imageWidth: value.imageWidth ?? 100,
       spacing: value.spacing ?? 20,
       headerHeight: value.headerHeight ?? 70,
+      headerStyle: value.headerStyle === undefined ? 'band' : value.headerStyle,
     };
+    if (typeof out.headerStyle !== 'string' || !Object.hasOwn(GUIDE_HEADERS, out.headerStyle))
+      throw Error('Choose a coloured, text-only or hidden header.');
     for (const [key, min, max] of [
       ['margin', 40, 120],
       ['imageWidth', 40, 100],
@@ -716,6 +735,7 @@
     COVER_DESIGNS,
     GUIDE_FONTS,
     EXPORT_QUALITY,
+    GUIDE_HEADERS,
     pageOptions,
     sections,
     comparison,

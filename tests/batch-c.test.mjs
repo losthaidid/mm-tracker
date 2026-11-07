@@ -120,6 +120,22 @@ function fileFixture(){
  new Function('window','document',source('batch-c-files.js'))(w,document);new Function('window','module','exports',source('vendor/jszip.min.js'))(w,undefined,undefined);
  return {F:w.WorkHubBatchCFiles,w,calls,document};
 }
+test('text-only headers use normal text ink and hidden headers omit branding and guide titles while keeping steps and footer numbers',async()=>{
+ for(const layout of ['classic','walkthrough','split','compact']){
+  const {F,calls}=fileFixture();
+  for(const headerStyle of ['text','none']){
+   calls.length=0;
+   const g={...guide(),layout,exportHeading:'Unique branding heading',title:'Unique document title',page:{headerStyle},colours:{accent:'#245e9a',paper:'#ffffff'}};
+   for await(const page of F.pages(g,()=>true))F.release(page);
+   const text=calls.filter(c=>c[0]==='text'),heading=text.filter(c=>c[1]==='Unique branding heading'),title=text.filter(c=>c[1]==='Unique document title');
+   if(headerStyle==='none'){assert.equal(heading.length,0);assert.equal(title.length,0);assert.equal(text.some(c=>String(c[1]).includes('illustrated')),false);}
+   else {assert.ok(heading.length);assert.ok(title.length);assert.ok(heading.every(c=>c[5]!=='#245e9a'));}
+   assert.ok(text.some(c=>String(c[1]).includes('Step a')));
+   assert.ok(text.some(c=>String(c[1]).includes('Page 1')));
+   assert.equal(calls.some(c=>c[0]==='fill'&&c[1]==='#245e9a'&&c[2]===0&&c[3]===0&&c[4]===1240),false);
+  }
+ }
+});
 test('image headers reject malformed/oversized files before decoding, including PNG, JPEG and WebP dimensions',()=>{
  const {F}=fileFixture();assert.deepEqual(F.dimensions(new Uint8Array(png(17,11))),{width:17,height:11});assert.throws(()=>F.dimensions(new Uint8Array([1,2,3])),/PNG/);
  const oversized=png(1,1);oversized.writeUInt32BE(9000,16);oversized.writeUInt32BE(9000,20);assert.throws(()=>F.dimensions(new Uint8Array(oversized)),/megapixels/);

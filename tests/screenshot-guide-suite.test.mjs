@@ -86,6 +86,63 @@ test('brand templates retain only maintained branding and never copy guide steps
   const template = E.brandTemplate('Company', g);
   assert.equal(template.settings.cover.title, ''); assert.equal(template.settings.cover.images.length, 0); assert.equal(template.settings.steps, undefined); assert.equal(template.settings.footer.logo.src, image.src); assert.equal(template.settings.contents, true);
 });
+test('header choices validate, preserve legacy appearance and survive templates and editable round trips', () => {
+  assert.equal(E.guide(guide()).page.headerStyle, 'band');
+  for (const headerStyle of ['band', 'text', 'none']) {
+    const g = E.guide({ ...guide(), exportHeading: 'Retained heading', page: { headerStyle } });
+    assert.equal(E.guide(copy(g)).page.headerStyle, headerStyle);
+    assert.equal(E.brandTemplate('My header', g).settings.page.headerStyle, headerStyle);
+    assert.equal(g.exportHeading, 'Retained heading');
+  }
+  for (const headerStyle of [null, false, 12, [], {}, 'transparent', '__proto__'])
+    assert.throws(() => E.guide({ ...guide(), page: { headerStyle } }), /header/);
+});
+test('header controls update preview and invalidate downloads, retain text while hidden and restore from files and recovery', async t => {
+  const c = fixture(t); await c.start(); await c.module.add([{ name: 'one.png' }]);
+  c.set('[data-bc-export-heading]', 'Operations / My guide');
+  c.set('[data-bc-header-style]', 'text', 'change'); await c.module.preview();
+  assert.equal(c.previews.findLast(p => p.type === 'document').guide.page.headerStyle, 'text');
+  await c.module.prepare('pdf'); assert.ok(c.d.querySelector('[data-bc-ready] a'));
+  c.set('[data-bc-header-style]', 'none', 'change');
+  assert.equal(c.d.querySelector('[data-bc-ready] a'), null);
+  assert.equal(c.d.querySelector('[data-bc-export-heading]').disabled, true);
+  assert.equal(c.d.querySelector('[data-bc-page="headerHeight"]').disabled, true);
+  assert.equal(c.d.querySelector('[data-bc-export-heading]').value, 'Operations / My guide');
+  c.set('[data-bc-template-name]', 'No header'); await c.click('save-template');
+  c.set('[data-bc-header-style]', 'band', 'change');
+  c.set('[data-bc-template]', 'No header', 'change'); await c.click('apply-template');
+  assert.equal(c.d.querySelector('[data-bc-header-style]').value, 'none');
+  await c.module.flushDraft();
+  assert.equal((await c.w.WorkHubGuideStore.read('one')).draft.guide.page.headerStyle, 'none');
+  const saved = await c.saved();
+  await c.module.importGuide({ size: 100, text: async () => JSON.stringify(saved) });
+  assert.equal(c.d.querySelector('[data-bc-header-style]').value, 'none');
+  c.set('[data-bc-header-style]', 'text', 'change');
+  assert.equal(c.d.querySelector('[data-bc-export-heading]').disabled, false);
+  assert.equal(c.d.querySelector('[data-bc-page="headerHeight"]').disabled, false);
+  assert.equal(c.d.querySelector('[data-bc-export-heading]').value, 'Operations / My guide');
+});
+test('cancelling any file picker preserves the builder, draft, canvas and ready download; dialog Escape still closes', async t => {
+  const c = fixture(t); await c.start(); await c.module.add([{ name: 'kept.png' }]);
+  c.set('[data-bc-caption]', 'Keep my unfinished instructions'); await c.module.prepare('pdf');
+  const room = c.d.querySelector('#batchCRoom'), canvas = room.querySelector('[data-bc-canvas]'),
+    link = room.querySelector('[data-bc-ready] a'), before = await c.saved();
+  const ready = room.querySelector('[data-bc-ready] a');
+  assert.ok(link);
+  for (const input of room.querySelectorAll('input[type="file"]')) {
+    input.dispatchEvent(new c.w.Event('cancel', { bubbles: true }));
+    assert.ok(room.isConnected && room.open);
+    assert.equal(room.querySelector('[data-bc-canvas]'), canvas);
+    assert.equal(room.querySelector('[data-bc-ready] a'), ready);
+  }
+  assert.deepEqual(await c.saved(), before);
+  room.dispatchEvent(new c.w.Event('cancel', { cancelable: true }));
+  assert.equal(room.isConnected, false);
+  c.module.open('privacy'); await c.module.add([{ name: 'private.png' }]);
+  const privacy = c.d.querySelector('#batchCRoom');
+  privacy.querySelector('input[type="file"]').dispatchEvent(new c.w.Event('cancel', { bubbles: true }));
+  assert.ok(privacy.isConnected && privacy.open);
+});
 test('real browser-store module keeps accounts isolated, merges concurrent draft/template writes and handles quota atomically', async () => {
   const indexedDB = memoryIDB(), w = { indexedDB, WorkHubBatchCEngine: E }; new Function('window', source('batch-c-store.js'))(w); const S = w.WorkHubGuideStore;
   await Promise.all([S.saveDraft('one', guide()), S.saveTemplate('one', 'Company', guide())]);
@@ -176,20 +233,57 @@ async function native(t) {
   const w = { Image, WorkHubBatchCEngine: E, atob: s => Buffer.from(s, 'base64').toString('binary') }, document = { baseURI: new URL('../index.html', import.meta.url).href, createElement: () => createCanvas(1, 1), fonts: { ready: Promise.resolve() } };
   new Function('window', 'document', source('batch-c-files.js'))(w, document); new Function('window', 'module', 'exports', source('vendor/jszip.min.js'))(w, undefined, undefined);
   const imageOf = (colour, width = 600, height = 300) => { const c = createCanvas(width, height), ctx = c.getContext('2d'); ctx.fillStyle = colour; ctx.fillRect(0, 0, width, height); return { src: c.toDataURL('image/png'), width, height }; };
-  return { F: w.WorkHubBatchCFiles, w, imageOf };
+  return { F: w.WorkHubBatchCFiles, w, imageOf, createCanvas };
 }
 test('rendered before-and-after comparisons keep both images and their arrangement without changing source pixels', async t => {
   const n = await native(t); if (!n) return; const { F, imageOf } = n, s = { ...step('a'), image: imageOf('#ff0000'), comparison: E.comparison({ image: imageOf('#0000ff'), orientation: 'side' }) };
   let c = await F.raster(s, () => true); assert.ok(c.width > c.height); let ctx = c.getContext('2d'); assert.deepEqual(Array.from(ctx.getImageData(c.width / 4, c.height / 2, 1, 1).data), [255, 0, 0, 255]); assert.deepEqual(Array.from(ctx.getImageData(c.width * 3 / 4, c.height / 2, 1, 1).data), [0, 0, 255, 255]); F.release(c);
   s.comparison.orientation = 'stack'; c = await F.raster(s, () => true); ctx = c.getContext('2d'); assert.deepEqual(Array.from(ctx.getImageData(c.width / 2, c.height / 4, 1, 1).data), [255, 0, 0, 255]); assert.deepEqual(Array.from(ctx.getImageData(c.width / 2, c.height * 3 / 4, 1, 1).data), [0, 0, 255, 255]); F.release(c);
 });
-test('cover gallery frames fit wide screenshots and contents thumbnails retain privacy covers', async t => {
-  const n = await native(t); if (!n) return; const { F, imageOf } = n, wide = imageOf('#ffffff', 1000, 200), g = E.guide({ ...guide(), colours: E.GUIDE_PALETTES.blue, cover: { enabled: true, design: 'editorial', images: [wide, wide] } });
-  const cover = await F.previewPage(g, 0, () => true), ctx = cover.getContext('2d'); let run = 0, longest = 0;
-  for (let y = 0; y < cover.height; y++) { const p = ctx.getImageData(90, y, 1, 1).data; if (p[2] - p[0] > 35) { run++; longest = Math.max(longest, run); } else run = 0; }
-  assert.ok(longest > 150 && longest < 300); F.release(cover);
+test('contents thumbnails retain privacy covers', async t => {
+  const n = await native(t); if (!n) return; const { F, imageOf } = n;
   const shot = imageOf('#ff0000', 400, 300), hidden = { ...step('private'), image: shot, marks: [{ type: 'cover', color: '#000000', size: .01, points: [[.1, .1], [.4, .4]] }] }, toc = await F.previewPage({ ...guide(), contents: true, steps: [hidden] }, 0, () => true), row = toc.guideMeta.links[0].rect;
   assert.deepEqual(Array.from(toc.getContext('2d').getImageData(row.x + 105, row.y + 32, 1, 1).data), [0, 0, 0, 255]); F.release(toc);
+});
+test('front-cover images have no border or inset frame and transparent pixels show the page in every cover design', async t => {
+  const n = await native(t); if (!n) return; const { F, createCanvas } = n;
+  const asset = createCanvas(400, 200), ink = asset.getContext('2d');
+  ink.fillStyle = '#ff0000'; ink.fillRect(150, 50, 100, 100);
+  const im = { src: asset.toDataURL('image/png'), width: 400, height: 200 };
+  for (const design of ['band', 'editorial', 'gallery']) {
+    const page = await F.previewPage({ ...guide(), page: { headerStyle: 'none' },
+      colours: { accent: '#245e9a', paper: '#ffffff' },
+      cover: { enabled: true, design, title: 'A cover', titleSize: 50, images: [im] } }, 0, () => true),
+      ctx = page.getContext('2d'), top = design === 'gallery' ? 90 : 90 + 50 * 1.28 + 54;
+    for (const [x, y] of [[90, top + 100], [1149, top + 100], [200, top], [200, top + 529], [120, top + 100]])
+      assert.deepEqual(Array.from(ctx.getImageData(x, y, 1, 1).data), [255, 255, 255, 255], design);
+    assert.deepEqual(Array.from(ctx.getImageData(620, top + 265, 1, 1).data), [255, 0, 0, 255]);
+    F.release(page);
+  }
+});
+test('plain and hidden headers match PNG exports across layouts and remove the top coloured strip on cover, contents and steps', async t => {
+  const n = await native(t); if (!n) return; const { F, w, imageOf } = n;
+  const firstRed = page => { const ctx = page.getContext('2d'); for (let y = 0; y < page.height; y++) {
+    const p = ctx.getImageData(page.width / 2, y, 1, 1).data; if (p[0] > 240 && p[1] < 10 && p[2] < 10) return y;
+  } return page.height; };
+  for (const layout of ['walkthrough', 'split', 'compact']) {
+    const positions = [];
+    for (const headerStyle of ['band', 'text', 'none']) {
+      const g = E.guide({ ...guide(), layout, exportHeading: 'Operations', page: { headerStyle },
+        colours: { accent: '#245e9a', paper: '#ffffff' }, contents: true,
+        cover: { enabled: true, design: 'band', images: [imageOf('#ff0000')] },
+        steps: [{ ...step('a'), image: imageOf('#ff0000') }] }),
+        zip = await w.JSZip.loadAsync(Buffer.from(await (await F.export(g, 'images', () => true)).arrayBuffer()));
+      for (let i = 0; i < 3; i++) {
+        const page = await F.previewPage(g, i, () => true);
+        assert.deepEqual(page.toBuffer('image/png'), await zip.file(String(i + 1).padStart(3, '0') + '-guide-page.png').async('nodebuffer'));
+        if (headerStyle !== 'band') assert.deepEqual(Array.from(page.getContext('2d').getImageData(5, 5, 1, 1).data), [255, 255, 255, 255]);
+        if (i === 2 && layout === 'walkthrough') positions.push(firstRed(page));
+        F.release(page);
+      }
+    }
+    if (layout === 'walkthrough') assert.ok(positions[2] + 80 < positions[0]);
+  }
 });
 test('compact header height moves screenshot content upward without reducing the maintained screenshot width', async t => {
   const n = await native(t); if (!n) return; const { F, imageOf } = n, g = { ...guide(), steps: [{ ...step('a'), image: imageOf('#ff0000') }] }, positions = [];

@@ -529,24 +529,28 @@
             ctx = c.getContext('2d');
           ctx.fillStyle = colour.paper;
           ctx.fillRect(0, 0, 1240, 1754);
-          ctx.fillStyle = colour.accent;
-          ctx.font = '600 19px system-ui, sans-serif';
-          const heading = (guide.exportHeading ?? E.DEFAULT_GUIDE_HEADING)
-            .replace(/\s+/g, ' ')
-            .trim();
-          let y = 68 * headerScale;
-          if (heading)
-            for (const line of wrap(ctx, heading, width)) {
+          let y = 48;
+          if (guide.page.headerStyle !== 'none') {
+            ctx.fillStyle = guide.page.headerStyle === 'text' ? colour.ink : colour.accent;
+            ctx.font = '600 19px system-ui, sans-serif';
+            const heading = (guide.exportHeading ?? E.DEFAULT_GUIDE_HEADING)
+              .replace(/\s+/g, ' ')
+              .trim();
+            y = 68 * headerScale;
+            if (heading)
+              for (const line of wrap(ctx, heading, width)) {
+                ctx.fillText(line, margin, y);
+                y += 25;
+              }
+            y = heading ? Math.max(120 * headerScale, y + 25 * headerScale) : 84 * headerScale;
+            ctx.fillStyle = colour.ink;
+            ctx.font = '600 27px system-ui, sans-serif';
+            for (const line of wrap(ctx, guide.title || 'Screenshot guide', width)) {
               ctx.fillText(line, margin, y);
-              y += 25;
+              y += 35;
             }
-          y = heading ? Math.max(120 * headerScale, y + 25 * headerScale) : 84 * headerScale;
-          ctx.fillStyle = colour.ink;
-          ctx.font = '600 27px system-ui, sans-serif';
-          for (const line of wrap(ctx, guide.title || 'Screenshot guide', width)) {
-            ctx.fillText(line, margin, y);
-            y += 35;
           }
+          ctx.fillStyle = colour.ink;
           ctx.font = '600 30px system-ui, sans-serif';
           titleLines = wrap(
             ctx,
@@ -679,51 +683,64 @@
       ctx.fillRect(0, 0, 1240, 1754);
       const heading = (guide.exportHeading ?? E.DEFAULT_GUIDE_HEADING).replace(/\s+/g, ' ').trim();
       font(17, true);
-      const headings = heading ? wrap(ctx, heading, width - 130) : [],
+      const headerStyle = guide.page.headerStyle,
+        headings = headerStyle !== 'none' && heading ? wrap(ctx, heading, width - 130) : [],
         band = headings.length ? Math.max(headings.length * 23 + 20, 86 * headerScale) : 8;
-      ctx.fillStyle = colour.accent;
-      ctx.fillRect(0, 0, 1240, band);
-      if (headings.length) {
-        ctx.fillStyle = onAccent;
-        headings.forEach((s, i) =>
-          ctx.fillText(s, margin, (band - headings.length * 23) / 2 + 17 + i * 23)
-        );
-        box(
-          ctx,
-          1240 - margin - 98,
-          (band - 36) / 2,
-          100,
-          36,
-          blend(colour.accent, onAccent, 0.12),
-          null,
-          5
-        );
-        font(14, true);
-        ctx.fillStyle = onAccent;
-        ctx.fillText(
-          'PAGE ' + String(pageNo).padStart(2, '0'),
-          1240 - margin - 86,
-          (band - 36) / 2 + 23
-        );
+      let top;
+      if (headerStyle === 'band') {
+        ctx.fillStyle = colour.accent;
+        ctx.fillRect(0, 0, 1240, band);
+        if (headings.length) {
+          ctx.fillStyle = onAccent;
+          headings.forEach((s, i) =>
+            ctx.fillText(s, margin, (band - headings.length * 23) / 2 + 17 + i * 23)
+          );
+          box(
+            ctx,
+            1240 - margin - 98,
+            (band - 36) / 2,
+            100,
+            36,
+            blend(colour.accent, onAccent, 0.12),
+            null,
+            5
+          );
+          font(14, true);
+          ctx.fillStyle = onAccent;
+          ctx.fillText(
+            'PAGE ' + String(pageNo).padStart(2, '0'),
+            1240 - margin - 86,
+            (band - 36) / 2 + 23
+          );
+        }
+        top = band + Math.max(42, 48 * headerScale);
+      } else {
+        const start = Math.max(40, 64 * headerScale);
+        ctx.fillStyle = colour.ink;
+        headings.forEach((s, i) => ctx.fillText(s, margin, start + 17 + i * 23));
+        top = start + (headings.length ? headings.length * 23 + 34 : 34);
       }
-      let top = band + Math.max(42, 48 * headerScale);
-      font(pageNo === 1 ? (compact ? 35 : 38) : 24, true);
-      ctx.fillStyle = colour.ink;
-      for (const title of wrap(ctx, guide.title || 'Screenshot guide', width)) {
-        ctx.fillText(title, margin, top);
-        top += pageNo === 1 ? 45 : 31;
+      if (headerStyle !== 'none') {
+        font(pageNo === 1 ? (compact ? 35 : 38) : 24, true);
+        ctx.fillStyle = colour.ink;
+        for (const title of wrap(ctx, guide.title || 'Screenshot guide', width)) {
+          ctx.fillText(title, margin, top);
+          top += pageNo === 1 ? 45 : 31;
+        }
+        font(17);
+        ctx.fillStyle = colour.body;
+        if (pageNo === 1)
+          ctx.fillText(
+            guide.steps.length + ' illustrated ' + (guide.steps.length === 1 ? 'step' : 'steps'),
+            margin,
+            top + 5
+          );
+        if (headerStyle === 'band') {
+          ctx.fillStyle = line;
+          ctx.fillRect(margin, top + (pageNo === 1 ? 20 : 4), width, 1);
+        }
       }
-      font(17);
-      ctx.fillStyle = colour.body;
-      if (pageNo === 1)
-        ctx.fillText(
-          guide.steps.length + ' illustrated ' + (guide.steps.length === 1 ? 'step' : 'steps'),
-          margin,
-          top + 5
-        );
-      ctx.fillStyle = line;
-      ctx.fillRect(margin, top + (pageNo === 1 ? 20 : 4), width, 1);
-      bodyTop = y = top + (pageNo === 1 ? 46 * headerScale : 22);
+      bodyTop = y = headerStyle === 'none' ? 48 : top + (pageNo === 1 ? 46 * headerScale : 22);
       usedBottom = y;
       column = 0;
       rowBottom = y;
@@ -1082,29 +1099,36 @@
       const margin = 90,
         width = 1060,
         headerScale = guide.page.headerHeight / 100,
+        headerStyle = guide.page.headerStyle,
         heading = guide.exportHeading.replace(/\s+/g, ' ').trim(),
         accentInk = palette({ accent: colour.accent, paper: colour.accent }).ink;
       ctx.imageSmoothingQuality = 'high';
       ctx.textBaseline = 'top';
       ctx.font = '700 19px Arial, sans-serif';
-      const headings = heading ? wrap(ctx, heading, width) : [],
+      const headings = headerStyle !== 'none' && heading ? wrap(ctx, heading, width) : [],
         headHeight = headings.length * 26,
         bandHeight = Math.max(96, headHeight + 32, 150 * headerScale);
-      if (cover.design === 'band') {
+      if (headerStyle === 'band' && cover.design === 'band') {
         ctx.fillStyle = colour.accent;
         ctx.fillRect(0, 0, 1240, bandHeight);
         ctx.fillStyle = accentInk;
-      } else {
+      } else if (headerStyle === 'band') {
         ctx.fillStyle = colour.accent;
         ctx.fillRect(margin, 58 * headerScale, cover.design === 'editorial' ? 90 : width, 6);
       }
+      if (headerStyle !== 'band') ctx.fillStyle = colour.ink;
       ctx.textAlign = cover.align;
       const x = cover.align === 'center' ? 620 : margin;
       for (const [i, line] of headings.entries())
         ctx.fillText(
           line,
           x,
-          (cover.design === 'band' ? (bandHeight - headHeight) / 2 : 92 * headerScale) + i * 26
+          (headerStyle === 'band'
+            ? cover.design === 'band'
+              ? (bandHeight - headHeight) / 2
+              : 92 * headerScale
+            : Math.max(40, 64 * headerScale)) +
+            i * 26
         );
       const block = (text, key, bold = false) => {
           const size = cover[key + 'Size'],
@@ -1122,18 +1146,23 @@
         subtitle = block(cover.subtitle, 'subtitle'),
         details = block(cover.details, 'details'),
         textHeight = title.height + (subtitle.height ? 28 + subtitle.height : 0),
-        top = Math.max(170, bandHeight + 46, (130 + headHeight) * headerScale + 30),
+        top =
+          headerStyle === 'band'
+            ? Math.max(170, bandHeight + 46, (130 + headHeight) * headerScale + 30)
+            : headerStyle === 'text' && headings.length
+              ? Math.max(112, Math.max(40, 64 * headerScale) + headHeight + 42)
+              : 90,
         detailsTop = bottom - details.height,
         available = detailsTop - (details.height ? 48 : 0) - top,
         naturalGalleryHeight = !images.length
           ? 0
           : images.length === 1
-            ? (1032 * cover.images[0].height) / cover.images[0].width + 28
+            ? (1060 * cover.images[0].height) / cover.images[0].width
             : images.length === 2
-              ? Math.max(...cover.images.map(im => (490 * im.height) / im.width + 28))
+              ? Math.max(...cover.images.map(im => (518 * im.height) / im.width))
               : Math.max(
-                  (636 * cover.images[0].height) / cover.images[0].width + 28,
-                  ...cover.images.slice(1).map(im => 2 * ((344 * im.height) / im.width + 28) + 24)
+                  (664 * cover.images[0].height) / cover.images[0].width,
+                  ...cover.images.slice(1).map(im => (2 * (372 * im.height)) / im.width + 24)
                 ),
         imageHeight = images.length
           ? Math.min(620, Math.max(180, naturalGalleryHeight), available - textHeight - 54)
@@ -1166,15 +1195,7 @@
                   { x: 778, y: y + (imageHeight + 24) / 2, w: 372, h: (imageHeight - 24) / 2 },
                 ];
         for (const [i, box] of boxes.entries()) {
-          ctx.strokeStyle = colour.accent;
-          ctx.lineWidth = 1;
-          ctx.strokeRect(box.x, box.y, box.w, box.h);
-          const fit = contain(cover.images[i], {
-            x: box.x + 14,
-            y: box.y + 14,
-            w: box.w - 28,
-            h: box.h - 28,
-          });
+          const fit = contain(cover.images[i], box);
           ctx.drawImage(images[i], fit.x, fit.y, fit.w, fit.h);
         }
       };
@@ -1186,7 +1207,7 @@
       text(title, titleY, colour.ink);
       text(subtitle, titleY + title.height + 28, colour.body);
       if (cover.design !== 'gallery' && images.length) gallery(top + textHeight + 54);
-      if (cover.design === 'editorial') {
+      if (headerStyle === 'band' && cover.design === 'editorial') {
         ctx.fillStyle = colour.accent;
         ctx.fillRect(margin, titleY - 30, width, 2);
       }
@@ -1228,16 +1249,22 @@
       ctx.fillStyle = colour.paper;
       ctx.fillRect(0, 0, 1240, 1754);
       ctx.fillStyle = colour.accent;
-      ctx.fillRect(0, 0, 1240, 12);
+      const headerStyle = guide.page.headerStyle;
+      if (headerStyle === 'band') ctx.fillRect(0, 0, 1240, 12);
+      else ctx.fillStyle = colour.ink;
       ctx.font = '600 17px Arial, sans-serif';
-      y = 65 * headerScale;
-      for (const line of wrap(ctx, guide.exportHeading.replace(/\s+/g, ' ').trim(), width)) {
+      y = headerStyle === 'none' ? 40 : 65 * headerScale;
+      const headings =
+        headerStyle === 'none'
+          ? []
+          : wrap(ctx, guide.exportHeading.replace(/\s+/g, ' ').trim(), width);
+      for (const line of headings) {
         ctx.fillText(line, margin, y);
         y += 24;
       }
       ctx.font = '700 48px Arial, sans-serif';
       ctx.fillStyle = colour.ink;
-      y += 48 * headerScale;
+      y += headerStyle === 'none' ? 48 : 48 * headerScale;
       ctx.fillText('Contents' + (++number > 1 ? ' · continued' : ''), margin, y);
       y += 44;
       ctx.font = '24px Arial, sans-serif';
