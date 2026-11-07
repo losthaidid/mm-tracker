@@ -16,7 +16,7 @@ test('Kept experience: extracted palettes are deterministic, ignore transparency
   const p=A.extract(pixels);assert.equal(p.options[0].accent,'#148c64');assert.equal(JSON.stringify(p),JSON.stringify(A.extract(pixels)));
   for(const o of p.options) { assert.ok(A.contrast(o.colors.text,o.colors.page)>=4.5); assert.ok(A.contrast(o.colors.text,o.colors.surface)>=4.5); }
   assert.throws(()=>A.extract([0,0,0,0]),/transparent/);
-  const settings={};A.upgrade(settings);A.validate(settings);settings.branding.mode='logo';assert.throws(()=>A.validate(settings),/icon/);settings.branding.image='data:image/svg+xml,<script/>';assert.throws(()=>A.validate(settings),/icon/);
+  const settings={};A.validate(settings);assert.equal(settings.branding,undefined);settings.branding={mode:'logo',initials:'WH',image:''};assert.throws(()=>A.validate(settings),/icon/);settings.branding.image='data:image/svg+xml,<script/>';assert.throws(()=>A.validate(settings),/icon/);
 });
 test('Kept experience: search matches several terms across title, status and details and escapes previews', t => {
   const w=modules(t), C=w.WorkHubCommandPalette, rows=[{id:'1',title:'<img src=x>',type:'ticket',group:'Records',detail:'Timeout on network',meta:'Ticket · Open'}, {id:'go:tasks',title:'Open Tasks',type:'command',group:'Pages',detail:'Browse tasks'}];

@@ -16,7 +16,7 @@ The seven kept selections from the November design discussion are implemented. T
 
 Logos accept PNG, JPG and WebP up to 10 MB and 40 megapixels. The app creates a bounded 96 × 96 PNG icon (up to about 48 KB). Original pictures are processed locally. Only the icon and chosen colours sync with your appearance preferences. Palette-source pictures are discarded after extraction. Theme export/import and backups include the selected icon and loading style. Theme imports are limited to 150 KB and all saved preferences are validated.
 
-Initials contain one to three characters. The original artwork remains available. The website's editable name and moving letter animation are preserved. Changing the icon still leaves the home button accessible by keyboard.
+Initials contain one to three characters. The original artwork remains available. Older accounts use the original icon and animated loading without inserting new preference fields; those fields are written only when appearance is explicitly saved. The website's editable name and moving letter animation are preserved. Changing the icon still leaves the home button accessible by keyboard.
 
 Minimal removes the scene, Illustrated keeps still artwork, and Animated uses the existing startup artwork. All preserve actual asset, account and record-loading status and the recovery controls. They do not add a fake progress delay. The on-page appearance sample is a labelled style preview.
 

@@ -46,7 +46,6 @@
     if (!p || typeof p !== 'object') return;
     if (p.colors === undefined) p.colors = { ...COLORS };
     if (p.palettes === undefined) p.palettes = [];
-    root.WorkHubExperienceAppearance?.upgrade(p);
   }
   function appearanceValidate(p) {
     root.WorkHubExperienceAppearance?.validate(p);

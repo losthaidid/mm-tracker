@@ -24,14 +24,15 @@
   const validImage = s =>
     typeof s === 'string' &&
     (s === '' || (s.length <= 65000 && /^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(s)));
-  function upgrade(p) {
-    if (p.loadingStyle === undefined) p.loadingStyle = 'animated';
-    if (p.branding === undefined) p.branding = { mode: 'default', initials: 'WH', image: '' };
-  }
+  // Defaults belong to the presentation. Old account documents stay unchanged until Save theme.
+  const DEFAULT_BRANDING = Object.freeze({ mode: 'default', initials: 'WH', image: '' });
+  const branding = p => (p.branding === undefined ? DEFAULT_BRANDING : p.branding);
   function validate(p) {
-    const b = p.branding;
+    const b = branding(p);
     if (
-      !['minimal', 'illustrated', 'animated'].includes(p.loadingStyle) ||
+      !['minimal', 'illustrated', 'animated'].includes(
+        p.loadingStyle === undefined ? 'animated' : p.loadingStyle
+      ) ||
       !b ||
       !['default', 'initials', 'logo'].includes(b.mode) ||
       typeof b.initials !== 'string' ||
@@ -46,7 +47,7 @@
       );
   }
   function fields(p) {
-    const b = p.branding;
+    const b = branding(p);
     return `<section class="hub-theme-section ea-section"><span class="hub-kicker">YOUR SIGNATURE</span><h4>Website icon & arrival</h4><p class="hub-meta">Your icon appears in the header and browser tab. Your website name keeps its existing motion.</p><div class="form-grid"><label>Icon style<select name="brandMode">${[
       ['default', 'Original artwork'],
       ['initials', 'My initials'],
@@ -61,19 +62,20 @@
       ['animated', 'Animated · moving artwork'],
     ]
       .map(
-        ([v, l]) => `<option value="${v}"${v === p.loadingStyle ? ' selected' : ''}>${l}</option>`
+        ([v, l]) =>
+          `<option value="${v}"${v === (p.loadingStyle || 'animated') ? ' selected' : ''}>${l}</option>`
       )
       .join(
         ''
-      )}</select></label><div class="ea-loading-preview" data-ea-loading="${p.loadingStyle}" aria-label="Loading screen style preview"><span class="ea-loading-art" aria-hidden="true">✧</span><span><small>YOUR WORKSPACE</small><strong data-ea-name>${esc(p.workspace)}</strong><span>Loading your records…</span></span><i aria-hidden="true"></i></div><p class="hub-meta">This is a style preview. The actual loading screen shows real sign-in and record-loading progress.</p></section>`;
+      )}</select></label><div class="ea-loading-preview" data-ea-loading="${p.loadingStyle || 'animated'}" aria-label="Loading screen style preview"><span class="ea-loading-art" aria-hidden="true">✧</span><span><small>YOUR WORKSPACE</small><strong data-ea-name>${esc(p.workspace)}</strong><span>Loading your records…</span></span><i aria-hidden="true"></i></div><p class="hub-meta">This is a style preview. The actual loading screen shows real sign-in and record-loading progress.</p></section>`;
   }
   function values(form, p) {
     return {
-      loadingStyle: form.elements.loadingStyle?.value || p.loadingStyle,
+      loadingStyle: form.elements.loadingStyle?.value || p.loadingStyle || 'animated',
       branding: {
-        mode: form.elements.brandMode?.value || p.branding.mode,
-        initials: (form.elements.brandInitials?.value ?? p.branding.initials).trim(),
-        image: form.elements.brandImage?.value ?? p.branding.image,
+        mode: form.elements.brandMode?.value || branding(p).mode,
+        initials: (form.elements.brandInitials?.value ?? branding(p).initials).trim(),
+        image: form.elements.brandImage?.value ?? branding(p).image,
       },
     };
   }
@@ -187,7 +189,7 @@
         paletteForm = null;
         signature = '';
       }
-      const b = account ? p.branding : { mode: 'default' },
+      const b = account ? branding(p) : DEFAULT_BRANDING,
         palette = root.WorkHubAppearance.palette(p, ''),
         accent = palette.accent;
       const next = JSON.stringify([account, b, accent]),
@@ -231,7 +233,7 @@
         }
       }
       const preview = document.querySelector('[data-ea-loading]');
-      if (preview) preview.dataset.eaLoading = p.loadingStyle;
+      if (preview) preview.dataset.eaLoading = p.loadingStyle || 'animated';
       const name = document.querySelector('[data-ea-name]');
       if (name) name.textContent = p.workspace;
     }
@@ -335,7 +337,6 @@
     return { mount, apply };
   }
   root.WorkHubExperienceAppearance = {
-    upgrade,
     validate,
     fields,
     values,
