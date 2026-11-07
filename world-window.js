@@ -1,183 +1,87 @@
-/* Repositions the existing living window. Scene, weather, time, visitors and
-   settings stay owned by atmosphere.js; positions are local to this account session. */
+/* Header-mounted living window. Atmosphere retains the original scene, clock,
+   weather, visitors and settings; wide view is a local presentation choice. */
 (function (root) {
   'use strict';
   function install(a) {
     let owner = '',
       generation,
       panel = null,
-      position = null,
-      drag = null,
-      minimised = false;
+      expanded = false;
     const context = () => (a.ready() ? a.owner() : '');
-    function paintPosition() {
-      if (!panel) return;
-      if (!position) {
-        panel.style.removeProperty('left');
-        panel.style.removeProperty('top');
-        panel.style.removeProperty('right');
-        return;
-      }
-      panel.style.left = position.x + 'px';
-      panel.style.top = position.y + 'px';
-      panel.style.right = 'auto';
-    }
-    function move(x, y) {
-      if (!panel || !a.ready() || owner !== a.owner()) return;
-      const rect = panel.getBoundingClientRect(),
-        w = rect.width || (minimised ? 222 : 292),
-        h = rect.height || (minimised ? 45 : 285);
-      position = {
-        x: Math.max(12, Math.min(Math.max(12, root.innerWidth - w - 12), x)),
-        y: Math.max(12, Math.min(Math.max(12, root.innerHeight - h - 12), y)),
-      };
-      paintPosition();
-    }
-    function finish(cancel = false) {
-      if (!drag) return;
-      const old = drag;
-      drag = null;
-      try {
-        old.handle.releasePointerCapture?.(old.id);
-      } catch {}
-      if (cancel) {
-        position = old.before;
-        paintPosition();
-      }
-    }
-    function reset() {
-      finish();
-      position = null;
-      paintPosition();
-      fit();
-    }
-    function fit() {
-      if (!panel || panel.hidden || !a.ready()) return;
-      if (position) return move(position.x, position.y);
-      const rect = panel.getBoundingClientRect();
-      if (
-        rect.width &&
-        rect.height &&
-        (rect.left < 12 ||
-          rect.top < 12 ||
-          rect.right > root.innerWidth - 12 ||
-          rect.bottom > root.innerHeight - 12)
-      )
-        move(rect.left, rect.top);
-    }
     function paint() {
       if (!panel) return;
-      panel.dataset.minimised = String(minimised);
-      panel.querySelector('#whWorldContent').hidden = minimised;
-      const toggle = panel.querySelector('[data-world-window="toggle"]');
-      toggle.setAttribute('aria-expanded', String(!minimised));
+      const value = String(expanded),
+        toggle = panel.querySelector('[data-world-window="expand"]');
+      if (panel.dataset.expanded !== value) panel.dataset.expanded = value;
+      toggle.setAttribute('aria-expanded', value);
       toggle.setAttribute(
         'aria-label',
-        minimised ? 'Expand scenery window' : 'Minimise scenery window'
+        expanded ? 'Use compact scenery in the header' : 'Enlarge scenery within the header'
       );
-      toggle.title = minimised ? 'Expand scenery window' : 'Minimise scenery window';
-      toggle.textContent = minimised ? '＋' : '−';
-      fit();
+      toggle.title = expanded ? 'Use compact header view' : 'See a larger scene in the header';
+      toggle.querySelector('[data-world-expand-icon]').textContent = expanded ? '↙' : '↗';
+      toggle.querySelector('[data-world-expand-label]').textContent = expanded
+        ? 'Compact view'
+        : 'Wide view';
+    }
+    function reset() {
+      expanded = false;
+      paint();
     }
     function create() {
       panel = document.createElement('aside');
       panel.id = 'whWorldWindow';
-      panel.setAttribute('aria-label', 'Scenery window');
+      panel.setAttribute('aria-label', 'Live scenery in the header');
       panel.innerHTML =
-        '<div class="wh-world-header"><button type="button" class="wh-world-handle" aria-label="Move scenery window. Drag or use arrow keys; Home resets its position." title="Drag to move · arrow keys move · Home resets"><span aria-hidden="true">⠿</span><span>World window</span></button><button type="button" data-world-window="reset" aria-label="Reset scenery window position" title="Reset position">↺</button><button type="button" data-world-window="toggle" aria-controls="whWorldContent"></button></div><div id="whWorldContent"></div>';
-      const handle = panel.querySelector('.wh-world-handle');
-      handle.addEventListener('pointerdown', event => {
-        if (!a.ready() || owner !== a.owner() || event.button !== 0 || event.isPrimary === false)
-          return;
-        const rect = panel.getBoundingClientRect();
-        drag = {
-          id: event.pointerId,
-          handle,
-          x: event.clientX,
-          y: event.clientY,
-          left: rect.left,
-          top: rect.top,
-          before: position && { ...position },
-        };
-        event.preventDefault();
-        try {
-          handle.setPointerCapture?.(event.pointerId);
-        } catch {}
-      });
-      handle.addEventListener('pointermove', event => {
-        if (!drag || event.pointerId !== drag.id) return;
-        if (!a.ready() || owner !== a.owner() || generation !== a.generation()) {
-          finish(true);
-          return;
-        }
-        move(drag.left + event.clientX - drag.x, drag.top + event.clientY - drag.y);
-      });
-      handle.addEventListener('pointerup', event => {
-        if (event.pointerId === drag?.id) finish();
-      });
-      handle.addEventListener('pointercancel', () => finish(true));
-      handle.addEventListener('lostpointercapture', () => finish(true));
-      handle.addEventListener('keydown', event => {
-        if (event.key === 'Escape' && drag) {
-          event.preventDefault();
-          event.stopPropagation();
-          finish(true);
-          return;
-        }
-        if (
-          !a.ready() ||
-          owner !== a.owner() ||
-          !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home'].includes(event.key)
-        )
-          return;
-        event.preventDefault();
-        event.stopPropagation();
-        if (event.key === 'Home') return reset();
-        const rect = panel.getBoundingClientRect(),
-          n = event.shiftKey ? 40 : 16;
-        move(
-          rect.left + (event.key === 'ArrowLeft' ? -n : event.key === 'ArrowRight' ? n : 0),
-          rect.top + (event.key === 'ArrowUp' ? -n : event.key === 'ArrowDown' ? n : 0)
-        );
-      });
-      panel.querySelector('[data-world-window="reset"]').addEventListener('click', reset);
-      panel.querySelector('[data-world-window="toggle"]').addEventListener('click', () => {
-        finish();
-        minimised = !minimised;
+        '<div id="whWorldContent"></div><button type="button" class="wh-world-expand" data-world-window="expand" aria-controls="whWorldContent"><span data-world-expand-icon aria-hidden="true">↗</span><span data-world-expand-label>Wide view</span></button>';
+      panel.querySelector('[data-world-window="expand"]').addEventListener('click', () => {
+        if (!a.ready() || owner !== a.owner() || generation !== a.generation()) return;
+        expanded = !expanded;
         paint();
       });
-      document.body.append(panel);
+      panel.addEventListener('keydown', event => {
+        if (event.key !== 'Escape' || !expanded) return;
+        event.preventDefault();
+        event.stopPropagation();
+        reset();
+        panel.querySelector('[data-world-window="expand"]').focus({ preventScroll: true });
+      });
     }
     function mount() {
       const next = context(),
-        epoch = a.generation();
+        epoch = a.generation(),
+        header = document.getElementById('hubHeader');
       if (next !== owner || epoch !== generation) {
-        finish(true);
         owner = next;
         generation = epoch;
-        position = null;
-        minimised = root.innerWidth <= 620;
-        paintPosition();
-        paint();
+        expanded = false;
       }
-      if (!next) {
+      if (!next || !header) {
         if (panel) panel.hidden = true;
+        delete document.body.dataset.hubWorld;
         return;
       }
       const card = document.getElementById('hubAtmosphereCard');
       if (!card) return;
       if (!panel) create();
       const host = panel.querySelector('#whWorldContent');
-      if (card.parentElement !== host) host.append(card);
+      let caption = card.querySelector('.wh-world-caption');
+      if (!caption) {
+        caption = document.createElement('span');
+        caption.className = 'wh-world-caption';
+        for (const node of card.querySelectorAll('#hubAtmosphereCaption,#hubAtmosphereClock'))
+          caption.append(node);
+        card.append(caption);
+      }
+      if (card.parentElement !== host) host.replaceChildren(card);
+      if (panel.parentElement !== header) {
+        const actions = header.querySelector(':scope > .header-actions');
+        header.insertBefore(panel, actions);
+      }
       panel.hidden = false;
+      document.body.dataset.hubWorld = 'header';
       paint();
     }
-    root.addEventListener('resize', () => {
-      finish(true);
-      fit();
-    });
-    root.addEventListener('blur', () => finish(true));
-    root.addEventListener('pagehide', () => finish(true));
     return { mount, reset };
   }
   root.WorkHubWorldWindow = { install };

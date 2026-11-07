@@ -667,96 +667,152 @@ body[data-hub-layout='renewed'] .pc-quick {
   border-color: var(--hub-border);
 }
 
-/* The same living window is larger, movable and no longer at the sidebar's foot. */
-#whWorldWindow {
-  position: fixed;
-  z-index: 80;
-  top: 210px;
-  right: 24px;
-  width: 292px;
-  max-width: calc(100vw - 24px);
-  max-height: calc(100dvh - 24px);
-  color: var(--hub-text);
+/* A living scene is part of the brand header, never over the workspace. */
+body[data-hub-layout='renewed'][data-hub-world='header'] #hubHeader {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(340px, 410px) minmax(250px, 1fr);
+  align-items: center;
+  gap: 18px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+body[data-hub-layout='renewed'][data-hub-world='header'] #hubHeader > .hub-header-brand {
+  grid-column: 1;
+  grid-row: 1;
+}
+body[data-hub-layout='renewed'][data-hub-world='header'] #hubHeader > .header-actions {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+}
+body #hubHeader #whWorldWindow {
+  position: relative;
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: center;
+  width: 100%;
+  min-width: 0;
+  max-width: 410px;
   border: 1px solid var(--hub-border);
-  border-radius: 17px;
-  background: var(--hub-surface);
-  box-shadow: 0 12px 38px color-mix(in srgb, var(--hub-text) 14%, transparent);
+  border-radius: 16px;
+  background: linear-gradient(
+    110deg,
+    color-mix(in srgb, var(--hub-link) 6%, var(--hub-surface)),
+    var(--hub-surface)
+  );
+  color: var(--hub-text);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--hub-surface) 65%, transparent);
 }
 #whWorldWindow[hidden],
-#whWorldWindow:has(#hubAtmosphereCard[hidden]),
-#whWorldContent[hidden] {
+#whWorldWindow:has(#hubAtmosphereCard[hidden]) {
   display: none;
 }
-.wh-world-header {
-  display: flex;
-  gap: 3px;
+body #hubHeader #whWorldWindow #hubAtmosphereCard {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
   align-items: center;
-  padding: 7px;
-  border-bottom: 1px solid var(--hub-border);
-}
-.wh-world-header > button {
-  min-height: 30px;
-  min-width: 30px;
-  padding: 4px 7px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--hub-text);
-  font-size: 14px;
-}
-.wh-world-header > .wh-world-handle {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
-  font-size: 11px;
-  font-weight: 650;
-  text-align: left;
-  touch-action: none;
-  cursor: grab;
-}
-.wh-world-handle:active {
-  cursor: grabbing;
-}
-.wh-world-handle > span:first-child {
-  font-size: 17px;
-  color: var(--hub-link);
-}
-body #whWorldWindow #hubAtmosphereCard {
-  display: block;
+  gap: 14px;
   width: 100%;
   max-width: none;
+  min-height: 0;
   margin: 0;
-  padding: 14px;
+  padding: 7px 13px 7px 7px;
   border: 0;
-  border-radius: 0 0 16px 16px;
-  background: var(--hub-surface);
+  border-radius: inherit;
+  color: var(--hub-text);
+  background: transparent;
+  text-align: left;
   box-shadow: none;
 }
-body #whWorldWindow #hubAtmosphereCard :is(svg, .hub-atmosphere-window) {
+body #hubHeader #whWorldWindow #hubAtmosphereCard :is(svg, .hub-atmosphere-window) {
   display: block;
+  grid-column: 1;
+  width: 180px;
+  max-width: 100%;
+  height: 99px;
   max-height: none;
-  width: 100%;
+  margin: 0;
 }
-body #whWorldWindow #hubAtmosphereCaption {
-  margin-top: 12px;
-  font-size: 13px;
+.wh-world-caption {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 3px 0 26px;
+  align-self: stretch;
 }
-body #whWorldWindow #hubAtmosphereClock {
+.wh-world-caption::before {
+  content: 'YOUR WORLD, LIVE';
+  color: var(--hub-link);
+  font-size: 8px;
+  font-weight: 650;
+  letter-spacing: 0.13em;
+  line-height: 1.4;
+}
+body #hubHeader #whWorldWindow #hubAtmosphereCaption {
+  margin: 0;
+  color: var(--hub-text);
+  font-size: 14px;
+  line-height: 1.35;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+body #hubHeader #whWorldWindow #hubAtmosphereClock {
+  margin: 0;
+  color: var(--hub-muted);
   font-size: 11px;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
 }
-#whWorldWindow[data-minimised='true'] {
-  width: 222px;
+body #hubHeader #whWorldWindow .wh-world-expand {
+  position: absolute;
+  bottom: 8px;
+  right: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 24px;
+  padding: 3px 7px;
+  border: 1px solid var(--hub-border);
+  border-radius: 6px;
+  background: var(--hub-surface-soft);
+  color: var(--hub-text);
+  font-size: 10px;
+  line-height: 1.4;
 }
-#whWorldContent {
-  max-height: calc(100dvh - 78px);
-  overflow: auto;
-  overscroll-behavior: contain;
+body #hubHeader #whWorldWindow .wh-world-expand:hover {
+  border-color: var(--hub-link);
+  color: var(--hub-link);
 }
-#whWorldWindow[data-minimised='true'] .wh-world-header {
-  border-bottom: 0;
+body #hubHeader #whWorldWindow[data-expanded='true'] {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  max-width: none;
+  border-color: color-mix(in srgb, var(--hub-link) 45%, var(--hub-border));
+}
+body #hubHeader #whWorldWindow[data-expanded='true'] #hubAtmosphereCard {
+  grid-template-columns: minmax(220px, 440px) minmax(0, 280px);
+  justify-content: center;
+  gap: 30px;
+  padding: 14px 22px;
+}
+body
+  #hubHeader
+  #whWorldWindow[data-expanded='true']
+  #hubAtmosphereCard
+  :is(svg, .hub-atmosphere-window) {
+  width: 100%;
+  height: auto;
+  max-height: 242px;
+}
+body #hubHeader #whWorldWindow[data-expanded='true'] #hubAtmosphereCaption {
+  font-size: 20px;
+}
+body #hubHeader #whWorldWindow[data-expanded='true'] #hubAtmosphereClock {
+  font-size: 14px;
 }
 body:is(.hub-present, .hub-private, .hub-focus, .hub-sorting) #whWorldWindow {
   display: none;
@@ -802,8 +858,24 @@ body[data-hub-layout='renewed']
   }
 }
 @media (max-width: 1100px) {
-  #whWorldWindow {
-    top: 250px;
+  body[data-hub-layout='renewed'][data-hub-world='header'] #hubHeader {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px 18px;
+  }
+  body[data-hub-layout='renewed'][data-hub-world='header'] #hubHeader > .header-actions {
+    grid-column: 2;
+  }
+  body #hubHeader #whWorldWindow {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    max-width: none;
+  }
+  body #hubHeader #whWorldWindow #hubAtmosphereCard {
+    grid-template-columns: 154px minmax(0, 1fr);
+  }
+  body #hubHeader #whWorldWindow #hubAtmosphereCard :is(svg, .hub-atmosphere-window) {
+    width: 154px;
+    height: 85px;
   }
   body[data-hub-layout='renewed'] #hubToolbar > [data-hub='commands'] {
     flex-basis: 100%;
@@ -832,11 +904,6 @@ body[data-hub-layout='renewed']
   body[data-hub-layout='renewed'] #view .my-day-page .hub-layout > [data-widget] {
     grid-column: 1 / -1;
   }
-  #whWorldWindow {
-    top: 250px;
-    right: 12px;
-    width: 266px;
-  }
 }
 @media (max-width: 620px) {
   body[data-hub-layout='renewed'] {
@@ -852,8 +919,45 @@ body[data-hub-layout='renewed']
   body[data-hub-layout='renewed'] #hubHeader h1 {
     font-size: 18px;
   }
-  #whWorldWindow {
-    top: 160px;
+  body[data-hub-layout='renewed'][data-hub-world='header'] #hubHeader {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  body[data-hub-layout='renewed'][data-hub-world='header'] #hubHeader > .header-actions {
+    grid-column: 1;
+    grid-row: 2;
+    width: 100%;
+    justify-self: stretch;
+    justify-content: flex-end;
+  }
+  body #hubHeader #whWorldWindow,
+  body #hubHeader #whWorldWindow[data-expanded='true'] {
+    grid-column: 1;
+    grid-row: 3;
+  }
+  body #hubHeader #whWorldWindow #hubAtmosphereCard {
+    grid-template-columns: 136px minmax(0, 1fr);
+    gap: 10px;
+  }
+  body #hubHeader #whWorldWindow #hubAtmosphereCard :is(svg, .hub-atmosphere-window) {
+    width: 136px;
+    height: 75px;
+  }
+  body #hubHeader #whWorldWindow .wh-world-caption {
+    gap: 3px;
+  }
+  body #hubHeader #whWorldWindow[data-expanded='true'] #hubAtmosphereCard {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    padding: 14px;
+  }
+  body
+    #hubHeader
+    #whWorldWindow[data-expanded='true']
+    #hubAtmosphereCard
+    :is(svg, .hub-atmosphere-window) {
+    width: min(100%, 360px);
+    height: auto;
+    justify-self: center;
   }
   body[data-hub-layout='renewed'] #hubHeader .header-actions {
     margin-left: auto;
