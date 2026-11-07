@@ -21,7 +21,7 @@ jobs:
             const params = {
               owner: context.repo.owner,
               repo: context.repo.repo,
-              pages_deployment_id: '3e6c17dcb566d376616df8ad7bb045523c18ae1f'
+              pages_deployment_id: '47d30331ed779a41676de14b1af273a2d4d70503'
             };
             const read = async () => {
               const result = await github.request('GET /repos/{owner}/{repo}/pages/deployments/{pages_deployment_id}', params);
