@@ -16,6 +16,9 @@
     version: 1,
     title: '',
     layout: 'walkthrough',
+    page: E.pageOptions(),
+    quality: 'balanced',
+    contents: false,
     exportHeading: E.DEFAULT_GUIDE_HEADING,
     footer: E.footer(),
     cover: E.cover(),
@@ -51,7 +54,19 @@
       guidePreviewPage = null,
       guidePreviewRunning = false,
       guidePreviewPending = false,
-      guidePreviewView = 'page';
+      guidePreviewView = 'page',
+      guidePreviewPages = [],
+      guidePreviewIndex = 0,
+      guidePreviewRevision = -1,
+      guidePreviewZoom = 1;
+    const store = root.WorkHubGuideStore;
+    let draftTimer = 0,
+      draftJob = 0,
+      storageLoaded = false,
+      autoSave = true,
+      recoveryDraft = null,
+      brandTemplates = [],
+      storageEpoch = 0;
     let projects = { privacy: blank(), guide: blank() },
       histories = new Map(),
       redo = new Map(),
@@ -409,6 +424,313 @@
           (m && !m.locked && m.type !== 'image' ? ' and selected object.' : '.')
       );
     }
+    function workspaceFields() {
+      return (
+        '<section class="bc-recovery"><div><label class="bc-object-check"><input type="checkbox" data-bc-autosave checked>Automatically save a recovery draft on this device</label><p data-bc-save-status role="status" aria-live="polite">Checking saved drafts…</p></div>' +
+        button('clear-recovery', 'Clear saved recovery copy') +
+        '<div data-bc-recovery hidden><p data-bc-recovery-message></p>' +
+        button('restore-recovery', 'Restore saved draft') +
+        button('keep-current', 'Keep current guide') +
+        '</div></section>' +
+        '<details class="bc-workspace-options"><summary>Page layout, contents &amp; brand templates</summary><div class="bc-workspace-grid"><fieldset><legend>Page layout</legend>' +
+        [
+          ['headerHeight', 'Header height (%)', 60, 110],
+          ['margin', 'Side margins (px)', 40, 120],
+          ['imageWidth', 'Screenshot width (%)', 40, 100],
+          ['spacing', 'Space between steps (px)', 8, 48],
+        ]
+          .map(
+            ([key, label, min, max]) =>
+              '<label>' +
+              label +
+              ' <output data-bc-page-value="' +
+              key +
+              '"></output><input type="range" min="' +
+              min +
+              '" max="' +
+              max +
+              '" step="1" data-bc-page="' +
+              key +
+              '"></label>'
+          )
+          .join('') +
+        '<p class="bc-guide-heading-help">The compact header is the default. Changes apply to the live preview and every export.</p>' +
+        button('reset-page', 'Reset page layout') +
+        '</fieldset><fieldset><legend>Contents &amp; navigation</legend><label class="bc-object-check"><input type="checkbox" data-bc-contents>Include an automatic contents page</label><p class="bc-guide-heading-help">PDF contents entries are clickable and steps appear as PDF bookmarks. JPG/PNG pages include the printed contents. Guide page numbering starts after the cover and contents.</p></fieldset>' +
+        '<fieldset><legend>Brand templates</legend><label>Saved template<select data-bc-template><option value="">Choose a template</option></select></label><div class="bc-object-actions">' +
+        button('apply-template', 'Apply template') +
+        button('delete-template', 'Delete template') +
+        '</div><label>Template name<input maxlength="40" data-bc-template-name placeholder="e.g. My company guide"></label>' +
+        button('save-template', 'Save current branding') +
+        '<p class="bc-guide-heading-help">Save up to twelve sets of headings, colours, footer logo, fonts, cover design and page settings for your account on this device. Screenshot steps and cover text/images are kept when applying a template.</p></fieldset></div></details>'
+      );
+    }
+    function updateWorkspace() {
+      if (mode !== 'guide' || !room) return;
+      const g = project();
+      for (const el of room.querySelectorAll('[data-bc-page]')) {
+        el.value = g.page[el.dataset.bcPage];
+        $('[data-bc-page-value="' + el.dataset.bcPage + '"]').textContent = String(el.value);
+      }
+      $('[data-bc-contents]').checked = g.contents;
+      $('[data-bc-quality]').value = g.quality;
+      $('[data-bc-autosave]').checked = autoSave;
+      $('[data-bc-autosave]').disabled = !store || !storageLoaded || busy;
+      $('[data-bc-recovery]').hidden = !recoveryDraft;
+      const select = $('[data-bc-template]'),
+        value = select.value;
+      select.innerHTML =
+        '<option value="">Choose a template</option>' +
+        brandTemplates
+          .map(t => '<option value="' + esc(t.name) + '">' + esc(t.name) + '</option>')
+          .join('');
+      select.value = value;
+      for (const action of ['apply-template', 'delete-template', 'save-template', 'clear-recovery'])
+        $('[data-bc="' + action + '"]').disabled = busy || !store || !storageLoaded;
+      for (const action of ['apply-template', 'delete-template'])
+        $('[data-bc="' + action + '"]').disabled ||= !select.value;
+    }
+    function saveMessage(message) {
+      const el = $('[data-bc-save-status]');
+      if (el && mode === 'guide') el.textContent = message;
+    }
+    function scheduleDraft() {
+      clearTimeout(draftTimer);
+      if (
+        !store ||
+        !storageLoaded ||
+        !autoSave ||
+        recoveryDraft ||
+        mode !== 'guide' ||
+        !owner ||
+        !a.ready() ||
+        a.owner() !== owner
+      )
+        return;
+      saveMessage('Saving recovery draft…');
+      draftTimer = setTimeout(() => {
+        void flushDraft();
+      }, 400);
+    }
+    async function flushDraft() {
+      clearTimeout(draftTimer);
+      draftTimer = 0;
+      if (
+        !store ||
+        !storageLoaded ||
+        !autoSave ||
+        recoveryDraft ||
+        !owner ||
+        !a.ready() ||
+        a.owner() !== owner
+      )
+        return;
+      const current = owner,
+        job = ++draftJob,
+        epoch = storageEpoch,
+        version = revision;
+      try {
+        const snapshot = E.guide(projects.guide);
+        if (!snapshot.steps.length && !snapshot.title.trim() && !snapshot.cover.enabled) return;
+        await store.saveDraft(current, snapshot);
+        if (owner === current && epoch === storageEpoch && job === draftJob && version === revision)
+          saveMessage(
+            'Recovery draft saved on this device at ' +
+              new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) +
+              '.'
+          );
+      } catch (err) {
+        if (owner === current && epoch === storageEpoch && job === draftJob)
+          saveMessage('Recovery draft not saved: ' + err.message);
+      }
+    }
+    async function checkStored() {
+      if (!store || mode !== 'guide') {
+        saveMessage('Save an editable guide to keep an external copy.');
+        return;
+      }
+      const dialog = room,
+        current = owner,
+        epoch = storageEpoch,
+        version = revision,
+        alive = () =>
+          room === dialog &&
+          a.ready() &&
+          a.owner() === current &&
+          epoch === storageEpoch &&
+          mode === 'guide';
+      try {
+        const saved = await store.read(current);
+        if (!alive()) return;
+        brandTemplates = [];
+        for (const template of (Array.isArray(saved.templates) ? saved.templates : []).slice(
+          0,
+          12
+        )) {
+          try {
+            brandTemplates.push(E.brandTemplate(template.name, template.settings));
+          } catch {
+            /* A broken template must not block draft recovery. */
+          }
+        }
+        autoSave = saved.autoSave !== false;
+        storageLoaded = true;
+        if (saved.draft && (!projects.guide.steps.length || revision !== version)) {
+          recoveryDraft = saved.draft;
+          $('[data-bc-recovery-message]').textContent =
+            'A recovery copy from ' +
+            new Date(saved.draft.savedAt).toLocaleString() +
+            ' is available.';
+          updateWorkspace();
+          if (
+            !projects.guide.steps.length &&
+            !projects.guide.title &&
+            !projects.guide.cover.enabled &&
+            revision === version &&
+            !busy
+          ) {
+            await restoreRecovery();
+            return;
+          }
+          saveMessage(
+            'Restore the recovery copy or keep the current guide to resume automatic saving.'
+          );
+        } else {
+          recoveryDraft = null;
+          saveMessage(
+            autoSave
+              ? 'Recovery saving is on for this account and device.'
+              : 'Recovery saving is off. Save an editable guide to keep your work.'
+          );
+          scheduleDraft();
+        }
+        updateWorkspace();
+      } catch (err) {
+        if (alive()) {
+          storageLoaded = true;
+          saveMessage(err.message);
+          updateWorkspace();
+        }
+      }
+    }
+    async function validateImages(data, alive) {
+      for (const s of data.steps) {
+        await F.loadImage(s.image, alive);
+        await F.loadLayers(s, alive);
+        if (s.comparison) await F.loadImage(s.comparison.image, alive);
+        if (!alive()) return;
+      }
+      for (const img of data.cover.images) {
+        await F.loadImage(img, alive);
+        if (!alive()) return;
+      }
+      if (data.footer.logo) await F.loadImage(data.footer.logo, alive, 1600, 600);
+    }
+    async function restoreRecovery() {
+      if (!recoveryDraft || busy || mode !== 'guide') return;
+      const dialog = room,
+        current = owner,
+        version = revision,
+        epoch = storageEpoch,
+        alive = () =>
+          room === dialog &&
+          a.ready() &&
+          a.owner() === current &&
+          revision === version &&
+          epoch === storageEpoch;
+      setBusy(true);
+      saveMessage('Restoring your saved guide…');
+      try {
+        const data = E.guide(recoveryDraft.guide);
+        if (!data.steps.length && !data.title.trim() && !data.cover.enabled)
+          throw Error('This recovery copy is empty.');
+        await validateImages(data, alive);
+        if (!alive()) return;
+        recoveryDraft = null;
+        projects.guide = data;
+        histories.clear();
+        redo.clear();
+        removed = null;
+        changed();
+        close();
+        open('guide');
+        saveMessage('Your saved guide has been recovered.');
+      } catch (err) {
+        if (alive()) saveMessage('Recovery copy could not be opened: ' + err.message);
+      } finally {
+        if (room === dialog) setBusy(false);
+      }
+    }
+    async function templateAction(action) {
+      if (!store || !storageLoaded || mode !== 'guide') return;
+      const current = owner,
+        dialog = room,
+        epoch = storageEpoch,
+        version = revision,
+        alive = () =>
+          room === dialog && a.ready() && a.owner() === current && epoch === storageEpoch;
+      const name =
+        action === 'save-template'
+          ? $('[data-bc-template-name]').value.trim()
+          : $('[data-bc-template]').value;
+      if (action === 'apply-template') {
+        const template = brandTemplates.find(t => t.name === name);
+        if (!template) return;
+        const cover = project().cover,
+          settings = E.brandTemplate(name, template.settings).settings,
+          next = E.guide({
+            ...project(),
+            ...settings,
+            cover: {
+              ...settings.cover,
+              title: cover.title,
+              subtitle: cover.subtitle,
+              details: cover.details,
+              images: cover.images,
+            },
+          });
+        setBusy(true);
+        try {
+          if (next.footer.logo)
+            await F.loadImage(next.footer.logo, () => alive() && version === revision, 1600, 600);
+          if (!alive() || version !== revision) return;
+          projects.guide = next;
+          drag = null;
+          changed();
+          $('[data-bc-export-heading]').value = next.exportHeading;
+          $('[data-bc-footer-text]').value = next.footer.text;
+          $('[data-bc-footer-opacity]').value = Math.round(next.footer.opacity * 100);
+          updateBranding();
+          updateWorkspace();
+          updateCover();
+          paint();
+          status('Brand template applied. Your screenshots and maintained cover content are kept.');
+        } finally {
+          if (room === dialog) setBusy(false);
+        }
+        return;
+      }
+      let result;
+      try {
+        result =
+          action === 'save-template'
+            ? await store.saveTemplate(current, name, project())
+            : await store.deleteTemplate(current, name);
+      } catch (err) {
+        if (alive()) throw err;
+        return;
+      }
+      if (!alive()) return;
+      brandTemplates = (result.templates || []).map(t => E.brandTemplate(t.name, t.settings));
+      updateWorkspace();
+      $('[data-bc-template]').value = action === 'save-template' ? name : '';
+      updateWorkspace();
+      status(
+        action === 'save-template'
+          ? 'Brand template saved for future guides.'
+          : 'Brand template deleted.'
+      );
+    }
     function coverFields() {
       return (
         '<details class="bc-cover"><summary>Front cover · text, fonts &amp; images</summary>' +
@@ -458,6 +780,82 @@
         button('preview-cover', 'Preview front cover') +
         '</div></div></details>'
       );
+    }
+    function stepFields() {
+      return (
+        '<label class="bc-object-check"><input type="checkbox" data-bc-page-break data-needs-image>Start this step on a new page</label><details class="bc-structured"><summary>Expected result, notes, tips &amp; cautions</summary>' +
+        [
+          ['expected', 'Expected result', 2000],
+          ['notes', 'Notes / prerequisites', 2000],
+          ['tip', 'Tip', 1500],
+          ['warning', 'Caution', 1500],
+        ]
+          .map(
+            ([key, label, max]) =>
+              '<label>' +
+              label +
+              '<textarea data-bc-step="' +
+              key +
+              '" maxlength="' +
+              max +
+              '" rows="3" data-needs-image></textarea></label>'
+          )
+          .join('') +
+        '</details><details class="bc-comparison"><summary>Before-and-after comparison</summary><p class="bc-guide-heading-help">The selected screenshot is Before. Add an After image to display both together in the guide preview and exports. The canvas edits the Before image.</p><label class="bc-file-label secondary">Choose / replace After image<input type="file" data-bc-comparison-file accept="image/png,image/jpeg,image/webp" data-needs-image></label>' +
+        '<div data-bc-comparison-content hidden><img data-bc-comparison-preview alt="After screenshot preview"><label>Before label<input maxlength="80" data-bc-comparison="before"></label><label>After label<input maxlength="80" data-bc-comparison="after"></label><label>Arrangement<select data-bc-comparison="orientation"><option value="side">Side by side</option><option value="stack">Stacked vertically</option></select></label>' +
+        button('remove-comparison', 'Remove After image') +
+        '</div></details>'
+      );
+    }
+    function updateStepFields() {
+      if (mode !== 'guide' || !room) return;
+      const s = step();
+      for (const el of room.querySelectorAll('[data-bc-step]'))
+        if (document.activeElement !== el) el.value = s?.[el.dataset.bcStep] || '';
+      $('[data-bc-page-break]').checked = !!s?.pageBreakBefore;
+      $('[data-bc-comparison-content]').hidden = !s?.comparison;
+      const img = $('[data-bc-comparison-preview]');
+      if (s?.comparison) {
+        if (img.getAttribute('src') !== s.comparison.image.src) img.src = s.comparison.image.src;
+        for (const el of room.querySelectorAll('[data-bc-comparison]'))
+          if (document.activeElement !== el) el.value = s.comparison[el.dataset.bcComparison];
+      } else img.removeAttribute('src');
+    }
+    async function addComparison(file) {
+      guard();
+      const s = step();
+      if (!file || busy || !s || mode !== 'guide') return;
+      const dialog = room,
+        current = owner,
+        version = revision,
+        job = loadId,
+        alive = () =>
+          room === dialog &&
+          a.ready() &&
+          a.owner() === current &&
+          version === revision &&
+          job === loadId &&
+          step() === s;
+      setBusy(true);
+      status('Preparing the After image locally…');
+      try {
+        const img = await F.imageFromFile(file, alive);
+        if (!alive()) return;
+        const comparison = E.comparison({ ...(s.comparison || {}), image: img }),
+          checked = E.guide({
+            ...project(),
+            steps: project().steps.map(t => (t === s ? { ...t, comparison } : t)),
+          }).steps.find(t => t.id === s.id);
+        remember();
+        s.comparison = checked.comparison;
+        changed();
+        updateStepFields();
+        status('Before-and-after comparison added. Open the live preview to see both images.');
+      } catch (err) {
+        if (alive()) throw err;
+      } finally {
+        if (room === dialog) setBusy(false);
+      }
     }
     function updateCover() {
       if (mode !== 'guide' || !room) return;
@@ -727,14 +1125,21 @@
         '"></label>' +
         '<p class="bc-guide-heading-help">Lower opacity creates a faint footer watermark. No background box is added. Footer space is reserved above page numbering.</p>' +
         '</fieldset></div><section class="bc-guide-preview" aria-label="Live export preview"><div class="bc-guide-preview-head"><div><h3>Live export preview</h3>' +
-        '<p class="bc-guide-heading-help">Changes update automatically. A front cover comes before the guide steps.</p></div><div class="bc-preview-views" role="group" aria-label="Preview view">' +
+        '<p class="bc-guide-heading-help">Every exported page, including the cover, contents and continued instructions. Changes update automatically.</p></div><div class="bc-preview-views" role="group" aria-label="Preview view">' +
         button('preview-page', 'Full page', 'aria-pressed="true"') +
         button('preview-steps', 'First guide page', 'aria-pressed="false" hidden') +
         button('preview-footer', 'Footer close-up', 'aria-pressed="false"') +
         button('refresh-preview', 'Refresh preview', 'data-needs-steps') +
         '</div></div>' +
         '<p data-bc-preview-status role="status" aria-live="polite">Add a screenshot to preview your guide.</p>' +
-        '<div class="bc-page-sheet" data-bc-page-sheet hidden><canvas data-bc-page-preview role="img" aria-label="Preview of the first exported guide page"></canvas></div></section></div></details>'
+        '<div class="bc-preview-nav" data-bc-preview-nav hidden>' +
+        button('preview-prev', '← Previous page') +
+        '<label>Page<select data-bc-preview-select></select></label>' +
+        button('preview-next', 'Next page →') +
+        '<span data-bc-preview-total></span><label>Zoom<input type="range" min="40" max="200" value="100" data-bc-preview-zoom><output data-bc-preview-zoom-value>100%</output></label>' +
+        button('preview-fit', 'Fit preview') +
+        '</div>' +
+        '<div class="bc-document-preview"><nav data-bc-preview-thumbs aria-label="Document page thumbnails" hidden></nav><div class="bc-preview-reader" data-bc-preview-reader><div class="bc-page-sheet" data-bc-page-sheet hidden><canvas data-bc-page-preview role="img" aria-label="Preview of the exported guide page"></canvas></div></div></div></section></div></details>'
       );
     }
     function updateBranding() {
@@ -745,7 +1150,14 @@
       const preset = Object.entries(E.GUIDE_PALETTES).find(
         ([, p]) => p.accent === c.accent && p.paper === c.paper
       );
-      $('[data-bc-layout]').value = project().layout;
+      const layoutSelect = $('[data-bc-layout]');
+      if (project().layout === 'classic' && !layoutSelect.querySelector('[value="classic"]')) {
+        const option = document.createElement('option');
+        option.value = 'classic';
+        option.textContent = 'Original layout (minimal)';
+        layoutSelect.prepend(option);
+      }
+      layoutSelect.value = project().layout;
       $('[data-bc-layout-help]').textContent =
         E.GUIDE_LAYOUTS[project().layout]?.description ||
         'Original one-step-per-page layout. Choose a new layout to redesign this guide.';
@@ -791,6 +1203,52 @@
       guidePreviewPending = false;
       if (guidePreviewPage) F.release(guidePreviewPage);
       guidePreviewPage = null;
+      guidePreviewPages = [];
+      guidePreviewRevision = -1;
+      guidePreviewIndex = 0;
+    }
+    function updatePreviewNavigation() {
+      if (mode !== 'guide' || !room) return;
+      const nav = $('[data-bc-preview-nav]'),
+        thumbs = $('[data-bc-preview-thumbs]'),
+        select = $('[data-bc-preview-select]'),
+        stale = guidePreviewRevision !== revision;
+      nav.hidden = thumbs.hidden = !guidePreviewPages.length;
+      if (!guidePreviewPages.length) return;
+      if (thumbs.dataset.revision !== String(guidePreviewRevision)) {
+        thumbs.dataset.revision = String(guidePreviewRevision);
+        const label = p =>
+          p.index +
+          1 +
+          ' · ' +
+          (p.kind === 'cover' ? 'Cover' : p.kind === 'contents' ? 'Contents' : 'Guide page');
+        thumbs.innerHTML = guidePreviewPages
+          .map(p =>
+            button(
+              'preview-go',
+              '<img alt="" src="' + p.thumbnail + '"><span>' + esc(label(p)) + '</span>',
+              'data-index="' + p.index + '" aria-label="' + esc(label(p)) + '"'
+            )
+          )
+          .join('');
+        select.innerHTML = guidePreviewPages
+          .map(p => '<option value="' + p.index + '">' + esc(label(p)) + '</option>')
+          .join('');
+      }
+      select.value = String(guidePreviewIndex);
+      select.disabled = stale || busy;
+      $('[data-bc="preview-prev"]').disabled = stale || busy || guidePreviewIndex <= 0;
+      $('[data-bc="preview-next"]').disabled =
+        stale || busy || guidePreviewIndex >= guidePreviewPages.length - 1;
+      for (const el of thumbs.querySelectorAll('button')) {
+        el.disabled = stale || busy;
+        if (+el.dataset.index === guidePreviewIndex) el.setAttribute('aria-current', 'page');
+        else el.removeAttribute('aria-current');
+      }
+      $('[data-bc-preview-total]').textContent =
+        'Page ' + (guidePreviewIndex + 1) + ' of ' + guidePreviewPages.length;
+      $('[data-bc-preview-zoom]').value = Math.round(guidePreviewZoom * 100);
+      $('[data-bc-preview-zoom-value]').textContent = Math.round(guidePreviewZoom * 100) + '%';
     }
     function paintGuidePreview() {
       const canvas = $('[data-bc-page-preview]'),
@@ -809,10 +1267,13 @@
         String(guidePreviewView === 'footer')
       );
       if (!guidePreviewPage) return;
-      const top = guidePreviewView === 'footer' ? Math.max(0, guidePreviewPage.height - 414) : 0,
+      const top =
+          guidePreviewView === 'footer'
+            ? Math.max(0, guidePreviewPage.height - 414 * (guidePreviewPage.pageScale || 1))
+            : 0,
         height = guidePreviewPage.height - top;
-      canvas.width = 620;
-      canvas.height = Math.round(height / 2);
+      canvas.width = Math.min(guidePreviewPage.width, Math.round(620 * guidePreviewZoom));
+      canvas.height = Math.round((height * canvas.width) / guidePreviewPage.width);
       canvas
         .getContext('2d')
         .drawImage(
@@ -828,15 +1289,22 @@
         );
       sheet.hidden = false;
       sheet.dataset.view = guidePreviewView;
+      sheet.style.width = Math.round(620 * guidePreviewZoom) + 'px';
+      sheet.style.maxWidth = 'none';
       canvas.setAttribute(
         'aria-label',
-        guidePreviewView === 'footer'
-          ? 'Footer close-up of the first exported page'
-          : guidePreviewView === 'steps'
-            ? 'First guide page after the cover'
-            : project().cover.enabled
-              ? 'Front cover preview'
-              : 'First exported guide page'
+        guidePreviewPages.length
+          ? (guidePreviewView === 'footer' ? 'Footer close-up · ' : '') +
+              (guidePreviewPages[guidePreviewIndex]?.kind === 'cover'
+                ? 'Front cover'
+                : 'Document page ' + (guidePreviewIndex + 1))
+          : guidePreviewView === 'footer'
+            ? 'Footer close-up of the first exported page'
+            : guidePreviewView === 'steps'
+              ? 'First guide page after the cover'
+              : project().cover.enabled
+                ? 'Front cover preview'
+                : 'First exported guide page'
       );
       $('[data-bc="preview-page"]').setAttribute(
         'aria-pressed',
@@ -846,10 +1314,12 @@
         'aria-pressed',
         String(guidePreviewView === 'footer')
       );
+      updatePreviewNavigation();
     }
     function scheduleGuidePreview(delay = 200) {
       clearTimeout(guidePreviewTimer);
       guidePreviewJob++;
+      updatePreviewNavigation();
       if (mode !== 'guide' || !room?.querySelector('.bc-branding')?.open) return;
       if (project().steps.length || project().cover.enabled) {
         $('[data-bc-preview-status]').textContent = 'Updating preview…';
@@ -859,6 +1329,9 @@
       } else {
         if (guidePreviewPage) F.release(guidePreviewPage);
         guidePreviewPage = null;
+        guidePreviewPages = [];
+        guidePreviewRevision = -1;
+        updatePreviewNavigation();
         $('[data-bc-page-sheet]').hidden = true;
         $('[data-bc-preview-status]').textContent = 'Add a screenshot to preview your guide.';
       }
@@ -891,19 +1364,56 @@
       guidePreviewRunning = true;
       try {
         const snapshot = E.guide(project());
-        page = await F.preview(snapshot, alive, guidePreviewView === 'steps');
+        if (F.documentPreview && F.previewPage) {
+          if (guidePreviewRevision !== version) {
+            const result = await F.documentPreview(snapshot, alive, n => {
+              if (alive())
+                $('[data-bc-preview-status]').textContent =
+                  'Preparing document preview · ' + n + ' pages…';
+            });
+            page = result.firstPage;
+            if (!alive()) return;
+            guidePreviewPages = result.pages;
+            guidePreviewIndex = Math.min(
+              guidePreviewIndex,
+              Math.max(0, guidePreviewPages.length - 1)
+            );
+            if (guidePreviewView === 'steps')
+              guidePreviewIndex = Math.max(
+                0,
+                guidePreviewPages.findIndex(p => p.kind === 'steps')
+              );
+            guidePreviewRevision = version;
+            if (guidePreviewIndex !== 0) {
+              F.release(page);
+              page = null;
+              page = await F.previewPage(snapshot, guidePreviewIndex, alive);
+            }
+          } else page = await F.previewPage(snapshot, guidePreviewIndex, alive);
+        } else page = await F.preview(snapshot, alive, guidePreviewView === 'steps');
         if (!alive()) return;
         if (guidePreviewPage) F.release(guidePreviewPage);
         guidePreviewPage = page;
         page = null;
         paintGuidePreview();
-        $('[data-bc-preview-status]').textContent =
-          (snapshot.cover.enabled && guidePreviewView !== 'steps'
-            ? 'Front cover'
-            : E.GUIDE_LAYOUTS[snapshot.layout]?.label || 'Original layout') +
-          ' preview ready. Full exports include all steps and continuation pages.';
+        $('[data-bc-preview-status]').textContent = guidePreviewPages.length
+          ? (E.GUIDE_LAYOUTS[snapshot.layout]?.label || 'Original layout') +
+            ' · ' +
+            guidePreviewPages.length +
+            ' pages · ' +
+            E.EXPORT_QUALITY[snapshot.quality].label +
+            ' preview ready.'
+          : (snapshot.cover.enabled && guidePreviewView !== 'steps'
+              ? 'Front cover'
+              : E.GUIDE_LAYOUTS[snapshot.layout]?.label || 'Original layout') +
+            ' preview ready. Full exports include all steps and continuation pages.';
       } catch (err) {
         if (alive()) {
+          if (guidePreviewPage) F.release(guidePreviewPage);
+          guidePreviewPage = null;
+          guidePreviewPages = [];
+          guidePreviewRevision = -1;
+          updatePreviewNavigation();
           $('[data-bc-page-sheet]').hidden = true;
           $('[data-bc-preview-status]').textContent = 'Preview unavailable: ' + err.message;
         }
@@ -954,13 +1464,20 @@
       revision++;
       clearUrls();
       scheduleGuidePreview();
+      if (mode === 'guide') {
+        guidePreviewRevision = -1;
+        scheduleDraft();
+      }
     }
     function close() {
+      if (mode === 'guide') void flushDraft();
       if (paintFrame) root.cancelAnimationFrame(paintFrame);
       paintFrame = 0;
       loadId++;
       changed();
       cancelGuidePreview();
+      clearTimeout(draftTimer);
+      draftTimer = 0;
       drag = null;
       pan = null;
       image = null;
@@ -986,6 +1503,12 @@
         histories.clear();
         redo.clear();
         clipboard = [];
+        brandTemplates = [];
+        recoveryDraft = null;
+        storageLoaded = false;
+        autoSave = true;
+        storageEpoch++;
+        draftJob++;
         objectIndex = -1;
         objectRef = null;
         objectListKey = '';
@@ -1020,7 +1543,7 @@
         button('privacy', 'Open privacy editor ↗') +
         '</article><article><span class="bc-launch-icon" aria-hidden="true">▤</span><h3>Screenshot guide builder</h3><p>Arrange numbered steps, write captions, customise the export heading and prepare a PDF, JPG or PNG page collection.</p>' +
         button('guide', 'Build a screenshot guide ↗') +
-        '</article></div><p class="bc-local-note">Local editing · No AI · No image uploads or database storage. Save an editable guide file to continue on another day.</p></section>'
+        '</article></div><p class="bc-local-note">Local editing · No AI · No image uploads. Guide recovery drafts and brand templates can be saved on this device for your account. Save an editable file for an external copy.</p></section>'
       );
     }
     function preview(t) {
@@ -1166,6 +1689,7 @@
         tool === 'move' ? 'grab' : tool === 'object' ? 'move' : 'crosshair';
       updateObjects();
       updateCover();
+      updateWorkspace();
     }
     function thumbs() {
       $('[data-bc-steps]').innerHTML = project()
@@ -1311,9 +1835,11 @@
         current = owner;
       thumbs();
       controls();
+      updateStepFields();
       if (!s) return;
       $('[data-bc-step-title]').value = s.title;
       $('[data-bc-caption]').value = s.caption;
+      updateStepFields();
       const alive = () => !!room && job === loadId && a.ready() && current === a.owner();
       status('Opening screenshot…');
       try {
@@ -1332,7 +1858,7 @@
       const s = step();
       if (!s) return;
       const history = histories.get(s.id) || [];
-      history.push({ marks: s.marks, crop: s.crop });
+      history.push({ marks: s.marks, crop: s.crop, comparison: s.comparison || null });
       histories.set(s.id, history.slice(-30));
       redo.set(s.id, []);
     }
@@ -1356,11 +1882,13 @@
       }
       list.pop();
       const target = to.get(s.id) || [];
-      target.push({ marks: s.marks, crop: s.crop });
+      target.push({ marks: s.marks, crop: s.crop, comparison: s.comparison || null });
       to.set(s.id, target);
       s.marks = checked.marks;
       s.crop = checked.crop;
+      s.comparison = checked.comparison;
       changed();
+      updateStepFields();
       paint();
     }
     async function add(files) {
@@ -1497,20 +2025,10 @@
         } catch (err) {
           throw Error('Guide could not be opened: ' + err.message);
         }
-        for (const s of data.steps) {
-          await F.loadImage(s.image, alive);
-          await F.loadLayers(s, alive);
-          if (!alive()) return;
-        }
-        for (const img of data.cover.images) {
-          await F.loadImage(img, alive);
-          if (!alive()) return;
-        }
-        if (data.footer.logo) {
-          await F.loadImage(data.footer.logo, alive, 1600, 600);
-          if (!alive()) return;
-        }
+        await validateImages(data, alive);
+        if (!alive()) return;
         projects.guide = data;
+        recoveryDraft = null;
         mode = 'guide';
         histories.clear();
         redo.clear();
@@ -1579,6 +2097,7 @@
               )
               .join('') +
             '</select></label><p id="bcLayoutHelp" data-bc-layout-help class="bc-guide-heading-help"></p></div>' +
+            workspaceFields() +
             coverFields() +
             brandingFields()
           : '') +
@@ -1627,7 +2146,10 @@
         (guideMode ? 'THE WORDS THAT HELP' : 'YOUR SHARING CHECK') +
         '</span><h3>' +
         (guideMode ? 'Explain this step.' : 'Keep the detail you need.') +
-        '</h3><label>Step title<input data-bc-step-title maxlength="180" placeholder="Give this step a clear name" data-needs-image></label><label>Caption<textarea data-bc-caption maxlength="8000" rows="6" placeholder="What should the reader do or notice?" data-needs-image></textarea></label>' +
+        '</h3><label>Step title<input data-bc-step-title maxlength="180" placeholder="Give this step a clear name" data-needs-image></label><label>' +
+        (guideMode ? 'Action / instructions' : 'Caption') +
+        '<textarea data-bc-caption maxlength="8000" rows="6" placeholder="What should the reader do or notice?" data-needs-image></textarea></label>' +
+        (guideMode ? stepFields() : '') +
         objectFields() +
         (guideMode
           ? '<div class="bc-step-actions">' +
@@ -1638,9 +2160,13 @@
             '</div>'
           : '<p>Solid cover replaces selected pixels in the exported PNG. Use Compare original to review what changed.</p>' +
             button('to-guide', 'Add edited image to a guide ↗', 'data-needs-image')) +
-        '<p class="bc-draft-note">Drafts stay in this tab while signed in. Save an editable guide file to continue later. Editable files retain original images; exported PDF / JPG / PNG files contain your finished edits.</p></aside></div><footer class="bc-footer"><div class="bc-export-actions">' +
+        '<p class="bc-draft-note">Guide recovery copies can be saved on this device for your account. Save an editable guide for an external copy. Editable files retain original images; PDF / JPG / PNG exports contain your finished edits.</p></aside></div><footer class="bc-footer"><div class="bc-export-actions">' +
         (guideMode
-          ? '<label>Export format<select data-bc-format><option value="pdf">PDF guide</option><option value="jpg-images">JPG pages in ZIP</option><option value="images">PNG pages in ZIP</option><option value="pdf-zip">PDF in ZIP</option></select></label>'
+          ? '<label>Export format<select data-bc-format><option value="pdf">PDF guide</option><option value="jpg-images">JPG pages in ZIP</option><option value="images">PNG pages in ZIP</option><option value="pdf-zip">PDF in ZIP</option></select></label><label>Export quality<select data-bc-quality>' +
+            Object.entries(E.EXPORT_QUALITY)
+              .map(([key, value]) => '<option value="' + key + '">' + value.label + '</option>')
+              .join('') +
+            '</select><small>Small for sharing; print quality for sharper pages and larger files.</small></label>'
           : '') +
         button('export', guideMode ? 'Prepare guide' : 'Prepare edited PNG', 'class="bc-primary"') +
         button('editable', 'Save editable guide') +
@@ -1694,6 +2220,49 @@
       room.addEventListener('change', event => {
         if (busy) return;
         const el = event.target;
+        if (el.matches('[data-bc-quality],[data-bc-contents]')) {
+          if (el.matches('[data-bc-quality]')) project().quality = el.value;
+          else project().contents = el.checked;
+          room.querySelector('.bc-branding').open = true;
+          changed();
+          updateWorkspace();
+        }
+        if (el.matches('[data-bc-template]')) updateWorkspace();
+        if (el.matches('[data-bc-preview-select]')) {
+          guidePreviewIndex = +el.value;
+          guidePreviewView = 'page';
+          scheduleGuidePreview(0);
+        }
+        if (el.matches('[data-bc-autosave]') && store) {
+          autoSave = el.checked;
+          clearTimeout(draftTimer);
+          draftJob++;
+          const current = owner,
+            epoch = storageEpoch,
+            enabled = autoSave;
+          void store
+            .setAutoSave(current, enabled)
+            .then(() => {
+              if (owner !== current || epoch !== storageEpoch || autoSave !== enabled) return;
+              if (enabled) scheduleDraft();
+              else saveMessage('Recovery saving is off. Save an editable guide to keep your work.');
+            })
+            .catch(err => {
+              if (owner === current && epoch === storageEpoch) saveMessage(err.message);
+            });
+        }
+        if (el.matches('[data-bc-comparison-file]')) {
+          void addComparison(el.files[0]).catch(err => status(err.message, true));
+          el.value = '';
+        }
+        if (el.matches('[data-bc-page-break]') && step()) {
+          step().pageBreakBefore = el.checked;
+          changed();
+        }
+        if (el.matches('[data-bc-comparison="orientation"]') && step()?.comparison) {
+          step().comparison = E.comparison({ ...step().comparison, orientation: el.value });
+          changed();
+        }
         if (el.matches('[data-bc-cover]') && (el.tagName === 'SELECT' || el.type === 'checkbox'))
           editCover(el);
         if (el.matches('[data-bc-cover-files]')) {
@@ -1766,6 +2335,24 @@
         if (busy) return;
         const el = event.target,
           s = step();
+        if (el.matches('[data-bc-page]')) {
+          project().page = E.pageOptions({ ...project().page, [el.dataset.bcPage]: +el.value });
+          room.querySelector('.bc-branding').open = true;
+          changed();
+          updateWorkspace();
+        }
+        if (el.matches('[data-bc-preview-zoom]')) {
+          guidePreviewZoom = +el.value / 100;
+          paintGuidePreview();
+        }
+        if (el.matches('[data-bc-step]') && s) {
+          s[el.dataset.bcStep] = el.value;
+          changed();
+        }
+        if (el.matches('[data-bc-comparison]') && el.tagName !== 'SELECT' && s?.comparison) {
+          s.comparison = E.comparison({ ...s.comparison, [el.dataset.bcComparison]: el.value });
+          changed();
+        }
         if (el.matches('[data-bc-cover]') && el.tagName !== 'SELECT' && el.type !== 'checkbox')
           editCover(el);
         if (el.matches('[data-bc-title]')) {
@@ -2129,6 +2716,7 @@
       thumbs();
       controls();
       void select(project().steps[0]?.id || '');
+      if (guideMode) void checkStored();
     }
     async function handle(el) {
       guard();
@@ -2144,6 +2732,77 @@
       }
       if (busy) return;
       const s = step();
+      if (['save-template', 'delete-template', 'apply-template'].includes(action)) {
+        await templateAction(action);
+        return;
+      }
+      if (action === 'restore-recovery') {
+        await restoreRecovery();
+        return;
+      }
+      if (action === 'keep-current') {
+        recoveryDraft = null;
+        updateWorkspace();
+        scheduleDraft();
+        return;
+      }
+      if (action === 'clear-recovery' && store) {
+        const current = owner,
+          epoch = storageEpoch,
+          previous = autoSave;
+        autoSave = false;
+        clearTimeout(draftTimer);
+        draftJob++;
+        try {
+          await store.clearDraft(current);
+          if (owner !== current || epoch !== storageEpoch) return;
+          recoveryDraft = null;
+          updateWorkspace();
+          saveMessage(
+            'Recovery copy cleared. Your open guide is kept; automatic recovery saving is now off.'
+          );
+        } catch (err) {
+          if (owner === current && epoch === storageEpoch) {
+            autoSave = previous;
+            updateWorkspace();
+            saveMessage(err.message);
+          }
+        }
+        return;
+      }
+      if (action === 'reset-page') {
+        project().page = E.pageOptions();
+        changed();
+        updateWorkspace();
+        return;
+      }
+      if (action === 'remove-comparison' && s?.comparison) {
+        remember();
+        s.comparison = null;
+        changed();
+        updateStepFields();
+        return;
+      }
+      if (['preview-prev', 'preview-next', 'preview-go'].includes(action)) {
+        if (guidePreviewRevision !== revision) return;
+        const index =
+          action === 'preview-go'
+            ? +el.dataset.index
+            : guidePreviewIndex + (action === 'preview-prev' ? -1 : 1);
+        if (!Number.isInteger(index) || index < 0 || index >= guidePreviewPages.length) return;
+        guidePreviewIndex = index;
+        guidePreviewView = 'page';
+        scheduleGuidePreview(0);
+        return;
+      }
+      if (action === 'preview-fit') {
+        guidePreviewZoom = Math.max(
+          0.4,
+          Math.min(2, (($('[data-bc-preview-reader]').clientWidth || 640) - 24) / 620)
+        );
+        paintGuidePreview();
+        return;
+      }
       if (action === 'choose-object') {
         chooseObject(+el.dataset.index);
         return;
@@ -2207,6 +2866,22 @@
         return;
       }
       if (['preview-page', 'preview-footer', 'preview-steps'].includes(action)) {
+        if (guidePreviewPages.length && F.documentPreview) {
+          guidePreviewView =
+            action === 'preview-footer' ? 'footer' : action === 'preview-steps' ? 'steps' : 'page';
+          if (action === 'preview-footer') paintGuidePreview();
+          else {
+            guidePreviewIndex =
+              action === 'preview-steps'
+                ? Math.max(
+                    0,
+                    guidePreviewPages.findIndex(p => p.kind === 'steps')
+                  )
+                : 0;
+            scheduleGuidePreview(0);
+          }
+          return;
+        }
         const previous = guidePreviewView;
         guidePreviewView =
           action === 'preview-page' ? 'page' : action === 'preview-steps' ? 'steps' : 'footer';
@@ -2219,6 +2894,7 @@
       }
       if (action === 'preview-cover') {
         guidePreviewView = 'page';
+        guidePreviewIndex = 0;
         room.querySelector('.bc-branding').open = true;
         scheduleGuidePreview(0);
         return;
@@ -2366,6 +3042,9 @@
       redo.clear();
       clipboard = [];
     });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden' && mode === 'guide') void flushDraft();
+    });
     return {
       cards,
       decorateModal,
@@ -2376,6 +3055,8 @@
       addLogo,
       addLayers,
       addCoverImages,
+      addComparison,
+      flushDraft,
       preview: renderGuidePreview,
       select,
       prepare,
