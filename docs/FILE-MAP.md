@@ -220,3 +220,15 @@ Presentation breaks: [presentation-break.js](../presentation-break.js) owns cust
 Personal Notes: [notes-engine.js](../notes-engine.js) owns the bounded `workhub.notebook` document, notebook validation, stale-edit guards, text version history, search and escaped Markdown rendering. [notes.js](../notes.js) supplies the library, stable editor, save status, My Day Quick note action, project/company context, recoverable Trash and Markdown exports. [notes.css](../notes.css) provides theme-aware surfaces, responsive writing/focus views and reduced-motion-aware notebook/card animation. Load the engine before the UI and both before Studio. See [WORKSPACE-TOOLS.md](WORKSPACE-TOOLS.md#personal-notes).
 
 Validation combinations: [validator-transform.js](../validator-transform.js) parses per-row grouped dependencies and positional lists. Independent Original vs Recombined: [validator-reconcile-engine.js](../validator-reconcile-engine.js) groups exploded File B by exact matching keys, compares comma values with original File A and produces the two-sheet report; [validator-reconcile.js](../validator-reconcile.js) owns the independent uploads, mapping, comparison and export UI. [validator-studio.js](../validator-studio.js) integrates the tab and keeps dataset-specific validation editor context. [validator-files.js](../validator-files.js) supplies local value readers, identifier preservation and workbook writing. See [VALIDATION-RECOMBINED.md](VALIDATION-RECOMBINED.md).
+
+## Website experience additions
+
+| File | Responsibility |
+| --- | --- |
+| `experience-appearance.js` | Validated account icon/loading preferences, bounded local image palette extraction, icon/favicon previews and finite navigation icon reactions. |
+| `command-palette.js` | Grouped, escaped search results, record previews and keyboard selection; existing Studio handlers execute actions. |
+| `file-launcher.js` | Compatible, permission-filtered local file destinations, file-drop handling and draft/ownership checks. |
+| `summary-cards.js` | Explicit record selection, permission-aware snapshot model, canvas image preview/export and invalidation. |
+| `kept-experience.css` | Theme-aware controls/dialogs, responsive previews and reduced-motion overrides. |
+
+See [the usage guide](KEPT-EXPERIENCE.md). Integration remains in `studio.js`; startup styles are critical CSS in `index.html` with account-cache preference handling in `startup.js`. Existing tool APIs handle the actual imports.

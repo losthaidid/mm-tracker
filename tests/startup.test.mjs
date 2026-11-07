@@ -313,3 +313,24 @@ test('startup restores only the matching account rendering choice before Studio 
   assert.equal(root.dataset.startupRendering, 'auto');
   assert.notEqual(root.style.getPropertyValue('--startup-surround-accent'), forestInk);
 });
+
+test('startup style: matching-account preferences select all three styles without changing real phases or delaying completion', t => {
+  for (const style of ['minimal', 'illustrated', 'animated']) {
+    const prefs = { workspace: 'The renamed workspace', loadingStyle: style, theme: 'forest', motion: 'off' };
+    const { window, document, timers } = startup(t, true, {
+      [authKey]: JSON.stringify({ user: { id: 'owner' } }),
+      [cacheKey('owner')]: JSON.stringify({ document: { data: { workhub: { preferences: prefs } } } }),
+      [cacheKey('other')]: JSON.stringify({ document: { data: { workhub: { preferences: { ...prefs, loadingStyle: 'minimal', workspace: 'Other account' } } } } }),
+    });
+    assert.equal(document.documentElement.dataset.startupStyle, style);
+    assert.equal(document.getElementById('workhubStartupBrand').textContent, prefs.workspace);
+    assert.equal(document.documentElement.dataset.startupMotion, 'off');
+    window.WorkHubStartup.phase('records', 'Reading your saved records');
+    assert.equal(document.documentElement.dataset.startupPhase, 'records');
+    assert.match(document.getElementById('workhubStartupStatus').textContent, /Reading your saved records/);
+    window.WorkHubStartup.finish();
+    assert.equal(document.documentElement.hasAttribute('data-workhub-startup'), false);
+    for (const timer of timers.values()) if (timer.delay === 220) timer.callback();
+    assert.equal(document.documentElement.dataset.startupStyle, undefined);
+  }
+});

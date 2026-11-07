@@ -211,6 +211,9 @@
           deny('Your account cannot open or create this item.');
         return;
       }
+      // File destinations and card exports recheck their actual source permissions.
+      // The current page can be unrelated to that source.
+      if (control.closest('[data-fl],#flInput,#flChooser,[data-sc],#scWorkspace')) return;
       const id = feature(t);
       if (!C.byId.has(id)) return;
       let action = 'view';

@@ -510,6 +510,7 @@
       sync,
       loadFile,
       handle,
+      hasDraft: () => !!editor || importing,
       snapshot: () => ({
         owner,
         pid,

@@ -87,6 +87,7 @@
     delete page.dataset.startupTheme;
     delete page.dataset.startupBackground;
     delete page.dataset.startupRendering;
+    delete page.dataset.startupStyle;
   }
   function appearance(preferences) {
     if (finished) return;
@@ -109,6 +110,9 @@
       !['page', 'surface', 'text', 'secondary', 'accent'].every(key => validColor(colors[key]))
     )
       colors = neutral;
+    page.dataset.startupStyle = ['minimal', 'illustrated', 'animated'].includes(p.loadingStyle)
+      ? p.loadingStyle
+      : 'animated';
     const baseInk = readable(colors.text, [colors.surface]),
       soft = tint(colors.surface, colors.secondary, 0.06, baseInk),
       alt = tint(colors.surface, colors.accent, 0.06, baseInk),

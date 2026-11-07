@@ -10341,6 +10341,13 @@ handoverWorkspace = WorkHubHandover.install(fileWorkspaceAdapter);
 hub = WorkHubStudio.install({
   can: fileWorkspaceAdapter.can,
   saveDriveFile: fileWorkspaceAdapter.saveDriveFile,
+  driveReady: () => filesLibrary.api.connected(),
+  openDriveUpload: file => filesLibrary.uploadDialog(file),
+  openGoLive() {
+    tab = 'specs';
+    projectView = 'go-live-issues';
+    render();
+  },
   state: () => state,
   cloud: () => cloud,
   refreshSchedule: refreshScheduleStatuses,
