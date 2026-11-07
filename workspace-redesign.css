@@ -1,0 +1,899 @@
+/* Shared workspace and widget design. Scene artwork, diagram geometry and exported
+   document palettes keep their own rendering rules. Personal overrides load last. */
+body[data-hub-layout='renewed'] {
+  --wh-paper: var(--hub-surface);
+  --wh-soft: var(--hub-surface-soft);
+  --wh-line: color-mix(in srgb, var(--hub-border) 80%, var(--hub-surface));
+  --wh-radius: 16px;
+  --wh-space: 22px;
+  --wh-gap: 20px;
+  --wh-shadow: 0 3px 14px color-mix(in srgb, var(--hub-text) 4%, transparent);
+}
+body[data-hub-layout='renewed'][data-hub-design='editorial'] {
+  --wh-radius: 4px;
+}
+body[data-hub-layout='renewed']:is([data-hub-design='compact-pro'], [data-hub-design='fiori']) {
+  --wh-radius: 9px;
+  --wh-space: 18px;
+  --wh-gap: 16px;
+}
+body[data-hub-layout='renewed'][data-density='compact'] {
+  --wh-space: 16px;
+  --wh-gap: 14px;
+}
+
+/* One compact identity row, with the real export, save and account controls. */
+body[data-hub-layout='renewed'] #hubHeader {
+  min-height: 68px;
+  padding: 12px clamp(16px, 2vw, 30px);
+  gap: 16px;
+}
+body[data-hub-layout='renewed']:not([data-hub-design='fiori']) #hubHeader {
+  background: var(--wh-paper);
+  border-bottom: 1px solid var(--wh-line);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--hub-text) 2%, transparent);
+}
+body[data-hub-layout='renewed'] #hubHeader h1 {
+  font-size: 20px;
+  line-height: 1.2;
+  letter-spacing: -0.035em;
+}
+body[data-hub-layout='renewed'] #hubHeader p {
+  margin: 4px 0 0;
+  font-size: 11px;
+  line-height: 1.4;
+}
+body[data-hub-layout='renewed'] #hubHeader .hub-brand-mark {
+  width: 40px;
+  height: 40px;
+  flex-basis: 40px;
+  padding: 8px;
+}
+body[data-hub-layout='renewed'] #hubHeader .hub-header-brand {
+  gap: 12px;
+}
+body[data-hub-layout='renewed'] #hubHeader .header-actions {
+  gap: 8px;
+}
+body[data-hub-layout='renewed'] #hubHeader :is(.header-actions > button, .settings-menu > summary) {
+  min-height: 35px;
+  padding: 7px 11px;
+  border-radius: 9px;
+  font-size: 12px;
+}
+body[data-hub-layout='renewed'] #hubAtmosphereBadge,
+body[data-hub-layout='renewed'] #hubAtmospherePocket {
+  display: none;
+}
+body[data-hub-layout='renewed'][data-hub-design='current'] #hubShell {
+  grid-template-columns: 218px minmax(0, 1fr);
+}
+body[data-hub-layout='renewed'] #hubShell > main.page {
+  max-width: 1740px;
+  padding: 22px clamp(18px, 2.5vw, 38px) 110px;
+  min-width: 0;
+}
+body[data-hub-layout='renewed']:is(
+    [data-hub-design='current'],
+    [data-hub-design='editorial'],
+    [data-hub-design='compact-pro'],
+    [data-hub-design='fiori']
+  )
+  #hubSidebar {
+  padding: 18px 12px;
+  border-right-color: var(--wh-line);
+  max-height: 100dvh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+body[data-hub-layout='renewed'] #hubSidebar .hub-side-intro {
+  padding: 10px 12px 18px;
+  margin: 0 0 12px;
+  background: transparent;
+  border-bottom: 1px solid var(--wh-line);
+}
+body[data-hub-layout='renewed'] #hubSidebar .hub-side-intro .hub-kicker {
+  margin: 0;
+  font-size: 9px;
+  letter-spacing: 0.16em;
+}
+body[data-hub-layout='renewed'] #hubSidebar .hub-side-intro p {
+  font-size: 11px;
+  line-height: 1.6;
+  margin: 7px 0 0;
+}
+body[data-hub-layout='renewed'] #tabs button[data-tab] {
+  border-radius: 9px;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s;
+}
+body[data-hub-layout='renewed']:is(
+    [data-hub-design='current'],
+    [data-hub-design='editorial'],
+    [data-hub-design='compact-pro'],
+    [data-hub-design='fiori']
+  )
+  #tabs
+  button[data-tab] {
+  min-height: 39px;
+  padding: 9px 11px;
+  font-size: 12px;
+}
+body[data-hub-layout='renewed'] #tabs .wd-nav-group > strong {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+}
+body[data-hub-layout='renewed'] #tabs button[data-tab].active {
+  box-shadow: inset 3px 0 0 var(--hub-link);
+}
+body[data-hub-layout='renewed'][data-hub-design='modern-hub'] #tabs button[data-tab].active,
+body[data-hub-layout='renewed'][data-hub-design='clear-desk'] #tabs button[data-tab].active {
+  box-shadow: inset 0 -3px 0 var(--hub-link);
+}
+body[data-hub-layout='renewed'] #wdWorkspaceBar {
+  min-height: 36px;
+  padding: 0 0 12px;
+  margin: 0 0 10px;
+  border: 0;
+  background: transparent;
+  align-items: center;
+}
+body[data-hub-layout='renewed'] #wdSectionTitle {
+  font-size: 15px;
+  line-height: 1.4;
+  font-weight: 650;
+}
+body[data-hub-layout='renewed'] .wd-context-eyebrow {
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  margin-bottom: 3px;
+}
+body[data-hub-layout='renewed'] #wdWorkspaceBar > button {
+  min-height: 31px;
+  font-size: 11px;
+  padding: 5px 10px;
+  border-radius: 8px;
+}
+
+/* Frequent commands stay in reach; secondary commands have one accessible home. */
+body[data-hub-layout='renewed'] #hubToolbar {
+  position: relative;
+  z-index: 92;
+  gap: 7px;
+  margin: 0 0 20px;
+  padding: 8px;
+  border: 1px solid var(--wh-line);
+  border-radius: 12px;
+  background: var(--wh-paper);
+  box-shadow: var(--wh-shadow);
+}
+body[data-hub-layout='renewed'] #hubToolbar > [data-hub='commands'] {
+  flex: 1 1 210px;
+  max-width: none;
+  min-width: 160px;
+  border-color: transparent;
+  background: var(--wh-soft);
+  padding: 10px 13px;
+  font-size: 12px;
+}
+body[data-hub-layout='renewed'] #hubToolbar button {
+  min-height: 35px;
+  padding: 7px 10px;
+  font-size: 11px;
+  border-radius: 8px;
+}
+body[data-hub-layout='renewed'] #hubToolbar #focusShortcuts {
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.wh-tool-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+.wh-tool-menu > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 35px;
+  padding: 7px 11px;
+  border: 1px solid var(--hub-border);
+  border-radius: 8px;
+  color: var(--hub-text);
+  background: var(--hub-surface);
+  cursor: pointer;
+  list-style: none;
+  font-size: 11px;
+  font-weight: 600;
+}
+.wh-tool-menu > summary::-webkit-details-marker {
+  display: none;
+}
+.wh-tool-menu[open] > summary {
+  border-color: var(--hub-link);
+  background: var(--hub-surface-soft);
+}
+.wh-tool-popover {
+  position: absolute;
+  z-index: 150;
+  top: calc(100% + 9px);
+  right: 0;
+  width: min(350px, calc(100vw - 36px));
+  max-height: min(460px, 70dvh);
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  padding: 12px;
+  border: 1px solid var(--hub-border);
+  border-radius: 13px;
+  background: var(--hub-surface);
+  box-shadow: 0 12px 36px color-mix(in srgb, var(--hub-text) 13%, transparent);
+}
+.wh-tool-menu:not([open]) > .wh-tool-popover,
+.wh-tool-menu[hidden],
+.wh-tool-popover > [hidden] {
+  display: none;
+}
+body[data-hub-layout='renewed'] #hubToolbar .wh-tool-popover > button {
+  width: 100%;
+  text-align: left;
+  white-space: normal;
+  padding: 11px;
+  min-height: 42px;
+  line-height: 1.5;
+}
+
+/* Compact page introductions. The living My Day hero is deliberately excluded. */
+body[data-hub-layout='renewed']
+  #view
+  :is(
+    .workspace-heading,
+    .hub-head:not(.mv-hero):not(.md-day-intro),
+    .df-hero,
+    .wl-hero,
+    .val-head,
+    .project-banner,
+    .rehearsal-hero
+  ) {
+  min-height: 0;
+  padding: 20px 0 22px;
+  margin: 0 0 20px;
+  border: 0;
+  border-bottom: 1px solid var(--wh-line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  gap: 18px;
+}
+body[data-hub-layout='renewed']
+  #view
+  :is(
+    .workspace-heading,
+    .hub-head:not(.mv-hero):not(.md-day-intro),
+    .df-hero,
+    .wl-hero,
+    .val-head,
+    .project-banner,
+    .rehearsal-hero
+  )
+  :is(h1, h2) {
+  font-size: clamp(25px, 2.3vw, 34px);
+  letter-spacing: -0.04em;
+  line-height: 1.18;
+  margin: 5px 0 0;
+}
+body[data-hub-layout='renewed']
+  #view
+  :is(
+    .workspace-heading,
+    .hub-head:not(.mv-hero):not(.md-day-intro),
+    .df-hero,
+    .wl-hero,
+    .val-head,
+    .rehearsal-hero
+  )
+  p {
+  max-width: 720px;
+  font-size: 13px;
+  line-height: 1.65;
+  margin: 9px 0 0;
+}
+body[data-hub-layout='renewed']
+  #view
+  :is(.workspace-heading, .hub-head:not(.mv-hero):not(.md-day-intro), .df-hero, .wl-hero, .val-head)
+  :is(.hub-kicker, .eyebrow) {
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  margin-bottom: 5px;
+}
+body[data-hub-layout='renewed'] #view :is(.df-hero-symbol, .wl-hero-art) {
+  max-width: 100px;
+  min-width: 0;
+  padding: 12px;
+  font-size: 36px;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Shared widget surfaces, without changing the controls inside them. */
+body[data-hub-layout='renewed']
+  #view
+  :is(
+    .hub-card:not(.md-widget),
+    .hub-widget:not(.md-widget),
+    .panel,
+    .task-main-card,
+    .ticket-card,
+    .nt-editor,
+    .nt-sidebar,
+    .nt-card,
+    .df-panel,
+    .ho-ready,
+    .pi-main,
+    .val-panel,
+    .val-mode-card,
+    .val-profile-card,
+    .val-setup-card,
+    .wl-card,
+    .wl-panel,
+    .gate-card,
+    .feedback-card,
+    .ss-panel,
+    .bench-case-list > button
+  ) {
+  border-color: var(--wh-line);
+  border-radius: var(--wh-radius);
+  background-color: var(--wh-paper);
+  box-shadow: var(--wh-shadow);
+  min-width: 0;
+}
+body[data-hub-layout='renewed']
+  #view
+  :is(.hub-card:not(.md-widget), .hub-widget:not(.md-widget), .df-panel, .val-panel, .wl-panel) {
+  padding: var(--wh-space);
+}
+body[data-hub-layout='renewed']
+  #view
+  :is(.hub-card:not(.md-widget), .df-panel, .wl-panel, .val-panel)
+  > h3 {
+  font-size: 16px;
+  line-height: 1.4;
+  letter-spacing: -0.02em;
+  margin: 0 0 14px;
+}
+body[data-hub-layout='renewed']
+  #view
+  :is(
+    .hub-grid,
+    .df-room,
+    .val-workspace,
+    .wl-grid,
+    .task-main-list,
+    .ticket-grid,
+    .gate-company-groups
+  ) {
+  gap: var(--wh-gap);
+}
+body[data-hub-layout='renewed']
+  #view
+  :is(.toolbar, .hub-toolbar, .df-toolbar, .pi-toolbar, .val-toolbar, .phase-toolbar) {
+  gap: 9px;
+  border-radius: 12px;
+}
+body[data-hub-layout='renewed']
+  #view
+  :is(.toolbar, .hub-toolbar, .df-toolbar, .pi-toolbar, .phase-toolbar)
+  :is(input, select) {
+  min-height: 38px;
+  border-radius: 9px;
+  padding: 8px 11px;
+  font-size: 12px;
+}
+body[data-hub-layout='renewed']
+  #view
+  :is(
+    .actions,
+    .toolbar,
+    .hub-toolbar,
+    .workspace-heading,
+    .task-action-buttons,
+    .md-row-actions,
+    .panel-top,
+    .pi-toolbar
+  )
+  > button {
+  border-radius: 9px;
+  min-height: 35px;
+  font-size: 12px;
+}
+body[data-hub-layout='renewed']
+  #view
+  :is(.stats, .workspace-summary, .df-stats, .val-metrics, .schedule-metrics, .bench-lab-stats) {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 155px), 1fr));
+  gap: 12px;
+  margin: 0 0 24px;
+}
+body[data-hub-layout='renewed']
+  #view
+  :is(.stats, .workspace-summary, .df-stats, .val-metrics, .schedule-metrics, .bench-lab-stats)
+  > div {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 17px 18px;
+  min-width: 0;
+  border: 1px solid var(--wh-line);
+  border-radius: 12px;
+  background: var(--wh-paper);
+  box-shadow: var(--wh-shadow);
+}
+body[data-hub-layout='renewed']
+  #view
+  :is(.stats, .workspace-summary, .df-stats, .val-metrics, .schedule-metrics, .bench-lab-stats)
+  > div::before {
+  content: '';
+  width: 22px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--hub-link);
+}
+body[data-hub-layout='renewed']
+  #view
+  :is(.stats, .workspace-summary, .df-stats, .val-metrics, .schedule-metrics, .bench-lab-stats)
+  > div
+  > span {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--hub-muted);
+}
+body[data-hub-layout='renewed']
+  #view
+  :is(.stats, .workspace-summary, .df-stats, .val-metrics, .schedule-metrics, .bench-lab-stats)
+  > div
+  > strong {
+  font-size: 27px;
+  letter-spacing: -0.045em;
+  font-weight: 650;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+/* My Day keeps the landscape, garden, orb, terrarium and every drag target. */
+body[data-hub-layout='renewed'] #view .my-day-page .hub-layout {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--wh-gap);
+  align-items: stretch;
+}
+body[data-hub-layout='renewed'] #view .my-day-page .hub-layout > [data-widget] {
+  grid-column: span 6;
+  border-radius: var(--wh-radius);
+}
+body[data-hub-layout='renewed']
+  #view
+  .my-day-page
+  .hub-layout
+  > :is([data-span='wide'], .md-expanded, .hub-wide) {
+  grid-column: 1 / -1;
+}
+body[data-hub-layout='renewed']
+  #view
+  .my-day-page
+  .md-widget:not([data-widget='orb'])
+  .mv-widget-shell {
+  padding: var(--wh-space);
+  border-color: var(--wh-line);
+  background-color: var(--wh-paper);
+  background-image: none;
+  box-shadow: var(--wh-shadow);
+}
+body[data-hub-layout='renewed'] #view .my-day-page .hub-widget-head {
+  gap: 12px;
+  padding-bottom: 15px;
+  margin-bottom: 18px;
+  border-color: var(--wh-line);
+}
+body[data-hub-layout='renewed'] #view .my-day-page .mv-widget-kicker {
+  margin: 0 0 5px 0;
+  font-size: 8px;
+  letter-spacing: 0.13em;
+}
+body[data-hub-layout='renewed'] #view .my-day-page .hub-widget-head h3 {
+  font-size: 15px;
+  line-height: 1.4;
+}
+body[data-hub-layout='renewed'] #view .my-day-page .hub-widget-symbol {
+  border-radius: 10px;
+  width: 32px;
+  height: 32px;
+  flex-basis: 32px;
+}
+body[data-hub-layout='renewed'] #view .my-day-page .hub-widget-actions {
+  gap: 5px;
+}
+body[data-hub-layout='renewed'] #view .my-day-page .hub-widget-actions .md-button {
+  min-width: 29px;
+  min-height: 29px;
+  border-radius: 7px;
+  padding: 4px 6px;
+  font-size: 13px;
+}
+body[data-hub-layout='renewed'] #view .my-day-page :is(.md-mission, .md-up-card, .md-gap-card) {
+  border-radius: 12px;
+}
+body[data-hub-layout='renewed'] #view .my-day-page .md-empty {
+  padding: 24px 12px;
+}
+body[data-hub-layout='renewed'] #view .my-day-page .md-empty h4 {
+  font-size: 20px;
+}
+
+/* Records and planning widgets have calmer rows and less bulky action blocks. */
+body[data-hub-layout='renewed'] #view .workspace-v10 .task-main-card {
+  padding: 21px;
+  margin-bottom: 16px;
+}
+body[data-hub-layout='renewed'] #view .task-card-heading {
+  gap: 18px;
+}
+body[data-hub-layout='renewed'] #view :is(.task-card-heading, .ticket-card) h3 {
+  font-size: 18px;
+  line-height: 1.45;
+  letter-spacing: -0.025em;
+}
+body[data-hub-layout='renewed'] #view .task-action-cluster {
+  width: 270px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--wh-soft);
+}
+body[data-hub-layout='renewed'] #view :is(.task-date-strip, .task-card-meta, .ticket-card-meta) {
+  font-size: 11px;
+  gap: 9px;
+}
+body[data-hub-layout='renewed'] #view :is(.task-sub-card, .subitem-card, .pi-inline-child) {
+  border-radius: 10px;
+}
+body[data-hub-layout='renewed']
+  #view
+  :is(.scroll, .table-wrap, .pi-table-scroll, .df-table-wrap, .val-scroll) {
+  max-width: 100%;
+  min-width: 0;
+  overscroll-behavior-x: contain;
+}
+body[data-hub-layout='renewed'] #view :is(th, td) {
+  padding: 12px 13px;
+  line-height: 1.55;
+  border-bottom-color: var(--wh-line);
+}
+body[data-hub-layout='renewed'] #view th {
+  background: var(--wh-soft);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.035em;
+}
+body[data-hub-layout='renewed'] #view td {
+  font-size: 12px;
+}
+body[data-hub-layout='renewed']
+  #view
+  :is(.workhub-calendar, .schedule-day-agenda, .nt-sidebar, .nt-editor) {
+  border-radius: var(--wh-radius);
+  border-color: var(--wh-line);
+}
+body[data-hub-layout='renewed'] #view .workhub-month-grid {
+  gap: 1px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/* The screenshot editor follows website colours; its exported pages stay independent. */
+body[data-hub-layout='renewed'] .bc-guide-studio {
+  --bc-ink: var(--hub-text);
+  --bc-muted: var(--hub-muted);
+  --bc-line: var(--hub-border);
+  --bc-accent: var(--hub-link);
+  background: var(--hub-surface-soft);
+  color: var(--hub-text);
+}
+body[data-hub-layout='renewed']
+  .bc-guide-studio
+  :is(
+    .bc-header,
+    .bc-workspace-tabs,
+    .bc-studio-status,
+    .bc-editor,
+    .bc-toolbar,
+    .bc-step-details,
+    .bc-guide-preview,
+    .bc-footer,
+    .bc-guide-fields,
+    .bc-guide-layout,
+    .bc-more-tools > div,
+    .bc-recovery-options > div
+  ) {
+  background: var(--hub-surface);
+  color: var(--hub-text);
+}
+body[data-hub-layout='renewed']
+  .bc-guide-studio
+  :is(.bc-selection-bar, .bc-step-strip, .bc-preview-reader) {
+  background-color: var(--hub-surface-soft);
+}
+body[data-hub-layout='renewed'] .bc-guide-studio .bc-workspace-tabs button[aria-selected='true'] {
+  color: var(--hub-link);
+  background: var(--hub-blue-soft);
+  border-color: var(--hub-border);
+}
+
+/* Private presentation controls use the theme; the shared process snapshot and
+   maintained annotation colours remain owned by the presentation renderer. */
+body[data-hub-layout='renewed'] :is(#processPresenter.pc-presenter, .pc-stage) {
+  background: var(--hub-bg);
+}
+body[data-hub-layout='renewed'] .pc-bubble {
+  color: var(--hub-text);
+}
+body[data-hub-layout='renewed'] .pc-bubble > summary {
+  color: var(--hub-text);
+  background: color-mix(in srgb, var(--hub-surface) 94%, transparent);
+  border-color: var(--hub-border);
+  box-shadow: 0 5px 25px color-mix(in srgb, var(--hub-text) 10%, transparent);
+}
+body[data-hub-layout='renewed'] .pc-bubble[open] > summary {
+  background: var(--hub-blue-soft);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--hub-link) 15%, transparent);
+}
+body[data-hub-layout='renewed'] .pc-bubble-menu {
+  color: var(--hub-text);
+  background: color-mix(in srgb, var(--hub-surface) 97%, transparent);
+  border-color: var(--hub-border);
+}
+body[data-hub-layout='renewed'] .pc-bubble-menu :is(input, select, textarea) {
+  color: var(--hub-text);
+  background: var(--hub-surface);
+  border-color: var(--hub-border);
+}
+body[data-hub-layout='renewed'] .pc-type-tray button b {
+  color: var(--hub-link);
+}
+body[data-hub-layout='renewed'] .pc-quick {
+  border-color: var(--hub-border);
+}
+
+/* The same living window is larger, movable and no longer at the sidebar's foot. */
+#whWorldWindow {
+  position: fixed;
+  z-index: 80;
+  top: 210px;
+  right: 24px;
+  width: 292px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 24px);
+  color: var(--hub-text);
+  border: 1px solid var(--hub-border);
+  border-radius: 17px;
+  background: var(--hub-surface);
+  box-shadow: 0 12px 38px color-mix(in srgb, var(--hub-text) 14%, transparent);
+}
+#whWorldWindow[hidden],
+#whWorldWindow:has(#hubAtmosphereCard[hidden]),
+#whWorldContent[hidden] {
+  display: none;
+}
+.wh-world-header {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  padding: 7px;
+  border-bottom: 1px solid var(--hub-border);
+}
+.wh-world-header > button {
+  min-height: 30px;
+  min-width: 30px;
+  padding: 4px 7px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--hub-text);
+  font-size: 14px;
+}
+.wh-world-header > .wh-world-handle {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 650;
+  text-align: left;
+  touch-action: none;
+  cursor: grab;
+}
+.wh-world-handle:active {
+  cursor: grabbing;
+}
+.wh-world-handle > span:first-child {
+  font-size: 17px;
+  color: var(--hub-link);
+}
+body #whWorldWindow #hubAtmosphereCard {
+  display: block;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 14px;
+  border: 0;
+  border-radius: 0 0 16px 16px;
+  background: var(--hub-surface);
+  box-shadow: none;
+}
+body #whWorldWindow #hubAtmosphereCard :is(svg, .hub-atmosphere-window) {
+  display: block;
+  max-height: none;
+  width: 100%;
+}
+body #whWorldWindow #hubAtmosphereCaption {
+  margin-top: 12px;
+  font-size: 13px;
+}
+body #whWorldWindow #hubAtmosphereClock {
+  font-size: 11px;
+}
+#whWorldWindow[data-minimised='true'] {
+  width: 222px;
+}
+#whWorldContent {
+  max-height: calc(100dvh - 78px);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+#whWorldWindow[data-minimised='true'] .wh-world-header {
+  border-bottom: 0;
+}
+body:is(.hub-present, .hub-private, .hub-focus, .hub-sorting) #whWorldWindow {
+  display: none;
+}
+body[data-hub-layout='renewed'].hub-present #hubShell {
+  grid-template-columns: minmax(0, 1fr);
+}
+body[data-hub-layout='renewed'] #view .ticket-folio {
+  background: var(--wh-paper) !important;
+  border-color: var(--wh-line) !important;
+  border-radius: var(--wh-radius) !important;
+}
+body[data-hub-layout='renewed'] #view .ticket-folder-tab {
+  position: static;
+  display: inline-flex;
+  max-width: 100%;
+  height: auto;
+  padding: 4px 8px;
+  margin-bottom: 10px;
+  border: 1px solid var(--wh-line);
+  border-radius: 6px;
+  background: var(--wh-soft);
+  font-size: 9px;
+}
+body[data-hub-layout='renewed'][data-hub-design='compact-pro'] #view :is(th, td),
+body[data-hub-layout='renewed'][data-density='compact'] #view :is(th, td) {
+  padding: 8px 10px;
+}
+body[data-hub-layout='renewed']
+  :is(#hubToolbar, #view, #whWorldWindow)
+  :is(button, summary):focus-visible {
+  outline: 3px solid var(--hub-link);
+  outline-offset: 3px;
+}
+
+@media (min-width: 1650px) {
+  body[data-hub-layout='renewed']:not([data-hub-design='compact-pro'])
+    #view
+    .my-day-page
+    .hub-layout
+    > [data-widget]:not([data-span='wide']):not(.md-expanded) {
+    grid-column: span 4;
+  }
+}
+@media (max-width: 1100px) {
+  #whWorldWindow {
+    top: 250px;
+  }
+  body[data-hub-layout='renewed'] #hubToolbar > [data-hub='commands'] {
+    flex-basis: 100%;
+  }
+  body[data-hub-layout='renewed'] #view .task-action-cluster {
+    width: 235px;
+  }
+}
+@media (max-width: 900px) {
+  body[data-hub-layout='renewed'][data-hub-design='current'] #hubShell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  body[data-hub-layout='renewed'] #hubShell > main.page {
+    padding: 18px 16px 125px;
+  }
+  body[data-hub-layout='renewed']:is(
+      [data-hub-design='current'],
+      [data-hub-design='editorial'],
+      [data-hub-design='compact-pro'],
+      [data-hub-design='fiori']
+    )
+    #hubSidebar {
+    max-height: none;
+    overflow: visible;
+  }
+  body[data-hub-layout='renewed'] #view .my-day-page .hub-layout > [data-widget] {
+    grid-column: 1 / -1;
+  }
+  #whWorldWindow {
+    top: 250px;
+    right: 12px;
+    width: 266px;
+  }
+}
+@media (max-width: 620px) {
+  body[data-hub-layout='renewed'] {
+    --wh-space: 17px;
+    --wh-gap: 15px;
+  }
+  body[data-hub-layout='renewed'] #hubHeader {
+    min-height: 66px;
+    padding: 11px 14px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  body[data-hub-layout='renewed'] #hubHeader h1 {
+    font-size: 18px;
+  }
+  #whWorldWindow {
+    top: 160px;
+  }
+  body[data-hub-layout='renewed'] #hubHeader .header-actions {
+    margin-left: auto;
+    flex-wrap: wrap;
+  }
+  body[data-hub-layout='renewed'] #hubToolbar .wh-tool-menu {
+    margin-left: auto;
+  }
+  body[data-hub-layout='renewed'] #hubToolbar #focusShortcuts {
+    width: 100%;
+    order: 1;
+  }
+  body[data-hub-layout='renewed'] #view .task-action-cluster {
+    width: 100%;
+    max-width: none;
+  }
+  body[data-hub-layout='renewed'] #view .task-card-heading {
+    flex-wrap: wrap;
+  }
+  body[data-hub-layout='renewed'] #view :is(.df-hero-symbol, .wl-hero-art) {
+    display: none;
+  }
+  body[data-hub-layout='renewed']
+    #view
+    :is(
+      input:not([type='range'], [type='color'], [type='checkbox'], [type='radio']),
+      select,
+      textarea
+    ) {
+    font-size: 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  body[data-hub-layout='renewed'] #tabs button[data-tab] {
+    transition: none;
+  }
+}
+@media print {
+  #whWorldWindow,
+  #whWorkspaceTools {
+    display: none !important;
+  }
+}

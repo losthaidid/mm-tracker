@@ -71,3 +71,30 @@ test('Website designs: Fiori side navigation is distinct from Clear Desk and kee
  for(let i=0;i<3;i++){x.mobile(true);assert.equal(x.d.querySelectorAll('#wdSectionMenu button').length,15);x.mobile(false);assert.equal(x.d.querySelectorAll('#tabs > .wd-nav-group').length,3);assert.equal(x.d.querySelectorAll('#tabs button').length,15);assert.ok(nodes.every(n=>n.isConnected));}
  assert.equal(x.writes(),0);
 });
+test('Website designs: renewed toolbar groups original secondary commands while preserving frequent actions, drafts and listeners',t=>{
+ const x=fixture(t),bar=x.d.getElementById('hubToolbar'),editor=x.d.getElementById('editor');
+ bar.innerHTML='<button data-hub="commands">Search</button><button data-hub="quick">Quick add</button><button data-hub="timer-new">Start timer</button><button data-hub="privacy">Privacy</button><button id="reminderInboxButton">Reminders</button><div id="focusShortcuts"><button id="focusModeButton">Focus</button><button id="breakTerrariumButton">Break</button></div>';
+ const controls=[...bar.querySelectorAll('button')],timer=controls[2];let fired=0;timer.addEventListener('click',()=>fired++);
+ editor.value='Unsaved draft 001';const before=structuredClone(x.state());x.ui.mount();
+ assert.equal(x.d.body.dataset.hubLayout,'renewed');
+ assert.equal(x.d.querySelector('#view').dataset.whSection,'files');
+ assert.equal(bar.querySelector('.wh-tool-popover [data-hub="timer-new"]'),timer);
+ assert.equal(bar.querySelector('#focusShortcuts').parentElement,bar);
+ assert.equal(x.d.getElementById('reminderInboxButton').nextElementSibling.id,'focusShortcuts');
+ for(const design of Object.keys(x.w.WorkHubWebsiteDesigns.DESIGNS)){
+  x.saved(design);assert.ok(controls.every(node=>node.isConnected));assert.equal(x.d.getElementById('editor'),editor);
+ }
+ const menu=x.d.getElementById('whWorkspaceTools');menu.open=true;timer.click();assert.equal(fired,1);assert.equal(menu.open,false);
+ menu.open=true;timer.dispatchEvent(new x.w.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));
+ assert.equal(menu.open,false);assert.equal(x.d.activeElement,menu.querySelector('summary'));
+ assert.equal(editor.value,'Unsaved draft 001');assert.deepEqual(x.state().records,before.records);assert.equal(x.writes(),0);
+ x.signOut();assert.equal(x.d.body.hasAttribute('data-hub-layout'),false);assert.equal(x.d.querySelector('#view').hasAttribute('data-wh-section'),false);
+});
+test('Website designs: toolbar additions join the existing group once and hidden commands cannot leave an empty open menu',t=>{
+ const x=fixture(t),bar=x.d.getElementById('hubToolbar');
+ const late=x.d.createElement('button');late.textContent='Late command';bar.append(late);x.ui.mount();
+ const menu=x.d.getElementById('whWorkspaceTools');assert.equal(menu.hidden,false);assert.equal(menu.querySelector('button'),late);
+ menu.open=true;late.hidden=true;x.ui.mount();assert.equal(menu.hidden,true);assert.equal(menu.open,false);
+ const undo=x.d.createElement('button');undo.id='hubUndo';bar.append(undo);x.ui.mount();
+ assert.equal(undo.parentElement,bar);assert.equal(x.d.querySelectorAll('#whWorkspaceTools').length,1);assert.equal(x.writes(),0);
+});

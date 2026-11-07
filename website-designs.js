@@ -92,6 +92,7 @@
   function install(a) {
     const $ = id => document.getElementById(id);
     const media = root.matchMedia?.('(max-width: 900px)');
+    const worldWindow = root.WorkHubWorldWindow?.install(a);
     let owner = '',
       generation,
       dialog = null,
@@ -117,16 +118,58 @@
     function apply() {
       const id = a.ready() ? (dialog ? draft : current()) : 'current';
       if (document.body.dataset.hubDesign !== id) document.body.dataset.hubDesign = id;
+      if (a.ready()) document.body.dataset.hubLayout = 'renewed';
+      else delete document.body.dataset.hubLayout;
       if (id === 'compact-pro')
         document.body.dataset.wdNavCollapsed = String(compactCollapsed && !media?.matches);
       else delete document.body.dataset.wdNavCollapsed;
       arrange(id);
+      arrangeToolbar();
+      worldWindow?.mount();
       for (const label of document.querySelectorAll('[data-wd-active-label]')) {
         const text = DESIGNS[id].name + (dialog && draft !== base ? ' · preview' : '');
         if (label.textContent !== text) label.textContent = text;
       }
       const bar = $('wdWorkspaceBar');
       if (bar) bar.hidden = id === 'current' || !a.ready();
+    }
+    function arrangeToolbar() {
+      const bar = $('hubToolbar');
+      if (!bar) return;
+      let menu = $('whWorkspaceTools');
+      if (!a.ready()) {
+        if (menu) menu.open = false;
+        return;
+      }
+      if (!menu) {
+        menu = document.createElement('details');
+        menu.id = 'whWorkspaceTools';
+        menu.className = 'wh-tool-menu';
+        menu.innerHTML =
+          '<summary>Workspace tools <span aria-hidden="true">⌄</span></summary><div class="wh-tool-popover" role="group" aria-label="More workspace commands"></div>';
+        menu.addEventListener('keydown', event => {
+          if (event.key !== 'Escape' || !menu.open) return;
+          event.preventDefault();
+          event.stopPropagation();
+          menu.open = false;
+          menu.querySelector('summary').focus({ preventScroll: true });
+        });
+        bar.append(menu);
+      }
+      const panel = menu.querySelector('.wh-tool-popover'),
+        keep = node =>
+          node.matches(
+            '[data-hub="commands"],[data-hub="quick"],#reminderInboxButton,#focusShortcuts,#hubUndo,#labUndo'
+          );
+      // Keep original controls and listeners. Focus/break shortcuts stay beside the inbox.
+      for (const node of [...panel.children]) if (keep(node)) bar.insertBefore(node, menu);
+      for (const node of [...bar.children])
+        if (node !== menu && !keep(node) && node.matches('button')) panel.append(node);
+      if (menu.nextElementSibling) bar.append(menu);
+      menu.hidden = ![...panel.children].some(
+        node => !node.hidden && node.style.display !== 'none'
+      );
+      if (menu.hidden) menu.open = false;
     }
     function arrange(id) {
       const nav = $('tabs');
@@ -242,6 +285,11 @@
       const section = $('wdSectionTitle');
       const title = active?.querySelector('.hub-nav-label')?.textContent || 'Your workspace';
       if (section && section.textContent !== title) section.textContent = title;
+      const view = $('view');
+      if (view) {
+        if (a.ready() && active) view.dataset.whSection = active.dataset.tab;
+        else delete view.dataset.whSection;
+      }
     }
     function mount() {
       const [next, epoch] = context();
@@ -393,6 +441,12 @@
       dialog.querySelector('[data-wd-close]').focus({ preventScroll: true });
     }
     document.addEventListener('click', e => {
+      const tools = $('whWorkspaceTools');
+      if (
+        tools?.open &&
+        (!tools.contains(e.target) || e.target.closest?.('.wh-tool-popover button'))
+      )
+        tools.open = false;
       if (e.target.closest?.('#wdNavToggle')) {
         if (a.ready() && document.body.dataset.hubDesign === 'compact-pro') {
           compactCollapsed = !compactCollapsed;
