@@ -75,13 +75,15 @@ html:is([data-effect-level='balanced'], [data-effect-level='phone'], [data-effec
   .hub-header-brand
   .brand-title-letters
   > span {
-  animation: none !important;
+  animation: brand-letter-wave 4.2s ease-in-out infinite;
+  animation-delay: calc(var(--brand-letter) * -0.16s);
   background: none;
   color: var(--hub-text);
+  text-shadow: none;
 }
 html:is([data-effect-level='balanced'], [data-effect-level='phone'], [data-effect-level='smooth'])
   .brand-title-letters {
-  animation: motion-title-breathe 6s ease-in-out infinite;
+  animation: none;
 }
 html:is([data-effect-level='balanced'], [data-effect-level='phone'], [data-effect-level='smooth'])
   #hubSiteTitle {
@@ -106,11 +108,6 @@ html:is([data-effect-level='balanced'], [data-effect-level='phone'], [data-effec
   .rest-room[data-motion='flow'][data-phase='complete']
   [data-rest='resume'] {
   animation-name: motion-ready-light;
-}
-@keyframes motion-title-breathe {
-  50% {
-    opacity: 0.86;
-  }
 }
 @keyframes motion-symbol-float {
   to {

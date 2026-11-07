@@ -102,7 +102,26 @@
       saving = false,
       compactCollapsed = false,
       grouping = '',
-      groupedNodes = [];
+      groupedNodes = [],
+      measuredHeader = null,
+      headerObserver = null;
+    function measureHeader() {
+      const header = $('hubHeader');
+      if (header !== measuredHeader) {
+        headerObserver?.disconnect();
+        measuredHeader = header;
+        if (header && root.ResizeObserver) {
+          headerObserver = new root.ResizeObserver(measureHeader);
+          headerObserver.observe(header);
+        }
+      }
+      const height = header?.getBoundingClientRect().height;
+      if (!height) return;
+      const value = Math.ceil(height) + 'px';
+      if (document.documentElement.style.getPropertyValue('--hub-header-height') !== value)
+        document.documentElement.style.setProperty('--hub-header-height', value);
+    }
+    root.addEventListener('resize', measureHeader);
     const context = () => [a.ready() ? a.owner() : '', a.generation()];
     const current = () => choice(a.prefs()?.design);
     const valid = () => a.ready() && owner === a.owner() && generation === a.generation();
@@ -126,6 +145,7 @@
       arrange(id);
       arrangeToolbar();
       worldWindow?.mount();
+      measureHeader();
       for (const label of document.querySelectorAll('[data-wd-active-label]')) {
         const text = DESIGNS[id].name + (dialog && draft !== base ? ' · preview' : '');
         if (label.textContent !== text) label.textContent = text;

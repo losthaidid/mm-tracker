@@ -935,7 +935,7 @@ test('the companion remains visible around the phone keyboard and supports keybo
 
 test('editable website title and subtitle save to the same private account and survive restore',async t=>{
  const {api,document,db}=await app(t);await hubAction(api,'header-edit');const form=document.getElementById('hubHeaderForm');fill(form,{workspace:'Haidid’s SAP Space',headerSubtitle:'A place for ideas & progress'});api.hub.submit(form);await settle();
- assert.equal(document.getElementById('hubSiteTitle').textContent,'Haidid’s SAP Space');assert.equal(document.getElementById('hubSiteSubtitle').textContent,'A place for ideas & progress');assert.equal(document.title,'Haidid’s SAP Space');assert.equal(db.row.document.data.workhub.headerSubtitle,'A place for ideas & progress');assert.equal(api.parseBackup(api.payload(api.state())).workhub.preferences.workspace,'Haidid’s SAP Space');
+ assert.equal(document.getElementById('hubSiteTitle').textContent,'Haidid’s SAP Space');assert.equal(document.querySelector('#hubSiteTitle [data-brand-home]').getAttribute('aria-label'),'Haidid’s SAP Space · Go to My day');assert.equal([...document.querySelectorAll('#hubSiteTitle .brand-title-letters > span')].map(n=>n.textContent).join(''),'Haidid’s SAP Space');assert.equal(document.getElementById('hubSiteSubtitle').textContent,'A place for ideas & progress');assert.equal(document.title,'Haidid’s SAP Space');assert.equal(db.row.document.data.workhub.headerSubtitle,'A place for ideas & progress');assert.equal(api.parseBackup(api.payload(api.state())).workhub.preferences.workspace,'Haidid’s SAP Space');
  assert.equal(document.getElementById('tabs').parentElement.id,'hubSidebar');assert.equal(document.querySelector('main.page').parentElement.id,'hubShell');
 });
 
@@ -1944,9 +1944,9 @@ test('recipients: account saves, reopened records and JSON backups retain compan
 
 test('grouped Settings: five sections keep all existing actions and section changes stay open',async t=>{
  const {api,document,window,db}=await app(t),ui=api.hub.settingsPanel,menu=document.getElementById('settingsMenu');api.hub.chromeUX.open();await settle();
- assert.equal(document.querySelectorAll('#settingsCategories [role="tab"]').length,5);assert.deepEqual(copy(ui.snapshot().groups.map(g=>[g.id,g.count])),[['workspace',5],['work',8],['companion',4],['data',7],['account',3]]);assert.equal(document.querySelectorAll('.settings-group:not([hidden])').length,1);assert.equal(document.querySelector('.settings-group:not([hidden])').id,'settingsGroup-workspace');assert.equal(document.querySelectorAll('.settings-option').length,27);assert.equal(document.querySelector('#hubSettingsAppearance button'),null);
- for(const [id,group]of [['hubSettingsHeader','workspace'],['websiteDesignButton','workspace'],['claimSettingsButton','work'],['recipientSettingsButton','work'],['momoAdventureSettings','companion'],['soundscapeSettings','companion'],['backupButton','data'],['storageManagerButton','data'],['driveSettingsButton','data'],['workspaceResetButton','data'],['cloudSignOut','account']])assert.equal(document.getElementById(id).closest('.settings-group').id,'settingsGroup-'+group);
- document.querySelector('[data-settings-group="work"]').click();assert.equal(menu.open,true);assert.equal(ui.snapshot().active,'work');document.getElementById('recipientSettingsButton').click();await settle();assert.equal(menu.open,false);assert.ok(document.getElementById('recipientDirectory'));api.closeModal();api.hub.chromeUX.open();document.querySelector('[data-settings-group="companion"]').click();document.getElementById('soundscapeSettings').click();await settle();assert.equal(menu.open,false);assert.ok(document.querySelector('#modalBody .soundscape-room'));assert.equal(db.calls.length,0);
+ assert.equal(document.querySelectorAll('#settingsCategories [role="tab"]').length,5);assert.deepEqual(copy(ui.snapshot().groups.map(g=>[g.id,g.count])),[['workspace',5],['work',8],['companion',4],['data',8],['account',3]]);assert.equal(document.querySelectorAll('.settings-group:not([hidden])').length,1);assert.equal(document.querySelector('.settings-group:not([hidden])').id,'settingsGroup-workspace');assert.equal(document.querySelectorAll('.settings-option').length,28);assert.equal(document.querySelector('#hubSettingsAppearance button'),null);
+ for(const [id,group]of [['hubSettingsHeader','workspace'],['websiteDesignButton','workspace'],['claimSettingsButton','work'],['recipientSettingsButton','work'],['momoAdventureSettings','companion'],['soundscapeSettings','companion'],['backupButton','data'],['exportButton','data'],['storageManagerButton','data'],['driveSettingsButton','data'],['workspaceResetButton','data'],['cloudSignOut','account']])assert.equal(document.getElementById(id).closest('.settings-group').id,'settingsGroup-'+group);
+ document.querySelector('[data-settings-group="work"]').click();assert.equal(menu.open,true);assert.equal(ui.snapshot().active,'work');document.getElementById('recipientSettingsButton').click();await settle();assert.equal(menu.open,false);assert.ok(document.getElementById('recipientDirectory'));api.closeModal();api.hub.chromeUX.open();document.querySelector('[data-settings-group="companion"]').click();document.getElementById('soundscapeSettings').click();await settle();assert.equal(menu.open,false);assert.ok(document.querySelector('#modalBody .soundscape-room'));api.closeModal();api.hub.chromeUX.open();document.querySelector('[data-settings-group="data"]').click();document.getElementById('exportButton').click();await settle();assert.equal(menu.open,false);assert.ok(document.getElementById('reportExportForm'));assert.equal(document.querySelectorAll('#exportButton').length,1);assert.equal(db.calls.length,0);
 });
 
 test('grouped Settings: search finds options across sections, escapes input and clears without closing',async t=>{
@@ -1965,7 +1965,7 @@ test('grouped Settings: keyboard section navigation, narrow-screen orientation a
 test('grouped Settings: later launchers and sync visibility update without cloning controls or writing records',async t=>{
  const {api,document,window,db}=await app(t),ui=api.hub.settingsPanel,button=document.createElement('button');button.id='customWorkspaceSetting';button.textContent='Custom workspace option';let clicked=0;button.addEventListener('click',()=>clicked++);document.getElementById('hubSettingsAppearance').append(button);await settle();assert.equal(document.querySelector('#settingsItems-workspace #customWorkspaceSetting'),button);assert.equal(ui.snapshot().groups.find(g=>g.id==='workspace').count,6);for(let i=0;i<3;i++)ui.mount();assert.equal(document.querySelectorAll('#customWorkspaceSetting').length,1);
  api.hub.chromeUX.open();button.click();assert.equal(clicked,1);assert.equal(document.getElementById('settingsMenu').open,false);button.hidden=true;await settle();assert.equal(button.closest('.settings-entry').hidden,true);assert.equal(ui.snapshot().groups.find(g=>g.id==='workspace').count,5);
- api.cloud.conflict=true;api.cloud.status='Newer records need review';api.notice();await settle();assert.equal(document.getElementById('cloudRetry').closest('.settings-entry').hidden,true);assert.equal(document.getElementById('cloudReload').closest('.settings-entry').hidden,false);assert.equal(document.getElementById('restoreButton').disabled,true);assert.equal(ui.snapshot().groups.find(g=>g.id==='data').count,6);assert.match(document.getElementById('settingsSaveStatus').textContent,/review/);assert.equal(db.calls.length,0);
+ api.cloud.conflict=true;api.cloud.status='Newer records need review';api.notice();await settle();assert.equal(document.getElementById('cloudRetry').closest('.settings-entry').hidden,true);assert.equal(document.getElementById('cloudReload').closest('.settings-entry').hidden,false);assert.equal(document.getElementById('restoreButton').disabled,true);assert.equal(ui.snapshot().groups.find(g=>g.id==='data').count,7);assert.match(document.getElementById('settingsSaveStatus').textContent,/review/);assert.equal(db.calls.length,0);
 });
 
 test('grouped Settings: sign-out clears the search and hides account-owned options while sign-in remains available',async t=>{
@@ -3218,22 +3218,22 @@ test('Workspace redesign: every shell keeps the compact header, original scenery
  const view=document.querySelector('.my-day-page'),landscape=view.querySelector('.mv-landscape'),art=landscape.outerHTML,
   widgets=[...view.querySelectorAll('[data-widget]')],world=document.getElementById('hubAtmosphereCard'),worldArt=world.querySelector('svg'),
   header=document.getElementById('hubHeader'),before=copy(api.state()),writes=db.calls.length,ui=api.hub.websiteDesigns;
- assert.equal(world.parentElement.id,'whWorldContent');
+ assert.equal(world.parentElement.id,'hubSidebar');assert.equal(world.nextElementSibling.className,'hub-side-note');
  assert.ok(document.querySelector('#whWorkspaceTools [data-hub="privacy"]'));
  assert.equal(document.getElementById('focusModeButton').nextElementSibling.id,'breakTerrariumButton');
  ui.open();
  for(const design of Object.keys(window.WorkHubWebsiteDesigns.DESIGNS)){
   const radio=document.querySelector('[name="websiteDesign"][value="'+design+'"]');radio.checked=true;
   radio.dispatchEvent(new window.Event('change',{bubbles:true}));
-  assert.equal(window.getComputedStyle(header).minHeight,'68px',design);
+  assert.equal(window.getComputedStyle(header).minHeight,'62px',design);assert.equal(window.getComputedStyle(header).position,'sticky',design);assert.equal(window.getComputedStyle(header).top,'0px',design);
   assert.equal(document.querySelector('.mv-landscape'),landscape);assert.equal(landscape.outerHTML,art);
   assert.ok(widgets.every(node=>node.isConnected&&node.draggable&&node.querySelector('[data-hub="widget-size"],[data-md="expand"]')));
   assert.equal(document.getElementById('hubAtmosphereCard'),world);assert.equal(world.querySelector('svg'),worldArt);
  }
  ui.close();assert.deepEqual(copy(api.state()),before);assert.equal(db.calls.length,writes);
  world.click();assert.ok(document.getElementById('atmosphereForm'));api.closeModal();
- await atmosphereChoices(ctx,{mode:'off'});assert.equal(window.getComputedStyle(document.getElementById('whWorldWindow')).display,'none');
- await atmosphereChoices(ctx,{mode:'auto'});assert.notEqual(window.getComputedStyle(document.getElementById('whWorldWindow')).display,'none');
+ await atmosphereChoices(ctx,{mode:'off'});assert.equal(window.getComputedStyle(world).display,'none');
+ await atmosphereChoices(ctx,{mode:'auto'});assert.notEqual(window.getComputedStyle(world).display,'none');
  assert.equal(world.querySelector('svg'),worldArt);assert.equal(db.calls.length,writes);
 });
 test('Workspace redesign: Process Hub follows light and dark theme tokens without replacing the canvas, maintained form or playback',async t=>{

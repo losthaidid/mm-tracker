@@ -1215,6 +1215,8 @@
       event => {
         event.preventDefault();
         event.stopImmediatePropagation();
+        const settings = document.getElementById('settingsMenu');
+        if (settings) settings.open = false;
         const day = a.today(),
           from = shift(day, -29);
         a.openModal(

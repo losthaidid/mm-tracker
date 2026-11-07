@@ -22,11 +22,14 @@ body[data-hub-layout='renewed'][data-density='compact'] {
   --wh-gap: 14px;
 }
 
-/* One compact identity row, with the real export, save and account controls. */
+/* A compact, pinned identity row; Settings contains the export action. */
 body[data-hub-layout='renewed'] #hubHeader {
-  min-height: 68px;
-  padding: 12px clamp(16px, 2vw, 30px);
-  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 180;
+  min-height: 62px;
+  padding: 8px clamp(16px, 2vw, 30px);
+  gap: 12px;
 }
 body[data-hub-layout='renewed']:not([data-hub-design='fiori']) #hubHeader {
   background: var(--wh-paper);
@@ -38,15 +41,18 @@ body[data-hub-layout='renewed'] #hubHeader h1 {
   line-height: 1.2;
   letter-spacing: -0.035em;
 }
+body[data-hub-layout='renewed'] #hubHeader h1 [data-brand-home] {
+  min-height: 0;
+}
 body[data-hub-layout='renewed'] #hubHeader p {
   margin: 4px 0 0;
   font-size: 11px;
   line-height: 1.4;
 }
 body[data-hub-layout='renewed'] #hubHeader .hub-brand-mark {
-  width: 40px;
-  height: 40px;
-  flex-basis: 40px;
+  width: 36px;
+  height: 36px;
+  flex-basis: 36px;
   padding: 8px;
 }
 body[data-hub-layout='renewed'] #hubHeader .hub-header-brand {
@@ -667,155 +673,32 @@ body[data-hub-layout='renewed'] .pc-quick {
   border-color: var(--hub-border);
 }
 
-/* A living scene is part of the brand header, never over the workspace. */
-body[data-hub-layout='renewed'][data-hub-world='header'] #hubHeader {
-  display: grid;
-  grid-template-columns: minmax(160px, 1fr) minmax(340px, 410px) minmax(250px, 1fr);
-  align-items: center;
-  gap: 18px;
-  padding-top: 10px;
-  padding-bottom: 10px;
+/* The whole left column stays below the measured header. Its own scrollbar
+   keeps every navigation item and the restored scenery reachable on short screens. */
+html {
+  scroll-padding-top: calc(var(--hub-header-height, 62px) + 16px);
 }
-body[data-hub-layout='renewed'][data-hub-world='header'] #hubHeader > .hub-header-brand {
-  grid-column: 1;
-  grid-row: 1;
+body[data-hub-layout='renewed']:not([data-hub-design='canvas']) #hubSidebar {
+  position: sticky;
+  top: var(--hub-header-height, 62px);
 }
-body[data-hub-layout='renewed'][data-hub-world='header'] #hubHeader > .header-actions {
-  grid-column: 3;
-  grid-row: 1;
-  justify-self: end;
+@media (min-width: 901px) {
+  body[data-hub-layout='renewed']:not([data-hub-design='canvas'], [data-hub-design='clear-desk'])
+    #hubSidebar {
+    align-self: start;
+    height: calc(100dvh - var(--hub-header-height, 62px));
+    min-height: 0;
+    max-height: calc(100dvh - var(--hub-header-height, 62px));
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    scrollbar-width: thin;
+  }
 }
-body #hubHeader #whWorldWindow {
-  position: relative;
-  grid-column: 2;
-  grid-row: 1;
-  justify-self: center;
-  width: 100%;
-  min-width: 0;
-  max-width: 410px;
-  border: 1px solid var(--hub-border);
-  border-radius: 16px;
-  background: linear-gradient(
-    110deg,
-    color-mix(in srgb, var(--hub-link) 6%, var(--hub-surface)),
-    var(--hub-surface)
-  );
-  color: var(--hub-text);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--hub-surface) 65%, transparent);
+body[data-hub-layout='renewed'] #hubSidebar #hubAtmosphereCard {
+  margin-top: 18px;
 }
-#whWorldWindow[hidden],
-#whWorldWindow:has(#hubAtmosphereCard[hidden]) {
-  display: none;
-}
-body #hubHeader #whWorldWindow #hubAtmosphereCard {
-  display: grid;
-  grid-template-columns: 180px minmax(0, 1fr);
-  align-items: center;
-  gap: 14px;
-  width: 100%;
-  max-width: none;
-  min-height: 0;
-  margin: 0;
-  padding: 7px 13px 7px 7px;
-  border: 0;
-  border-radius: inherit;
-  color: var(--hub-text);
-  background: transparent;
-  text-align: left;
-  box-shadow: none;
-}
-body #hubHeader #whWorldWindow #hubAtmosphereCard :is(svg, .hub-atmosphere-window) {
-  display: block;
-  grid-column: 1;
-  width: 180px;
-  max-width: 100%;
-  height: 99px;
-  max-height: none;
-  margin: 0;
-}
-.wh-world-caption {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 5px;
-  min-width: 0;
-  padding: 3px 0 26px;
-  align-self: stretch;
-}
-.wh-world-caption::before {
-  content: 'YOUR WORLD, LIVE';
-  color: var(--hub-link);
-  font-size: 8px;
-  font-weight: 650;
-  letter-spacing: 0.13em;
-  line-height: 1.4;
-}
-body #hubHeader #whWorldWindow #hubAtmosphereCaption {
-  margin: 0;
-  color: var(--hub-text);
-  font-size: 14px;
-  line-height: 1.35;
-  font-weight: 650;
-  letter-spacing: -0.02em;
-  overflow-wrap: anywhere;
-}
-body #hubHeader #whWorldWindow #hubAtmosphereClock {
-  margin: 0;
-  color: var(--hub-muted);
-  font-size: 11px;
-  line-height: 1.4;
-  font-variant-numeric: tabular-nums;
-}
-body #hubHeader #whWorldWindow .wh-world-expand {
-  position: absolute;
-  bottom: 8px;
-  right: 11px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  min-height: 24px;
-  padding: 3px 7px;
-  border: 1px solid var(--hub-border);
-  border-radius: 6px;
-  background: var(--hub-surface-soft);
-  color: var(--hub-text);
-  font-size: 10px;
-  line-height: 1.4;
-}
-body #hubHeader #whWorldWindow .wh-world-expand:hover {
-  border-color: var(--hub-link);
-  color: var(--hub-link);
-}
-body #hubHeader #whWorldWindow[data-expanded='true'] {
-  grid-column: 1 / -1;
-  grid-row: 2;
-  max-width: none;
-  border-color: color-mix(in srgb, var(--hub-link) 45%, var(--hub-border));
-}
-body #hubHeader #whWorldWindow[data-expanded='true'] #hubAtmosphereCard {
-  grid-template-columns: minmax(220px, 440px) minmax(0, 280px);
-  justify-content: center;
-  gap: 30px;
-  padding: 14px 22px;
-}
-body
-  #hubHeader
-  #whWorldWindow[data-expanded='true']
-  #hubAtmosphereCard
-  :is(svg, .hub-atmosphere-window) {
-  width: 100%;
-  height: auto;
-  max-height: 242px;
-}
-body #hubHeader #whWorldWindow[data-expanded='true'] #hubAtmosphereCaption {
-  font-size: 20px;
-}
-body #hubHeader #whWorldWindow[data-expanded='true'] #hubAtmosphereClock {
-  font-size: 14px;
-}
-body:is(.hub-present, .hub-private, .hub-focus, .hub-sorting) #whWorldWindow {
-  display: none;
+body[data-hub-layout='renewed'] #hubHeader #settingsMenu > .settings-panel.settings-organized {
+  max-height: calc(100dvh - var(--hub-header-height, 62px) - 24px);
 }
 body[data-hub-layout='renewed'].hub-present #hubShell {
   grid-template-columns: minmax(0, 1fr);
@@ -842,7 +725,7 @@ body[data-hub-layout='renewed'][data-density='compact'] #view :is(th, td) {
   padding: 8px 10px;
 }
 body[data-hub-layout='renewed']
-  :is(#hubToolbar, #view, #whWorldWindow)
+  :is(#hubToolbar, #view, #hubSidebar)
   :is(button, summary):focus-visible {
   outline: 3px solid var(--hub-link);
   outline-offset: 3px;
@@ -858,25 +741,6 @@ body[data-hub-layout='renewed']
   }
 }
 @media (max-width: 1100px) {
-  body[data-hub-layout='renewed'][data-hub-world='header'] #hubHeader {
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 10px 18px;
-  }
-  body[data-hub-layout='renewed'][data-hub-world='header'] #hubHeader > .header-actions {
-    grid-column: 2;
-  }
-  body #hubHeader #whWorldWindow {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    max-width: none;
-  }
-  body #hubHeader #whWorldWindow #hubAtmosphereCard {
-    grid-template-columns: 154px minmax(0, 1fr);
-  }
-  body #hubHeader #whWorldWindow #hubAtmosphereCard :is(svg, .hub-atmosphere-window) {
-    width: 154px;
-    height: 85px;
-  }
   body[data-hub-layout='renewed'] #hubToolbar > [data-hub='commands'] {
     flex-basis: 100%;
   }
@@ -905,63 +769,44 @@ body[data-hub-layout='renewed']
     grid-column: 1 / -1;
   }
 }
+@media (max-width: 760px) {
+  body[data-hub-layout='renewed'] #hubHeader #settingsMenu > .settings-panel.settings-organized {
+    top: calc(var(--hub-header-height, 62px) + 8px);
+  }
+}
 @media (max-width: 620px) {
   body[data-hub-layout='renewed'] {
     --wh-space: 17px;
     --wh-gap: 15px;
   }
   body[data-hub-layout='renewed'] #hubHeader {
-    min-height: 66px;
-    padding: 11px 14px;
-    flex-wrap: wrap;
+    min-height: 62px;
+    padding: 8px 14px;
+    flex-wrap: nowrap;
     gap: 10px;
   }
   body[data-hub-layout='renewed'] #hubHeader h1 {
     font-size: 18px;
   }
-  body[data-hub-layout='renewed'][data-hub-world='header'] #hubHeader {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  body[data-hub-layout='renewed'][data-hub-world='header'] #hubHeader > .header-actions {
-    grid-column: 1;
-    grid-row: 2;
-    width: 100%;
-    justify-self: stretch;
-    justify-content: flex-end;
-  }
-  body #hubHeader #whWorldWindow,
-  body #hubHeader #whWorldWindow[data-expanded='true'] {
-    grid-column: 1;
-    grid-row: 3;
-  }
-  body #hubHeader #whWorldWindow #hubAtmosphereCard {
-    grid-template-columns: 136px minmax(0, 1fr);
-    gap: 10px;
-  }
-  body #hubHeader #whWorldWindow #hubAtmosphereCard :is(svg, .hub-atmosphere-window) {
-    width: 136px;
-    height: 75px;
-  }
-  body #hubHeader #whWorldWindow .wh-world-caption {
-    gap: 3px;
-  }
-  body #hubHeader #whWorldWindow[data-expanded='true'] #hubAtmosphereCard {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 10px;
-    padding: 14px;
-  }
-  body
-    #hubHeader
-    #whWorldWindow[data-expanded='true']
-    #hubAtmosphereCard
-    :is(svg, .hub-atmosphere-window) {
-    width: min(100%, 360px);
-    height: auto;
-    justify-self: center;
+  body[data-hub-layout='renewed'] #hubHeader .hub-header-brand {
+    width: auto;
+    flex: 1;
+    gap: 8px;
   }
   body[data-hub-layout='renewed'] #hubHeader .header-actions {
+    width: auto;
+    max-width: 45%;
     margin-left: auto;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    flex-shrink: 0;
+  }
+  body[data-hub-layout='renewed'] #hubHeader .header-actions .save-pill {
+    display: none;
+  }
+  body[data-hub-layout='renewed'] #hubHeader .settings-menu > summary {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
   }
   body[data-hub-layout='renewed'] #hubToolbar .wh-tool-menu {
     margin-left: auto;

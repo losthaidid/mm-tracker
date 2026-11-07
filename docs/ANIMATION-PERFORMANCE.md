@@ -17,7 +17,7 @@ An Automatic fallback remains for the current Automatic session to avoid repeate
 - The global renderer previously captured its budget only at page load. It now refreshes its sky layers, reaction limits and intersecting-card budget on rendering changes, without rebuilding forms or replacing inputs.
 - Default desktop card glows are capped at six. Full effects retains the previous behavior. Smooth removes the decorative aura nodes entirely and restores them when required.
 - Click and pointer feedback share one expiry timer instead of scheduling a timer for every particle. Both live nodes and pending cleanup work are bounded. Automatic pointer trails are less frequent and skip the additional streak/full-page sweep.
-- Header text uses a single gentle opacity animation in the lighter profiles instead of animating every letter's movement and gradient. Symbol and terrarium breathing effects use transforms/opacity rather than animated shadows. Theme colours and privacy redaction remain intact.
+- Header letters retain their small, staggered transform animation in lighter profiles, without gradient or shadow painting; the complete title does not animate as a second layer. Symbol and terrarium breathing effects use transforms/opacity rather than animated shadows. Theme colours and privacy redaction remain intact.
 - My Day avoids scheduling tilt and parallax work in Smooth. Offscreen scenery continues to pause in every profile, and profile changes cancel pending decorative frames. The full-screen rest scene clears the covered global decorations while retaining its own plant, water, music and Resume work behavior.
 
 ## Functionality and verification
