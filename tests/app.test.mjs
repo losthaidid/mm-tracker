@@ -3793,3 +3793,15 @@ test('Excel Report selected-column filters and pasted extraction work in the int
  assert.ok(document.querySelector('.er-live-card').nextElementSibling.classList.contains('er-report-card'));
  assert.equal(db.calls.length,calls);
 });
+
+test('Visual refinement: every section retains navigation, data and working controls',async t=>{
+ const {api,document,window,db}=await app(t),buttons=[...document.querySelectorAll('#tabs button[data-tab]')],before=JSON.parse(api.payload(api.state())).data,calls=db.calls.length;
+ for(const section of ['home','tickets','tasks','schedule','specs','notes','knowledge','processhub','files','handover','waiting','studio','lab','validator','snippets']){
+  api.showTab(section);api.hub.visualRefinement.measureNavigation();
+  assert.equal(document.body.dataset.vs,'ready');assert.equal(document.getElementById('view').dataset.vsPage,section);
+  for(const button of buttons)assert.equal(document.querySelector('#tabs button[data-tab="'+button.dataset.tab+'"]'),button);
+ }
+ api.showTab('tickets');api.editRecord('tickets');const input=document.getElementById('editForm').elements.namedItem('description');input.value='Unsaved visual test';input.focus();input.setSelectionRange(3,7);
+ api.hub.visualRefinement.mount('tickets');assert.equal(document.activeElement,input);assert.equal(input.value,'Unsaved visual test');assert.equal(input.selectionStart,3);
+ assert.equal(db.calls.length,calls);assert.deepEqual(JSON.parse(api.payload(api.state())).data,before);
+});

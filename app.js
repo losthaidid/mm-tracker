@@ -344,7 +344,8 @@ function tag(v) {
               : k.includes('review')
                 ? 'review'
                 : '';
-  return `<span class="tag ${cls}">${esc(v) || '—'}</span>`;
+  const tone = window.WorkHubVisualRefinement?.tone(v);
+  return `<span class="tag ${cls}"${tone ? ' data-vs-tone="' + tone + '"' : ''}>${esc(v) || '—'}</span>`;
 }
 function selectOptions(values, current, empty = 'All') {
   const merged = [
@@ -1185,6 +1186,7 @@ function render() {
   // A design-only save updates the shell while keeping open editors and working data intact.
   if (hub?.websiteDesigns?.preservingContent()) {
     hub.websiteDesigns.mount();
+    hub.visualRefinement?.mount(tab);
     return;
   }
   filesLibrary?.sync();
@@ -1194,6 +1196,7 @@ function render() {
     $('view').innerHTML = '';
     $('tabs').hidden = true;
     hub?.afterRender(tab);
+    hub?.visualRefinement?.mount(tab);
     return;
   }
   access?.sync();
@@ -1207,6 +1210,7 @@ function render() {
     $('tabs').hidden = false;
     hub?.afterRender(tab);
     access?.apply();
+    hub?.visualRefinement?.mount(tab);
     return;
   }
   if (!visible.includes(tab)) tab = visible[0] || 'tickets';
@@ -1252,6 +1256,7 @@ function render() {
   projectItemsWorkspace?.mount();
   access?.apply();
   hub?.websiteDesigns?.mount();
+  hub?.visualRefinement?.mount(tab);
 }
 
 function taskLinkedLabel(t, d = state) {
