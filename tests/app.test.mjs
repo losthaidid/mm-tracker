@@ -1008,10 +1008,13 @@ test('the floating timer moves, minimises, recovers and stays within a phone vie
 
 test('Momo walks locally and pauses for typing, reduced motion, presentation and disabled wandering',async t=>{
  const {api,document,window,db,intervals,frames}=await app(t,{storage:{'mm-tracker.momo-moments.v1':JSON.stringify({visitors:false})}}),tick=intervals.find(x=>x.ms===1000).callback,pet=document.getElementById('hubPet'),before=pet.style.top;
+ // A route can queue one navigation layout frame after companion motion stops.
+ // Drain it once without advancing time: an active walk would queue another frame.
+ const flushPendingFrame=()=>{for(const [id,callback]of [...frames]){frames.delete(id);callback(window.performance.now());}};
  tick();assert.ok(frames.size);assert.equal(pet.dataset.roaming,'true');for(const [id,callback]of [...frames]){frames.delete(id);callback(window.performance.now()+6000);}assert.notEqual(pet.style.top,before);assert.equal(db.calls.length,0);
- const start=Date.now();window.Date.now=()=>start+30000;tick();assert.ok(frames.size);api.showTab('knowledge');document.getElementById('hubSearch').focus();assert.equal(frames.size,0);assert.equal(pet.dataset.roaming,'false');document.getElementById('hubSearch').blur();
- window.matchMedia=()=>({matches:true});tick();assert.equal(frames.size,0);window.matchMedia=()=>({matches:false});tick();assert.ok(frames.size);document.querySelector('#hubToolbar [data-hub="presentation"]').click();await settle();assert.equal(frames.size,0);
- document.getElementById('hubExitPresentation').click();await settle();api.hub.setTool('theme');api.showTab('studio');const form=document.getElementById('hubTheme');form.elements.namedItem('roaming').checked=false;form.elements.namedItem('roaming').dispatchEvent(new window.Event('change',{bubbles:true}));tick();assert.equal(frames.size,0);assert.equal(db.calls.length,0);
+ const start=Date.now();window.Date.now=()=>start+30000;tick();assert.ok(frames.size);api.showTab('knowledge');document.getElementById('hubSearch').focus();flushPendingFrame();assert.equal(frames.size,0);assert.equal(pet.dataset.roaming,'false');document.getElementById('hubSearch').blur();
+ window.matchMedia=()=>({matches:true});tick();flushPendingFrame();assert.equal(frames.size,0);window.matchMedia=()=>({matches:false});tick();assert.ok(frames.size);document.querySelector('#hubToolbar [data-hub="presentation"]').click();await settle();flushPendingFrame();assert.equal(frames.size,0);
+ document.getElementById('hubExitPresentation').click();await settle();api.hub.setTool('theme');api.showTab('studio');const form=document.getElementById('hubTheme');form.elements.namedItem('roaming').checked=false;form.elements.namedItem('roaming').dispatchEvent(new window.Event('change',{bubbles:true}));tick();flushPendingFrame();assert.equal(frames.size,0);assert.equal(db.calls.length,0);
 });
 
 function addReportTicket(api,document,number='INC-101'){
