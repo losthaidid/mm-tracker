@@ -626,3 +626,71 @@ body[data-motion='off'] .er-workspace *::after {
   outline: 2px solid var(--hub-accent, #3868e9);
   outline-offset: 2px;
 }
+
+.er-paste-preview {
+  margin-top: 20px;
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--hub-accent, #3868e9) 35%, var(--er-border));
+  border-radius: 12px;
+  background: var(--er-soft);
+  min-width: 0;
+}
+.er-paste-preview h4 {
+  margin: 6px 0;
+  font-size: 1rem;
+}
+.er-paste-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 14px;
+}
+.er-paste-options label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+.er-paste-table {
+  margin: 14px 0 8px;
+  max-height: 340px;
+}
+.er-paste-table table {
+  width: 100%;
+}
+.er-paste-table th,
+.er-paste-table td {
+  min-width: 120px;
+  max-width: 260px;
+}
+.er-paste-table .is-kept {
+  background: color-mix(in srgb, var(--hub-accent, #3868e9) 12%, var(--er-soft));
+}
+.er-paste-table th.is-kept {
+  box-shadow: inset 0 -3px var(--hub-accent, #3868e9);
+}
+.er-paste-table .is-skipped {
+  opacity: 0.48;
+}
+.er-paste-table .val-btn {
+  white-space: nowrap;
+  padding: 5px 7px;
+}
+.er-paste-preview > small {
+  display: block;
+  color: var(--er-muted);
+  font-size: 0.75rem;
+}
+.er-paste-summary {
+  margin: 14px 0 0;
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+@media (max-width: 600px) {
+  .er-paste-options {
+    grid-template-columns: 1fr;
+  }
+  .er-paste-preview {
+    padding: 12px;
+  }
+}
