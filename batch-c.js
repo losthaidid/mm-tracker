@@ -18,6 +18,7 @@
     layout: 'walkthrough',
     exportHeading: E.DEFAULT_GUIDE_HEADING,
     footer: E.footer(),
+    cover: E.cover(),
     colours: E.colours(),
     numbering: E.numbering(),
     styles: [],
@@ -61,6 +62,10 @@
       objectRef = null,
       objectListKey = '',
       clipboard = [];
+    let layerImages = new Map(),
+      layerLoadJob = 0,
+      layerLoadKey = '',
+      coverImageRefs = [];
     const project = () => projects[mode],
       step = () => project().steps.find(s => s.id === selected),
       $ = selector => room?.querySelector(selector);
@@ -69,10 +74,10 @@
       activeObject = () => step()?.marks[objectIndex];
     function objectFields() {
       return (
-        '<section class="bc-objects" aria-label="Screenshot objects"><h3>Objects &amp; instructions</h3><label>Object<select data-bc-object><option value="-1">Choose an object</option></select></label><p class="bc-guide-heading-help">Use Select objects, drag to move, or drag a corner to resize. Locked objects can be selected from this list.</p>' +
+        '<section class="bc-objects" aria-label="Screenshot objects"><h3>Objects &amp; instructions</h3><label>Object<select data-bc-object><option value="-1">Choose an object</option></select></label><p class="bc-guide-heading-help">Choose an object here or use Select objects on the canvas. Drag to move or resize; Delete selected object removes it. Unlock a locked object first.</p>' +
         '<div class="bc-object-actions">' +
         [
-          ['delete-object', 'Delete'],
+          ['delete-object', 'Delete selected object'],
           ['duplicate-object', 'Duplicate'],
           ['front-object', 'Bring to front'],
           ['back-object', 'Send to back'],
@@ -101,9 +106,10 @@
           )
           .join('') +
         '</div>' +
-        '<label>Object colour<input type="color" data-bc-object-color></label><label data-bc-object-size-label>Size / stroke (pixels)<input type="number" min="0.1" step="0.1" data-bc-object-size></label>' +
+        '<label data-bc-object-color-label>Object colour<input type="color" data-bc-object-color></label><label data-bc-object-size-label>Size / stroke (pixels)<input type="number" min="0.1" step="0.1" data-bc-object-size></label>' +
+        '<label data-bc-object-name-label hidden>Image name<input maxlength="120" data-bc-object-name></label><p class="bc-guide-heading-help" data-bc-image-help hidden>Images fit inside the selected box without stretching. Transparent backgrounds are preserved. Bring to front / Send to back changes the stacking order.</p>' +
         '<label data-bc-object-text-label hidden>Text<textarea maxlength="500" rows="3" data-bc-object-text></textarea><small>Resize the box or reduce its text size until the label fits.</small></label><label data-bc-object-number-label hidden>Number<input type="number" min="1" max="999" data-bc-object-number></label><label data-bc-object-instruction-label hidden>Linked instruction<textarea maxlength="300" rows="3" data-bc-object-instruction placeholder="What should the reader do at this marker?"></textarea></label>' +
-        '<label data-bc-object-opacity-label hidden>Dim opacity<input type="range" min="10" max="85" data-bc-object-opacity></label>' +
+        '<label data-bc-object-opacity-label hidden><span data-bc-opacity-label>Dim opacity</span><input type="range" min="10" max="85" data-bc-object-opacity></label>' +
         button('apply-object', 'Apply object changes') +
         '</div>' +
         (mode === 'guide'
@@ -127,7 +133,7 @@
         select = $('[data-bc-object]');
       if (!select) return;
       const key = JSON.stringify(
-        marks.map(o => [o.type, o.number, o.text?.slice(0, 28), o.locked])
+        marks.map(o => [o.type, o.number, o.text?.slice(0, 28), o.name, o.locked])
       );
       if (key !== objectListKey) {
         select.innerHTML =
@@ -144,7 +150,7 @@
                   i +
                     1 +
                     '. ' +
-                    o.type +
+                    (o.type === 'image' ? 'Image · ' + o.name : o.type) +
                     (o.type === 'number' ? ' ' + o.number : '') +
                     (o.text ? ' · ' + o.text.slice(0, 28) : '') +
                     (o.locked ? ' · locked' : '')
@@ -163,7 +169,8 @@
         'back-object',
         'apply-object',
       ])
-        $('[data-bc="' + action + '"]').disabled = busy || !m || !!m.locked;
+        for (const el of room.querySelectorAll('[data-bc="' + action + '"]'))
+          el.disabled = busy || !m || !!m.locked;
       for (const action of ['lock-object', 'copy-object'])
         $('[data-bc="' + action + '"]').disabled = busy || !m;
       $('[data-bc="copy-all"]').disabled = busy || !marks.length;
@@ -171,6 +178,8 @@
       $('[data-bc="lock-object"]').textContent = m?.locked ? 'Unlock object' : 'Lock object';
       for (const el of $('[data-bc-object-properties]').querySelectorAll('input,textarea'))
         el.disabled = busy || !m || !!m.locked;
+      $('[data-bc-object-opacity]').min = m?.type === 'image' ? 5 : 10;
+      $('[data-bc-object-opacity]').max = m?.type === 'image' ? 100 : 85;
       if (m && objectRef !== m) {
         const b = E.markBounds(m, s.image);
         for (const k of ['x', 'y', 'w', 'h'])
@@ -181,6 +190,7 @@
         $('[data-bc-object-text]').value = m.text || '';
         $('[data-bc-object-number]').value = m.number || 1;
         $('[data-bc-object-instruction]').value = m.instruction || '';
+        $('[data-bc-object-name]').value = m.name || '';
         $('[data-bc-object-opacity]').value = Math.round((m.opacity || 0.55) * 100);
         for (const input of $('[data-bc-object-properties]').querySelectorAll('input,textarea'))
           input.dataset.current = input.value;
@@ -190,10 +200,23 @@
         ['text', ['text', 'callout'].includes(m?.type)],
         ['number', m?.type === 'number'],
         ['instruction', m?.type === 'number'],
-        ['opacity', m?.type === 'spotlight'],
+        ['opacity', ['spotlight', 'image'].includes(m?.type)],
+        ['name', m?.type === 'image'],
       ])
         $('[data-bc-object-' + part + '-label]').hidden = !show;
-      $('[data-bc-object-size-label]').hidden = m?.type === 'spotlight';
+      $('[data-bc-object-size-label]').hidden = ['spotlight', 'image'].includes(m?.type);
+      $('[data-bc-object-color-label]').hidden = m?.type === 'image';
+      $('[data-bc-image-help]').hidden = m?.type !== 'image';
+      $('[data-bc-opacity-label]').textContent =
+        m?.type === 'image' ? 'Image opacity' : 'Dim opacity';
+      const selection = $('[data-bc-selection-status]');
+      if (selection)
+        selection.textContent = m
+          ? (m.type === 'image' ? m.name || 'Image layer' : m.type) +
+            (m.locked
+              ? ' · Locked: unlock in Objects & instructions to delete.'
+              : ' selected · Delete removes this object. Undo restores it.')
+          : 'Choose Select objects, then click an object to move, resize or delete it.';
       if (mode === 'guide') {
         $('[data-bc-linked]').checked = project().linkedInstructions;
         const list = $('[data-bc-linked-list]'),
@@ -277,7 +300,8 @@
         next.number = +$('[data-bc-object-number]').value;
         next.instruction = $('[data-bc-object-instruction]').value;
       }
-      if (m.type === 'spotlight' && edited('opacity'))
+      if (m.type === 'image') next.name = $('[data-bc-object-name]').value;
+      if (['spotlight', 'image'].includes(m.type) && edited('opacity'))
         next.opacity = +$('[data-bc-object-opacity]').value / 100;
       commitMarks(s.marks.map((o, i) => (i === objectIndex ? next : o)));
     }
@@ -314,6 +338,7 @@
           s.marks.filter((_, i) => i !== objectIndex),
           -1
         );
+        status('Object deleted. Use Undo to restore it.');
         return;
       }
       if (action === 'duplicate-object') {
@@ -357,7 +382,7 @@
         $('[data-bc-' + key + ']').value = value;
       const m = activeObject(),
         s = step();
-      if (m && !m.locked) {
+      if (m && !m.locked && m.type !== 'image') {
         const size =
           (m.type === 'number'
             ? style.marker
@@ -380,8 +405,240 @@
         );
       }
       status(
-        'Style applied to the current tool' + (m && !m.locked ? ' and selected object.' : '.')
+        'Style applied to the current tool' +
+          (m && !m.locked && m.type !== 'image' ? ' and selected object.' : '.')
       );
+    }
+    function coverFields() {
+      return (
+        '<details class="bc-cover"><summary>Front cover · text, fonts &amp; images</summary>' +
+        '<div class="bc-cover-inner"><label class="bc-object-check"><input type="checkbox" data-bc-cover="enabled">Include a front cover</label>' +
+        '<p class="bc-guide-heading-help">An optional opening page before your screenshot steps. Uses your export colours and footer. Cover text sizes are in page pixels; images keep their proportions.</p>' +
+        '<div data-bc-cover-content hidden><div class="bc-cover-design"><label>Cover design<select data-bc-cover="design">' +
+        Object.entries(E.COVER_DESIGNS)
+          .map(([id, item]) => '<option value="' + id + '">' + esc(item.label) + '</option>')
+          .join('') +
+        '</select></label><label>Text alignment<select data-bc-cover="align"><option value="left">Left</option><option value="center">Center</option></select></label></div><p data-bc-cover-description class="bc-guide-heading-help"></p>' +
+        '<div class="bc-cover-text-grid">' +
+        [
+          ['title', 'Cover title', 180, 24, 100],
+          ['subtitle', 'Subtitle', 500, 14, 44],
+          ['details', 'Details / author / version', 800, 12, 32],
+        ]
+          .map(
+            ([key, label, length, min, max]) =>
+              '<fieldset><legend>' +
+              label +
+              '</legend><label>Text<textarea rows="' +
+              (key === 'title' ? 2 : 3) +
+              '" maxlength="' +
+              length +
+              '" data-bc-cover="' +
+              key +
+              '"' +
+              (key === 'title' ? ' placeholder="Uses the guide title when blank"' : '') +
+              '></textarea></label>' +
+              '<div class="bc-cover-design"><label>Font<select data-bc-cover="' +
+              key +
+              'Font">' +
+              Object.entries(E.GUIDE_FONTS)
+                .map(([id, font]) => '<option value="' + id + '">' + esc(font.label) + '</option>')
+                .join('') +
+              '</select></label><label>Size<input type="number" min="' +
+              min +
+              '" max="' +
+              max +
+              '" step="1" data-bc-cover="' +
+              key +
+              'Size"></label></div></fieldset>'
+          )
+          .join('') +
+        '</div><section class="bc-cover-images"><h3>Cover images <span data-bc-cover-count></span></h3><label class="bc-file-label secondary">+ Add cover images<input type="file" data-bc-cover-files accept="image/png,image/jpeg,image/webp" multiple></label>' +
+        '<p class="bc-guide-heading-help">Up to three images. The first image leads the gallery. Transparent PNG and WebP backgrounds are preserved.</p><div data-bc-cover-images></div></section>' +
+        button('preview-cover', 'Preview front cover') +
+        '</div></div></details>'
+      );
+    }
+    function updateCover() {
+      if (mode !== 'guide' || !room) return;
+      const cover = project().cover;
+      for (const el of room.querySelectorAll('[data-bc-cover]')) {
+        const value = cover[el.dataset.bcCover];
+        if (el.type === 'checkbox') el.checked = value;
+        else if (document.activeElement !== el) el.value = value;
+      }
+      $('[data-bc-cover-content]').hidden = !cover.enabled;
+      $('[data-bc-cover-description]').textContent = E.COVER_DESIGNS[cover.design].description;
+      $('[data-bc-cover-count]').textContent = cover.images.length + ' / 3';
+      $('[data-bc-cover-files]').disabled = busy || cover.images.length >= 3;
+      const list = $('[data-bc-cover-images]');
+      if (
+        cover.images.length !== coverImageRefs.length ||
+        cover.images.some((img, i) => img.src !== coverImageRefs[i]) ||
+        (cover.images.length && !list.children.length)
+      ) {
+        coverImageRefs = cover.images.map(img => img.src);
+        list.innerHTML = cover.images
+          .map(
+            (img, i) =>
+              '<article><img src="' +
+              img.src +
+              '" alt="Cover image ' +
+              (i + 1) +
+              '"><div><strong>Image ' +
+              (i + 1) +
+              '</strong><div class="bc-object-actions">' +
+              button(
+                'cover-up',
+                'Move earlier',
+                'data-index="' + i + '"' + (i === 0 ? ' disabled' : '')
+              ) +
+              button(
+                'cover-down',
+                'Move later',
+                'data-index="' + i + '"' + (i === cover.images.length - 1 ? ' disabled' : '')
+              ) +
+              button('cover-remove', 'Remove image', 'data-index="' + i + '"') +
+              '</div></div></article>'
+          )
+          .join('');
+      }
+      for (const el of list.querySelectorAll('button'))
+        el.disabled =
+          busy ||
+          (el.dataset.bc === 'cover-up' && +el.dataset.index === 0) ||
+          (el.dataset.bc === 'cover-down' && +el.dataset.index === cover.images.length - 1);
+      $('[data-bc="preview-steps"]').hidden = !cover.enabled;
+      $('[data-bc="preview-steps"]').disabled = busy || !project().steps.length;
+      $('[data-bc="preview-page"]').textContent = cover.enabled ? 'Front cover' : 'Full page';
+      $('[data-bc="refresh-preview"]').disabled =
+        busy || (!project().steps.length && !cover.enabled);
+    }
+    function editCover(el) {
+      const key = el.dataset.bcCover,
+        value = el.type === 'checkbox' ? el.checked : el.type === 'number' ? +el.value : el.value;
+      try {
+        project().cover = E.cover({ ...project().cover, [key]: value });
+        if (key === 'enabled') {
+          guidePreviewView = 'page';
+          room.querySelector('.bc-branding').open = true;
+        }
+        changed();
+        updateCover();
+      } catch (err) {
+        status(err.message, true);
+      }
+    }
+    async function addCoverImages(files) {
+      guard();
+      if (busy || mode !== 'guide') return;
+      const list = [...files];
+      if (!list.length) return;
+      if (project().cover.images.length + list.length > 3)
+        throw Error(
+          'A cover can contain up to three images. Remove an image before adding another.'
+        );
+      const dialog = room,
+        current = owner,
+        version = revision,
+        job = loadId,
+        alive = () =>
+          room === dialog &&
+          a.ready() &&
+          a.owner() === current &&
+          revision === version &&
+          job === loadId;
+      setBusy(true);
+      status('Preparing cover images locally…');
+      try {
+        const additions = [];
+        for (const file of list) {
+          additions.push(await F.imageFromFile(file, alive));
+          if (!alive()) return;
+        }
+        const cover = E.guide({
+          ...project(),
+          cover: { ...project().cover, images: [...project().cover.images, ...additions] },
+        }).cover;
+        if (!alive()) return;
+        project().cover = cover;
+        changed();
+        updateCover();
+        status('Cover images added. Preview front cover to review the design.');
+      } catch (err) {
+        if (alive()) throw err;
+      } finally {
+        if (room === dialog) setBusy(false);
+      }
+    }
+    async function addLayers(files) {
+      guard();
+      const s = step(),
+        list = [...files];
+      if (busy || !s || !image || !list.length) return;
+      if (s.marks.length + list.length > E.LIMITS.marks)
+        throw Error(
+          'This screenshot has too many objects. Delete some before adding image layers.'
+        );
+      const dialog = room,
+        current = owner,
+        version = revision,
+        job = loadId,
+        alive = () =>
+          room === dialog &&
+          a.ready() &&
+          a.owner() === current &&
+          revision === version &&
+          job === loadId &&
+          step() === s;
+      setBusy(true);
+      status('Preparing image layers locally…');
+      try {
+        const additions = [],
+          area = s.crop || { x: 0, y: 0, w: 1, h: 1 };
+        for (const [i, file] of list.entries()) {
+          const img = await F.imageFromFile(file, alive);
+          if (!alive()) return;
+          const scale = Math.min(
+              (area.w * s.image.width * 0.6) / img.width,
+              (area.h * s.image.height * 0.6) / img.height
+            ),
+            w = (img.width * scale) / s.image.width,
+            h = (img.height * scale) / s.image.height,
+            x = Math.min(area.x + area.w - w, area.x + (area.w - w) / 2 + i * 0.025),
+            y = Math.min(area.y + area.h - h, area.y + (area.h - h) / 2 + i * 0.025);
+          additions.push({
+            type: 'image',
+            image: img,
+            name: String(file.name || 'Image layer').slice(0, 120),
+            opacity: 1,
+            color: '#183b35',
+            size: 0.01,
+            points: [
+              [x, y],
+              [x + w, y + h],
+            ],
+          });
+        }
+        E.guide({
+          ...project(),
+          steps: project().steps.map(t =>
+            t === s ? { ...t, marks: [...s.marks, ...additions] } : t
+          ),
+        });
+        const decoded = await F.loadLayers({ marks: additions }, alive);
+        if (!alive()) return;
+        for (const [src, img] of decoded) layerImages.set(src, img);
+        tool = 'object';
+        commitMarks([...s.marks, ...additions], s.marks.length + additions.length - 1);
+        status(
+          'Image layer added. Drag to move, drag a corner to resize, and use Bring to front / Send to back to stack it.'
+        );
+      } catch (err) {
+        if (alive()) throw err;
+      } finally {
+        if (room === dialog) setBusy(false);
+      }
     }
     function brandingFields() {
       const f = project().footer,
@@ -470,8 +727,9 @@
         '"></label>' +
         '<p class="bc-guide-heading-help">Lower opacity creates a faint footer watermark. No background box is added. Footer space is reserved above page numbering.</p>' +
         '</fieldset></div><section class="bc-guide-preview" aria-label="Live export preview"><div class="bc-guide-preview-head"><div><h3>Live export preview</h3>' +
-        '<p class="bc-guide-heading-help">First exported page. Changes update automatically.</p></div><div class="bc-preview-views" role="group" aria-label="Preview view">' +
+        '<p class="bc-guide-heading-help">Changes update automatically. A front cover comes before the guide steps.</p></div><div class="bc-preview-views" role="group" aria-label="Preview view">' +
         button('preview-page', 'Full page', 'aria-pressed="true"') +
+        button('preview-steps', 'First guide page', 'aria-pressed="false" hidden') +
         button('preview-footer', 'Footer close-up', 'aria-pressed="false"') +
         button('refresh-preview', 'Refresh preview', 'data-needs-steps') +
         '</div></div>' +
@@ -542,6 +800,10 @@
         'aria-pressed',
         String(guidePreviewView === 'page')
       );
+      $('[data-bc="preview-steps"]').setAttribute(
+        'aria-pressed',
+        String(guidePreviewView === 'steps')
+      );
       $('[data-bc="preview-footer"]').setAttribute(
         'aria-pressed',
         String(guidePreviewView === 'footer')
@@ -570,7 +832,11 @@
         'aria-label',
         guidePreviewView === 'footer'
           ? 'Footer close-up of the first exported page'
-          : 'First exported guide page'
+          : guidePreviewView === 'steps'
+            ? 'First guide page after the cover'
+            : project().cover.enabled
+              ? 'Front cover preview'
+              : 'First exported guide page'
       );
       $('[data-bc="preview-page"]').setAttribute(
         'aria-pressed',
@@ -585,7 +851,7 @@
       clearTimeout(guidePreviewTimer);
       guidePreviewJob++;
       if (mode !== 'guide' || !room?.querySelector('.bc-branding')?.open) return;
-      if (project().steps.length) {
+      if (project().steps.length || project().cover.enabled) {
         $('[data-bc-preview-status]').textContent = 'Updating preview…';
         guidePreviewTimer = setTimeout(() => {
           void renderGuidePreview();
@@ -604,7 +870,11 @@
         guidePreviewPending = true;
         return;
       }
-      if (mode !== 'guide' || !room?.querySelector('.bc-branding')?.open || !project().steps.length)
+      if (
+        mode !== 'guide' ||
+        !room?.querySelector('.bc-branding')?.open ||
+        (!project().steps.length && !project().cover.enabled)
+      )
         return;
       const dialog = room,
         current = owner,
@@ -621,18 +891,22 @@
       guidePreviewRunning = true;
       try {
         const snapshot = E.guide(project());
-        page = await F.preview(snapshot, alive);
+        page = await F.preview(snapshot, alive, guidePreviewView === 'steps');
         if (!alive()) return;
         if (guidePreviewPage) F.release(guidePreviewPage);
         guidePreviewPage = page;
         page = null;
         paintGuidePreview();
         $('[data-bc-preview-status]').textContent =
-          (E.GUIDE_LAYOUTS[snapshot.layout]?.label || 'Original layout') +
+          (snapshot.cover.enabled && guidePreviewView !== 'steps'
+            ? 'Front cover'
+            : E.GUIDE_LAYOUTS[snapshot.layout]?.label || 'Original layout') +
           ' preview ready. Full exports include all steps and continuation pages.';
       } catch (err) {
-        if (alive())
+        if (alive()) {
+          $('[data-bc-page-sheet]').hidden = true;
           $('[data-bc-preview-status]').textContent = 'Preview unavailable: ' + err.message;
+        }
       } finally {
         if (page) F.release(page);
         guidePreviewRunning = false;
@@ -690,6 +964,10 @@
       drag = null;
       pan = null;
       image = null;
+      layerImages.clear();
+      layerLoadJob++;
+      layerLoadKey = '';
+      coverImageRefs = [];
       busy = false;
       if (room) {
         room.close();
@@ -847,9 +1125,10 @@
         el.disabled = busy || !project().footer.logo;
       for (const el of room.querySelectorAll('[data-needs-steps]'))
         el.disabled = busy || !project().steps.length;
-      $('[data-bc="undo"]').disabled = !s || !histories.get(s.id)?.length;
-      $('[data-bc="redo"]').disabled = !s || !redo.get(s.id)?.length;
-      for (const el of room.querySelectorAll('[data-needs-image]')) el.disabled = !s || !image;
+      $('[data-bc="undo"]').disabled = busy || !s || !histories.get(s.id)?.length;
+      $('[data-bc="redo"]').disabled = busy || !s || !redo.get(s.id)?.length;
+      for (const el of room.querySelectorAll('[data-needs-image]'))
+        el.disabled = busy || !s || !image;
       const restore = $('[data-bc="undo-remove"]'),
         up = $('[data-bc="up"]'),
         down = $('[data-bc="down"]');
@@ -886,6 +1165,7 @@
       $('[data-bc-canvas]').style.cursor =
         tool === 'move' ? 'grab' : tool === 'object' ? 'move' : 'crosshair';
       updateObjects();
+      updateCover();
     }
     function thumbs() {
       $('[data-bc-steps]').innerHTML = project()
@@ -910,6 +1190,38 @@
         controls();
         return;
       }
+      const sources = new Set(s.marks.filter(m => m.type === 'image').map(m => m.image.src));
+      for (const src of layerImages.keys()) if (!sources.has(src)) layerImages.delete(src);
+      if ([...sources].some(src => !layerImages.has(src))) {
+        const key = selected + '|' + revision + '|' + loadId;
+        if (layerLoadKey !== key) {
+          layerLoadKey = key;
+          const dialog = room,
+            current = owner,
+            version = revision,
+            job = ++layerLoadJob,
+            alive = () =>
+              room === dialog &&
+              a.ready() &&
+              a.owner() === current &&
+              revision === version &&
+              step() === s &&
+              job === layerLoadJob;
+          void F.loadLayers(s, alive)
+            .then(layers => {
+              if (alive()) {
+                layerImages = layers;
+                layerLoadKey = '';
+                paint();
+              }
+            })
+            .catch(err => {
+              if (alive()) status(err.message, true);
+            });
+        }
+        controls();
+        return;
+      }
       const preview =
         drag?.kind === 'object'
           ? { ...s, marks: s.marks.map((m, i) => (i === drag.index ? drag.mark : m)) }
@@ -922,7 +1234,7 @@
                 ],
               }
             : s;
-      F.draw(c, preview, image, original);
+      F.draw(c, preview, image, original, layerImages);
       const crop = drag?.kind === 'crop' ? E.bounds(drag.mark.points) : s.crop;
       if (crop && !original) {
         const ctx = c.getContext('2d'),
@@ -990,6 +1302,9 @@
       objectListKey = '';
       original = false;
       image = null;
+      layerImages.clear();
+      layerLoadJob++;
+      layerLoadKey = '';
       drag = null;
       const s = step(),
         job = ++loadId,
@@ -1002,9 +1317,11 @@
       const alive = () => !!room && job === loadId && a.ready() && current === a.owner();
       status('Opening screenshot…');
       try {
-        const img = await F.loadImage(s.image, alive);
+        const img = await F.loadImage(s.image, alive),
+          layers = await F.loadLayers(s, alive);
         if (!alive()) return;
         image = img;
+        layerImages = layers;
         fit();
         status('Solid cover replaces pixels in the exported image. Blur softens details.');
       } catch (err) {
@@ -1025,13 +1342,24 @@
       const from = forward ? redo : histories,
         to = forward ? histories : redo,
         list = from.get(s.id) || [],
-        state = list.pop();
+        state = list.at(-1);
       if (!state) return;
+      let checked;
+      try {
+        checked = E.guide({
+          ...project(),
+          steps: project().steps.map(t => (t === s ? { ...t, ...state } : t)),
+        }).steps.find(t => t.id === s.id);
+      } catch (err) {
+        status(err.message, true);
+        return;
+      }
+      list.pop();
       const target = to.get(s.id) || [];
       target.push({ marks: s.marks, crop: s.crop });
       to.set(s.id, target);
-      s.marks = state.marks;
-      s.crop = state.crop;
+      s.marks = checked.marks;
+      s.crop = checked.crop;
       changed();
       paint();
     }
@@ -1104,7 +1432,8 @@
         current = owner,
         version = revision,
         dialog = room;
-      if (!snapshot.steps.length) throw Error('Add a screenshot first.');
+      if (!snapshot.steps.length && !(format === 'editable' && snapshot.cover.enabled))
+        throw Error('Add a screenshot first.');
       const alive = () =>
         room === dialog && a.ready() && a.owner() === current && version === revision;
       clearUrls();
@@ -1170,6 +1499,11 @@
         }
         for (const s of data.steps) {
           await F.loadImage(s.image, alive);
+          await F.loadLayers(s, alive);
+          if (!alive()) return;
+        }
+        for (const img of data.cover.images) {
+          await F.loadImage(img, alive);
           if (!alive()) return;
         }
         if (data.footer.logo) {
@@ -1245,6 +1579,7 @@
               )
               .join('') +
             '</select></label><p id="bcLayoutHelp" data-bc-layout-help class="bc-guide-heading-help"></p></div>' +
+            coverFields() +
             brandingFields()
           : '') +
         '<nav class="bc-step-strip" data-bc-steps aria-label="Guide steps"' +
@@ -1277,7 +1612,9 @@
               '</button>'
           )
           .join('') +
-        '</div><div class="bc-tool-options"><label>Colour<input type="color" data-bc-color value="#183b35"></label><label data-bc-brush-control><span data-bc-size-label>Brush size</span><input type="range" data-bc-size min="2" max="80" value="24" aria-label="Brush or border thickness"></label>' +
+        '<label class="bc-file-label secondary">+ Add image layer<input type="file" data-bc-layer-files accept="image/png,image/jpeg,image/webp" multiple data-needs-image></label>' +
+        button('delete-object', 'Delete selected object', 'class="bc-delete-object" disabled') +
+        '</div><p class="bc-selection-help" data-bc-selection-status></p><div class="bc-tool-options"><label>Colour<input type="color" data-bc-color value="#183b35"></label><label data-bc-brush-control><span data-bc-size-label>Brush size</span><input type="range" data-bc-size min="2" max="80" value="24" aria-label="Brush or border thickness"></label>' +
         '<label data-bc-number-control hidden>Marker size<input type="range" data-bc-marker-size min="16" max="160" value="60" aria-label="Number marker size"></label><span data-bc-next-number hidden></span>' +
         '<label data-bc-new-text-control hidden>Label text<input data-bc-new-text maxlength="500" placeholder="Type your label before drawing"></label><label data-bc-text-size-control hidden>Text size<input type="range" data-bc-text-size min="10" max="120" value="24"></label><label data-bc-dim-control hidden>Dim opacity<input type="range" data-bc-dim-opacity min="10" max="85" value="55"></label>' +
         button('undo', 'Undo') +
@@ -1357,6 +1694,16 @@
       room.addEventListener('change', event => {
         if (busy) return;
         const el = event.target;
+        if (el.matches('[data-bc-cover]') && (el.tagName === 'SELECT' || el.type === 'checkbox'))
+          editCover(el);
+        if (el.matches('[data-bc-cover-files]')) {
+          void addCoverImages(el.files).catch(err => status(err.message, true));
+          el.value = '';
+        }
+        if (el.matches('[data-bc-layer-files]')) {
+          void addLayers(el.files).catch(err => status(err.message, true));
+          el.value = '';
+        }
         if (el.matches('[data-bc-object]')) chooseObject(+el.value);
         if (el.matches('[data-bc-number-mode],[data-bc-number-start]')) {
           try {
@@ -1419,6 +1766,8 @@
         if (busy) return;
         const el = event.target,
           s = step();
+        if (el.matches('[data-bc-cover]') && el.tagName !== 'SELECT' && el.type !== 'checkbox')
+          editCover(el);
         if (el.matches('[data-bc-title]')) {
           project().title = el.value;
           changed();
@@ -1857,9 +2206,36 @@
         scheduleGuidePreview(0);
         return;
       }
-      if (action === 'preview-page' || action === 'preview-footer') {
-        guidePreviewView = action === 'preview-page' ? 'page' : 'footer';
+      if (['preview-page', 'preview-footer', 'preview-steps'].includes(action)) {
+        const previous = guidePreviewView;
+        guidePreviewView =
+          action === 'preview-page' ? 'page' : action === 'preview-steps' ? 'steps' : 'footer';
+        if ((previous === 'steps') !== (guidePreviewView === 'steps')) {
+          scheduleGuidePreview(0);
+          return;
+        }
         paintGuidePreview();
+        return;
+      }
+      if (action === 'preview-cover') {
+        guidePreviewView = 'page';
+        room.querySelector('.bc-branding').open = true;
+        scheduleGuidePreview(0);
+        return;
+      }
+      if (['cover-remove', 'cover-up', 'cover-down'].includes(action) && mode === 'guide') {
+        const images = [...project().cover.images],
+          i = +el.dataset.index;
+        if (!Number.isInteger(i) || i < 0 || i >= images.length) return;
+        if (action === 'cover-remove') images.splice(i, 1);
+        else {
+          const next = i + (action === 'cover-up' ? -1 : 1);
+          if (next < 0 || next >= images.length) return;
+          [images[i], images[next]] = [images[next], images[i]];
+        }
+        project().cover = E.cover({ ...project().cover, images });
+        changed();
+        updateCover();
         return;
       }
       if (action === 'reset-logo-layout') {
@@ -1903,7 +2279,9 @@
       }
       if (action === 'undo-remove' && removed) {
         if (project().steps.length >= 24) throw Error('Remove a step before restoring this one.');
-        project().steps.splice(removed.index, 0, removed.step);
+        const steps = [...project().steps];
+        steps.splice(removed.index, 0, removed.step);
+        project().steps = E.guide({ ...project(), steps }).steps;
         const id = removed.step.id;
         removed = null;
         changed();
@@ -1996,6 +2374,8 @@
       close,
       add,
       addLogo,
+      addLayers,
+      addCoverImages,
       preview: renderGuidePreview,
       select,
       prepare,

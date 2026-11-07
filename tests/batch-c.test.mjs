@@ -45,7 +45,7 @@ function ui(t){
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;};w.HTMLCanvasElement.prototype.getContext=()=>({fillRect(){},strokeRect(){},drawImage(){},save(){},restore(){},setLineDash(){}});w.HTMLCanvasElement.prototype.setPointerCapture=function(){};w.HTMLCanvasElement.prototype.toDataURL=()=>image.src;
  w.URL.createObjectURL=blob=>{blobs.push(blob);return 'blob:local-'+blobs.length;};w.URL.revokeObjectURL=url=>revoked.push(url);w.Blob=Blob;
  w.eval(source('batch-c-engine.js'));
- w.WorkHubBatchCFiles={imageFromFile:async()=>copy(image),logoFromFile:async()=>copy(image),loadImage:async()=>({}),draw:(c,s,img,original)=>renders.push({s:copy(s),original}),release(){},raster:async()=>({width:8,height:6,toDataURL:()=>image.src}),export:async(g,format,alive)=>{exports.push({g:copy(g),format,alive});return new Blob(['clean export']);}};
+ w.WorkHubBatchCFiles={imageFromFile:async()=>copy(image),logoFromFile:async()=>copy(image),loadImage:async()=>({}),loadLayers:async s=>new Map(s.marks.filter(m=>m.type==='image').map(m=>[m.image.src,{}])),draw:(c,s,img,original)=>renders.push({s:copy(s),original}),release(){},raster:async()=>({width:8,height:6,toDataURL:()=>image.src}),export:async(g,format,alive)=>{exports.push({g:copy(g),format,alive});return new Blob(['clean export']);}};
  w.eval(source('batch-c.js'));const state={tickets:[{id:'t',ticket:'<T1>',description:'Connection timeout during upload',history:'Fix: <script>literal</script>',pic:'Rina',status:'Closed'}]};
  const adapter={ready:()=>!!owner,owner:()=>owner,state:()=>state,tell(){},latestHistory:t=>t.history},module=w.WorkHubBatchC.install(adapter);
  const click=(op,extra={})=>{const b=d.createElement('button');b.dataset.bc=op;Object.assign(b.dataset,extra);return module.handle(b);};
@@ -351,6 +351,74 @@ test('native zoom pixels keep privacy covers applied even above the zoom in laye
 });
 test('editing only an object colour preserves exact geometry and stroke at the image edge',async t=>{
  const original=shape('rectangle',{size:.01234567,points:[[.33135,.2],[1,.7]]}),c=await objects(t,[original]);await c.pick(0);c.d.querySelector('[data-bc-object-color]').value='#123456';await c.click('apply-object');const saved=await c.saved();assert.deepEqual(saved.steps[0].marks[0].points,original.points);assert.equal(saved.steps[0].marks[0].size,original.size);assert.equal(saved.steps[0].marks[0].color,'#123456');
+});
+test('embedded image layers and cover settings round-trip with bounded resources and legacy covers stay disabled',()=>{
+ const g=guide();g.cover={enabled:true,design:'gallery',title:'My manual',titleFont:'serif',titleSize:88,images:[copy(image)]};g.steps[0].marks=[shape('image',{image:copy(image),name:'Logo',opacity:.45})];
+ const checked=E.guide(g);assert.equal(checked.cover.enabled,true);assert.equal(checked.cover.titleFont,'serif');assert.equal(checked.steps[0].marks[0].image.src,image.src);assert.deepEqual(copy(E.guide(checked)),copy(checked));assert.equal(E.guide(guide()).cover.enabled,false);assert.equal(guide().cover,undefined);
+ for(const change of [g=>g.cover.design='other',g=>g.cover.enabled='yes',g=>g.cover.titleFont='url(remote-font)',g=>g.cover.titleSize=101,g=>g.cover.subtitleSize=0,g=>g.cover.images=Array(4).fill(image),g=>g.cover.images[0].src='https://example.com/logo.png',g=>g.steps[0].marks[0].image.src='data:image/svg+xml;base64,AA==',g=>g.steps[0].marks[0].opacity=0,g=>g.steps[0].marks[0].image.width=2401,g=>g.steps[0].marks[0].name='x'.repeat(121)]){const bad=copy(g);change(bad);assert.throws(()=>E.guide(bad));}
+ const huge=copy(g);huge.cover.images=Array(3).fill({...image,width:2400,height:2400});assert.throws(()=>E.guide(huge),/large/);
+});
+test('image layers stack without replacing a step, remain editable and support visible delete, undo and saved files',async t=>{
+ const c=await objects(t,[shape()]),before=await c.saved();await c.module.addLayers([{name:'Badge.png'},{name:'Second.png'}]);let saved=await c.saved();
+ assert.equal(saved.steps.length,2);assert.deepEqual(saved.steps[0].image,before.steps[0].image);assert.deepEqual(saved.steps[0].marks.map(m=>m.type),['rectangle','image','image']);assert.equal(c.d.querySelector('[data-bc-object-name]').value,'Second.png');assert.equal(c.d.querySelector('[data-bc-object-opacity]').value,'100');
+ const deleteButtons=c.d.querySelectorAll('[data-bc="delete-object"]');assert.equal(deleteButtons.length,2);assert.ok([...deleteButtons].every(b=>!b.disabled));
+ c.set('[data-bc-object-opacity]',40,'input');await c.click('apply-object');saved=await c.saved();assert.equal(saved.steps[0].marks[2].opacity,.4);
+ c.pointer('pointerdown',.55,.55);c.pointer('pointerup',.65,.65);saved=await c.saved();assert.equal(saved.steps[0].marks[2].name,'Second.png');assert.ok(saved.steps[0].marks[2].points[0][0]>.2);
+ c.d.querySelector('.bc-toolbar [data-bc="delete-object"]').click();assert.equal((await c.saved()).steps[0].marks.length,2);assert.match(c.d.querySelector('[data-bc-status]').textContent,/Editable/);await c.click('undo');await settle();assert.equal((await c.saved()).steps[0].marks.length,3);
+ await c.pick(2);await c.click('back-object');assert.equal((await c.saved()).steps[0].marks[0].name,'Second.png');await c.click('lock-object');assert.ok([...deleteButtons].every(b=>b.disabled));await c.click('lock-object');await c.click('delete-object');await c.click('undo');await settle();
+ const final=await c.saved();await c.module.importGuide({size:JSON.stringify(final).length,text:async()=>JSON.stringify(final)});await settle();assert.deepEqual(await c.saved(),final);
+ for(const format of ['pdf','jpg-images','images']){await c.module.prepare(format);assert.equal(c.exports.at(-1).g.steps[0].marks.filter(m=>m.type==='image').length,2);}
+});
+test('failed layer batches, corrupt imports and cancelled account work leave no partial images behind',async t=>{
+ const c=await objects(t),before=await c.saved();let n=0;c.w.WorkHubBatchCFiles.imageFromFile=async()=>{if(++n===2)throw Error('Bad image');return copy(image);};await assert.rejects(()=>c.module.addLayers([{name:'ok.png'},{name:'bad.png'}]),/Bad image/);assert.deepEqual(await c.saved(),before);
+ const bad=copy(before);bad.steps[0].marks=[shape('image',{image:copy(image)})];c.w.WorkHubBatchCFiles.loadLayers=async s=>{if(s.marks.some(m=>m.type==='image'))throw Error('Corrupt layer');return new Map();};await assert.rejects(()=>c.module.importGuide({size:100,text:async()=>JSON.stringify(bad)}),/Corrupt layer/);assert.deepEqual(await c.saved(),before);
+ let finish;c.w.WorkHubBatchCFiles.imageFromFile=()=>new Promise(resolve=>finish=resolve);const pending=c.module.addLayers([{name:'private.png'}]);c.account('next');finish(copy(image));await pending;c.module.open('guide');assert.equal(c.d.querySelectorAll('[data-bc="select"]').length,0);
+});
+test('front cover text, fonts, sizes, design and image ordering are maintained and exported with the guide',async t=>{
+ const c=await objects(t),set=(key,value,event='input')=>c.set('[data-bc-cover="'+key+'"]',value,event);
+ set('enabled',true,'change');set('title','A useful manual');set('subtitle','Review every request');set('details','Team A\nVersion 2');set('titleFont','serif','change');set('titleSize',90);set('subtitleFont','mono','change');set('detailsSize',20);set('design','editorial','change');set('align','center','change');
+ await c.module.addCoverImages([{name:'one.png'},{name:'two.png'}]);let saved=await c.saved();assert.equal(saved.cover.title,'A useful manual');assert.equal(saved.cover.titleFont,'serif');assert.equal(saved.cover.titleSize,90);assert.equal(saved.cover.subtitleFont,'mono');assert.equal(saved.cover.design,'editorial');assert.equal(saved.cover.align,'center');assert.equal(saved.cover.images.length,2);
+ assert.equal(c.d.querySelectorAll('[data-bc-cover-images] img').length,2);await c.click('cover-remove',{index:'0'});assert.equal((await c.saved()).cover.images.length,1);await c.click('cover-up',{index:'0'});assert.equal((await c.saved()).cover.images.length,1);
+ saved=await c.saved();await c.module.importGuide({size:100,text:async()=>JSON.stringify(saved)});await settle();assert.equal(c.d.querySelector('[data-bc-cover="titleSize"]').value,'90');assert.equal(c.d.querySelector('[data-bc-cover="enabled"]').checked,true);
+ for(const format of ['pdf','images','jpg-images']){await c.module.prepare(format);assert.deepEqual(c.exports.at(-1).g.cover,saved.cover);}
+ c.account('other');c.module.open('guide');assert.equal(c.d.querySelector('[data-bc-cover="enabled"]').checked,false);assert.equal(c.d.querySelectorAll('[data-bc-cover-images] img').length,0);
+});
+test('cover image batches are atomic, bounded and cancelled when accounts change',async t=>{
+ const c=await objects(t),before=await c.saved();let n=0;c.w.WorkHubBatchCFiles.imageFromFile=async()=>{if(++n===2)throw Error('Bad cover');return copy(image);};await assert.rejects(()=>c.module.addCoverImages([{name:'one.png'},{name:'bad.png'}]),/Bad cover/);assert.deepEqual(await c.saved(),before);
+ await assert.rejects(()=>c.module.addCoverImages(Array(4).fill({name:'x.png'})),/three/);let finish;c.w.WorkHubBatchCFiles.imageFromFile=()=>new Promise(resolve=>finish=resolve);const pending=c.module.addCoverImages([{name:'private.png'}]);c.account('next');finish(copy(image));await pending;c.module.open('guide');assert.equal(c.d.querySelectorAll('[data-bc-cover-images] img').length,0);
+});
+test('cover preview can switch to the first guide page, and image ordering changes the leading image',async t=>{
+ const c=await objects(t),seen=[];c.w.WorkHubBatchCFiles.preview=async(g,alive,contentOnly)=>{seen.push({g:copy(g),contentOnly});const page=c.d.createElement('canvas');page.width=1240;page.height=1754;return page;};
+ c.set('[data-bc-cover="enabled"]',true,'change');await c.module.preview();assert.equal(seen.at(-1).g.cover.enabled,true);assert.equal(seen.at(-1).contentOnly,false);assert.match(c.d.querySelector('[data-bc-page-preview]').getAttribute('aria-label'),/Front cover/);
+ await c.click('preview-steps');await c.module.preview();assert.equal(seen.at(-1).contentOnly,true);assert.equal(c.d.querySelector('[data-bc="preview-steps"]').getAttribute('aria-pressed'),'true');
+ await c.click('preview-cover');await c.module.preview();assert.equal(seen.at(-1).contentOnly,false);
+ let count=0;c.w.WorkHubBatchCFiles.imageFromFile=async()=>{const width=8+(count++);return {src:'data:image/png;base64,'+png(width,6).toString('base64'),width,height:6};};await c.module.addCoverImages([{name:'a.png'},{name:'b.png'}]);const before=await c.saved();await c.click('cover-up',{index:'1'});let saved=await c.saved();assert.equal(saved.cover.images[0].src,before.cover.images[1].src);await c.click('cover-down',{index:'0'});saved=await c.saved();assert.deepEqual(saved.cover.images,before.cover.images);
+});
+test('undo preserves the current guide and history when restoring a layer would exceed the shared image budget',async t=>{
+ const big={src:'data:image/png;base64,'+png(1400,1400).toString('base64'),width:1400,height:1400},c=await objects(t,Array.from({length:5},()=>shape('image',{image:copy(big)})));await c.pick(0);await c.click('delete-object');c.w.WorkHubBatchCFiles.imageFromFile=async()=>copy(big);await c.module.addCoverImages([{name:'one.png'},{name:'two.png'}]);const before=await c.saved();await c.click('undo');assert.match(c.d.querySelector('[data-bc-status]').textContent,/too large/);assert.deepEqual(await c.saved(),before);assert.equal(c.d.querySelector('[data-bc="undo"]').disabled,false);
+});
+test('adding a cover image while a screenshot opens does not cancel or strand the screenshot editor',async t=>{
+ const c=await objects(t);let finish;c.w.WorkHubBatchCFiles.loadImage=()=>new Promise(resolve=>finish=resolve);const id=c.d.querySelector('[data-bc="select"]').dataset.id,pending=c.module.select(id);await c.module.addCoverImages([{name:'cover.png'}]);finish({});await pending;assert.equal(c.d.querySelector('[data-bc-layer-files]').disabled,false);assert.equal((await c.saved()).cover.images.length,1);
+});
+test('cover preview uses the chosen fonts and sizes, adds exactly one opening page and keeps step numbering',async()=>{
+ const {F,calls}=fileFixture();
+ for(const design of ['band','editorial','gallery']){
+  const g={...guide(),layout:'walkthrough',cover:{enabled:true,design,title:'A useful manual',titleFont:'serif',titleSize:90,subtitle:'How to work',subtitleFont:'mono',subtitleSize:28,details:'Version 2',detailsSize:20,images:[copy(image)]}};
+  calls.length=0;const cover=await F.preview(g,()=>true);assert.equal(cover.height,1754);assert.ok(calls.some(c=>c[0]==='text'&&c[1]==='A useful manual'&&c[4]==='700 90px Georgia, serif'));assert.ok(calls.some(c=>c[0]==='text'&&c[1]==='How to work'&&c[4].includes('28px "Courier New"')));assert.equal(calls.some(c=>c[0]==='text'&&/^Page /.test(c[1])),false);F.release(cover);
+  let withCover=0,without=0;calls.length=0;for await(const p of F.pages(g,()=>true)){withCover++;F.release(p);}assert.ok(calls.some(c=>c[0]==='text'&&/^Page 1/.test(c[1])));for await(const p of F.pages({...g,cover:{enabled:false}},()=>true)){without++;F.release(p);}assert.equal(withCover,without+1);
+  calls.length=0;const content=await F.preview(g,()=>true,true);assert.ok(calls.some(c=>c[0]==='text'&&c[1]==='Step a'));assert.equal(calls.some(c=>c[0]==='text'&&c[1]==='A useful manual'),false);F.release(content);
+ }
+ const empty={...guide(),steps:[],cover:{enabled:true,title:'Cover before screenshots'}};const cover=await F.preview(empty,()=>true);F.release(cover);
+ await assert.rejects(()=>F.preview({...guide(),cover:{enabled:true,title:'W'.repeat(180),titleSize:100,subtitle:'W'.repeat(500),subtitleSize:44,details:'W'.repeat(800),detailsSize:32,images:[image]}},()=>true),/does not fit/);
+});
+test('native image layers preserve transparency, opacity, aspect ratio and stacking, including privacy edits above them',async()=>{
+ let createCanvas,Image;try{({createCanvas,Image}=await import('@napi-rs/canvas'));}catch{return;}
+ const base=createCanvas(400,300),b=base.getContext('2d');b.fillStyle='#ffffff';b.fillRect(0,0,400,300);const layer=createCanvas(100,50),l=layer.getContext('2d');l.fillStyle='#0000ff';l.fillRect(25,0,50,50);
+ const w={WorkHubBatchCEngine:E,Image,atob:s=>Buffer.from(s,'base64').toString('binary')},document={baseURI:new URL('../index.html',import.meta.url).href,createElement:()=>createCanvas(1,1)};new Function('window','document',source('batch-c-files.js'))(w,document);const F=w.WorkHubBatchCFiles;
+ const im={src:layer.toDataURL('image/png'),width:100,height:50},overlay=shape('image',{image:im,opacity:.5,points:[[.25,.25],[.75,.75]]}),s={...step('a'),image:{src:base.toDataURL('image/png'),width:400,height:300},marks:[overlay]};
+ let c=await F.raster(s,()=>true),pixel=(x,y)=>Array.from(c.getContext('2d').getImageData(x,y,1,1).data);assert.deepEqual(pixel(110,150),[255,255,255,255]);assert.deepEqual(pixel(200,85),[255,255,255,255]);assert.ok(pixel(200,150)[2]===255&&pixel(200,150)[0]>=126&&pixel(200,150)[0]<=128);F.release(c);
+ s.marks.push(shape('cover',{color:'#ff0000',points:[[.4,.4],[.6,.6]]}));c=await F.raster(s,()=>true);assert.deepEqual(pixel(200,150),[255,0,0,255]);F.release(c);s.marks.reverse();c=await F.raster(s,()=>true);const p=pixel(200,150);assert.ok(p[0]>=126&&p[0]<=128&&p[2]>=126&&p[2]<=128);F.release(c);
+ await assert.rejects(()=>F.raster({...s,marks:[shape('image',{image:{...im,width:99}})]},()=>true),/dimensions/);
 });
 test('polished walkthrough packs wide illustrated steps with linked instructions and a footer onto one page',async()=>{
  const {F,calls}=fileFixture(),g=guide();g.layout='walkthrough';g.linkedInstructions=true;g.footer={text:'Team / Internal'};
