@@ -3213,6 +3213,48 @@ test('startup theme: reload uses the saved Studio palette rather than an unsaved
  assert.equal(reloaded.document.body.dataset.hubTheme,'lagoon');assert.equal(root.dataset.startupTheme,'lagoon');assert.equal(root.style.getPropertyValue('--startup-page'),'#eef8f7');assert.equal(root.hasAttribute('data-workhub-startup'),false);assert.equal(reloaded.db.calls.length,0);
 });
 
+test('Workspace redesign: every shell keeps the compact header, original scenery, widget controls and secondary commands without writes',async t=>{
+ const ctx=await app(t,{styles:true}),{api,document,window,db}=ctx;api.showTab('home');await settle();
+ const view=document.querySelector('.my-day-page'),landscape=view.querySelector('.mv-landscape'),art=landscape.outerHTML,
+  widgets=[...view.querySelectorAll('[data-widget]')],world=document.getElementById('hubAtmosphereCard'),worldArt=world.querySelector('svg'),
+  header=document.getElementById('hubHeader'),before=copy(api.state()),writes=db.calls.length,ui=api.hub.websiteDesigns;
+ assert.equal(world.parentElement.id,'whWorldContent');
+ assert.ok(document.querySelector('#whWorkspaceTools [data-hub="privacy"]'));
+ assert.equal(document.getElementById('focusModeButton').nextElementSibling.id,'breakTerrariumButton');
+ ui.open();
+ for(const design of Object.keys(window.WorkHubWebsiteDesigns.DESIGNS)){
+  const radio=document.querySelector('[name="websiteDesign"][value="'+design+'"]');radio.checked=true;
+  radio.dispatchEvent(new window.Event('change',{bubbles:true}));
+  assert.equal(window.getComputedStyle(header).minHeight,'68px',design);
+  assert.equal(document.querySelector('.mv-landscape'),landscape);assert.equal(landscape.outerHTML,art);
+  assert.ok(widgets.every(node=>node.isConnected&&node.draggable&&node.querySelector('[data-hub="widget-size"],[data-md="expand"]')));
+  assert.equal(document.getElementById('hubAtmosphereCard'),world);assert.equal(world.querySelector('svg'),worldArt);
+ }
+ ui.close();assert.deepEqual(copy(api.state()),before);assert.equal(db.calls.length,writes);
+ world.click();assert.ok(document.getElementById('atmosphereForm'));api.closeModal();
+ await atmosphereChoices(ctx,{mode:'off'});assert.equal(window.getComputedStyle(document.getElementById('whWorldWindow')).display,'none');
+ await atmosphereChoices(ctx,{mode:'auto'});assert.notEqual(window.getComputedStyle(document.getElementById('whWorldWindow')).display,'none');
+ assert.equal(world.querySelector('svg'),worldArt);assert.equal(db.calls.length,writes);
+});
+test('Workspace redesign: Process Hub follows light and dark theme tokens without replacing the canvas, maintained form or playback',async t=>{
+ const {api,document,window,db}=await app(t,{styles:true});api.showTab('processhub');
+ document.querySelector('[data-rehearsal="new"]').click();await settle();
+ const root=document.getElementById('rehearsalRoot'),canvas=document.getElementById('rehearsalBoard'),
+  form=document.getElementById('processHubDetails'),field=form.elements.namedItem('name'),
+  prefs=api.state().workhub.preferences,original=prefs.theme,model=copy(api.hub.rehearsal.model()),writes=db.calls.length;
+ field.value='Unfinished process 001';
+ const surfaces=new Set();
+ for(const theme of ['forest','dark','ocean','lavender','rose']){
+  prefs.theme=theme;api.hub.refreshTheme();
+  surfaces.add(document.documentElement.style.getPropertyValue('--hub-surface'));
+  assert.equal(window.getComputedStyle(root).getPropertyValue('--ph-signal').trim(),'var(--hub-link)');
+  assert.equal(window.getComputedStyle(root).getPropertyValue('--r-ink').trim(),'var(--ph-ink)');
+  assert.equal(window.getComputedStyle(root.querySelector('.rehearsal-stage')).colorScheme,document.documentElement.style.colorScheme);
+  assert.equal(document.getElementById('rehearsalBoard'),canvas);assert.equal(document.getElementById('processHubDetails'),form);
+  assert.equal(field.value,'Unfinished process 001');assert.deepEqual(copy(api.hub.rehearsal.model()),model);
+ }
+ prefs.theme=original;api.hub.refreshTheme();assert.ok(surfaces.size>=4);assert.equal(db.calls.length,writes);
+});
 test('live theme: preset preview, save, discard and saved combinations update the whole page without a reload',async t=>{
  const {api,document,window,db}=await app(t,{styles:true});api.hub.setTool('theme');api.showTab('studio');
  const body=document.body,header=document.getElementById('hubHeader'),page=document.documentElement;
