@@ -622,7 +622,7 @@
               '"></label>'
           )
           .join('') +
-        '<p class="bc-guide-heading-help">The compact header is the default. Changes apply to the live preview and every export.</p>' +
+        '<p class="bc-guide-heading-help">Header appearance above lets you keep plain text or hide the header. Changes apply to the live preview and every export.</p>' +
         button('reset-page', 'Reset page layout') +
         '</fieldset><fieldset><legend>Contents &amp; navigation</legend><label class="bc-object-check"><input type="checkbox" data-bc-contents>Include an automatic contents page</label><p class="bc-guide-heading-help">PDF contents entries are clickable and steps appear as PDF bookmarks. JPG/PNG pages include the printed contents. Guide page numbering starts after the cover and contents.</p></fieldset>' +
         '<fieldset><legend>Brand templates</legend><label>Saved template<select data-bc-template><option value="">Choose a template</option></select></label><div class="bc-object-actions">' +
@@ -636,8 +636,13 @@
     function updateWorkspace() {
       if (mode !== 'guide' || !room) return;
       const g = project();
+      $('[data-bc-header-style]').value = g.page.headerStyle;
+      $('[data-bc-header-help]').textContent = E.GUIDE_HEADERS[g.page.headerStyle].description;
+      $('[data-bc-export-heading]').disabled = busy || g.page.headerStyle === 'none';
       for (const el of room.querySelectorAll('[data-bc-page]')) {
         el.value = g.page[el.dataset.bcPage];
+        if (el.dataset.bcPage === 'headerHeight')
+          el.disabled = busy || g.page.headerStyle === 'none';
         $('[data-bc-page-value="' + el.dataset.bcPage + '"]').textContent = String(el.value);
       }
       $('[data-bc-contents]').checked = g.contents;
@@ -905,7 +910,7 @@
       return (
         '<details class="bc-cover"><summary>Front cover · text, fonts &amp; images</summary>' +
         '<div class="bc-cover-inner"><label class="bc-object-check"><input type="checkbox" data-bc-cover="enabled">Include a front cover</label>' +
-        '<p class="bc-guide-heading-help">An optional opening page before your screenshot steps. Uses your export colours and footer. Cover text sizes are in page pixels; images keep their proportions.</p>' +
+        '<p class="bc-guide-heading-help">An optional opening page before your screenshot steps. Uses your export colours, header appearance and footer. Cover text sizes are in page pixels; images keep their proportions.</p>' +
         '<div data-bc-cover-content hidden><div class="bc-cover-design"><label>Cover design<select data-bc-cover="design">' +
         Object.entries(E.COVER_DESIGNS)
           .map(([id, item]) => '<option value="' + id + '">' + esc(item.label) + '</option>')
@@ -946,7 +951,7 @@
           )
           .join('') +
         '</div><section class="bc-cover-images"><h3>Cover images <span data-bc-cover-count></span></h3><label class="bc-file-label secondary">+ Add cover images<input type="file" data-bc-cover-files accept="image/png,image/jpeg,image/webp" multiple></label>' +
-        '<p class="bc-guide-heading-help">Up to three images. The first image leads the gallery. Transparent PNG and WebP backgrounds are preserved.</p><div data-bc-cover-images></div></section>' +
+        '<p class="bc-guide-heading-help">Up to three borderless images. The first image leads the gallery. Transparent PNG and WebP backgrounds sit directly on the page without a frame.</p><div data-bc-cover-images></div></section>' +
         button('preview-cover', 'Preview front cover') +
         '</div></div></details>'
       );
@@ -2252,9 +2257,15 @@
         (guideMode
           ? '<div class="bc-guide-fields"><label class="bc-guide-name">Guide title<input data-bc-title maxlength="180" placeholder="e.g. How to submit a support request" value="' +
             esc(project().title) +
-            '"></label><div><label class="bc-guide-name">Export heading<input data-bc-export-heading maxlength="180" aria-describedby="bcExportHeadingHelp" placeholder="e.g. MY COMPANY / USER GUIDE" value="' +
+            '"></label><div><label class="bc-guide-name">Header appearance<select data-bc-header-style aria-describedby="bcHeaderHelp">' +
+            Object.entries(E.GUIDE_HEADERS)
+              .map(
+                ([id, header]) => '<option value="' + id + '">' + esc(header.label) + '</option>'
+              )
+              .join('') +
+            '</select></label><p id="bcHeaderHelp" data-bc-header-help class="bc-guide-heading-help"></p></div><div><label class="bc-guide-name">Export heading<input data-bc-export-heading maxlength="180" aria-describedby="bcExportHeadingHelp" placeholder="e.g. MY COMPANY / USER GUIDE" value="' +
             esc(project().exportHeading) +
-            '"></label><p id="bcExportHeadingHelp" class="bc-guide-heading-help">Shown at the top of every PDF, JPG and PNG page. Leave blank to hide. Saved with your editable guide.</p></div></div>' +
+            '"></label><p id="bcExportHeadingHelp" class="bc-guide-heading-help">Shown when a header is enabled. Leave blank to hide this text; Header appearance controls the band and guide title. Saved with your editable guide.</p></div></div>' +
             '<div class="bc-guide-layout"><label class="bc-guide-name">Export layout<select data-bc-layout aria-describedby="bcLayoutHelp">' +
             (project().layout === 'classic'
               ? '<option value="classic">Original layout (minimal)</option>'
@@ -2341,6 +2352,7 @@
         '</div><div data-bc-ready class="bc-ready"></div><p data-bc-status role="status" aria-live="polite">Images and edits stay local to this browser. No records are changed.</p></footer></div>';
       mountGuideLayout();
       room.addEventListener('cancel', event => {
+        if (event.target !== event.currentTarget) return;
         event.preventDefault();
         close();
       });
@@ -2389,6 +2401,12 @@
       room.addEventListener('change', event => {
         if (busy) return;
         const el = event.target;
+        if (el.matches('[data-bc-header-style]')) {
+          project().page = E.pageOptions({ ...project().page, headerStyle: el.value });
+          revealGuidePreview();
+          changed();
+          updateWorkspace();
+        }
         if (el.matches('[data-bc-quality],[data-bc-contents]')) {
           if (el.matches('[data-bc-quality]')) project().quality = el.value;
           else project().contents = el.checked;
