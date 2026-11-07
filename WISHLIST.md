@@ -17,6 +17,7 @@ Kept from the website design and functionality ideas in this discussion. The num
 | 31 | Drag-and-drop file launcher | Drop a file from any website page, preview its name/type and choose a compatible available tool. Open the chosen tool with the file ready, preserve local processing where supported and ask before leaving an unfinished editor. Drive uploads use the existing explicit upload flow. |
 | 34 | Shareable summary cards | Turn selected tickets, tasks or project information into neatly designed images for sharing, with a preview before export. |
 | 40 | Selectable loading-screen styles | Choose minimal, illustrated or animated loading designs that follow the selected website theme. Preserve the maintained website name, actual startup status and motion preferences. |
+| 59 | Create a theme from an image | Extract colour suggestions from a selected logo or picture and preview them across the website before applying a theme. Preserve the existing theme controls and readable text/control contrast. |
 
 These are wishlist selections only; implementation has not been requested. No batch assigned.
 
