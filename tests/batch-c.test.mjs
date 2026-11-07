@@ -213,7 +213,7 @@ test('layout selection opens the full-page live preview, invalidates downloads a
  for(const layout of ['split','compact','walkthrough']){
   await c.module.prepare('pdf');assert.ok(c.d.querySelector('[data-bc-ready] a'));
   select.value=layout;select.dispatchEvent(new c.w.Event('change',{bubbles:true}));
-  assert.equal(c.d.querySelector('[data-bc-ready] a'),null);assert.equal(c.d.querySelector('.bc-branding').open,true);
+  assert.equal(c.d.querySelector('[data-bc-ready] a'),null);assert.equal(c.d.querySelector('[data-bc-pane="design"]').hidden,false);
   await c.module.preview();assert.equal(frames.at(-1).layout,layout);assert.equal(c.d.querySelector('[data-bc-page-preview]').height,layout==='compact'?450:877);
   for(const format of ['pdf','jpg-images','images']){await c.module.prepare(format);assert.equal(c.exports.at(-1).g.layout,layout);assert.equal(c.exports.at(-1).g.footer.logo.src,image.src);}
  }
@@ -364,7 +364,7 @@ test('image layers stack without replacing a step, remain editable and support v
  const deleteButtons=c.d.querySelectorAll('[data-bc="delete-object"]');assert.equal(deleteButtons.length,2);assert.ok([...deleteButtons].every(b=>!b.disabled));
  c.set('[data-bc-object-opacity]',40,'input');await c.click('apply-object');saved=await c.saved();assert.equal(saved.steps[0].marks[2].opacity,.4);
  c.pointer('pointerdown',.55,.55);c.pointer('pointerup',.65,.65);saved=await c.saved();assert.equal(saved.steps[0].marks[2].name,'Second.png');assert.ok(saved.steps[0].marks[2].points[0][0]>.2);
- c.d.querySelector('.bc-toolbar [data-bc="delete-object"]').click();assert.equal((await c.saved()).steps[0].marks.length,2);assert.match(c.d.querySelector('[data-bc-status]').textContent,/Editable/);await c.click('undo');await settle();assert.equal((await c.saved()).steps[0].marks.length,3);
+ c.d.querySelector('.bc-editor [data-bc="delete-object"]').click();assert.equal((await c.saved()).steps[0].marks.length,2);assert.match(c.d.querySelector('[data-bc-status]').textContent,/Editable/);await c.click('undo');await settle();assert.equal((await c.saved()).steps[0].marks.length,3);
  await c.pick(2);await c.click('back-object');assert.equal((await c.saved()).steps[0].marks[0].name,'Second.png');await c.click('lock-object');assert.ok([...deleteButtons].every(b=>b.disabled));await c.click('lock-object');await c.click('delete-object');await c.click('undo');await settle();
  const final=await c.saved();await c.module.importGuide({size:JSON.stringify(final).length,text:async()=>JSON.stringify(final)});await settle();assert.deepEqual(await c.saved(),final);
  for(const format of ['pdf','jpg-images','images']){await c.module.prepare(format);assert.equal(c.exports.at(-1).g.steps[0].marks.filter(m=>m.type==='image').length,2);}
