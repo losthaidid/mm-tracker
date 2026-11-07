@@ -63,15 +63,24 @@
     if (!c.getContext('2d')) throw Error('This browser cannot open the image editor.');
     return c;
   }
+  function pageCanvas(w, h, quality = 'balanced') {
+    const scale = E.EXPORT_QUALITY[quality].scale,
+      c = canvas(Math.round(w * scale), Math.round(h * scale));
+    c.logicalWidth = w;
+    c.logicalHeight = h;
+    c.pageScale = scale;
+    c.getContext('2d').scale?.(scale, scale);
+    return c;
+  }
   const release = c => {
     c.width = c.height = 1;
   };
-  const blob = (c, type = 'image/png') =>
+  const blob = (c, type = 'image/png', quality = 0.92) =>
     new Promise((resolve, reject) =>
       c.toBlob(
         b => (b ? resolve(b) : reject(Error('The image could not be exported.'))),
         type,
-        type === 'image/jpeg' ? 0.92 : undefined
+        type === 'image/jpeg' ? quality : undefined
       )
     );
   function read(file) {
@@ -351,13 +360,82 @@
     release(c);
     return out;
   }
+  function comparisonPlan(step, before) {
+    const pair = step.comparison,
+      side = pair.orientation === 'side',
+      after = pair.image,
+      width = Math.max(
+        1000,
+        Math.min(2400, Math.max(before.width, after.width) * (side ? 2 : 1) + (side ? 24 : 0))
+      ),
+      panelWidth = side ? (width - 24) / 2 : width,
+      scratch = canvas(1, 1),
+      ctx = scratch.getContext('2d');
+    ctx.font = '600 20px Arial, sans-serif';
+    const labels = [pair.before, pair.after].map(label => wrap(ctx, label, panelWidth - 24)),
+      labelH = Math.max(42, ...labels.map(lines => lines.length * 26 + 16)),
+      heights = [before, after].map(im =>
+        Math.max(1, Math.min(side ? 1500 : 1000, im.height * Math.min(1, panelWidth / im.width)))
+      ),
+      imageH = Math.max(...heights),
+      height = side ? labelH + imageH : labelH * 2 + heights[0] + heights[1] + 24;
+    release(scratch);
+    return {
+      width,
+      height: Math.ceil(height),
+      panels: [before, after].map((im, i) => ({
+        labels: labels[i],
+        x: side ? i * (panelWidth + 24) : 0,
+        y: side ? 0 : i === 0 ? 0 : labelH + heights[0] + 24,
+        w: panelWidth,
+        h: side ? imageH : heights[i],
+        labelH,
+      })),
+    };
+  }
+  function rasterDimensions(step) {
+    const before = {
+      width: Math.max(1, Math.round(step.image.width * (step.crop?.w || 1))),
+      height: Math.max(1, Math.round(step.image.height * (step.crop?.h || 1))),
+    };
+    return step.comparison ? comparisonPlan(step, before) : before;
+  }
   async function raster(step, alive) {
     const img = await loadImage(step.image, alive),
       layers = await loadLayers(step, alive),
       c = canvas(1, 1);
+    let edited;
     try {
-      return cropped(draw(c, step, img, false, layers), step.crop);
+      edited = cropped(draw(c, step, img, false, layers), step.crop);
+      if (!step.comparison) return edited;
+      const after = await loadImage(step.comparison.image, alive),
+        plan = comparisonPlan(step, edited),
+        out = canvas(plan.width, plan.height),
+        ctx = out.getContext('2d');
+      try {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, out.width, out.height);
+        ctx.font = '600 20px Arial, sans-serif';
+        ctx.textBaseline = 'top';
+        ctx.fillStyle = '#17232d';
+        plan.panels.forEach((p, i) => {
+          p.labels.forEach((line, row) => ctx.fillText(line, p.x + 12, p.y + 8 + row * 26));
+          const fitted = contain(i === 0 ? edited : step.comparison.image, {
+            x: p.x,
+            y: p.y + p.labelH,
+            w: p.w,
+            h: p.h,
+          });
+          ctx.drawImage(i === 0 ? edited : after, fitted.x, fitted.y, fitted.w, fitted.h);
+        });
+        release(edited);
+        return out;
+      } catch (err) {
+        release(out);
+        throw err;
+      }
     } catch (err) {
+      if (edited) release(edited);
       release(c);
       throw err;
     }
@@ -429,7 +507,10 @@
       colour = palette(guide.colours),
       logo = footer.logo ? await loadImage(footer.logo, alive, 1600, 600) : null,
       layout = E.logoLayout(footer),
-      contentBottom = logo ? Math.min(1510, layout.y - 40) : footer.text.trim() ? 1510 : 1620;
+      contentBottom = logo ? Math.min(1510, layout.y - 40) : footer.text.trim() ? 1510 : 1620,
+      margin = guide.page.margin,
+      width = 1240 - margin * 2,
+      headerScale = guide.page.headerHeight / 100;
     let pageNo = 0;
     for (let i = 0; i < guide.steps.length; i++) {
       check(alive);
@@ -444,26 +525,26 @@
             throw Error(
               'This guide exceeds 120 pages. Shorten captions or split it into smaller guides.'
             );
-          const c = canvas(1240, 1754),
+          const c = pageCanvas(1240, 1754, guide.quality),
             ctx = c.getContext('2d');
           ctx.fillStyle = colour.paper;
-          ctx.fillRect(0, 0, c.width, c.height);
+          ctx.fillRect(0, 0, 1240, 1754);
           ctx.fillStyle = colour.accent;
           ctx.font = '600 19px system-ui, sans-serif';
           const heading = (guide.exportHeading ?? E.DEFAULT_GUIDE_HEADING)
             .replace(/\s+/g, ' ')
             .trim();
-          let y = 68;
+          let y = 68 * headerScale;
           if (heading)
-            for (const line of wrap(ctx, heading, 1100)) {
-              ctx.fillText(line, 70, y);
+            for (const line of wrap(ctx, heading, width)) {
+              ctx.fillText(line, margin, y);
               y += 25;
             }
-          y = heading ? Math.max(120, y + 25) : 84;
+          y = heading ? Math.max(120 * headerScale, y + 25 * headerScale) : 84 * headerScale;
           ctx.fillStyle = colour.ink;
           ctx.font = '600 27px system-ui, sans-serif';
-          for (const line of wrap(ctx, guide.title || 'Screenshot guide', 1100)) {
-            ctx.fillText(line, 70, y);
+          for (const line of wrap(ctx, guide.title || 'Screenshot guide', width)) {
+            ctx.fillText(line, margin, y);
             y += 35;
           }
           ctx.font = '600 30px system-ui, sans-serif';
@@ -473,30 +554,36 @@
               '  ' +
               (step.title || 'Step ' + (i + 1)) +
               (first ? '' : ' · continued'),
-            1100
+            width
           );
-          y += 22;
+          y += 22 * headerScale;
           for (const line of titleLines) {
-            ctx.fillText(line, 70, y);
+            ctx.fillText(line, margin, y);
             y += 39;
           }
           if (first) {
             const scale = Math.min(
-              1100 / screenshot.width,
+              (width * guide.page.imageWidth) / 100 / screenshot.width,
               880 / screenshot.height,
               (contentBottom - 70 - y) / screenshot.height
             );
-            y += 20;
-            ctx.drawImage(screenshot, 70, y, screenshot.width * scale, screenshot.height * scale);
-            y += screenshot.height * scale + 35;
+            y += 20 * headerScale;
+            ctx.drawImage(
+              screenshot,
+              margin + (width - screenshot.width * scale) / 2,
+              y,
+              screenshot.width * scale,
+              screenshot.height * scale
+            );
+            y += screenshot.height * scale + 15 + guide.page.spacing;
           }
           ctx.font = '24px system-ui, sans-serif';
           ctx.fillStyle = colour.body;
-          if (!lines) lines = wrap(ctx, E.caption(step, guide.linkedInstructions), 1100);
+          if (!lines) lines = wrap(ctx, E.caption(step, guide.linkedInstructions), width);
           const capacity = Math.max(1, Math.floor((contentBottom - y) / 35)),
             showing = lines.splice(0, capacity);
           for (const line of showing) {
-            ctx.fillText(line, 70, y);
+            ctx.fillText(line, margin, y);
             y += 35;
           }
           drawFooter(ctx, footer, logo, colour, layout);
@@ -505,6 +592,7 @@
           ctx.fillText('Step ' + (i + 1) + ' of ' + guide.steps.length, 70, 1695);
           ctx.fillText('Page ' + pageNo, 1070, 1695);
           check(alive);
+          c.guideMeta = { kind: 'steps', stepIds: [step.id] };
           yield c;
           first = false;
         } while (lines.length);
@@ -522,8 +610,11 @@
       logo = footer.logo ? await loadImage(footer.logo, alive, 1600, 600) : null,
       logoBox = E.logoLayout(footer),
       bottom = logo ? Math.min(1510, logoBox.y - 40) : footer.text.trim() ? 1510 : 1620,
-      cardWidth = compact ? 534 : 1100,
-      gap = 20,
+      margin = guide.page.margin,
+      width = 1240 - margin * 2,
+      headerScale = guide.page.headerHeight / 100,
+      cardWidth = compact ? (width - 32) / 2 : width,
+      gap = guide.page.spacing,
       textSize = compact ? 22 : 23,
       lineHeight = compact ? 30 : 32,
       planned = new Map();
@@ -556,7 +647,8 @@
       rowBottom = 0,
       pageNo = 0,
       firstStep = 0,
-      lastStep = 0;
+      lastStep = 0,
+      pageSteps = [];
     const font = (size, bold = false) => {
       ctx.font = (bold ? '600 ' : '') + size + 'px Arial, sans-serif';
       ctx.textAlign = 'left';
@@ -581,45 +673,61 @@
         throw Error(
           'This guide exceeds 120 pages. Shorten captions or split it into smaller guides.'
         );
-      c = canvas(1240, 1754);
+      c = pageCanvas(1240, 1754, guide.quality);
       ctx = c.getContext('2d');
       ctx.fillStyle = colour.paper;
       ctx.fillRect(0, 0, 1240, 1754);
       const heading = (guide.exportHeading ?? E.DEFAULT_GUIDE_HEADING).replace(/\s+/g, ' ').trim();
       font(17, true);
-      const headings = heading ? wrap(ctx, heading, 970) : [],
-        band = headings.length ? Math.max(86, 30 + headings.length * 23) : 12;
+      const headings = heading ? wrap(ctx, heading, width - 130) : [],
+        band = headings.length ? Math.max(headings.length * 23 + 20, 86 * headerScale) : 8;
       ctx.fillStyle = colour.accent;
       ctx.fillRect(0, 0, 1240, band);
       if (headings.length) {
         ctx.fillStyle = onAccent;
-        headings.forEach((s, i) => ctx.fillText(s, 70, 34 + i * 23));
-        box(ctx, 1072, 24, 100, 36, blend(colour.accent, onAccent, 0.12), null, 5);
+        headings.forEach((s, i) =>
+          ctx.fillText(s, margin, (band - headings.length * 23) / 2 + 17 + i * 23)
+        );
+        box(
+          ctx,
+          1240 - margin - 98,
+          (band - 36) / 2,
+          100,
+          36,
+          blend(colour.accent, onAccent, 0.12),
+          null,
+          5
+        );
         font(14, true);
         ctx.fillStyle = onAccent;
-        ctx.fillText('PAGE ' + String(pageNo).padStart(2, '0'), 1084, 47);
+        ctx.fillText(
+          'PAGE ' + String(pageNo).padStart(2, '0'),
+          1240 - margin - 86,
+          (band - 36) / 2 + 23
+        );
       }
-      let top = band + 48;
+      let top = band + Math.max(42, 48 * headerScale);
       font(compact ? 35 : 38, true);
       ctx.fillStyle = colour.ink;
-      for (const title of wrap(ctx, guide.title || 'Screenshot guide', 1100)) {
-        ctx.fillText(title, 70, top);
+      for (const title of wrap(ctx, guide.title || 'Screenshot guide', width)) {
+        ctx.fillText(title, margin, top);
         top += 45;
       }
       font(17);
       ctx.fillStyle = colour.body;
       ctx.fillText(
         guide.steps.length + ' illustrated ' + (guide.steps.length === 1 ? 'step' : 'steps'),
-        70,
+        margin,
         top + 5
       );
       ctx.fillStyle = line;
-      ctx.fillRect(70, top + 25, 1100, 1);
-      bodyTop = y = top + 46;
+      ctx.fillRect(margin, top + 20, width, 1);
+      bodyTop = y = top + 46 * headerScale;
       usedBottom = y;
       column = 0;
       rowBottom = y;
       firstStep = lastStep = 0;
+      pageSteps = [];
     }
     function finishPage() {
       const height = compact
@@ -627,15 +735,17 @@
         : 1754;
       let out = c;
       if (height !== 1754) {
-        out = canvas(1240, height);
-        out.getContext('2d').drawImage(c, 0, 0, 1240, height, 0, 0, 1240, height);
+        out = pageCanvas(1240, height, guide.quality);
+        out
+          .getContext('2d')
+          .drawImage(c, 0, 0, c.width, Math.round(height * c.pageScale), 0, 0, 1240, height);
         release(c);
       }
       const context = out.getContext('2d'),
         offset = height - 1754;
       drawFooter(context, footer, logo, colour, logoBox, offset);
       context.fillStyle = line;
-      context.fillRect(70, 1686 + offset, 1100, 1);
+      context.fillRect(margin, 1686 + offset, width, 1);
       context.font = '16px Arial, sans-serif';
       context.fillStyle = colour.body;
       context.fillText(
@@ -644,13 +754,14 @@
           (lastStep === firstStep ? '' : '–' + lastStep) +
           ' of ' +
           guide.steps.length,
-        70,
+        margin,
         1716 + offset
       );
-      box(context, 1086, 1698 + offset, 84, 29, soft, null, 5);
+      box(context, 1240 - margin - 84, 1698 + offset, 84, 29, soft, null, 5);
       context.font = '600 15px Arial, sans-serif';
       context.fillStyle = softAccent;
-      context.fillText('Page ' + pageNo, 1096, 1718 + offset);
+      context.fillText('Page ' + pageNo, 1240 - margin - 74, 1718 + offset);
+      out.guideMeta = { kind: 'steps', stepIds: [...pageSteps] };
       c = null;
       return out;
     }
@@ -670,10 +781,12 @@
     function rowsFor(step, width) {
       const rows = [];
       font(textSize);
-      if (step.caption.trim()) {
-        rows.push({ kind: 'label', text: 'WHAT TO DO', h: 24 });
-        for (const text of wrap(ctx, step.caption.trimEnd(), width))
-          rows.push({ kind: text ? 'body' : 'space', text, h: text ? lineHeight : 10 });
+      for (const section of E.sections(step)) {
+        if (rows.length) rows.push({ kind: 'space', h: 12 });
+        const tone = section.key;
+        rows.push({ kind: 'label', tone, text: section.label, h: 24 });
+        for (const text of wrap(ctx, section.text.trimEnd(), width - (tone === 'caption' ? 0 : 24)))
+          rows.push({ kind: text ? 'body' : 'space', tone, text, h: text ? lineHeight : 10 });
       }
       const links = guide.linkedInstructions
         ? step.marks
@@ -700,15 +813,17 @@
           cardWidth - 122
         ),
         header = Math.max(56, titles.length * (compact ? 31 : 34) + 16),
-        textWidth = split ? 420 : cardWidth - 48,
+        frameW = split ? Math.round(((cardWidth - 48) * 604) / 1052) : cardWidth - 48,
+        textWidth = split ? cardWidth - frameW - 76 : cardWidth - 48,
         rows = rowsFor(step, textWidth),
-        imageWidth = split ? 580 : cardWidth - 72,
+        imageWidth = ((split ? frameW - 24 : cardWidth - 72) * guide.page.imageWidth) / 100,
         cap = compact ? 260 : split ? 570 : dims.width / dims.height < 0.9 ? 820 : 580,
         scale = Math.min(imageWidth / dims.width, cap / dims.height);
       return {
         titles,
         header,
         textWidth,
+        frameW,
         rows,
         scale,
         imageH: first ? dims.height * scale : 0,
@@ -725,10 +840,7 @@
         : (p.imageH ? p.imageH + 24 : 0) + (rowsHeight && p.imageH ? 18 : 0) + rowsHeight) +
       20;
     function dimsOf(step) {
-      return {
-        width: Math.max(1, Math.round(step.image.width * (step.crop?.w || 1))),
-        height: Math.max(1, Math.round(step.image.height * (step.crop?.h || 1))),
-      };
+      return rasterDimensions(step);
     }
     function firstRows(rows, start) {
       let h = 0;
@@ -739,10 +851,12 @@
       return h;
     }
     function paintCard(p, screenshot, stepIndex, first, shown, height) {
-      const x = 70 + (compact ? column * 566 : 0),
+      const x = margin + (compact ? column * (cardWidth + 32) : 0),
         top = y,
         contentY = top + 20 + p.header + 14;
       box(ctx, x, top, cardWidth, height, cardFill, line, 10);
+      const id = guide.steps[stepIndex].id;
+      if (!pageSteps.includes(id)) pageSteps.push(id);
       box(ctx, x + 22, top + 22, 48, 48, colour.accent, null, 8);
       font(22, true);
       ctx.fillStyle = onAccent;
@@ -755,7 +869,7 @@
       );
       if (first) {
         const frameX = x + 24,
-          frameW = split ? 604 : cardWidth - 48;
+          frameW = p.frameW;
         ctx.save();
         ctx.shadowColor = '#10243a16';
         ctx.shadowBlur = 9;
@@ -771,19 +885,40 @@
           p.imageH
         );
       }
-      const textX = split ? x + 656 : x + 24;
+      const textX = split ? x + p.frameW + 52 : x + 24;
       let rowY = split
         ? contentY
         : contentY + (first ? p.imageH + 24 : 0) + (first && shown.length ? 18 : 0);
       for (const row of shown) {
+        const panel = row.tone && row.tone !== 'caption',
+          panelFill = panel
+            ? blend(
+                colour.paper,
+                row.tone === 'warning' ? '#a63d23' : colour.accent,
+                row.tone === 'warning' ? 0.12 : 0.07
+              )
+            : null,
+          panelPalette = panel
+            ? palette({
+                paper: panelFill,
+                accent: row.tone === 'warning' ? '#923c24' : colour.accent,
+              })
+            : null,
+          inset = panel ? 12 : 0;
+        if (panel) {
+          ctx.fillStyle = panelFill;
+          ctx.fillRect(textX - 5, rowY - 2, p.textWidth + 10, row.h + 4);
+          ctx.fillStyle = panelPalette.accent;
+          ctx.fillRect(textX - 5, rowY - 2, 3, row.h + 4);
+        }
         if (row.kind === 'space') {
           rowY += row.h;
           continue;
         }
         if (row.kind === 'label') {
           font(12, true);
-          ctx.fillStyle = cardAccent;
-          ctx.fillText(row.text, textX, rowY + 14);
+          ctx.fillStyle = panelPalette?.accent || cardAccent;
+          ctx.fillText(row.text, textX + inset, rowY + 14);
         } else if (row.kind === 'linked') {
           ctx.fillStyle = soft;
           ctx.fillRect(textX - 6, rowY - 2, p.textWidth + 12, row.h + 4);
@@ -799,8 +934,8 @@
           ctx.fillText(row.text, textX + 42, rowY + 23);
         } else {
           font(textSize);
-          ctx.fillStyle = cardInk;
-          ctx.fillText(row.text, textX, rowY + 23);
+          ctx.fillStyle = panelPalette?.ink || cardInk;
+          ctx.fillText(row.text, textX + inset, rowY + 23);
         }
         rowY += row.h;
       }
@@ -813,6 +948,12 @@
           screenshot = await raster(step, alive);
         try {
           if (!c) newPage();
+          if (step.pageBreakBefore && usedBottom > bodyTop) {
+            const page = finishPage();
+            newPage();
+            check(alive);
+            yield page;
+          }
           const full = plan(step, screenshot),
             rows = full.rows;
           let cursor = 0,
@@ -822,7 +963,14 @@
             const p = plan(step, screenshot, first),
               remaining = rows.slice(cursor),
               allRows = rowTotal(remaining);
-            if (first && !compact && !split && !planned.has(i) && i + 1 < guide.steps.length) {
+            if (
+              first &&
+              !compact &&
+              !split &&
+              !planned.has(i) &&
+              i + 1 < guide.steps.length &&
+              !guide.steps[i + 1].pageBreakBefore
+            ) {
               const other = plan(guide.steps[i + 1], dimsOf(guide.steps[i + 1])),
                 sum = p.imageH + other.imageH,
                 bases =
@@ -921,7 +1069,7 @@
       footer = E.footer(guide.footer),
       layout = E.logoLayout(footer),
       bottom = footer.logo ? Math.min(1510, layout.y - 40) : footer.text.trim() ? 1510 : 1620,
-      c = canvas(1240, 1754),
+      c = pageCanvas(1240, 1754, guide.quality),
       ctx = c.getContext('2d');
     try {
       const images = [];
@@ -932,24 +1080,31 @@
       ctx.fillRect(0, 0, 1240, 1754);
       const margin = 90,
         width = 1060,
+        headerScale = guide.page.headerHeight / 100,
         heading = guide.exportHeading.replace(/\s+/g, ' ').trim(),
         accentInk = palette({ accent: colour.accent, paper: colour.accent }).ink;
       ctx.imageSmoothingQuality = 'high';
       ctx.textBaseline = 'top';
       ctx.font = '700 19px Arial, sans-serif';
       const headings = heading ? wrap(ctx, heading, width) : [],
-        headHeight = headings.length * 26;
+        headHeight = headings.length * 26,
+        bandHeight = Math.max(96, headHeight + 32, 150 * headerScale);
       if (cover.design === 'band') {
         ctx.fillStyle = colour.accent;
-        ctx.fillRect(0, 0, 1240, Math.max(150, 92 + headHeight));
+        ctx.fillRect(0, 0, 1240, bandHeight);
         ctx.fillStyle = accentInk;
       } else {
         ctx.fillStyle = colour.accent;
-        ctx.fillRect(margin, 58, cover.design === 'editorial' ? 90 : width, 6);
+        ctx.fillRect(margin, 58 * headerScale, cover.design === 'editorial' ? 90 : width, 6);
       }
       ctx.textAlign = cover.align;
       const x = cover.align === 'center' ? 620 : margin;
-      for (const [i, line] of headings.entries()) ctx.fillText(line, x, 92 + i * 26);
+      for (const [i, line] of headings.entries())
+        ctx.fillText(
+          line,
+          x,
+          (cover.design === 'band' ? (bandHeight - headHeight) / 2 : 92 * headerScale) + i * 26
+        );
       const block = (text, key, bold = false) => {
           const size = cover[key + 'Size'],
             font =
@@ -966,7 +1121,7 @@
         subtitle = block(cover.subtitle, 'subtitle'),
         details = block(cover.details, 'details'),
         textHeight = title.height + (subtitle.height ? 28 + subtitle.height : 0),
-        top = Math.max(222, 130 + headHeight),
+        top = Math.max(170, bandHeight + 46, (130 + headHeight) * headerScale + 30),
         detailsTop = bottom - details.height,
         available = detailsTop - (details.height ? 48 : 0) - top,
         imageHeight = images.length ? Math.min(620, available - textHeight - 54) : 0;
@@ -1030,22 +1185,131 @@
       ctx.textBaseline = 'alphabetic';
       ctx.textAlign = 'left';
       drawFooter(ctx, footer, logo, colour, layout);
+      c.guideMeta = { kind: 'cover', stepIds: [] };
       return c;
     } catch (err) {
       release(c);
       throw err;
     }
   }
+  function contentPages(guide, alive) {
+    return guide.layout === 'classic' ? classicPages(guide, alive) : designedPages(guide, alive);
+  }
+  async function* contentsPages(guide, stepPages, alive) {
+    const colour = palette(guide.colours),
+      footer = guide.footer,
+      logoBox = E.logoLayout(footer),
+      logo = footer.logo ? await loadImage(footer.logo, alive, 1600, 600) : null,
+      bottom = logo ? Math.min(1510, logoBox.y - 40) : footer.text.trim() ? 1510 : 1620,
+      margin = guide.page.margin,
+      width = 1240 - 2 * margin,
+      headerScale = guide.page.headerHeight / 100;
+    let c,
+      ctx,
+      y,
+      number = 0,
+      links = [];
+    function start() {
+      c = pageCanvas(1240, 1754, guide.quality);
+      ctx = c.getContext('2d');
+      ctx.fillStyle = colour.paper;
+      ctx.fillRect(0, 0, 1240, 1754);
+      ctx.fillStyle = colour.accent;
+      ctx.fillRect(0, 0, 1240, 12);
+      ctx.font = '600 17px Arial, sans-serif';
+      y = 65 * headerScale;
+      for (const line of wrap(ctx, guide.exportHeading.replace(/\s+/g, ' ').trim(), width)) {
+        ctx.fillText(line, margin, y);
+        y += 24;
+      }
+      ctx.font = '700 48px Arial, sans-serif';
+      ctx.fillStyle = colour.ink;
+      y += 48 * headerScale;
+      ctx.fillText('Contents' + (++number > 1 ? ' · continued' : ''), margin, y);
+      y += 44;
+      ctx.font = '24px Arial, sans-serif';
+      for (const line of wrap(ctx, guide.title || 'Screenshot guide', width)) {
+        ctx.fillText(line, margin, y);
+        y += 32;
+      }
+      ctx.font = '16px Arial, sans-serif';
+      ctx.fillStyle = colour.body;
+      ctx.fillText('Guide page numbers start after the cover and contents.', margin, y + 10);
+      y += 54 * headerScale;
+      links = [];
+    }
+    function finish() {
+      drawFooter(ctx, footer, logo, colour, logoBox);
+      c.guideMeta = { kind: 'contents', stepIds: [], links };
+      const out = c;
+      c = null;
+      return out;
+    }
+    try {
+      start();
+      for (const [i, step] of guide.steps.entries()) {
+        check(alive);
+        ctx.font = '600 22px Arial, sans-serif';
+        const lines = wrap(
+            ctx,
+            String(i + 1).padStart(2, '0') + '  ' + (step.title || 'Step ' + (i + 1)),
+            width - 110
+          ),
+          h = Math.max(50, lines.length * 29 + 20);
+        if (y + h > bottom) {
+          yield finish();
+          start();
+          ctx.font = '600 22px Arial, sans-serif';
+        }
+        ctx.fillStyle = colour.ink;
+        lines.forEach((line, row) => ctx.fillText(line, margin, y + 25 + row * 29));
+        ctx.fillStyle = colour.accent;
+        ctx.textAlign = 'right';
+        ctx.fillText(String((stepPages.get(step.id) ?? 0) + 1), 1240 - margin, y + 25);
+        ctx.textAlign = 'left';
+        links.push({ target: step.id, rect: { x: margin, y, w: width, h } });
+        y += h;
+        ctx.fillStyle = colour.accent;
+        ctx.globalAlpha = 0.15;
+        ctx.fillRect(margin, y - 6, width, 1);
+        ctx.globalAlpha = 1;
+      }
+      if (c) yield finish();
+    } finally {
+      if (c) release(c);
+    }
+  }
   async function* pages(value, alive) {
     const guide = E.guide(value);
     let count = 0;
+    const stepPages = new Map();
+    if (guide.contents && guide.steps.length) {
+      let n = 0;
+      for await (const page of contentPages(guide, alive)) {
+        try {
+          check(alive);
+          for (const id of page.guideMeta?.stepIds || [])
+            if (!stepPages.has(id)) stepPages.set(id, n);
+          n++;
+        } finally {
+          release(page);
+        }
+      }
+    }
     if (guide.cover.enabled) {
       yield await coverPage(guide, alive);
       count++;
     }
-    const content =
-      guide.layout === 'classic' ? classicPages(guide, alive) : designedPages(guide, alive);
-    for await (const page of content) {
+    if (guide.contents && guide.steps.length)
+      for await (const page of contentsPages(guide, stepPages, alive)) {
+        count++;
+        if (count > 120) {
+          release(page);
+          throw Error('This guide exceeds 120 pages including its contents.');
+        }
+        yield page;
+      }
+    for await (const page of contentPages(guide, alive)) {
       if (++count > 120) {
         release(page);
         throw Error(
@@ -1057,7 +1321,10 @@
   }
   async function preview(value, alive, contentOnly = false) {
     const guide = E.guide(value);
-    if (contentOnly) guide.cover.enabled = false;
+    if (contentOnly) {
+      guide.cover.enabled = false;
+      guide.contents = false;
+    }
     if (!guide.steps.length && !guide.cover.enabled)
       throw Error('Add a screenshot to preview your guide.');
     await document.fonts?.ready;
@@ -1076,6 +1343,104 @@
       await iterator.return();
     }
   }
+  async function previewPage(value, index, alive) {
+    if (!Number.isInteger(index) || index < 0 || index >= 120)
+      throw Error('Choose a valid preview page.');
+    await document.fonts?.ready;
+    let n = 0;
+    for await (const page of pages(value, alive)) {
+      if (n++ === index) return page;
+      release(page);
+    }
+    throw Error('This preview page is no longer available. Refresh the preview.');
+  }
+  async function documentPreview(value, alive, progress) {
+    const result = { pages: [], firstPage: null };
+    await document.fonts?.ready;
+    try {
+      for await (const page of pages(value, alive)) {
+        try {
+          check(alive);
+          const thumb = canvas(150, Math.max(1, Math.round((page.height * 150) / page.width)));
+          try {
+            thumb.getContext('2d').drawImage(page, 0, 0, thumb.width, thumb.height);
+            result.pages.push({
+              index: result.pages.length,
+              width: page.width,
+              height: page.height,
+              thumbnail: thumb.toDataURL('image/png'),
+              ...page.guideMeta,
+            });
+          } finally {
+            release(thumb);
+          }
+          if (!result.firstPage) result.firstPage = page;
+          progress?.(result.pages.length);
+        } finally {
+          if (page !== result.firstPage) release(page);
+        }
+      }
+      check(alive);
+      return result;
+    } catch (err) {
+      if (result.firstPage) release(result.firstPage);
+      throw err;
+    }
+  }
+  function pdfNavigation(pdf, library, guide, records) {
+    if (!guide.contents) return;
+    const { PDFName, PDFHexString } = library,
+      first = new Map();
+    for (const record of records)
+      for (const id of record.meta?.stepIds || []) if (!first.has(id)) first.set(id, record.page);
+    for (const record of records) {
+      const annotations = [];
+      for (const link of record.meta?.links || []) {
+        const target = first.get(link.target);
+        if (!target) continue;
+        const r = link.rect,
+          sx = record.page.getWidth() / 1240,
+          sy = record.page.getHeight() / 1754;
+        annotations.push(
+          pdf.context.register(
+            pdf.context.obj({
+              Type: 'Annot',
+              Subtype: 'Link',
+              Rect: [
+                r.x * sx,
+                record.page.getHeight() - (r.y + r.h) * sy,
+                (r.x + r.w) * sx,
+                record.page.getHeight() - r.y * sy,
+              ],
+              Border: [0, 0, 0],
+              Dest: [target.ref, 'Fit'],
+            })
+          )
+        );
+      }
+      if (annotations.length)
+        record.page.node.set(PDFName.of('Annots'), pdf.context.obj(annotations));
+    }
+    const items = guide.steps.filter(step => first.has(step.id));
+    if (!items.length) return;
+    const root = pdf.context.obj({ Type: 'Outlines', Count: items.length }),
+      rootRef = pdf.context.register(root),
+      nodes = items.map((step, i) =>
+        pdf.context.obj({
+          Title: PDFHexString.fromText(i + 1 + '. ' + (step.title || 'Step')),
+          Parent: rootRef,
+          Dest: [first.get(step.id).ref, 'Fit'],
+        })
+      ),
+      refs = nodes.map(node => pdf.context.register(node));
+    nodes.forEach((node, i) => {
+      if (i) node.set(PDFName.of('Prev'), refs[i - 1]);
+      if (i + 1 < refs.length) node.set(PDFName.of('Next'), refs[i + 1]);
+    });
+    root.set(PDFName.of('First'), refs[0]);
+    root.set(PDFName.of('Last'), refs.at(-1));
+    pdf.catalog.set(PDFName.of('Outlines'), rootRef);
+  }
   async function exportFile(value, format, alive) {
     const guide = E.guide(value);
     if (!guide.steps.length) throw Error('Add at least one screenshot first.');
@@ -1092,7 +1457,10 @@
       }
     }
     let pdf = null,
-      zip = null;
+      zip = null,
+      library = null;
+    const quality = E.EXPORT_QUALITY[guide.quality],
+      records = [];
     const jpeg = format === 'jpg-images';
     if (format === 'images' || jpeg) {
       if (!root.JSZip) throw Error('The ZIP library is unavailable. Refresh and try again.');
@@ -1103,26 +1471,39 @@
           pdfLibrary = null;
           throw err;
         });
-      const { PDFDocument } = await pdfLibrary;
+      library = await pdfLibrary;
+      const { PDFDocument } = library;
       check(alive);
       pdf = await PDFDocument.create();
+      pdf.setTitle(guide.title || 'Screenshot guide');
     }
     let n = 0;
     for await (const page of pages(guide, alive)) {
       try {
-        const rendered = await blob(page, jpeg ? 'image/jpeg' : 'image/png');
+        let asJpeg = jpeg || (!!pdf && guide.quality === 'small'),
+          rendered = await blob(page, asJpeg ? 'image/jpeg' : 'image/png', quality.jpeg);
+        if (pdf && guide.quality === 'small') {
+          const png = await blob(page);
+          if (png.size <= rendered.size) {
+            rendered = png;
+            asJpeg = false;
+          }
+        }
         check(alive);
         const bytes = await rendered.arrayBuffer();
         check(alive);
         if (zip)
           zip.file(String(++n).padStart(3, '0') + '-guide-page.' + (jpeg ? 'jpg' : 'png'), bytes);
         else {
-          const image = await pdf.embedPng(bytes),
+          const image = asJpeg ? await pdf.embedJpg(bytes) : await pdf.embedPng(bytes),
             p = pdf.addPage([
               595.28,
-              page.height === 1754 ? 841.89 : (595.28 * page.height) / page.width,
+              (page.logicalHeight || page.height) === 1754
+                ? 841.89
+                : (595.28 * page.height) / page.width,
             ]);
           p.drawImage(image, { x: 0, y: 0, width: p.getWidth(), height: p.getHeight() });
+          records.push({ page: p, meta: page.guideMeta });
         }
       } finally {
         release(page);
@@ -1134,6 +1515,7 @@
       check(alive);
       return result;
     }
+    pdfNavigation(pdf, library, guide, records);
     const result = new Blob([await pdf.save()], { type: 'application/pdf' });
     check(alive);
     if (format === 'pdf-zip') {
@@ -1161,9 +1543,12 @@
     draw,
     cropped,
     raster,
+    rasterDimensions,
     wrap,
     pages,
     preview,
+    documentPreview,
+    previewPage,
     export: exportFile,
   };
 })(window);

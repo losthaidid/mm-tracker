@@ -59,6 +59,40 @@
     serif: { label: 'Serif', family: 'Georgia, serif' },
     mono: { label: 'Monospace', family: '"Courier New", monospace' },
   };
+  const EXPORT_QUALITY = {
+    small: { label: 'Small file', scale: 0.75, jpeg: 0.78 },
+    balanced: { label: 'Balanced', scale: 1, jpeg: 0.92 },
+    print: { label: 'Print quality', scale: 1.5, jpeg: 0.97 },
+  };
+  function pageOptions(value = {}) {
+    if (!value || typeof value !== 'object') throw Error('Check the page layout.');
+    const out = {
+      margin: value.margin ?? 70,
+      imageWidth: value.imageWidth ?? 100,
+      spacing: value.spacing ?? 20,
+      headerHeight: value.headerHeight ?? 70,
+    };
+    for (const [key, min, max] of [
+      ['margin', 40, 120],
+      ['imageWidth', 40, 100],
+      ['spacing', 8, 48],
+      ['headerHeight', 60, 110],
+    ])
+      if (!Number.isFinite(out[key]) || out[key] < min || out[key] > max)
+        throw Error('Keep margins, screenshot width and spacing within the shown ranges.');
+    return out;
+  }
+  function sections(step) {
+    return [
+      ['caption', 'WHAT TO DO'],
+      ['expected', 'EXPECTED RESULT'],
+      ['notes', 'NOTES'],
+      ['tip', 'TIP'],
+      ['warning', 'CAUTION'],
+    ]
+      .map(([key, label]) => ({ key, label, text: step[key] || '' }))
+      .filter(s => s.text.trim());
+  }
   function numbering(value = {}) {
     const mode = value?.mode ?? 'screenshot',
       start = value?.start ?? 1;
@@ -145,7 +179,11 @@
           .sort((a, b) => a.number - b.number)
           .map(m => m.number + '. ' + m.instruction.trim())
       : [];
-    return step.caption + (list.length ? '\n\nNumbered instructions\n' + list.join('\n') : '');
+    return (
+      sections(step)
+        .map(s => (s.key === 'caption' ? '' : s.label + '\n') + s.text)
+        .join('\n\n') + (list.length ? '\n\nNumbered instructions\n' + list.join('\n') : '')
+    );
   }
   const stop = new Set(
     'a an the and or but for to of in on at by is are was were be been being with without from this that these those it its as i we you they our your their please issue error problem when after before cannot unable not have has had can could should would will do does did no yes need check ticket test system user request failed failure'.split(
@@ -245,6 +283,22 @@
     )
       throw Error('Choose a valid embedded PNG, JPEG or WebP image.');
     return { src: value.src, width: value.width, height: value.height };
+  }
+  function comparison(value = null) {
+    if (value === null) return null;
+    if (
+      !value ||
+      !['side', 'stack'].includes(value.orientation ?? 'side') ||
+      !str(value.before ?? 'Before', 80) ||
+      !str(value.after ?? 'After', 80)
+    )
+      throw Error('Check the before-and-after labels and arrangement.');
+    return {
+      image: embeddedImage(value.image),
+      orientation: value.orientation ?? 'side',
+      before: value.before ?? 'Before',
+      after: value.after ?? 'After',
+    };
   }
   function cover(value = {}) {
     if (!value || typeof value !== 'object' || Array.isArray(value))
@@ -384,6 +438,11 @@
       throw Error('Use an export heading up to 180 characters.');
     if (value.linkedInstructions !== undefined && typeof value.linkedInstructions !== 'boolean')
       throw Error('Choose whether to include linked numbered instructions.');
+    if (value.contents !== undefined && typeof value.contents !== 'boolean')
+      throw Error('Choose whether to include a contents page.');
+    const quality = value.quality ?? 'balanced';
+    if (typeof quality !== 'string' || !Object.hasOwn(EXPORT_QUALITY, quality))
+      throw Error('Choose an export quality.');
     const layout = value.layout === undefined ? 'classic' : value.layout;
     if (
       typeof layout !== 'string' ||
@@ -425,6 +484,24 @@
       ids.add(s.id);
       pixels += s.image.width * s.image.height;
       chars += s.image.src.length;
+      const pair = comparison(s.comparison),
+        details = {};
+      if (pair) {
+        pixels += pair.image.width * pair.image.height;
+        chars += pair.image.src.length;
+      }
+      for (const [key, max] of [
+        ['expected', 2000],
+        ['notes', 2000],
+        ['tip', 1500],
+        ['warning', 1500],
+      ]) {
+        const text = s[key] ?? '';
+        if (!str(text, max)) throw Error('Shorten the step result, notes, tip or caution.');
+        details[key] = text;
+      }
+      if (s.pageBreakBefore !== undefined && typeof s.pageBreakBefore !== 'boolean')
+        throw Error('Check the step page break.');
       const marks = s.marks.map(m => {
         if (
           !m ||
@@ -498,6 +575,7 @@
       });
       if (
         s.caption.length +
+          Object.values(details).reduce((n, text) => n + text.length, 0) +
           marks.reduce((n, m) => n + (m.instruction?.length || 0) + (m.text?.length || 0), 0) >
         12000
       )
@@ -508,6 +586,9 @@
         id: s.id,
         title: s.title,
         caption: s.caption,
+        ...details,
+        comparison: pair,
+        pageBreakBefore: s.pageBreakBefore ?? false,
         image: { src: s.image.src, width: s.image.width, height: s.image.height },
         marks,
         crop: s.crop ? { x: s.crop.x, y: s.crop.y, w: s.crop.w, h: s.crop.h } : null,
@@ -522,6 +603,9 @@
       version: 1,
       title: value.title,
       layout,
+      page: pageOptions(value.page),
+      quality,
+      contents: value.contents ?? false,
       exportHeading:
         value.exportHeading === undefined ? DEFAULT_GUIDE_HEADING : value.exportHeading,
       footer: branding,
@@ -531,6 +615,31 @@
       styles: styles(value.styles),
       linkedInstructions: value.linkedInstructions === undefined ? false : value.linkedInstructions,
       steps,
+    };
+  }
+  function brandTemplate(name, value) {
+    if (!str(name, 40) || !name.trim())
+      throw Error('Give this template a name (up to 40 characters).');
+    const g = guide({
+      ...value,
+      kind: 'workhub-screenshot-guide',
+      version: 1,
+      title: '',
+      steps: [],
+      cover: { ...value.cover, title: '', subtitle: '', details: '', images: [] },
+    });
+    return {
+      name: name.trim(),
+      settings: {
+        layout: g.layout,
+        page: g.page,
+        quality: g.quality,
+        contents: g.contents,
+        exportHeading: g.exportHeading,
+        footer: g.footer,
+        colours: g.colours,
+        cover: g.cover,
+      },
     };
   }
   const bounds = points => {
@@ -606,6 +715,11 @@
     GUIDE_PALETTES,
     COVER_DESIGNS,
     GUIDE_FONTS,
+    EXPORT_QUALITY,
+    pageOptions,
+    sections,
+    comparison,
+    brandTemplate,
     MARK_TYPES,
     numbering,
     styles,
