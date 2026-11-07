@@ -23,6 +23,8 @@
     function feature(target) {
       const explicit = target?.closest?.('[data-access-feature]')?.dataset.accessFeature;
       if (explicit) return explicit;
+      if (target?.closest?.('.batch-settings,[data-batch="settings"]')) return 'workspace';
+      if (target?.closest?.('#wlField,[data-wl="fields"],[data-wl^="field-"]')) return 'snippets';
       if (
         target?.closest?.('[data-df],#dfSetup,#dfUpload,#dfFile,#dfUnshare,.df-room:not(.ho-room)')
       )
@@ -55,6 +57,9 @@
       if (target?.closest?.('#presentationBreakButton')) return 'presentation-break';
       const action = target?.closest?.('[data-action]')?.dataset.action;
       if (action === 'tab-visibility' || target?.closest?.('#visibilityForm')) return 'workspace';
+      const form = target?.closest?.('form');
+      const recordFeature = root.WorkHubShortcutAccess?.recordForms[form?.id];
+      if (recordFeature) return recordFeature;
       return a.feature();
     }
     async function load(user) {
@@ -135,6 +140,7 @@
         if (!can(id)) b.title = 'Access disabled by the website Owner';
       }
       for (const b of document.querySelectorAll('[data-hub="tool"],[data-tool]')) {
+        if (b.closest('#settingsMenu')) continue;
         const id = 'studio.' + b.dataset.tool;
         if (!C.byId.has(id)) continue;
         if (C.hidden(profile, id) || a.hidden().includes(id)) b.hidden = true;
@@ -161,17 +167,50 @@
           disable(b, !can(f, 'run'));
         }
       }
+      for (const b of document.querySelectorAll('[data-hub="quick"]'))
+        b.hidden =
+          !!root.WorkHubShortcutAccess &&
+          !root.WorkHubShortcutAccess.quick.some(([hub]) =>
+            root.WorkHubShortcutAccess.allowedHub({ hub }, can)
+          );
     }
     function guard(event) {
       const t = event.target;
-      if (
-        !cloud().ready ||
-        !t?.closest ||
-        t.closest('.um-room,#cloudGate,#settingsMenu,#visibilityForm')
-      )
-        return;
+      if (!cloud().ready || !t?.closest || t.closest('.um-room,#cloudGate')) return;
       const control = t.closest('button,a,input,select,textarea,form');
       if (!control) return;
+      const shortcuts = root.WorkHubShortcutAccess;
+      const deny = message => {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        a.tell(message, true);
+      };
+      if (t.closest('#settingsMenu')) {
+        if (control.matches('button:not([data-settings-stay])') && shortcuts) {
+          const key = shortcuts.settingKey(control);
+          if (!shortcuts.allowedSetting(key, can, profile?.role === 'owner'))
+            deny(
+              ['backupButton', 'exportButton'].includes(key)
+                ? 'Export permission is required for every visible feature.'
+                : 'Your permissions do not allow this setting.'
+            );
+        }
+        return;
+      }
+      const formKey = shortcuts?.settingForms[control.closest('form')?.id];
+      if (formKey) {
+        if (
+          !['cancel', 'close'].includes(control.dataset.action || control.dataset.hub) &&
+          !shortcuts.allowedSetting(formKey, can, profile?.role === 'owner')
+        )
+          deny('Your permissions do not allow this setting.');
+        return;
+      }
+      if (shortcuts?.hubRule(control.dataset)) {
+        if (!shortcuts.allowedHub(control.dataset, can))
+          deny('Your account cannot open or create this item.');
+        return;
+      }
       const id = feature(t);
       if (!C.byId.has(id)) return;
       let action = 'view';
@@ -196,7 +235,8 @@
       const hoAction = ['preview', 'download', 'drive'].includes(control.dataset.ho)
         ? 'export'
         : '';
-      if (dfAction || hoAction) action = dfAction || hoAction;
+      if (control.dataset.batch === 'settings') action = 'edit';
+      else if (dfAction || hoAction) action = dfAction || hoAction;
       else if (event.type === 'submit' && ['dfSetup', 'dfUnshare'].includes(t.id)) action = 'edit';
       else if (
         /export|download|^pdf$|^xlsx$|^csv$|^original$/.test(op) ||
@@ -229,7 +269,8 @@
         );
       }
     }
-    for (const name of ['click', 'submit', 'change']) document.addEventListener(name, guard, true);
+    // Window capture runs before feature listeners on document, including Studio shortcuts.
+    for (const name of ['click', 'submit', 'change']) root.addEventListener(name, guard, true);
     root.setInterval(() => void refresh(), 30000);
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) void refresh();

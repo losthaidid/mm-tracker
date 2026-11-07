@@ -2677,6 +2677,14 @@
           type: 'process-open',
         })),
       ]
+        .filter(
+          x =>
+            !root.WorkHubShortcutAccess ||
+            root.WorkHubShortcutAccess.allowedHub(
+              { hub: x.type === 'command' ? 'command' : x.type, id: x.id },
+              a.can || (() => true)
+            )
+        )
         .filter(x => x.title.toLowerCase().includes(q))
         .slice(0, 30);
       return (
@@ -2999,6 +3007,11 @@
     async function handle(el) {
       const action = el.dataset.hub,
         id = el.dataset.id;
+      if (
+        root.WorkHubShortcutAccess &&
+        !root.WorkHubShortcutAccess.allowedHub(el.dataset, a.can || (() => true))
+      )
+        throw Error('Your account cannot open or create this item.');
       if (action === 'header-edit') {
         $('settingsMenu').open = false;
         form(
@@ -3034,9 +3047,16 @@
         return;
       }
       if (action === 'quick') {
+        const choices = root.WorkHubShortcutAccess.quick.filter(([hub]) =>
+          root.WorkHubShortcutAccess.allowedHub({ hub }, a.can || (() => true))
+        );
+        if (!choices.length) {
+          a.tell('Your account has no available Quick add actions.', true);
+          return;
+        }
         a.openModal(
           'Make something happen',
-          `<div class="hub-grid">${btn('new-task', '＋ Task')}${btn('new-ticket', '＋ Ticket')}${btn('new-item', '＋ Project item')}${btn('new-range', '＋ Schedule activity')}${btn('note-edit', '＋ Knowledge note')}${btn('waiting-edit', '＋ Follow-up')}</div>`
+          `<div class="hub-grid">${choices.map(([hub, label]) => btn(hub, label)).join('')}</div>`
         );
         return;
       }

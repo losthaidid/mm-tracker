@@ -81,6 +81,16 @@
       'Statuses, phases and reusable dropdown options.',
       'built in lists dropdown status phase options',
     ],
+    'work-context': [
+      'work',
+      'Shared environments, labels and the context attached to your work.',
+      'work context labels environments system client',
+    ],
+    'field-library': [
+      'work',
+      'Manage reusable field definitions for your validation templates.',
+      'reusable field library columns validation templates',
+    ],
     claimSettingsButton: [
       'work',
       'On-site locations, distances and mileage rates.',
@@ -277,7 +287,7 @@
           });
         }
       });
-      observer.observe(panel, {
+      observer.observe($('settingsMenu'), {
         subtree: true,
         childList: true,
         characterData: true,
@@ -288,17 +298,14 @@
     /** Match button IDs/actions to ITEMS without replacing the original event handlers. */
     function scan() {
       for (const [button, r] of records)
-        if (!panel.contains(button)) {
+        if (!$('settingsMenu').contains(button)) {
           r.row.remove();
           records.delete(button);
         }
-      for (const button of panel.querySelectorAll('button:not([data-settings-stay])')) {
+      for (const button of $('settingsMenu').querySelectorAll('button:not([data-settings-stay])')) {
         if (records.has(button)) continue;
         const key =
-            button.id ||
-            (button.dataset.hub === 'tool' && button.dataset.tool === 'theme'
-              ? 'appearance'
-              : button.dataset.action),
+            root.WorkHubShortcutAccess?.settingKey(button) || button.id || button.dataset.action,
           item = ITEMS[key] || ['workspace', 'More options for your workspace.', ''],
           group = GROUPS.find(g => g.id === item[0]),
           row = document.createElement('div'),
@@ -346,6 +353,12 @@
           shown =
             !button.hidden &&
             (!r.required || a.ready()) &&
+            (!root.WorkHubShortcutAccess ||
+              root.WorkHubShortcutAccess.allowedSetting(
+                root.WorkHubShortcutAccess.settingKey(button),
+                a.can || (() => true),
+                root.WorkHubCurrentAccess?.snapshot()?.role === 'owner'
+              )) &&
             tokens.every(token => label.includes(token));
         r.row.hidden = !shown;
         r.row.classList.toggle('is-disabled', button.disabled);

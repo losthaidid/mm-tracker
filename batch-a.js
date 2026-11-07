@@ -202,7 +202,8 @@
       );
     }
     function capture(d, form, kind, id) {
-      if (!form.querySelector('[data-batch-fields]')) return;
+      if (!form.querySelector('[data-batch-fields]') || (a.can && !a.can('workspace', 'edit')))
+        return;
       const v = new FormData(form),
         values = {
           environmentId: v.get('batchEnvironment') || '',
@@ -223,7 +224,12 @@
       modal.classList.remove('batch-reading');
       modal.removeAttribute('data-batch-reading');
       const formEl = body.querySelector('#editForm,#hubNote,#projectForm');
-      if (formEl && !formEl.querySelector('[data-batch-fields]') && a.ready()) {
+      if (
+        formEl &&
+        !formEl.querySelector('[data-batch-fields]') &&
+        a.ready() &&
+        (!a.can || a.can('workspace', 'edit'))
+      ) {
         const kind =
           formEl.id === 'hubNote'
             ? 'notes'

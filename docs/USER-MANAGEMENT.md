@@ -22,7 +22,9 @@ Select someone in **User accounts**, choose permissions and save.
 | View only | Allows viewing but blocks saved changes. |
 | Enabled | Uses the separate Create, Edit, Delete, Run/use and Export switches. |
 
-There are 29 permission entries: 13 main screens, nine Studio tools, three Project tools, and Focus mode, Break Terrarium, Presentation break and personal settings. Parent restrictions also apply to child tools. Basic personal settings remain readable. Validation can run an existing saved template without permission to change the template.
+There are 31 permission entries: 15 main screens, nine Studio tools, three Project tools, and Focus mode, Break Terrarium, Presentation break and personal settings. Parent restrictions also apply to child tools. Basic personal settings remain readable. Validation can run an existing saved template without permission to change the template.
+
+Settings only lists actions permitted for the signed-in account. Work setup also checks the relevant feature, and unavailable options are excluded from Settings search and category counts. Account and sign-out controls remain available. Quick add and Search & commands only offer permitted targets; creating an item requires Create permission for that feature. If no Quick add actions are available, its toolbar button is hidden. Permission checks run before shortcut handlers and are checked again when a shortcut is used.
 
 Full workspace backups and Excel reports require Export permission for every visible feature. Per-feature exports follow that feature's Export permission. These controls govern the website's export actions; someone who can view information can still copy what they have already seen.
 
@@ -47,3 +49,7 @@ Apply `supabase/user-management.sql`, `supabase/access-catalog.sql` and `supabas
 Deploy `supabase/functions/workhub-admin/index.ts` as **workhub-admin**, with the gateway JWT check disabled: the function explicitly validates the bearer token with Auth and verifies the current Owner role in the database. Its service-role key comes only from the platform's private environment. CORS permits the published website origin. Publish the frontend after both backend steps succeed.
 
 `access-catalog.js` is the shared feature registry. Keep the generated SQL catalog synchronized when adding features. Database tests execute the actual SQL under anonymous, member and Owner roles. Edge tests cover identity checks, password verification, body limits, CORS and approval ordering. Application tests cover visibility, route restrictions, requests, run-only validation and projected-document compatibility across every feature.
+
+Shortcut access rules live in `shortcut-access.js`, loaded after `access-catalog.js` and before `access-control.js`. Settings, Quick add and commands share these existing feature/action rules. Record forms keep their target feature when opened from another screen. Work-context fields are omitted and left untouched when personal work setup is read-only, so permitted record creation does not attempt an unrelated settings write. No database permissions or suspension behavior are changed by this interface fix.
+
+![Synthetic restricted-member Settings preview](images/settings-permissions.jpg)
