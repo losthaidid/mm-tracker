@@ -358,3 +358,7 @@ Each sub-task has **Add feedback** beside its feedback in the Tasks list and ins
 Sub-task feedback uses the existing account autosave and backups, remains editable in the sub-task editor, and appears in Excel’s Task notes sheet. Cancelled, deleted-target, full-history and conflicting saves preserve records and drafts. No database migration is needed.
 
 People & Responsibilities: open Projects to map business users to maintained MM areas and activities with drag/drop, reporting lines, scoped roles, and PNG/Excel exports. See [the guide](docs/PROJECT-PEOPLE.md).
+
+## Written procedures in Process Hub
+
+Open **Process Hub → Written procedures** to save ordinary processes such as handling a CR Form. Start blank or use the editable CR Form example, maintain ordered instructions with roles, checklists, expected outcomes and reference links, then choose **Save procedure**. Search and category filters help find saved guides; duplicate, archive/restore and Markdown download are available. Reading checkmarks are personal to the current visit. The existing **Animated processes** tab retains the canvas and playback. See [the written-procedure guide](docs/WRITTEN-PROCEDURES.md).
