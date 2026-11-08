@@ -1,0 +1,225 @@
+/* Sentence builder only; the existing Process Hub canvas keeps its design. */
+#modal:has(#psBuilder, #psRules) {
+  width: min(960px, calc(100vw - 24px));
+  max-width: none;
+}
+:is(#psBuilder, #psRules) {
+  color: var(--hub-text);
+}
+.ps-intro {
+  padding: 18px;
+  margin-bottom: 18px;
+  border: 1px solid var(--hub-border);
+  border-radius: 16px;
+  background: var(--hub-surface-soft);
+}
+.ps-intro h3 {
+  margin: 8px 0;
+  font-size: 1.4rem;
+}
+.ps-intro p,
+.ps-help,
+.ps-samples p,
+.ps-condition p {
+  color: var(--hub-muted);
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+.ps-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+:is(#psBuilder, #psRules) label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.8rem;
+  margin: 10px 0;
+  min-width: 0;
+}
+:is(#psBuilder, #psRules) :is(input, select, textarea) {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+:is(#psBuilder, #psRules) textarea {
+  resize: vertical;
+}
+.ps-tabs,
+.ps-rule-tools {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin: 14px 0;
+}
+.ps-tabs [aria-current='page'] {
+  background: var(--hub-accent);
+  color: var(--hub-accent-ink);
+}
+.ps-rule-list {
+  display: grid;
+  gap: 9px;
+  max-height: 50dvh;
+  overflow: auto;
+  padding: 3px;
+}
+.ps-rule-list article {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid var(--hub-border);
+  background: var(--hub-surface);
+  border-radius: 12px;
+}
+.ps-rule-list small {
+  display: block;
+  color: var(--hub-muted);
+  overflow-wrap: anywhere;
+  margin-top: 5px;
+}
+.ps-save-rules,
+.ps-next {
+  border-top: 1px solid var(--hub-border);
+  padding-top: 16px;
+  margin-top: 20px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.ps-save-rules p,
+.ps-next > span {
+  font-size: 0.78rem;
+  color: var(--hub-muted);
+  flex: 1 1 220px;
+}
+.ps-preview {
+  margin-top: 22px;
+}
+.ps-preview-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.ps-preview-heading > span {
+  color: var(--hub-muted);
+  font-size: 0.8rem;
+}
+.ps-preview-steps {
+  padding: 0;
+  list-style-position: inside;
+  counter-reset: pssteps;
+  display: grid;
+  gap: 12px;
+}
+.ps-preview-steps > li {
+  display: block;
+  counter-increment: pssteps;
+  border: 1px solid var(--hub-border);
+  border-radius: 14px;
+  padding: 16px;
+  background: var(--hub-surface);
+}
+.ps-preview-steps > li > div:first-child {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ps-preview-steps > li > div:first-child::before {
+  content: counter(pssteps, decimal-leading-zero);
+  font-weight: 700;
+  color: var(--hub-accent);
+  font-size: 0.9rem;
+}
+.ps-type,
+.ps-owner {
+  padding: 4px 8px;
+  background: var(--hub-surface-soft);
+  border-radius: 8px;
+  font-size: 0.7rem;
+}
+.ps-preview-steps small {
+  color: var(--hub-muted);
+  font-size: 0.75rem;
+  display: block;
+  margin-top: 8px;
+}
+.ps-binding {
+  font-size: 0.8rem;
+  margin: 12px 0;
+  padding: 10px;
+  border-left: 3px solid var(--hub-accent);
+  background: var(--hub-surface-soft);
+}
+.ps-binding details {
+  margin-top: 8px;
+}
+.ps-routes {
+  display: flex;
+  gap: 8px;
+  flex-direction: column;
+  font-size: 0.8rem;
+  margin-top: 12px;
+}
+.ps-issues,
+.ps-notices {
+  padding: 14px;
+  border: 1px solid var(--hub-border);
+  border-radius: 12px;
+  margin: 12px 0;
+  background: var(--hub-surface-soft);
+  font-size: 0.8rem;
+}
+.ps-issues {
+  border-color: var(--hub-danger, #c16b66);
+}
+.ps-samples {
+  margin-top: 16px;
+}
+.ps-condition {
+  font-size: 0.8rem;
+  border: 1px solid var(--hub-border);
+  border-radius: 12px;
+  padding: 12px;
+  margin: 12px 0;
+}
+.ps-condition label.check-label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.ps-condition input[type='checkbox'] {
+  width: auto;
+}
+@media (max-width: 600px) {
+  .ps-fields {
+    grid-template-columns: 1fr;
+  }
+  .ps-rule-list article {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .ps-preview-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .ps-tabs button {
+    flex: 1 1 40%;
+  }
+  .ps-intro {
+    padding: 14px;
+  }
+  .ps-intro h3 {
+    font-size: 1.18rem;
+  }
+}
+
+#psResult {
+  scroll-margin-top: 100px;
+}

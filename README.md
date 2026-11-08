@@ -362,3 +362,7 @@ People & Responsibilities: open Projects to map business users to maintained MM 
 ## Written procedures in Process Hub
 
 Open **Process Hub → Written procedures** to save ordinary processes such as handling a CR Form. Start blank or use the editable CR Form example, maintain ordered instructions with roles, checklists, expected outcomes and reference links, then choose **Save procedure**. Search and category filters help find saved guides; duplicate, archive/restore and Markdown download are available. Reading checkmarks are personal to the current visit. The existing **Animated processes** tab retains the canvas and playback. See [the written-procedure guide](docs/WRITTEN-PROCEDURES.md).
+
+## Describe an animated process
+
+In **Process Hub → Animated processes**, choose **Describe a process** to turn a description into an editable animated draft without AI. **Sentence rules** maintains terms/values, action aliases and effects, sentence patterns, people and departments. Preview matched fields and responsibilities, resolve uncertain references, then open the existing editor and choose **Save process**. Number/text conditions can drive automatic branches; interactive decisions remain available. See [the sentence-builder guide](docs/PROCESS-SENTENCES.md) for syntax, examples and limits.
