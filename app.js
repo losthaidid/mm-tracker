@@ -1215,6 +1215,7 @@ function render() {
   }
   if (!visible.includes(tab)) tab = visible[0] || 'tickets';
   const preserved =
+    (tab === 'processhub' && hub?.procedures?.patchRender()) ||
     (tab === 'lab' && hub?.workbench?.workshop?.patchRender()) ||
     (tab === 'validator' && hub?.validator?.patchRender()) ||
     (tab === 'studio' &&

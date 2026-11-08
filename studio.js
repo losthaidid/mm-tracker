@@ -122,6 +122,7 @@
   }
   function validate(d) {
     root.WorkHubNotesEngine?.validate(d);
+    root.WorkHubProceduresEngine?.validate(d);
     root.WorkHubMyDayEngine.validate(d);
     root.WorkHubScheduleEngine?.validate(d);
     root.WorkHubWorkbench?.validate(d);
@@ -314,6 +315,9 @@
       goLiveIssues = null,
       solution = null,
       rehearsal = null,
+      procedures = null,
+      processHubMode = 'animated',
+      processHubOwner = '',
       tcodes = null,
       focusPanel = null,
       life = null,
@@ -1541,14 +1545,22 @@
     }
     function currentProcess() {
       return (
-        data().processes.find(p => p.id === processId) ||
-        data().processes.find(p => p.archived === processArchive)
+        data().processes.find(p => p.kind !== 'procedure' && p.id === processId) ||
+        data().processes.find(p => p.kind !== 'procedure' && p.archived === processArchive)
       );
     }
     function processHub() {
+      const account = a.cloud().ready ? a.cloud().user?.id || '' : '';
+      if (processHubOwner !== account) {
+        processHubOwner = account;
+        processHubMode = 'animated';
+      }
       return (
-        rehearsal?.render() ||
-        '<section class="hub"><h2>Process Hub</h2><p>Refresh this page to load the process canvas.</p></section>'
+        root.WorkHubProcedures.tabs(processHubMode) +
+        (processHubMode === 'written'
+          ? procedures.render()
+          : rehearsal?.render() ||
+            '<section class="hub"><h2>Process Hub</h2><p>Refresh this page to load the process canvas.</p></section>')
       );
     }
     function processEditor(id = '') {
@@ -2713,6 +2725,14 @@
             detail: n.notes || n.content || n.title,
             meta: 'Knowledge note',
           })),
+          ...root.WorkHubProceduresEngine.rows(s).map(p => ({
+            id: 'written:' + p.id,
+            title: p.name,
+            type: 'process-open',
+            group: 'Records',
+            detail: p.description || 'Open this written procedure.',
+            meta: 'Written procedure · ' + p.procedure.category,
+          })),
           ...root.WorkHubRehearsalEngine.library(s).map(p => ({
             id: p.id,
             title: p.name,
@@ -2916,6 +2936,11 @@
       if (sorting && !sorting.source.isConnected) clearSort();
       if (tab !== 'processhub') clearTimeout(walkTimer);
       viewTab = tab;
+      const processAccount = a.cloud().ready ? a.cloud().user?.id || '' : '';
+      if (processAccount !== processHubOwner) {
+        processHubOwner = processAccount;
+        processHubMode = 'animated';
+      }
       mountChrome();
       chromeUX?.mount();
       websiteDesigns?.mount();
@@ -2981,6 +3006,7 @@
       fileLauncher?.sync();
       summaryCards?.sync();
       rehearsal?.mount();
+      procedures?.mount();
       tcodes?.mount();
     }
     const renderers = {
@@ -3241,6 +3267,11 @@
         return;
       }
       if (action === 'process-edit') {
+        if (root.WorkHubProceduresEngine.rows(a.state()).some(p => p.id === id)) {
+          await procedures.open(id, true);
+          return;
+        }
+        processHubMode = 'animated';
         navigate('processhub');
         if (id) {
           rehearsal?.open(id);
@@ -3249,6 +3280,12 @@
         return;
       }
       if (action === 'process-open') {
+        if (id?.startsWith('written:')) {
+          a.closeModal();
+          await procedures.open(id.slice(8));
+          return;
+        }
+        processHubMode = 'animated';
         rehearsal?.open(id);
         processId = id;
         stepId = '';
@@ -4218,11 +4255,21 @@
     });
     rehearsal = root.WorkHubRehearsal?.install({
       ...a,
-      active: () => viewTab === 'processhub',
+      active: () => viewTab === 'processhub' && processHubMode === 'animated',
       recordLinks,
       ready: () => a.cloud().ready,
       owner: () => a.cloud().user?.id || '',
       prefs: () => themePreview || prefs(),
+    });
+    procedures = root.WorkHubProcedures.install({
+      ...a,
+      active: () => viewTab === 'processhub' && processHubMode === 'written',
+      selectMode(value) {
+        if (value === 'written' && rehearsal?.snapshot().editing)
+          throw Error('Save or cancel the open animated-process editor before switching sections.');
+        processHubOwner = a.cloud().user?.id || '';
+        processHubMode = value;
+      },
     });
     tcodes = root.WorkHubSapTcodes?.install({
       ...a,
@@ -4386,7 +4433,8 @@
       ) ||
       !!validator?.launchContext().dirty ||
       !!notes?.hasDraft() ||
-      !!goLiveIssues?.hasDraft();
+      !!goLiveIssues?.hasDraft() ||
+      !!procedures?.hasDraft();
     summaryCards = root.WorkHubSummaryCards.install({ ...a, unfinished });
     fileLauncher = root.WorkHubFileLauncher.install({
       ...a,
@@ -4425,6 +4473,8 @@
       },
     });
     return {
+      procedures,
+      processHubMode: () => processHubMode,
       fileLauncher,
       summaryCards,
       experienceAppearance,

@@ -714,6 +714,7 @@
     const rows = d.workhub.rehearsal.processes.map(normalize),
       ids = new Set(rows.map(p => p.id));
     for (const raw of d.workhub.processes || []) {
+      if (raw.kind === 'procedure') continue;
       const p = fromHub(raw);
       while (ids.has(p.id)) p.id = 'hub:' + p.id;
       ids.add(p.id);
