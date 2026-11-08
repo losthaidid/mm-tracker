@@ -549,6 +549,7 @@
             sleep: 'Taking a quiet moment.',
           }[mood];
         b.hidden = !message;
+        positionCompanionBubble();
       }
       petTimer = setTimeout(() => {
         document.body.dataset.mascotMood = 'idle';
@@ -564,7 +565,11 @@
       petWalk = null,
       petFrame = 0,
       petNextWalk = 0,
-      petStation = 0;
+      petStation = 0,
+      petBubbleFrame = 0,
+      observedPetBubble = null,
+      petBubbleResize = null,
+      petBubbleMutation = null;
     try {
       const saved = JSON.parse(localStorage.getItem(petPositionKey) || 'null');
       if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
@@ -640,25 +645,86 @@
           touchAction: 'none',
           cursor: petDrag ? 'grabbing' : 'grab',
         });
-      const bubble = $('hubPetBubble'),
-        bubbleWidth = Math.min(240, b.viewportWidth - 24),
-        bubbleLeft = Math.max(
-          b.left,
-          Math.min(b.left + b.viewportWidth - 24 - bubbleWidth, left + b.size / 2 - bubbleWidth / 2)
-        );
-      if (bubble)
-        styleValues(bubble, {
-          position: 'absolute',
-          width: bubbleWidth + 'px',
-          maxWidth: 'none',
-          left: bubbleLeft - left + 'px',
-          right: 'auto',
-          top: top - b.top < 110 ? 'calc(100% + 10px)' : 'auto',
-          bottom: top - b.top < 110 ? 'auto' : 'calc(100% + 10px)',
-        });
+      positionCompanionBubble();
       dataValue(pet, 'positionPinned', companionPinned);
       life?.layout();
       adventures?.moved(before, { x: left, y: top });
+    }
+    function queueCompanionBubble() {
+      if (petBubbleFrame || $('hubPetBubble')?.hidden !== false) return;
+      petBubbleFrame = root.requestAnimationFrame(() => {
+        petBubbleFrame = 0;
+        positionCompanionBubble();
+      });
+    }
+    function positionCompanionBubble() {
+      const bubble = $('hubPetBubble'),
+        pet = $('hubPet');
+      if (!bubble || !pet) return;
+      if (observedPetBubble !== bubble) {
+        petBubbleResize?.disconnect();
+        petBubbleMutation?.disconnect();
+        observedPetBubble = bubble;
+        if (root.ResizeObserver) {
+          petBubbleResize = new root.ResizeObserver(queueCompanionBubble);
+          for (const el of [bubble, $('hubHeader'), $('hubToolbar'), $('tabs')])
+            if (el) petBubbleResize.observe(el);
+        }
+        if (root.MutationObserver) {
+          petBubbleMutation = new root.MutationObserver(queueCompanionBubble);
+          petBubbleMutation.observe(bubble, {
+            childList: true,
+            subtree: true,
+            characterData: true,
+            attributes: true,
+            attributeFilter: ['hidden'],
+          });
+        }
+      }
+      if (bubble.hidden || pet.hidden) return;
+      const v = root.visualViewport,
+        view = {
+          x: v?.offsetLeft || 0,
+          y: v?.offsetTop || 0,
+          w: v?.width || root.innerWidth,
+          h: v?.height || root.innerHeight,
+        },
+        width = Math.max(1, Math.min(240, view.w - 24));
+      styleValues(bubble, {
+        position: 'absolute',
+        width: width + 'px',
+        maxWidth: 'none',
+        maxHeight: Math.min(280, view.h * 0.42) + 'px',
+        right: 'auto',
+        bottom: 'auto',
+      });
+      const anchor = pet.getBoundingClientRect(),
+        size = bubble.getBoundingClientRect(),
+        obstacles = ['hubHeader', 'hubToolbar', 'tabs']
+          .map($)
+          .filter(el => el && !el.hidden)
+          .map(el => el.getBoundingClientRect())
+          .filter(
+            r =>
+              r.width &&
+              r.height &&
+              r.bottom > view.y &&
+              r.top < view.y + view.h &&
+              r.right > view.x &&
+              r.left < view.x + view.w
+          ),
+        spot = root.WorkHubMomoBehaviourEngine.speechSpot(
+          anchor,
+          { w: width, h: bubble.offsetHeight || size.height || 80 },
+          view,
+          obstacles
+        );
+      styleValues(bubble, {
+        visibility: spot ? 'visible' : 'hidden',
+        left: spot ? spot.x - anchor.left + 'px' : '0px',
+        top: spot ? spot.y - anchor.top + 'px' : '0px',
+        maxHeight: (spot?.height || 56) + 'px',
+      });
     }
     function rememberCompanion() {
       try {
@@ -838,6 +904,7 @@
       positionTimer();
     };
     root.addEventListener('resize', resizeFloaters);
+    document.addEventListener('scroll', queueCompanionBubble, { capture: true, passive: true });
     root.visualViewport?.addEventListener('resize', resizeFloaters);
     root.visualViewport?.addEventListener('scroll', resizeFloaters);
     document.addEventListener('visibilitychange', () => {
