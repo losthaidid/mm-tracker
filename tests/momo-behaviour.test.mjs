@@ -41,3 +41,21 @@ test('work-area resting places fit a phone viewport and avoid the controls being
   assert.equal(Object.keys(E.FRIENDS).length,17);
   assert.equal(E.FRIENDS.rabbit.role,'rival');assert.equal(E.FRIENDS.squirrel.role,'gift');assert.equal(E.FRIENDS.cat.role,'seat');
 });
+
+const speechClear = (p,r) => p.x + p.width <= r.left || p.x >= r.right || p.y + p.height <= r.top || p.y >= r.bottom;
+test('speech cards avoid toolbar overlap and remain in the visible viewport at every edge',()=>{
+ const view={x:0,y:0,w:570,h:700},bar={left:0,right:557,top:82,bottom:140},header={left:0,right:570,top:0,bottom:70};
+ for(const anchor of [{left:230,right:374,top:150,bottom:294},{left:12,right:156,top:12,bottom:156},{left:414,right:558,top:544,bottom:688},{left:12,right:124,top:540,bottom:652}]){
+  const spot=E.speechSpot(anchor,{w:240,h:88},view,[header,bar]);assert.ok(spot);assert.ok(speechClear(spot,bar));assert.ok(speechClear(spot,header));assert.ok(speechClear(spot,anchor));assert.ok(spot.x>=12&&spot.x+spot.width<=558);assert.ok(spot.y>=12&&spot.y+spot.height<=688);
+ }
+ const greeting=E.speechSpot({left:230,right:374,top:150,bottom:294},{w:240,h:88},view,[header,bar]);assert.ok(greeting.y>=304,'The greeting moves below Momo when the toolbar occupies the space above him.');
+});
+test('speech cards resize long messages and account for a keyboard-shifted visual viewport',()=>{
+ const view={x:15,y:40,w:375,h:260},anchor={left:200,right:312,top:70,bottom:182},header={left:0,right:500,top:0,bottom:64};
+ const spot=E.speechSpot(anchor,{w:240,h:240},view,[header]);assert.ok(spot);assert.ok(spot.height<240);assert.ok(speechClear(spot,anchor));assert.ok(speechClear(spot,header));assert.ok(spot.x>=27&&spot.x+spot.width<=378);assert.ok(spot.y>=52&&spot.y+spot.height<=288);
+ assert.equal(E.speechSpot(anchor,{w:240,h:100},view,[{left:0,right:500,top:0,bottom:500}]),null);
+});
+
+test('speech cards use diagonal free space beside desktop navigation before shortening a message',()=>{
+ const view={x:0,y:0,w:1100,h:750},anchor={left:230,right:374,top:150,bottom:294},chrome=[{left:0,right:1100,top:0,bottom:62},{left:0,right:220,top:80,bottom:750},{left:240,right:1088,top:83,bottom:223}];const spot=E.speechSpot(anchor,{w:240,h:70},view,chrome);assert.ok(spot);assert.equal(spot.height,70);assert.ok(chrome.every(r=>speechClear(spot,r)));assert.ok(speechClear(spot,anchor));
+});

@@ -120,6 +120,48 @@
         )[0] || null
     );
   }
+  /** Place a speech card beside its companion without covering visible workspace chrome. */
+  function speechSpot(anchor, size, view, obstacles = []) {
+    const gap = 10,
+      left = view.x + 12,
+      top = view.y + 12,
+      right = view.x + view.w - 12,
+      bottom = view.y + view.h - 12,
+      width = Math.min(size.w, right - left),
+      blocked = [...obstacles, anchor],
+      intersects = (p, h, r) =>
+        p.x < r.right + gap &&
+        p.x + width > r.left - gap &&
+        p.y < r.bottom + gap &&
+        p.y + h > r.top - gap;
+    if (width <= 0) return null;
+    // Keep longer messages scrollable when a small viewport cannot fit their full height.
+    for (const height of [...new Set([size.h, Math.min(size.h, 92), Math.min(size.h, 56)])]) {
+      if (height > bottom - top || height <= 0) continue;
+      const cx = (anchor.left + anchor.right - width) / 2,
+        cy = (anchor.top + anchor.bottom - height) / 2,
+        points = [
+          { x: cx, y: anchor.top - gap - height },
+          { x: cx, y: anchor.bottom + gap },
+          { x: anchor.right + gap, y: cy },
+          { x: anchor.left - gap - width, y: cy },
+          ...obstacles.flatMap(r => [
+            { x: cx, y: r.bottom + gap },
+            { x: cx, y: r.top - gap - height },
+            { x: r.right + gap, y: cy },
+            { x: r.left - gap - width, y: cy },
+          ]),
+        ].map(p => ({ x: clamp(p.x, left, right - width), y: clamp(p.y, top, bottom - height) }));
+      const xs = [...new Set([...points.map(p => p.x), left, right - width])],
+        ys = [...new Set([...points.map(p => p.y), top, bottom - height])];
+      const target = xs
+        .flatMap(x => ys.map(y => ({ x, y })))
+        .filter(p => !blocked.some(r => intersects(p, height, r)))
+        .sort((a, b) => Math.hypot(a.x - cx, a.y - cy) - Math.hypot(b.x - cx, b.y - cy))[0];
+      if (target) return { ...target, width, height };
+    }
+    return null;
+  }
   root.WorkHubMomoBehaviourEngine = Object.freeze({
     clamp,
     ease,
@@ -131,6 +173,7 @@
     soccer,
     overlaps,
     clearSpot,
+    speechSpot,
     FRIENDS,
   });
 })(typeof window !== 'undefined' ? window : globalThis);
