@@ -88,6 +88,21 @@
     )
       throw Error('Check process project and knowledge links.');
     for (const step of p.steps) {
+      if (step.sentenceCondition !== undefined) {
+        const c = step.sentenceCondition;
+        if (
+          step.type !== 'decision' ||
+          step.decision?.answers?.length !== 2 ||
+          !c ||
+          !fieldOK(c.field) ||
+          !['eq', 'ne', 'gt', 'ge', 'lt', 'le'].includes(c.operator) ||
+          !(text(c.value, 300) || (Number.isFinite(c.value) && Math.abs(c.value) <= 1e12)) ||
+          (!['eq', 'ne'].includes(c.operator) && typeof c.value !== 'number')
+        )
+          throw Error(
+            'Automatic conditions require a sample field, a supported comparison and two named answers.'
+          );
+      }
       if (
         step.entity !== undefined &&
         (!step.entity ||
@@ -646,6 +661,8 @@
     return imageBytes;
   }
   function validate(d) {
+    if (d.workhub.rehearsal.sentenceRules !== undefined)
+      root.WorkHubProcessSentenceEngine.validateRules(d.workhub.rehearsal.sentenceRules);
     let imageBytes = validateSaved(d.workhub.rehearsal);
     // Older Process Hub records stay in their original collection. Validate new
     // canvas extensions without reducing their previous 200-step allowance.
@@ -777,6 +794,27 @@
     checkValues(result);
     return { values: result, changes: diff };
   }
+  function evaluateCondition(c, values) {
+    if (!Object.hasOwn(values, c.field))
+      throw Error('Missing sample field for automatic condition: ' + c.field);
+    let a = values[c.field],
+      b = c.value;
+    if (typeof b === 'number') {
+      if (typeof a !== 'number' || !Number.isFinite(a))
+        throw Error('The automatic condition needs a numeric sample field: ' + c.field);
+    } else {
+      a = String(a).trim().toLowerCase();
+      b = b.trim().toLowerCase();
+    }
+    return {
+      eq: () => a === b,
+      ne: () => a !== b,
+      gt: () => a > b,
+      ge: () => a >= b,
+      lt: () => a < b,
+      le: () => a <= b,
+    }[c.operator]();
+  }
   function plan(process, scenario, overrides = {}, routes = {}, visitChoices = {}) {
     const map = new Map(process.steps.map(s => [s.id, s])),
       entries = [],
@@ -808,7 +846,12 @@
             ? s.failNext
             : Object.hasOwn(routes, s.id)
               ? routes[s.id]
-              : (scenario.routes?.[s.id] ?? s.next);
+              : (scenario.routes?.[s.id] ??
+                (s.sentenceCondition
+                  ? s.decision.answers[
+                      evaluateCondition(s.sentenceCondition, applied.values) ? 0 : 1
+                    ].next
+                  : s.next));
       if (chosen && !answers(s).some(a => a.next === nextId && a.outcome === outcome))
         throw Error('Choose a connected decision answer.');
       if (
@@ -1077,6 +1120,7 @@
     TYPE_ICONS,
     ENTITY_FIELDS,
     validateCanvas,
+    evaluateCondition,
     connect,
     disconnect,
     connector,

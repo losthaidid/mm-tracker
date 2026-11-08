@@ -373,6 +373,7 @@
         '"></label></details>' +
         field('link', 'Reference URL', s.link, false, 2000) +
         routeFields(s, draft) +
+        (root.WorkHubProcessSentences?.conditionFields(s) || '') +
         reference('projectId', 'Related project', refs.projects, s.projectId) +
         reference('noteId', 'Knowledge note', refs.notes, s.noteId) +
         '<div class="pc-editor-actions"><button type="button" data-pc="cancel">Cancel</button><button type="submit">Save step</button><button type="button" data-pc="delete-step">Delete step</button></div><p data-pc-error role="alert"></p></form>';
@@ -432,6 +433,9 @@
               .map(a => a.next)
               .filter(id => id && id !== row.next);
           } else delete row.decision;
+          const condition = root.WorkHubProcessSentences?.readCondition(f, row);
+          if (condition) row.sentenceCondition = condition;
+          else delete row.sentenceCondition;
           E.pruneConnectors(draft);
           for (const scenario of draft.scenarios)
             if (

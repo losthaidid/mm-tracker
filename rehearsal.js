@@ -32,6 +32,7 @@
       overrides = {},
       drag = null,
       suppressClick = 0;
+    let sentences = null;
     let audio = null,
       audioReady = false,
       audioPending = null,
@@ -1015,6 +1016,7 @@
           ? button('save-draft', '✓ Save process', '', 'primary') +
             button('discard-draft', 'Discard changes')
           : button('new', '＋ New process', '', 'primary') +
+            (sentences?.header() || '') +
             (isSaved
               ? button('edit-process', 'Edit process') + button('duplicate', 'Duplicate')
               : button('keep', 'Save this example'));
@@ -1683,6 +1685,7 @@
     }
     function mount() {
       resetOwner();
+      sentences?.sync();
       presenter?.sync();
       if (a.active && !a.active()) {
         closeOverlay();
@@ -1881,7 +1884,7 @@
             step =>
               `<label>${esc(step.title)}<select name="outcome-${esc(step.id)}"><option value="success">Success / normal path</option><option value="failure"${s.choices[step.id] === 'failure' ? ' selected' : ''}>Failure / exception path</option></select></label>${
                 step.alternatives?.length || step.decision
-                  ? `<label>Normal route from ${esc(step.title)}<select name="route-${esc(step.id)}">${[
+                  ? `<label>Normal route from ${esc(step.title)}<select name="route-${esc(step.id)}">${step.sentenceCondition ? `<option value="__condition__"${s.routes?.[step.id] === undefined ? ' selected' : ''}>Evaluate the automatic condition</option>` : ''}${[
                       step.next,
                       ...step.alternatives,
                       ...(step.decision?.answers || []).map(a => a.next),
@@ -1889,7 +1892,7 @@
                       .filter((id, i, list) => list.indexOf(id) === i)
                       .map(
                         id =>
-                          `<option value="${esc(id)}"${(s.routes?.[step.id] ?? step.next) === id ? ' selected' : ''}>${esc((step.decision?.answers.find(a => a.next === id)?.label || 'Route') + ' → ' + (p.steps.find(x => x.id === id)?.title || 'End route'))}</option>`
+                          `<option value="${esc(id)}"${(s.routes?.[step.id] ?? (step.sentenceCondition ? '__condition__' : step.next)) === id ? ' selected' : ''}>${esc((step.decision?.answers.find(a => a.next === id)?.label || 'Route') + ' → ' + (p.steps.find(x => x.id === id)?.title || 'End route'))}</option>`
                       )
                       .join('')}</select></label>`
                   : ''
@@ -1915,7 +1918,7 @@
         { label: 'Yes', next: step.next },
         { label: 'No', next: step.alternatives?.[0] || step.failNext || '' },
       ];
-      return `<fieldset class="ph-decision-editor"${step.type !== 'decision' ? ' hidden' : ''}><legend>Decision question &amp; answers</legend><label class="check-label"><input name="decisionEnabled" type="checkbox"${step.decision ? ' checked' : ''}>Enable named answers</label><p>Maintain 2–6 answers with different destinations. The default is used in automatic playback; interactive playback waits for your choice. An empty destination ends the route.</p><label>Question<input name="decisionQuestion" maxlength="500" value="${esc(step.decision?.question || step.title)}"></label>${Array.from({ length: 6 }, (_, i) => `<div class="ph-answer-editor"><label>Answer ${i + 1}<input name="decisionLabel-${i}" maxlength="120" value="${esc(choices[i]?.label || '')}" placeholder="${i < 2 ? 'Answer label' : 'Optional answer'}"></label><label>Go to<select name="decisionNext-${i}"><option value="">End route</option>${p.steps.map(s => `<option value="${esc(s.id)}"${s.id === choices[i]?.next ? ' selected' : ''}>${esc(s.title)}</option>`).join('')}</select></label><label class="check-label"><input type="radio" name="decisionDefault" value="${i}"${(step.decision ? !!choices[i] && choices[i].next === step.next : i === 0) ? ' checked' : ''}>Default</label></div>`).join('')}<p>Normal routes below are maintained from these answers when this is a decision step. Exception routing remains available separately.</p></fieldset>`;
+      return `<fieldset class="ph-decision-editor"${step.type !== 'decision' ? ' hidden' : ''}><legend>Decision question &amp; answers</legend><label class="check-label"><input name="decisionEnabled" type="checkbox"${step.decision ? ' checked' : ''}>Enable named answers</label><p>Maintain 2–6 answers with different destinations. The default is used in automatic playback; interactive playback waits for your choice. An empty destination ends the route.</p><label>Question<input name="decisionQuestion" maxlength="500" value="${esc(step.decision?.question || step.title)}"></label>${Array.from({ length: 6 }, (_, i) => `<div class="ph-answer-editor"><label>Answer ${i + 1}<input name="decisionLabel-${i}" maxlength="120" value="${esc(choices[i]?.label || '')}" placeholder="${i < 2 ? 'Answer label' : 'Optional answer'}"></label><label>Go to<select name="decisionNext-${i}"><option value="">End route</option>${p.steps.map(s => `<option value="${esc(s.id)}"${s.id === choices[i]?.next ? ' selected' : ''}>${esc(s.title)}</option>`).join('')}</select></label><label class="check-label"><input type="radio" name="decisionDefault" value="${i}"${(step.decision ? !!choices[i] && choices[i].next === step.next : i === 0) ? ' checked' : ''}>Default</label></div>`).join('')}<p>Normal routes below are maintained from these answers when this is a decision step. Exception routing remains available separately.</p>${root.WorkHubProcessSentences?.conditionFields(step) || ''}</fieldset>`;
     }
     function stepEditor(id) {
       const p = model(),
@@ -1993,7 +1996,10 @@
         for (const step of p.steps)
           if (value('outcome-' + step.id) === 'failure') choices[step.id] = 'failure';
         for (const step of p.steps)
-          if (step.alternatives?.length || step.decision)
+          if (
+            (step.alternatives?.length || step.decision) &&
+            value('route-' + step.id) !== '__condition__'
+          )
             routes[step.id] = value('route-' + step.id);
         const changed = {
           id: form.dataset.id,
@@ -2058,6 +2064,9 @@
           step.next = normal.next;
           step.alternatives = answers.map(a => a.next).filter(id => id && id !== normal.next);
         } else delete step.decision;
+        const condition = root.WorkHubProcessSentences?.readCondition(form, step);
+        if (condition) step.sentenceCondition = condition;
+        else delete step.sentenceCondition;
         editing = false;
         editorSnapshot = null;
         try {
@@ -3720,7 +3729,29 @@
       },
       tell: a.tell,
     });
+    sentences = root.WorkHubProcessSentences?.install({
+      ...a,
+      busy: () => !!draft || editing,
+      adopt(candidate) {
+        guard(owner);
+        if (draft || editing) throw Error('Finish the open process draft first.');
+        draft = candidate;
+        baseFingerprint = '';
+        processId = candidate.id;
+        scenarioId = candidate.scenarios[0].id;
+        routeChoices = {};
+        overrides = {};
+        route = null;
+        editing = false;
+        selected = '';
+        editorSnapshot = null;
+        paused = false;
+        setMode('full', false);
+        a.tell('Sentence draft opened. Review the flow and choose Save process when ready.');
+      },
+    });
     return {
+      sentences,
       render,
       mount,
       saveForm,
