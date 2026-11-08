@@ -4,6 +4,16 @@
 
 **K** means keep the selected idea in the wishlist. **E** means explain the selected idea. **N** means provide the next suggestions. These shorthands do not request implementation.
 
+## Pending website enhancements · 8 November 2026
+
+Kept from the continuing website enhancement discussion. These numbers belong to that discussion, separate from earlier batches.
+
+| Selection | Enhancement | Saved scope |
+| --- | --- | --- |
+| 75 | Save resolutions into Knowledge | Turn a resolved Go-Live issue into a reusable Knowledge article containing the problem, cause and solution, linked to the original issue. Review the article before saving it. |
+
+This is a wishlist selection only; implementation has not been requested. No batch assigned.
+
 ## Implemented website experience enhancements · 8 November 2026
 
 Kept from the website design and functionality ideas in this discussion, then approved for implementation. All seven are implemented; see [the usage guide](docs/KEPT-EXPERIENCE.md). The numbers below belong to that discussion, separate from earlier batches.
