@@ -115,6 +115,7 @@
     'text',
     'muted',
     'border',
+    'secondary',
     'mint',
     'yellow',
     'peach',
@@ -192,6 +193,7 @@
       ink = across(readable(c.text, surface)),
       muted = across(mix(ink, surface, 0.12)),
       dark = luminance(surface) < 0.179;
+    style.setProperty('--hub-secondary', c.secondary);
     style.setProperty('--hub-text', ink);
     style.setProperty('--hub-muted', muted);
     style.setProperty('--hub-page-text', readable(ink, c.page));

@@ -66,8 +66,8 @@ test('Theme surfaces: scenic headings and metric text keep their light foregroun
     assert.equal(colour('.mv-hero-metric small'),'var(--hub-scenic-muted)',theme+' metric label');
     assert.equal(colour('.mv-hero h2 em'),'var(--hub-scenic-accent)',theme+' heading accent');
     assert.equal(colour('.md-primary'),'var(--hub-on-accent)',theme+' primary control');
-    assert.equal(colour('.md-focus-orb span'),'rgb(36, 75, 61)',theme+' light orb clock');
-    assert.equal(colour('.md-focus-orb small'),'rgb(36, 75, 61)',theme+' light orb label');
+    assert.equal(colour('.md-focus-orb span'),'var(--mv-scrim, #19242f)',theme+' light orb clock');
+    assert.equal(colour('.md-focus-orb small'),'var(--mv-scrim, #19242f)',theme+' light orb label');
     const tokens = dom.window.getComputedStyle(document.body);
     for (const key of ['text','muted','link','success','warning','danger'])
       for (const bg of ['surface','surface-soft','surface-hover','blue-soft'])
@@ -93,9 +93,38 @@ test('Theme changes update root surfaces and inherited controls immediately with
     assert.equal(page.getPropertyValue('--hub-surface'),body.getPropertyValue('--hub-surface'),p.theme+' root surface');
     assert.equal(page.getPropertyValue('--hub-text'),body.getPropertyValue('--hub-text'),p.theme+' root text');
     assert.equal(page.getPropertyValue('--hub-on-accent'),body.getPropertyValue('--hub-on-accent'),p.theme+' primary button contrast');
+    assert.equal(body.getPropertyValue('--hub-secondary').trim(),window.WorkHubAppearance.palette(p,'').colors.secondary,p.theme+' secondary colour');
+    assert.equal(page.getPropertyValue('--hub-secondary'),body.getPropertyValue('--hub-secondary'),p.theme+' root secondary colour');
     assert.equal(root.style.colorScheme,document.body.style.colorScheme);
     assert.equal(document.body,originalBody); assert.equal(document.getElementById('sidebar'),sidebar);
   }
   assert.equal(root.style.getPropertyValue('--hub-bg'),'#f8f7f2');
   assert.equal(root.style.getPropertyValue('--hub-surface'),'#fffefa');
+});
+
+test('My Day scene layers inherit the active accent and secondary colours across all times of day', t => {
+  const dom = new JSDOM('<body></body>', { runScripts: 'outside-only' });
+  t.after(() => dom.window.close());
+  const { window } = dom, { document } = window;
+  const source = file => readFileSync(new URL('../' + file, import.meta.url), 'utf8');
+  window.eval(source('my-day-visuals.js'));
+  const { hero } = window.WorkHubMyDayVisuals.install({ ready: () => false });
+  document.body.innerHTML = `<section class="my-day-page">${hero({ date: '2026-11-13', total: 0, done: 0, activities: 0, open: 0, actions: '' })}</section>`;
+  const sheet = document.createElement('style');
+  sheet.textContent = source('my-day-visuals.css');
+  document.head.append(sheet);
+  const banner = document.querySelector('.mv-hero');
+  for (const period of ['morning', 'day', 'dusk', 'night']) {
+    banner.dataset.mvPeriod = period;
+    const tokens = window.getComputedStyle(banner);
+    const pageTokens = window.getComputedStyle(banner.parentElement);
+    assert.match(pageTokens.getPropertyValue('--mv-hue'), /var\(--hub-accent\).*var\(--hub-secondary/);
+    assert.match(tokens.getPropertyValue('--mv-sky-top'), /var\(--mv-(hue|scrim)\)/);
+    assert.match(tokens.getPropertyValue('--mv-valley'), /var\(--mv-hue\)/);
+    assert.match(tokens.getPropertyValue('--mv-river-deep'), /var\(--mv-water\)/);
+  }
+  assert.equal(document.querySelector('#mvSky stop').getAttribute('stop-color'), 'var(--mv-sky-top)');
+  assert.equal(document.querySelector('#mvRiver stop:last-child').getAttribute('stop-color'), 'var(--mv-river-deep)');
+  assert.equal(document.querySelector('.mv-layer-far path').getAttribute('fill'), 'var(--mv-mountain-far)');
+  assert.equal(document.querySelector('.mv-celestial').getAttribute('fill'), 'var(--mv-sun)');
 });

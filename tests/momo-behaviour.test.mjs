@@ -43,6 +43,23 @@ test('work-area resting places fit a phone viewport and avoid the controls being
 });
 
 const speechClear = (p,r) => p.x + p.width <= r.left || p.x >= r.right || p.y + p.height <= r.top || p.y >= r.bottom;
+test('viewport overlays use the nearest free edge or corner around the visible chrome', () => {
+  const view = { x: 12, y: 28, w: 420, h: 650 }, size = { w: 112, h: 112 };
+  const header = { left: 12, right: 432, top: 0, bottom: 88 };
+  const toolbar = { left: 110, right: 425, top: 96, bottom: 168 };
+  const dock = { left: 60, right: 410, top: 606, bottom: 666 };
+  const chrome = [header, toolbar, dock];
+  const clipped = E.freePosition({ x: 84, y: 80 }, size, view, chrome);
+  assert.equal(clipped.x, 84);
+  assert.equal(clipped.y, 178);
+  const preferred = { x: 73, y: 310 };
+  assert.equal(E.freePosition(preferred, size, view, chrome).y, preferred.y);
+  const aboveDock = E.freePosition({ x: 230, y: 570 }, size, view, chrome);
+  assert.equal(aboveDock.y, dock.top - size.h - 10);
+  assert.equal(E.freePosition(preferred, size, view, [
+    { left: 0, right: 480, top: 0, bottom: 700 },
+  ]), null);
+});
 test('speech cards avoid toolbar overlap and remain in the visible viewport at every edge',()=>{
  const view={x:0,y:0,w:570,h:700},bar={left:0,right:557,top:82,bottom:140},header={left:0,right:570,top:0,bottom:70};
  for(const anchor of [{left:230,right:374,top:150,bottom:294},{left:12,right:156,top:12,bottom:156},{left:414,right:558,top:544,bottom:688},{left:12,right:124,top:540,bottom:652}]){
