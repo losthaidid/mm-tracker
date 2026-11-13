@@ -37,6 +37,32 @@ test('every focus track receives a higher music level through the existing compr
   ui.stop();assert.equal(context.state,'closed');
 });
 
+test('the upbeat preset and track picker work before and during playback and reopen with the saved mix',async t=>{
+  const {window,document,contexts}=audio(t),options={ready:()=>true,tell(){},openModal(title,body){document.getElementById('modalBody').innerHTML=body;}};
+  const ui=window.WorkHubSoundscape.install(options);ui.open();
+  const select=document.getElementById('soundscapeTrack');
+  const choose=id=>{select.value=id;select.dispatchEvent(new window.Event('change',{bubbles:true}));};
+  const preset=id=>document.querySelector(`[data-preset="${id}"]`).click();
+  assert.deepEqual([...select.querySelectorAll('optgroup[label="Upbeat"] option')].map(o=>o.value),['sunrise','city','neon']);
+  choose('city');assert.equal(ui.snapshot().mix.lofi,85);assert.equal(ui.snapshot().mix.rain,45);
+  preset('upbeat');assert.equal(select.value,'city');assert.equal(ui.snapshot().mix.rain,0);
+  assert.equal(contexts.length,0);
+  await ui.start();const context=contexts[0];
+  const source=()=>context.nodes.findLast(n=>n.buffer?.numberOfChannels===2&&!n.stopped);
+  const first=source();assert.equal(first.loop,true);
+  const level=document.querySelector('[data-sound-level="lofi"]');level.value='39';level.dispatchEvent(new window.Event('input',{bubbles:true}));
+  choose('neon');assert.equal(first.stopped,true);assert.equal(first.disconnected,true);assert.equal(ui.snapshot().mix.lofi,39);
+  assert.equal(ui.snapshot().trackName,'Neon run');assert.match(document.getElementById('soundscapeStatus').textContent,/Neon run/);
+  const music=source(),left=music.buffer.getChannelData(0),right=music.buffer.getChannelData(1);
+  assert.ok(Math.abs(music.buffer.length/music.buffer.sampleRate-48*60/124)<0.002);
+  assert.equal(left[0],left.at(-1));assert.equal(right[0],right.at(-1));
+  ui.stop();assert.equal(music.stopped,true);assert.equal(context.state,'closed');
+  const reopened=window.WorkHubSoundscape.install(options);reopened.open();
+  assert.equal(document.getElementById('soundscapeTrack').value,'neon');assert.equal(reopened.snapshot().mix.lofi,39);assert.equal(reopened.snapshot().playing,false);
+  reopened.preset('lofi');assert.equal(document.getElementById('soundscapeTrack').value,'lantern');
+  reopened.preset('upbeat');assert.equal(document.getElementById('soundscapeTrack').value,'sunrise');assert.equal(contexts.length,1);
+});
+
 test('all rest tracks are louder at equal slider levels, stay below clipping at full volume and pause or stop normally',async t=>{
   const {window,contexts}=audio(t),ui=window.WorkHubRestAudio.install({ready:()=>true});await ui.start();ui.change('volume',100);const context=contexts[0];
   for(const track of Object.keys(window.WorkHubRestAudio.TRACKS)){

@@ -283,7 +283,7 @@ Settings opens on pointer hover and closes with a short animation after leaving.
 
 Drag Momo’s house with a mouse or finger, or focus it and use arrow keys (Shift for larger moves). Tap still sends Momo home or wakes Momo. Cancelled drags return to their earlier position. The house stays inside the visible viewport and remembers its position on that device; the previous home placement is migrated locally.
 
-**Your soundscape → Lo-fi study → Play soundscape** blends original mellow keys, warm bass and soft drums with the ambient channels. **Paper lanterns** (72 BPM) and **Blue hour** (66 BPM) are synthesized as short stereo loops after Play, with a separate music volume slider. Track and mix choices stay on the device; reloading never starts playback automatically. A single audio buffer loops independently of animation timers and is released on Pause/sign-out. No subscription, API key, media downloads or cloud audio storage is used.
+In **Your soundscape**, choose **Upbeat focus** and press **Play soundscape**. The **Focus track** picker includes **Sunrise shuffle** (96 BPM), **City groove** (108 BPM), and **Neon run** (124 BPM). **Lo-fi study** uses the mellow **Paper lanterns** (72 BPM) or **Blue hour** (66 BPM). Mix the instrumental loops with the ambience sliders and adjust **Focus music** independently. The browser generates the music when you play it. Track and mix choices stay on the device, and pausing or signing out releases the audio.
 
 The scenery now hides the entire inactive sun/moon group, so animated opacity cannot reveal both. Sun and moon gently bob, and the sun rays rotate. Animations Off, reduced motion and hidden-page pausing still apply.
 
@@ -291,7 +291,7 @@ The scenery now hides the entire inactive sun/moon group, so animated opacity ca
 
 Use **Focus mode** beside **Reminders** to open a small floating panel while continuing to work on the page underneath. Choose a task or focus freely, set 1–1,440 minutes and start. It shares the timer with **Studio → Focus room**, including duration updates. Pause/resume preserves elapsed time; **End** finishes the timer. Drag the header or use arrow keys while the move handle is focused. Position is clamped to the visible screen and remembered on this device. Minimise or hide the panel to clear space; the timer continues and the toolbar opens it again. The panel hides during dialogs, privacy/presentation mode and when the page is hidden. Signing out or changing accounts clears the active Focus session.
 
-Use a saved mix or Rainy desk, Café corner, Forest walk, By the fire and Lo-fi study. Press Play to listen, adjust volume or mute, and use **Fine-tune your mix** for full settings. **Stop audio** stops the soundscape. Opening Focus mode starts neither the timer nor audio automatically. Timer and audio controls do not save tracker records or replace the current page’s unsaved forms.
+Choose a soundscape preset in **Set the scene**, then press **Play**. Use **Fine-tune your mix** to select a specific track and adjust its balance with the ambience. **Stop audio** stops the soundscape. The timer and music each start through their own Play or Start controls.
 
 ## Momo’s world and adventures
 
