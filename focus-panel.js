@@ -192,7 +192,11 @@
         button('end', 'End', 'id="fpEnd" hidden', 'fp-quiet') +
         '</div></form><section class="fp-audio"><div class="fp-audio-heading"><h3>Your little soundtrack</h3>' +
         button('quiet', 'Stop audio', '', 'fp-text') +
-        '</div><div id="fpSoundPane"><label class="fp-wide-label">Set the scene<select id="fpPreset"><option value="">Your saved mix</option><option value="rain">Rainy desk</option><option value="cafe">Café corner</option><option value="forest">Forest walk</option><option value="fireplace">By the fire</option><option value="lofi">Lo-fi study</option></select></label><div class="fp-sound-row">' +
+        '</div><div id="fpSoundPane"><label class="fp-wide-label">Set the scene<select id="fpPreset"><option value="">Your saved mix</option>' +
+        root.WorkHubSoundscape.presetChoices
+          .map(([key, label]) => `<option value="${key}">${label}</option>`)
+          .join('') +
+        '</select></label><div class="fp-sound-row">' +
         button('sound-play', art('play', 14) + '<span>Play</span>', 'id="fpSoundPlay"', 'fp-soft') +
         '<label class="fp-volume">Volume<input id="fpVolume" type="range" min="0" max="100" step="1" aria-label="Focus soundscape volume"></label>' +
         button('mute', 'Mute', 'id="fpMute" aria-pressed="false"', 'fp-text') +
@@ -323,9 +327,11 @@
       const audioStatus =
         sound?.error ||
         (sound?.playing
-          ? sound.muted
+          ? sound.muted || sound.master === 0
             ? 'Soundscape is muted.'
-            : 'Your soundscape is playing.'
+            : sound.trackName
+              ? `Playing ${sound.trackName}.`
+              : 'Your soundscape is playing.'
           : 'Choose a scene, then press Play.');
       if ($('fpAudioStatus').textContent !== audioStatus)
         $('fpAudioStatus').textContent = audioStatus;

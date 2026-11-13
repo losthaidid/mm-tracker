@@ -4,37 +4,6 @@
   max-width: 580px;
   margin: auto;
 }
-.soundscape-hero {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  padding: 22px;
-  margin-bottom: 20px;
-  border: 1px solid var(--hub-border);
-  border-radius: 18px;
-  background: linear-gradient(130deg, var(--hub-mint), var(--hub-blue-soft));
-}
-.soundscape-window {
-  display: grid;
-  place-items: center;
-  width: 72px;
-  height: 84px;
-  flex: 0 0 72px;
-  color: var(--hub-text);
-  background: var(--hub-surface);
-  border: 3px solid var(--hub-border);
-  border-radius: 30px 30px 8px 8px;
-  font-size: 2.4rem;
-}
-.soundscape-hero h3 {
-  margin: 6px 0;
-  font-size: 1.2rem;
-}
-.soundscape-hero p {
-  margin: 0;
-  color: var(--hub-muted);
-  font-size: 0.8125rem;
-}
 .soundscape-presets {
   display: flex;
   gap: 8px;
@@ -131,16 +100,6 @@ body.hub-present #soundscapeDock {
   }
 }
 @media (max-width: 520px) {
-  .soundscape-hero {
-    gap: 13px;
-    padding: 15px;
-  }
-  .soundscape-window {
-    width: 48px;
-    height: 64px;
-    flex-basis: 48px;
-    font-size: 1.8rem;
-  }
   .soundscape-channels {
     padding: 14px;
   }
@@ -169,7 +128,7 @@ body.hub-present #soundscapeDock {
   gap: 17px;
   align-items: center;
   padding: 18px;
-  margin-top: 18px;
+  margin: 18px 0;
   border: 1px solid var(--hub-border);
   border-radius: 17px;
   background: linear-gradient(120deg, var(--hub-lavender), var(--hub-surface-soft));

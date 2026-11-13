@@ -14,18 +14,40 @@
       cafe: 'Café murmur',
       forest: 'Forest breeze',
       fireplace: 'Fireplace',
-      lofi: 'Lo-fi focus music',
+      lofi: 'Focus music',
     };
   const PRESETS = {
-    rain: { rain: 55, cafe: 0, forest: 10, fireplace: 0, lofi: 0 },
-    cafe: { rain: 20, cafe: 50, forest: 0, fireplace: 0, lofi: 0 },
-    forest: { rain: 0, cafe: 0, forest: 65, fireplace: 0, lofi: 0 },
-    fireplace: { rain: 15, cafe: 0, forest: 0, fireplace: 60, lofi: 0 },
-    lofi: { rain: 12, cafe: 0, forest: 0, fireplace: 0, lofi: 85 },
+    rain: { label: 'Rainy desk', mix: { rain: 55, cafe: 0, forest: 10, fireplace: 0, lofi: 0 } },
+    cafe: { label: 'Café corner', mix: { rain: 20, cafe: 50, forest: 0, fireplace: 0, lofi: 0 } },
+    forest: { label: 'Forest walk', mix: { rain: 0, cafe: 0, forest: 65, fireplace: 0, lofi: 0 } },
+    fireplace: {
+      label: 'By the fire',
+      mix: { rain: 15, cafe: 0, forest: 0, fireplace: 60, lofi: 0 },
+    },
+    lofi: {
+      label: 'Lo-fi study',
+      mix: { rain: 12, cafe: 0, forest: 0, fireplace: 0, lofi: 85 },
+      mood: 'mellow',
+      track: 'lantern',
+    },
+    upbeat: {
+      label: 'Upbeat focus',
+      mix: { rain: 0, cafe: 0, forest: 0, fireplace: 0, lofi: 85 },
+      mood: 'upbeat',
+      track: 'sunrise',
+    },
   };
+  const presetChoices = Object.entries(PRESETS).map(([key, { label }]) =>
+    Object.freeze([key, label])
+  );
+  const musicGroups = [
+    ['upbeat', 'Upbeat'],
+    ['mellow', 'Mellow'],
+  ];
   const level = (n, f = 0) => (Number.isFinite(n) ? Math.max(0, Math.min(100, Math.round(n))) : f);
   function install(a) {
-    const $ = id => document.getElementById(id);
+    const $ = id => document.getElementById(id),
+      tracks = root.WorkHubLofi.TRACKS;
     let mix = { rain: 45, cafe: 0, forest: 0, fireplace: 0, lofi: 0 },
       master = 45,
       muted = false,
@@ -50,7 +72,7 @@
         );
         master = level(p.master, 45);
         muted = p.muted === true;
-        if (Object.hasOwn(root.WorkHubLofi.TRACKS, p.track)) track = p.track;
+        if (Object.hasOwn(tracks, p.track)) track = p.track;
       }
     } catch {}
     function persist() {
@@ -73,6 +95,13 @@
         );
       persist();
       paint();
+    }
+    function preset(key) {
+      if (!Object.hasOwn(PRESETS, key)) return;
+      const choice = PRESETS[key];
+      mix = { ...choice.mix };
+      if (choice.track && tracks[track].mood !== choice.mood) track = choice.track;
+      apply();
     }
     function noise(seconds = 5, crackle = false) {
       const buffer = context.createBuffer(
@@ -121,7 +150,7 @@
         }
       }
       const buffer = root.WorkHubLofi.createBuffer(context, track);
-      musicVoice = bed('lofi', buffer, 'lowpass', 3200, 1);
+      musicVoice = bed('lofi', buffer, 'lowpass', tracks[track].mood === 'upbeat' ? 5100 : 3200, 1);
       renderedTrack = track;
     }
     function start() {
@@ -263,46 +292,59 @@
       if ($('settingsMenu')) $('settingsMenu').open = false;
       a.openModal(
         'Your soundscape',
-        `<div class="soundscape-room"><div class="soundscape-hero"><span class="soundscape-window" aria-hidden="true">☂</span><div><span class="hub-kicker">MAKE A LITTLE ROOM FOR CALM</span><h3>A place that sounds like you.</h3><p>Soft keys, a gentle beat, or a little rain. Make room for one good thing.</p></div></div><div class="soundscape-presets" role="group" aria-label="Soundscape presets">${[
-          ['rain', 'Rainy desk'],
-          ['cafe', 'Café corner'],
-          ['forest', 'Forest walk'],
-          ['fireplace', 'By the fire'],
-          ['lofi', '♫ Lo-fi study'],
-        ]
+        `<div class="soundscape-room"><div class="soundscape-presets" role="group" aria-label="Soundscape presets">${presetChoices
           .map(
             ([k, l]) => `<button type="button" data-sound="preset" data-preset="${k}">${l}</button>`
           )
-          .join('')}</div><div class="soundscape-channels">${Object.entries(NAMES)
+          .join(
+            ''
+          )}</div><section class="soundscape-music"><div class="soundscape-record" aria-hidden="true"><i></i></div><div><label for="soundscapeTrack">Focus track</label><select id="soundscapeTrack" aria-describedby="soundscapeTrackDetail">${musicGroups
+          .map(
+            ([mood, label]) =>
+              `<optgroup label="${label}">${Object.entries(tracks)
+                .filter(([, song]) => song.mood === mood)
+                .map(
+                  ([id, song]) =>
+                    `<option value="${id}"${track === id ? ' selected' : ''}>${song.name} · ${song.bpm} BPM</option>`
+                )
+                .join('')}</optgroup>`
+          )
+          .join(
+            ''
+          )}</select><p id="soundscapeTrackDetail" class="hub-meta"></p></div></section><div class="actions"><button type="button" class="primary" data-sound="play" id="soundscapePlay">Play soundscape</button><button type="button" data-sound="mute" id="soundscapeMute" aria-pressed="${muted}">${muted ? 'Unmute' : 'Mute'}</button></div><p id="soundscapeStatus" class="hub-meta" role="status"></p><div class="soundscape-channels">${Object.entries(
+          NAMES
+        )
           .map(
             ([k, l]) =>
               `<label><span>${l}</span><input type="range" min="0" max="100" step="1" value="${mix[k]}" data-sound-level="${k}" aria-label="${l} volume"><output id="sound-${k}">${mix[k]}%</output></label>`
           )
           .join(
             ''
-          )}</div><section class="soundscape-music"><div class="soundscape-record" aria-hidden="true"><i></i></div><div><label for="soundscapeTrack">Your lo-fi loop</label><select id="soundscapeTrack">${Object.entries(
-          root.WorkHubLofi.TRACKS
-        )
-          .map(
-            ([id, s]) =>
-              `<option value="${id}"${track === id ? ' selected' : ''}>${s.name} · ${s.bpm} BPM</option>`
-          )
-          .join(
-            ''
-          )}</select><p class="hub-meta">Fuller mellow keys, warm bass and a steady beat. Lo-fi study brings the music forward. Blend in a little ambience, then set Overall volume to your liking.</p></div></section><label class="soundscape-master"><span>Overall volume</span><input type="range" min="0" max="100" step="1" value="${master}" data-sound-master aria-label="Overall soundscape volume"><output id="sound-master">${master}%</output></label><div class="actions"><button type="button" class="primary" data-sound="play" id="soundscapePlay">Play soundscape</button><button type="button" data-sound="mute" id="soundscapeMute" aria-pressed="${muted}">${muted ? 'Unmute' : 'Mute'}</button></div><p id="soundscapeStatus" class="hub-meta" role="status"></p><p class="hub-meta">Your mix stays on this device. Playback starts only when you press Play. The music and ambience are generated in your browser. No API key, music subscription, downloads or cloud uploads are needed.</p></div>`
+          )}</div><label class="soundscape-master"><span>Overall volume</span><input type="range" min="0" max="100" step="1" value="${master}" data-sound-master aria-label="Overall soundscape volume"><output id="sound-master">${master}%</output></label><p class="hub-meta">Your track and mix stay on this device.</p></div>`
       );
       paint();
     }
     function paint() {
-      root.WorkHubExperience?.paintSound({ mix, playing, muted: muted || master === 0 });
+      root.WorkHubExperience?.paintSound({
+        mix,
+        playing,
+        muted: muted || master === 0,
+        trackName: tracks[track].name,
+      });
       const status =
         error ||
         (!playing
           ? 'Ready when you are.'
-          : muted
+          : muted || master === 0
             ? 'Soundscape is muted.'
-            : 'Your soundscape is playing.');
+            : mix.lofi
+              ? `Playing ${tracks[track].name}.`
+              : 'Your soundscape is playing.');
       if ($('soundscapeStatus')) $('soundscapeStatus').textContent = status;
+      const trackInput = $('soundscapeTrack');
+      if (trackInput && trackInput.value !== track) trackInput.value = track;
+      const trackDetail = $('soundscapeTrackDetail');
+      if (trackDetail) trackDetail.textContent = tracks[track].detail;
       if ($('soundscapePlay'))
         $('soundscapePlay').textContent = playing ? 'Pause soundscape' : 'Play soundscape';
       if ($('soundscapeMute')) {
@@ -315,6 +357,8 @@
         if ($('sound-' + k)) $('sound-' + k).textContent = mix[k] + '%';
       }
       if ($('sound-master')) $('sound-master').textContent = master + '%';
+      const volume = document.querySelector('[data-sound-master]');
+      if (volume) volume.value = master;
       let dock = $('soundscapeDock');
       if (playing && a.ready()) {
         if (!dock) {
@@ -385,10 +429,7 @@
         muted = !muted;
         apply();
       }
-      if (action === 'preset' && PRESETS[el.dataset.preset]) {
-        mix = { ...PRESETS[el.dataset.preset] };
-        apply();
-      }
+      if (action === 'preset') preset(el.dataset.preset);
     });
     document.addEventListener('input', event => {
       const el = event.target;
@@ -402,8 +443,10 @@
     });
     document.addEventListener('change', event => {
       if (event.target.id !== 'soundscapeTrack') return;
-      if (Object.hasOwn(root.WorkHubLofi.TRACKS, event.target.value)) {
+      if (Object.hasOwn(tracks, event.target.value)) {
+        const changed = track !== event.target.value;
         track = event.target.value;
+        if (changed && !mix.lofi) mix.lofi = PRESETS.lofi.mix.lofi;
         apply();
       }
     });
@@ -417,12 +460,7 @@
       start,
       stop,
       tick,
-      preset: key => {
-        if (PRESETS[key]) {
-          mix = { ...PRESETS[key] };
-          apply();
-        }
-      },
+      preset,
       setMaster: value => {
         master = level(value, master);
         apply();
@@ -438,10 +476,11 @@
         playing,
         error,
         track,
+        trackName: mix.lofi ? tracks[track].name : '',
         musicRunning: !!musicVoice,
         starting: !!starting,
       }),
     };
   }
-  root.WorkHubSoundscape = { install };
+  root.WorkHubSoundscape = { install, presetChoices: Object.freeze(presetChoices) };
 })(window);

@@ -26,13 +26,14 @@
         '<div><span>YOUR FOCUS SOUNDSCAPE</span><strong></strong><small></small></div>';
     }
     art.dataset.state = !s.playing ? 'paused' : s.muted ? 'muted' : 'playing';
-    art.querySelector('strong').textContent = {
+    const titles = {
       rain: 'A rainy window',
       cafe: 'A quiet café',
       forest: 'Among the leaves',
       fireplace: 'Beside the fire',
       lofi: 'A rhythm for focus',
-    }[kind];
+    };
+    art.querySelector('strong').textContent = (kind === 'lofi' && s.trackName) || titles[kind];
     art.querySelector('small').textContent = !s.playing
       ? 'Paused · ready when you are'
       : s.muted
