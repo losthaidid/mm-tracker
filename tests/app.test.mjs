@@ -3919,7 +3919,7 @@ test('Written procedures: library duplicate, archive, restore, delete undo and M
  let downloaded,blob;window.URL.createObjectURL=value=>{blob=value;return 'blob:procedure-test';};window.URL.revokeObjectURL=()=>{};window.HTMLAnchorElement.prototype.click=function(){downloaded={name:this.download,url:this.href};};const writes=db.calls.length;document.querySelector('[data-procedure=download]').click();await settle();assert.match(downloaded.name,/CR-Form.*copy.*\.md$/);assert.equal(downloaded.url,'blob:procedure-test');assert.match(blob.type,/text\/markdown/);assert.match(await blob.text(),/Receive the request/);assert.equal(db.calls.length,writes);assert.deepEqual(copy(api.state().workhub.processes.find(p=>p.id===original.id)),original);
 });
 
-test('Momo speech placement clears the toolbar after new text, scroll, drag and viewport changes without saving',async t=>{
+test('Momo speech and character placement clear the toolbar after new text, scroll, drag and viewport changes without saving',async t=>{
  const {api,document,window,frames,db}=await app(t),pet=document.getElementById('hubPet'),bubble=document.getElementById('hubPetBubble');
  const rect=(left,top,width,height)=>({left,top,width,height,right:left+width,bottom:top+height});
  Object.defineProperty(window,'innerWidth',{value:570,configurable:true});Object.defineProperty(window,'innerHeight',{value:700,configurable:true});
@@ -3927,13 +3927,24 @@ test('Momo speech placement clears the toolbar after new text, scroll, drag and 
  document.getElementById('hubHeader').getBoundingClientRect=()=>rect(0,0,570,70);document.getElementById('hubToolbar').getBoundingClientRect=()=>toolbar;document.getElementById('tabs').getBoundingClientRect=()=>rect(0,0,0,0);
  bubble.getBoundingClientRect=()=>{const a=pet.getBoundingClientRect();return rect(a.left+(parseFloat(bubble.style.left)||0),a.top+(parseFloat(bubble.style.top)||0),parseFloat(bubble.style.width)||240,Math.min(messageHeight,parseFloat(bubble.style.maxHeight)||280));};
  Object.defineProperty(bubble,'offsetHeight',{get:()=>Math.min(messageHeight,parseFloat(bubble.style.maxHeight)||280)});
- window.dispatchEvent(new window.Event('resize'));const button=pet.querySelector('button');pointer(window,button,'pointerdown',parseFloat(pet.style.left),parseFloat(pet.style.top));pointer(window,document,'pointermove',230,150);pointer(window,document,'pointerup',230,150);
- const source=JSON.stringify(api.state()),writes=db.calls.length;const flush=()=>{for(const [id,callback] of [...frames]){frames.delete(id);callback(10);}};const clear=()=>{const b=bubble.getBoundingClientRect(),p=pet.getBoundingClientRect();assert.equal(bubble.style.visibility,'visible');assert.ok(b.bottom<=toolbar.top||b.top>=toolbar.bottom||b.right<=toolbar.left||b.left>=toolbar.right);assert.ok(b.bottom<=p.top||b.top>=p.bottom||b.right<=p.left||b.left>=p.right);assert.ok(b.left>=12&&b.right<=window.innerWidth-12);assert.ok(b.top>=12&&b.bottom<=window.innerHeight-12);};
+ window.dispatchEvent(new window.Event('resize'));const button=pet.querySelector('button');pointer(window,button,'pointerdown',parseFloat(pet.style.left),parseFloat(pet.style.top));pointer(window,document,'pointermove',230,40);pointer(window,document,'pointerup',230,40);
+ const source=JSON.stringify(api.state()),writes=db.calls.length;
+ const flush=()=>{for(const [id,callback] of [...frames]){frames.delete(id);callback(10);}};
+ const separate=(a,b)=>a.bottom<=b.top||a.top>=b.bottom||a.right<=b.left||a.left>=b.right;
+ const inView=r=>r.left>=12&&r.right<=window.innerWidth-12&&r.top>=12&&r.bottom<=window.innerHeight-12;
+ const clear=()=>{const b=bubble.getBoundingClientRect(),p=pet.getBoundingClientRect();assert.equal(bubble.style.visibility,'visible');assert.ok(separate(b,toolbar));assert.ok(separate(b,p));assert.ok(separate(p,toolbar));assert.ok(inView(b));assert.ok(inView(p));};
+ assert.equal(pet.dataset.positionPinned,'true');assert.ok(pet.getBoundingClientRect().top>=toolbar.bottom+10);
+ const saved=window.localStorage.getItem('mm-tracker.companion-position.v1');
  bubble.textContent='Back already, Haidid? I kept our little adventure warm.';bubble.hidden=false;await settle();flush();clear();assert.ok(bubble.getBoundingClientRect().top>=pet.getBoundingClientRect().bottom);
- toolbar=rect(0,260,570,58);document.dispatchEvent(new window.Event('scroll'));flush();clear();
+ toolbar=rect(0,180,570,58);document.dispatchEvent(new window.Event('scroll'));flush();clear();
+ assert.equal(window.localStorage.getItem('mm-tracker.companion-position.v1'),saved);
  messageHeight=180;bubble.append(document.createElement('button'));await settle();flush();clear();
  Object.defineProperty(window,'innerWidth',{value:375,configurable:true});Object.defineProperty(window,'innerHeight',{value:667,configurable:true});toolbar=rect(0,80,375,70);window.dispatchEvent(new window.Event('resize'));clear();
  button.dispatchEvent(new window.KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true,cancelable:true}));clear();
+ Object.defineProperty(window,'innerHeight',{value:252,configurable:true});window.dispatchEvent(new window.Event('resize'));
+ assert.equal(pet.style.width,'80px');assert.ok(inView(pet.getBoundingClientRect()));assert.ok(separate(pet.getBoundingClientRect(),toolbar));
+ toolbar=rect(0,70,375,182);window.dispatchEvent(new window.Event('resize'));assert.equal(pet.style.display,'none');
+ toolbar=rect(0,80,375,70);Object.defineProperty(window,'innerHeight',{value:667,configurable:true});window.dispatchEvent(new window.Event('resize'));assert.equal(pet.style.display,'');clear();
  assert.equal(JSON.stringify(api.state()),source);assert.equal(db.calls.length,writes);
 });
 

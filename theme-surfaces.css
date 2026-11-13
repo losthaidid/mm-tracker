@@ -1,5 +1,5 @@
 /* Shared interface colours. Load after feature sheets and before personal overrides.
-   Deliberately scoped to UI surfaces: scenery, companion art, process diagram palettes,
+   Deliberately scoped to UI surfaces: companion art, process diagram palettes,
    annotation colours and exported documents keep their own meaningful colours. */
 :root:not([data-workhub-startup]) {
   background: var(--hub-bg);
@@ -7,9 +7,6 @@
 }
 body[data-hub-theme] {
   color: var(--hub-page-text, var(--hub-text));
-  --hub-scenic-text: #fffdf3;
-  --hub-scenic-muted: #d4e2d3;
-  --hub-scenic-accent: #e8d8a8;
   --ink: var(--hub-text);
   --text: var(--hub-text);
   --muted: var(--hub-muted);
@@ -428,8 +425,8 @@ body[data-hub-theme] .validation-studio .val-segments button.val-btn.is-active {
   box-shadow: none;
 }
 
-/* My Day UI uses the theme; its river, trees and terrarium remain illustrated scenery. */
-body[data-hub-theme] .my-day-page .md-day-intro {
+/* The landscape in My Day derives its colours and shade from the theme in my-day-visuals.css. */
+body[data-hub-theme] .my-day-page .md-day-intro:not(.mv-hero) {
   background: linear-gradient(115deg, var(--hub-surface-soft), var(--hub-blue-soft));
   color: var(--hub-text);
   border-color: var(--hub-border);
@@ -1140,8 +1137,8 @@ body[data-hub-theme]
   color: inherit;
 }
 
-/* The orb keeps its pale illustrated fill even in dark themes. */
+/* The orb uses a pale tint of the active palette even in dark themes. */
 body[data-hub-theme] .my-day-page .md-focus-orb :is(span, small) {
-  color: #244b3d;
+  color: var(--mv-scrim, #19242f);
   text-shadow: none;
 }

@@ -557,7 +557,10 @@
       }, duration);
     }
     // Keep the companion in viewport space, independently of page height or CSS loading.
-    const petPositionKey = 'mm-tracker.companion-position.v1';
+    const petPositionKey = 'mm-tracker.companion-position.v1',
+      companionChromeSelector =
+        '#hubHeader, #hubSidebar, #hubToolbar, #wdWorkspaceBar, #settingsMenu[open] > .settings-panel, #whWorkspaceTools[open] > .wh-tool-popover',
+      umbrellaRoom = { side: 0.08, above: 0.48 };
     let petPosition = { x: 1, y: 0.42 },
       petDrag = null,
       companionPinned = false,
@@ -566,7 +569,11 @@
       petFrame = 0,
       petNextWalk = 0,
       petStation = 0,
-      petBubbleFrame = 0,
+      petPositionFrame = 0,
+      petChromeDirty = false,
+      petChrome = [],
+      observedPetChrome = [],
+      petChromeResize = null,
       observedPetBubble = null,
       petBubbleResize = null,
       petBubbleMutation = null;
@@ -580,51 +587,86 @@
         };
       }
     } catch {}
-    function companionBounds() {
-      const v = root.visualViewport,
-        width = v?.width || root.innerWidth || document.documentElement.clientWidth || 375,
-        height = v?.height || root.innerHeight || document.documentElement.clientHeight || 667;
+    function companionViewport() {
+      const v = root.visualViewport;
+      return {
+        x: v?.offsetLeft || 0,
+        y: v?.offsetTop || 0,
+        w: v?.width || root.innerWidth || document.documentElement.clientWidth || 375,
+        h: v?.height || root.innerHeight || document.documentElement.clientHeight || 667,
+      };
+    }
+    function companionBounds(view, maxSize = view.w < 600 ? 112 : 144) {
       const margin = 12,
         umbrella = $('hubPet')?.dataset.umbrella === 'true',
-        overhead = umbrella ? 0.48 : 0,
-        right = umbrella ? 0.08 : 0,
+        overhead = umbrella ? umbrellaRoom.above : 0,
+        extra = umbrella ? umbrellaRoom.side : 0,
         size = Math.max(
           16,
           Math.min(
-            width < 600 ? 112 : 144,
-            (width - margin * 2) / (1 + right * 2),
-            (height - margin * 2) / (1 + overhead)
+            maxSize,
+            (view.w - margin * 2) / (1 + extra * 2),
+            (view.h - margin * 2) / (1 + overhead)
           )
-        );
+        ),
+        side = size * extra,
+        above = size * overhead;
       return {
-        left: (v?.offsetLeft || 0) + margin + size * right,
-        top: (v?.offsetTop || 0) + margin + size * overhead,
-        width: Math.max(0, width - size * (1 + right * 2) - margin * 2),
-        height: Math.max(0, height - size * (1 + overhead) - margin * 2),
+        left: view.x + margin + side,
+        top: view.y + margin + above,
+        width: Math.max(0, view.w - size - side * 2 - margin * 2),
+        height: Math.max(0, view.h - size - above - margin * 2),
         size,
-        viewportWidth: width,
+        side,
+        above,
+      };
+    }
+    function setCompanionPosition(point, bounds) {
+      const { clamp } = root.WorkHubMomoBehaviourEngine;
+      petPosition = {
+        x: bounds.width ? clamp((point.x - bounds.left) / bounds.width) : 0,
+        y: bounds.height ? clamp((point.y - bounds.top) / bounds.height) : 0,
       };
     }
     function positionCompanion(pixels = null) {
       const pet = $('hubPet');
       if (!pet) return;
       const before = { x: parseFloat(pet.style.left) || 0, y: parseFloat(pet.style.top) || 0 };
-      const b = companionBounds();
-      if (pixels)
-        petPosition = {
-          x: b.width ? Math.min(1, Math.max(0, (pixels.x - b.left) / b.width)) : 0,
-          y: b.height ? Math.min(1, Math.max(0, (pixels.y - b.top) / b.height)) : 0,
+      const view = companionViewport(),
+        normal = companionBounds(view);
+      if (pixels) setCompanionPosition(pixels, normal);
+      let left, top, size, spot;
+      // Preserve the preferred position across layout changes. Smaller art fits short viewports.
+      for (const limit of new Set([
+        normal.size,
+        Math.min(normal.size, 80),
+        Math.min(normal.size, 48),
+      ])) {
+        const b = limit === normal.size ? normal : companionBounds(view, limit);
+        const point = {
+          x: b.left - b.side + petPosition.x * b.width,
+          y: b.top - b.above + petPosition.y * b.height,
         };
-      const left = b.left + petPosition.x * b.width,
-        top = b.top + petPosition.y * b.height;
+        spot = root.WorkHubMomoBehaviourEngine.freePosition(
+          point,
+          { w: b.size + 2 * b.side, h: b.size + b.above },
+          view,
+          petChrome
+        );
+        left = (spot?.x ?? point.x) + b.side;
+        top = (spot?.y ?? point.y) + b.above;
+        size = b.size;
+        if (spot) break;
+      }
       styleValues(pet, {
         position: 'fixed',
         left: left + 'px',
         top: top + 'px',
         right: 'auto',
         bottom: 'auto',
-        width: b.size + 'px',
-        height: b.size + 'px',
+        width: size + 'px',
+        height: size + 'px',
+        display: spot ? '' : 'none',
         zIndex: '90',
         padding: '0px',
         border: '0px',
@@ -650,12 +692,52 @@
       life?.layout();
       adventures?.moved(before, { x: left, y: top });
     }
-    function queueCompanionBubble() {
-      if (petBubbleFrame || $('hubPetBubble')?.hidden !== false) return;
-      petBubbleFrame = root.requestAnimationFrame(() => {
-        petBubbleFrame = 0;
-        positionCompanionBubble();
+    function queueCompanionPosition() {
+      if (petPositionFrame || $('hubPet')?.hidden !== false) return;
+      petPositionFrame = root.requestAnimationFrame(() => {
+        petPositionFrame = 0;
+        if (petChromeDirty) layoutCompanion();
+        else positionCompanionBubble();
       });
+    }
+    function queueCompanionLayout() {
+      petChromeDirty = true;
+      queueCompanionPosition();
+    }
+    function layoutCompanion() {
+      petChromeDirty = false;
+      const chrome = [...document.querySelectorAll(companionChromeSelector)];
+      if (
+        root.ResizeObserver &&
+        (chrome.length !== observedPetChrome.length ||
+          chrome.some((el, i) => el !== observedPetChrome[i]))
+      ) {
+        petChromeResize?.disconnect();
+        petChromeResize ??= new root.ResizeObserver(queueCompanionLayout);
+        for (const el of chrome) petChromeResize.observe(el);
+        observedPetChrome = chrome;
+      }
+      const view = companionViewport();
+      petChrome = chrome
+        .filter(el => !el.hidden)
+        .map(el => el.getBoundingClientRect())
+        .filter(
+          r =>
+            r.width &&
+            r.height &&
+            r.bottom > view.y &&
+            r.top < view.y + view.h &&
+            r.right > view.x &&
+            r.left < view.x + view.w
+        );
+      if (petPositionFrame) {
+        root.cancelAnimationFrame(petPositionFrame);
+        petPositionFrame = 0;
+      }
+      positionCompanion();
+    }
+    function queueCompanionBubble() {
+      if ($('hubPetBubble')?.hidden === false) queueCompanionPosition();
     }
     function positionCompanionBubble() {
       const bubble = $('hubPetBubble'),
@@ -667,8 +749,7 @@
         observedPetBubble = bubble;
         if (root.ResizeObserver) {
           petBubbleResize = new root.ResizeObserver(queueCompanionBubble);
-          for (const el of [bubble, $('hubHeader'), $('hubToolbar'), $('tabs')])
-            if (el) petBubbleResize.observe(el);
+          petBubbleResize.observe(bubble);
         }
         if (root.MutationObserver) {
           petBubbleMutation = new root.MutationObserver(queueCompanionBubble);
@@ -681,52 +762,50 @@
           });
         }
       }
-      if (bubble.hidden || pet.hidden) return;
-      const v = root.visualViewport,
-        view = {
-          x: v?.offsetLeft || 0,
-          y: v?.offsetTop || 0,
-          w: v?.width || root.innerWidth,
-          h: v?.height || root.innerHeight,
-        },
+      if (bubble.hidden || pet.hidden || pet.style.display === 'none') return;
+      const view = companionViewport(),
         width = Math.max(1, Math.min(240, view.w - 24));
+      const maxHeight = Math.min(280, Math.floor(view.h * 0.42));
       styleValues(bubble, {
         position: 'absolute',
         width: width + 'px',
         maxWidth: 'none',
-        maxHeight: Math.min(280, view.h * 0.42) + 'px',
+        maxHeight: maxHeight + 'px',
         right: 'auto',
         bottom: 'auto',
       });
-      const anchor = pet.getBoundingClientRect(),
-        size = bubble.getBoundingClientRect(),
-        obstacles = ['hubHeader', 'hubToolbar', 'tabs']
-          .map($)
-          .filter(el => el && !el.hidden)
-          .map(el => el.getBoundingClientRect())
-          .filter(
-            r =>
-              r.width &&
-              r.height &&
-              r.bottom > view.y &&
-              r.top < view.y + view.h &&
-              r.right > view.x &&
-              r.left < view.x + view.w
-          ),
+      const rect = pet.getBoundingClientRect(),
+        anchor =
+          pet.dataset.umbrella === 'true'
+            ? {
+                left: rect.left - rect.width * umbrellaRoom.side,
+                right: rect.right + rect.width * umbrellaRoom.side,
+                top: rect.top - rect.height * umbrellaRoom.above,
+                bottom: rect.bottom,
+              }
+            : rect,
+        measuredHeight = bubble.offsetHeight || bubble.getBoundingClientRect().height || 80,
         spot = root.WorkHubMomoBehaviourEngine.speechSpot(
           anchor,
-          { w: width, h: bubble.offsetHeight || size.height || 80 },
+          { w: width, h: measuredHeight },
           view,
-          obstacles
+          petChrome
         );
       styleValues(bubble, {
         visibility: spot ? 'visible' : 'hidden',
-        left: spot ? spot.x - anchor.left + 'px' : '0px',
-        top: spot ? spot.y - anchor.top + 'px' : '0px',
-        maxHeight: (spot?.height || 56) + 'px',
+        left: spot ? spot.x - rect.left + 'px' : '0px',
+        top: spot ? spot.y - rect.top + 'px' : '0px',
+        maxHeight: (spot && spot.height < measuredHeight ? spot.height : maxHeight) + 'px',
       });
     }
     function rememberCompanion() {
+      const pet = $('hubPet');
+      // Keep the drop that fit so the companion does not drift back to the toolbar later.
+      if (pet && pet.style.display !== 'none')
+        setCompanionPosition(
+          { x: parseFloat(pet.style.left), y: parseFloat(pet.style.top) },
+          companionBounds(companionViewport())
+        );
       try {
         localStorage.setItem(
           petPositionKey,
@@ -734,12 +813,13 @@
         );
       } catch {}
     }
-    function pinCompanion(value) {
+    function pinCompanion(value, point) {
       stopCompanionWalk();
       moments?.finish(false);
       adventures?.finish(false);
       life?.manualMove();
       companionPinned = value;
+      if (point) positionCompanion(point);
       rememberCompanion();
       if ($('hubPet')) $('hubPet').dataset.positionPinned = String(value);
       petNextWalk = Date.now() + 20000;
@@ -784,7 +864,8 @@
       petDrag = null;
       if (drag.moved) {
         petSuppressClickUntil = Date.now() + 600;
-        pinCompanion(true);
+        const pet = $('hubPet');
+        pinCompanion(true, { x: parseFloat(pet.style.left), y: parseFloat(pet.style.top) });
       }
       try {
         drag.button.releasePointerCapture?.(event.pointerId);
@@ -843,7 +924,8 @@
           'input,select,textarea,[contenteditable="true"],#hubPet button'
         ) &&
         pet &&
-        !pet.hidden
+        !pet.hidden &&
+        pet.style.display !== 'none'
       );
     }
     function tickCompanion() {
@@ -900,11 +982,24 @@
       petFrame = root.requestAnimationFrame(frame);
     }
     const resizeFloaters = () => {
-      positionCompanion();
+      layoutCompanion();
       positionTimer();
     };
     root.addEventListener('resize', resizeFloaters);
-    document.addEventListener('scroll', queueCompanionBubble, { capture: true, passive: true });
+    document.addEventListener('scroll', queueCompanionLayout, { capture: true, passive: true });
+    document.addEventListener(
+      'toggle',
+      event => {
+        if (event.target.matches?.('#settingsMenu, #whWorkspaceTools')) queueCompanionLayout();
+      },
+      true
+    );
+    if (root.MutationObserver) {
+      new root.MutationObserver(queueCompanionLayout).observe(document.body, {
+        attributes: true,
+        attributeFilter: ['data-hub-design'],
+      });
+    }
     root.visualViewport?.addEventListener('resize', resizeFloaters);
     root.visualViewport?.addEventListener('scroll', resizeFloaters);
     document.addEventListener('visibilitychange', () => {
@@ -1126,6 +1221,7 @@
       if (present) stopCompanionWalk();
       atmosphere?.sync();
       myDay?.visual?.sync();
+      queueCompanionLayout();
     }
     function heroArt() {
       return '<div class="hub-hero-art" aria-hidden="true"><svg viewBox="0 0 280 170" fill="none"><ellipse cx="150" cy="145" rx="103" ry="12" fill="#d9e2df"/><circle cx="206" cy="61" r="46" fill="#f8dba4"/><rect x="45" y="41" width="114" height="99" rx="12" transform="rotate(-9 45 41)" fill="#c8dfd6" stroke="#456d68" stroke-width="2"/><rect x="75" y="27" width="118" height="114" rx="12" transform="rotate(8 75 27)" fill="#fffef7" stroke="#2c4359" stroke-width="2"/><path d="M96 57l5 5 10-12M95 82l5 5 10-12M95 107l5 5 10-12" stroke="#328976" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M124 57h43M122 82h40M121 107h28" stroke="#9baab5" stroke-width="4" stroke-linecap="round"/><path d="M204 139v-35M204 111c-28-3-30-22-22-28 13-7 24 10 22 28zM204 101c-1-25 19-29 26-20 7 12-9 22-26 20z" stroke="#366d5b" stroke-width="2" fill="#8bc5a3"/><path d="M188 121h33l-5 24h-23z" fill="#dd967e" stroke="#734f48" stroke-width="2"/><path d="M43 24l3 8 8 3-8 3-3 8-3-8-8-3 8-3 3-8zM239 25l2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5z" fill="#8d7dcb"/><circle cx="241" cy="117" r="4" fill="#e7b26d"/></svg></div>';
@@ -1179,7 +1275,7 @@
       mountShell();
       const toolbar = $('hubToolbar');
       toolbar.hidden = !a.cloud().ready;
-      positionCompanion();
+      if (!$('hubPet').style.width) layoutCompanion();
       if (!a.cloud().ready) themePreview = null;
       applyTheme();
       if (a.cloud().ready) recoverTimer();
@@ -3011,6 +3107,7 @@
       mountChrome();
       chromeUX?.mount();
       websiteDesigns?.mount();
+      layoutCompanion();
       taskCompletion?.mount(tab);
       reminders?.decorate(tab);
       projectDates?.decorate();
