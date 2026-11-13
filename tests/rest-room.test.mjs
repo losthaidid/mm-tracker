@@ -37,8 +37,23 @@ test('pending fullscreen cannot reopen an old account session and releases only 
 test('closing rest preserves a different feature fullscreen and page exit releases a terrarium-owned fullscreen',async t=>{
  const c=setup(t);c.start();await settle();const other=c.document.createElement('section');c.document.body.append(other);c.setActive(other);c.account('two');await settle();assert.equal(c.active,other);assert.equal(c.events.includes('exit'),false);c.start();await settle();assert.equal(c.active,c.requests.at(-1));c.window.dispatchEvent(new c.window.Event('pagehide'));await settle();assert.equal(c.active,null);assert.equal(c.room.snapshot(),null);assert.equal(c.document.body.classList.contains('rest-room-open'),false);
 });
-test('observatory scenery changes without resetting a break, music or the persistent end alarm and is stored per account',async t=>{
- const c=setup(t);c.start();await settle();const d=c.document,select=d.querySelector('[data-rest-scenery]'),before=c.room.snapshot();assert.ok(d.querySelector('.observatory-art'));select.value='observatory';select.dispatchEvent(new c.window.Event('change',{bubbles:true}));assert.equal(c.room.snapshot().scenery,'observatory');assert.equal(c.room.snapshot().end,before.end);assert.equal(c.audio.state.playing,true);c.advance(61000);assert.equal(c.audio.state.alerting,true);assert.equal(c.room.snapshot().scenery,'observatory');d.querySelector('[data-rest="resume"]').click();assert.equal(c.audio.state.alerting,false);c.account('two');c.start();await settle();assert.equal(c.room.snapshot().scenery,'garden');
+test('observatory scenery changes without replacing the fullscreen stage, break timer or alarm',async t=>{
+ const c=setup(t);c.start();await settle();
+ const d=c.document,dialog=d.getElementById('restRoom'),stage=c.active,select=d.querySelector('[data-rest-scenery]'),before=c.room.snapshot();
+ const art=stage.querySelector(':scope > .observatory-art');
+ assert.equal(art.getAttribute('aria-hidden'),'true');
+ for(const scenery of ['observatory','garden','observatory']){
+  select.value=scenery;select.dispatchEvent(new c.window.Event('change',{bubbles:true}));
+  assert.equal(dialog.dataset.scenery,scenery);assert.equal(c.room.snapshot().scenery,scenery);
+  assert.equal(c.room.snapshot().end,before.end);assert.equal(c.active,stage);
+  assert.equal(stage.querySelector('.observatory-art'),art);assert.equal(c.audio.state.playing,true);
+ }
+ c.advance(61000);assert.equal(c.audio.state.alerting,true);assert.equal(c.room.snapshot().scenery,'observatory');
+ assert.equal(d.activeElement,d.querySelector('[data-rest="resume"]'));
+ d.querySelector('[data-rest="resume"]').click();assert.equal(c.audio.state.alerting,false);
+ c.start();await settle();assert.equal(c.room.snapshot().scenery,'observatory');
+ assert.equal(c.active.closest('#restRoom').dataset.scenery,'observatory');
+ c.account('two');c.start();await settle();assert.equal(c.room.snapshot().scenery,'garden');
 });
 test('terrarium reports a fulfilled fullscreen promise without native state as windowed and preserves the break',async t=>{
  const c=setup(t);c.window.HTMLElement.prototype.requestFullscreen=()=>Promise.resolve();c.start();await settle();
