@@ -188,84 +188,6 @@ body[data-experience-phase='evening'] #hubHeader {
 .experience-sound-art[data-state='muted'] svg {
   opacity: 0.45;
 }
-.observatory-art {
-  display: none;
-  position: relative;
-  width: 100%;
-  min-height: 430px;
-  border-radius: 50% 50% 18px 18px;
-  overflow: hidden;
-  background: linear-gradient(#132b46, #304b69 75%, #1d3a4d);
-  align-self: center;
-}
-.observatory-art svg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-.observatory-art > span {
-  position: absolute;
-  bottom: 12px;
-  left: 12px;
-  right: 12px;
-  text-align: center;
-  letter-spacing: 0.17em;
-  font: 9px system-ui;
-  color: #cedbc9;
-}
-.obs-stars {
-  position: absolute;
-  inset: -24px;
-  background:
-    radial-gradient(circle, #f4e7bc 1px, transparent 2px) 17px 21px/59px 67px,
-    radial-gradient(circle, #d5e8f3 1px, transparent 2px) 35px 41px/103px 97px;
-  animation: obs-stars 9s ease-in-out infinite alternate;
-}
-.obs-moon {
-  position: absolute;
-  width: 58px;
-  height: 58px;
-  border-radius: 50%;
-  background: #f0e7c4;
-  top: 12%;
-  left: 70%;
-  box-shadow: inset -12px -3px #c9d1bc;
-  animation: obs-moon-float 6s ease-in-out infinite alternate;
-}
-.obs-telescope {
-  transform-origin: 295px 322px;
-  animation: obs-turn 7s ease-in-out infinite alternate;
-}
-.obs-dome {
-  transform-origin: 300px 300px;
-  animation: obs-dome 10s ease-in-out infinite alternate;
-}
-.obs-shooting {
-  position: absolute;
-  left: 15%;
-  top: 12%;
-  width: 65px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, #f9e9c0);
-  transform: rotate(25deg);
-  animation: obs-shoot 24s linear infinite;
-}
-.rest-room[data-scenery='observatory'] .rest-landscape {
-  display: none;
-}
-.rest-room[data-scenery='observatory'] .observatory-art {
-  display: block;
-}
-.rest-room[data-scenery='observatory'] .rest-countdown {
-  position: relative;
-  border-radius: 50%;
-  padding: 20px 15px;
-  max-width: 290px;
-  background: #e5e7da;
-  color: #20383e;
-  box-shadow: inset -13px 0 #cad3bf;
-}
 .rest-scenery-label {
   display: flex;
   align-items: center;
@@ -281,9 +203,6 @@ body[data-experience-phase='evening'] #hubHeader {
   border-radius: 20px;
   background: #f5f5ed;
   color: #456450;
-}
-#restRoom[data-motion='still'] .observatory-art * {
-  animation: none;
 }
 #hubMomoHome .experience-habitat {
   width: 100%;
@@ -374,47 +293,6 @@ body[data-experience-phase='evening'] #hubHeader {
     transform: rotate(360deg);
   }
 }
-@keyframes obs-stars {
-  from {
-    opacity: 0.95;
-    transform: translate(-10px, 7px);
-  }
-  to {
-    opacity: 0.45;
-    transform: translate(12px, -7px);
-  }
-}
-@keyframes obs-turn {
-  from {
-    transform: rotate(-12deg);
-  }
-  to {
-    transform: rotate(12deg);
-  }
-}
-@keyframes obs-dome {
-  from {
-    transform: skewX(-4deg);
-  }
-  to {
-    transform: skewX(4deg);
-  }
-}
-@keyframes obs-shoot {
-  0%,
-  93%,
-  100% {
-    opacity: 0;
-  }
-  94% {
-    opacity: 1;
-    transform: translate(0, 0) rotate(25deg);
-  }
-  98% {
-    opacity: 0;
-    transform: translate(190px, 100px) rotate(25deg);
-  }
-}
 @keyframes habitat-sleep {
   50% {
     opacity: 0.4;
@@ -487,23 +365,6 @@ body.hub-present .experience-celebration {
   display: none;
 }
 @media (max-width: 600px) {
-  .observatory-art {
-    min-height: 300px;
-  }
-  .obs-shooting {
-    display: none;
-  }
-  .obs-stars {
-    background-size:
-      95px 110px,
-      150px 150px;
-  }
-  .obs-stars.far {
-    display: none;
-  }
-  .obs-dome {
-    animation-duration: 14s;
-  }
   .rest-scenery-label {
     font-size: 0;
   }
@@ -527,7 +388,6 @@ body.hub-present .experience-celebration {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .observatory-art *,
   .experience-sound-art *,
   #hubMomoHome .habitat-sleep,
   #hubPet[data-experience-reaction],
@@ -564,77 +424,4 @@ body[data-experience-paused='true'] #hubMomoHome * {
   fill: #e9dab4;
   stroke: currentColor;
   stroke-width: 2;
-}
-
-.rest-room[data-scenery='observatory'] .rest-countdown [data-rest-clock],
-.rest-room[data-scenery='observatory'] .rest-countdown small {
-  color: #20383e;
-  opacity: 1;
-}
-
-.obs-stars.far {
-  opacity: 0.4;
-  background-size:
-    139px 127px,
-    179px 159px;
-  animation-duration: 14s;
-  animation-direction: alternate-reverse;
-}
-.obs-cloud {
-  animation: obs-cloud-drift 12s ease-in-out infinite alternate;
-}
-.obs-ground-mist {
-  animation: obs-cloud-drift 9s ease-in-out infinite alternate-reverse;
-}
-.obs-grass {
-  transform-origin: 300px 480px;
-  animation: obs-grass-sway 3.5s ease-in-out infinite alternate;
-}
-.obs-window,
-.obs-lens {
-  animation: obs-window-glow 3s ease-in-out infinite alternate;
-}
-@keyframes obs-cloud-drift {
-  from {
-    transform: translateX(-18px);
-  }
-  to {
-    transform: translateX(30px);
-  }
-}
-@keyframes obs-moon-float {
-  from {
-    transform: translateY(-7px);
-  }
-  to {
-    transform: translateY(9px);
-  }
-}
-@keyframes obs-grass-sway {
-  from {
-    transform: skewX(-5deg);
-  }
-  to {
-    transform: skewX(5deg);
-  }
-}
-@keyframes obs-window-glow {
-  from {
-    opacity: 0.55;
-  }
-  to {
-    opacity: 1;
-  }
-}
-#restRoom[data-phase='paused'] .observatory-art * {
-  animation-play-state: paused;
-}
-
-#restRoom[data-motion='still'] .observatory-art * {
-  animation: none !important;
-}
-@media (prefers-reduced-motion: reduce) {
-  .observatory-art * {
-    animation: none !important;
-  }
 }

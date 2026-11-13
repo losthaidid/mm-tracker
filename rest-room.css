@@ -741,6 +741,261 @@ body.hub-present .rest-room * {
   overflow-x: hidden;
   background: var(--rest-background);
 }
+
+/* Observatory colour and artwork cover the entire break in either display mode. */
+.observatory-art {
+  display: none;
+}
+.rest-room[data-scenery='observatory'] {
+  --obs-night: #100b1d;
+  --obs-horizon: #251a37;
+  --obs-text: #f5f1fa;
+  --obs-muted: #c9bedb;
+  --obs-silver: #dcd2ed;
+  --obs-border: #736484;
+  --rest-background:
+    radial-gradient(ellipse at 75% 59%, var(--obs-horizon), transparent 72%), var(--obs-night);
+  color: var(--obs-text);
+  color-scheme: dark;
+}
+.rest-room[data-scenery='observatory']::backdrop,
+.rest-room[data-scenery='observatory'] .rest-room-shell:fullscreen::backdrop {
+  background: var(--obs-night);
+}
+.rest-room[data-scenery='observatory'] .rest-room-shell {
+  position: relative;
+  isolation: isolate;
+  max-width: none;
+  padding-inline: max(5vw, calc((100% - 1440px) / 2));
+}
+.rest-room[data-scenery='observatory'] .observatory-art {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    linear-gradient(0deg, var(--obs-night), transparent 27%),
+    linear-gradient(90deg, #100b1df7, #100b1dc9 32%, #100b1d44 61%, #100b1d12 85%),
+    url('./assets/moonlit-observatory.webp') right center / cover no-repeat;
+}
+.rest-room[data-scenery='observatory'] .rest-landscape {
+  display: none;
+}
+.rest-room[data-scenery='observatory'] .rest-room-main {
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 0;
+}
+.rest-room[data-scenery='observatory'] .rest-copy {
+  max-width: min(440px, 48%);
+  padding-block: clamp(26px, 5.5vh, 70px);
+}
+.rest-room[data-scenery='observatory'] h2 {
+  color: var(--obs-text);
+  text-shadow: 0 2px 22px #100b1d;
+}
+.rest-room[data-scenery='observatory'] :is(.rest-wordmark > i, h2 em, .rest-music-waves) {
+  color: var(--obs-silver);
+}
+.rest-room[data-scenery='observatory']
+  :is(
+    .rest-wordmark,
+    .rest-state-chip,
+    .rest-kicker,
+    #restRoomDescription,
+    .rest-countdown > small,
+    .rest-live-status,
+    .rest-fullscreen-status,
+    label,
+    .rest-music-label small,
+    .rest-audio-panel > p,
+    .rest-room-footer
+  ) {
+  color: var(--obs-muted);
+}
+.rest-room[data-scenery='observatory'] :is(.rest-countdown > span, .rest-music-label strong) {
+  color: var(--obs-text);
+}
+.rest-room[data-scenery='observatory'] .rest-countdown > span {
+  font-size: clamp(54px, 6.8vw, 92px);
+  text-shadow: 0 2px 24px #100b1d;
+}
+.rest-room[data-scenery='observatory'] .rest-progress {
+  background: #c2abd34b;
+}
+.rest-room[data-scenery='observatory'] .rest-progress > i {
+  background: linear-gradient(90deg, #a995c8, var(--obs-text));
+  box-shadow: none;
+}
+.rest-room[data-scenery='observatory'] :is(button, select, .rest-state-chip) {
+  background: #22182f;
+  border-color: var(--obs-border);
+  color: var(--obs-text);
+}
+.rest-room[data-scenery='observatory'] button:hover {
+  background: #39294a;
+}
+.rest-room[data-scenery='observatory'] button.rest-primary {
+  color: var(--obs-night);
+  background: var(--obs-silver);
+  border-color: var(--obs-silver);
+}
+.rest-room[data-scenery='observatory'] button.rest-primary:hover {
+  background: var(--obs-text);
+}
+.rest-room[data-scenery='observatory'] :is(button, select, input):focus-visible {
+  outline-color: var(--obs-silver);
+}
+.rest-room[data-scenery='observatory'] .rest-volume input {
+  accent-color: var(--obs-silver);
+}
+.rest-room[data-scenery='observatory'] .rest-audio-panel {
+  background: #1c1428e8;
+  border-color: #554762;
+}
+.rest-room[data-scenery='observatory'][data-phase='complete'] .rest-alarm-note {
+  color: var(--obs-silver);
+}
+.rest-room[data-scenery='observatory'] .experience-rest-art {
+  display: none;
+}
+.rest-room[data-scenery='observatory'][data-phase='complete'] [data-rest='resume'] {
+  animation: none;
+  box-shadow: 0 0 24px #e7dafa44;
+}
+
+.obs-cloud,
+.obs-star,
+.obs-shooting {
+  position: absolute;
+}
+.obs-cloud {
+  top: 43%;
+  left: 39%;
+  width: 58%;
+  height: 12%;
+  background: radial-gradient(ellipse, #c8b5e61a, #ad9ac50a 42%, transparent 70%);
+}
+.obs-cloud-distant {
+  top: 54%;
+  left: 54%;
+  opacity: 0.55;
+}
+.obs-star {
+  top: var(--obs-y);
+  left: var(--obs-x);
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: #ece5f8;
+  opacity: 0.38;
+}
+.obs-shooting {
+  top: 18%;
+  left: 52%;
+  width: 58px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #ede5f9);
+  opacity: 0;
+}
+.rest-room[data-scenery='observatory'][data-motion='flow'] .obs-cloud {
+  animation: observatory-cloud 28s ease-in-out infinite alternate;
+}
+.rest-room[data-scenery='observatory'][data-motion='flow'] .obs-cloud-distant {
+  animation-direction: alternate-reverse;
+  animation-duration: 38s;
+}
+.rest-room[data-scenery='observatory'][data-motion='flow'] .obs-star {
+  animation: observatory-twinkle 8s ease-in-out var(--obs-delay) infinite alternate;
+}
+.rest-room[data-scenery='observatory'][data-motion='flow'] .obs-shooting {
+  animation: observatory-shoot 38s linear -28s infinite;
+}
+.rest-room[data-scenery='observatory'][data-phase='paused'][data-motion='flow']
+  .observatory-art
+  > * {
+  animation-play-state: paused;
+}
+@keyframes observatory-cloud {
+  to {
+    transform: translateX(12%);
+  }
+}
+@keyframes observatory-twinkle {
+  to {
+    opacity: 0.78;
+  }
+}
+@keyframes observatory-shoot {
+  0%,
+  91%,
+  100% {
+    opacity: 0;
+  }
+  92% {
+    opacity: 0.75;
+    transform: translate(0) rotate(24deg);
+  }
+  96% {
+    opacity: 0;
+    transform: translate(140px, 62px) rotate(24deg);
+  }
+}
+
+@media (max-width: 700px) {
+  .rest-room[data-scenery='observatory'] {
+    --rest-background: var(--obs-night);
+  }
+  .rest-room[data-scenery='observatory'] .rest-room-shell {
+    padding-left: max(18px, env(safe-area-inset-left));
+    padding-right: max(18px, env(safe-area-inset-right));
+  }
+  .rest-room[data-scenery='observatory'] .rest-room-top {
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 9px;
+  }
+  .rest-room[data-scenery='observatory'] .rest-room-top-actions {
+    justify-content: flex-start;
+  }
+  .rest-room[data-scenery='observatory'] .rest-state-chip {
+    order: 1;
+  }
+  .rest-room[data-scenery='observatory'] .observatory-art {
+    position: relative;
+    inset: auto;
+    z-index: 0;
+    flex: none;
+    height: clamp(165px, 29svh, 255px);
+    margin-inline: calc(-1 * max(18px, env(safe-area-inset-left)))
+      calc(-1 * max(18px, env(safe-area-inset-right)));
+    background:
+      linear-gradient(0deg, var(--obs-night), #100b1d00 32%, #100b1d00 83%, var(--obs-night)),
+      url('./assets/moonlit-observatory.webp') right center / cover no-repeat;
+  }
+  .rest-room[data-scenery='observatory'] .rest-room-main {
+    align-items: start;
+  }
+  .rest-room[data-scenery='observatory'] .rest-copy {
+    max-width: 100%;
+    padding: 0 0 20px;
+  }
+  .rest-room[data-scenery='observatory'] h2 {
+    font-size: clamp(29px, 8vw, 43px);
+    margin-block: 8px;
+  }
+  .rest-room[data-scenery='observatory'] .rest-countdown {
+    margin-block: 8px;
+  }
+  .rest-room[data-scenery='observatory'] .rest-room-actions > button {
+    flex: 1 1 auto;
+  }
+  .rest-room[data-scenery='observatory'] .rest-audio-panel {
+    padding: 14px;
+  }
+}
 .rest-room-top-actions {
   display: flex;
   align-items: center;
