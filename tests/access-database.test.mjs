@@ -96,6 +96,56 @@ test('Access database: saved validation profiles enforce create, edit and delete
  await sign();perms.validator={mode:'use',run:true,create:false,edit:false,delete:true};await command('permissions',member,{version:4,permissions:perms});await sign(member);await save(db,deleted,3);
 });
 
+test('Access database: SAP Tables uses scoped record creation and retains private annotations when access is hidden', async t => {
+  const { db, sign, command, add } = await setup(t);
+  await db.exec("delete from public.workhub_feature_catalog where id='studio.tables'");
+  const registration = read('supabase/sap-tables-access.sql');
+  await db.exec(registration);
+  await db.exec(registration);
+  const permissions = C.preset('view');
+  permissions.studio = { mode: 'use', create: true, edit: true };
+  permissions.workspace = C.preset().workspace;
+  permissions['studio.tables'] = { mode: 'use', create: true };
+  const legacyPermissions = { ...permissions };
+  delete legacyPermissions['studio.tables'];
+  await add(legacyPermissions);
+  const profile = {
+    status: 'active',
+    role: 'member',
+    permissions: C.normalize(legacyPermissions),
+  };
+  assert.equal(C.can(profile, 'studio.tables'), false);
+  await sign();
+  await command('permissions', member, { version: 1, permissions });
+  await sign(member);
+  const initial = doc({ projects: [{ id: 'project-default', name: 'SAP Projects', code: '' }], activeProjectId: 'project-default' });
+  const created = structuredClone(initial);
+  created.data.workhub.sapTables = { records: [{ id: 'z-1', code: 'ZMM_AUDIT', notes: 'PRIVATE_TABLE' }] };
+  C.assertChange({ ...profile, permissions }, initial.data, created.data);
+  await save(db, created, 0);
+  const changed = structuredClone(created);
+  changed.data.workhub.sapTables.records[0].notes = 'Updated';
+  await assert.rejects(save(db, changed, 1), error => error.code === '42501');
+  await sign();
+  permissions['studio.tables'] = { mode: 'use', edit: true };
+  await command('permissions', member, { version: 2, permissions });
+  await sign(member);
+  changed.data.workhub.sapTables.standard = {
+    EKPO: { favorite: true, archived: false, notes: 'PRIVATE_NOTE' },
+  };
+  await save(db, changed, 1);
+  await sign();
+  permissions['studio.tables'] = { mode: 'hidden' };
+  await command('permissions', member, { version: 3, permissions });
+  await sign(member);
+  const view = (await db.query('select * from public.load_mm_tracker()')).rows[0].document;
+  assert.doesNotMatch(JSON.stringify(view), /ZMM_AUDIT|PRIVATE_NOTE/);
+  await save(db, view, 2);
+  await db.exec('reset role');
+  const saved = (await db.query('select document from public.mm_tracker_documents where user_id=$1', [member])).rows[0].document;
+  assert.deepEqual(saved.data.workhub.sapTables, changed.data.workhub.sapTables);
+});
+
 test('Access database: unrelated edits retain filtered history, reminders and record metadata with idempotent retries',async t=>{
  const {db,sign,command,add}=await setup(t);await add();
  const before=doc({tickets:[{id:'ticket-1',description:'Before'}],tasks:[{id:'task-1',task:'PRIVATE_TASK'}],workhub:{

@@ -136,6 +136,7 @@
     root.WorkHubRehearsalEngine?.validate(d);
     root.WorkHubExperienceEngine?.validate(d);
     root.WorkHubSapTcodesEngine?.validate(d);
+    root.WorkHubSapTablesEngine?.validate(d);
     root.WorkHubDriveFilesEngine?.validate(d);
     root.WorkHubReminders?.validate(d);
     root.WorkHubProjectDates.validate(d);
@@ -319,6 +320,7 @@
       processHubMode = 'animated',
       processHubOwner = '',
       tcodes = null,
+      sapTables = null,
       focusPanel = null,
       life = null,
       atmosphere = null,
@@ -2093,6 +2095,7 @@
         theme: 'Theme studio',
         reader: 'JSON & IDoc Reader',
         tcodes: 'SAP T-codes',
+        tables: 'SAP Tables',
         focus: 'Focus room',
         journey: 'Project journey',
         scrapbook: 'Scrapbook',
@@ -2117,7 +2120,7 @@
         )
         .join(
           ''
-        )}</div>${currentTool === 'reader' ? reader?.render() || '' : currentTool === 'screenshots' ? batchC?.cards() || '' : currentTool === 'theme' ? themeStudio() : currentTool === 'tcodes' ? tcodes?.render() || '' : currentTool === 'focus' ? `<section class="hub-card">${focusWidget()}${prefs().desk ? desk() : ''}</section>` : currentTool === 'journey' ? `<section class="hub-card">${journey()}</section>` : currentTool === 'scrapbook' ? scrapbook() : currentTool === 'wrap' ? dailySummary() : sessionsView()}</section>`;
+        )}</div>${currentTool === 'reader' ? reader?.render() || '' : currentTool === 'screenshots' ? batchC?.cards() || '' : currentTool === 'theme' ? themeStudio() : currentTool === 'tcodes' ? tcodes?.render() || '' : currentTool === 'tables' ? sapTables?.render() || '' : currentTool === 'focus' ? `<section class="hub-card">${focusWidget()}${prefs().desk ? desk() : ''}</section>` : currentTool === 'journey' ? `<section class="hub-card">${journey()}</section>` : currentTool === 'scrapbook' ? scrapbook() : currentTool === 'wrap' ? dailySummary() : sessionsView()}</section>`;
     }
     function timerKey() {
       return a.cloud().user ? 'mm-tracker.timer.v1:' + a.cloud().user.id : null;
@@ -3185,6 +3188,7 @@
       rehearsal?.mount();
       procedures?.mount();
       tcodes?.mount();
+      sapTables?.mount();
     }
     const renderers = {
       home: dashboard,
@@ -4452,6 +4456,16 @@
       ...a,
       ready: () => a.cloud().ready,
       owner: () => a.cloud().user?.id || '',
+    });
+    sapTables = root.WorkHubSapTables?.install({
+      ...a,
+      ready: () => a.cloud().ready,
+      owner: () => a.cloud().user?.id || '',
+      generation: () => a.cloud().generation,
+      active: () =>
+        viewTab === 'studio' &&
+        currentTool === 'tables' &&
+        !a.state().preferences.hiddenTabs?.includes('studio.tables'),
     });
     projectDates = root.WorkHubProjectDates.install(a);
     standup = root.WorkHubProjectStandup?.install({
