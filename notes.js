@@ -371,7 +371,7 @@
           '</div>'
         : '';
     }
-    function open(id = '', template = '') {
+    function open(id = '', template = '', fromMyDay = false) {
       guard();
       if (editor && !close()) return;
       const existing = id ? store().notes.find(n => n.id === id) : null;
@@ -397,6 +397,7 @@
       const room = document.createElement('dialog');
       room.id = 'notesRoom';
       room.className = 'nt-room';
+      if (fromMyDay) room.setAttribute('data-day-controls', '');
       room.setAttribute('aria-labelledby', 'ntRoomTitle');
       room.innerHTML =
         '<form id="ntEditorForm" autocomplete="off"><div class="nt-room-bar"><div class="nt-room-identity">' +
@@ -548,7 +549,7 @@
       guard();
       const action = el.dataset.nt,
         id = el.dataset.id;
-      if (action === 'new') open();
+      if (action === 'new') open('', '', el.classList?.contains('nt-day-quick'));
       if (action === 'meeting') open('', 'meeting');
       if (action === 'open') open(id);
       if (action === 'library') a.navigate('notes');

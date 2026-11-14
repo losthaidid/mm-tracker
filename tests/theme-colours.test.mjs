@@ -50,7 +50,7 @@ test('Theme colours: primary buttons, website links and semantic text remain rea
 
 
 test('Theme surfaces: scenic headings and metric text keep their light foreground while light controls follow the theme', t => {
-  const dom = new JSDOM('<head></head><body><main id="view"><section class="my-day-page"><header class="hub-head md-day-intro mv-hero"><h2>Your day.<em>A world of possibility.</em></h2><p class="mv-welcome">A little space for yourself.</p><button class="mv-hero-metric"><small>Today’s intention</small><strong>2<span> left</span></strong></button><button class="md-button md-primary">Start my day</button></header><div class="md-focus-orb"><span>25:00</span><small>Ready when you are</small></div></section></main></body>', { runScripts: 'outside-only' });
+  const dom = new JSDOM('<head></head><body><main id="view"><section class="my-day-page"><header class="hub-head md-day-intro mv-hero"><p class="mv-day-label">Morning</p><h2 class="mv-quote">Begin with one good step.</h2><button class="mv-hero-metric"><small>Today’s intention</small><strong>2<span> left</span></strong></button><button class="md-button md-primary">Start my day</button></header><div class="md-focus-orb"><span>25:00</span><small>Ready when you are</small></div></section></main></body>', { runScripts: 'outside-only' });
   t.after(() => dom.window.close());
   const { document } = dom.window;
   const style = document.createElement('style');
@@ -61,10 +61,9 @@ test('Theme surfaces: scenic headings and metric text keep their light foregroun
     dom.window.WorkHubAppearance.apply({theme});
     const colour = selector => dom.window.getComputedStyle(document.querySelector(selector)).color;
     assert.equal(colour('.mv-hero h2'),'var(--hub-scenic-text)',theme+' scenic heading');
-    assert.equal(colour('.mv-welcome'),'var(--hub-scenic-muted)',theme+' description');
+    assert.equal(colour('.mv-day-label'),'var(--hub-scenic-muted)',theme+' date label');
     assert.equal(colour('.mv-hero-metric strong'),'var(--hub-scenic-text)',theme+' counter');
     assert.equal(colour('.mv-hero-metric small'),'var(--hub-scenic-muted)',theme+' metric label');
-    assert.equal(colour('.mv-hero h2 em'),'var(--hub-scenic-accent)',theme+' heading accent');
     assert.equal(colour('.md-primary'),'var(--hub-on-accent)',theme+' primary control');
     assert.equal(colour('.md-focus-orb span'),'var(--mv-scrim, #19242f)',theme+' light orb clock');
     assert.equal(colour('.md-focus-orb small'),'var(--mv-scrim, #19242f)',theme+' light orb label');
@@ -102,29 +101,33 @@ test('Theme changes update root surfaces and inherited controls immediately with
   assert.equal(root.style.getPropertyValue('--hub-surface'),'#fffefa');
 });
 
-test('My Day scene layers inherit the active accent and secondary colours across all times of day', t => {
+test('My Day scenery uses fixed time-of-day colours and takes its frame from the theme accent', t => {
   const dom = new JSDOM('<body></body>', { runScripts: 'outside-only' });
   t.after(() => dom.window.close());
   const { window } = dom, { document } = window;
   const source = file => readFileSync(new URL('../' + file, import.meta.url), 'utf8');
   window.eval(source('my-day-visuals.js'));
   const { hero } = window.WorkHubMyDayVisuals.install({ ready: () => false });
-  document.body.innerHTML = `<section class="my-day-page">${hero({ date: '2026-11-13', total: 0, done: 0, activities: 0, open: 0, actions: '' })}</section>`;
+  document.body.innerHTML = `<section class="my-day-page">${hero({ total: 0, done: 0, activities: 0, open: 0, actions: '' })}</section>`;
   const sheet = document.createElement('style');
   sheet.textContent = source('my-day-visuals.css');
   document.head.append(sheet);
   const banner = document.querySelector('.mv-hero');
+  const skies = new Set();
   for (const period of ['morning', 'day', 'dusk', 'night']) {
     banner.dataset.mvPeriod = period;
-    const tokens = window.getComputedStyle(banner);
-    const pageTokens = window.getComputedStyle(banner.parentElement);
-    assert.match(pageTokens.getPropertyValue('--mv-hue'), /var\(--hub-accent\).*var\(--hub-secondary/);
-    assert.match(tokens.getPropertyValue('--mv-sky-top'), /var\(--mv-(hue|scrim)\)/);
-    assert.match(tokens.getPropertyValue('--mv-valley'), /var\(--mv-hue\)/);
-    assert.match(tokens.getPropertyValue('--mv-river-deep'), /var\(--mv-water\)/);
+    const properties = ['sky-top', 'sky-bottom', 'valley', 'river-deep', 'sun', 'cabin-wall'];
+    const palette = () => properties.map(key => window.getComputedStyle(banner).getPropertyValue('--mv-' + key).trim());
+    const before = palette();
+    for (const token of before) assert.match(token, /^#[0-9a-f]{6}$/i);
+    skies.add(before[0]);
+    document.body.style.setProperty('--hub-accent', '#b14988');
+    document.body.style.setProperty('--hub-secondary', '#ffba52');
+    assert.deepEqual(palette(), before);
   }
+  assert.equal(skies.size, 4);
+  assert.match(sheet.textContent, /border: 2px solid var\(--hub-accent/);
   assert.equal(document.querySelector('#mvSky stop').getAttribute('stop-color'), 'var(--mv-sky-top)');
   assert.equal(document.querySelector('#mvRiver stop:last-child').getAttribute('stop-color'), 'var(--mv-river-deep)');
-  assert.equal(document.querySelector('.mv-layer-far path').getAttribute('fill'), 'var(--mv-mountain-far)');
   assert.equal(document.querySelector('.mv-celestial').getAttribute('fill'), 'var(--mv-sun)');
 });

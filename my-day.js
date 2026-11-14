@@ -9,6 +9,14 @@
     );
   const button = (action, label, extra = '', cls = '') =>
     `<button type="button" class="md-button ${cls}" data-md="${action}" ${extra}>${label}</button>`;
+  const actionIcons = {
+    start: 'M8 5v14l11-7Z',
+    close: 'M4 18h16M7 15a5 5 0 0 1 10 0M12 4v2M4.5 8.5 6 10m12 0 1.5-1.5',
+    effects: 'M4 7h16M4 17h16M8 4v6m8 4v6',
+    layout: 'M4 4h6v6H4Zm10 0h6v6h-6ZM4 14h6v6H4Zm10 0h6v6h-6Z',
+  };
+  const labeled = (icon, title) =>
+    `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="${actionIcons[icon]}"/></svg><span>${title}</span>`;
   const field = (name, label, value = '', type = 'text', extra = '') =>
     `<label class="md-field">${esc(label)}<input name="${name}" type="${type}" value="${esc(value)}" ${extra}></label>`;
   const select = (name, label, rows, value, blank = 'Choose…') =>
@@ -154,17 +162,20 @@
       sync();
       const d = current();
       return visual.hero({
-        date: today(),
-        name: a.prefs().name,
         done: completeCount(),
         total: d.missions.length,
         activities: E.agenda(state(), today()).length,
         open: E.openTasks(state()).length,
         actions:
-          button('morning', d.started ? 'Review my plan' : 'Start my day', '', 'md-primary') +
-          button('evening', d.closed ? 'Review day’s close' : 'Close my day') +
-          button('settings', 'Effects & hours') +
-          button('layout', 'Arrange dashboard'),
+          button(
+            'morning',
+            labeled('start', d.started ? 'Review my plan' : 'Start my day'),
+            '',
+            'md-primary'
+          ) +
+          button('evening', labeled('close', d.closed ? 'Review day’s close' : 'Close my day')) +
+          button('settings', labeled('effects', 'Effects & hours')) +
+          button('layout', labeled('layout', 'Arrange dashboard')),
       });
     }
     function toolbar() {
@@ -214,9 +225,12 @@
             ))
       }</div>`;
     }
+    const focusState = f => (f.active ? (f.paused ? 'paused' : 'running') : 'ready');
+    const focusLabel = f =>
+      ({ ready: 'Ready when you are', paused: 'Paused', running: 'Running' })[focusState(f)];
     function orb() {
       const f = a.focus();
-      return `<div class="md-orb-wrap"><div class="md-focus-orb${f.active && !f.paused ? ' is-running' : ''}" data-md-orb style="--orb-progress:${100 * (1 - f.remaining / (f.minutes * 60))}%"><i class="mv-orb-orbit" aria-hidden="true"><b></b><b></b></i><div><span data-md-focus-clock>${clockText(f.remaining)}</span><small data-md-focus-state>${f.active ? (f.paused ? 'Paused' : 'One thing at a time') : 'Ready when you are'}</small></div></div><p class="hub-sensitive" data-md-focus-title>${esc(f.title) || 'A quiet place to begin.'}</p></div><div class="md-center-actions">${button('focus-open', f.active ? 'Adjust focus' : 'Start focus', '', 'md-primary')}${button('focus-pause', f.paused ? 'Resume' : 'Pause', `${!f.active ? ' disabled' : ''}`)}${button('focus-end', 'End', `${!f.active ? ' disabled' : ''}`)}</div>${meta('Uses your existing focus countdown. Use Track work on a task to record time for Plan & reality.')}`;
+      return `<div class="md-orb-wrap"><div class="md-focus-orb${f.active && !f.paused ? ' is-running' : ''}" data-md-orb style="--orb-progress:${100 * (1 - f.remaining / (f.minutes * 60))}%"><i class="mv-orb-orbit" aria-hidden="true"><b></b><b></b></i><div><span data-md-focus-clock>${clockText(f.remaining)}</span><small class="md-state-pill" data-md-focus-state data-state="${focusState(f)}">${focusLabel(f)}</small></div></div><p class="hub-sensitive" data-md-focus-title>${esc(f.title) || 'A quiet place to begin.'}</p></div><div class="md-center-actions">${button('focus-open', f.active ? 'Adjust focus' : 'Start focus', '', 'md-primary')}${button('focus-pause', f.paused ? 'Resume' : 'Pause', `${!f.active ? ' disabled' : ''}`)}${button('focus-end', 'End', `${!f.active ? ' disabled' : ''}`)}</div>${meta('Uses your existing focus countdown. Use Track work on a task to record time for Plan & reality.')}`;
     }
     function radar() {
       const w = E.workload(state(), today()),
@@ -805,7 +819,7 @@
         return;
       }
       if (action === 'break-start') {
-        rest.start(el.dataset.label, store().settings.breakMinutes * 60);
+        rest.start(el.dataset.label, store().settings.breakMinutes * 60, true);
         return;
       }
       if (action === 'break-pause') {
@@ -817,7 +831,7 @@
         return;
       }
       if (action === 'break-open') {
-        rest.open();
+        rest.open(true, true);
         return;
       }
       if (action === 'break-resume') {
@@ -1456,8 +1470,11 @@
       const f = a.focus();
       for (const el of page.querySelectorAll('[data-md-focus-clock]'))
         text(el, clockText(f.remaining));
-      for (const el of page.querySelectorAll('[data-md-focus-state]'))
-        text(el, f.active ? (f.paused ? 'Paused' : 'One thing at a time') : 'Ready when you are');
+      for (const el of page.querySelectorAll('[data-md-focus-state]')) {
+        const status = focusState(f);
+        if (el.dataset.state !== status) el.dataset.state = status;
+        text(el, focusLabel(f));
+      }
       for (const el of page.querySelectorAll('[data-md-focus-title]'))
         text(el, f.title || 'A quiet place to begin.');
       for (const el of page.querySelectorAll('[data-md-orb]')) {

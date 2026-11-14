@@ -425,7 +425,7 @@ body[data-hub-theme] .validation-studio .val-segments button.val-btn.is-active {
   box-shadow: none;
 }
 
-/* The landscape in My Day derives its colours and shade from the theme in my-day-visuals.css. */
+/* My Day artwork has fixed palettes by time of day. The frame uses the theme accent. */
 body[data-hub-theme] .my-day-page .md-day-intro:not(.mv-hero) {
   background: linear-gradient(115deg, var(--hub-surface-soft), var(--hub-blue-soft));
   color: var(--hub-text);
@@ -436,17 +436,13 @@ body[data-hub-theme] .my-day-page .md-day-intro:not(.mv-hero) {
 body[data-hub-theme] .my-day-page .md-day-intro.mv-hero {
   color: var(--hub-scenic-text);
 }
-body[data-hub-theme]
-  .my-day-page
-  .md-day-intro.mv-hero
-  :is(h2, .mv-hero-eyebrow, .mv-hero-metric strong) {
+body[data-hub-theme] .my-day-page .md-day-intro.mv-hero :is(h2, .mv-hero-metric strong) {
   color: var(--hub-scenic-text);
 }
 body[data-hub-theme]
   .my-day-page
   .md-day-intro.mv-hero
   :is(
-    .mv-welcome,
     .mv-day-label,
     .mv-hero-metric small,
     .mv-hero-metric em,
@@ -454,9 +450,6 @@ body[data-hub-theme]
     .mv-metric-arrow
   ) {
   color: var(--hub-scenic-muted);
-}
-body[data-hub-theme] .my-day-page .md-day-intro.mv-hero h2 em {
-  color: var(--hub-scenic-accent);
 }
 body[data-hub-theme]
   .my-day-page

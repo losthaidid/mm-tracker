@@ -1,0 +1,296 @@
+/* My Day control roles stay consistent across widgets and their editors. */
+body[data-hub-theme]
+  :is(
+    #view .my-day-page,
+    #modal:has(.md-form, #hubLayout, .md-connections-list),
+    #notesRoom[data-day-controls]
+  ) {
+  --md-control-bg: var(--hub-surface);
+  --md-control-text: var(--hub-text);
+  --md-control-border: var(--hub-border);
+  --md-control-soft: color-mix(in srgb, var(--hub-accent) 10%, var(--hub-surface));
+  --md-control-edge: color-mix(in srgb, var(--hub-accent) 45%, var(--hub-border));
+  --md-focus-ring: var(--hub-link);
+}
+body[data-hub-theme]
+  :is(
+    #view .my-day-page,
+    #modal:has(.md-form, #hubLayout, .md-connections-list),
+    #notesRoom[data-day-controls]
+  )
+  button:not(.mv-hero-metric, .mv-next-quote, .md-hour, .md-garden-plant) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 7px 12px;
+  border: 1px solid var(--md-control-border);
+  border-radius: 10px;
+  background: var(--md-control-bg);
+  color: var(--md-control-text);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 625;
+  line-height: 1.32;
+  text-align: center;
+  box-shadow: 0 2px 3px #111c2c08;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    transform 140ms ease;
+}
+body[data-hub-theme]
+  :is(
+    #view .my-day-page,
+    #modal:has(.md-form, #hubLayout, .md-connections-list),
+    #notesRoom[data-day-controls]
+  )
+  button
+  svg {
+  flex: none;
+}
+body[data-hub-theme]
+  :is(
+    #view .my-day-page,
+    #modal:has(.md-form, #hubLayout, .md-connections-list),
+    #notesRoom[data-day-controls]
+  )
+  button:not(.mv-hero-metric, .mv-next-quote, .md-hour, .md-garden-plant):hover:not(:disabled) {
+  border-color: var(--md-control-edge);
+  background: var(--md-control-soft);
+}
+body[data-hub-theme]
+  :is(
+    #view .my-day-page,
+    #modal:has(.md-form, #hubLayout, .md-connections-list),
+    #notesRoom[data-day-controls]
+  )
+  button:is(.md-primary, .primary, [data-md='complete']):not(.mv-hero-metric) {
+  border-color: var(--hub-accent);
+  background: var(--hub-accent);
+  color: var(--hub-on-accent);
+}
+body[data-hub-theme]
+  :is(
+    #view .my-day-page,
+    #modal:has(.md-form, #hubLayout, .md-connections-list),
+    #notesRoom[data-day-controls]
+  )
+  button:is(.md-primary, .primary, [data-md='complete']):hover:not(:disabled) {
+  background: color-mix(in srgb, var(--hub-accent) 92%, var(--hub-text));
+  border-color: var(--hub-accent);
+}
+body[data-hub-theme]
+  :is(
+    #view .my-day-page,
+    #modal:has(.md-form, #hubLayout, .md-connections-list),
+    #notesRoom[data-day-controls]
+  )
+  button:is(.md-danger, [data-md$='-delete'], [data-md='focus-end']):not(.primary) {
+  border-color: color-mix(in srgb, var(--hub-danger) 36%, var(--hub-border));
+  color: var(--hub-negative-text, var(--hub-danger));
+  background: var(--hub-negative-bg, var(--hub-surface-soft));
+}
+body[data-hub-theme]
+  :is(
+    #view .my-day-page,
+    #modal:has(.md-form, #hubLayout, .md-connections-list),
+    #notesRoom[data-day-controls]
+  )
+  button:is([aria-pressed='true'], .is-active, .nt-day-quick) {
+  border-color: var(--md-control-edge);
+  background: var(--md-control-soft);
+  color: var(--hub-link);
+}
+body[data-hub-theme] #view .my-day-page .mv-view-switch {
+  gap: 4px;
+  padding: 4px;
+  background: var(--hub-surface-soft);
+  border-color: var(--hub-border);
+  border-radius: 13px;
+}
+body[data-hub-theme] #view .my-day-page .mv-view-switch button:not([aria-pressed='true']) {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+body[data-hub-theme] #view .my-day-page .mv-view-switch button:hover:not(:disabled) {
+  border-color: var(--md-control-edge);
+}
+body[data-hub-theme] #view .my-day-page .hub-widget-actions button {
+  width: 33px;
+  height: 34px;
+  min-width: 33px;
+  min-height: 34px;
+  padding: 0;
+  border-radius: 9px;
+  color: var(--hub-link);
+}
+body[data-hub-theme] #view .my-day-page :is(.hub-drag-handle, .md-time-handle, .md-idea-handle) {
+  cursor: grab;
+}
+body[data-hub-theme]
+  #view
+  .my-day-page
+  :is(.hub-drag-handle, .md-time-handle, .md-idea-handle):active {
+  cursor: grabbing;
+}
+body[data-hub-theme] #view .my-day-page .mv-hero .md-hero-actions button {
+  min-height: 42px;
+}
+body[data-hub-theme] #view .my-day-page .mv-hero button.mv-next-quote:is(:hover, :focus-visible) {
+  background: #203f45;
+  border-color: var(--mv-glass-line);
+  color: var(--hub-scenic-text);
+}
+body[data-hub-theme] #view .my-day-page .mv-hero .md-hero-actions [data-md='evening'] {
+  border-color: #f6fff390;
+  background: #19333980;
+  color: #fffdf6;
+}
+body[data-hub-theme] #view .my-day-page .mv-hero .md-hero-actions [data-md='evening']:hover {
+  border-color: #fffdf6;
+  background: #193339dc;
+}
+body[data-hub-theme]
+  :is(
+    #view .my-day-page,
+    #modal:has(.md-form, #hubLayout, .md-connections-list),
+    #notesRoom[data-day-controls]
+  )
+  :is(button, input, select, textarea):focus-visible {
+  outline: 2px solid var(--md-focus-ring);
+  outline-offset: 2px;
+}
+body[data-hub-theme] #view .my-day-page .mv-hero :is(button, input):focus-visible {
+  outline-color: var(--mv-light);
+}
+body[data-hub-theme] #view .mv-hero button.mv-hero-metric {
+  outline-offset: -5px;
+}
+body[data-hub-theme]
+  #view
+  .my-day-page[data-mv-motion='flow']
+  button:active:not(:disabled, .md-hour, .md-garden-plant) {
+  transform: translateY(1px);
+}
+body[data-hub-theme]
+  :is(
+    #view .my-day-page,
+    #modal:has(.md-form, #hubLayout, .md-connections-list),
+    #notesRoom[data-day-controls]
+  )
+  button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+body[data-hub-theme]
+  :is(
+    #view .my-day-page,
+    #modal:has(.md-form, #hubLayout, .md-connections-list),
+    #notesRoom[data-day-controls]
+  )
+  :is(input[type='checkbox'], input[type='radio'], input[type='range']) {
+  accent-color: var(--hub-accent);
+}
+body[data-hub-theme]
+  :is(
+    #view .my-day-page,
+    #modal:has(.md-form, #hubLayout, .md-connections-list),
+    #notesRoom[data-day-controls]
+  )
+  :is(select, .md-field input:not([type='checkbox'], [type='radio'], [type='range']), textarea) {
+  min-height: 38px;
+  border-radius: 9px;
+  border-color: var(--md-control-border);
+}
+body[data-hub-theme] #view .my-day-page .md-hour {
+  min-height: 26px;
+  padding: 2px;
+  font-size: 10px;
+}
+body[data-hub-theme] #view .my-day-page .md-hour:hover:not(:disabled) {
+  color: var(--hub-link);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+body[data-hub-theme] #view .my-day-page .md-garden-plant:hover {
+  filter: brightness(1.08);
+}
+body[data-hub-theme] #view .my-day-page .md-state-pill {
+  display: inline-block;
+  margin: 6px auto 0;
+  padding: 3px 8px;
+  border-radius: 10px;
+  background: var(--hub-surface);
+  color: var(--hub-text);
+  line-height: 1.38;
+  letter-spacing: 0.018em;
+}
+body[data-hub-theme]
+  #view
+  .my-day-page
+  .md-state-pill:is([data-state='running'], [data-state='complete']) {
+  background: var(--hub-positive-bg);
+  color: var(--hub-positive-text, var(--hub-success));
+}
+body[data-hub-theme] #view .my-day-page .md-state-pill[data-state='paused'] {
+  background: var(--hub-caution-bg);
+  color: var(--hub-caution-text, var(--hub-warning));
+}
+
+/* Break controls retain the active break scene's contrast. */
+.rest-room[data-day-controls] [data-rest-chrome] :is(button, select) {
+  min-height: 40px;
+  border-radius: 12px;
+  padding-inline: 12px;
+  transition:
+    border-color 140ms,
+    background-color 140ms;
+}
+.rest-room[data-day-controls] [data-rest-chrome] :is(button, select, input):focus-visible {
+  outline: 2px solid #e6f1ee;
+  outline-offset: 3px;
+}
+.rest-room[data-day-controls][data-phase='complete'] .rest-state-chip {
+  border-color: #f5d38c;
+}
+
+@media (pointer: coarse), (max-width: 700px) {
+  body[data-hub-theme]
+    :is(
+      #view .my-day-page,
+      #modal:has(.md-form, #hubLayout, .md-connections-list),
+      #notesRoom[data-day-controls]
+    )
+    button:not(.mv-hero-metric, .mv-next-quote, .md-hour, .md-garden-plant) {
+    min-height: 44px;
+  }
+  body[data-hub-theme] #view .my-day-page .hub-widget-actions button {
+    width: 44px;
+    height: 44px;
+  }
+  body[data-hub-theme] #view .my-day-page .mv-hero :is(.mv-next-quote, .md-hero-actions button) {
+    min-height: 44px;
+  }
+  body[data-hub-theme] #view .my-day-page .nt-day-quick {
+    order: 0;
+  }
+  .rest-room[data-day-controls] [data-rest-chrome] :is(button, select) {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(
+      #view .my-day-page,
+      #modal:has(.md-form, #hubLayout),
+      #notesRoom[data-day-controls],
+      .rest-room[data-day-controls]
+    )
+    :is(button, select, input, .mv-cabin-window, .mv-cabin-glow) {
+    transition: none !important;
+    transform: none;
+  }
+}
