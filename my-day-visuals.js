@@ -40,36 +40,36 @@
       return `<g transform="translate(${px} ${py}) scale(${s})"><g class="mv-tree" style="--tree:${i}"><path d="M-3 0 3 0 2-82-2-82Z" fill="var(--mv-scrim)"/><path d="M0-130-32-74-18-74-43-31-20-31-48-2 46-2 20-31 40-31 17-74 31-74Z" fill="currentColor"/><path d="M0-130 0-5 46-2 20-31 40-31 17-74 31-74Z" fill="var(--mv-scrim)" opacity=".17"/></g></g>`;
     }).join('');
   }
-  function scene() {
+  function scene(prefix = 'mv') {
     return `<div class="mv-scene" aria-hidden="true"><svg class="mv-landscape" viewBox="0 0 1440 500" preserveAspectRatio="xMidYMid slice"><defs>
-      <linearGradient id="mvSky" x2="0%" y2="100%"><stop stop-color="var(--mv-sky-top)"/><stop offset="1" stop-color="var(--mv-sky-bottom)"/></linearGradient>
-      <linearGradient id="mvRiver" x2="80%" y2="100%"><stop stop-color="var(--mv-light)"/><stop offset=".45" stop-color="var(--mv-river-light)"/><stop offset="1" stop-color="var(--mv-river-deep)"/></linearGradient>
-      <linearGradient id="mvEarth" x2="0%" y2="100%"><stop stop-color="var(--mv-mountain-mid)"/><stop offset="1" stop-color="var(--mv-foreground)"/></linearGradient>
-      <linearGradient id="mvRoof" x2="0%" y2="100%"><stop stop-color="var(--mv-cabin-roof)"/><stop offset="1" stop-color="var(--mv-valley)"/></linearGradient>
-      <radialGradient id="mvGlow"><stop stop-color="var(--mv-sun)" stop-opacity=".58"/><stop offset="1" stop-color="var(--mv-sun)" stop-opacity="0"/></radialGradient>
-      <linearGradient id="mvMist"><stop stop-color="var(--mv-light)" stop-opacity="0"/><stop offset=".5" stop-color="var(--mv-light)" stop-opacity=".25"/><stop offset="1" stop-color="var(--mv-light)" stop-opacity="0"/></linearGradient>
-      <clipPath id="mvRiverClip"><path d="M971 310Q998 336 936 350T861 392Q901 419 1026 415T1189 468L1270 520H793Q807 450 745 423T764 369Q886 337 936 310Z"/></clipPath>
-      <mask id="mvMoonShape" maskUnits="userSpaceOnUse" x="0" y="0" width="1440" height="500"><rect width="1440" height="500" fill="white"/><circle class="mv-moon-cutout" cx="1127" cy="111" r="44" fill="black"/></mask>
+      <linearGradient id="${prefix}Sky" x2="0%" y2="100%"><stop stop-color="var(--mv-sky-top)"/><stop offset="1" stop-color="var(--mv-sky-bottom)"/></linearGradient>
+      <linearGradient id="${prefix}River" x2="80%" y2="100%"><stop stop-color="var(--mv-light)"/><stop offset=".45" stop-color="var(--mv-river-light)"/><stop offset="1" stop-color="var(--mv-river-deep)"/></linearGradient>
+      <linearGradient id="${prefix}Earth" x2="0%" y2="100%"><stop stop-color="var(--mv-mountain-mid)"/><stop offset="1" stop-color="var(--mv-foreground)"/></linearGradient>
+      <linearGradient id="${prefix}Roof" x2="0%" y2="100%"><stop stop-color="var(--mv-cabin-roof)"/><stop offset="1" stop-color="var(--mv-valley)"/></linearGradient>
+      <radialGradient id="${prefix}Glow"><stop stop-color="var(--mv-sun)" stop-opacity=".58"/><stop offset="1" stop-color="var(--mv-sun)" stop-opacity="0"/></radialGradient>
+      <linearGradient id="${prefix}Mist"><stop stop-color="var(--mv-light)" stop-opacity="0"/><stop offset=".5" stop-color="var(--mv-light)" stop-opacity=".25"/><stop offset="1" stop-color="var(--mv-light)" stop-opacity="0"/></linearGradient>
+      <clipPath id="${prefix}RiverClip"><path d="M971 310Q998 336 936 350T861 392Q901 419 1026 415T1189 468L1270 520H793Q807 450 745 423T764 369Q886 337 936 310Z"/></clipPath>
+      <mask id="${prefix}MoonShape" maskUnits="userSpaceOnUse" x="0" y="0" width="1440" height="500"><rect width="1440" height="500" fill="white"/><circle class="mv-moon-cutout" cx="1127" cy="111" r="44" fill="black"/></mask>
     </defs>
-    <rect width="1440" height="500" fill="url(#mvSky)"/>
+    <rect width="1440" height="500" fill="url(#${prefix}Sky)"/>
     <g class="mv-stars">${Array.from({ length: 25 }, (_, i) => `<circle cx="${470 + ((i * 173) % 950)}" cy="${22 + ((i * 43) % 175)}" r="${i % 3 === 0 ? 1.5 : 0.8}" style="--i:${i}"/>`).join('')}</g>
-    <g class="mv-layer mv-layer-sky"><g transform="translate(1110 125)"><g class="mv-sun-rays" stroke="var(--mv-sun)" stroke-width="2">${Array.from({ length: 24 }, (_, i) => `<path d="M72 0H190" transform="rotate(${i * 15})"/>`).join('')}</g></g><circle class="mv-celestial-halo" cx="1110" cy="125" r="160" fill="url(#mvGlow)"/><circle class="mv-celestial" cx="1110" cy="125" r="49" fill="var(--mv-sun)" mask="url(#mvMoonShape)"/>
+    <g class="mv-layer mv-layer-sky"><g transform="translate(1110 125)"><g class="mv-sun-rays" stroke="var(--mv-sun)" stroke-width="2">${Array.from({ length: 24 }, (_, i) => `<path d="M72 0H190" transform="rotate(${i * 15})"/>`).join('')}</g></g><circle class="mv-celestial-halo" cx="1110" cy="125" r="160" fill="url(#${prefix}Glow)"/><circle class="mv-celestial" cx="1110" cy="125" r="49" fill="var(--mv-sun)" mask="url(#${prefix}MoonShape)"/>
       <g class="mv-cloud mv-cloud-one" fill="var(--mv-light)" opacity=".25"><path d="M645 99q33-26 70-5 6-38 42-30 29-22 54 7 43-8 60 28Z"/><path d="M978 60q18-15 40-5 18-28 49-5 22-6 35 10Z"/></g>
       <g class="mv-cloud mv-cloud-two" fill="var(--mv-light)" opacity=".2"><path d="M1122 198q27-24 63-11 3-24 34-20 34-15 55 15 43-6 60 15Z"/></g>
     </g>
     <g class="mv-layer mv-layer-far"><path d="M170 320 415 137 563 252 737 118 903 248 1030 162 1280 290 1440 180 1440 500 170 500Z" fill="var(--mv-mountain-far)"/><path d="m624 216 113-98 82 64-83-22-45 44Z" fill="var(--mv-light)" opacity=".23"/><path d="m922 240 108-78 72 42-64-18-46 43Z" fill="var(--mv-light)" opacity=".19"/></g>
-    <g class="mv-layer mv-layer-mid"><path d="M-10 393Q140 198 351 293T713 264Q864 194 1003 286T1455 249V520H-10Z" fill="var(--mv-mountain-mid)"/><path d="M380 330Q648 226 909 325T1520 282" fill="none" stroke="url(#mvMist)" stroke-width="34"/>
+    <g class="mv-layer mv-layer-mid"><path d="M-10 393Q140 198 351 293T713 264Q864 194 1003 286T1455 249V520H-10Z" fill="var(--mv-mountain-mid)"/><path d="M380 330Q648 226 909 325T1520 282" fill="none" stroke="url(#${prefix}Mist)" stroke-width="34"/>
       <g style="color:var(--mv-tree-far)">${trees(665, 334, 17, 0.65)}</g>
     </g>
     <g class="mv-layer mv-layer-valley"><path d="M-40 427Q161 311 386 367T750 324Q920 346 988 312T1490 350L1460 520H-40Z" fill="var(--mv-valley)"/>
-      <path class="mv-river-body" d="M971 310Q998 336 936 350T861 392Q901 419 1026 415T1189 468L1270 520H793Q807 450 745 423T764 369Q886 337 936 310Z" fill="url(#mvRiver)" opacity=".95"/>
-      <g clip-path="url(#mvRiverClip)"><g class="mv-river-caustics" stroke="var(--mv-light)" fill="none">${Array.from({ length: 16 }, (_, i) => `<path style="--i:${i}" d="M710 ${315 + i * 14}q65-15 130 0t130 0t130 0t130 0"/>`).join('')}</g><path class="mv-river-current" d="M953 305Q1018 337 913 361T821 392Q864 438 1028 435T1220 515" fill="none" stroke="var(--mv-sun)" stroke-width="5"/><g class="mv-river-ripples" fill="none" stroke="var(--mv-light)">${Array.from({ length: 7 }, (_, i) => `<g transform="translate(${820 + ((i * 47) % 360)} ${375 + i * 22})"><ellipse style="--i:${i}" rx="18" ry="4"/></g>`).join('')}</g></g>
+      <path class="mv-river-body" d="M971 310Q998 336 936 350T861 392Q901 419 1026 415T1189 468L1270 520H793Q807 450 745 423T764 369Q886 337 936 310Z" fill="url(#${prefix}River)" opacity=".95"/>
+      <g clip-path="url(#${prefix}RiverClip)"><g class="mv-river-caustics" stroke="var(--mv-light)" fill="none">${Array.from({ length: 16 }, (_, i) => `<path style="--i:${i}" d="M710 ${315 + i * 14}q65-15 130 0t130 0t130 0t130 0"/>`).join('')}</g><path class="mv-river-current" d="M953 305Q1018 337 913 361T821 392Q864 438 1028 435T1220 515" fill="none" stroke="var(--mv-sun)" stroke-width="5"/><g class="mv-river-ripples" fill="none" stroke="var(--mv-light)">${Array.from({ length: 7 }, (_, i) => `<g transform="translate(${820 + ((i * 47) % 360)} ${375 + i * 22})"><ellipse style="--i:${i}" rx="18" ry="4"/></g>`).join('')}</g></g>
       <g class="mv-water-lines" fill="none" stroke="var(--mv-light)" stroke-linecap="round" opacity=".46"><path d="M908 352h48m-126 45h72m-46 47h120m74 31h112m-23 29h114" stroke-width="2"/><path d="M944 326h18m-58 42h33m-87 52h63m115 25h56m-21 48h54"/></g>
       <path d="M1015 361q43-44 85-9" fill="none" stroke="var(--mv-river-light)" stroke-width="7"/><path d="M1015 359v-23m16 8v-22m17 13v-20m18 21v-19m17 25v-18m16 31v-21" stroke="var(--mv-cabin-roof)" stroke-width="3"/>
     </g>
-    <g class="mv-layer mv-layer-near"><path d="M-20 431Q180 347 378 414T749 414L760 520H-20Z" fill="var(--mv-foreground)"/><path d="M1080 419Q1194 309 1475 367V520H1243Q1176 432 1080 419Z" fill="url(#mvEarth)"/>
+    <g class="mv-layer mv-layer-near"><path d="M-20 431Q180 347 378 414T749 414L760 520H-20Z" fill="var(--mv-foreground)"/><path d="M1080 419Q1194 309 1475 367V520H1243Q1176 432 1080 419Z" fill="url(#${prefix}Earth)"/>
       <g style="color:var(--mv-tree-near)">${trees(1215, 390, 9, 1.1)}${trees(80, 427, 5, 0.85)}</g>
-      <g class="mv-cabin" transform="translate(1146 318)"><path d="M-37 43V-4L0-30 42-4V43Z" fill="var(--mv-mountain-mid)"/><path d="M-52-4 0-45 54-4 43 3 0-29-41 3Z" fill="url(#mvRoof)"/><path d="M26-25V-53h12v39" fill="var(--mv-foreground)"/><path d="M-25 10h16v17h-16Zm36 0h16v17H11Z" fill="var(--mv-sun)" class="mv-cabin-window"/><path d="M-4 43V11H6v32" fill="var(--mv-scrim)"/><path d="M-52 43H54" stroke="var(--mv-cabin-roof)" stroke-width="5"/>
+      <g class="mv-cabin" transform="translate(1146 318)"><path d="M-37 43V-4L0-30 42-4V43Z" fill="var(--mv-mountain-mid)"/><path d="M-52-4 0-45 54-4 43 3 0-29-41 3Z" fill="url(#${prefix}Roof)"/><path d="M26-25V-53h12v39" fill="var(--mv-foreground)"/><path d="M-25 10h16v17h-16Zm36 0h16v17H11Z" fill="var(--mv-sun)" class="mv-cabin-window"/><path d="M-4 43V11H6v32" fill="var(--mv-scrim)"/><path d="M-52 43H54" stroke="var(--mv-cabin-roof)" stroke-width="5"/>
         <g class="mv-smoke" fill="none" stroke="var(--mv-light)" opacity=".38" stroke-width="4" stroke-linecap="round"><path d="M32-57q-13-12-1-24t-2-26"/></g>
       </g>
       <g fill="var(--mv-valley)" opacity=".7"><ellipse cx="1263" cy="427" rx="32" ry="5"/><ellipse cx="1189" cy="447" rx="20" ry="4"/><ellipse cx="1347" cy="448" rx="46" ry="8"/></g>
@@ -749,5 +749,5 @@
       active: allowed,
     };
   }
-  root.WorkHubMyDayVisuals = { install, phase, period };
+  root.WorkHubMyDayVisuals = { install, phase, period, scene };
 })(window);

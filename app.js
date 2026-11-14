@@ -1145,9 +1145,10 @@ function rangeDates(start, end = start) {
 }
 
 function pendingObjectCounts() {
+  if (filterState.status !== 'Pending') return '';
   const pending = state.tickets.filter(t => t.status === 'Pending'),
     objects = [...new Set([...state.lists.ticketObjects, ...pending.map(t => t.object)])];
-  return `<section class="pending-objects" aria-label="Pending tickets by object"><span>Object bookmarks · Pending</span>${objects.map(o => `<button class="small${filterState.status === 'Pending' && filterState.object === o ? ' selected' : ''}" data-action="pending-object" data-object="${esc(o || '__unassigned')}">${esc(o) || 'Unassigned'} <strong>${pending.filter(t => t.object === o).length}</strong></button>`).join('')}</section>`;
+  return `<section class="pending-objects" aria-label="Pending tickets by object"><span>Object bookmarks · Pending</span>${objects.map(o => `<button class="small${filterState.object === o ? ' selected' : ''}" data-action="pending-object" data-object="${esc(o || '__unassigned')}">${esc(o) || 'Unassigned'} <strong>${pending.filter(t => t.object === o).length}</strong></button>`).join('')}</section>`;
 }
 
 // Version 5: configurable milestones, linked tasks, secured actions, TOIL, and project governance.

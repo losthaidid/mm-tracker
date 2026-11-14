@@ -1892,7 +1892,7 @@
         )
         .join(
           ''
-        )}</div></div><p class="hub-meta"><button type="button" data-momo-style="gallery">Wardrobe & hobbies</button><br>Your companion pauses while you type or drag him. Your device’s reduced-motion setting is respected.</p></section><div class="actions"><button type="submit" class="primary">Save theme</button>${btn('theme-reset-preview', 'Discard preview')}</div><p id="hubThemeStatus" class="hub-meta" role="status">${themePreview ? 'Preview only · save to keep this look.' : 'Your saved appearance is active.'}</p></form><input type="file" id="hubThemeFile" accept=".json,application/json" hidden></section><aside class="hub-card hub-theme-preview"><span class="hub-kicker">LIVE PREVIEW</span><h3>A little more you.</h3><p>See your colours, type and spacing come together.</p><div class="hub-preview-mini"><span class="hub-badge">YOUR WORKSPACE</span><h3>A good day starts here.</h3><p>One clear task. A little progress.</p><div class="hub-preview-sample"><span class="hub-preview-dot">✓</span><span><strong>Review the next step</strong><small>Ready when you are</small></span></div><div class="hub-progress"><span style="width:68%"></span></div>${btn('celebrate', 'Try a celebration', '', 'primary')}</div><p class="hub-meta">Your saved look follows your account on phone and laptop.</p></aside></div>`;
+        )}</div></div><p class="hub-meta"><button type="button" data-momo-style="gallery">Wardrobe & hobbies</button><br>Your companion pauses while you type or drag him. Your device’s reduced-motion setting is respected.</p></section><div class="actions"><button type="submit" class="primary">Save theme</button>${btn('theme-reset-preview', 'Discard preview')}</div><p id="hubThemeStatus" class="hub-meta" role="status">${themePreview ? 'Preview only · save to keep this look.' : 'Your saved appearance is active.'}</p></form><input type="file" id="hubThemeFile" accept=".json,application/json" hidden></section><aside class="hub-card hub-theme-preview" aria-labelledby="hubThemePreviewTitle"><h3 id="hubThemePreviewTitle">Live preview</h3>${root.WorkHubWebsiteDesigns?.colourPreview(p, 'studioPalette') || ''}<div class="actions">${btn('celebrate', 'Try a celebration')}</div></aside></div>`;
     }
     function previewTheme(form) {
       const p = themeValues(form),
@@ -1901,16 +1901,29 @@
       validate(d);
       themePreview = p;
       applyTheme(p);
+      syncThemePalette(form, p);
+      if ($('hubThemeStatus')) {
+        $('hubThemeStatus').textContent = 'Preview only · save to keep this look.';
+        $('hubThemeStatus').dataset.saved = 'false';
+      }
+    }
+    function syncThemePalette(form, p) {
       form
         .querySelectorAll('[data-theme-choice]')
         .forEach(el => el.setAttribute('aria-pressed', String(el.dataset.themeChoice === p.theme)));
       form
         .querySelector('[data-theme-choice="custom"] .hub-palette-swatch')
         ?.style.setProperty('--palette', p.accent);
-      if ($('hubThemeStatus')) {
-        $('hubThemeStatus').textContent = 'Preview only · save to keep this look.';
-        $('hubThemeStatus').dataset.saved = 'false';
-      }
+    }
+    function syncSavedColours(colours) {
+      const form = $('hubTheme');
+      if (!form) return;
+      form.elements.namedItem('theme').value = colours.theme;
+      form.elements.namedItem('accent').value = colours.accent;
+      for (const [key, value] of Object.entries(colours.colors))
+        form.elements.namedItem('color-' + key).value = value;
+      syncThemePalette(form, colours);
+      if (themePreview) Object.assign(themePreview, colours, { design: prefs().design });
     }
 
     function simulationValues(values) {
@@ -4488,6 +4501,11 @@
       prefs,
       canEdit: () =>
         !root.WorkHubCurrentAccess || root.WorkHubCurrentAccess.can('workspace', 'edit'),
+      canEditColours: () => a.can('studio.theme', 'edit'),
+      visibleAppearance: () => themePreview || prefs(),
+      previewColours: colours => applyTheme({ ...(themePreview || prefs()), ...colours }),
+      refreshColours: () => applyTheme(),
+      coloursSaved: syncSavedColours,
       mutate: a.mutate,
       tell: a.tell,
     });

@@ -1144,10 +1144,52 @@ test('recorded sessions archive, restore, delete and undo while preserving calen
  const bad=copy(api.state());bad.workhub.sessions[0].archived='yes';assert.throws(()=>api.validate(bad),/work session/);
 });
 
-test('Tickets starts with Pending selected and All statuses remains available',async t=>{
- const {api,document,window}=await app(t),pending=addReportTicket(api,document,'PENDING-DEFAULT'),closed=addReportTicket(api,document,'CLOSED-HISTORY');await settle();api.mutate(d=>d.tickets.find(x=>x.id===closed).status='Closed');await settle();api.showTab('tickets');
- assert.equal(document.getElementById('statusFilter').value,'Pending');assert.equal(document.querySelectorAll('.ticket-queue-card').length,1);assert.match(document.querySelector('.ticket-queue-card').textContent,/PENDING-DEFAULT/);
- document.getElementById('statusFilter').value='';document.getElementById('statusFilter').dispatchEvent(new window.Event('change',{bubbles:true}));assert.equal(document.querySelectorAll('.ticket-queue-card').length,2);api.showTab('home');api.showTab('tickets');assert.equal(document.getElementById('statusFilter').value,'');assert.ok(api.state().tickets.find(t=>t.id===pending));
+test('Tickets starts with Pending selected and shows object bookmarks only while Pending is selected', async t => {
+  const { api, document, window, db } = await app(t);
+  const pending = addReportTicket(api, document, 'PENDING-DEFAULT');
+  const closed = addReportTicket(api, document, 'CLOSED-HISTORY');
+  await settle();
+  api.mutate(d => {
+    d.tickets.find(ticket => ticket.id === pending).object = d.lists.ticketObjects[0];
+    d.tickets.find(ticket => ticket.id === closed).status = 'Closed';
+  });
+  await settle();
+  api.showTab('tickets');
+  const writes = db.calls.length;
+  const bookmarks = () => document.querySelector('.pending-objects');
+  const cards = () => document.querySelectorAll('.ticket-queue-card');
+  const status = value => {
+    const filter = document.getElementById('statusFilter');
+    filter.value = value;
+    filter.dispatchEvent(new window.Event('change', { bubbles: true }));
+  };
+  assert.equal(document.getElementById('statusFilter').value, 'Pending');
+  assert.equal(cards().length, 1);
+  assert.match(cards()[0].textContent, /PENDING-DEFAULT/);
+  assert.match(bookmarks().textContent, /Object bookmarks · Pending/);
+  const first = bookmarks().querySelector('[data-action="pending-object"]');
+  const object = first.dataset.object;
+  first.click();
+  await settle();
+  assert.equal(document.getElementById('objectFilter').value, object);
+  assert.equal(bookmarks().querySelector('.selected').dataset.object, object);
+
+  status('Closed');
+  assert.equal(bookmarks(), null);
+  assert.equal(cards().length, 1);
+  assert.match(cards()[0].textContent, /CLOSED-HISTORY/);
+  status('');
+  assert.equal(bookmarks(), null);
+  assert.equal(cards().length, 2);
+  api.showTab('home');
+  api.showTab('tickets');
+  assert.equal(document.getElementById('statusFilter').value, '');
+  assert.equal(bookmarks(), null);
+
+  status('Pending');
+  assert.ok(bookmarks());
+  assert.equal(document.getElementById('objectFilter').value, '');
+  assert.equal(db.calls.length, writes);
 });
 
 test('Momo offers expressive local jokes, clumsy recovery poses and persistent quiet time',async t=>{
@@ -3681,6 +3723,81 @@ test('Website designs: every existing section remains reachable in each saved de
 });
 test('Website designs: saving colours from an open preview retains the separately saved design',async t=>{
  const {api,document,window,db}=await app(t);api.hub.setTool('theme');api.showTab('studio');document.querySelector('[data-theme-choice="forest"]').click();const form=document.getElementById('hubTheme');assert.equal(api.state().workhub.preferences.theme,'ocean');const ui=api.hub.websiteDesigns;ui.open();const radio=document.querySelector('[name="websiteDesign"][value="clear-desk"]');radio.checked=true;radio.dispatchEvent(new window.Event('change',{bubbles:true}));document.querySelector('#websiteDesignChooser form').dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));await settle();assert.equal(document.getElementById('hubTheme'),form);assert.equal(api.state().workhub.preferences.theme,'ocean');assert.equal(document.body.dataset.hubTheme,'forest');api.hub.submit(form);await settle();assert.equal(api.state().workhub.preferences.theme,'forest');assert.equal(api.state().workhub.preferences.design,'clear-desk');assert.equal(document.body.dataset.hubDesign,'clear-desk');assert.equal(db.row.document.data.workhub.preferences.design,'clear-desk');
+});
+
+test('Website designs: colours preview on the current shell and My Day without writes, then apply as one appearance save', async t => {
+  const { api, document, window, db } = await app(t, { styles: true });
+  const root = document.documentElement;
+  const ui = api.hub.websiteDesigns;
+  const header = document.getElementById('hubHeader');
+  const sidebar = document.getElementById('hubSidebar');
+  const hero = document.querySelector('.my-day-page .mv-hero');
+  const colour = name => root.style.getPropertyValue('--hub-' + name);
+  const savedAccent = colour('accent');
+  const chooser = () => document.getElementById('websiteDesignChooser');
+  const change = (control, value) => {
+    control.value = value;
+    control.dispatchEvent(new window.Event('change', { bubbles: true }));
+  };
+  const selectPalette = value => change(chooser().querySelector('[name="websitePalette"]'), value);
+  const selectDesign = value => {
+    const radio = chooser().querySelector('[name="websiteDesign"][value="' + value + '"]');
+    radio.checked = true;
+    radio.dispatchEvent(new window.Event('change', { bubbles: true }));
+  };
+  const submitChooser = () =>
+    chooser().querySelector('form').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+
+  document.getElementById('websiteDesignButton').click();
+  assert.equal(chooser().querySelector('img, [role="img"]').getAttribute('aria-label'), 'Header, navigation, buttons and My Day scenery');
+  assert.equal(document.querySelectorAll('#mvSky').length, 1);
+  assert.equal(chooser().querySelectorAll('#wdPaletteSky').length, 1);
+  selectPalette('dark');
+  assert.equal(root.style.colorScheme, 'dark');
+  assert.equal(colour('surface'), '#23313d');
+  assert.equal(api.state().workhub.preferences.theme, 'ocean');
+  assert.equal(db.calls.length, 0);
+  assert.equal(document.getElementById('hubHeader'), header);
+  assert.equal(document.getElementById('hubSidebar'), sidebar);
+  assert.equal(document.querySelector('.my-day-page .mv-hero'), hero);
+  chooser().dispatchEvent(new window.Event('cancel', { cancelable: true }));
+  assert.equal(chooser(), null);
+  assert.equal(colour('accent'), savedAccent);
+  assert.equal(root.style.colorScheme, 'light');
+
+  api.hub.setTool('theme');
+  api.showTab('studio');
+  const form = document.getElementById('hubTheme');
+  change(form.elements.radius, '24');
+  ui.open();
+  selectDesign('clear-desk');
+  assert.ok(chooser().querySelector('[data-wd-custom-colours]').hidden);
+  selectPalette('custom');
+  assert.equal(chooser().querySelector('[data-wd-custom-colours]').hidden, false);
+  change(chooser().querySelector('[data-wd-colour="accent"]'), '#ad436d');
+  change(chooser().querySelector('[data-wd-colour="secondary"]'), '#bc6e91');
+  assert.equal(colour('accent'), '#ad436d');
+  assert.equal(colour('secondary'), '#bc6e91');
+  assert.ok(document.querySelector('#studioPaletteSky'));
+  assert.equal(db.calls.length, 0);
+  submitChooser();
+  await settle();
+  assert.equal(chooser(), null);
+  assert.equal(document.getElementById('hubTheme'), form);
+  assert.equal(form.elements.theme.value, 'custom');
+  assert.equal(form.elements['color-secondary'].value, '#bc6e91');
+  assert.equal(form.elements.radius.value, '24');
+  assert.match(document.getElementById('hubThemeStatus').textContent, /Preview only/);
+  assert.equal(db.calls.length, 1);
+  const saved = db.row.document.data.workhub.preferences;
+  assert.equal(saved.theme, 'custom');
+  assert.equal(saved.design, 'clear-desk');
+  assert.equal(saved.colors.secondary, '#bc6e91');
+  assert.notEqual(saved.radius, 24);
+  document.querySelector('[data-hub="theme-reset-preview"]').click();
+  assert.equal(colour('accent'), '#ad436d');
+  assert.equal(document.body.dataset.hubDesign, 'clear-desk');
+  assert.equal(db.calls.length, 1);
 });
 
 async function legacyTaskCompletionFixture(t) {

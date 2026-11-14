@@ -8,6 +8,7 @@
     );
   const clock = n =>
     `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`;
+  const controlIdleMs = 5000;
   function scene() {
     return `<div class="rest-landscape" aria-hidden="true"><div class="rest-halo"></div><div class="rest-star-ring"></div><div class="rest-globe"><div class="rest-glass-light"></div><div class="rest-moon"></div><svg viewBox="0 0 600 500" class="rest-plants"><defs><linearGradient id="restEarth" x2="0" y2="1"><stop stop-color="#759b72"/><stop offset="1" stop-color="#244e48"/></linearGradient></defs><path d="M0 405Q125 335 270 390T600 370V500H0Z" fill="#46786a"/><path d="M0 448Q135 374 308 421T600 415V500H0Z" fill="url(#restEarth)"/><g class="rest-fern"><path d="M197 440Q186 315 121 238" fill="none" stroke="#c3d2a4" stroke-width="4"/><path d="M165 356Q66 346 74 285 139 279 165 356ZM146 307Q66 277 88 226 149 244 146 307ZM188 408Q72 401 68 349 143 328 188 408ZM167 354Q160 263 213 259 243 318 167 354ZM189 412Q191 326 246 335 264 388 189 412Z" fill="#97b991"/></g><g class="rest-fern second"><path d="M402 443Q405 324 472 256" fill="none" stroke="#c3d2a4" stroke-width="4"/><path d="M423 367Q432 277 487 288 498 352 423 367ZM448 314Q450 234 501 252 508 304 448 314ZM405 417Q420 336 473 351 487 413 405 417ZM425 366Q349 354 360 298 417 298 425 366ZM405 419Q322 407 332 355 393 355 405 419Z" fill="#719f91"/></g><g class="rest-sprout"><path d="M302 450V327" stroke="#d4d6a7" stroke-width="4"/><path d="M302 390Q233 374 255 335 305 342 302 390ZM302 365Q359 334 370 370 352 405 302 402Z" fill="#b0c99c"/><path d="M302 327Q273 273 300 255 336 278 302 327Z" fill="#d9d7ab"/></g></svg>${Array.from({ length: 16 }, (_, i) => `<i class="rest-firefly" style="--i:${i};left:${12 + ((i * 19) % 76)}%;top:${25 + ((i * 29) % 56)}%"></i>`).join('')}<div class="rest-globe-base"></div></div><div class="rest-water"></div><span class="rest-scene-note">A SMALL PAUSE. A LITTLE ROOM TO GROW.</span></div>`;
   }
@@ -18,6 +19,8 @@
       trigger = null,
       resuming = false,
       fullscreenPending = null,
+      lastControlActivity = 0,
+      controlsScrollTop = 0,
       scenery = 'garden';
     const audio = root.WorkHubRestAudio.install({
       ready: () => a.ready() && !!session && session.owner === a.owner(),
@@ -59,6 +62,42 @@
       }
       fullscreenPending = null;
       document.body.classList.remove('rest-room-open');
+    }
+    function setControls(visible) {
+      if (!dialog?.open || dialog.dataset.controls === (visible ? 'visible' : 'hidden')) return;
+      const stage = dialog.querySelector('.rest-room-shell'),
+        wake = dialog.querySelector('[data-rest="show-controls"]'),
+        active = document.activeElement;
+      dialog.dataset.controls = visible ? 'visible' : 'hidden';
+      if (active === wake || (!visible && active?.closest('[data-rest-chrome]')))
+        stage.focus({ preventScroll: true });
+      for (const section of dialog.querySelectorAll('[data-rest-chrome]'))
+        section.toggleAttribute('inert', !visible);
+      wake.hidden = visible;
+      if (visible) stage.scrollTop = controlsScrollTop;
+      else {
+        controlsScrollTop = stage.scrollTop;
+        stage.scrollTop = 0;
+      }
+    }
+    function revealControls() {
+      lastControlActivity = Date.now();
+      setControls(true);
+    }
+    function hideIdleControls() {
+      if (
+        !dialog?.open ||
+        session.complete ||
+        session.pausedAt ||
+        fullscreenPending ||
+        document.hidden ||
+        Date.now() - lastControlActivity < controlIdleMs
+      )
+        return;
+      const active = document.activeElement;
+      if (active?.matches(':focus-visible,select,input') && active.closest('[data-rest-chrome]'))
+        return;
+      setControls(false);
     }
     function paintFullscreen(message = '') {
       if (!dialog) return;
@@ -142,11 +181,13 @@
           : 'Sound is unavailable. The break timer is still running. Use Retry sound to try again.'
         : s.starting
           ? 'Preparing your rest soundscape…'
-          : session?.complete
+          : session?.complete && session.natural
             ? 'The alarm keeps ringing until you press Resume work.'
-            : s.music
-              ? 'Rest-only music · warm pads, gentle bells and no focus beat.'
-              : 'Rest music is off. The break-end alarm will still ring until Resume work.';
+            : session?.complete
+              ? ''
+              : s.music
+                ? 'Rest-only music · warm pads and gentle bells.'
+                : 'Rest music is off. The break-end alarm will still ring until Resume work.';
       dialog.querySelector('[data-rest="retry"]').hidden = !s.error;
     }
     function ensureDialog() {
@@ -154,7 +195,9 @@
       dialog = document.createElement('dialog');
       dialog.id = 'restRoom';
       dialog.className = 'rest-room';
-      dialog.setAttribute('aria-labelledby', 'restRoomTitle');
+      dialog.dataset.controls = 'visible';
+      controlsScrollTop = 0;
+      dialog.setAttribute('aria-label', 'Break Terrarium');
       dialog.setAttribute('aria-describedby', 'restRoomDescription');
       dialog.setAttribute('aria-modal', 'true');
       try {
@@ -163,15 +206,91 @@
             ? 'observatory'
             : 'garden';
       } catch {}
-      dialog.innerHTML = `<div class="rest-room-shell"><header class="rest-room-top"><span class="rest-wordmark"><i aria-hidden="true">♧</i> YOUR REST TERRARIUM</span><div class="rest-room-top-actions"><label class="rest-scenery-label">Scenery<select data-rest-scenery aria-label="Break scenery"><option value="garden">Glass garden</option>${root.WorkHubExperienceArt ? '<option value="observatory">Moonlit observatory</option>' : ''}</select></label><span class="rest-state-chip" data-rest-phase-label></span><button type="button" data-rest="fullscreen" aria-pressed="false">Full screen</button></div></header><p class="rest-fullscreen-status" data-rest-fullscreen-status role="status" hidden></p>${root.WorkHubExperienceArt?.observatory() || ''}<div class="rest-room-main"><section class="rest-copy"><span class="rest-kicker" data-rest-label></span><h2 id="restRoomTitle">A little pause.<br><em>A world of calm.</em></h2><p id="restRoomDescription">Let the world wait a moment. Your work and focus timers are safely paused.</p><div class="rest-countdown" role="timer" aria-label="Break time remaining" aria-live="off"><span data-rest-clock>05:00</span><small data-rest-clock-label>TIME JUST FOR YOU</small></div><div class="rest-progress" aria-hidden="true"><i data-rest-progress></i></div><p class="rest-live-status" role="status" data-rest-status></p><div class="rest-room-actions"><button type="button" class="rest-primary" data-rest="pause">Pause break</button><button type="button" data-rest="end">End break early</button><button type="button" class="rest-primary" data-rest="resume" hidden>Resume work <span aria-hidden="true">↗</span></button></div></section>${scene()}</div><section class="rest-audio-panel" aria-label="Rest soundscape">${root.WorkHubExperienceArt ? '<span class="experience-rest-art" aria-hidden="true">' + root.WorkHubExperienceArt.sound('rest') + '</span>' : ''}<div class="rest-music-label"><span aria-hidden="true" class="rest-music-waves"><i></i><i></i><i></i><i></i></span><div><strong>A different rhythm for rest</strong><small>Your focus soundscape stays unchanged.</small></div></div><label class="rest-track-label">Rest soundscape<select data-rest-track aria-label="Rest soundscape">${Object.entries(
-        root.WorkHubRestAudio.TRACKS
-      )
+      const tracks = Object.entries(root.WorkHubRestAudio.TRACKS)
         .map(([key, s]) => `<option value="${key}">${s.name} · ${s.detail}</option>`)
-        .join(
-          ''
-        )}</select></label><button type="button" data-rest="music" data-rest-music>Ⅱ Pause rest music</button><label class="rest-volume">Volume <output data-rest-volume-label></output><input type="range" min="0" max="100" step="1" data-rest-volume aria-label="Rest soundscape volume"></label><p class="rest-alarm-note"><span aria-hidden="true">◷</span> Break-end alarm · rings until Resume work</p><button type="button" data-rest="retry" hidden>Retry sound</button><p data-rest-audio-status></p></section><footer class="rest-room-footer"><span>ONE SMALL BREAK CAN CHANGE THE FEEL OF A DAY.</span><span>Resume work only when you choose.</span></footer></div>`;
+        .join('');
+      dialog.innerHTML = `
+        <div class="rest-room-shell" tabindex="-1">
+          <header class="rest-room-top" data-rest-chrome>
+            <span class="rest-wordmark"><i aria-hidden="true">♧</i> YOUR REST TERRARIUM</span>
+            <div class="rest-room-top-actions">
+              <label class="rest-scenery-label">Scenery<select data-rest-scenery aria-label="Break scenery">
+                <option value="garden">Glass garden</option>
+                ${root.WorkHubExperienceArt ? '<option value="observatory">Moonlit observatory</option>' : ''}
+              </select></label>
+              <span class="rest-state-chip" data-rest-phase-label></span>
+              <button type="button" data-rest="fullscreen" aria-pressed="false">Full screen</button>
+            </div>
+          </header>
+          <p class="rest-fullscreen-status" data-rest-chrome data-rest-fullscreen-status role="status" hidden></p>
+          ${root.WorkHubExperienceArt?.observatory() || ''}
+          <div class="rest-room-main">
+            <section class="rest-copy">
+              <div data-rest-chrome>
+                <span class="rest-kicker" data-rest-label></span>
+                <h2 id="restRoomTitle">A little pause.<br><em>A world of calm.</em></h2>
+                <p id="restRoomDescription">Let the world wait a moment. Your work and focus timers are safely paused.</p>
+              </div>
+              <div class="rest-timing">
+                <div class="rest-countdown" role="timer" aria-label="Break time remaining" aria-live="off">
+                  <span data-rest-clock>05:00</span><small data-rest-clock-label>TIME JUST FOR YOU</small>
+                </div>
+                <div class="rest-progress" aria-hidden="true"><i data-rest-progress></i></div>
+              </div>
+              <div data-rest-chrome>
+                <p class="rest-live-status" role="status" data-rest-status></p>
+                <div class="rest-room-actions">
+                  <button type="button" class="rest-primary" data-rest="pause">Pause break</button>
+                  <button type="button" data-rest="end">End break early</button>
+                  <button type="button" class="rest-primary" data-rest="resume" hidden>Resume work <span aria-hidden="true">↗</span></button>
+                </div>
+              </div>
+            </section>
+            ${scene()}
+          </div>
+          <section class="rest-audio-panel" data-rest-chrome aria-label="Rest soundscape">
+            ${root.WorkHubExperienceArt ? '<span class="experience-rest-art" aria-hidden="true">' + root.WorkHubExperienceArt.sound('rest') + '</span>' : ''}
+            <div class="rest-music-label">
+              <span aria-hidden="true" class="rest-music-waves"><i></i><i></i><i></i><i></i></span>
+              <div><strong>Rest music</strong></div>
+            </div>
+            <label class="rest-track-label">Rest soundscape<select data-rest-track>${tracks}</select></label>
+            <button type="button" data-rest="music" data-rest-music>Ⅱ Pause rest music</button>
+            <label class="rest-volume">Volume <output data-rest-volume-label></output><input type="range" min="0" max="100" step="1" data-rest-volume aria-label="Rest soundscape volume"></label>
+            <p class="rest-alarm-note"><span aria-hidden="true">◷</span> Break-end alarm · rings until Resume work</p>
+            <button type="button" data-rest="retry" hidden>Retry sound</button><p data-rest-audio-status></p>
+          </section>
+          <button type="button" data-rest="show-controls" hidden>Show break controls</button>
+        </div>`;
       dialog.dataset.scenery = scenery;
       dialog.querySelector('[data-rest-scenery]').value = scenery;
+      dialog.addEventListener('focusin', event => {
+        if (event.target.closest('[data-rest-chrome]')) revealControls();
+      });
+      dialog.addEventListener(
+        'pointermove',
+        event => {
+          if (event.pointerType !== 'touch') revealControls();
+        },
+        { passive: true }
+      );
+      dialog.addEventListener('wheel', revealControls, { passive: true });
+      dialog.addEventListener(
+        'pointerdown',
+        event => {
+          if (event.target.closest('[data-rest-chrome]')) revealControls();
+        },
+        { passive: true }
+      );
+      dialog.addEventListener('keydown', event => {
+        if (event.key === 'Escape') return;
+        const show = dialog.dataset.controls === 'hidden';
+        revealControls();
+        if (show && ['Enter', ' '].includes(event.key)) {
+          event.preventDefault();
+          dialog.querySelector('[data-rest="pause"]').focus();
+        }
+      });
       dialog.addEventListener('change', event => {
         if (
           !session ||
@@ -190,6 +309,7 @@
         finish(false);
       });
       dialog.addEventListener('click', event => {
+        revealControls();
         const action = event.target.closest('[data-rest]')?.dataset.rest;
         if (!action) return;
         sync();
@@ -218,10 +338,13 @@
         }
       });
       dialog.addEventListener('input', event => {
-        if (event.target.hasAttribute('data-rest-volume'))
+        if (event.target.hasAttribute('data-rest-volume')) {
+          revealControls();
           audio.change('volume', +event.target.value);
+        }
       });
       dialog.addEventListener('change', event => {
+        revealControls();
         if (event.target.hasAttribute('data-rest-track')) audio.change('track', event.target.value);
       });
       document.body.append(dialog);
@@ -234,9 +357,10 @@
       if (!dialog.open) {
         dialog.showModal();
         dialog
-          .querySelector(session.complete ? '[data-rest="resume"]' : '[data-rest="pause"]')
-          .focus();
+          .querySelector(session.complete ? '[data-rest="resume"]' : '.rest-room-shell')
+          .focus({ preventScroll: true });
       }
+      revealControls();
       paint();
       if (automaticFullscreen) void fullscreen();
     }
@@ -271,6 +395,7 @@
         dialog.querySelector(`[data-rest="${key}"]`).hidden = !session.complete;
       dialog.querySelector('[data-rest-music]').hidden = session.complete;
       if (changed) {
+        revealControls();
         dialog.querySelector('#restRoomTitle').innerHTML = session.complete
           ? 'Your break<br><em>is over.</em>'
           : 'A little pause.<br><em>A world of calm.</em>';
@@ -407,6 +532,7 @@
       if (!session.complete && !session.pausedAt && Date.now() >= session.end) finish(true);
       audio.tick();
       paint();
+      hideIdleControls();
     }
     document.addEventListener('workhub-presentation-launch', event => {
       if (session && event.detail?.kind !== 'rest') {
@@ -416,7 +542,10 @@
     });
     document.addEventListener('visibilitychange', tick);
     document.addEventListener('fullscreenchange', () => {
-      if (dialog) paintFullscreen();
+      if (dialog) {
+        revealControls();
+        paintFullscreen();
+      }
     });
     document.addEventListener(
       'keydown',

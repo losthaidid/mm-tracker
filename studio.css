@@ -2704,7 +2704,7 @@ body .hub-palette-choice.active {
 }
 .hub-card.hub-theme-preview {
   position: sticky;
-  top: 22px;
+  top: calc(var(--hub-header-height, 62px) + 16px);
   padding: 22px;
   overflow: hidden;
   background: var(--hub-bg);
@@ -2712,77 +2712,12 @@ body .hub-palette-choice.active {
   box-shadow: none;
 }
 .hub-theme-preview > h3 {
-  font-size: 1.3rem;
-  line-height: 1.4;
-  margin: 16px 0 8px;
-}
-.hub-theme-preview > p {
-  font-size: 0.875rem;
-  margin: 8px 0 18px;
-}
-.hub-preview-mini {
-  display: grid;
-  gap: 11px;
-  padding: 17px;
-  margin: 19px 0;
-  border: 1px solid var(--hub-border);
-  border-radius: var(--hub-radius);
-  background: var(--hub-surface);
-  box-shadow: var(--hub-shadow);
-}
-.hub-preview-mini :is(h3, h4) {
-  margin: 0 0 3px;
   font-size: 1.1rem;
-}
-.hub-preview-mini > p {
-  margin: 0;
-  color: var(--hub-muted);
-}
-.hub-preview-sample {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 11px 12px;
-  border: 1px solid var(--hub-border);
-  border-radius: 9px;
-  background: var(--hub-surface-soft);
-  font-size: 0.8125rem;
-}
-.hub-preview-dot {
-  display: grid;
-  place-items: center;
-  flex: 0 0 28px;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--hub-accent);
-  color: var(--hub-on-accent);
-}
-.hub-preview-sample strong,
-.hub-preview-sample small {
-  display: block;
-}
-.hub-preview-sample small {
-  margin-top: 3px;
-  color: var(--hub-muted);
-}
-.hub-preview-sample:nth-child(3) .hub-preview-dot {
-  background: var(--hub-success);
-}
-.hub-theme-preview .hub-hero-art {
-  position: static;
-  width: min(190px, 85%);
-  margin: 15px auto;
-}
-.hub-theme-preview .hub-desk {
-  min-height: 200px;
-  margin-top: 20px;
-}
-.hub-theme-preview .desk-scene {
-  height: 145px;
+  line-height: 1.4;
+  margin: 0 0 14px;
 }
 .hub-theme-preview .actions {
-  margin-top: 18px;
+  margin-top: 12px;
 }
 #hubTheme > .actions {
   margin-top: 25px;
@@ -3228,6 +3163,7 @@ body[data-motion='off'] .hub-confetti {
   }
   .hub-card.hub-theme-preview {
     position: static;
+    grid-row: 1;
   }
   .hub-wide,
   .hub-widget[data-span='wide'] {

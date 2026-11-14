@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { JSDOM } from 'jsdom';
 const settle = async () => { for(let i=0;i<16;i++)await Promise.resolve(); };
 function setup(t,{supported=true,reject=false,pending=false}={}) {
- const dom=new JSDOM('<button id="start">Break Terrarium</button>',{url:'https://losthaidid.github.io/mm-tracker/',runScripts:'outside-only'});t.after(()=>dom.window.close());
+ const dom=new JSDOM('<button id="start">Break Terrarium</button>',{url:'https://losthaidid.github.io/mm-tracker/',runScripts:'outside-only',pretendToBeVisual:true});t.after(()=>dom.window.close());
  const {window}=dom,{document}=window;let now=100000,owner='one',ready=true,active=null,resolveRequest;
  const requests=[],events=[],resumed=[],audio={state:{music:true,playing:false,starting:false,paused:false,track:'garden',volume:60,alarm:true,alerting:false,error:''},snapshot(){return this.state;},start(){events.push('audio');this.state.playing=true;return Promise.resolve();},stop(){this.state.playing=false;this.state.alerting=false;},pause(value){this.state.paused=value;},finish(){this.state.playing=false;this.state.alerting=true;},tick(){},change(key,value){this.state[key]=value;}};
  window.eval(readFileSync(new URL('../experience-art.js',import.meta.url),'utf8'));window.WorkHubRestAudio={TRACKS:{garden:{name:'Cloud garden',detail:'Rest'}},install:()=>audio};window.Date.now=()=>now;
@@ -58,4 +58,68 @@ test('observatory scenery changes without replacing the fullscreen stage, break 
 test('terrarium reports a fulfilled fullscreen promise without native state as windowed and preserves the break',async t=>{
  const c=setup(t);c.window.HTMLElement.prototype.requestFullscreen=()=>Promise.resolve();c.start();await settle();
  assert.equal(c.active,null);assert.match(c.document.querySelector('[data-rest-fullscreen-status]').textContent,/unavailable/);assert.equal(c.room.snapshot().complete,false);assert.equal(c.resumed.length,0);
+});
+
+test('idle controls fade, wake from pointer, tap and keyboard, and return for the persistent break alarm', async t => {
+  const c = setup(t);
+  c.start();
+  await settle();
+  const { document, window, room } = c;
+  const dialog = document.getElementById('restRoom');
+  const stage = dialog.querySelector('.rest-room-shell');
+  const wake = dialog.querySelector('[data-rest="show-controls"]');
+  const pause = dialog.querySelector('[data-rest="pause"]');
+  const resume = dialog.querySelector('[data-rest="resume"]');
+  const sections = [...dialog.querySelectorAll('[data-rest-chrome]')];
+  const end = room.snapshot().end;
+  const assertControls = visible => {
+    assert.equal(dialog.dataset.controls, visible ? 'visible' : 'hidden');
+    assert.equal(wake.hidden, visible);
+    assert.ok(sections.every(section => section.hasAttribute('inert') === !visible));
+    assert.equal(dialog.querySelector('[role="timer"]').closest('[inert]'), null);
+  };
+
+  c.advance(4999);
+  assertControls(true);
+  c.advance(1);
+  assertControls(false);
+  assert.equal(dialog.querySelector('[data-rest-clock]').textContent, '00:55');
+  assert.equal(c.audio.state.playing, true);
+  stage.dispatchEvent(new window.Event('pointermove', { bubbles: true }));
+  assertControls(true);
+  c.advance(5000);
+  assertControls(false);
+  stage.click();
+  assertControls(true);
+  c.advance(5000);
+  wake.click();
+  assertControls(true);
+  c.advance(5000);
+  assertControls(false);
+  stage.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+  assertControls(true);
+  assert.equal(room.snapshot().end, end);
+
+  pause.focus();
+  c.advance(5000);
+  assertControls(true);
+  pause.click();
+  stage.focus();
+  c.advance(20000);
+  assertControls(true);
+  assert.equal(room.snapshot().seconds, 35);
+  pause.click();
+  c.advance(5000);
+  assertControls(false);
+  c.advance(30000);
+  assertControls(true);
+  assert.equal(document.activeElement, resume);
+  assert.equal(c.audio.state.alerting, true);
+  c.advance(7000);
+  assertControls(true);
+  assert.equal(c.audio.state.alerting, true);
+  assert.deepEqual(c.resumed, []);
+  resume.click();
+  assert.equal(c.audio.state.alerting, false);
+  assert.deepEqual(c.resumed, [{ id: 'work' }]);
 });

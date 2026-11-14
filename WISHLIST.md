@@ -14,6 +14,13 @@ Kept from the continuing website enhancement discussion. These numbers belong to
 
 This is a wishlist selection only; implementation has not been requested. No batch assigned.
 
+## Implemented website enhancements · 14 November 2026
+
+| Selection | Enhancement |
+| --- | --- |
+| 159 | Live preview for theme changes in Website design and Theme Studio |
+| 197 | Break Terrarium hideaway controls with a visible countdown and an explicit Resume work step |
+
 ## Implemented website experience enhancements · 8 November 2026
 
 Kept from the website design and functionality ideas in this discussion, then approved for implementation. All seven are implemented; see [the usage guide](docs/KEPT-EXPERIENCE.md). The numbers below belong to that discussion, separate from earlier batches.
