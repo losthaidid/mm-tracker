@@ -18,6 +18,7 @@ insert into public.workhub_feature_catalog(id,name,parent,paths) values
 ('studio.theme','Theme studio','studio',array[]::text[]),
 ('studio.reader','JSON & IDoc Reader','studio',array[]::text[]),
 ('studio.tcodes','SAP T-codes','studio',array['workhub.tcodes']::text[]),
+('studio.tables','SAP Tables','studio',array['workhub.sapTables.records','workhub.sapTables.standard']::text[]),
 ('studio.focus','Focus room','studio',array[]::text[]),
 ('studio.journey','Project journey','studio',array[]::text[]),
 ('studio.scrapbook','Scrapbook','studio',array['workhub.scrapbook']::text[]),

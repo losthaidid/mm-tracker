@@ -55,6 +55,13 @@
     ['studio.theme', 'Theme studio', 'Studio tools', 'studio', []],
     ['studio.reader', 'JSON & IDoc Reader', 'Studio tools', 'studio', []],
     ['studio.tcodes', 'SAP T-codes', 'Studio tools', 'studio', ['workhub.tcodes']],
+    [
+      'studio.tables',
+      'SAP Tables',
+      'Studio tools',
+      'studio',
+      ['workhub.sapTables.records', 'workhub.sapTables.standard'],
+    ],
     ['studio.focus', 'Focus room', 'Studio tools', 'studio', []],
     ['studio.journey', 'Project journey', 'Studio tools', 'studio', []],
     ['studio.scrapbook', 'Scrapbook', 'Studio tools', 'studio', ['workhub.scrapbook']],
@@ -147,7 +154,8 @@
   }
   function get(data, path) {
     const value = path.split('.').reduce((v, k) => v?.[k], data);
-    // A first profile is a record creation, even for workspaces created before profiles existed.
+    // A first entry is a record creation in workspaces that predate these collections.
+    if (value === undefined && path === 'workhub.sapTables.records') return [];
     return path === 'workhub.validator.profiles' && value === undefined ? [] : value;
   }
   function delta(old, next, allow) {

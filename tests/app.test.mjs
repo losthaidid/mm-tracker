@@ -3716,6 +3716,110 @@ test('Website designs: preview cannot save after a conflict, denied permission o
  const {api,document,window,db}=await app(t),ui=api.hub.websiteDesigns,before=copy(api.state()),calls=db.calls.length;ui.open();const radio=document.querySelector('[name="websiteDesign"][value="modern-hub"]');radio.checked=true;radio.dispatchEvent(new window.Event('change',{bubbles:true}));api.cloud.conflict=true;document.querySelector('#websiteDesignChooser form').dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));await settle();assert.deepEqual(copy(api.state()),before);assert.equal(db.calls.length,calls);assert.ok(document.getElementById('websiteDesignChooser'));api.cloud.conflict=false;ui.close();
  const invalid=copy(api.state());invalid.workhub.preferences.design='untrusted';assert.throws(()=>api.validate(invalid),/theme|appearance/);api.cloud.user={id:'new-owner'};ui.mount();assert.equal(ui.snapshot().preview,false);await api.loadCloud(null);assert.equal(document.body.dataset.hubDesign,'current');assert.equal(document.getElementById('websiteDesignChooser'),null);
 });
+test('SAP Tables: Studio search and edition filters open related entries and save personal tables through the account document', async t => {
+  const { api, document, window, db } = await app(t);
+  api.showTab('studio');
+  document.querySelector('[data-hub="tool"][data-tool="tables"]').click();
+  await settle();
+  const search = document.getElementById('sapTableSearch');
+  const find = value => {
+    search.value = value;
+    search.dispatchEvent(new window.Event('input', { bubbles: true }));
+  };
+  const scope = value => {
+    const select = document.querySelector('[data-sap-table-filter="system"]');
+    select.value = value;
+    select.dispatchEvent(new window.Event('change', { bubbles: true }));
+  };
+  const rows = () => [...document.querySelectorAll('#sapTableResults .sap-table-card')];
+  const open = (parent, name) => {
+    [...parent.querySelectorAll('[data-sap-table="open"]')]
+      .find(button => button.dataset.code === name).click();
+  };
+  scope('public');
+  assert.ok(rows().length > 0);
+  assert.ok(rows().every(card => card.textContent.includes('CDS view')));
+  assert.match(document.getElementById('sapTableResults').textContent, /View Browser/);
+  scope('s4');
+  search.focus();
+  find('EKPO');
+  assert.equal(document.activeElement, search);
+  assert.equal(document.getElementById('sapTableSearch'), search);
+  open(document.getElementById('sapTableResults'), 'EKPO');
+  const detail = () => document.getElementById('sapTableDetail');
+  assert.match(detail().textContent, /EBELN \+ EBELP/);
+  open(detail(), 'EKBE');
+  assert.equal(document.getElementById('modalTitle').textContent, 'EKBE');
+  assert.match(detail().textContent, /MATDOC/);
+  detail().querySelector('[data-sap-table="back"]').click();
+  assert.equal(document.getElementById('modalTitle').textContent, 'EKPO');
+  assert.equal(db.calls.length, 0);
+  api.closeModal();
+
+  document.querySelector('#sapTablesRoot [data-sap-table="add"]').click();
+  let form = document.getElementById('sapTableEditor');
+  const submit = () => form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  form.elements.code.value = '/acme/po_audit';
+  form.elements.title.value = 'QA review for each receipt';
+  form.querySelector('[value="s4"]').checked = true;
+  form.elements.fields.value = 'EBELN, EBELP';
+  form.querySelector('[data-sap-table="add-link"]').click();
+  form.elements.relatedCode.value = 'EKPO';
+  form.elements.relatedFields.value = 'EBELN + EBELP';
+  form.elements.relatedNote.value = 'Additional QA checks after goods receipt';
+  submit();
+  await settle();
+  assert.equal(db.calls.length, 1);
+  assert.equal(document.getElementById('modalTitle').textContent, '/ACME/PO_AUDIT');
+  open(detail(), 'EKPO');
+  assert.match(detail().textContent, /Additional QA checks after goods receipt/);
+  detail().querySelector('[data-sap-table="edit"]').click();
+  form = document.getElementById('sapTableEditor');
+  form.elements.notes.value = 'Check the receipt before posting an invoice.';
+  submit();
+  await settle();
+  assert.equal(db.calls.length, 2);
+  detail().querySelector('[data-sap-table="favorite"]').click();
+  await settle();
+  detail().querySelector('[data-sap-table="archive"]').click();
+  await settle();
+  assert.equal(api.state().workhub.sapTables.standard.EKPO.archived, true);
+  detail().querySelector('[data-sap-table="archive"]').click();
+  await settle();
+  assert.equal(api.state().workhub.sapTables.standard.EKPO.archived, false);
+  const stored = api.parseBackup(api.payload(api.state())).workhub.sapTables;
+  assert.equal(stored.records[0].code, '/ACME/PO_AUDIT');
+  assert.equal(stored.standard.EKPO.favorite, true);
+  assert.match(stored.standard.EKPO.notes, /before posting/);
+  assert.equal(db.row.document.data.workhub.tcodes.records.length, 79);
+});
+
+test('SAP Tables: account and feature permission changes close a custom draft and block writes', async t => {
+  const { api, document, window, db } = await app(t);
+  api.showTab('studio');
+  document.querySelector('[data-tool="tables"]').click();
+  await settle();
+  document.querySelector('[data-sap-table="add"]').click();
+  const oldForm = document.getElementById('sapTableEditor');
+  oldForm.elements.code.value = 'Z_OLD_ACCOUNT';
+  oldForm.elements.title.value = 'Private draft';
+  oldForm.querySelector('[value="ecc"]').checked = true;
+  const permissions = window.WorkHubAccessCatalog.preset('view');
+  db.access = { userId: api.cloud.user.id, role: 'member', status: 'active', version: 2, permissions };
+  await api.access.load(api.cloud.user);
+  api.showTab('studio');
+  assert.equal(document.getElementById('modal').open, false);
+  assert.equal(document.querySelector('#sapTablesRoot [data-sap-table="add"]'), null);
+  oldForm.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  assert.equal(db.calls.length, 0);
+  permissions['studio.tables'] = { mode: 'hidden' };
+  await api.access.load(api.cloud.user);
+  api.showTab('studio');
+  assert.equal(document.getElementById('sapTablesRoot'), null);
+  assert.equal(document.querySelector('[data-tool="tables"]').hidden, true);
+  assert.equal(db.calls.length, 0);
+});
+
 test('Website designs: every existing section remains reachable in each saved design with one route per section',async t=>{
  const {api,document,db}=await app(t),ids=['home','tickets','tasks','schedule','specs','notes','knowledge','processhub','files','handover','waiting','studio','lab','validator','snippets'];
  for(const design of ['current','clear-desk','modern-hub','editorial','canvas','fiori','compact-pro']){api.mutate(d=>d.workhub.preferences.design=design);await settle();const writes=db.calls.length;for(const id of ids){const node=document.querySelector('#tabs button[data-tab="'+id+'"]');assert.ok(node,design+' '+id);node.click();await settle();assert.ok(document.getElementById('view').innerHTML.length>50,design+' '+id);assert.equal(document.querySelectorAll('#tabs button[data-tab="'+id+'"]').length,1);assert.equal(document.body.dataset.hubDesign,design);}assert.equal(db.calls.length,writes);assert.equal(api.parseBackup(api.payload(api.state())).workhub.preferences.design,design);assert.equal(db.row.document.data.workhub.preferences.design,design);}

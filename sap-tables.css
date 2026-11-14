@@ -1,0 +1,229 @@
+/* The SAP table reference uses Studio’s card and editor foundations. */
+.sap-tables {
+  min-width: 0;
+}
+.sap-table-tools > label {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.sap-table-tools > label:first-child {
+  flex: 1 1 245px;
+  min-width: min(100%, 245px);
+}
+.sap-table-tools :is(input, select),
+.sap-table-refiners select {
+  width: 100%;
+  max-width: 100%;
+  min-height: 42px;
+}
+.sap-table-refiners {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px 20px;
+  padding: 12px 2px 0;
+}
+.sap-table-refiners > label {
+  display: grid;
+  gap: 6px;
+  max-width: 100%;
+  font-size: 0.75rem;
+}
+.sap-table-checks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  margin: 0 0 2px;
+}
+.sap-table-checks .check-label {
+  min-height: 40px;
+  margin: 0;
+}
+.sap-table-refiners > button {
+  margin-inline-start: auto;
+}
+.sap-table-count {
+  margin: 16px 0 4px;
+  font-size: 0.8rem;
+  color: var(--hub-muted);
+}
+.sap-table-context {
+  padding: 11px 14px;
+  border: 1px solid var(--hub-border);
+  border-inline-start: 3px solid var(--hub-link);
+  border-radius: 9px;
+  background: var(--hub-surface-soft);
+  color: var(--hub-text);
+  line-height: 1.55;
+}
+.sap-table-card .actions {
+  margin-top: auto;
+}
+body button.sap-table-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 40px;
+  max-width: 100%;
+  width: auto;
+  height: auto;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  background: var(--hub-surface-soft);
+  color: var(--hub-link);
+  border-radius: 7px;
+  font:
+    650 0.9rem/1.3 ui-monospace,
+    Consolas,
+    monospace;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+body button.sap-table-link:hover {
+  border-color: var(--hub-link);
+  background: var(--hub-blue-soft);
+}
+.sap-table-detail,
+#sapTableEditor {
+  display: grid;
+  gap: 18px;
+  color: var(--hub-text);
+}
+.sap-table-detail {
+  overflow-wrap: anywhere;
+}
+.sap-table-detail h3 {
+  margin: 10px 0 6px;
+}
+.sap-table-detail :is(p, ul) {
+  margin: 6px 0;
+}
+.sap-table-detail h4 {
+  margin: 0 0 8px;
+  font-size: 0.91rem;
+}
+.sap-table-detail .tcode-tags span {
+  font-size: 0.71rem;
+}
+.sap-table-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.sap-table-fields > code {
+  border: 1px solid var(--hub-border);
+  border-radius: 6px;
+  padding: 4px 7px;
+  color: var(--hub-text);
+  background: var(--hub-surface-soft);
+  font-size: 0.79rem;
+}
+.sap-table-detail-summary .actions {
+  margin-top: 12px;
+}
+.sap-table-detail ul.sap-table-relations {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  list-style: none;
+  padding: 0;
+  gap: 10px;
+}
+.sap-table-relations > li {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--hub-border);
+  border-radius: 11px;
+  background: var(--hub-surface);
+  color: var(--hub-text);
+  font-size: 0.81rem;
+  line-height: 1.5;
+}
+.sap-table-relation-head,
+.sap-table-relations footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+.sap-table-relation-head span,
+.sap-table-relations footer small,
+.sap-table-direction {
+  color: var(--hub-muted);
+  font-size: 0.75rem;
+}
+.sap-table-field-map {
+  padding: 7px 8px;
+  border-radius: 7px;
+  background: var(--hub-surface-soft);
+  color: var(--hub-text);
+  font:
+    0.78rem/1.55 ui-monospace,
+    Consolas,
+    monospace;
+}
+.sap-table-sources {
+  padding-inline-start: 18px;
+  font-size: 0.85rem;
+}
+.sap-table-detail a,
+.sap-table-context a {
+  color: var(--hub-link);
+}
+#sapTableEditor label {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  font-size: 0.8rem;
+}
+#sapTableEditor input:not([type='checkbox']),
+#sapTableEditor :is(select, textarea) {
+  width: 100%;
+}
+#sapTableEditor small {
+  color: var(--hub-muted);
+  line-height: 1.45;
+}
+#sapTableEditor fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--hub-border);
+  border-radius: 11px;
+}
+#sapTableEditor .sap-table-editor-systems {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 15px;
+}
+#sapTableEditor .check-label {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  min-height: 35px;
+}
+.sap-table-editor-link {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  margin: 0 0 10px;
+  border: 1px solid var(--hub-border);
+  border-radius: 8px;
+  background: var(--hub-surface-soft);
+}
+.sap-table-editor-link button {
+  justify-self: start;
+}
+@media (max-width: 660px) {
+  .sap-table-tools > label:first-child {
+    flex-basis: 100%;
+  }
+  .sap-table-tools > label:not(:first-child) {
+    flex: 1 1 145px;
+  }
+  .sap-table-refiners > label {
+    flex: 1 0 100%;
+  }
+}
