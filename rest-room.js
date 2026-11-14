@@ -349,10 +349,11 @@
       });
       document.body.append(dialog);
     }
-    function open(automaticFullscreen = true) {
+    function open(automaticFullscreen = true, fromMyDay = false) {
       sync();
       if (!session) return;
       ensureDialog();
+      if (!dialog.open) dialog.toggleAttribute('data-day-controls', fromMyDay);
       document.body.classList.add('rest-room-open');
       if (!dialog.open) {
         dialog.showModal();
@@ -429,11 +430,11 @@
         }
       });
     }
-    function start(label, duration) {
+    function start(label, duration, fromMyDay = false) {
       sync();
       if (!owner) return;
       if (session) {
-        open();
+        open(true, fromMyDay);
         return;
       }
       if (
@@ -464,7 +465,7 @@
         complete: false,
         resume: { work, focus, music },
       };
-      open(false);
+      open(false, fromMyDay);
       startSound();
       // Start audio and request fullscreen synchronously from the same click.
       void fullscreen();

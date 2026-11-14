@@ -28,10 +28,66 @@
           : 'night';
   const PHASE_NAMES = {
     morning: 'Morning light',
-    day: 'A little daylight',
+    day: 'Afternoon light',
     dusk: 'Golden hour',
-    night: 'A quieter constellation',
+    night: 'Night',
   };
+  const QUOTE_FALLBACK = 'Give your attention to one thing you can move forward.';
+  const dateLabel = new Intl.DateTimeFormat(undefined, {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
+  const timeLabel = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+  const houseLit = hour => hour < 8 || hour >= 17;
+
+  // Keep each period's full cycle available across visits within this tab.
+  function shuffleBag(items, random = Math.random, key = value => value) {
+    let remaining = [];
+    let previous;
+    return () => {
+      if (!remaining.length) {
+        remaining = [...items];
+        for (let i = remaining.length - 1; i > 0; i--) {
+          const j = Math.floor(random() * (i + 1));
+          [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
+        }
+      }
+      const index = remaining.findIndex(item => key(item) !== previous);
+      const item = remaining.splice(index < 0 ? 0 : index, 1)[0];
+      if (item !== undefined) previous = key(item);
+      return item;
+    };
+  }
+
+  const periodBags = (items = {}, key) =>
+    Object.fromEntries(
+      Object.entries(items).map(([slot, rows]) => [slot, shuffleBag(rows, Math.random, key)])
+    );
+  const heroIcon = (d, size = 20) =>
+    `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="${d}"/></svg>`;
+  const quoteIcon = heroIcon('M20 7v5h-5M20 12a8 8 0 1 0-2.4 5.7', 17);
+  const metricIcons = {
+    priorities: heroIcon('M12 3l2.6 6.4L21 12l-6.4 2.6L12 21l-2.6-6.4L3 12l6.4-2.6L12 3Z', 19),
+    schedule: heroIcon('M4 6h16v14H4ZM4 10h16M8 4v4m8-4v4M8 14h3m2 0h3', 19),
+    tasks: heroIcon('M6 5h12v15H6ZM9 13l2 2 4-5m-6 8h6', 19),
+    arrow: heroIcon('M6 18 18 6M9 6h9v9', 14),
+  };
+  function paintMoment(hero, moment, elapsed) {
+    const layer = hero.querySelector('.mv-life-layer');
+    if (!layer || layer.dataset.moment === (moment?.id || '')) return;
+    layer.dataset.moment = moment?.id || '';
+    if (moment?.id === 'windows-light' && elapsed < 3000) hero.classList.add('mv-lighting-cabin');
+    else hero.classList.remove('mv-lighting-cabin');
+    layer.innerHTML = moment
+      ? `<g class="mv-moment" style="--mv-moment-duration:${moment.duration}s;--mv-moment-start:${-elapsed / 1000}s">${moment.render()}</g>`
+      : '';
+    const caption = hero.querySelector('.mv-scene-note');
+    if (caption) {
+      caption.textContent = moment?.label || '';
+      caption.hidden = !moment;
+    }
+  }
   function trees(x, y, n, scale = 1) {
     return Array.from({ length: n }, (_, i) => {
       const px = x + i * 32,
@@ -41,11 +97,11 @@
     }).join('');
   }
   function scene(prefix = 'mv') {
-    return `<div class="mv-scene" aria-hidden="true"><svg class="mv-landscape" viewBox="0 0 1440 500" preserveAspectRatio="xMidYMid slice"><defs>
+    return `<div class="mv-scene" aria-hidden="true"><svg class="mv-landscape" viewBox="0 0 1440 500" preserveAspectRatio="xMaxYMid slice"><defs>
       <linearGradient id="${prefix}Sky" x2="0%" y2="100%"><stop stop-color="var(--mv-sky-top)"/><stop offset="1" stop-color="var(--mv-sky-bottom)"/></linearGradient>
-      <linearGradient id="${prefix}River" x2="80%" y2="100%"><stop stop-color="var(--mv-light)"/><stop offset=".45" stop-color="var(--mv-river-light)"/><stop offset="1" stop-color="var(--mv-river-deep)"/></linearGradient>
-      <linearGradient id="${prefix}Earth" x2="0%" y2="100%"><stop stop-color="var(--mv-mountain-mid)"/><stop offset="1" stop-color="var(--mv-foreground)"/></linearGradient>
-      <linearGradient id="${prefix}Roof" x2="0%" y2="100%"><stop stop-color="var(--mv-cabin-roof)"/><stop offset="1" stop-color="var(--mv-valley)"/></linearGradient>
+      <linearGradient id="${prefix}River" x2="80%" y2="100%"><stop stop-color="var(--mv-river-shine)"/><stop offset=".45" stop-color="var(--mv-river-light)"/><stop offset="1" stop-color="var(--mv-river-deep)"/></linearGradient>
+      <linearGradient id="${prefix}Earth" x2="0%" y2="100%"><stop stop-color="var(--mv-bank-light)"/><stop offset="1" stop-color="var(--mv-foreground)"/></linearGradient>
+      <linearGradient id="${prefix}Roof" x2="0%" y2="100%"><stop stop-color="#d0ae7e"/><stop offset="1" stop-color="#8c7560"/></linearGradient>
       <radialGradient id="${prefix}Glow"><stop stop-color="var(--mv-sun)" stop-opacity=".58"/><stop offset="1" stop-color="var(--mv-sun)" stop-opacity="0"/></radialGradient>
       <linearGradient id="${prefix}Mist"><stop stop-color="var(--mv-light)" stop-opacity="0"/><stop offset=".5" stop-color="var(--mv-light)" stop-opacity=".25"/><stop offset="1" stop-color="var(--mv-light)" stop-opacity="0"/></linearGradient>
       <clipPath id="${prefix}RiverClip"><path d="M971 310Q998 336 936 350T861 392Q901 419 1026 415T1189 468L1270 520H793Q807 450 745 423T764 369Q886 337 936 310Z"/></clipPath>
@@ -69,7 +125,7 @@
     </g>
     <g class="mv-layer mv-layer-near"><path d="M-20 431Q180 347 378 414T749 414L760 520H-20Z" fill="var(--mv-foreground)"/><path d="M1080 419Q1194 309 1475 367V520H1243Q1176 432 1080 419Z" fill="url(#${prefix}Earth)"/>
       <g style="color:var(--mv-tree-near)">${trees(1215, 390, 9, 1.1)}${trees(80, 427, 5, 0.85)}</g>
-      <g class="mv-cabin" transform="translate(1146 318)"><path d="M-37 43V-4L0-30 42-4V43Z" fill="var(--mv-mountain-mid)"/><path d="M-52-4 0-45 54-4 43 3 0-29-41 3Z" fill="url(#${prefix}Roof)"/><path d="M26-25V-53h12v39" fill="var(--mv-foreground)"/><path d="M-25 10h16v17h-16Zm36 0h16v17H11Z" fill="var(--mv-sun)" class="mv-cabin-window"/><path d="M-4 43V11H6v32" fill="var(--mv-scrim)"/><path d="M-52 43H54" stroke="var(--mv-cabin-roof)" stroke-width="5"/>
+      <g class="mv-cabin" transform="translate(1146 318)"><path d="M-37 43V-4L0-30 42-4V43Z" fill="var(--mv-cabin-wall)"/><path d="M-52-4 0-45 54-4 43 3 0-29-41 3Z" fill="url(#${prefix}Roof)"/><path d="M26-25V-53h12v39" fill="#8e8e77"/><g class="mv-cabin-glow" fill="#ffd88e"><ellipse cx="-17" cy="19" rx="17" ry="16"/><ellipse cx="19" cy="19" rx="17" ry="16"/></g><path d="M-25 10h16v17h-16Zm36 0h16v17H11Z" fill="#62766a" class="mv-cabin-window"/><path d="M-4 43V11H6v32" fill="#514a3f"/><path d="M-52 43H54" stroke="var(--mv-cabin-roof)" stroke-width="5"/>
         <g class="mv-smoke" fill="none" stroke="var(--mv-light)" opacity=".38" stroke-width="4" stroke-linecap="round"><path d="M32-57q-13-12-1-24t-2-26"/></g>
       </g>
       <g fill="var(--mv-valley)" opacity=".7"><ellipse cx="1263" cy="427" rx="32" ry="5"/><ellipse cx="1189" cy="447" rx="20" ry="4"/><ellipse cx="1347" cy="448" rx="46" ry="8"/></g>
@@ -77,16 +133,8 @@
     <g class="mv-layer mv-layer-front"><path d="M-20 503Q147 444 276 481T616 492L640 530H-20Z" fill="var(--mv-scrim)"/><g class="mv-fern" fill="var(--mv-tree-far)"><path d="M1355 530q-11-78 51-144-12 81-51 144Z"/><path d="M1350 530q-41-53-22-119 31 52 22 119Z"/><path d="M1343 530q-52-28-61-77 47 21 61 77Z"/></g>
       <g fill="var(--mv-sun)"><circle cx="1274" cy="436" r="2"/><circle cx="1228" cy="464" r="2.4"/><circle cx="1323" cy="409" r="2"/></g>
     </g>
-    <g class="mv-butterflies">${[
-      [995, 265, 'var(--mv-sun)'],
-      [1260, 288, 'var(--mv-river-light)'],
-    ]
-      .map(
-        ([x, y, c], i) =>
-          `<g transform="translate(${x} ${y})"><g class="mv-butterfly" style="--i:${i}"><g class="mv-butterfly-wings" fill="${c}"><path d="M0 0C-22-21-24 11 0 4Z"/><path d="M0 0C22-21 24 11 0 4Z"/></g><path d="M0-3V7" stroke="var(--mv-scrim)" stroke-width="2"/></g></g>`
-      )
-      .join('')}</g>
-    <g class="mv-wind-leaves" fill="var(--mv-river-light)">${Array.from({ length: 12 }, (_, i) => `<g transform="translate(${770 + ((i * 71) % 650)} ${170 + ((i * 37) % 220)})"><path style="--i:${i}" d="M0 0Q14-11 19 1Q9 14 0 0Z"/></g>`).join('')}</g></svg><div class="mv-light-beams"></div><div class="mv-shooting-stars"><i></i><i></i></div><div class="mv-scene-haze"></div><div class="mv-motes">${Array.from({ length: 16 }, (_, i) => `<i style="--i:${i};left:${35 + ((i * 17) % 63)}%;top:${15 + ((i * 23) % 70)}%"></i>`).join('')}</div></div>`;
+    <g class="mv-life-layer mv-layer mv-layer-near" data-moment=""></g>
+    <g class="mv-wind-leaves" fill="var(--mv-river-light)">${Array.from({ length: 12 }, (_, i) => `<g transform="translate(${770 + ((i * 71) % 650)} ${170 + ((i * 37) % 220)})"><path style="--i:${i}" d="M0 0Q14-11 19 1Q9 14 0 0Z"/></g>`).join('')}</g></svg><div class="mv-light-beams"></div><div class="mv-scene-haze"></div><div class="mv-motes">${Array.from({ length: 16 }, (_, i) => `<i style="--i:${i};left:${35 + ((i * 17) % 63)}%;top:${15 + ((i * 23) % 70)}%"></i>`).join('')}</div></div>`;
   }
   function install(a) {
     let owner = '',
@@ -110,13 +158,24 @@
       lastSpark = 0,
       lastLight = 0,
       sparkPoint = null;
+    let quoteBags, sceneBags;
+    let quotePeriod = '',
+      currentQuote = '',
+      clockMinute,
+      displayDay;
+    let scenePeriod = '',
+      activeMoment,
+      elapsed = 0,
+      quietFor = 0,
+      lastSceneTick;
     const animations = new Set(),
       numbers = new Map(),
       charts = new Map(),
       revealed = new Set(),
       counterJobs = new Map(),
       frames = new Set();
-    const reduced = () => !!root.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const motionPreference = '(prefers-reduced-motion: reduce)';
+    const reduced = () => !!root.matchMedia?.(motionPreference)?.matches;
     const allowed = () =>
       a.ready() &&
       !document.hidden &&
@@ -159,6 +218,89 @@
         litCard = null;
       }
     }
+    function quoteFor(when, advance = false) {
+      if (quotePeriod !== when || !currentQuote || advance) {
+        quoteBags ||= periodBags(root.WorkHubMyDayQuotes, quote => quote.opening);
+        quotePeriod = when;
+        currentQuote = quoteBags[when]?.()?.text || QUOTE_FALLBACK;
+      }
+      return currentQuote;
+    }
+    function updateQuote(hero, when, advance = false) {
+      const target = hero.querySelector('[data-mv-quote]');
+      if (target) {
+        const next = '“' + quoteFor(when, advance) + '”';
+        if (target.textContent !== next) target.textContent = next;
+      }
+    }
+    function resetScene() {
+      activeMoment = undefined;
+      elapsed = quietFor = 0;
+      lastSceneTick = undefined;
+    }
+    function updateScene(hero, when, now, enabled) {
+      if (!hero.querySelector('.mv-life-layer') || document.hidden) {
+        lastSceneTick = undefined;
+        return;
+      }
+      if (scenePeriod !== when) {
+        scenePeriod = when;
+        resetScene();
+      }
+      if (!enabled) {
+        resetScene();
+        paintMoment(hero, null, 0);
+        return;
+      }
+      if (hero.classList.contains('mv-out-of-view')) {
+        lastSceneTick = undefined;
+        return;
+      }
+      sceneBags ||= periodBags(root.WorkHubMyDayScenes, item => item.id);
+      const particles = a.settings().particles;
+      elapsed += lastSceneTick === undefined ? 0 : Math.min(1500, Math.max(0, now - lastSceneTick));
+      lastSceneTick = now;
+      if (
+        activeMoment &&
+        (elapsed >= activeMoment.duration * 1000 ||
+          (!particles && activeMoment.id === 'bank-fireflies'))
+      ) {
+        activeMoment = undefined;
+        elapsed = 0;
+        quietFor = 9000 + Math.round(Math.random() * 8500);
+      } else if (!activeMoment && elapsed >= quietFor) {
+        activeMoment = sceneBags[when]?.();
+        if (!particles && activeMoment?.id === 'bank-fireflies') activeMoment = sceneBags[when]();
+        elapsed = 0;
+      }
+      paintMoment(hero, activeMoment, elapsed);
+    }
+    function refreshHero(hero, moving) {
+      if (!hero || document.hidden) {
+        lastSceneTick = undefined;
+        return;
+      }
+      const now = new Date();
+      const hour = now.getHours();
+      const when = period(hour);
+      if (hero.dataset.mvPeriod !== when) {
+        hero.dataset.mvPeriod = when;
+        const label = hero.querySelector('[data-mv-period-name]');
+        if (label) label.textContent = PHASE_NAMES[when];
+      }
+      const minute = Math.floor(now.getTime() / 60000);
+      if (clockMinute !== minute) {
+        clockMinute = minute;
+        const time = hero.querySelector('[data-mv-time]');
+        if (time) time.textContent = timeLabel.format(now);
+        hero.dataset.mvWindows = houseLit(hour) ? 'lit' : 'off';
+        const date = hero.querySelector('[data-mv-date]');
+        if (date && displayDay !== now.toDateString()) date.textContent = dateLabel.format(now);
+        displayDay = now.toDateString();
+      }
+      if (quotePeriod !== when || !currentQuote) updateQuote(hero, when);
+      updateScene(hero, when, now.getTime(), moving);
+    }
     function sync() {
       const next = a.ready() ? a.owner() : '';
       if (owner !== next) {
@@ -167,6 +309,9 @@
         resetLight();
         owner = next;
         view = 'all';
+        quoteBags = sceneBags = undefined;
+        quotePeriod = currentQuote = '';
+        resetScene();
         page = null;
         pending = null;
         entered = false;
@@ -179,7 +324,7 @@
         observer?.disconnect();
         observer = null;
       }
-      const live = document.querySelector('.my-day-page');
+      const live = document.querySelector('.my-day-page:not(.hub-palette-preview-scenery)');
       if (!live) {
         clearEffects();
         observer?.disconnect();
@@ -188,6 +333,8 @@
         page = null;
         observedPage = null;
         entered = false;
+        quotePeriod = currentQuote = '';
+        resetScene();
         charts.clear();
         revealed.clear();
         stopCounters();
@@ -195,15 +342,10 @@
         return;
       }
       page = live;
-      const hero = page.querySelector('.mv-hero'),
-        when = period(new Date().getHours());
-      if (hero && hero.dataset.mvPeriod !== when) {
-        hero.dataset.mvPeriod = when;
-        const label = hero.querySelector('[data-mv-period-name]');
-        if (label) label.textContent = PHASE_NAMES[when];
-      }
-      const motion = allowed() ? 'flow' : 'still';
+      const moving = allowed();
+      const motion = moving ? 'flow' : 'still';
       if (page.dataset.mvMotion !== motion) page.dataset.mvMotion = motion;
+      refreshHero(page.querySelector('.mv-hero'), moving);
       if (!a.settings().celebrations && burstNode) {
         clearTimeout(effectTimer);
         burstNode.remove();
@@ -212,7 +354,7 @@
       }
       if (!a.settings().particles)
         touchLayer?.querySelectorAll('.mv-pointer-spark').forEach(el => el.remove());
-      if (!allowed()) {
+      if (!moving) {
         clearEffects();
         resetLight();
         stopCounters();
@@ -220,11 +362,20 @@
       }
     }
     function hero(data) {
-      const when = period(new Date().getHours()),
-        greeting = data.name
-          ? `A little space for ${esc(data.name)}.`
-          : 'A little space for yourself.';
-      return `<div class="mv-atmosphere" aria-hidden="true"><i></i><i></i><i></i></div><header class="hub-head md-day-intro mv-hero" data-mv-period="${when}">${scene()}<div class="mv-hero-shade"></div><div class="mv-hero-content"><div class="mv-hero-eyebrow"><span class="mv-status-orbit" aria-hidden="true"></span><span>YOUR WORKSPACE, IN BLOOM</span><span class="mv-edition">MY DAY</span></div><p class="mv-day-label">${esc(new Date(data.date + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }))} <i></i> <span data-mv-period-name>${PHASE_NAMES[when]}</span></p><h2>Your day.<br><em>A world of possibility.</em></h2><p class="mv-welcome">${greeting} Give your ideas room, find your rhythm, and let the small wins grow.</p><div class="md-hero-actions">${data.actions}</div></div><div class="mv-scene-note"><span class="mv-note-mark" aria-hidden="true">✧</span><span>SMALL STEPS. NEW PERSPECTIVES.</span></div><div class="mv-hero-metrics"><button type="button" data-md="missions" class="mv-hero-metric"><span class="mv-metric-icon" aria-hidden="true">✧</span><span><small>Today’s intention</small><strong>${Math.max(0, data.total - data.done)}<span> left</span></strong><em>${data.total ? (data.done === data.total ? 'today’s priorities complete' : 'priorities to move forward') : 'choose your priorities'}</em></span><i class="mv-metric-track" style="--mv-meter:${data.total ? (data.done / data.total) * 100 : 0}%"></i></button><button type="button" data-mv="jump" data-target="dayJourney" class="mv-hero-metric"><span class="mv-metric-icon" aria-hidden="true">◷</span><span><small>Room to make progress</small><strong>${data.activities}<span> planned</span></strong><em>activities on your calendar</em></span><span class="mv-metric-arrow" aria-hidden="true">↗</span></button><button type="button" data-mv="jump" data-target="tasks" class="mv-hero-metric"><span class="mv-metric-icon" aria-hidden="true">↗</span><span><small>One step at a time</small><strong>${data.open}<span> open</span></strong><em>tasks ready for your next step</em></span><span class="mv-metric-arrow" aria-hidden="true">↗</span></button></div></header>`;
+      const now = new Date();
+      const when = period(now.getHours());
+      const quote = quoteFor(when);
+      return `<div class="mv-atmosphere" aria-hidden="true"><i></i><i></i><i></i></div>
+        <header class="hub-head md-day-intro mv-hero" data-mv-period="${when}" data-mv-windows="${houseLit(now.getHours()) ? 'lit' : 'off'}">
+          ${scene()}<div class="mv-hero-shade"></div>
+          <div class="mv-hero-content">
+            <p class="mv-day-label"><span data-mv-date>${esc(dateLabel.format(now))}</span><i aria-hidden="true"></i><span data-mv-time>${esc(timeLabel.format(now))}</span><i aria-hidden="true"></i><span data-mv-period-name>${PHASE_NAMES[when]}</span></p>
+            <h2 class="mv-quote" data-mv-quote aria-live="polite" aria-atomic="true">“${esc(quote)}”</h2>
+            <button type="button" class="mv-next-quote" data-mv="next-quote">${quoteIcon}<span>Next quote</span></button>
+            <div class="md-hero-actions">${data.actions}</div>
+          </div>
+          <div class="mv-scene-note" aria-hidden="true" hidden></div>
+          <div class="mv-hero-metrics"><button type="button" data-md="missions" class="mv-hero-metric"><span class="mv-metric-icon" aria-hidden="true">${metricIcons.priorities}</span><span><small>Today’s intention</small><strong>${Math.max(0, data.total - data.done)}<span> left</span></strong><em>${data.total ? (data.done === data.total ? 'today’s priorities complete' : 'priorities to move forward') : 'choose your priorities'}</em></span><i class="mv-metric-track" style="--mv-meter:${data.total ? (data.done / data.total) * 100 : 0}%"></i></button><button type="button" data-mv="jump" data-target="dayJourney" class="mv-hero-metric"><span class="mv-metric-icon" aria-hidden="true">${metricIcons.schedule}</span><span><small>Room to make progress</small><strong>${data.activities}<span> planned</span></strong><em>activities on your calendar</em></span><span class="mv-metric-arrow" aria-hidden="true">${metricIcons.arrow}</span></button><button type="button" data-mv="jump" data-target="tasks" class="mv-hero-metric"><span class="mv-metric-icon" aria-hidden="true">${metricIcons.tasks}</span><span><small>One step at a time</small><strong>${data.open}<span> open</span></strong><em>tasks ready for your next step</em></span><span class="mv-metric-arrow" aria-hidden="true">${metricIcons.arrow}</span></button></div></header>`;
     }
     function toolbar() {
       return `<div class="mv-dashboard-nav"><div><span class="mv-section-kicker">A PLACE FOR GOOD WORK</span><h3>Your personal landscape</h3></div><div class="mv-view-switch" role="group" aria-label="Dashboard sections">${Object.entries(
@@ -465,6 +616,10 @@
             entries => {
               for (const entry of entries) {
                 entry.target.classList.toggle('mv-out-of-view', !entry.isIntersecting);
+                if (entry.target.classList.contains('mv-hero')) {
+                  lastSceneTick = undefined;
+                  if (entry.isIntersecting) refreshHero(entry.target, allowed());
+                }
                 if (entry.isIntersecting) {
                   animateCharts(entry.target);
                   reveal(entry.target);
@@ -685,9 +840,7 @@
     document.addEventListener('visibilitychange', () => {
       sync();
     });
-    root
-      .matchMedia?.('(prefers-reduced-motion: reduce)')
-      .addEventListener?.('change', () => sync());
+    root.matchMedia?.(motionPreference)?.addEventListener?.('change', () => sync());
     document.addEventListener('click', event => {
       const button = event.target.closest?.('.my-day-page button');
       if (button && !button.disabled && !document.body.classList.contains('hub-sorting')) {
@@ -703,6 +856,11 @@
       event.preventDefault();
       event.stopPropagation();
       if (!a.ready()) return;
+      if (el.dataset.mv === 'next-quote') {
+        const hero = el.closest('.mv-hero');
+        if (hero) updateQuote(hero, period(new Date().getHours()), true);
+        return;
+      }
       if (el.dataset.mv === 'view') {
         captureLayout();
         view = Object.hasOwn(LABELS, el.dataset.view) ? el.dataset.view : 'all';
@@ -749,5 +907,5 @@
       active: allowed,
     };
   }
-  root.WorkHubMyDayVisuals = { install, phase, period, scene };
+  root.WorkHubMyDayVisuals = { install, phase, period, scene, shuffleBag };
 })(window);
