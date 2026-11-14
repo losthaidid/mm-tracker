@@ -39,6 +39,7 @@ function fixture(t, hour = 7) {
   const view = document.getElementById('view');
   const hero = () => view.querySelector('.mv-hero');
   const render = () => {
+    ui.sync();
     view.innerHTML = `<section class="my-day-page">${ui.hero({
       done: 0,
       total: 0,
@@ -59,8 +60,8 @@ function fixture(t, hour = 7) {
     window, document, ui, view, prefs, settings, media, render, hero, moveTime,
     quote: () => hero().querySelector('.mv-quote').textContent.slice(1, -1),
     moment: () => hero().querySelector('.mv-life-layer').dataset.moment,
-    setHour(h) {
-      clock = new RealDate(2026, 10, 14, h, 0).getTime();
+    setHour(h, day = 14, minute = 0) {
+      clock = new RealDate(2026, 10, day, h, minute).getTime();
       ui.sync();
     },
   };
@@ -89,7 +90,11 @@ test('My Day quote stays through a rerender, advances on demand and on returning
   const x = fixture(t);
   const before = x.quote();
   const next = x.hero().querySelector('[data-mv="next-quote"]');
-  assert.ok(x.window.WorkHubMyDayQuotes.morning.some(quote => quote.text === before));
+  const original = x.window.WorkHubMyDayQuotes.morning.find(quote => quote.text === before);
+  assert.ok(original);
+  assert.equal(x.hero().querySelector('.mv-quote > span').textContent, '“' + original.opening);
+  assert.equal(x.hero().querySelector('.mv-quote > em').textContent, original.text.slice(original.opening.length) + '”');
+  assert.equal(x.hero().querySelector('.mv-quote').getAttribute('aria-live'), 'polite');
   next.focus();
   next.click();
   assert.notEqual(x.quote(), before);
@@ -108,6 +113,75 @@ test('My Day quote stays through a rerender, advances on demand and on returning
     assert.ok(x.window.WorkHubMyDayQuotes[period].some(quote => quote.text === x.quote()));
   }
   assert.equal(x.window.localStorage.length, 0);
+});
+
+test('My Day moon and star field hold steady through midnight, visits and quote changes', t => {
+  const x = fixture(t, 22);
+  const sky = () => x.hero().querySelector('.mv-stars').innerHTML;
+  const phase = () => x.hero().dataset.mvMoon;
+  const firstField = sky();
+  const firstPhase = phase();
+  assert.ok(x.hero().querySelectorAll('.mv-stars circle').length > 25);
+  x.setHour(1, 15);
+  x.hero().querySelector('[data-mv="next-quote"]').click();
+  assert.equal(sky(), firstField);
+  assert.equal(phase(), firstPhase);
+  x.view.replaceChildren();
+  x.ui.sync();
+  x.render();
+  assert.equal(sky(), firstField);
+  assert.equal(phase(), firstPhase);
+
+  const phases = new Set([phase()]);
+  const outlines = new Set([x.hero().querySelector('[data-mv-moon-outline]').getAttribute('d')]);
+  for (let day = 15; day <= 21; day++) {
+    x.setHour(14, day);
+    assert.equal(sky(), '');
+    x.setHour(22, day);
+    assert.notEqual(sky(), firstField);
+    if (day <= 20) {
+      phases.add(phase());
+      outlines.add(x.hero().querySelector('[data-mv-moon-outline]').getAttribute('d'));
+    } else {
+      assert.equal(phases.size, 7);
+      assert.equal(outlines.size, 7);
+      assert.ok(phases.has('full') && phases.has('waxing-crescent') && phases.has('first-quarter'));
+    }
+  }
+});
+
+test('My Day sun lowers during the afternoon and daytime weather returns to clear', t => {
+  const x = fixture(t, 13);
+  const position = () => x.hero().querySelector('.mv-sun-position').getAttribute('transform').match(/[0-9.]+/g).map(Number);
+  const noon = position();
+  x.setHour(15);
+  const afternoon = position();
+  x.setHour(15, 14, 1);
+  assert.ok(position()[0] > afternoon[0]);
+  x.setHour(18);
+  const evening = position();
+  assert.ok(noon[0] < afternoon[0] && afternoon[0] < evening[0]);
+  assert.ok(noon[1] < afternoon[1] && afternoon[1] < evening[1]);
+
+  const weather = () => x.hero().dataset.mvWeather;
+  assert.equal(weather(), 'clear');
+  x.window.Math.random = () => 0.6;
+  x.moveTime(33);
+  assert.equal(weather(), 'cloud');
+  x.moveTime(15);
+  assert.equal(weather(), 'clear');
+  x.window.Math.random = () => 0.1;
+  x.moveTime(57);
+  assert.equal(weather(), 'rain');
+  x.media.matches = true;
+  x.ui.sync();
+  assert.equal(weather(), 'clear');
+  x.moveTime(90);
+  assert.equal(weather(), 'clear');
+  x.media.matches = false;
+  x.setHour(22);
+  x.moveTime(90);
+  assert.equal(weather(), 'clear');
 });
 
 test('My Day uses a full shuffle before repeating and prevents a repeat across cycles', t => {

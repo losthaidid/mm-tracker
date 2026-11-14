@@ -129,5 +129,5 @@ test('My Day scenery uses fixed time-of-day colours and takes its frame from the
   assert.match(sheet.textContent, /border: 2px solid var\(--hub-accent/);
   assert.equal(document.querySelector('#mvSky stop').getAttribute('stop-color'), 'var(--mv-sky-top)');
   assert.equal(document.querySelector('#mvRiver stop:last-child').getAttribute('stop-color'), 'var(--mv-river-deep)');
-  assert.equal(document.querySelector('.mv-celestial').getAttribute('fill'), 'var(--mv-sun)');
+  assert.equal(document.querySelector('.mv-sun-light circle:last-child').getAttribute('fill'), 'var(--mv-sun)');
 });
