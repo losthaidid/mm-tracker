@@ -370,7 +370,7 @@
           ${scene()}<div class="mv-hero-shade"></div>
           <div class="mv-hero-content">
             <p class="mv-day-label"><span data-mv-date>${esc(dateLabel.format(now))}</span><i aria-hidden="true"></i><span data-mv-time>${esc(timeLabel.format(now))}</span><i aria-hidden="true"></i><span data-mv-period-name>${PHASE_NAMES[when]}</span></p>
-            <h2 class="mv-quote" data-mv-quote aria-live="polite" aria-atomic="true">“${esc(quote)}”</h2>
+            <h2 class="mv-quote" aria-live="polite" aria-atomic="true"><span class="mv-quote-ink" data-mv-quote>“${esc(quote)}”</span></h2>
             <button type="button" class="mv-next-quote" data-mv="next-quote">${quoteIcon}<span>Next quote</span></button>
             <div class="md-hero-actions">${data.actions}</div>
           </div>

@@ -1,7 +1,7 @@
 /* My Day's fixed landscape palettes vary with the local time. */
 @font-face {
-  font-family: 'Instrument Serif';
-  src: url('./vendor/instrument-serif/InstrumentSerif-Regular.woff2') format('woff2');
+  font-family: 'DM Serif Text';
+  src: url('./vendor/dm-serif-text/DMSerifText-Regular.woff2') format('woff2');
   font-style: normal;
   font-weight: 400;
   font-display: swap;
@@ -252,14 +252,37 @@
 .my-day-page .mv-hero h2.mv-quote {
   color: var(--hub-scenic-text);
   font:
-    400 clamp(36px, 4.1vw, 65px) / 1.065 'Instrument Serif',
+    400 clamp(36px, 3.45vw, 56px) / 1.14 'DM Serif Text',
     Georgia,
     serif;
-  letter-spacing: -0.022em;
+  letter-spacing: -0.026em;
   margin: 0 0 15px;
-  max-width: 20ch;
+  max-width: 22ch;
   text-wrap: balance;
   text-shadow: 0 2px 15px var(--mv-scrim);
+}
+@media (forced-colors: none) and (prefers-contrast: no-preference) {
+  @supports ((background-clip: text) or (-webkit-background-clip: text)) {
+    .my-day-page .mv-hero h2.mv-quote {
+      filter: drop-shadow(0 2px 3px #102322b3);
+      text-shadow: none;
+    }
+    .mv-quote-ink {
+      background-image: linear-gradient(
+        180deg,
+        #fffef9 16%,
+        #fff9ec 44%,
+        #e9d7b3 51%,
+        #fff7df 57%,
+        #e5cc9d 92%
+      );
+      -webkit-box-decoration-break: clone;
+      box-decoration-break: clone;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+  }
 }
 .mv-next-quote {
   display: inline-flex;
@@ -1269,7 +1292,7 @@ body[data-hub-theme='dark'] .mv-widget-kicker {
     min-height: 530px;
   }
   .my-day-page .mv-hero h2.mv-quote {
-    font-size: clamp(36px, 5vw, 52px);
+    font-size: clamp(33px, 4.1vw, 46px);
   }
   .mv-hero-content {
     max-width: 530px;
@@ -1313,8 +1336,8 @@ body[data-hub-theme='dark'] .mv-widget-kicker {
     width: 100%;
   }
   .my-day-page .mv-hero h2.mv-quote {
-    font-size: clamp(31px, 8.5vw, 43px);
-    line-height: 1.08;
+    font-size: clamp(28px, 7.3vw, 39px);
+    line-height: 1.16;
     max-width: 100%;
   }
   .my-day-page .mv-hero .mv-day-label {
