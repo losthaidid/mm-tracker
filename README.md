@@ -128,7 +128,7 @@ The existing Tickets, Tasks, Schedule and Projects remain available alongside **
 
 All tabs share the same warm, colourful visual system. A laptop uses a workspace sidebar; a phone uses compact scrolling navigation, stacked panels and touch-sized controls. Existing forms, reports and private records use the same workflows.
 
-Choose **Settings → Edit header** to maintain the title and subtitle. The title also names the browser tab. These small settings save with the existing private account and are included in JSON backups. **Settings → Appearance & motion** opens Theme Studio, with palette swatches, a live preview and an explicit Save theme action. Changing the custom colour selects the Custom palette automatically.
+Choose **Settings → Edit header** to maintain the title and subtitle. The title also names the browser tab. These small settings save with the existing private account and are included in JSON backups. **Settings → Website design** previews the layout and colour palette together, including the header, navigation, buttons and My Day scenery. **Apply** saves your choices, and **Cancel** returns to the appearance you had when you opened the chooser. **Settings → Appearance & motion** opens Theme Studio for colours, typography, backgrounds and motion. Changing a custom colour there selects the Custom palette automatically.
 
 Theme studio also includes Momo's **24 outfit styles, 12 colour palettes and 33 accessories**, optional daily surprises, twelve quiet hobbies, and **My background pictures** for a device-only gallery. **Display rendering → Smooth** reduces large GPU layers on TVs while keeping the landscape moving. See [the wardrobe, pictures and display guide](docs/COMPANION-WARDROBE.md).
 
@@ -162,7 +162,7 @@ If recorded time overlaps an existing booking, the timer stays paused and preser
 
 Work sessions opens on **Active**, with **Archived** and **All** views. Archive a finished session to tidy the active list, or restore it whenever needed. Archive state syncs between devices. **Delete** asks for confirmation and offers **Undo deletion** until the next deletion or account change. Archiving or deleting a session preserves its existing Schedule and Project activities. Archived sessions remain in Excel's time history, marked in the **Record** column; deleted sessions leave that history.
 
-The Tickets tab starts with **Pending** selected. Choose **All statuses** or another status whenever needed; the selected filter remains while navigating within the current page.
+The Tickets tab starts with **Pending** selected. **Object bookmarks · Pending** appears with that status and hides when you select **All statuses** or another status. The selected filter is remembered while navigating within the workspace.
 
 ## Automatic device syncing
 

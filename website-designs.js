@@ -89,6 +89,49 @@
       '</strong></small></div><button type="button" data-website-design-open>Choose website design</button></section>'
     );
   }
+  function colourPreview(p, sceneId, design = p.design) {
+    const when = root.WorkHubMyDayVisuals?.period(new Date().getHours());
+    return `<div class="hub-palette-preview" data-preview-design="${choice(design)}" role="img" aria-label="Header, navigation, buttons and My Day scenery">
+      <div class="hub-palette-preview-header">
+        <span class="hub-palette-preview-icon" aria-hidden="true">✦</span>
+        <strong>${esc(p.workspace || 'My WorkHub')}</strong><span class="hub-palette-preview-settings">Settings</span>
+      </div>
+      <div class="hub-palette-preview-body">
+        <div class="hub-palette-preview-nav"><strong>My Day</strong><span>Tickets</span><span>Projects</span></div>
+        <div class="hub-palette-preview-page">
+          <div class="my-day-page hub-palette-preview-scenery">
+            <div class="md-day-intro mv-hero" data-mv-period="${when || 'day'}">
+              ${root.WorkHubMyDayVisuals?.scene(sceneId) || ''}
+              <div class="mv-hero-shade"></div><span class="hub-palette-preview-scene-label">My Day</span>
+            </div>
+          </div>
+          <div class="hub-palette-preview-actions"><span>Quick add</span><span>Reminders</span></div>
+        </div>
+      </div>
+    </div>`;
+  }
+  const themeColours = ({ theme, accent, colors }) => ({ theme, accent, colors });
+  const sameColours = (left, right) => JSON.stringify(left) === JSON.stringify(right);
+
+  function colourControls(p) {
+    const { THEMES } = root.WorkHubAppearance;
+    const options = [
+      ...Object.entries(THEMES).map(([id, [name]]) => [id, name]),
+      ['custom', 'Custom colours'],
+    ];
+    const fields = [
+      ['accent', 'Accent', p.accent],
+      ['page', 'Page', p.colors.page],
+      ['surface', 'Cards', p.colors.surface],
+      ['text', 'Text', p.colors.text],
+      ['secondary', 'Secondary', p.colors.secondary],
+    ];
+    return `<div class="wd-colour-options"><label class="wd-colour-preset">Colour palette
+      <select name="websitePalette">${options.map(([id, name]) => `<option value="${id}"${p.theme === id ? ' selected' : ''}>${name}</option>`).join('')}</select>
+      </label><div class="wd-custom-colours" data-wd-custom-colours${p.theme === 'custom' ? '' : ' hidden'}>
+        ${fields.map(([id, name, value]) => `<label>${name}<input type="color" data-wd-colour="${id}" value="${esc(value)}"></label>`).join('')}
+      </div></div>`;
+  }
   function install(a) {
     const $ = id => document.getElementById(id);
     const media = root.matchMedia?.('(max-width: 900px)');
@@ -98,6 +141,9 @@
       dialog = null,
       draft = 'current',
       base = 'current',
+      draftColours = null,
+      baseColours = null,
+      savedColours = null,
       focus = null,
       saving = false,
       compactCollapsed = false,
@@ -125,14 +171,57 @@
     const context = () => [a.ready() ? a.owner() : '', a.generation()];
     const current = () => choice(a.prefs()?.design);
     const valid = () => a.ready() && owner === a.owner() && generation === a.generation();
+    const canEditColours = () => a.canEdit() && a.canEditColours?.();
+    const colourChanged = () => !!draftColours && !sameColours(draftColours, baseColours);
     function close(restoreFocus = true) {
       const old = dialog;
       dialog = null;
+      if (colourChanged()) a.refreshColours();
+      draftColours = baseColours = savedColours = null;
       old?.close();
       old?.remove();
       apply();
       if (restoreFocus && focus?.isConnected) focus.focus?.({ preventScroll: true });
       focus = null;
+    }
+    function paintChooser() {
+      const changed = draft !== base || colourChanged();
+      dialog.querySelector('[type="submit"]').disabled =
+        !a.canEdit() || (colourChanged() && !canEditColours());
+      const palettes = dialog.querySelector('.wd-colour-options');
+      if (palettes)
+        for (const control of palettes.querySelectorAll('select, input'))
+          control.disabled = !canEditColours();
+      const status = $('wdChooserStatus'),
+        preview = dialog.querySelector('.hub-palette-preview'),
+        message = !a.canEdit()
+          ? 'Your account can preview the layout.'
+          : changed
+            ? `Previewing ${DESIGNS[draft].name} · apply to save.`
+            : 'Saved layout · ' + DESIGNS[base].name;
+      if (status.textContent !== message) status.textContent = message;
+      if (preview) preview.dataset.previewDesign = draft;
+    }
+    function previewColours(event) {
+      const field = event.target;
+      if (field.name !== 'websitePalette' && !field.hasAttribute('data-wd-colour')) return;
+      if (!valid() || !canEditColours()) return;
+      if (field.name === 'websitePalette') {
+        const theme = field.value;
+        if (theme !== 'custom' && !Object.hasOwn(root.WorkHubAppearance.THEMES, theme)) return;
+        draftColours = { ...draftColours, theme };
+      } else {
+        const colour = field.dataset.wdColour;
+        if (!/^#[0-9a-f]{6}$/i.test(field.value)) return;
+        draftColours =
+          colour === 'accent'
+            ? { ...draftColours, accent: field.value }
+            : { ...draftColours, colors: { ...draftColours.colors, [colour]: field.value } };
+      }
+      dialog.querySelector('[data-wd-custom-colours]').hidden = draftColours.theme !== 'custom';
+      if (colourChanged()) a.previewColours(draftColours);
+      else a.refreshColours();
+      paintChooser();
     }
     function apply() {
       const id = a.ready() ? (dialog ? draft : current()) : 'current';
@@ -319,7 +408,14 @@
         generation = epoch;
         compactCollapsed = false;
         close(false);
-      } else if (dialog && !saving && current() !== base) close(false);
+      } else if (
+        dialog &&
+        !saving &&
+        (current() !== base ||
+          (savedColours &&
+            (!canEditColours() || !sameColours(savedColours, themeColours(a.prefs())))))
+      )
+        close(false);
       const host = $('hubSettingsAppearance');
       if (host && !$('websiteDesignButton')) {
         const button = document.createElement('button');
@@ -350,10 +446,8 @@
           '<div><span class="wd-context-eyebrow">YOUR WORKSPACE / <span data-wd-active-label></span></span><strong id="wdSectionTitle"></strong></div><button type="button" data-website-design-open>Change design</button>';
         page.prepend(bar);
       }
-      if (dialog) {
-        const submit = dialog.querySelector('[type="submit"]');
-        submit.disabled = !a.canEdit();
-      }
+      if (dialog) paintChooser();
+      if (colourChanged()) a.previewColours(draftColours);
       apply();
     }
     function open() {
@@ -367,6 +461,12 @@
       if (settings) settings.open = false;
       base = current();
       draft = base;
+      // A palette from Theme Studio may already be previewed behind this chooser.
+      // Restore that appearance on cancel and only save colours explicitly edited here.
+      if (canEditColours()) {
+        savedColours = themeColours(a.prefs());
+        draftColours = baseColours = themeColours(a.visibleAppearance());
+      }
       focus = document.activeElement;
       dialog = document.createElement('dialog');
       dialog.id = 'websiteDesignChooser';
@@ -374,7 +474,11 @@
       dialog.dataset.accessFeature = 'workspace';
       dialog.setAttribute('aria-labelledby', 'wdChooserTitle');
       dialog.innerHTML =
-        '<form><header class="wd-chooser-head"><div><span class="hub-kicker">A SPACE THAT FITS YOUR DAY</span><h2 id="wdChooserTitle">Make room for a different view.</h2><p>Seven designs. The same work, always with you.</p></div><button type="button" data-wd-close aria-label="Close website design preview">×</button></header><fieldset class="wd-design-options"><legend>Choose your website design</legend>' +
+        '<form><header class="wd-chooser-head"><h2 id="wdChooserTitle">Website design</h2><button type="button" data-wd-close aria-label="Close website design preview">×</button></header>' +
+        (draftColours
+          ? `<section class="wd-palette-section" aria-label="Live colour preview">${colourControls(draftColours)}${colourPreview(a.visibleAppearance(), 'wdPalette', draft)}</section>`
+          : '') +
+        '<fieldset class="wd-design-options"><legend>Choose your website design</legend>' +
         Object.entries(DESIGNS)
           .map(
             ([id, d]) =>
@@ -395,13 +499,7 @@
               '</em></span></label>'
           )
           .join('') +
-        '</fieldset><p class="wd-preview-note">Choosing a card previews the layout immediately. Your colour theme stays with you. Use this design to save it to your account.</p><footer class="wd-chooser-foot"><span role="status" id="wdChooserStatus">' +
-        (a.canEdit()
-          ? 'Your saved design is ' + DESIGNS[base].name + '.'
-          : 'Preview is available. Your account cannot save appearance changes.') +
-        '</span><div><button type="button" data-wd-close>Cancel preview</button><button type="submit" class="primary"' +
-        (!a.canEdit() ? ' disabled' : '') +
-        '>Use this design</button></div></footer></form>';
+        '</fieldset><footer class="wd-chooser-foot"><span role="status" id="wdChooserStatus"></span><div><button type="button" data-wd-close>Cancel</button><button type="submit" class="primary">Apply</button></div></footer></form>';
       (document.fullscreenElement || document.body).append(dialog);
       dialog.addEventListener('keydown', e => e.stopPropagation());
       dialog.addEventListener('cancel', e => {
@@ -413,16 +511,19 @@
       });
       for (const button of dialog.querySelectorAll('[data-wd-close]'))
         button.onclick = () => close();
+      dialog.addEventListener('input', previewColours);
       dialog.addEventListener('change', e => {
-        if (e.target.name !== 'websiteDesign') return;
+        if (e.target.name !== 'websiteDesign') {
+          previewColours(e);
+          return;
+        }
         if (!valid()) {
           close(false);
           return;
         }
         draft = choice(e.target.value);
         apply();
-        $('wdChooserStatus').textContent =
-          'Previewing ' + DESIGNS[draft].name + ' · your saved design is unchanged.';
+        paintChooser();
       });
       dialog.querySelector('form').addEventListener('submit', e => {
         e.preventDefault();
@@ -430,8 +531,11 @@
           if (!valid() || current() !== base)
             throw Error('Your account or design changed. Open the chooser again.');
           if (!a.canEdit()) throw Error('Your account does not allow appearance changes.');
-          const selected = draft;
-          if (selected === base) {
+          const selected = draft,
+            colours = colourChanged() ? draftColours : null;
+          if (colours && (!canEditColours() || !sameColours(savedColours, themeColours(a.prefs()))))
+            throw Error('Your saved colours or permissions changed. Open the chooser again.');
+          if (selected === base && !colours) {
             close();
             return;
           }
@@ -439,15 +543,22 @@
           let ok;
           try {
             ok = a.mutate(d => {
-              d.workhub.preferences.design = selected;
+              const p = d.workhub.preferences;
+              if (selected !== base) p.design = selected;
+              if (colours) Object.assign(p, colours);
             });
           } finally {
             saving = false;
           }
           if (ok) {
+            if (colours) a.coloursSaved(colours);
             close();
             mount();
-            a.tell(DESIGNS[selected].name + ' is now your website design.');
+            a.tell(
+              colours
+                ? 'Your appearance is saved.'
+                : DESIGNS[selected].name + ' is now your website design.'
+            );
           } else {
             if ($('wdChooserStatus'))
               $('wdChooserStatus').textContent =
@@ -458,6 +569,7 @@
           a.tell(error.message, true);
         }
       });
+      paintChooser();
       dialog.showModal();
       dialog.querySelector('[data-wd-close]').focus({ preventScroll: true });
     }
@@ -509,5 +621,5 @@
       }),
     };
   }
-  root.WorkHubWebsiteDesigns = { DESIGNS, choice, launcher, install };
+  root.WorkHubWebsiteDesigns = { DESIGNS, choice, launcher, colourPreview, install };
 })(globalThis);

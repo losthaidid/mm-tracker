@@ -13,8 +13,7 @@ body.rest-room-open {
   height: 100dvh;
   max-width: none;
   max-height: none;
-  overflow: auto;
-  overflow-x: hidden;
+  overflow: hidden;
   overscroll-behavior: contain;
   color: #e7efe2;
   --rest-background:
@@ -35,12 +34,39 @@ body.rest-room-open {
   display: none !important;
 }
 .rest-room-shell {
-  min-height: 100%;
+  position: relative;
+  height: 100%;
   max-width: 1440px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   padding: 28px 48px 20px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.rest-room-shell:focus {
+  outline: none;
+}
+.rest-room [data-rest-chrome] {
+  transition:
+    opacity 260ms ease,
+    visibility 260ms ease;
+}
+.rest-room[data-controls='hidden'] [data-rest-chrome] {
+  opacity: 0;
+  visibility: hidden;
+}
+.rest-room button[data-rest='show-controls'] {
+  position: absolute;
+  z-index: 3;
+  /* Keep a visible way back to the controls, including on short touch screens. */
+  inset-block-end: max(12px, env(safe-area-inset-bottom));
+  inset-inline-end: max(14px, env(safe-area-inset-right));
+  background: #142c2d;
+  border-radius: 999px;
+}
+.rest-room button[data-rest='show-controls']:hover {
+  background: #2a4846;
 }
 .rest-room-top {
   background: transparent;
@@ -328,12 +354,6 @@ body.rest-room-open {
   font-weight: 600;
   color: #d7e4cf;
 }
-.rest-music-label small {
-  display: block;
-  font-size: 10px;
-  color: #a2bda9;
-  margin-top: 3px;
-}
 .rest-music-waves {
   display: flex;
   align-items: center;
@@ -405,15 +425,6 @@ body.rest-room-open {
 .rest-audio-panel > [data-rest='retry'] {
   grid-column: 1 / 3;
   justify-self: start;
-}
-.rest-room-footer {
-  display: flex;
-  justify-content: space-between;
-  gap: 15px;
-  margin-top: 20px;
-  color: #8fae9c;
-  font-size: 8px;
-  letter-spacing: 0.12em;
 }
 .rest-room[data-motion='flow']:not([data-phase='paused']) .rest-globe {
   animation: rest-breathe 4.5s ease-in-out infinite;
@@ -699,19 +710,8 @@ body.rest-room-open {
   .rest-music-label strong {
     font-size: 11px;
   }
-  .rest-music-label small {
-    font-size: 9px;
-  }
   .rest-audio-panel > p {
     font-size: 10px;
-  }
-  .rest-room-footer {
-    font-size: 7px;
-    line-height: 1.7;
-    letter-spacing: 0.06em;
-  }
-  .rest-room-footer > span:first-child {
-    max-width: 160px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -808,9 +808,7 @@ body.hub-present .rest-room * {
     .rest-live-status,
     .rest-fullscreen-status,
     label,
-    .rest-music-label small,
-    .rest-audio-panel > p,
-    .rest-room-footer
+    .rest-audio-panel > p
   ) {
   color: var(--obs-muted);
 }
@@ -1008,6 +1006,80 @@ body.hub-present .rest-room * {
   line-height: 1.7;
   color: #bdcfc2;
   margin: 12px 0 0;
+}
+.rest-room[data-controls='hidden'] .rest-room-shell {
+  overflow: hidden;
+}
+.rest-room[data-controls='hidden'] .rest-timing {
+  position: fixed;
+  z-index: 2;
+  inset-inline-start: max(20px, env(safe-area-inset-left));
+  inset-block-start: max(20px, env(safe-area-inset-top));
+  min-width: 102px;
+  padding: 8px 14px;
+  border: 1px solid #dce8c83b;
+  border-radius: 12px;
+  background: #102728ed;
+  pointer-events: none;
+}
+.rest-room[data-controls='hidden'] .rest-countdown {
+  margin: 0 0 5px;
+}
+.rest-room[data-controls='hidden'] .rest-countdown > span {
+  font-size: 27px;
+}
+.rest-room[data-controls='hidden'] .rest-progress {
+  margin: 0;
+}
+.rest-room[data-controls='hidden'] [data-rest-clock-label] {
+  display: none;
+}
+.rest-room[data-controls='hidden'] .rest-room-main {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  pointer-events: none;
+}
+.rest-room[data-controls='hidden'] .rest-copy {
+  position: static;
+  display: contents;
+}
+.rest-room[data-controls='hidden'] .rest-copy > [data-rest-chrome] {
+  position: absolute;
+}
+.rest-room[data-controls='hidden'] .rest-landscape {
+  min-height: 0;
+  margin: 0;
+}
+.rest-room[data-controls='hidden'] .rest-globe {
+  width: min(76vw, 62dvh, 600px);
+}
+.rest-room[data-scenery='observatory'][data-controls='hidden'] .rest-timing {
+  background: #22182fed;
+  border-color: var(--obs-border);
+}
+.rest-room[data-scenery='observatory'][data-controls='hidden'] .observatory-art {
+  background:
+    linear-gradient(0deg, var(--obs-night), transparent 24%),
+    linear-gradient(90deg, #100b1d99, #100b1d19 55%, #100b1d00),
+    url('./assets/moonlit-observatory.webp') right center / cover no-repeat;
+}
+.rest-room[data-scenery='observatory'] button[data-rest='show-controls'] {
+  background: #22182f;
+}
+.rest-room[data-scenery='observatory'] button[data-rest='show-controls']:hover {
+  background: #39294a;
+}
+@media (max-width: 700px) {
+  .rest-room[data-scenery='observatory'][data-controls='hidden'] .observatory-art {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    height: auto;
+    margin: 0;
+  }
 }
 @media (max-width: 640px) {
   .rest-room-top-actions {
