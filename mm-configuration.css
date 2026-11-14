@@ -1,0 +1,421 @@
+/* Scoped to Process Hub's MM Configuration tab and its shared dialog. */
+.wp-tabs {
+  flex-wrap: wrap;
+}
+
+.mmc-room,
+.mmc-editor {
+  color: var(--hub-text);
+  font-family: var(--hub-font);
+}
+.mmc-room {
+  --mmc-border: var(--hub-border);
+  --mmc-tint: color-mix(in srgb, var(--hub-link) 8%, var(--hub-surface));
+  --mmc-subtle: var(--hub-surface-soft);
+  --mmc-gap: clamp(14px, 2vw, 24px);
+}
+.mmc-room h2,
+.mmc-room h3,
+.mmc-room h4,
+.mmc-room p {
+  margin: 0;
+}
+.mmc-room p,
+.mmc-room small,
+.mmc-editor > p {
+  color: var(--hub-muted);
+  line-height: 1.55;
+}
+.mmc-hero,
+.mmc-result-heading,
+.mmc-maintain-head,
+.mmc-stage-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+}
+.mmc-hero {
+  align-items: flex-end;
+  margin: 10px 0 var(--mmc-gap);
+  color: var(--hub-text);
+  background: linear-gradient(110deg, var(--hub-surface), var(--mmc-tint));
+  border: 1px solid var(--mmc-border);
+  border-radius: 14px;
+  padding: clamp(15px, 2.2vw, 24px);
+}
+.mmc-room .mmc-edition {
+  margin-top: 8px;
+  font-size: 0.82rem;
+}
+.mmc-hero h2 {
+  font-size: clamp(26px, 3vw, 36px);
+  letter-spacing: -0.035em;
+  line-height: 1.12;
+  margin-bottom: 7px;
+}
+.mmc-view-controls,
+.mmc-config-tabs,
+.mmc-form-actions,
+.mmc-row-actions,
+.mmc-references,
+.mmc-sources {
+  display: flex;
+  gap: 7px 9px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.mmc-room button[aria-pressed='true'],
+.mmc-room button[aria-current='step'] {
+  border-color: color-mix(in srgb, var(--hub-link) 52%, var(--mmc-border));
+  background: var(--mmc-tint);
+  color: var(--hub-link);
+}
+.mmc-layout {
+  display: grid;
+  grid-template-columns: minmax(255px, 320px) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--mmc-gap);
+}
+.mmc-layout > * {
+  min-width: 0;
+}
+.mmc-panel {
+  background: var(--hub-surface);
+  border: 1px solid var(--mmc-border);
+  border-radius: 14px;
+  padding: clamp(14px, 1.7vw, 23px);
+  min-width: 0;
+}
+.mmc-controls > label {
+  margin-top: 10px;
+}
+.mmc-controls fieldset {
+  border: 0;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+}
+.mmc-controls label,
+.mmc-editor label,
+.mmc-search {
+  color: var(--hub-text);
+  display: grid;
+  gap: 5px;
+  font-size: 0.83rem;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.mmc-controls input:not([type='checkbox']),
+.mmc-controls select,
+.mmc-editor input:not([type='checkbox']),
+.mmc-editor select,
+.mmc-editor textarea,
+.mmc-search input {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+.mmc-controls fieldset:disabled {
+  opacity: 0.7;
+}
+.mmc-controls .mmc-check,
+.mmc-editor .mmc-check {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  font-weight: 500;
+  gap: 7px;
+}
+.mmc-check input {
+  margin: 3px 0 0;
+}
+.mmc-input-details,
+.mmc-where {
+  border-top: 1px solid var(--mmc-border);
+  padding-top: 9px;
+  margin-top: 12px;
+}
+.mmc-input-details summary,
+.mmc-where summary {
+  cursor: pointer;
+  color: var(--hub-link);
+  font-weight: 700;
+  font-size: 0.87rem;
+}
+.mmc-advanced {
+  margin-top: 12px;
+}
+.mmc-form-actions {
+  margin-top: 15px;
+}
+.mmc-result-heading p {
+  margin-top: 5px;
+  font-size: 0.84rem;
+}
+.mmc-status {
+  white-space: nowrap;
+  border: 1px solid var(--mmc-border);
+  border-radius: 99px;
+  padding: 5px 10px;
+  background: var(--mmc-tint);
+  color: var(--hub-link);
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+.mmc-status[data-status='blocked'] {
+  background: var(--mmc-subtle);
+  color: var(--hub-text);
+}
+.mmc-determination,
+.mmc-effects {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  padding: 0;
+  margin: 16px 0;
+  overflow: hidden;
+  border: 1px solid var(--mmc-border);
+  border-radius: 10px;
+  background: var(--mmc-border);
+}
+.mmc-determination > div,
+.mmc-effects > div {
+  min-width: 0;
+  background: var(--hub-surface);
+  padding: 10px;
+  overflow-wrap: anywhere;
+}
+.mmc-determination strong,
+.mmc-effects dt {
+  display: block;
+  color: var(--hub-muted);
+  font-size: 0.76rem;
+  font-weight: 650;
+  margin-bottom: 3px;
+}
+.mmc-determination span,
+.mmc-effects dd {
+  display: block;
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  font-weight: 650;
+}
+.mmc-determination small {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.76rem;
+}
+.mmc-steps {
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+}
+.mmc-steps li {
+  display: flex;
+  min-width: 0;
+}
+.mmc-steps button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 9px;
+  text-align: left;
+  font-size: 0.83rem;
+}
+.mmc-step-dot {
+  display: block;
+  flex: 0 0 6px;
+  height: 6px;
+  border: 1px solid var(--hub-link);
+  border-radius: 100%;
+}
+.mmc-step-dot[data-status='completed'] {
+  background: var(--hub-link);
+}
+.mmc-stage {
+  padding-top: 13px;
+  border-top: 1px solid var(--mmc-border);
+  animation: mmc-stage-in 170ms ease-out;
+}
+@keyframes mmc-stage-in {
+  from {
+    opacity: 0.82;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.mmc-stage-head {
+  margin-bottom: 5px;
+}
+.mmc-stage-head h4 {
+  font-size: 1.05rem;
+}
+.mmc-stage-head span {
+  font-size: 0.84rem;
+  color: var(--hub-muted);
+}
+.mmc-notes {
+  color: var(--hub-muted);
+  margin: 12px 0;
+  padding-left: 18px;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+.mmc-room .mmc-note {
+  margin-top: 7px;
+  font-size: 0.84rem;
+}
+.mmc-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--mmc-border);
+  border-radius: 10px;
+}
+.mmc-posting {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+  margin: 0;
+}
+.mmc-posting caption,
+.mmc-posting td,
+.mmc-posting th {
+  padding: 8px 10px;
+  text-align: left;
+}
+.mmc-posting caption {
+  background: var(--mmc-tint);
+  font-weight: 700;
+}
+.mmc-posting th,
+.mmc-posting td {
+  border-bottom: 1px solid var(--mmc-border);
+  white-space: normal;
+}
+.mmc-posting tr:last-child td {
+  border-bottom: 0;
+}
+.mmc-posting small {
+  display: block;
+  margin-top: 3px;
+}
+.mmc-posting .mmc-number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.mmc-checkpoint {
+  padding: 9px 12px;
+  border-left: 2px solid var(--mmc-border);
+  margin: 9px 0 0;
+}
+.mmc-checkpoint h4 {
+  font-size: 0.9rem;
+  margin-bottom: 3px;
+}
+.mmc-checkpoint p,
+.mmc-checkpoint a,
+.mmc-references code,
+.mmc-room .mmc-footer,
+.mmc-config-rows p {
+  font-size: 0.82rem;
+}
+.mmc-checkpoint .mmc-location,
+.mmc-references,
+.mmc-sources,
+.mmc-room .mmc-footer {
+  margin-top: 8px;
+}
+.mmc-room .mmc-code {
+  color: var(--hub-link);
+  font:
+    0.79rem ui-monospace,
+    monospace;
+  padding: 4px 7px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.mmc-config-tabs {
+  margin: 15px 0;
+}
+.mmc-search {
+  max-width: 420px;
+}
+.mmc-config-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mmc-config-rows > li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  padding: 11px 0;
+  border-top: 1px solid var(--mmc-border);
+  overflow-wrap: anywhere;
+}
+.mmc-row-actions {
+  justify-content: flex-end;
+}
+.mmc-row-actions > span {
+  font-size: 0.8rem;
+  color: var(--hub-muted);
+}
+.mmc-editor > p {
+  margin-top: 0;
+}
+.mmc-editor-grid {
+  display: grid;
+  gap: 0 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.mmc-delete {
+  margin-right: auto;
+}
+@media (max-width: 850px) {
+  .mmc-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .mmc-controls fieldset,
+  .mmc-advanced {
+    display: grid;
+    align-items: start;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 10px;
+  }
+  .mmc-input-details,
+  .mmc-form-actions {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 480px) {
+  .mmc-editor-grid,
+  .mmc-controls fieldset,
+  .mmc-advanced,
+  .mmc-determination,
+  .mmc-effects {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .mmc-posting td,
+  .mmc-posting th {
+    padding: 7px 5px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mmc-stage {
+    animation: none;
+  }
+}
+body[data-motion='off'] .mmc-stage {
+  animation: none;
+}

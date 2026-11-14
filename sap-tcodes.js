@@ -60,7 +60,14 @@
       if((form&&form.dataset.owner!==a.owner())||(view&&view.dataset.owner!==a.owner())||(!a.ready()&&(form||view)))a.closeModal();
       resetOwner();
     }
-    return {render,mount,editor,save};
+    return {
+      render,mount,editor,save,
+      selectReference(code) {
+        resetOwner();
+        const record=a.state().workhub.tcodes.records.find(row=>row.code===code);
+        if(record)filters={query:code,system:'',category:'',favorite:false,archived:record.archived};
+      },
+    };
   }
   root.WorkHubSapTcodes={install};
 })(window);

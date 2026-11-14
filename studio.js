@@ -137,6 +137,7 @@
     root.WorkHubExperienceEngine?.validate(d);
     root.WorkHubSapTcodesEngine?.validate(d);
     root.WorkHubSapTablesEngine?.validate(d);
+    root.WorkHubMmConfigurationEngine?.validate(d);
     root.WorkHubDriveFilesEngine?.validate(d);
     root.WorkHubReminders?.validate(d);
     root.WorkHubProjectDates.validate(d);
@@ -317,6 +318,7 @@
       solution = null,
       rehearsal = null,
       procedures = null,
+      mmConfiguration = null,
       processHubMode = 'animated',
       processHubOwner = '',
       tcodes = null,
@@ -1714,18 +1716,25 @@
         data().processes.find(p => p.kind !== 'procedure' && p.archived === processArchive)
       );
     }
+    function featureVisible(id) {
+      const hidden = a.state().preferences.hiddenTabs || [];
+      return !hidden.includes(id) && !hidden.includes(id.split('.')[0]) && a.can(id);
+    }
     function processHub() {
       const account = a.cloud().ready ? a.cloud().user?.id || '' : '';
       if (processHubOwner !== account) {
         processHubOwner = account;
         processHubMode = 'animated';
       }
+      const showConfiguration = !!mmConfiguration && featureVisible('processhub.configuration');
+      if (processHubMode === 'configuration' && !showConfiguration) processHubMode = 'animated';
+      const tabs = root.WorkHubProcedures.tabs(processHubMode, showConfiguration);
+      if (processHubMode === 'written') return tabs + procedures.render();
+      if (processHubMode === 'configuration') return tabs + mmConfiguration.render();
       return (
-        root.WorkHubProcedures.tabs(processHubMode) +
-        (processHubMode === 'written'
-          ? procedures.render()
-          : rehearsal?.render() ||
-            '<section class="hub"><h2>Process Hub</h2><p>Refresh this page to load the process canvas.</p></section>')
+        tabs +
+        (rehearsal?.render() ||
+          '<section class="hub"><h2>Process Hub</h2><p>Refresh this page to load the process canvas.</p></section>')
       );
     }
     function processEditor(id = '') {
@@ -3187,6 +3196,7 @@
       summaryCards?.sync();
       rehearsal?.mount();
       procedures?.mount();
+      mmConfiguration?.sync();
       tcodes?.mount();
       sapTables?.mount();
     }
@@ -4446,7 +4456,9 @@
       ...a,
       active: () => viewTab === 'processhub' && processHubMode === 'written',
       selectMode(value) {
-        if (value === 'written' && rehearsal?.snapshot().editing)
+        if (value === 'configuration' && !featureVisible('processhub.configuration'))
+          throw Error('Your account cannot open MM Configuration.');
+        if (value !== 'animated' && rehearsal?.snapshot().editing)
           throw Error('Save or cancel the open animated-process editor before switching sections.');
         processHubOwner = a.cloud().user?.id || '';
         processHubMode = value;
@@ -4466,6 +4478,36 @@
         viewTab === 'studio' &&
         currentTool === 'tables' &&
         !a.state().preferences.hiddenTabs?.includes('studio.tables'),
+    });
+    mmConfiguration = root.WorkHubMmConfiguration?.install({
+      ...a,
+      active: () =>
+        viewTab === 'processhub' &&
+        processHubMode === 'configuration' &&
+        featureVisible('processhub.configuration'),
+      hasTable(code, edition) {
+        if (!featureVisible('studio.tables')) return false;
+        const table = root.WorkHubSapTablesEngine?.editableRow(a.state(), code);
+        return !!table?.systems.includes(edition);
+      },
+      openTable(code, edition) {
+        if (!this.hasTable(code, edition)) return;
+        currentTool = 'tables';
+        navigate('studio');
+        sapTables?.openReference(code, edition);
+      },
+      hasTcode(code) {
+        return (
+          featureVisible('studio.tcodes') &&
+          a.state().workhub.tcodes.records.some(row => row.code === code)
+        );
+      },
+      openTcode(code) {
+        if (!this.hasTcode(code)) return;
+        currentTool = 'tcodes';
+        tcodes?.selectReference(code);
+        navigate('studio');
+      },
     });
     projectDates = root.WorkHubProjectDates.install(a);
     standup = root.WorkHubProjectStandup?.install({
