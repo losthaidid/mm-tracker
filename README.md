@@ -360,6 +360,12 @@ Sub-task feedback uses the existing account autosave and backups, remains editab
 
 People & Responsibilities: open Projects to map business users to maintained MM areas and activities with drag/drop, reporting lines, scoped roles, and PNG/Excel exports. See [the guide](docs/PROJECT-PEOPLE.md).
 
+## MM Configuration in Process Hub
+
+Open **Process Hub → MM Configuration**, choose a scenario, then inspect each step for stock quantity, stock value, material and FI documents, and illustrative debits and credits. **What to check in SAP** links each step to relevant configuration, the SAP Tables catalogue, and SAP documentation. The scenarios include stock and direct-consumption purchasing, blocked receipts, goods issues, transfers, reversals, special procurement, physical inventory, and invoice processing.
+
+Use **Maintain configuration** to copy or override a material or movement preset, define plant and valuation settings, or add your G/L mappings. Saved settings follow your account and are included in JSON backups. A per-valuation-area material entry takes precedence over a default entry for the same material type. A custom movement uses the behavior of its chosen SAP standard base and can override its account modifier. Scenario inputs and results are illustrative and do not post to SAP.
+
 ## Written procedures in Process Hub
 
 Open **Process Hub → Written procedures** to save ordinary processes such as handling a CR Form. Start blank or use the editable CR Form example, maintain ordered instructions with roles, checklists, expected outcomes and reference links, then choose **Save procedure**. Search and category filters help find saved guides; duplicate, archive/restore and Markdown download are available. Reading checkmarks are personal to the current visit. The existing **Animated processes** tab retains the canvas and playback. See [the written-procedure guide](docs/WRITTEN-PROCEDURES.md).

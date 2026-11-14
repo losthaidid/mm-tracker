@@ -39,6 +39,18 @@
     ['knowledge', 'Knowledge', 'Screens', '', ['workhub.notes']],
     ['notes', 'Notes', 'Screens', '', ['workhub.notebook']],
     ['processhub', 'Process Hub', 'Screens', '', ['workhub.processes', 'workhub.rehearsal']],
+    [
+      'processhub.configuration',
+      'MM Configuration',
+      'Process Hub tools',
+      'processhub',
+      [
+        'workhub.mmConfiguration.materials',
+        'workhub.mmConfiguration.movements',
+        'workhub.mmConfiguration.plants',
+        'workhub.mmConfiguration.accounts',
+      ],
+    ],
     ['files', 'Files', 'Screens', '', ['workhub.driveFiles']],
     ['handover', 'Handover packs', 'Screens', '', []],
     ['waiting', 'Waiting on', 'Screens', '', ['workhub.waiting']],
@@ -155,8 +167,11 @@
   function get(data, path) {
     const value = path.split('.').reduce((v, k) => v?.[k], data);
     // A first entry is a record creation in workspaces that predate these collections.
-    if (value === undefined && path === 'workhub.sapTables.records') return [];
-    return path === 'workhub.validator.profiles' && value === undefined ? [] : value;
+    const recordCollection =
+      path === 'workhub.sapTables.records' ||
+      path === 'workhub.validator.profiles' ||
+      path.startsWith('workhub.mmConfiguration.');
+    return value === undefined && recordCollection ? [] : value;
   }
   function delta(old, next, allow) {
     if (same(old, next)) return true;

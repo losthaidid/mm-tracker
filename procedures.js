@@ -9,8 +9,22 @@
     );
   const btn = (op, label, attrs = '', cls = '') =>
     `<button type="button" class="${cls}" data-procedure="${op}" ${attrs}>${label}</button>`;
-  const tabs = mode =>
-    `<nav class="wp-tabs" aria-label="Process Hub sections" data-access-feature="processhub">${btn('tab', 'Animated processes', `data-mode="animated" aria-current="${mode === 'animated' ? 'page' : 'false'}"`)}${btn('tab', 'Written procedures', `data-mode="written" aria-current="${mode === 'written' ? 'page' : 'false'}"`)}</nav>`;
+  const tabs = (mode, configuration) => {
+    const sections = [
+      ['animated', 'Animated processes'],
+      ['written', 'Written procedures'],
+    ];
+    if (configuration) sections.push(['configuration', 'MM Configuration']);
+    return `<nav class="wp-tabs" aria-label="Process Hub sections" data-access-feature="processhub">${sections
+      .map(([id, title]) =>
+        btn(
+          'tab',
+          title,
+          `data-mode="${id}" aria-current="${id === mode ? 'page' : 'false'}"${id === 'configuration' ? ' data-access-feature="processhub.configuration"' : ''}`
+        )
+      )
+      .join('')}</nav>`;
+  };
   const field = (name, label, value, max, area = false, attrs = '') =>
     `<label class="wp-field">${label}${area ? `<textarea rows="3" maxlength="${max}" data-wp-field="${name}" ${attrs}>${esc(value)}</textarea>` : `<input maxlength="${max}" data-wp-field="${name}" value="${esc(value)}" ${attrs}>`}</label>`;
   function install(a) {
@@ -239,7 +253,7 @@
       const op = el.dataset.procedure,
         id = el.dataset.id;
       if (op === 'tab') {
-        if (!['animated', 'written'].includes(el.dataset.mode)) return;
+        if (!['animated', 'written', 'configuration'].includes(el.dataset.mode)) return;
         a.selectMode(el.dataset.mode);
         a.navigate('processhub');
         return;

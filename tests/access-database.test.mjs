@@ -185,3 +185,49 @@ test('Access database: Go-Live issues follow project edit and visibility permiss
  const projected=(await db.query('select * from public.load_mm_tracker()')).rows[0].document;
  assert.doesNotMatch(JSON.stringify(projected),/PRIVATE_ISSUE|North|goLiveIssues/);
 });
+
+test('Access database: MM Configuration protects material, movement, plant and G/L settings independently of Process Hub work', async t => {
+  const { db, sign, command, add } = await setup(t);
+  await db.exec("delete from public.workhub_feature_catalog where id='processhub.configuration'");
+  const patch = read('supabase/mm-configuration-access.sql');
+  await db.exec(patch);
+  await db.exec(patch);
+  const legacy = C.preset('view');
+  delete legacy['processhub.configuration'];
+  legacy.processhub = { mode: 'use', create: true, edit: true, delete: true, run: true };
+  legacy.workspace = C.preset().workspace;
+  await add(legacy);
+  const initial = doc({ projects: [{ id: 'project-default', name: 'SAP Projects', code: '' }], activeProjectId: 'project-default' });
+  await save(db, initial, 0);
+  const rights = { ...legacy, 'processhub.configuration': { mode: 'use', create: true, run: true } };
+  await sign();
+  await command('permissions', member, { version: 1, permissions: rights });
+  await sign(member);
+  const created = structuredClone(initial);
+  created.data.workhub.mmConfiguration = {
+    materials: [{ id: 'custom', code: 'ZSEC', notes: 'PRIVATE CONFIG' }],
+    movements: [{ id: 'mov', code: 'Z09' }],
+    plants: [{ id: 'plant', code: '1100' }],
+    accounts: [{ id: 'account', gl: '0000001234' }],
+  };
+  C.assertChange({ role: 'member', status: 'active', permissions: C.normalize(rights) }, initial.data, created.data);
+  await save(db, created, 1);
+  const updated = structuredClone(created);
+  updated.data.workhub.mmConfiguration.materials[0].notes = 'Changed';
+  await assert.rejects(save(db, updated, 2), e => e.code === '42501');
+  await sign();
+  rights['processhub.configuration'].edit = true;
+  await command('permissions', member, { version: 2, permissions: rights });
+  await sign(member);
+  await save(db, updated, 2);
+  await sign();
+  rights['processhub.configuration'] = { mode: 'hidden' };
+  await command('permissions', member, { version: 3, permissions: rights });
+  await sign(member);
+  const view = (await db.query('select * from public.load_mm_tracker()')).rows[0].document;
+  assert.doesNotMatch(JSON.stringify(view), /ZSEC|Z09|0000001234/);
+  await save(db, view, 3);
+  await db.exec('reset role');
+  const saved = (await db.query('select document from public.mm_tracker_documents where user_id=$1', [member])).rows[0].document;
+  assert.deepEqual(saved.data.workhub.mmConfiguration, updated.data.workhub.mmConfiguration);
+});

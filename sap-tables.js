@@ -527,6 +527,16 @@
 
     return {
       render,
+      openReference(code, system) {
+        sync();
+        guard();
+        const table = tableByCode(code);
+        if (!table?.systems.includes(system)) return;
+        filters = { ...activeFilters(), query: table.code, system, archived: table.archived };
+        trail = [];
+        a.render();
+        detail(table.code);
+      },
       mount() {
         sync();
         if (allowed()) paintResults();

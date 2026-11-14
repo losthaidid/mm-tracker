@@ -220,6 +220,7 @@
       const op =
         control.dataset.dr ||
         control.dataset.val ||
+        control.dataset.mmConfig ||
         control.dataset.md ||
         control.dataset.focus ||
         control.dataset.action ||
@@ -257,7 +258,8 @@
         ['focus', 'break', 'presentation-break'].includes(id)
       )
         action = 'run';
-      else if (event.type === 'submit' && t.id === 'drPaste') action = 'run';
+      else if (event.type === 'submit' && ['drPaste', 'mmConfigForm'].includes(t.id))
+        action = 'run';
       else if (/(?:^|-)(?:new|add|create|duplicate|copy|import)(?:-|$)/.test(op)) action = 'create';
       else if (/(?:^|-)(?:delete|remove)(?:-|$)/.test(op)) action = 'delete';
       else if (/(?:^|-)(?:save|apply|update|rename|publish|edit)(?:-|$)/.test(op)) action = 'edit';
