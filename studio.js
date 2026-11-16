@@ -1529,6 +1529,17 @@
           )
           .join('')}</select></label></article>`;
     }
+    function decorateBrowsedTask(card) {
+      const id = card.dataset.taskCard;
+      workbench?.closePeek();
+      workbench?.decorateRecords(card.parentElement);
+      card.insertAdjacentHTML('beforeend', standup?.taskContext(id) || '');
+      reminders?.decorateRecord(card, 'tasks', id);
+      card.insertAdjacentHTML(
+        'beforeend',
+        (batchA?.badges('tasks', id) || '') + (library?.recordTools('tasks', id) || '')
+      );
+    }
     function taskBoard() {
       const columns = Object.fromEntries(Object.keys(BOARD).map(key => [key, []]));
       for (const task of boardTasks()) columns[taskStatus(task)].push(task);
@@ -3387,7 +3398,8 @@
           root.WorkHubTaskWorkspace.browseDeck(
             el,
             boardTasks().filter(task => taskStatus(task) === key),
-            a.render
+            taskBoardCard,
+            decorateBrowsedTask
           );
         return;
       }

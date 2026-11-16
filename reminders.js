@@ -445,6 +445,23 @@
       }
     }
     const signatureOf = all => all.map(r => alertKey(r) + ':' + r.due).join('|');
+    function decorateRecord(target, kind, id) {
+      if (!target || target.querySelector(':scope > .reminder-item-control')) return;
+      const r = lookup(a.state(), kind, id),
+        holder = document.createElement('div');
+      holder.className = 'reminder-item-control';
+      holder.innerHTML = button(
+        'edit',
+        r && isDue(r, a.today())
+          ? 'Time to revisit · Remind me again'
+          : r?.at
+            ? '◷ ' + esc(when(r))
+            : 'Remind me in…',
+        { kind, recordId: id }
+      );
+      if (r && isDue(r, a.today())) holder.classList.add('is-due');
+      target.append(holder);
+    }
     function decorate(tab) {
       if (!syncOwner()) return;
       const all = items(),
@@ -464,46 +481,33 @@
       if ($('reminderInboxButton')) $('reminderInboxButton').dataset.owner = owner;
       const view = $('view');
       if (!view) return;
-      function attach(target, kind, id) {
-        if (!target || target.querySelector(':scope > [data-reminder="edit"]')) return;
-        const r = lookup(a.state(), kind, id),
-          holder = document.createElement('div');
-        holder.className = 'reminder-item-control';
-        holder.innerHTML = button(
-          'edit',
-          r && isDue(r, a.today())
-            ? 'Time to revisit · Remind me again'
-            : r?.at
-              ? '◷ ' + esc(when(r))
-              : 'Remind me in…',
-          { kind, recordId: id }
-        );
-        if (r && isDue(r, a.today())) holder.classList.add('is-due');
-        target.append(holder);
-      }
       if (tab === 'tickets')
         for (const card of view.querySelectorAll('.ticket-queue-card,.ticket-card,tr')) {
           const b = card.querySelector(
             '[data-action="edit"][data-group="tickets"],[data-action="detail"][data-id]'
           );
           if (b)
-            attach(card.tagName === 'TR' ? card.lastElementChild : card, 'tickets', b.dataset.id);
+            decorateRecord(
+              card.tagName === 'TR' ? card.lastElementChild : card,
+              'tickets',
+              b.dataset.id
+            );
         }
       if (tab === 'tasks')
         for (const card of view.querySelectorAll('.task-main-card,[data-task-card]')) {
           const id =
             card.dataset.taskCard ||
             card.querySelector('[data-action="edit"][data-group="tasks"]')?.dataset.id;
-          if (id) attach(card, 'tasks', id);
+          if (id) decorateRecord(card, 'tasks', id);
         }
       if (tab === 'specs') {
-        attach(
+        decorateRecord(
           view.querySelector('.project-banner .actions'),
           'projects',
           a.state().activeProjectId
         );
         for (const row of view.querySelectorAll('[data-project-id]'))
-          attach(row, 'projects', row.dataset.projectId);
+          decorateRecord(row, 'projects', row.dataset.projectId);
       }
       const kind =
         tab === 'tickets'
@@ -640,7 +644,18 @@
       if (!document.hidden) tick();
     });
     setInterval(tick, 5000);
-    return { set, schedule, snooze, dismiss, editor, inbox, decorate, tick, exportCalendar };
+    return {
+      set,
+      schedule,
+      snooze,
+      dismiss,
+      editor,
+      inbox,
+      decorate,
+      decorateRecord,
+      tick,
+      exportCalendar,
+    };
   }
   root.WorkHubReminders = {
     upgrade,

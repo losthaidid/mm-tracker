@@ -969,6 +969,10 @@ test('Task stacks browse by button, keyboard and swipe before advancing after a 
  const index = (key = 'todo') => lane(key).querySelector('.task-deck-counter').textContent;
  const next = () => lane('todo').querySelector('[data-step="1"]');
  const calls = db.calls.length;
+ const board = document.querySelector('.hub-board');
+ const banner = document.querySelector('.task-workspace-banner');
+ const otherCard = card('doing');
+ const nextButton = next();
  assert.equal(lane('todo').querySelectorAll('[data-task-card]').length, 1);
  assert.equal(card().dataset.taskCard, first);
  assert.equal(index(), '1 of 3');
@@ -976,7 +980,15 @@ test('Task stacks browse by button, keyboard and swipe before advancing after a 
  next().focus();
  next().click();
  assert.equal(card().dataset.taskCard, second);
+ assert.equal(document.querySelector('.hub-board'), board);
+ assert.equal(document.querySelector('.task-workspace-banner'), banner);
+ assert.equal(card('doing'), otherCard);
+ assert.equal(next(), nextButton);
  assert.equal(document.activeElement, next());
+ assert.equal(card().querySelector('[data-bench="status"][data-kind="tasks"]').dataset.id, second);
+ assert.equal(card().querySelector('[data-reminder="edit"]').dataset.id, second);
+ assert.ok(card().querySelector('.batch-record-context'));
+ assert.ok(card().querySelector('[data-wl="timeline"]'));
  next().dispatchEvent(new window.KeyboardEvent('keydown',{key:'ArrowRight', bubbles:true, cancelable:true}));
  assert.equal(card().dataset.taskCard, third);
  next().click();
@@ -993,6 +1005,8 @@ test('Task stacks browse by button, keyboard and swipe before advancing after a 
  touch(document, 'pointerup', 65, 124);
  assert.equal(card().dataset.taskCard, second);
  assert.equal(index(), '2 of 3');
+ assert.equal(document.querySelector('.hub-board'), board);
+ assert.equal(card('doing'), otherCard);
  assert.equal(db.calls.length, calls);
  assert.match(card().querySelector('.task-subitems').textContent, /Keep this sub-item/);
  const move = card().querySelector('[data-hub-move]');

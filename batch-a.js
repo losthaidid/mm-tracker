@@ -1485,6 +1485,7 @@
     return {
       sync,
       mount,
+      badges,
       matches,
       fields,
       capture,

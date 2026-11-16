@@ -71,29 +71,31 @@
       `<button type="button" data-hub="browse-task-deck" data-step="${step}" aria-label="${name} task in ${label}" aria-describedby="${counterId}"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${step < 0 ? 'm10 4-4 4 4 4' : 'm6 4 4 4-4 4'}"/></svg></button>`;
     return `<section class="hub-column" data-column="${key}" data-task-tone="${key}" aria-labelledby="taskDeckLane-${key}">
       <div class="flex-title task-column-heading"><h3 id="taskDeckLane-${key}">${label}</h3>
-      <div class="task-deck-nav" role="group" aria-label="${label} task cards">${count > 1 ? arrow(-1, 'Previous') : ''}<span id="${counterId}" class="task-deck-counter">${count ? `${index + 1} of ${count}` : '0 tasks'}</span>${count > 1 ? arrow(1, 'Next') : ''}</div></div>
+      <div class="task-deck-nav" role="group" aria-label="${label} task cards">${count > 1 ? arrow(-1, 'Previous') : ''}<span id="${counterId}" class="task-deck-counter" aria-live="polite" aria-atomic="true">${count ? `${index + 1} of ${count}` : '0 tasks'}</span>${count > 1 ? arrow(1, 'Next') : ''}</div></div>
       ${count ? `<div class="task-deck-stage" data-depth="${Math.min(2, count - 1)}">${renderCard(tasks[index])}</div>` : '<p class="task-column-empty">No tasks in this stage</p>'}
       </section>`;
   }
 
-  function browseDeck(button, tasks, render) {
+  function browseDeck(button, tasks, renderCard, decorateCard) {
     const column = button.closest(deckSelector),
       step = Number(button.dataset.step);
     if (!column || tasks.length < 2 || ![-1, 1].includes(step)) return;
     const key = column.dataset.column,
-      index = (deckIndex(key, tasks) + step + tasks.length) % tasks.length,
-      wasFocused = column.querySelector('.task-deck-nav').contains(document.activeElement),
-      outgoing = playing() && column.querySelector('[data-task-card]');
-    deckPositions.set(key, { index, id: tasks[index].id });
-    render();
-    const newColumn = document.querySelector(`${deckSelector}[data-column="${key}"]`);
-    if (wasFocused)
-      newColumn
-        ?.querySelector(`${deckControl}[data-step="${step}"]`)
-        ?.focus({ preventScroll: true });
-    const incoming = newColumn?.querySelector('[data-task-card]');
-    if (!outgoing || !incoming || !playing()) return;
-    const stage = incoming.parentElement;
+      stage = column.querySelector('.task-deck-stage'),
+      outgoing = stage?.querySelector('[data-task-card]');
+    if (!outgoing) return;
+    const index = (deckIndex(key, tasks) + step + tasks.length) % tasks.length,
+      next = tasks[index];
+    stage.innerHTML = renderCard(next, key);
+    deckPositions.set(key, { index, id: next.id });
+    column.querySelector('.task-deck-counter').textContent = `${index + 1} of ${tasks.length}`;
+    stage.dataset.depth = Math.min(2, tasks.length - 1);
+    stage.classList.remove('task-deck-gliding');
+    const incoming = stage.querySelector('[data-task-card]');
+    if (!incoming) return;
+    decorateCard(incoming);
+    if (!playing()) return;
+    for (const effect of outgoing.getAnimations?.() || []) if (effects.has(effect)) effect.cancel();
     outgoing.classList.add('task-deck-outgoing');
     outgoing.removeAttribute('data-task-card');
     outgoing.removeAttribute('draggable');
@@ -105,8 +107,8 @@
     animate(
       incoming,
       [
-        { opacity: 0.45, transform: `translateX(${step * 16}%) translateY(10px) scale(.97)` },
-        { opacity: 1, transform: 'none' },
+        { transform: `translateX(${step * 16}%) translateY(10px) scale(.97)` },
+        { transform: 'none' },
       ],
       330
     );
@@ -119,6 +121,7 @@
       250
     );
     const cleanup = () => {
+      if (outgoing.parentElement !== stage) return;
       outgoing.remove();
       stage.classList.remove('task-deck-gliding');
     };
