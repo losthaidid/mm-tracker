@@ -60,6 +60,7 @@
       returnFocus = null;
     const store = () => E.store(a.state());
     const allowed = () => a.ready() && !!a.owner();
+    const canDelete = () => a.can('notes', 'delete');
     function sync() {
       const next = allowed() ? a.owner() : '';
       if (next !== owner) {
@@ -89,6 +90,7 @@
     }
     function cards() {
       const rows = E.find(a.state(), { query, notebookId, filter, sort });
+      const showDelete = filter === 'trash' && canDelete();
       if (!rows.length)
         return (
           '<div class="nt-empty">' +
@@ -165,7 +167,21 @@
             esc(date(n.updatedAt)) +
             '</small>' +
             (n.trashed
-              ? btn('restore', '↶ Restore', 'data-id="' + esc(n.id) + '"')
+              ? '<div class="nt-trash-actions">' +
+                btn('restore', '↶ Restore', 'data-id="' + esc(n.id) + '"') +
+                (showDelete
+                  ? btn(
+                      'delete-permanently',
+                      'Delete permanently',
+                      'data-id="' +
+                        esc(n.id) +
+                        '" aria-label="Delete permanently: ' +
+                        esc(n.title) +
+                        '"',
+                      'nt-trash-delete'
+                    )
+                  : '') +
+                '</div>'
               : btn(
                   'open',
                   'Open note ' + icon('arrow'),
@@ -229,6 +245,7 @@
         query,
         notebookId,
         filter,
+        filter === 'trash' && canDelete(),
         sort,
         a.state().projects.map(p => [p.id, p.name]),
       ]);
@@ -487,6 +504,40 @@
         n.updatedAt = new Date().toISOString();
       });
     }
+    async function deleteFromTrash(id) {
+      if (!canDelete()) throw Error('Your account cannot delete notes.');
+      const note = store().notes.find(row => row.id === id);
+      if (filter !== 'trash' || !note?.trashed) throw Error('Choose a note in Trash.');
+      const account = owner,
+        expected = JSON.stringify(note);
+      const confirmed = await root.WorkHubDialogs.confirm(
+        `“${note.title}” and its saved versions will be permanently deleted.`,
+        {
+          title: 'Delete this note?',
+          confirmLabel: 'Delete permanently',
+          danger: true,
+          accessFeature: 'notes',
+          accessAction: 'delete',
+        }
+      );
+      if (!confirmed) return;
+      guard();
+      if (owner !== account || !canDelete())
+        throw Error('Your account or note permissions changed. Open Trash again.');
+      const ok = a.mutate(d => {
+        const notes = E.store(d).notes;
+        const index = notes.findIndex(row => row.id === id);
+        if (!notes[index]?.trashed || JSON.stringify(notes[index]) !== expected)
+          throw Error('This note changed. Open Trash and review it again.');
+        notes.splice(index, 1);
+      });
+      if (ok) {
+        document
+          .querySelector('.nt-workspace [data-filter="trash"]')
+          ?.focus({ preventScroll: true });
+        a.tell('Note permanently deleted.');
+      }
+    }
     function preview() {
       const on = $('ntPreview').hidden;
       $('ntPreview').hidden = !on;
@@ -559,6 +610,7 @@
       }
       if (action === 'pin') flag(id, 'pinned');
       if (action === 'restore') flag(id, 'trashed');
+      if (action === 'delete-permanently') return deleteFromTrash(id);
       if (action === 'book-new') notebookEditor();
       if (action === 'book-edit') notebookEditor(notebookId);
       if (!editor) return;

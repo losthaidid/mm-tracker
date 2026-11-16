@@ -387,6 +387,29 @@
   padding: 6px;
   font-size: 10px;
 }
+.nt-card-foot:has(.nt-trash-actions),
+.nt-trash-actions {
+  flex-wrap: wrap;
+}
+.nt-trash-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.nt-card-foot .nt-trash-actions .nt-button {
+  min-height: 34px;
+  padding-inline: 9px;
+  font-size: 11px;
+}
+.nt-card-foot .nt-trash-delete {
+  border-color: color-mix(in srgb, var(--hub-negative-text, #993b38) 28%, var(--nt-line));
+  color: var(--hub-negative-text, #993b38);
+}
+.nt-card-foot .nt-trash-delete:hover {
+  border-color: var(--hub-negative-text, #993b38);
+  color: var(--hub-negative-text, #993b38);
+  background: var(--hub-negative-bg, var(--nt-soft));
+}
 .nt-empty {
   grid-column: 1/-1;
   text-align: center;
