@@ -981,6 +981,7 @@
     }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
     return {
       decorate,
+      decorateRecords,
       render,
       resolve,
       peek,
