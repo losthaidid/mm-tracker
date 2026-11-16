@@ -147,7 +147,8 @@
         );
         if (r) {
           title = r.task || r.description || r.title || r.name || r.ticket;
-          status = kind === 'tasks' ? (r.done ? 'done' : r.boardStatus) : r.status || r.phase || '';
+          status =
+            kind === 'tasks' ? root.WorkHubTaskCompletion.status(r) : r.status || r.phase || '';
           notes = r.remarks || r.body || r.notes || r.error || r.history || '';
           feedback = r.feedback || '';
           if (kind === 'tasks')
@@ -173,12 +174,7 @@
     }
     function statuses(kind) {
       return kind === 'tasks'
-        ? [
-            ['todo', 'To do'],
-            ['doing', 'In progress'],
-            ['blocked', 'Blocked'],
-            ['done', 'Completed'],
-          ]
+        ? Object.entries(root.WorkHubTaskCompletion.BOARD)
         : (
             (kind === 'tickets'
               ? a.statusOptions.tickets
@@ -214,20 +210,19 @@
       if (date && ['specs', 'specSub'].includes(kind) && !root.WorkHubReminders.validDate(date))
         throw Error('Choose a valid status date.');
       const finishChildren =
-        kind === 'specs' && value === 'Completed' &&
+        kind === 'specs' &&
+        value === 'Completed' &&
         found.record.subItems?.some(sub => sub.status !== 'Completed');
       if (
         (!date && found.record.status === value && !finishChildren) ||
-        (kind === 'tasks' && (found.record.done ? 'done' : found.record.boardStatus) === value)
+        (kind === 'tasks' && root.WorkHubTaskCompletion.status(found.record) === value)
       )
         return true;
       return a.mutate(d => {
         if (kind === 'tasks') {
           const t = d.tasks.find(x => x.id === id);
           if (t.archived) throw Error('Restore the task before changing its status.');
-          t.done = value === 'done';
-          t.boardStatus = value;
-          t.doneDate = t.done ? t.doneDate || a.today() : '';
+          root.WorkHubTaskCompletion.setStatus(t, value, a.today());
         } else if (kind === 'taskSub' || kind === 'specSub') {
           const p = d[kind === 'taskSub' ? 'tasks' : 'specs'].find(x => x.id === parent);
           if (p.archived) throw Error('Restore the main item before changing its status.');
@@ -257,7 +252,7 @@
       statusReturn = fromModal ? { kind, id, parent } : null;
       a.openModal(
         'Update status',
-        `<div class="bench-status"><p class="hub-kicker">${esc(kind === 'tasks' ? 'MAIN TASK' : kind === 'taskSub' ? 'SUBTASK' : 'RECORD STATUS')}</p><h3>${esc(found.title)}</h3>${kind === 'tasks' ? '<p class="hub-meta">Completing this main task also completes its subtasks.</p>' : ''}${['specs', 'specSub'].includes(kind) ? '<label for="benchStatusDate">Status date</label><input id="benchStatusDate" type="date" min="1900-01-01" max="9999-12-31" value="' + esc(a.today()) + '"><p class="hub-meta">Today is captured automatically. Choose another date if needed.</p>' : ''}<div class="bench-status-options">${choices.map(([value, label]) => btn('status-pick', esc(label), attrs(kind, id, parent) + ` data-value="${esc(value)}" aria-pressed="${value === found.status}"`, value === found.status ? 'selected' : '')).join('')}</div><div class="modal-actions">${btn('status-cancel', 'Cancel')}</div></div>`
+        `<div class="bench-status"><p class="hub-kicker">${esc(kind === 'tasks' ? 'MAIN TASK' : kind === 'taskSub' ? 'SUB-ITEM' : 'RECORD STATUS')}</p><h3>${esc(found.title)}</h3>${kind === 'tasks' && found.record.subTasks?.length ? '<p class="hub-meta">Changing this status also updates all ' + found.record.subTasks.length + ' linked sub-item(s).</p>' : ''}${['specs', 'specSub'].includes(kind) ? '<label for="benchStatusDate">Status date</label><input id="benchStatusDate" type="date" min="1900-01-01" max="9999-12-31" value="' + esc(a.today()) + '"><p class="hub-meta">Today is captured automatically. Choose another date if needed.</p>' : ''}<div class="bench-status-options">${choices.map(([value, label]) => btn('status-pick', esc(label), attrs(kind, id, parent) + ` data-value="${esc(value)}" aria-pressed="${value === found.status}"`, value === found.status ? 'selected' : '')).join('')}</div><div class="modal-actions">${btn('status-cancel', 'Cancel')}</div></div>`
       );
     }
     function objectMenu(id) {
@@ -308,9 +303,11 @@
       if (!host || host.querySelector('[data-bench="status"]')) return;
       const found = resolve(kind, id, parent);
       if (!found || !statuses(kind).length) return;
-      const tag = [...host.querySelectorAll('.tag,.hub-badge')].find(
-          x => x.textContent.trim() === found.status
-        ),
+      const tag =
+          host.querySelector('[data-task-state-indicator]') ||
+          [...host.querySelectorAll('.tag,.hub-badge')].find(
+            x => x.textContent.trim() === found.status
+          ),
         b = document.createElement('button');
       b.type = 'button';
       b.className = 'bench-status-badge';
@@ -318,6 +315,11 @@
       b.dataset.kind = kind;
       b.dataset.id = id;
       b.dataset.parent = parent;
+      if (kind === 'tasks') b.dataset.taskTone = found.status;
+      if (kind === 'taskSub')
+        b.dataset.taskTone = Object.keys(root.WorkHubTaskCompletion.SUB_STATUS).find(
+          key => root.WorkHubTaskCompletion.SUB_STATUS[key] === found.status
+        );
       b.disabled =
         !!found.record.archived ||
         !!(
@@ -344,13 +346,14 @@
         if (!card) continue;
         const id = b.dataset.id;
         setPreview(card.querySelector('h3,h4,.ticket-button,.desc'), kind, id);
-        if (!card.matches('[data-pi-row]')) statusButton(
-          card.querySelector(
-            '.task-card-meta,.task-card-heading,.item-card-head,.ticket-card-head,.row-actions'
-          ) || card,
-          kind,
-          id
-        );
+        if (!card.matches('[data-pi-row]'))
+          statusButton(
+            card.querySelector(
+              '.task-card-meta,.task-card-heading,.item-card-head,.ticket-card-head,.row-actions'
+            ) || card,
+            kind,
+            id
+          );
       }
       for (const card of scope.querySelectorAll('[data-task-card]')) {
         setPreview(card.querySelector('h4'), 'tasks', card.dataset.taskCard);
@@ -376,7 +379,8 @@
         const card =
           b.closest('article,tr,.sub-item,.subitem-card,.subitem-manager-row') || b.parentElement;
         setPreview(card.querySelector('strong,h4'), 'specSub', b.dataset.id, b.dataset.parent);
-        if (!card.matches('.pi-inline-child')) statusButton(card, 'specSub', b.dataset.id, b.dataset.parent);
+        if (!card.matches('.pi-inline-child'))
+          statusButton(card, 'specSub', b.dataset.id, b.dataset.parent);
       }
       for (const b of scope.querySelectorAll('[data-action="open-booking"]'))
         setPreview(b, 'schedule', b.dataset.date + '|' + b.dataset.time);

@@ -412,6 +412,94 @@ function addTaskSub(api,document,parent,title,remarks,feedback,status='Not start
  api.saveTaskSub(form);return api.state().tasks.find(task=>task.id===parent).subTasks.at(-1).id;
 }
 
+test('Tasks workspace drafts sub-items in the main editor and saves once across status changes', async t => {
+ const {api, document, window, db} = await app(t);
+ api.showTab('tasks');
+ api.editRecord('tasks');
+ let form = document.getElementById('editForm');
+ const insert = async (title, remarks, feedback) => {
+   form.querySelector('[data-action="task-draft-insert"]').click();
+   await settle();
+   const row = [...form.querySelectorAll('[data-task-draft]')].at(-1);
+   for (const [key, value] of Object.entries({title, remarks, feedback}))
+     row.querySelector('[data-task-field="' + key + '"]').value = value;
+   return row;
+ };
+ const status = value => {
+   form.elements.boardStatus.value = value;
+   form.elements.boardStatus.dispatchEvent(new window.Event('change', {bubbles:true}));
+ };
+ form.elements.task.value = 'Prepare workstream';
+ const first = await insert('Review design', 'Original remarks', 'Approved');
+ await insert('Build configuration', '', '');
+ status('blocked');
+ assert.equal(first.querySelector('select').disabled, true);
+ assert.equal(first.querySelector('select').value, 'Blocked');
+ status('todo');
+ assert.equal(first.querySelector('select').disabled, false);
+ assert.equal(first.querySelector('select').value, 'Not started');
+ status('blocked');
+ assert.match(form.querySelector('[data-task-status-preview]').textContent, /all 2 sub-items to Blocked/);
+ assert.equal(db.calls.length, 0);
+ api.saveEdit(form);
+ await settle();
+ assert.equal(db.calls.length, 1);
+ const saved = copy(api.state().tasks[0]);
+ assert.deepEqual(saved.subTasks.map(s => s.status), ['Blocked', 'Blocked']);
+ assert.equal(saved.subTasks[0].feedback, 'Approved');
+ assert.equal(db.row.document.data.tasks[0].subTasks.length, 2);
+
+ api.editRecord('tasks', saved.id);
+ form = document.getElementById('editForm');
+ form.querySelector('[data-action="task-draft-discard"]').click();
+ await settle();
+ api.closeModal();
+ assert.deepEqual(copy(api.state().tasks[0]), saved);
+ assert.equal(db.calls.length, 1);
+
+ api.editRecord('tasks', saved.id);
+ form = document.getElementById('editForm');
+ const rows = form.querySelectorAll('[data-task-draft]');
+ rows[0].querySelector('[data-task-field="title"]').value = 'Review revised design';
+ rows[1].querySelector('[data-action="task-draft-discard"]').click();
+ await settle();
+ await insert('Capture sign-off', 'Next step', 'Awaiting review');
+ status('doing');
+ api.saveEdit(form);
+ await settle();
+ const edited = copy(api.state().tasks[0]);
+ assert.equal(db.calls.length, 2);
+ assert.equal(edited.boardStatus, 'doing');
+ assert.deepEqual(edited.subTasks.map(s => s.status), ['In Progress', 'In Progress']);
+ assert.deepEqual(edited.subTasks.map(s => s.title), ['Review revised design', 'Capture sign-off']);
+ assert.equal(edited.subTasks[0].id, saved.subTasks[0].id);
+ assert.equal(edited.subTasks[0].remarks, 'Original remarks');
+ assert.equal(edited.subTasks[1].feedback, 'Awaiting review');
+ assert.ok(document.querySelector('.tasks-workspace .task-subitems[open] .task-child'));
+ document.querySelector('[data-action="task-edit-children"]').click();
+ await settle();
+ const reopened = document.getElementById('editForm');
+ assert.equal(reopened.dataset.id, saved.id);
+ assert.equal(reopened.querySelectorAll('[data-task-draft]').length, 3);
+ assert.equal(reopened.querySelector('[data-task-draft]:last-child select').value, 'In Progress');
+ assert.equal(db.calls.length, 2);
+});
+
+test('Tasks workspace rejects a stale inline editor after a newer task change', async t => {
+ const {api, document, db} = await app(t);
+ const id = addMainTask(api, document, 'Maintain a delivery');
+ await settle();
+ api.editRecord('tasks', id);
+ const stale = document.getElementById('editForm');
+ stale.elements.task.value = 'Unsaved changes';
+ api.hub.moveTask(id, 'doing');
+ await settle();
+ assert.throws(() => api.saveEdit(stale), /task changed while the editor was open/i);
+ assert.equal(api.state().tasks[0].task, 'Maintain a delivery');
+ assert.equal(api.state().tasks[0].boardStatus, 'doing');
+ assert.equal(db.calls.length, 2);
+});
+
 test('task quick feedback appends a save-time timestamp without changing remarks, children or other tasks',async t=>{
  const {api,document,window,db}=await app(t),id=addMainTask(api,document,'Stock <review>');await settle();
  addTaskSub(api,document,id,'Check receipt','Child remarks','Child feedback','Blocked');await settle();
@@ -513,7 +601,7 @@ test('Batch A context survives base editors, cloud reopen and JSON backup restor
  const label=api.state().workhub.batchA.labels[0].id;
  api.editRecord('tasks');form=document.getElementById('editForm');form.elements.namedItem('task').value='Confirm design';form.elements.namedItem('batchEnvironment').value='qas';form.elements.namedItem('batchSystem').value='S4Q';form.elements.namedItem('batchClient').value='200';form.elements.namedItem('batchLabel').checked=true;api.saveEdit(form);await settle();
  const id=api.state().tasks[0].id;assert.deepEqual(copy(E.meta(api.state(),'tasks',id).labelIds),[label]);assert.equal(E.meta(api.state(),'tasks',id).client,'200');
- api.editRecord('tasks',id);form=document.getElementById('editForm');form.elements.namedItem('task').value='Confirm revised design';assert.equal(form.elements.namedItem('batchSystem').value,'S4Q');form.elements.namedItem('done').checked=true;form.elements.namedItem('batchOutcome').value='workaround';form.elements.namedItem('batchOutcomeNote').value='Approved interim approach';api.saveEdit(form);await settle();
+ api.editRecord('tasks',id);form=document.getElementById('editForm');form.elements.namedItem('task').value='Confirm revised design';assert.equal(form.elements.namedItem('batchSystem').value,'S4Q');form.elements.boardStatus.value='done';form.elements.namedItem('batchOutcome').value='workaround';form.elements.namedItem('batchOutcomeNote').value='Approved interim approach';api.saveEdit(form);await settle();
  assert.equal(E.meta(api.state(),'tasks',id).outcome,'workaround');assert.equal(E.meta(api.state(),'tasks',id).environmentId,'qas');
  const restored=api.parseBackup(api.payload(api.state()));assert.equal(restored.workhub.batchA.records.find(x=>x.recordId===id).outcomeNote,'Approved interim approach');
  const reopened=await app(t,{remote:copy(db.row),login:false});await reopened.api.loadCloud(sessionUser);await settle();assert.equal(reopened.api.state().workhub.batchA.records.find(x=>x.recordId===id).environmentId,'qas');
@@ -1349,18 +1437,18 @@ test('marking a main task complete finishes every unfinished child in a single s
  assert.equal(new Set(task.subTasks.slice(0,3).map(s=>s.updatedAt)).size,1);assert.deepEqual(copy(api.state().tasks.find(t=>t.id===other)),unrelated);assert.ok(db.row.document.data.tasks.find(t=>t.id===id).subTasks.every(s=>s.status==='Completed'));
 });
 
-test('main-task edit completion persists all child statuses and reopening preserves their completed work',async t=>{
+test('main-task editor cascades completion and reopening while preserving each child’s notes',async t=>{
  const {api,document,db}=await app(t),id=addMainTask(api,document,'Edit to finish');await settle();addTaskSub(api,document,id,'Configuration','Do not lose this','Approved','Blocked');await settle();
- api.editRecord('tasks',id);let form=document.getElementById('editForm');form.elements.namedItem('done').checked=true;const calls=db.calls.length;api.saveEdit(form);await settle();assert.equal(db.calls.length,calls+1);assert.equal(api.state().tasks[0].subTasks[0].status,'Completed');const completed=copy(api.state().tasks[0].subTasks);
+ api.editRecord('tasks',id);let form=document.getElementById('editForm');form.elements.boardStatus.value='done';const calls=db.calls.length;api.saveEdit(form);await settle();assert.equal(db.calls.length,calls+1);assert.equal(api.state().tasks[0].subTasks[0].status,'Completed');const completed=copy(api.state().tasks[0].subTasks);
  const other=await app(t,{remote:copy(db.row),login:false});await other.api.loadCloud(sessionUser);await settle();assert.equal(other.api.state().tasks[0].done,true);assert.deepEqual(copy(other.api.state().tasks[0].subTasks),completed);
- api.editRecord('tasks',id);form=document.getElementById('editForm');form.elements.namedItem('done').checked=false;api.saveEdit(form);await settle();assert.equal(api.state().tasks[0].done,false);assert.deepEqual(copy(api.state().tasks[0].subTasks),completed);
+ api.editRecord('tasks',id);form=document.getElementById('editForm');form.elements.boardStatus.value='todo';api.saveEdit(form);await settle();assert.equal(api.state().tasks[0].done,false);assert.equal(api.state().tasks[0].subTasks[0].status,'Not started');assert.equal(api.state().tasks[0].subTasks[0].remarks,completed[0].remarks);assert.equal(api.state().tasks[0].subTasks[0].feedback,completed[0].feedback);
 });
 
 test('board details support direct child completion and moving to Done completes the remaining children',async t=>{
  const {api,document,window,db}=await app(t),id=addMainTask(api,document,'Board delivery');await settle();const first=addTaskSub(api,document,id,'First child','First note','First feedback');await settle();addTaskSub(api,document,id,'Remaining child','Second note','Second feedback','Blocked');await settle();api.hub.setBoard(true);api.showTab('tasks');
  document.querySelector('[data-hub="task-detail"][data-id="'+id+'"]').click();await settle();document.querySelector('#modalBody [data-hub="subtask-complete"][data-id="'+first+'"]').click();await settle();assert.equal(document.getElementById('modal').open,true);assert.equal(document.querySelector('#modalBody [data-hub="subtask-complete"][data-id="'+first+'"]').disabled,true);assert.equal(api.state().tasks[0].done,false);assert.equal(api.state().tasks[0].subTasks[1].status,'Blocked');api.closeModal();
- let move=document.querySelector('[data-hub-move="'+id+'"]');move.value='done';const calls=db.calls.length;move.dispatchEvent(new window.Event('change',{bubbles:true}));await settle();assert.equal(db.calls.length,calls+1);assert.ok(api.state().tasks[0].subTasks.every(s=>s.status==='Completed'));assert.ok(document.querySelector('[data-column="done"] [data-task-card="'+id+'"]'));assert.match(document.querySelector('[data-task-card="'+id+'"] .hub-meta:nth-of-type(2)').textContent,/2\/2 subtasks/);
- move=document.querySelector('[data-hub-move="'+id+'"]');move.value='doing';move.dispatchEvent(new window.Event('change',{bubbles:true}));await settle();assert.equal(api.state().tasks[0].done,false);assert.ok(api.state().tasks[0].subTasks.every(s=>s.status==='Completed'));assert.equal(api.state().tasks[0].subTasks[1].feedback,'Second feedback');
+ let move=document.querySelector('[data-hub-move="'+id+'"]');move.value='done';const calls=db.calls.length;move.dispatchEvent(new window.Event('change',{bubbles:true}));await settle();assert.equal(db.calls.length,calls+1);assert.ok(api.state().tasks[0].subTasks.every(s=>s.status==='Completed'));assert.ok(document.querySelector('[data-column="done"] [data-task-card="'+id+'"]'));assert.match(document.querySelector('[data-task-card="'+id+'"] .task-sub-count').textContent,/2\/2 complete/);
+ move=document.querySelector('[data-hub-move="'+id+'"]');move.value='doing';move.dispatchEvent(new window.Event('change',{bubbles:true}));await settle();assert.equal(api.state().tasks[0].done,false);assert.ok(api.state().tasks[0].subTasks.every(s=>s.status==='In Progress'));assert.equal(api.state().tasks[0].subTasks[1].feedback,'Second feedback');
 });
 
 test('Focus supports custom minutes and updating a running total keeps elapsed time',async t=>{
@@ -1408,7 +1496,7 @@ test('workspace Schedule uses activity titles and consistent location, task and 
 test('workspace status badges complete a main task and all subtasks in a single preserved save',async t=>{
  const {api,document,db}=await app(t),id=addMainTask(api,document,'Finish a release');await settle();addTaskSub(api,document,id,'Review','Keep remarks','Keep feedback','Blocked');await settle();api.showTab('tasks');const before=db.calls.length;
  document.querySelector('[data-bench="status"][data-kind="tasks"]').click();assert.ok(document.querySelector('.bench-status-options'));document.querySelector('[data-bench="status-pick"][data-value="done"]').click();await settle();assert.equal(db.calls.length,before+1);const task=api.state().tasks[0];assert.equal(task.done,true);assert.equal(task.subTasks[0].status,'Completed');assert.equal(task.subTasks[0].remarks,'Keep remarks');assert.equal(task.subTasks[0].feedback,'Keep feedback');assert.equal(db.row.document.data.tasks[0].done,true);
- api.hub.workbench.changeStatus('tasks',id,'','todo');await settle();assert.equal(api.state().tasks[0].subTasks[0].status,'Completed');assert.throws(()=>api.hub.workbench.changeStatus('tasks',id,'','invalid'),/valid status/);
+ api.hub.workbench.changeStatus('tasks',id,'','todo');await settle();assert.equal(api.state().tasks[0].subTasks[0].status,'Not started');assert.throws(()=>api.hub.workbench.changeStatus('tasks',id,'','invalid'),/valid status/);
 });
 
 test('workspace ticket stopwatch bookings retain their colour after their session is deleted',async t=>{
@@ -3926,7 +4014,7 @@ test('Task completion rollup: last-child quick completion saves parent and child
 test('Task completion rollup: editor and board details complete the parent while manual reopening remains under user control',async t=>{
  const {api,document,window}=await app(t);const id=addMainTask(api,document,'Editor main'),sub=addTaskSub(api,document,id,'Own child','Notes','Feedback','In Progress');await settle();
  api.editTaskSub(id,sub);let f=document.getElementById('taskSubForm');f.elements.status.value='Completed';api.saveTaskSub(f);await settle();assert.equal(api.state().tasks.find(r=>r.id===id).done,true);
- api.editRecord('tasks',id);f=document.getElementById('editForm');f.elements.done.checked=false;api.saveEdit(f);await settle();assert.equal(api.state().tasks.find(r=>r.id===id).done,false);assert.equal(api.state().tasks.find(r=>r.id===id).subTasks[0].status,'Completed');
+ api.editRecord('tasks',id);f=document.getElementById('editForm');f.elements.boardStatus.value='todo';api.saveEdit(f);await settle();assert.equal(api.state().tasks.find(r=>r.id===id).done,false);assert.equal(api.state().tasks.find(r=>r.id===id).subTasks[0].status,'Not started');
  api.mutate(d=>d.tasks.find(r=>r.id===id).feedback='Unrelated update');await settle();assert.equal(api.state().tasks.find(r=>r.id===id).done,false);
  api.editTaskSub(id,sub);f=document.getElementById('taskSubForm');f.elements.status.value='In Progress';api.saveTaskSub(f);await settle();api.hub.setBoard(true);api.showTab('tasks');await api.hub.handle({dataset:{hub:'task-detail',id}});await settle();
  document.querySelector('#modalBody [data-hub="subtask-complete"]').click();await settle();assert.equal(api.state().tasks.find(r=>r.id===id).done,true);assert.equal(document.getElementById('modal').open,true);assert.match(document.getElementById('modalBody').textContent,/Feedback/);
@@ -3948,7 +4036,7 @@ test('Task completion rollup: stale reviews, closed dialogs, conflicts and chang
 });
 test('Task completion rollup: permission loss and rejected parent saves preserve original child statuses and notes',async t=>{
  const {api,document,window,db}=await app(t),id=addMainTask(api,document,'Protected parent');addTaskSub(api,document,id,'Protected child','Exact 001','Keep feedback','In Progress');await settle();
- const before=copy(api.state().tasks);api.editRecord('tasks',id);const form=document.getElementById('editForm');form.elements.done.checked=true;api.cloud.conflict=true;assert.throws(()=>api.saveEdit(form));assert.deepEqual(copy(api.state().tasks),before);api.cloud.conflict=false;api.closeModal();
+ const before=copy(api.state().tasks);api.editRecord('tasks',id);const form=document.getElementById('editForm');form.elements.boardStatus.value='done';api.cloud.conflict=true;assert.throws(()=>api.saveEdit(form));assert.deepEqual(copy(api.state().tasks),before);api.cloud.conflict=false;api.closeModal();
  api.access.can=(feature,action='view')=>feature!=='tasks'||action==='view';api.showTab('tasks');assert.equal(document.getElementById('taskCompletionNotice'),null);assert.throws(()=>api.hub.taskCompletion.review(),/cannot complete/);assert.deepEqual(copy(api.state().tasks),before);
 });
 

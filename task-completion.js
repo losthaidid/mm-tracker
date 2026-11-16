@@ -1,34 +1,57 @@
-/* Main-task completion uses the shared save pipeline; older groups need an explicit review. */
+/* Task status changes and completion rollup share the record save pipeline. */
 (function (root) {
   'use strict';
-  const esc = value => String(value ?? '').replace(
-    /[&<>"']/g,
-    c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
-  );
+  const esc = value =>
+    String(value ?? '').replace(
+      /[&<>"']/g,
+      c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
+    );
+  const BOARD = { todo: 'To do', doing: 'In progress', blocked: 'Blocked', done: 'Done' };
+  const SUB_STATUS = {
+    todo: 'Not started',
+    doing: 'In Progress',
+    blocked: 'Blocked',
+    done: 'Completed',
+  };
+  const status = task =>
+    task.done ? 'done' : task.boardStatus === 'done' ? 'todo' : task.boardStatus || 'todo';
+  function setStatus(task, value, date) {
+    if (!Object.hasOwn(BOARD, value)) throw Error('Choose a valid task status.');
+    task.boardStatus = value;
+    task.done = value === 'done';
+    task.doneDate = task.done ? task.doneDate || date : '';
+  }
   const allComplete = task =>
     !!task.subTasks?.length && task.subTasks.every(sub => sub.status === 'Completed');
   const pending = tasks => tasks.filter(task => !task.done && !task.archived && allComplete(task));
   function prepare(next, previous, date, at, restoring = false) {
     const oldTasks = new Map((previous?.tasks || []).map(task => [task.id, task]));
     for (const task of next.tasks || []) {
-      const old = oldTasks.get(task.id),
-        lifecycleChanged = !!old && ['done', 'boardStatus', 'archived']
-          .some(field => old[field] !== task[field]);
-      if (!restoring && !lifecycleChanged && !task.done && !task.archived && allComplete(task)) {
+      const old = oldTasks.get(task.id);
+      const nextStatus = status(task);
+      const priorStatus = old ? status(old) : 'todo';
+      if (!restoring && priorStatus !== nextStatus && Object.hasOwn(SUB_STATUS, nextStatus)) {
+        const target = SUB_STATUS[nextStatus];
+        task.subTasks = (task.subTasks || []).map(sub =>
+          sub.status === target ? sub : { ...sub, status: target, updatedAt: at }
+        );
+      } else if (
+        !restoring &&
+        old?.archived !== true &&
+        !task.done &&
+        !task.archived &&
+        allComplete(task)
+      ) {
         const oldSubs = new Map((old?.subTasks || []).map(sub => [sub.id, sub.status])),
-          changed = oldSubs.size !== task.subTasks.length ||
+          changed =
+            oldSubs.size !== task.subTasks.length ||
             task.subTasks.some(sub => oldSubs.get(sub.id) !== sub.status);
         if (changed) {
-          task.done = true;
-          task.doneDate = task.doneDate || date;
+          setStatus(task, 'done', date);
         }
       }
       if (task.done) {
         task.boardStatus = 'done';
-        if (!restoring && !old?.done)
-          task.subTasks = (task.subTasks || []).map(sub =>
-            sub.status === 'Completed' ? sub : { ...sub, status: 'Completed', updatedAt: at }
-          );
       } else if (task.boardStatus === 'done') task.boardStatus = 'todo';
     }
   }
@@ -41,7 +64,10 @@
     function mount(tab) {
       const form = document.getElementById('taskCompletionForm'),
         review = form && reviews.get(form);
-      if (review && (!editable() || review.owner !== identity() || review.generation !== generation()))
+      if (
+        review &&
+        (!editable() || review.owner !== identity() || review.generation !== generation())
+      )
         a.closeModal();
       const old = document.getElementById('taskCompletionNotice');
       if (tab !== 'tasks' || !editable()) {
@@ -59,7 +85,9 @@
       notice.setAttribute('aria-label', 'Main tasks ready to complete');
       notice.innerHTML =
         '<div><strong>All subtasks complete. One last step.</strong><p>' +
-        rows.length + ' main task' + (rows.length === 1 ? ' still has' : 's still have') +
+        rows.length +
+        ' main task' +
+        (rows.length === 1 ? ' still has' : 's still have') +
         ' an open status.</p></div><button type="button" data-task-completion-review>' +
         'Review main tasks</button>';
       if (!old) document.getElementById('view')?.prepend(notice);
@@ -72,21 +100,34 @@
       a.openModal(
         'Complete main tasks',
         '<form id="taskCompletionForm" data-access-feature="tasks">' +
-        '<p>These main tasks have completed subtasks. Choose which main tasks to mark Completed.</p>' +
-        (available.length > 100 ? '<p class="muted">Showing the first 100 of ' +
-          available.length + ' tasks. Review the remaining tasks in another batch.</p>' : '') +
-        '<div class="task-completion-list">' + rows.map(task =>
-          '<label><input type="checkbox" name="tasks" value="' + esc(task.id) +
-          '" checked><span><strong>' +
-          esc([task.number, task.task].filter(Boolean).join(' · ')) +
-          '</strong><small>' + task.subTasks.length + ' / ' + task.subTasks.length +
-          ' subtasks complete</small></span></label>'
-        ).join('') + '</div><label for="taskCompletionDate">Completion date</label>' +
-        '<input type="date" id="taskCompletionDate" name="completionDate" required value="' +
-        esc(a.today()) + '"><p class="muted">Subtask notes, feedback and dates stay as recorded. ' +
-        'Completed main tasks appear in Completed tasks.</p><div class="modal-actions">' +
-        '<button type="button" data-action="cancel">Cancel</button>' +
-        '<button type="submit" class="primary">Complete selected tasks</button></div></form>'
+          '<p>These main tasks have completed subtasks. Choose which main tasks to mark Completed.</p>' +
+          (available.length > 100
+            ? '<p class="muted">Showing the first 100 of ' +
+              available.length +
+              ' tasks. Review the remaining tasks in another batch.</p>'
+            : '') +
+          '<div class="task-completion-list">' +
+          rows
+            .map(
+              task =>
+                '<label><input type="checkbox" name="tasks" value="' +
+                esc(task.id) +
+                '" checked><span><strong>' +
+                esc([task.number, task.task].filter(Boolean).join(' · ')) +
+                '</strong><small>' +
+                task.subTasks.length +
+                ' / ' +
+                task.subTasks.length +
+                ' subtasks complete</small></span></label>'
+            )
+            .join('') +
+          '</div><label for="taskCompletionDate">Completion date</label>' +
+          '<input type="date" id="taskCompletionDate" name="completionDate" required value="' +
+          esc(a.today()) +
+          '"><p class="muted">Subtask notes, feedback and dates stay as recorded. ' +
+          'Completed main tasks appear in Completed tasks.</p><div class="modal-actions">' +
+          '<button type="button" data-action="cancel">Cancel</button>' +
+          '<button type="submit" class="primary">Complete selected tasks</button></div></form>'
       );
       const form = document.getElementById('taskCompletionForm');
       if (!form) throw Error('The completion review could not be opened.');
@@ -100,8 +141,13 @@
       const review = reviews.get(form),
         modal = document.getElementById('modal');
       if (!editable()) throw Error('Your account cannot complete main tasks.');
-      if (!review || document.getElementById('taskCompletionForm') !== form || !modal?.open ||
-          review.owner !== identity() || review.generation !== generation())
+      if (
+        !review ||
+        document.getElementById('taskCompletionForm') !== form ||
+        !modal?.open ||
+        review.owner !== identity() ||
+        review.generation !== generation()
+      )
         throw Error('This completion review expired. Open it again.');
       const selected = [...form.querySelectorAll('[name="tasks"]:checked')].map(el => el.value),
         date = form.elements.namedItem('completionDate')?.value;
@@ -110,17 +156,22 @@
       const current = new Map(a.state().tasks.map(task => [task.id, task]));
       for (const id of selected) {
         const task = current.get(id);
-        if (!review.rows.has(id) || !task || review.rows.get(id) !== JSON.stringify(task) ||
-            task.done || task.archived || !allComplete(task))
+        if (
+          !review.rows.has(id) ||
+          !task ||
+          review.rows.get(id) !== JSON.stringify(task) ||
+          task.done ||
+          task.archived ||
+          !allComplete(task)
+        )
           throw Error('A reviewed task changed. Open the review again before completing it.');
       }
       const chosen = new Set(selected);
       const ok = a.mutate(d => {
         for (const task of d.tasks)
           if (chosen.has(task.id)) {
-            task.done = true;
             task.doneDate = date;
-            task.boardStatus = 'done';
+            setStatus(task, 'done', date);
           }
       });
       if (ok) {
@@ -133,14 +184,31 @@
     document.addEventListener('click', event => {
       if (!event.target.closest?.('[data-task-completion-review]')) return;
       event.preventDefault();
-      try { review(); } catch (error) { a.tell(error.message, true); }
+      try {
+        review();
+      } catch (error) {
+        a.tell(error.message, true);
+      }
     });
     document.addEventListener('submit', event => {
       if (event.target.id !== 'taskCompletionForm') return;
       event.preventDefault();
-      try { apply(event.target); } catch (error) { a.tell(error.message, true); }
+      try {
+        apply(event.target);
+      } catch (error) {
+        a.tell(error.message, true);
+      }
     });
     return { mount, review, apply };
   }
-  root.WorkHubTaskCompletion = { allComplete, pending, prepare, install };
+  root.WorkHubTaskCompletion = {
+    BOARD,
+    SUB_STATUS,
+    status,
+    setStatus,
+    allComplete,
+    pending,
+    prepare,
+    install,
+  };
 })(globalThis);
