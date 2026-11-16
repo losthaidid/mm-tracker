@@ -691,7 +691,7 @@ body #view .tasks-workspace .hub-column {
   border-top: 3px solid var(--task-rail);
   border-radius: 14px;
   background: color-mix(in srgb, var(--task-rail) 8%, var(--hub-surface));
-  min-height: 250px;
+  min-height: 0;
 }
 .tasks-workspace .task-column-heading {
   position: relative;
@@ -705,11 +705,83 @@ body #view .tasks-workspace .hub-column {
   width: 70%;
   left: 15%;
 }
+.task-deck-nav {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+  flex: none;
+}
+.task-deck-counter {
+  padding: 0 5px;
+  color: var(--hub-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+body #view .task-deck-nav button {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  width: 29px;
+  min-height: 30px;
+  border: 1px solid var(--hub-border);
+  border-radius: 8px;
+  background: var(--hub-surface);
+  color: var(--hub-text);
+}
+body #view .task-deck-nav button:hover {
+  border-color: var(--task-rail);
+  background: var(--hub-surface-soft);
+  color: var(--hub-text);
+}
+.task-deck-stage {
+  --task-deck-offset: 0px;
+  position: relative;
+  padding-top: var(--task-deck-offset);
+  touch-action: pan-y pinch-zoom;
+}
+.task-deck-stage[data-depth='1'] {
+  --task-deck-offset: 8px;
+}
+.task-deck-stage[data-depth='2'] {
+  --task-deck-offset: 16px;
+}
+.task-deck-stage:is([data-depth='1'], [data-depth='2'])::after,
+.task-deck-stage[data-depth='2']::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  inset: 0 8px auto;
+  min-height: 28px;
+  border: 1px solid color-mix(in srgb, var(--task-rail) 35%, var(--hub-border));
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--task-rail) 13%, var(--hub-surface));
+  box-shadow: 0 3px 4px #172b351a;
+  pointer-events: none;
+}
+.task-deck-stage[data-depth='2']::after {
+  top: 8px;
+}
+.task-deck-stage[data-depth='2']::before {
+  inset-inline: 16px;
+  background: color-mix(in srgb, var(--task-rail) 20%, var(--hub-surface));
+}
+.task-deck-stage.task-deck-gliding {
+  overflow: clip;
+}
 .tasks-workspace .hub-task {
-  margin-bottom: 8px;
+  z-index: 1;
+  margin: 0;
   padding: 11px;
   border-radius: 11px;
   box-shadow: 0 2px 10px #213a4a0d;
+}
+.tasks-workspace .task-deck-outgoing {
+  position: absolute;
+  inset: var(--task-deck-offset) 0 auto;
+  z-index: 2;
+  pointer-events: none;
 }
 .tasks-workspace .task-board-card-top {
   display: flex;
@@ -743,7 +815,11 @@ body #view .tasks-workspace .hub-column {
   font-size: 11px;
 }
 .task-column-empty {
-  margin: 7px 3px 15px;
+  margin: 0;
+  padding: 16px 9px;
+  border: 1px dashed var(--hub-border);
+  border-radius: 9px;
+  text-align: center;
 }
 .tasks-workspace .hub-task .task-subheading {
   grid-template-columns: minmax(30px, 1fr) auto auto;
@@ -757,6 +833,10 @@ body #view .tasks-workspace .hub-column {
 }
 .tasks-workspace .hub-task .task-child-notes {
   grid-template-columns: 1fr;
+}
+.tasks-workspace .hub-task .task-subitems-body {
+  max-height: min(36vh, 250px);
+  overflow-y: auto;
 }
 
 body #modal:has(.task-editor) {
@@ -910,11 +990,12 @@ body #modal .task-editor h3 {
   .task-draft-note-fields {
     grid-template-columns: minmax(0, 1fr);
   }
-  body #view .tasks-workspace .hub-column {
-    min-height: 0;
-  }
   #modal .task-editor :is(button, input, select),
   #view .tasks-workspace :is(.task-view-switch button, .task-subheading, .task-board-move select) {
+    min-height: 44px;
+  }
+  body #view .task-deck-nav button {
+    width: 44px;
     min-height: 44px;
   }
   .task-draft-remove {

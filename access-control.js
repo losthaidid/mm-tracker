@@ -217,6 +217,7 @@
       const id = feature(t);
       if (!C.byId.has(id)) return;
       let action = 'view';
+      const confirmedAction = control.closest('#workhubConfirm')?.dataset.accessAction;
       const op =
         control.dataset.dr ||
         control.dataset.val ||
@@ -239,7 +240,10 @@
       const hoAction = ['preview', 'download', 'drive'].includes(control.dataset.ho)
         ? 'export'
         : '';
-      if (control.dataset.batch === 'settings') action = 'edit';
+      if (confirmedAction && (event.type === 'submit' || control.dataset.whChoice === 'confirm'))
+        action = confirmedAction;
+      else if (control.dataset.nt === 'delete-permanently') action = 'delete';
+      else if (control.dataset.batch === 'settings') action = 'edit';
       else if (dfAction || hoAction) action = dfAction || hoAction;
       else if (event.type === 'submit' && ['dfSetup', 'dfUnshare'].includes(t.id)) action = 'edit';
       else if (

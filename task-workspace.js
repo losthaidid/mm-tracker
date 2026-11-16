@@ -20,16 +20,22 @@
   const drafts = new WeakMap();
   const expanded = new Set();
   const effects = new Set();
+  const deckPositions = new Map();
   const cardSelector = '.tasks-workspace :is([data-task-record], [data-task-card])';
+  const deckSelector = '.tasks-workspace[data-task-layout="board"] [data-column]';
+  const deckControl = '[data-hub="browse-task-deck"]';
   const cardId = card => card.dataset.taskRecord || card.dataset.taskCard;
   let account = '',
-    generation;
+    generation,
+    swipe;
 
   function syncAccount(owner, version) {
     if (owner === account && version === generation) return;
     account = owner;
     generation = version;
     expanded.clear();
+    deckPositions.clear();
+    swipe = null;
     for (const effect of effects) effect.cancel();
   }
 
@@ -46,6 +52,78 @@
       .join(
         ''
       )}</div><button type="button" class="primary" data-action="new" data-group="tasks">＋ Add main task</button></div></header><div class="task-workspace-result" role="status" aria-live="polite"></div>`;
+  }
+
+  function deckIndex(key, tasks) {
+    const position = deckPositions.get(key);
+    const selected = position ? tasks.findIndex(task => task.id === position.id) : -1;
+    return selected < 0 ? (position?.index || 0) % tasks.length : selected;
+  }
+
+  function deck(key, tasks, renderCard) {
+    const label = BOARD[key],
+      count = tasks.length,
+      index = count ? deckIndex(key, tasks) : 0,
+      counterId = 'taskDeckPosition-' + key;
+    if (count) deckPositions.set(key, { index, id: tasks[index].id });
+    else deckPositions.delete(key);
+    const arrow = (step, name) =>
+      `<button type="button" data-hub="browse-task-deck" data-step="${step}" aria-label="${name} task in ${label}" aria-describedby="${counterId}"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${step < 0 ? 'm10 4-4 4 4 4' : 'm6 4 4 4-4 4'}"/></svg></button>`;
+    return `<section class="hub-column" data-column="${key}" data-task-tone="${key}" aria-labelledby="taskDeckLane-${key}">
+      <div class="flex-title task-column-heading"><h3 id="taskDeckLane-${key}">${label}</h3>
+      <div class="task-deck-nav" role="group" aria-label="${label} task cards">${count > 1 ? arrow(-1, 'Previous') : ''}<span id="${counterId}" class="task-deck-counter">${count ? `${index + 1} of ${count}` : '0 tasks'}</span>${count > 1 ? arrow(1, 'Next') : ''}</div></div>
+      ${count ? `<div class="task-deck-stage" data-depth="${Math.min(2, count - 1)}">${renderCard(tasks[index])}</div>` : '<p class="task-column-empty">No tasks in this stage</p>'}
+      </section>`;
+  }
+
+  function browseDeck(button, tasks, render) {
+    const column = button.closest(deckSelector),
+      step = Number(button.dataset.step);
+    if (!column || tasks.length < 2 || ![-1, 1].includes(step)) return;
+    const key = column.dataset.column,
+      index = (deckIndex(key, tasks) + step + tasks.length) % tasks.length,
+      wasFocused = column.querySelector('.task-deck-nav').contains(document.activeElement),
+      outgoing = playing() && column.querySelector('[data-task-card]');
+    deckPositions.set(key, { index, id: tasks[index].id });
+    render();
+    const newColumn = document.querySelector(`${deckSelector}[data-column="${key}"]`);
+    if (wasFocused)
+      newColumn
+        ?.querySelector(`${deckControl}[data-step="${step}"]`)
+        ?.focus({ preventScroll: true });
+    const incoming = newColumn?.querySelector('[data-task-card]');
+    if (!outgoing || !incoming || !playing()) return;
+    const stage = incoming.parentElement;
+    outgoing.classList.add('task-deck-outgoing');
+    outgoing.removeAttribute('data-task-card');
+    outgoing.removeAttribute('draggable');
+    outgoing.setAttribute('aria-hidden', 'true');
+    outgoing.inert = true;
+    outgoing.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+    stage.classList.add('task-deck-gliding');
+    stage.append(outgoing);
+    animate(
+      incoming,
+      [
+        { opacity: 0.45, transform: `translateX(${step * 16}%) translateY(10px) scale(.97)` },
+        { opacity: 1, transform: 'none' },
+      ],
+      330
+    );
+    const effect = animate(
+      outgoing,
+      [
+        { opacity: 1, transform: 'none' },
+        { opacity: 0, transform: `translateX(${-step * 26}%) rotate(${-step * 3}deg)` },
+      ],
+      250
+    );
+    const cleanup = () => {
+      outgoing.remove();
+      stage.classList.remove('task-deck-gliding');
+    };
+    if (effect) effect.finished.then(cleanup, cleanup);
+    else cleanup();
   }
 
   function progress(task) {
@@ -203,6 +281,7 @@
     effects.add(effect);
     const cleanup = () => effects.delete(effect);
     effect.finished.then(cleanup, cleanup);
+    return effect;
   }
 
   function capture(previous, next) {
@@ -225,6 +304,8 @@
         changes.set(task.id, {
           name: task.task,
           moved,
+          lane: status(task),
+          added: !old,
           rows,
           before: old ? progress(old).fraction : 0,
           fraction: progress(task).fraction,
@@ -237,19 +318,31 @@
       if (change.rows.size) expanded.add(id);
     }
     const positions = new Map();
-    if (playing() && [...changes.values()].some(change => change.moved)) {
-      for (const card of document.querySelectorAll('.tasks-workspace .hub-task')) {
-        const box = card.getBoundingClientRect();
-        if (box.width && box.bottom > 0 && box.top < root.innerHeight)
-          positions.set(cardId(card), box);
+    const vacated = new Set();
+    const columns = document.querySelectorAll(deckSelector);
+    if (columns.length) {
+      for (const [id, change] of changes) {
+        if (change.added && changes.size === 1) deckPositions.set(change.lane, { id, index: 0 });
+      }
+      for (const column of columns) {
+        const card = column.querySelector('[data-task-card]');
+        const change = changes.get(card?.dataset.taskCard);
+        if (!change?.moved) continue;
+        const id = card.dataset.taskCard;
+        vacated.add(column.dataset.column);
+        deckPositions.set(change.lane, { id, index: 0 });
+        if (playing()) {
+          const box = card.getBoundingClientRect();
+          if (box.width && box.bottom > 0 && box.top < root.innerHeight) positions.set(id, box);
+        }
       }
     }
-    return { changes, positions };
+    return { changes, positions, vacated };
   }
 
   function play(result) {
     if (!result) return;
-    const { changes, positions } = result;
+    const { changes, positions, vacated } = result;
     for (const card of document.querySelectorAll(cardSelector)) {
       const id = cardId(card);
       const from = positions.get(id);
@@ -261,12 +354,20 @@
           animate(
             card,
             [
-              { transform: `translate(${dx}px, ${dy}px)`, zIndex: 2 },
-              { transform: 'none', zIndex: 2 },
+              { transform: `translate(${dx}px, ${dy}px)`, zIndex: 5 },
+              { transform: 'none', zIndex: 5 },
             ],
             360
           );
-      }
+      } else if (vacated.has(card.closest('[data-column]')?.dataset.column))
+        animate(
+          card,
+          [
+            { opacity: 0.55, transform: 'translateY(12px) scale(.97)' },
+            { opacity: 1, transform: 'none' },
+          ],
+          350
+        );
       const change = changes.get(id);
       if (!change) continue;
       if (change.before !== change.fraction)
@@ -302,6 +403,44 @@
   }
   document.addEventListener('visibilitychange', visibility);
   motionQuery?.addEventListener?.('change', visibility);
+  document.addEventListener('keydown', event => {
+    if (!event.target.matches?.(deckControl) || !['ArrowLeft', 'ArrowRight'].includes(event.key))
+      return;
+    event.preventDefault();
+    const step = event.key === 'ArrowLeft' ? -1 : 1;
+    event.target
+      .closest('.task-deck-nav')
+      ?.querySelector(`${deckControl}[data-step="${step}"]`)
+      ?.click();
+  });
+  document.addEventListener('pointerdown', event => {
+    if (!['touch', 'pen'].includes(event.pointerType)) return;
+    swipe = null;
+    if (
+      event.isPrimary === false ||
+      event.target.closest?.('input, select, textarea, a, [data-hub-drag], .task-subitems-body')
+    )
+      return;
+    const stage = event.target.closest?.('.task-deck-stage');
+    if (stage && stage.dataset.depth !== '0')
+      swipe = { stage, id: event.pointerId, x: event.clientX, y: event.clientY };
+  });
+  document.addEventListener('pointercancel', event => {
+    if (event.pointerId === swipe?.id) swipe = null;
+  });
+  document.addEventListener('pointerup', event => {
+    if (!swipe || event.pointerId !== swipe.id) return;
+    const { stage, x, y } = swipe;
+    swipe = null;
+    const dx = event.clientX - x,
+      dy = event.clientY - y;
+    if (!stage.isConnected || Math.abs(dx) < 46 || Math.abs(dx) < 1.35 * Math.abs(dy)) return;
+    event.preventDefault();
+    stage
+      .closest(deckSelector)
+      ?.querySelector(`${deckControl}[data-step="${dx < 0 ? 1 : -1}"]`)
+      ?.click();
+  });
   document.addEventListener(
     'toggle',
     event => {
@@ -324,6 +463,8 @@
 
   root.WorkHubTaskWorkspace = {
     banner,
+    deck,
+    browseDeck,
     subItems,
     editorChildren,
     attachEditor,

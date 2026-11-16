@@ -56,8 +56,9 @@
     if (options.cancelLabel)
       dialog.querySelector('[type=button]').textContent = options.cancelLabel;
     const focus = document.activeElement;
-    const ownerFeature = root.WorkHubCurrentAccess?.feature?.(focus);
+    const ownerFeature = options.accessFeature || root.WorkHubCurrentAccess?.feature?.(focus);
     if (ownerFeature) dialog.dataset.accessFeature = ownerFeature;
+    if (options.accessAction) dialog.dataset.accessAction = options.accessAction;
     (document.fullscreenElement || document.body).append(dialog);
     return new Promise(resolve => {
       active = { dialog, resolve, context: captured, focus };
