@@ -62,7 +62,7 @@
     density: 'comfortable',
     desk: true,
   };
-  const BOARD = { todo: 'To do', doing: 'In progress', blocked: 'Blocked', done: 'Done' };
+  const { BOARD, status: taskStatus, setStatus: setTaskStatus } = root.WorkHubTaskCompletion;
   const TIME_OPTIONS = ['custom', 'task', 'project', 'ticket'];
   function subtaskCompletionButton(task, sub, detail = false) {
     const done = sub.status === 'Completed';
@@ -1507,9 +1507,6 @@
         id
       );
     }
-    function taskStatus(t) {
-      return t.done ? 'done' : t.boardStatus === 'done' ? 'todo' : t.boardStatus || 'todo';
-    }
     function taskBoard() {
       const tasks = a
         .state()
@@ -1519,17 +1516,20 @@
             !root.WorkHubReminders.isSnoozed(a.state(), 'tasks', t.id, today()) &&
             (!batchA || batchA.matches('tasks', t.id))
         );
-      return `<section class="hub">${head('MOVE WORK FORWARD', 'Task board', 'Each card keeps its main title and its own subtasks.', btn('toggle-board', 'List view') + btn('new-task', '＋ Add task', '', 'primary'))}<p class="hub-drag-hint">${icon('drag')} Drag a card’s dotted handle into a column. On your phone, drag the handle or use Move to.</p><div class="hub-board">${Object.entries(
-        BOARD
-      )
-        .map(
-          ([key, label]) =>
-            `<section class="hub-column" data-column="${key}"><div class="flex-title"><h3>${label}</h3><span class="hub-badge">${tasks.filter(t => taskStatus(t) === key).length}</span></div>${
-              tasks
-                .filter(t => taskStatus(t) === key)
-                .map(
-                  t =>
-                    `<article class="hub-task" draggable="true" data-task-card="${esc(t.id)}"><div class="flex-title"><span class="hub-kicker">${esc(t.priority)} · ${esc(t.taskType)}</span><button type="button" class="hub-drag-handle" data-hub="drag-help" data-hub-drag="task" aria-label="Drag task to a column, or use left and right arrow keys" title="Drag to move">${icon('drag')}</button></div><h4 class="hub-sensitive">${esc(t.task)}</h4><p class="hub-meta">${esc(a.taskLabel(t))}</p>${a.taskCompanyLabel?.(t) ? `<p class="hub-meta task-company-label">Company · ${esc(a.taskCompanyLabel(t))}</p>` : ''}${a.taskReferences?.(t) || ''}<div class="hub-progress"><span style="width:${t.subTasks.length ? (t.subTasks.filter(s => s.status === 'Completed').length / t.subTasks.length) * 100 : 0}%"></span></div><p class="hub-meta">${t.subTasks.filter(s => s.status === 'Completed').length}/${t.subTasks.length} subtasks · ${esc(t.dueDate) || 'No due date'}</p><div class="actions">${btn('task-detail', 'Details', 'data-id="' + esc(t.id) + '"', 'small')}${btn('task-feedback', 'Add feedback', 'data-id="' + esc(t.id) + '"', 'small')}${btn('timer-new', '▶', 'data-kind="task" data-id="' + esc(t.id) + '" aria-label="Start timer"', 'small')}</div><label class="hub-meta">Move to<select data-hub-move="${esc(t.id)}">${Object.entries(
+      return `<section class="hub tasks-workspace" data-task-layout="board">${root.WorkHubTaskWorkspace.banner(true)}
+        <p class="hub-drag-hint task-board-guide">${icon('drag')} Drag a task to a column, use the arrow keys on its handle, or choose Move to.</p><div class="hub-board">${Object.entries(
+          BOARD
+        )
+          .map(
+            ([key, label]) =>
+              `<section class="hub-column" data-column="${key}" data-task-tone="${key}"><div class="flex-title task-column-heading"><h3>${label}</h3><span class="hub-badge">${tasks.filter(t => taskStatus(t) === key).length}</span></div>${
+                tasks
+                  .filter(t => taskStatus(t) === key)
+                  .map(
+                    t =>
+                      `<article class="hub-task" draggable="true" data-task-card="${esc(t.id)}"><div class="flex-title task-board-card-top"><span class="hub-kicker">${esc(t.priority || t.taskType)}</span><button type="button" class="hub-drag-handle" data-hub="drag-help" data-hub-drag="task" aria-label="Drag task to a column, or use left and right arrow keys" title="Drag to move">${icon('drag')}</button></div><h4 class="hub-sensitive">${esc(t.task)}</h4><div class="task-board-context"><span>${esc(a.taskLabel(t))}</span><span>${t.dueDate ? 'Due ' + esc(t.dueDate) : 'No due date'}${t.doneDate ? ' · Completed ' + esc(t.doneDate) : ''}</span>${a.taskCompanyLabel?.(t) ? `<span class="task-company-label">Company · ${esc(a.taskCompanyLabel(t))}</span>` : ''}</div>
+                    ${a.taskReferences?.(t) || ''}${a.taskSubItems(t)}
+                    <div class="actions">${btn('task-edit', 'Edit task', 'data-id="' + esc(t.id) + '"', 'small')}${btn('task-detail', 'Details', 'data-id="' + esc(t.id) + '"', 'small')}${btn('task-feedback', 'Add feedback', 'data-id="' + esc(t.id) + '"', 'small')}${btn('timer-new', '▶', 'data-kind="task" data-id="' + esc(t.id) + '" aria-label="Start timer"', 'small')}</div><label class="task-board-move">Move to<select data-hub-move="${esc(t.id)}">${Object.entries(
                       BOARD
                     )
                       .map(
@@ -1537,25 +1537,24 @@
                           `<option value="${v}"${v === key ? ' selected' : ''}>${l}</option>`
                       )
                       .join('')}</select></label></article>`
-                )
-                .join('') || '<p class="hub-meta">Drop a card here.</p>'
-            }</section>`
-        )
-        .join('')}</div></section>`;
+                  )
+                  .join('') || '<p class="task-column-empty">No tasks in this stage</p>'
+              }</section>`
+          )
+          .join('')}</div></section>`;
     }
     function moveTask(id, status) {
+      const old = a.state().tasks.find(t => t.id === id);
+      if (!old || old.archived) throw Error('Task no longer available.');
       if (!Object.hasOwn(BOARD, status)) throw Error('Choose a valid column.');
+      if (taskStatus(old) === status) return;
       save(
         (h, d) => {
           const t = d.tasks.find(t => t.id === id);
-          if (!t || t.archived) throw Error('Task no longer available.');
-          t.boardStatus = status;
-          t.done = status === 'done';
-          t.doneDate = t.done ? t.doneDate || today() : '';
+          setTaskStatus(t, status, today());
         },
         'Task moved to ' + BOARD[status] + '.'
       );
-      if (status === 'done') confetti();
     }
     function completeSubtask(parentId, id, detail = false) {
       const task = a.state().tasks.find(t => t.id === parentId),
@@ -3145,20 +3144,6 @@
       workSchedule?.mount(tab);
       myDay?.mount();
       document.body.classList.toggle('hub-focus', !!focus);
-      const extra = $('hubBoardToggle');
-      if (extra) extra.remove();
-      if (tab === 'tasks' && !board) {
-        const target = $('view').querySelector(
-          '.workspace-heading .actions,.workspace-heading,.panel-top'
-        );
-        if (target) {
-          const b = document.createElement('button');
-          b.id = 'hubBoardToggle';
-          b.dataset.hub = 'toggle-board';
-          b.textContent = '▥ Board view';
-          target.append(b);
-        }
-      }
       if (['tickets', 'tasks', 'specs'].includes(tab)) {
         const cards = $('view').querySelectorAll(
           tab === 'tasks' ? '.task-main-card' : tab === 'tickets' ? '.ticket-card' : '.item-card'
@@ -3389,8 +3374,13 @@
         return;
       }
       if (action === 'toggle-board') {
-        board = !board;
+        const nextBoard = el.dataset.boardMode ? el.dataset.boardMode === 'board' : !board;
+        if (nextBoard === board) return;
+        board = nextBoard;
         a.render();
+        $('view')
+          .querySelector('[data-board-mode][aria-pressed="true"]')
+          ?.focus({ preventScroll: true });
         return;
       }
       if (action === 'layout') {

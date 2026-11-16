@@ -46,10 +46,30 @@ test('Task completion: manual parent reopening and board changes are preserved',
   E.prepare(next, before, '2026-11-06', 'now');
   assert.equal(next.tasks[0].done, false);
   assert.equal(next.tasks[0].boardStatus, 'todo');
+  assert.equal(next.tasks[0].subTasks[0].status, 'Not started');
   const later = clone(next);
   later.tasks[0].feedback = 'More feedback';
   E.prepare(later, next, '2026-11-06', 'now');
   assert.equal(later.tasks[0].done, false);
+});
+test('Task status: an explicit parent transition updates every child with one timestamp', () => {
+  const row = task('a', [child('s1', 'Not started'), child('s2', 'Completed')]);
+  let previous = { tasks: [row, task('b', [child('separate', 'Blocked')])] };
+  for (const [value, label] of Object.entries(E.SUB_STATUS)) {
+    const next = clone(previous), date = '2026-11-16';
+    E.setStatus(next.tasks[0], value, date);
+    E.prepare(next, previous, date, 'status-update');
+    assert.equal(next.tasks[0].done, value === 'done');
+    assert.equal(next.tasks[0].doneDate, value === 'done' ? date : '');
+    assert.equal(next.tasks[0].boardStatus, value);
+    assert.ok(next.tasks[0].subTasks.every(s => s.status === label));
+    assert.equal(next.tasks[0].subTasks[1].updatedAt, 'status-update');
+    for (const [index, saved] of row.subTasks.entries())
+      for (const key of ['id', 'title', 'remarks', 'feedback', 'createdAt'])
+        assert.equal(next.tasks[0].subTasks[index][key], saved[key]);
+    assert.deepEqual(next.tasks[1], previous.tasks[1]);
+    previous = next;
+  }
 });
 test('Task completion: parent cascade does not mutate shared children in the original document', () => {
   const before = { tasks: [task('a', [child('s'), child('done', 'Completed')])] },

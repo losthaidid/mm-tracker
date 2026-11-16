@@ -314,10 +314,12 @@ function save(next, restoring = false) {
   } catch {
     temporary = true;
   }
+  const taskEffects = restoring ? null : window.WorkHubTaskWorkspace.capture(state, next);
   state = next;
   corrupt = false;
   notice();
   render();
+  window.WorkHubTaskWorkspace.play(taskEffects);
   if (temporary) tell('Session only. Download a backup before closing.', true);
   return !temporary;
 }
@@ -681,6 +683,10 @@ document.addEventListener('change', e => {
   try {
     const el = e.target,
       id = el.id;
+    if (id === 'field-boardStatus' && el.form?.matches('.task-editor')) {
+      window.WorkHubTaskWorkspace.updateEditor(el.form);
+      return;
+    }
     if (progressFormChange(el) || enhancementChange(el) || projectChange(el)) return;
     if (id === 'statusFilter') {
       filterState.status = el.value;
@@ -708,8 +714,7 @@ document.addEventListener('change', e => {
       const ok = mutate(d => {
         const t = d.tasks.find(t => t.id === el.dataset.task);
         if (t.archived) throw Error('Restore the task before changing its completion.');
-        t.done = el.checked;
-        t.doneDate = el.checked ? today() : '';
+        window.WorkHubTaskCompletion.setStatus(t, el.checked ? 'done' : 'todo', today());
       });
       if (ok)
         tell(
@@ -1184,6 +1189,7 @@ function notice() {
 /** Choose the current screen, refresh its markup and then let feature modules decorate it. Rendering is not a save. */
 function render() {
   window.WorkHubDialogs.sync();
+  window.WorkHubTaskWorkspace.syncAccount(cloud.user?.id || '', cloud.generation);
   // A design-only save updates the shell while keeping open editors and working data intact.
   if (hub?.websiteDesigns?.preservingContent()) {
     hub.websiteDesigns.mount();
@@ -3773,9 +3779,40 @@ function editRecord(group, id) {
           : {};
   const r = old || defaults,
     projectId = old?.projectId || state.activeProjectId;
+  if (group === 'tasks') {
+    const { BOARD, status } = window.WorkHubTaskCompletion;
+    const currentStatus = status(r);
+    const values = Object.entries(BOARD)
+      .map(
+        ([key, label]) =>
+          `<option value="${key}"${key === currentStatus ? ' selected' : ''}>${label}</option>`
+      )
+      .join('');
+    const taskField = key => {
+      const [k, label, type, required] = FIELDS.tasks.find(([name]) => name === key);
+      return field(k, label, type, required, r[k] ?? '', 'tasks');
+    };
+    openModal(
+      old ? 'Edit task' : 'Add task',
+      `<form id="editForm" class="task-editor" data-group="tasks" data-id="${esc(id || '')}" data-original-status="${currentStatus}">
+        <section class="task-editor-details" aria-labelledby="taskDetailsHeading"><h3 id="taskDetailsHeading">Main task</h3>
+          <div class="form-grid">${taskField('task')}<div><label for="field-boardStatus">Status</label><select name="boardStatus" id="field-boardStatus">${values}</select></div>
+          ${taskField('priority')}${taskField('dueDate')}${taskField('taskType')}${taskField('number')}<div data-task-finished-date>${taskField('doneDate')}</div>${taskLinkFields(r)}
+          </div></section>
+        ${window.WorkHubTaskWorkspace.editorChildren(r)}
+        <details class="task-editor-context"><summary>Notes, links and references</summary>
+          <div class="form-grid">${taskField('remarks')}${taskField('feedback')}${taskReferenceFields(r)}</div>
+        </details>
+        <div class="modal-actions"><div>${old ? `<button type="button" class="danger" data-action="delete" data-group="tasks" data-id="${esc(id)}">Delete task</button>` : ''}</div>
+          <div class="actions"><button type="button" data-action="cancel">Cancel</button><button class="primary" type="submit">Save task</button></div></div></form>`
+    );
+    window.WorkHubTaskWorkspace.syncAccount(cloud.user?.id || '', cloud.generation);
+    window.WorkHubTaskWorkspace.attachEditor($('editForm'), old);
+    return;
+  }
   openModal(
     (old ? 'Edit ' : 'Add ') + { tickets: 'ticket', tasks: 'task', specs: 'project item' }[group],
-    `<form id="editForm" data-group="${group}" data-id="${esc(id || '')}"><div class="form-grid">${group === 'specs' ? projectField(projectId) + projectCompanyField(projectId, r.companyId || '') : ''}${FIELDS[group].map(([k, l, t, required]) => field(k, l, t, required, r[k] ?? '', group)).join('')}${group === 'tasks' ? taskLinkFields(r) + taskReferenceFields(r) : ''}</div>${group === 'tickets' ? '<p class="hint">Changing History tracker automatically updates the history date and time when you save.</p>' : group === 'specs' ? '<p class="hint">Completing this item completes its sub-items. Completing every sub-item automatically completes this item.</p>' : ''}<div class="modal-actions"><div>${old ? `<button type="button" class="danger" data-action="delete" data-group="${group}" data-id="${esc(id)}">Delete ${group === 'tickets' ? 'ticket' : 'record'}</button>` : ''}</div><div class="actions"><button type="button" data-action="cancel">Cancel</button><button class="primary" type="submit">Save ${group === 'tickets' ? 'ticket' : 'record'}</button></div></div></form>`
+    `<form id="editForm" data-group="${group}" data-id="${esc(id || '')}"><div class="form-grid">${group === 'specs' ? projectField(projectId) + projectCompanyField(projectId, r.companyId || '') : ''}${FIELDS[group].map(([k, l, t, required]) => field(k, l, t, required, r[k] ?? '', group)).join('')}</div>${group === 'tickets' ? '<p class="hint">Changing History tracker automatically updates the history date and time when you save.</p>' : group === 'specs' ? '<p class="hint">Completing this item completes its sub-items. Completing every sub-item automatically completes this item.</p>' : ''}<div class="modal-actions"><div>${old ? `<button type="button" class="danger" data-action="delete" data-group="${group}" data-id="${esc(id)}">Delete ${group === 'tickets' ? 'ticket' : 'record'}</button>` : ''}</div><div class="actions"><button type="button" data-action="cancel">Cancel</button><button class="primary" type="submit">Save ${group === 'tickets' ? 'ticket' : 'record'}</button></div></div></form>`
   );
 }
 
@@ -3789,6 +3826,7 @@ function saveEdit(form) {
     r = { id: id || uid() };
   if (id && !old) throw Error('The record no longer exists.');
   for (const [k, l, type] of FIELDS[group]) {
+    if (group === 'tasks' && k === 'done') continue;
     const el = form.elements.namedItem(k);
     r[k] =
       type === 'checkbox'
@@ -3807,8 +3845,14 @@ function saveEdit(form) {
     }
   }
   if (group === 'tasks') {
-    r.subTasks = clone(old?.subTasks || []);
-    r.boardStatus = old?.boardStatus || (r.done ? 'done' : 'todo');
+    const workspace = window.WorkHubTaskWorkspace;
+    workspace.syncAccount(cloud.user?.id || '', cloud.generation);
+    r.subTasks = workspace.readEditor(form, old, uid, new Date().toISOString());
+    window.WorkHubTaskCompletion.setStatus(
+      r,
+      form.elements.boardStatus.value,
+      old?.done ? '' : today()
+    );
     r.archived = old?.archived || false;
     r.archivedAt = old?.archivedAt || '';
     r.linkId =
@@ -3838,8 +3882,6 @@ function saveEdit(form) {
       r.archived = false;
       r.archivedAt = '';
     }
-    if (r.done && (!old || !old.done) && !r.doneDate) r.doneDate = today();
-    if (!r.done) r.doneDate = '';
   }
   if (group === 'specs') {
     rootDateCapture(form, r, old);
@@ -3893,7 +3935,11 @@ function saveEdit(form) {
       form.dataset.captureSession,
       form.dataset.captureOwner
     );
-  if (ok) tell('Saved.');
+  if (ok) {
+    const completed =
+      group === 'tasks' && !old?.done && state.tasks.find(task => task.id === r.id)?.done;
+    tell(completed ? 'Task and sub-items saved. View the task in Completed tasks.' : 'Saved.');
+  }
 }
 
 let pendingGovernanceImport = null,
@@ -4367,6 +4413,19 @@ async function enhancementAction(b) {
   if (await workhubAction(b)) return true;
   const a = b.dataset.action,
     id = b.dataset.id;
+  if (a === 'task-draft-insert' || a === 'task-draft-discard') {
+    window.WorkHubTaskWorkspace.changeDraft(b);
+    return true;
+  }
+  if (a === 'task-edit-children') {
+    const task = state.tasks.find(task => task.id === id);
+    if (!task || task.archived) throw Error('Open an active or completed task to add sub-items.');
+    editRecord('tasks', id);
+    window.WorkHubTaskWorkspace.changeDraft(
+      $('editForm').querySelector('[data-action="task-draft-insert"]')
+    );
+    return true;
+  }
   if (a === 'task-reference-add' || a === 'task-reference-remove') {
     const form = b.closest?.('#editForm[data-group="tasks"]');
     if (!form) throw Error('Reopen the task editor before changing its references.');
@@ -7728,7 +7787,8 @@ function editTaskSub(parentId, id = '') {
   const task = state.tasks.find(task => task.id === parentId),
     old = task?.subTasks.find(sub => sub.id === id);
   if (!task || (id && !old)) throw Error('Sub-task not found.');
-  const sub = old || { title: '', status: 'Not started', remarks: '', feedback: '' };
+  const { SUB_STATUS, status } = window.WorkHubTaskCompletion;
+  const sub = old || { title: '', status: SUB_STATUS[status(task)], remarks: '', feedback: '' };
   openModal(
     old ? 'Edit sub-task' : 'Add sub-task',
     `<form id="taskSubForm" data-parent="${esc(parentId)}" data-id="${esc(id)}"><div class="manual-entry-hero"><span class="eyebrow">Main task${task.number ? ' · ' + esc(task.number) : ''}</span><strong>${esc(task.task)}</strong></div><div class="form-grid"><div class="wide"><label for="taskSubTitle">Sub-task *</label><input id="taskSubTitle" name="title" maxlength="500" required value="${esc(sub.title)}"></div><div><label for="taskSubStatus">Status *</label><select id="taskSubStatus" name="status">${SUBITEM_STATUSES.map(status => `<option${status === sub.status ? ' selected' : ''}>${esc(status)}</option>`).join('')}</select></div><div class="wide"><label for="taskSubRemarks">Remarks</label><textarea id="taskSubRemarks" name="remarks" maxlength="32767">${esc(sub.remarks)}</textarea></div><div class="wide"><label for="taskSubFeedback">Feedback</label><textarea id="taskSubFeedback" name="feedback" maxlength="32767">${esc(sub.feedback)}</textarea></div></div><p class="hint">Remarks and feedback belong only to this sub-task. Completing the last unfinished sub-task also completes its main task.</p><div class="modal-actions"><div>${old ? `<button type="button" class="danger" data-action="delete-task-sub" data-parent="${esc(parentId)}" data-id="${esc(id)}">Delete sub-task</button>` : ''}</div><div class="actions"><button type="button" data-action="cancel">Cancel</button><button type="submit" class="primary">Save sub-task</button></div></div></form>`
@@ -7768,27 +7828,47 @@ function saveTaskSub(form) {
     );
   }
 }
+function taskSubItems(task) {
+  const rows = task.subTasks || [];
+  return window.WorkHubTaskWorkspace.subItems(
+    task,
+    `<div class="task-child-list">${rows.map(sub => subTaskCard(task, sub)).join('')}</div>
+    ${task.archived ? '' : `<button type="button" class="small task-manage-sub" data-action="task-edit-children" data-group="tasks" data-id="${esc(task.id)}">＋ Add sub-item</button>`}`
+  );
+}
 function taskCard(task) {
-  const subs = task.subTasks || [],
-    done = subs.filter(sub => sub.status === 'Completed').length;
-  return `<article class="task-main-card${taskOverdue(task) ? ' overdue' : ''}"><div class="task-card-heading"><div><span class="eyebrow">Main task${task.number ? ' · ' + esc(task.number) : ''}</span><h3>${esc(task.task)}</h3><div class="task-card-meta">${tag(task.taskType)}${tag(task.priority)}<span>${esc(taskLinkedLabel(task))}</span>${taskCompanyLabel(task) ? `<span class="task-company-label">Company · ${esc(taskCompanyLabel(task))}</span>` : ''}</div></div></div><div class="task-date-strip"><span>Due <strong>${dateLabel(task.dueDate)}</strong>${taskOverdue(task) ? ' · Overdue' : ''}</span>${task.doneDate ? `<span>Completed ${esc(task.doneDate)}</span>` : ''}${task.archived ? `<span>Archived ${esc(task.archivedAt)}</span>` : ''}</div><dl class="task-parent-notes"><div><dt>Main task remarks</dt><dd>${esc(task.remarks) || 'No remarks yet'}</dd></div><div><dt>Main task feedback</dt><dd>${esc(task.feedback) || 'No feedback yet'}</dd></div></dl>${taskReferencesMarkup(task)}<div class="task-subheading"><div><strong>Sub-tasks</strong><span>${done}/${subs.length} complete</span></div><button class="small" data-action="new-task-sub" data-parent="${esc(task.id)}">+ Add sub-task</button></div>${subs.length ? `<div class="progress"><span style="width:${(done / subs.length) * 100}%"></span></div><div class="task-child-list">${subs.map(sub => subTaskCard(task, sub)).join('')}</div>` : '<p class="task-sub-empty">Break this task into smaller actions, each with its own updates.</p>'}<div class="task-card-footer"><button class="small" data-action="edit" data-group="tasks" data-id="${esc(task.id)}">Edit main task</button>${task.archived ? `<button class="small" data-action="restore-task" data-id="${esc(task.id)}">Restore task</button>` : task.done ? `<button class="small" data-action="archive-task" data-id="${esc(task.id)}">Archive task</button>` : `<button class="small" data-action="schedule-task" data-id="${esc(task.id)}">Schedule task</button>`}</div></article>`;
+  const { BOARD, status } = window.WorkHubTaskCompletion;
+  const current = status(task),
+    company = taskCompanyLabel(task);
+  return `<article class="task-main-card${taskOverdue(task) ? ' overdue' : ''}" data-task-record="${esc(task.id)}" data-task-tone="${current}">
+    <div class="task-card-heading"><div>
+      ${task.number ? `<span class="task-card-number">Task ${esc(task.number)}</span>` : ''}
+      <h3 class="hub-sensitive">${esc(task.task)}</h3>
+      <div class="task-card-meta"><span class="tag" data-task-state-indicator>${BOARD[current]}</span>${tag(task.priority)}${tag(task.taskType)}<span>${esc(taskLinkedLabel(task))}</span>${company ? `<span class="task-company-label">Company · ${esc(company)}</span>` : ''}</div></div></div>
+    <div class="task-date-strip"><span>Due <strong>${dateLabel(task.dueDate)}</strong>${taskOverdue(task) ? ' · Overdue' : ''}</span>${task.doneDate ? `<span>Completed ${esc(task.doneDate)}</span>` : ''}${task.archived ? `<span>Archived ${esc(task.archivedAt)}</span>` : ''}</div>
+    ${taskSubItems(task)}
+    ${task.remarks || task.feedback || task.references?.length ? `<details class="task-card-context"><summary>Notes and references</summary><dl class="task-parent-notes"><div><dt>Remarks</dt><dd>${esc(task.remarks) || '—'}</dd></div><div><dt>Feedback</dt><dd>${esc(task.feedback) || '—'}</dd></div></dl>${taskReferencesMarkup(task)}</details>` : ''}
+    <div class="task-card-footer"><button type="button" class="small" data-action="edit" data-group="tasks" data-id="${esc(task.id)}">Edit main task</button>${task.archived ? `<button type="button" class="small" data-action="restore-task" data-id="${esc(task.id)}">Restore task</button>` : task.done ? `<button type="button" class="small" data-action="archive-task" data-id="${esc(task.id)}">Archive task</button>` : `<button type="button" class="small" data-action="schedule-task" data-id="${esc(task.id)}">Schedule task</button>`}</div></article>`;
 }
 function taskSummary() {
   const active = state.tasks.filter(task => !task.archived),
     subs = active.flatMap(task => task.subTasks || []);
-  return `<div class="workspace-summary">${[
-    ['Open main tasks', active.filter(task => !task.done).length],
-    ['Sub-tasks open', subs.filter(sub => sub.status !== 'Completed').length],
-    ['Overdue', state.tasks.filter(taskOverdue).length],
-    ['Completed main tasks', active.filter(task => task.done).length],
+  return `<div class="task-workspace-summary">${[
+    ['Open main tasks', active.filter(task => !task.done).length, 'todo'],
+    ['Open sub-items', subs.filter(sub => sub.status !== 'Completed').length, 'doing'],
+    ['Overdue', state.tasks.filter(taskOverdue).length, 'blocked'],
+    ['Completed main tasks', active.filter(task => task.done).length, 'done'],
   ]
-    .map(([label, count]) => `<div><span>${label}</span><strong>${count}</strong></div>`)
+    .map(
+      ([label, count, tone]) =>
+        `<div data-task-tone="${tone}"><span>${label}</span><strong>${count}</strong></div>`
+    )
     .join('')}</div>`;
 }
 function renderTasksV3() {
   const rows = filteredTasks(),
     completed = state.tasks.filter(task => task.done && !task.archived).length;
-  return `<div class="workspace-v10 tasks-workspace"><div class="workspace-heading"><div><span class="eyebrow">Tasks &amp; next steps</span><h2>From the main task to the smallest detail</h2><p>Keep every action, remark and piece of feedback connected.</p></div><button class="primary" data-action="new" data-group="tasks">+ Add main task</button></div>${taskSummary()}<section class="panel"><div class="workspace-toolbar"><input id="tasksSearch" type="search" value="${esc(tasksQuery)}" aria-label="Search tasks" placeholder="Search main tasks, sub-tasks, remarks or feedback"><select id="taskView" aria-label="Task view">${[
+  return `<div class="workspace-v10 tasks-workspace" data-task-layout="list">${window.WorkHubTaskWorkspace.banner(false)}${taskSummary()}<section class="task-list-panel"><div class="task-list-tools"><label class="task-search">Search tasks<input id="tasksSearch" type="search" value="${esc(tasksQuery)}" placeholder="Task, sub-item, remarks, or feedback"></label><label class="task-list-filter" data-task-tone="${{ active: 'doing', done: 'done', overdue: 'blocked', archive: 'todo' }[taskView]}">Show<select id="taskView" aria-label="Task view">${[
     ['active', 'Active tasks'],
     ['done', 'Completed tasks'],
     ['overdue', 'Overdue tasks'],
@@ -7800,7 +7880,7 @@ function renderTasksV3() {
     )
     .join(
       ''
-    )}</select><select id="taskPriority" aria-label="Task priority">${selectOptions(OPTIONS.priority, taskPriority, 'All priorities')}</select><select id="taskSort" aria-label="Sort tasks">${[
+    )}</select></label><label>Priority<select id="taskPriority" aria-label="Task priority">${selectOptions(OPTIONS.priority, taskPriority, 'All priorities')}</select></label><label>Sort<select id="taskSort" aria-label="Sort tasks">${[
     ['due', 'Due date first'],
     ['priority', 'Priority first'],
     ['number', 'Task number'],
@@ -7811,7 +7891,7 @@ function renderTasksV3() {
     )
     .join(
       ''
-    )}</select></div><div class="workspace-results"><span>${rows.length} main task${rows.length === 1 ? '' : 's'}</span><button class="small" data-action="archive-done"${completed ? '' : ' disabled'}>Archive completed (${completed})</button></div><div class="task-board">${rows.map(taskCard).join('') || '<div class="workspace-empty"><strong>No tasks in this view</strong><p>Add a main task or adjust your filters to get started.</p></div>'}</div></section></div>`;
+    )}</select></label></div><div class="task-list-results"><span>${rows.length} main task${rows.length === 1 ? '' : 's'}</span><button type="button" class="small" data-action="archive-done"${completed ? '' : ' disabled'}>Archive completed (${completed})</button></div><div class="task-board">${rows.map(taskCard).join('') || '<div class="workspace-empty"><strong>No tasks in this view</strong><p>Add a main task or adjust the filters.</p></div>'}</div></section></div>`;
 }
 /** Tickets use the card workspace; status, details and editors share the existing handlers. */
 function renderTickets() {
@@ -9715,6 +9795,7 @@ function saveCloud(next, restoring = false) {
     temporary = true;
   }
   const previous = state;
+  const taskEffects = restoring ? null : window.WorkHubTaskWorkspace.capture(previous, next);
   state = next;
   cloud.changeSerial++;
   if (MMTrackerMerge.sameRecords(document, JSON.parse(payload(previous)))) {
@@ -9728,6 +9809,7 @@ function saveCloud(next, restoring = false) {
   persistCloudCache();
   notice();
   render();
+  window.WorkHubTaskWorkspace.play(taskEffects);
   void flushCloud();
   hub?.saved(previous, next);
   return true;
@@ -10425,6 +10507,7 @@ hub = WorkHubStudio.install({
   taskLabel: taskLinkedLabel,
   taskCompanyLabel,
   taskReferences: taskReferencesMarkup,
+  taskSubItems,
   itemLabel: projectItemLabel,
   appendTicketHistory: autoHistory,
   rangeSegments,
