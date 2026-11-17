@@ -2899,6 +2899,61 @@ test('maintained leave types: adding a type populates Schedule and its yearly al
  const backup=api.parseBackup(api.payload(api.state()));assert.equal(backup.workhub.leaveTypes.at(-1).name,'Compassionate Leave');const report=window.WorkHubReports.build(api.state(),{asOf:'2026-10-28'});assert.equal(report.sheets.find(s=>s.name==='Schedule').rows[0].values[5],'Compassionate Leave');
  const next=await app(t,{remote:copy(db.row),login:false});await next.api.loadCloud(sessionUser);assert.equal(next.window.WorkHubLeaveBalancesEngine.balance(next.api.state(),'2026',id).remaining,.5);next.api.openRangeEditor('2026-10-26','09:00');assert.equal(next.document.getElementById('scheduleForm').elements.namedItem('kind').value,id);api.validate(api.state());
 });
+test('maintained leave types: earned dates persist and appear only in maintenance', async t => {
+ const ctx=await app(t),{api,document,window,db}=ctx;
+ const earnedDate='2026-08-24';
+ api.setMonth('2026-11');
+ api.showTab('schedule');
+ document.querySelector('[data-leave-balance="types"]').click();
+ document.querySelector('[data-leave-balance="new-type"]').click();
+ let form=document.getElementById('leaveTypeForm');
+ assert.equal(form.elements.earnedDate.type,'date');
+ assert.equal(form.elements.earnedDate.required,false);
+ fill(form,{name:'Replacement Leave',code:'RL',earnedDate});
+ submitLocal(window,form);
+ await settle();
+ const row=api.state().workhub.leaveTypes.at(-1);
+ const {id}=row;
+ assert.equal(row.earnedDate,earnedDate);
+ assert.equal(document.querySelector('#leaveTypesManager time').dateTime,earnedDate);
+ assert.equal(db.row.document.data.workhub.leaveTypes.at(-1).earnedDate,earnedDate);
+ assert.equal(api.parseBackup(api.payload(api.state())).workhub.leaveTypes.at(-1).earnedDate,earnedDate);
+
+ api.closeModal();
+ assert.doesNotMatch(document.getElementById('view').textContent,/Date earned|24 Aug 2026|2026-08-24/);
+ api.hub.leaveBalances.settings('2026',id);
+ assert.doesNotMatch(document.getElementById('leaveBalanceForm').textContent,/Date earned|24 Aug 2026|2026-08-24/);
+ api.closeModal();
+ form=await leaveEditor(ctx,id,{date:'2026-11-16'});
+ assert.equal(form.elements.namedItem('earnedDate'),null);
+ api.saveRange(form);
+ await settle();
+ const schedule=copy(api.state().schedule);
+ const balances=copy(api.state().workhub.leaveBalances);
+ assert.doesNotMatch(JSON.stringify(schedule),/earnedDate|2026-08-24/);
+ const report=window.WorkHubReports.build(api.state(),{asOf:'2026-11-17'});
+ assert.doesNotMatch(JSON.stringify(report),/earnedDate|2026-08-24/);
+
+ api.hub.leaveBalances.editType('annual-leave');
+ assert.equal(document.getElementById('leaveTypeForm').elements.namedItem('earnedDate'),null);
+ api.hub.leaveBalances.editType(id);
+ form=document.getElementById('leaveTypeForm');
+ assert.equal(form.elements.earnedDate.value,earnedDate);
+ form.elements.earnedDate.value='2026-09-04';
+ submitLocal(window,form);
+ await settle();
+ assert.equal(document.querySelector('#leaveTypesManager time').dateTime,'2026-09-04');
+
+ api.hub.leaveBalances.editType(id);
+ form=document.getElementById('leaveTypeForm');
+ form.elements.earnedDate.value='';
+ submitLocal(window,form);
+ await settle();
+ assert.equal(document.querySelector('#leaveTypesManager time'),null);
+ assert.equal(db.row.document.data.workhub.leaveTypes.at(-1).earnedDate,undefined);
+ assert.deepEqual(copy(api.state().schedule),schedule);
+ assert.deepEqual(copy(api.state().workhub.leaveBalances),balances);
+});
 test('maintained leave types: rename, archive and restore preserve bookings and escape maintained names',async t=>{
  const ctx=await app(t),{api,document,window}=ctx,id=await addLeaveType(ctx);let f=await leaveEditor(ctx,id,{date:'2026-10-26'});api.saveRange(f);await settle();const before=copy(api.state().schedule);api.hub.leaveBalances.editType(id);f=document.getElementById('leaveTypeForm');fill(f,{name:'Care <img src=x> Leave',code:'CARE'});f.elements.namedItem('archived').checked=true;api.hub.leaveBalances.saveType(f);await settle();assert.deepEqual(copy(api.state().schedule),before);assert.equal(document.querySelector('#leaveTypesManager img'),null);assert.match(document.getElementById('leaveTypesManager').textContent,/Care <img src=x> Leave/);api.closeModal();
  api.openRangeEditor('2026-10-27','09:00','',true);f=document.getElementById('scheduleForm');assert.equal(f.querySelector('option[value="'+id+'"]'),null);api.closeModal();api.openRangeEditor('2026-10-26','09:00');f=document.getElementById('scheduleForm');assert.match(f.elements.namedItem('kind').selectedOptions[0].textContent,/archived/);assert.equal(f.querySelector('[data-leave-editor] img'),null);fill(f,{leaveContact:'Keep this historical note'});api.saveRange(f);await settle();

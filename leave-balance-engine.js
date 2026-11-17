@@ -67,6 +67,12 @@
         throw Error(
           'Leave type names, codes and IDs must be valid and unique. Use a short code of up to 12 letters, numbers or hyphens.'
         );
+      if (
+        t.earnedDate !== undefined &&
+        t.earnedDate !== '' &&
+        (Object.hasOwn(TYPES, t.id) || !root.WorkHubReminders.validDate(t.earnedDate))
+      )
+        throw Error('Choose a valid date earned for the custom leave type.');
       ids.add(t.id);
       names.add(t.name.toLowerCase());
       codes.add(t.code);

@@ -90,3 +90,22 @@ test('holidays: invalid restored calendars fail and independent dates merge with
  const d=state();E.upgrade(d);for(const bad of [null,false,[{id:'2026-02-30',name:'Bad'}],[{id:'2026-10-26',name:''}],[{id:'2026-10-26',name:'A'},{id:'2026-10-26',name:'B'}]]){const x=copy(d);x.workhub.publicHolidays=bad;assert.throws(()=>E.validate(x),/Public holidays/);}
  const b={data:d},l=copy(b),r=copy(b);l.data.workhub.publicHolidays.push({id:'2026-10-26',name:'A'});r.data.workhub.publicHolidays.push({id:'2026-10-27',name:'B'});const m=window.MMTrackerMerge.merge(b,l,r);assert.deepEqual(copy(m.conflicts),[]);assert.equal(m.data.workhub.publicHolidays.length,2);
 });
+
+test('leave types validate an optional earned date on custom types', () => {
+  const d = state();
+  E.upgrade(d);
+  const custom = {id:'leave-comp',name:'Replacement Leave',code:'RL',archived:false};
+  d.workhub.leaveTypes.push(custom);
+  E.validate(d);
+  for (const value of ['', '2028-02-29']) {
+    custom.earnedDate = value;
+    E.validate(d);
+  }
+  for (const value of [null, '2026-02-29', '2026-10-20T00:00:00Z']) {
+    custom.earnedDate = value;
+    assert.throws(() => E.validate(d), /valid date earned/);
+  }
+  delete custom.earnedDate;
+  d.workhub.leaveTypes[0].earnedDate = '2026-10-20';
+  assert.throws(() => E.validate(d), /custom leave type/);
+});
