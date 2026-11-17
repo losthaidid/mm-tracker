@@ -3,6 +3,7 @@
   'use strict';
 
   const { entries, refs } = root.WorkHubSapTermsData;
+  const { groups, scenarios, byId: scenariosById } = root.WorkHubSapTransactionScenarios;
   const { editions, guides } = root.WorkHubMmKnowledgeData;
   const byId = new Map(entries.map(entry => [entry.id, entry]));
   const byGuide = new Map(guides.map(guide => [guide.id, guide]));
@@ -10,6 +11,9 @@
   const kinds = { key: 'Transaction/event key', modifier: 'Account grouping' };
   const inEdition = (entry, edition) =>
     !edition || (edition === 'historical' ? entry.historical : entry.editions.includes(edition));
+  const scenarioInEdition = (scenario, edition) => !edition || scenario.editions.includes(edition);
+  const scenarioLabel = scenario =>
+    [scenario.label, scenario.movements.join(' / ')].filter(Boolean).join(' · ');
   const displayCode = entry => (entry.modifier === '' ? entry.key + ' / blank' : entry.id);
   const fold = value =>
     value
@@ -21,6 +25,10 @@
   const singular = word =>
     word.length > 3 ? word.replace(/(ch|sh|ss|x|z)es$/, '$1').replace(/([^su])s$/, '$1') : word;
   const stopWords = new Set(['a', 'an', 'for', 'in', 'of', 'on', 'the', 'to', 'with']);
+  function searchField(text, weight) {
+    const phrase = fold(text);
+    return { phrase, words: phrase.split(' ').map(singular), weight };
+  }
   const index = entries.map(entry => {
     const fields = [
       [entry.id, 30],
@@ -37,13 +45,21 @@
       [entry.demo.setup, 5],
       [entry.check, 4],
       ...entry.demo.postings.map(item => [item.title + ' ' + item.effect, 5]),
-    ].map(([text, weight]) => {
-      const phrase = fold(text);
-      return { phrase, words: phrase.split(' ').map(singular), weight };
-    });
+    ].map(([text, weight]) => searchField(text, weight));
     return { entry, fields };
   });
-  function search(query = '', kind = '', edition = '') {
+  const scenarioTerms = new Map(
+    scenarios.map(scenario => [
+      scenario.id,
+      new Set(entries.filter(entry => scenario.codes.some(code => highlights(entry, code)))),
+    ])
+  );
+  function search(query = '', kind = '', edition = '', transaction = '') {
+    const scenario = scenariosById.get(transaction);
+    if (transaction && (!scenario || !scenarioInEdition(scenario, edition))) return [];
+    const matched = scenarioTerms.get(transaction);
+    const context =
+      scenario && searchField(groups[scenario.group] + ' ' + scenarioLabel(scenario), 6);
     const phrase = fold(query);
     const required = phrase
       .split(' ')
@@ -51,12 +67,18 @@
       .map(singular);
     return index
       .flatMap(({ entry, fields }) => {
-        if ((kind && entry.kind !== kind) || !inEdition(entry, edition)) return [];
+        if (
+          (kind && entry.kind !== kind) ||
+          !inEdition(entry, edition) ||
+          (matched && !matched.has(entry))
+        )
+          return [];
         if (!required.length) return [{ entry, score: 0 }];
+        const searchable = context ? [...fields, context] : fields;
         const scores = required.map(term =>
           Math.max(
             0,
-            ...fields
+            ...searchable
               .filter(field =>
                 field.words.some(
                   word => word === term || (/^[a-z]{3,}$/.test(term) && word.startsWith(term))
@@ -76,7 +98,7 @@
           (exactCode ? 120 : 0) +
           Math.max(
             0,
-            ...fields
+            ...searchable
               .filter(field => (' ' + field.phrase + ' ').includes(' ' + phrase + ' '))
               .map(field => field.weight * 2)
           );
@@ -88,6 +110,7 @@
 
   const currency = new Intl.NumberFormat('en-MY', { style: 'currency', currency: 'MYR' });
   function highlights(entry, code) {
+    if (!entry || !code) return false;
     if (entry.modifier === null) return code.split('/')[0] === entry.key;
     return code === (entry.modifier ? entry.id : entry.key);
   }
@@ -100,6 +123,7 @@
     let query = '',
       kind = '',
       edition = '',
+      transaction = '',
       playback = null,
       timer;
 
@@ -108,6 +132,30 @@
       Object.entries(values)
         .map(([value, title]) => option(value, title, current))
         .join('');
+    const currentScenario = () => scenariosById.get(transaction);
+    function scenarioOptions() {
+      return (
+        option('', 'All transaction scenarios', transaction) +
+        Object.entries(groups)
+          .map(([id, label]) => {
+            const choices = scenarios.filter(
+              scenario => scenario.group === id && scenarioInEdition(scenario, edition)
+            );
+            if (!choices.length) return '';
+            return `<optgroup label="${esc(label)}">${choices
+              .map(scenario => option(scenario.id, scenarioLabel(scenario), transaction))
+              .join('')}</optgroup>`;
+          })
+          .join('')
+      );
+    }
+    function scenarioContext() {
+      const scenario = currentScenario();
+      if (!scenario) return '';
+      return `<section class="sapt-context" aria-labelledby="saptContextHeading"><div><span class="mmk-topic">${esc(groups[scenario.group])}</span><h3 id="saptContextHeading">${esc(scenarioLabel(scenario))}</h3></div><button type="button" class="small" data-sapt="scenario">View worked example</button></section>`;
+    }
+    const canListTerms = () =>
+      !transaction || [...scenarioTerms.get(transaction)].some(entry => inEdition(entry, edition));
     const availability = entry =>
       entry.historical
         ? '<div class="mmk-badges"><span>Historical</span></div>'
@@ -124,20 +172,24 @@
     }
     const count = results => results.length + (results.length === 1 ? ' term' : ' terms');
     function render() {
-      const results = search(query, kind, edition);
+      const results = search(query, kind, edition, transaction);
       return `<section class="mmk-workspace sapt-workspace" data-access-feature="knowledge">
         <header class="mmk-hero sapt-hero"><div><h2>SAP Terms</h2><p>Follow the transaction key or account grouping from the SAP event to its posting.</p></div><div class="mmk-orbit" aria-hidden="true"><i></i><i></i><i></i></div></header>
-        <div class="mmk-controls sapt-controls"><label>Search SAP terms<input id="saptQuery" type="search" maxlength="200" autocomplete="off" placeholder="Try GBB/VNG, 551, or freight clearing" value="${esc(query)}"></label><label>Term type<select id="saptKind">${filters(kindLabels, kind, 'All terms')}</select></label><label>SAP edition<select id="saptEdition">${filters({ ...editions, historical: 'Historical' }, edition, 'All editions')}</select></label></div>
-        <div class="mmk-results-head"><h3>Account determination terms</h3><span id="saptCount" role="status">${count(results)}</span></div><div id="saptResults" class="mmk-grid">${cards(results)}</div>
+        <div class="mmk-controls sapt-controls"><label>Search SAP terms<input id="saptQuery" type="search" maxlength="200" autocomplete="off" placeholder="Try GBB/VNG, 551, or freight clearing" value="${esc(query)}"></label><label>Transaction scenario<select id="saptTransaction">${scenarioOptions()}</select></label><label>Term type<select id="saptKind">${filters(kindLabels, kind, 'All terms')}</select></label><label>SAP edition<select id="saptEdition">${filters({ ...editions, historical: 'Historical' }, edition, 'All editions')}</select></label></div>
+        <div id="saptContext">${scenarioContext()}</div>
+        <div id="saptTermResults"${canListTerms() ? '' : ' hidden'}><div class="mmk-results-head"><h3>Account determination terms</h3><span id="saptCount" role="status">${count(results)}</span></div><div id="saptResults" class="mmk-grid">${cards(results)}</div></div>
       </section>`;
     }
     function updateResults() {
-      const results = search(query, kind, edition);
+      const results = search(query, kind, edition, transaction);
+      $('saptTermResults').hidden = !canListTerms();
       $('saptCount').textContent = count(results);
       $('saptResults').innerHTML = cards(results);
     }
 
     function ledger(entry, data) {
+      if (data.outcome)
+        return `<div class="sapt-lookup"><span>Document result</span><strong>${esc(data.outcome)}</strong></div>`;
       if (data.lookup) {
         const { account, code } = data.lookup;
         return `<div class="sapt-lookup sapt-account" data-key-match="${highlights(entry, code)}"><span>Account selected</span><code>${esc(code)}</code><strong>${esc(account)}</strong></div>`;
@@ -188,24 +240,29 @@
         );
       return result;
     }
-    function details(entry) {
-      const navigation = entry.demo.postings.length > 1 ? 'step' : 'phase';
-      const related =
-        entry.kind === 'key'
-          ? entries.filter(
-              item => item.kind === 'modifier' && item.key === entry.key && inEdition(item, edition)
-            )
+    function details({ entry, scenario, demo, id }) {
+      const navigation = demo.postings.length > 1 ? 'step' : 'phase';
+      const matches = scenario && scenarioTerms.get(scenario.id);
+      const family = !entry
+        ? [...matches]
+        : entry.kind === 'key'
+          ? entries.filter(item => item.kind === 'modifier' && item.key === entry.key)
           : [byId.get(entry.key)];
+      const related = family.filter(
+        item => inEdition(item, edition) && (!matches || matches.has(item))
+      );
+      const guideIds = scenario?.guides ?? entry.guides;
+      const sources = scenario?.sources ?? entry.sources.map(name => refs[name]);
       const relatedButton = item =>
         `<button type="button" class="small" data-sapt="open" data-id="${esc(item.id)}">${esc(displayCode(item))}</button>`;
       const guideButton = id =>
         `<button type="button" class="small" data-sapt="guide" data-id="${esc(id)}">${esc(byGuide.get(id).title)} ↗</button>`;
-      return `<article class="mmk-reader sapt-reader" data-access-feature="knowledge" data-sapt-entry="${esc(entry.id)}">
+      return `<article class="mmk-reader sapt-reader" data-access-feature="knowledge" data-sapt-entry="${esc(id)}"${scenario ? ` data-sapt-scenario="${esc(scenario.id)}"` : ''}>
         <section class="sapt-walkthrough" aria-labelledby="saptExampleTitle">
-          <div class="sapt-scenario"><h3 id="saptExampleTitle" tabindex="-1">Worked example</h3><p>${esc(entry.demo.setup)}</p></div>
+          <div class="sapt-scenario"><h3 id="saptExampleTitle" tabindex="-1">${entry && scenario ? esc(scenarioLabel(scenario)) : 'Worked example'}</h3><p>${esc(demo.setup)}</p></div>
           <div id="saptPlayer" class="sapt-player" data-phase="trigger" data-playing="false">
             <div class="sapt-phase"><span id="saptPhase"></span><span id="saptPosition"></span></div>
-            <ol id="saptScenes" class="sapt-scenes" role="list" aria-label="Example steps">${entry.demo.postings.map(data => scene(entry, data)).join('')}</ol>
+            <ol id="saptScenes" class="sapt-scenes" role="list" aria-label="Example steps">${demo.postings.map(data => scene(entry, data)).join('')}</ol>
             <div class="sapt-controls-row" role="group" aria-label="Playback controls">
               <button type="button" class="small" data-sapt="previous">Previous ${navigation}</button>
               <button type="button" class="small sapt-play" data-sapt="play">Pause</button>
@@ -214,13 +271,17 @@
             </div>
           </div>
         </section>
-        <div class="sapt-lead"><div><span class="mmk-topic">${kinds[entry.kind]}</span><p>${esc(entry.explanation)}</p></div>${availability(entry)}</div>
+        ${
+          entry
+            ? `<div class="sapt-lead"><div><span class="mmk-topic">${kinds[entry.kind]}</span><p>${esc(entry.explanation)}</p></div>${availability(entry)}</div>
         <section class="mmk-section"><h3>Where to check in SAP</h3>${routes(entry)
           .map(path => `<div class="mmk-route"><p>${esc(path)}</p></div>`)
-          .join('')}<p>${esc(entry.check)}</p></section>
-        ${related.length ? `<section class="mmk-section"><h3>${entry.kind === 'key' ? 'Account groupings' : 'Transaction/event key'}</h3><div class="mmk-related">${related.map(relatedButton).join('')}</div></section>` : ''}
-        <section class="mmk-section"><h3>Related configuration guides</h3><div class="mmk-related">${entry.guides.map(guideButton).join('')}</div></section>
-        <section class="mmk-section"><h3>References</h3><ul class="mmk-sources">${entry.sources.map(id => reference(refs[id])).join('')}</ul></section>
+          .join('')}<p>${esc(entry.check)}</p></section>`
+            : ''
+        }
+        ${related.length ? `<section class="mmk-section"><h3>${!entry ? 'Account determination terms' : entry.kind === 'key' ? 'Account groupings' : 'Transaction/event key'}</h3><div class="mmk-related">${related.map(relatedButton).join('')}</div></section>` : ''}
+        <section class="mmk-section"><h3>Related configuration guides</h3><div class="mmk-related">${guideIds.map(guideButton).join('')}</div></section>
+        <section class="mmk-section"><h3>References</h3><ul class="mmk-sources">${sources.map(reference).join('')}</ul></section>
       </article>`;
     }
 
@@ -228,8 +289,7 @@
     const temporarilyPaused = () =>
       document.hidden ||
       document.body.matches('.hub-private, .hub-present, .hub-motion-paused, .rest-room-open');
-    const open = () =>
-      a.active() && playback && getReader()?.dataset.saptEntry === playback.entry.id;
+    const open = () => a.active() && playback && getReader()?.dataset.saptEntry === playback.id;
     function stop() {
       root.clearTimeout(timer);
       timer = undefined;
@@ -254,7 +314,7 @@
     }
     function go(step) {
       if (!open()) return;
-      const { postings } = playback.entry.demo;
+      const { postings } = playback.demo;
       const phases = postings.length * 2;
       playback.step = (step + phases) % phases;
       const position = Math.floor(playback.step / 2);
@@ -267,18 +327,24 @@
       }
       const isTrigger = playback.step % 2 === 0;
       $('saptPlayer').dataset.phase = isTrigger ? 'trigger' : 'posting';
+      const stage = postings[position];
       $('saptPhase').textContent = isTrigger
         ? 'Trigger'
-        : postings[position].lookup
+        : stage.lookup
           ? 'Account determination'
-          : 'FI posting';
+          : stage.outcome
+            ? 'Document result'
+            : 'FI posting';
       $('saptPosition').textContent = 'Step ' + (position + 1) + ' of ' + postings.length;
       schedule();
     }
-    function show(entry) {
+    function show(entry, scenario = currentScenario()) {
       stop();
-      playback = { entry, step: 0, paused: false };
-      a.openModal(displayCode(entry) + ' · ' + entry.title, details(entry));
+      const id = entry?.id ?? 'scenario/' + scenario.id;
+      const demo = scenario?.demo ?? entry.demo;
+      const title = entry ? displayCode(entry) + ' · ' + entry.title : scenarioLabel(scenario);
+      playback = { id, demo, step: 0, paused: false };
+      a.openModal(title, details({ entry, scenario, demo, id }));
       $('modalBody').scrollTop = 0;
       $('saptExampleTitle').focus({ preventScroll: true });
       go(allowsMotion() ? 0 : 1);
@@ -298,9 +364,15 @@
       }
     });
     document.addEventListener('change', event => {
-      if (a.active() && ['saptKind', 'saptEdition'].includes(event.target.id)) {
+      if (a.active() && ['saptKind', 'saptEdition', 'saptTransaction'].includes(event.target.id)) {
         kind = $('saptKind').value;
         edition = $('saptEdition').value;
+        transaction = $('saptTransaction').value;
+        if (event.target.id === 'saptEdition') {
+          if (currentScenario() && !scenarioInEdition(currentScenario(), edition)) transaction = '';
+          $('saptTransaction').innerHTML = scenarioOptions();
+        }
+        $('saptContext').innerHTML = scenarioContext();
         updateResults();
       }
     });
@@ -309,11 +381,15 @@
       if (!button || !a.active()) return;
       const { sapt: action, id } = button.dataset;
       if (action === 'open' && byId.has(id)) show(byId.get(id));
+      if (action === 'scenario' && currentScenario()) show(null);
       if (action === 'guide' && byGuide.has(id)) a.openGuide(id, edition);
       if (action === 'reset') {
         $('saptQuery').value = query = '';
         $('saptKind').value = kind = '';
         $('saptEdition').value = edition = '';
+        transaction = '';
+        $('saptTransaction').innerHTML = scenarioOptions();
+        $('saptContext').innerHTML = '';
         updateResults();
         $('saptQuery').focus();
       }
@@ -322,7 +398,7 @@
         playback.paused = !playback.paused;
         schedule();
       } else if (action === 'previous' || action === 'next' || action === 'restart') {
-        const distance = playback.entry.demo.postings.length > 1 ? 2 : 1;
+        const distance = playback.demo.postings.length > 1 ? 2 : 1;
         go(
           action === 'restart' ? 0 : playback.step + (action === 'previous' ? -distance : distance)
         );
@@ -335,7 +411,7 @@
       render,
       sync,
       reset() {
-        query = kind = edition = '';
+        query = kind = edition = transaction = '';
       },
     };
   }

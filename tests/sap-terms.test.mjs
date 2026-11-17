@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { createContext, runInContext } from 'node:vm';
 
 const context = createContext({});
-for (const file of ['mm-configuration-data.js', 'mm-knowledge-data.js', 'sap-terms-data.js', 'sap-terms.js']) {
+for (const file of ['mm-configuration-data.js', 'mm-configuration-engine.js', 'mm-knowledge-data.js', 'sap-terms-data.js', 'sap-transaction-scenarios.js', 'sap-terms.js']) {
   runInContext(readFileSync(new URL('../' + file, import.meta.url), 'utf8'), context);
 }
 const { entries, refs } = context.WorkHubSapTermsData;
@@ -63,4 +63,45 @@ test('SAP Terms search finds codes, context, and the right edition and kind', ()
   assert.equal(hit('WRY', '', 'historical')[0], 'WRY');
   assert.equal(hit('TM1', '', 'cloud')[0], 'TM1');
   assert.equal(hit('TM1', '', 'ecc').length, 0);
+});
+
+test('Transaction scenarios cover the Terms catalog, configuration models, and their movements and reversals', () => {
+  const { scenarios, groups } = context.WorkHubSapTransactionScenarios;
+  const config = context.WorkHubMmConfigurationData;
+  const modelIds = new Set(scenarios.map(row => row.modelId));
+  const movementIds = new Set(scenarios.flatMap(row => row.movements.map(code => code.split(' ')[0])));
+  const covered = new Set(scenarios.flatMap(row => search('', '', '', row.id).map(entry => entry.id)));
+  const guideIds = new Set(guides.map(guide => guide.id));
+  assert.equal(new Set(scenarios.map(row => row.id)).size, scenarios.length);
+  assert.equal(covered.size, entries.length);
+  for (const model of config.scenarios) assert.ok(modelIds.has(model.id), model.id);
+  for (const move of config.moves) {
+    assert.ok(movementIds.has(move.code), move.code);
+    assert.ok(!move.reversal || movementIds.has(move.reversal), move.reversal);
+  }
+  for (const row of scenarios) {
+    assert.ok(groups[row.group] && row.label && row.demo.setup && row.demo.postings.length, row.id);
+    assert.ok(row.editions.length && row.editions.every(edition => edition === 'historical' || Object.hasOwn(editions, edition)), row.id);
+    assert.ok(row.sources.length && row.sources.every(([, url]) => url.startsWith('https://')), row.id);
+    assert.ok(row.guides.every(id => guideIds.has(id)), row.id);
+    for (const step of row.demo.postings) {
+      assert.ok(step.title && step.effect, row.id);
+      if (step.lookup || step.outcome) continue;
+      const sum = lines => lines.reduce((total, line) => total + Math.round(line.amount * 100), 0);
+      assert.ok([...step.debit, ...step.credit].every(line => line.account && line.amount > 0), row.id);
+      assert.equal(sum(step.debit), sum(step.credit), row.id + ' ' + step.title);
+    }
+  }
+});
+
+test('Transaction scenarios distinguish posting context even when the movement type is shared', () => {
+  const hit = (id, query = '', kind = '', edition = '') => Array.from(search(query, kind, edition, id), item => item.id);
+  assert.deepEqual(hit('without-po'), ['BSX', 'GBB', 'GBB/ZOB']);
+  assert.deepEqual(hit('without-po', '501', 'modifier'), ['GBB/ZOB']);
+  assert.deepEqual(hit('without-po', 'WRX'), []);
+  assert.deepEqual(hit('po-stock', '101'), ['BSX', 'WRX']);
+  assert.deepEqual(hit('production-gr', '101').sort(), ['BSX', 'GBB', 'GBB/AUF']);
+  assert.deepEqual(hit('fixed-asset', '241', '', 'cloud'), ['BSX']);
+  assert.deepEqual(hit('storage-one'), []);
+  assert.deepEqual(hit('fixed-asset', '', '', 'historical'), []);
 });
