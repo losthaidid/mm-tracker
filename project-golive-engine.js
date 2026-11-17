@@ -18,6 +18,8 @@
     title: 500,
     header: 500,
   });
+  const SUB_STATUSES = ['Not started', 'In Progress', 'Blocked', 'Completed'];
+  const SUB_TYPES = ['Project', 'Ticket', 'Custom'];
   const aliases = {
     title: [
       'issue',
@@ -178,6 +180,14 @@
       if (issue.resolvedDate !== undefined && !root.WorkHubReminders?.validDate(issue.resolvedDate))
         throw Error('Check the date the Go-Live issue was resolved.');
       if (
+        issue.linkedTaskId !== undefined &&
+        (!validText(issue.linkedTaskId, 100) || !issue.linkedTaskId)
+      )
+        throw Error('Check the linked Go-Live task.');
+      if (issue.dueDate && !root.WorkHubReminders?.validDate(issue.dueDate))
+        throw Error('Choose a valid Go-Live issue due date.');
+      if (issue.subItems !== undefined) validateSubItems(issue.subItems);
+      if (
         !Array.isArray(issue.extras) ||
         issue.extras.length > LIMITS.columns ||
         issue.extras.some(
@@ -185,6 +195,29 @@
         )
       )
         throw Error('Check the additional issue columns and their values.');
+    }
+  }
+  function validateSubItems(items) {
+    if (!Array.isArray(items) || items.length > 500)
+      throw Error('Each Go-Live issue supports up to 500 sub-items.');
+    const ids = new Set();
+    for (const sub of items) {
+      if (
+        !sub ||
+        !validText(sub.id, 100) ||
+        !sub.id ||
+        ids.has(sub.id) ||
+        !validText(sub.title, LIMITS.title) ||
+        !sub.title.trim() ||
+        !SUB_STATUSES.includes(sub.status) ||
+        (sub.taskType && !SUB_TYPES.includes(sub.taskType)) ||
+        !validText(sub.remarks ?? '', 32767) ||
+        !validText(sub.feedback ?? '', 32767) ||
+        !validText(sub.owner ?? '', 200) ||
+        (sub.dueDate && !root.WorkHubReminders?.validDate(sub.dueDate))
+      )
+        throw Error('Check the Go-Live sub-item title, status, type, and notes.');
+      ids.add(sub.id);
     }
   }
   function validate(state) {
@@ -195,7 +228,19 @@
     const x = normal(status);
     if (['closed', 'resolved', 'complete', 'completed', 'done', 'fixed'].includes(x))
       return 'resolved';
-    if (['in progress', 'working', 'ongoing', 'investigating'].includes(x)) return 'progress';
+    if (
+      [
+        'in progress',
+        'working',
+        'ongoing',
+        'investigating',
+        'testing',
+        'development',
+        'uat',
+        'pending review',
+      ].includes(x)
+    )
+      return 'progress';
     if (['open', 'new', 'pending', 'blocked', 'on hold', 'not started'].includes(x)) return 'open';
     return 'other';
   }
@@ -207,6 +252,8 @@
   root.WorkHubGoLiveIssuesEngine = Object.freeze({
     FIELDS,
     LIMITS,
+    SUB_STATUSES,
+    SUB_TYPES,
     columns,
     suggest,
     textSheet,

@@ -914,6 +914,9 @@ body #modal .task-editor h3 {
   grid-template-columns: minmax(0, 2fr) minmax(102px, 1fr) auto;
   align-items: end;
 }
+.task-draft-main {
+  grid-template-columns: minmax(0, 2fr) repeat(2, minmax(105px, 1fr)) auto;
+}
 .task-draft-note-fields {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-top: 7px;

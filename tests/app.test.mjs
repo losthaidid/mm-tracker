@@ -4527,9 +4527,164 @@ test('Go-Live issues link one task and synchronize status from either editor', a
  assert.equal(issue().status,'Open');
  assert.equal(task().doneDate,'');
  api.hub.standup.open(projectId);
- const row=document.querySelector('[data-report-task]');
- assert.match(row.querySelector('summary').textContent,/Go-Live issue/);
+ const row=document.querySelector('[data-report-item="'+task().projectItemId+'"]');
+ assert.match(row.querySelector('summary').textContent,/Linked task/);
  assert.equal(row.open,false);
+ assert.equal(api.state().specs[0].goLiveIssueId,issue().id);
+});
+
+async function openGoLiveForLinkedWork(ctx) {
+ const {api,document}=ctx;
+ api.showTab('specs');
+ await api.action(document.querySelector('[data-action="project-view"][data-view="go-live-issues"]'));
+ return api.hub.goLiveIssues;
+}
+function setGoLiveField(ctx,selector,value) {
+ const el=ctx.document.querySelector(selector);
+ el.value=value;
+ el.dispatchEvent(new ctx.window.Event('input',{bubbles:true}));
+}
+async function addGoLiveForLinkedWork(ctx,title,child) {
+ const {api,document,window}=ctx;
+ const ui=await openGoLiveForLinkedWork(ctx);
+ await ui.handle(document.querySelector('[data-gli="new"]'));
+ setGoLiveField(ctx,'#gliEdit-title',title);
+ setGoLiveField(ctx,'#gliEdit-status','Open');
+ if(child) {
+  await ui.handle(document.querySelector('[data-gli="add-sub-item"]'));
+  setGoLiveField(ctx,'[data-gli-sub="title"]',child);
+  setGoLiveField(ctx,'[data-gli-sub="taskType"]','Ticket');
+ }
+ submitLocal(window,document.getElementById('gliIssueForm'));
+ await settle();
+ return api.state().projects.find(project=>project.id===api.state().activeProjectId).goLiveIssues.at(-1).id;
+}
+async function linkGoLiveItem(ctx,issueId,choice='new',alreadyHasTask=false) {
+ const {api,document}=ctx;
+ const action=alreadyHasTask?'project-link-issue-item':'project-source-task';
+ const button=document.querySelector('[data-action="'+action+'"][data-source="issue"][data-id="'+issueId+'"]');
+ assert.ok(button);
+ await api.action(button);
+ const form=document.getElementById('editForm');
+ assert.equal(form.elements.taskType.disabled,false);
+ form.elements.issueTaskItem.value=choice;
+ api.saveEdit(form);
+ await settle();
+ return api.state().tasks.find(row=>row.goLiveIssueId===issueId);
+}
+
+test('Go-Live issues share editable fields and sub-items with Tasks and Project Items after retyping the task',async t=>{
+ const ctx=await app(t),{api,document,window}=ctx;
+ const issueId=await addGoLiveForLinkedWork(ctx,'Warehouse issue','Confirm label size');
+ const linked=await linkGoLiveItem(ctx,issueId);
+ const task=()=>api.state().tasks.find(row=>row.id===linked.id);
+ const item=()=>api.state().specs.find(row=>row.id===linked.projectItemId);
+ const issue=()=>api.state().projects.find(p=>p.id===linked.sourceProjectId).goLiveIssues.find(row=>row.id===issueId);
+ assert.equal(item().subItems[0].id,task().subTasks[0].id);
+ assert.equal(task().subTasks[0].taskType,'Ticket');
+
+ api.editRecord('tasks',linked.id);
+ let form=document.getElementById('editForm');
+ fill(form,{task:'Warehouse issue updated',taskType:'Custom',dueDate:'2026-11-26',priority:'Critical',remarks:'Inspect the label stock',customLink:'Warehouse ticket review'});
+ form.elements.taskType.dispatchEvent(new window.Event('change',{bubbles:true}));
+ form.querySelector('[data-task-field="taskType"]').value='Custom';
+ api.saveEdit(form);
+ await settle();
+ assert.equal(task().taskType,'Custom');
+ assert.equal(task().sourceProjectId,linked.sourceProjectId);
+ assert.equal(issue().title,'Warehouse issue updated');
+ assert.equal(issue().description,'Inspect the label stock');
+ assert.equal(issue().priority,'Critical');
+ assert.equal(item().priority,'A');
+ assert.equal(item().dueDate,'2026-11-26');
+ assert.equal(item().subItems[0].taskType,'Custom');
+
+ api.editRecord('specs',linked.projectItemId);
+ fill(document.getElementById('editForm'),{description:'Warehouse delivery review',priority:'C',status:'Testing',feedback:'Ready for review'});
+ api.saveEdit(document.getElementById('editForm'));
+ await settle();
+ assert.equal(task().task,'Warehouse delivery review');
+ assert.equal(task().priority,'Low');
+ assert.equal(task().boardStatus,'doing');
+ assert.equal(issue().status,'Testing');
+ assert.equal(issue().resolution,'Ready for review');
+
+ const ui=await openGoLiveForLinkedWork(ctx);
+ await ui.handle(document.querySelector('[data-gli="edit"]'));
+ await ui.handle(document.querySelector('[data-gli="add-sub-item"]'));
+ setGoLiveField(ctx,'[data-gli-sub-index="1"] [data-gli-sub="title"]','Test printed sample');
+ setGoLiveField(ctx,'[data-gli-sub-index="1"] [data-gli-sub="taskType"]','Project');
+ setGoLiveField(ctx,'#gliEdit-dueDate','2026-11-30');
+ submitLocal(window,document.getElementById('gliIssueForm'));
+ await settle();
+ assert.equal(task().subTasks.length,2);
+ assert.equal(task().subTasks[1].title,'Test printed sample');
+ assert.equal(task().dueDate,'2026-11-30');
+ assert.equal(item().subItems[1].taskType,'Project');
+ const reopened=api.parseBackup(api.payload(api.state()));
+ assert.equal(reopened.tasks.find(row=>row.id===linked.id).subTasks.length,2);
+ assert.equal(reopened.tasks.find(row=>row.id===linked.id).taskType,'Custom');
+ api.hub.standup.open(linked.sourceProjectId);
+ assert.equal(document.querySelector('[data-report-item="'+linked.projectItemId+'"]').open,false);
+ assert.equal(document.querySelector('[data-report-task="'+linked.id+'"]'),null);
+});
+
+test('Go-Live issues can link an existing Project Item and keep the older task and both sub-item lists', async t=>{
+ const ctx=await app(t),{api,document}=ctx;
+ const item=standupFixture(api,document);
+ const legacyId=addMainTask(api,document,'Previous rollout task');
+ addTaskSub(api,document,legacyId,'Keep the original step','Original notes','','Not started');
+ const issueId=await addGoLiveForLinkedWork(ctx,'Existing rollout issue','Keep the issue step');
+ const projectId=api.state().activeProjectId;
+ api.mutate(d=>Object.assign(d.tasks.find(task=>task.id===legacyId),{
+  taskType:'Project',linkId:projectId,goLiveIssueId:issueId,
+ }));
+ await settle();
+ const linked=await linkGoLiveItem(ctx,issueId,item.id,true);
+ assert.equal(linked.id,legacyId);
+ assert.equal(linked.projectItemId,item.id);
+ assert.equal(api.state().tasks.length,1);
+ const titles=linked.subTasks.map(sub=>sub.title);
+ assert.equal(titles.length,4);
+ assert.ok(titles.includes('Keep the original step'));
+ assert.ok(titles.includes('Keep the issue step'));
+ assert.ok(titles.includes('Standard PO'));
+});
+
+test('Go-Live issues, linked tasks, and Project Items are deleted together from any of the three entry points',async t=>{
+ const ctx=await app(t),{api,document,window,db}=ctx;
+ const unaffected=await addGoLiveForLinkedWork(ctx,'Separate issue');
+ for (const source of ['issue','task','item']) {
+  const issueId=await addGoLiveForLinkedWork(ctx,'Remove work from '+source,'Delete the shared step');
+  const linked=await linkGoLiveItem(ctx,issueId);
+  const project=()=>api.state().projects.find(row=>row.id===linked.sourceProjectId);
+  const remove=async()=>{
+   if(source==='issue') {
+    const ui=await openGoLiveForLinkedWork(ctx);
+    await ui.handle(document.querySelector('[data-gli="delete"][data-id="'+issueId+'"]'));
+   } else {
+    api.editRecord(source==='item'?'specs':'tasks',source==='item'?linked.projectItemId:linked.id);
+    await api.action(document.querySelector('#editForm [data-action="delete"]'));
+   }
+  };
+  let confirmation='';
+  window.confirm=message=>{confirmation=message;return false;};
+  const writes=db.calls.length;
+  await remove();
+  assert.match(confirmation,/Go-Live issue.*task.*Project Item/);
+  assert.match(confirmation,/1 sub-item/);
+  assert.equal(db.calls.length,writes);
+  assert.ok(project().goLiveIssues.some(row=>row.id===issueId));
+
+  window.confirm=()=>true;
+  await remove();
+  await settle();
+  assert.equal(api.state().tasks.some(row=>row.id===linked.id),false);
+  assert.equal(api.state().specs.some(row=>row.id===linked.projectItemId),false);
+  assert.equal(project().goLiveIssues.some(row=>row.id===issueId),false);
+  assert.ok(project().goLiveIssues.some(row=>row.id===unaffected));
+  assert.equal(db.calls.length,writes+1);
+ }
 });
 
 test('Excel Report opens inside Validation Studio and does not save uploaded data', async t => {

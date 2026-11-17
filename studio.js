@@ -3005,6 +3005,7 @@
         today()
       );
       root.WorkHubProjectDates.prepare(next, previous, today(), restoring);
+      if (!restoring) root.WorkHubTaskProjectItems.finish(next, today());
       root.WorkHubProjectStandupEngine?.prepare(next, previous, restoring);
       root.WorkHubProjectPeopleEngine?.prepare(next, previous, restoring);
       root.WorkHubSolutionEngine?.prepare(next, previous, restoring);

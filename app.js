@@ -1333,7 +1333,14 @@ function projectTaskSource(projectId, kind, id) {
     const record = state.projects
       .find(project => project.id === projectId)
       ?.goLiveIssues?.find(issue => issue.id === id);
-    if (record) return { projectId, kind, record, task: links.taskForIssue(state, projectId, id) };
+    if (record)
+      return {
+        projectId,
+        kind,
+        record,
+        task: links.taskForIssue(state, projectId, id),
+        item: links.itemForIssue(state, projectId, id),
+      };
   }
   throw Error('The project item or Go-Live issue is unavailable.');
 }
@@ -1341,15 +1348,53 @@ function projectTaskSource(projectId, kind, id) {
 function projectSourceTaskButton(projectId, kind, id, className = 'small') {
   if (access && !access.can('tasks')) return '';
   const source = projectTaskSource(projectId, kind, id);
-  if (!source.task && access && !access.can('tasks', 'create')) return '';
-  return `<button type="button" class="${className}" data-action="project-source-task" data-access-feature="tasks" data-project="${esc(projectId)}" data-source="${kind}" data-id="${esc(id)}">${source.task ? 'Open task' : '＋ Create task'}</button>`;
+  const canLinkIssue = !access || access.can('specs', 'edit');
+  if (
+    !source.task &&
+    access &&
+    (!access.can('tasks', 'create') || (kind === 'issue' && !canLinkIssue))
+  )
+    return '';
+  const attrs = `class="${className}" data-access-feature="tasks" data-project="${esc(projectId)}" data-source="${kind}" data-id="${esc(id)}"`;
+  const linkItem =
+    kind === 'issue' &&
+    source.task &&
+    !source.item &&
+    canLinkIssue &&
+    (!access || access.can('tasks', 'edit'))
+      ? `<button type="button" ${attrs} data-action="project-link-issue-item">Link Project Item</button>`
+      : '';
+  return (
+    `<button type="button" ${attrs} data-action="project-source-task">${source.task ? 'Open task' : '＋ Create task'}</button>` +
+    linkItem
+  );
+}
+
+function issueTaskItemField(source) {
+  if (source?.kind !== 'issue') return '';
+  const links = WorkHubTaskProjectItems;
+  const options = state.specs
+    .filter(item => {
+      if (item.projectId !== source.projectId || item.goLiveIssueId) return false;
+      const linked = links.taskForItem(state, item);
+      return !source.task || !linked || linked.id === source.task.id;
+    })
+    .map(item => {
+      const linked = links.taskForItem(state, item);
+      const label = [projectItemLabel(item), item.description, linked && 'Uses its linked task']
+        .filter(Boolean)
+        .join(' · ');
+      return `<option value="${esc(item.id)}">${esc(label)}</option>`;
+    });
+  if (!access || access.can('specs', 'create'))
+    options.unshift('<option value="new">Create a Project Item</option>');
+  return `<div class="wide"><label for="issueTaskItem">Project Item *</label><select id="issueTaskItem" name="issueTaskItem" required><option value="">Choose a Project Item</option>${options.join('')}</select><p class="hint">The issue supplies the shared details. Existing sub-items from both records join the shared list.</p></div>`;
 }
 
 function taskFromProjectSource(source) {
   const { kind, record, projectId } = source;
   const links = WorkHubTaskProjectItems,
     item = kind === 'item',
-    priority = String(record.priority || '').toLowerCase(),
     boardStatus = item ? links.itemBoardStatus(record) : links.issueBoardStatus(record);
   return {
     taskType: 'Project',
@@ -1359,27 +1404,21 @@ function taskFromProjectSource(source) {
     done: boardStatus === 'done',
     doneDate: boardStatus === 'done' ? (item ? record.statusDate : record.resolvedDate) || '' : '',
     companyId: item ? record.companyId || '' : '',
-    dueDate: item ? record.dueDate || '' : '',
-    priority:
-      {
-        a: 'High',
-        b: 'Medium',
-        c: 'Low',
-        low: 'Low',
-        medium: 'Medium',
-        high: 'High',
-        critical: 'Critical',
-      }[priority] || 'Medium',
+    dueDate: record.dueDate || '',
+    priority: links.taskPriority(record.priority),
+    remarks: item ? '' : record.description,
+    feedback: item ? '' : record.resolution,
   };
 }
 
 function taskLinkFields(r, source) {
   const type = r.taskType || 'Custom';
+  const project = type === 'Project' ? r.linkId : WorkHubTaskProjectItems.sourceProject(r);
   return (
     (source
       ? `<div class="standup-task-context wide"><span class="standup-kicker">${source.kind === 'item' ? 'PROJECT ITEM' : 'GO-LIVE ISSUE'}</span><p>${source.kind === 'item' ? 'This task shares the project item’s status and sub-items.' : 'This task shares the Go-Live issue’s status.'}</p></div>`
       : hub?.standup?.taskContext(r.id) || '') +
-    `<div class="wide task-link-fields" data-task-link="Project"${type === 'Project' ? '' : ' hidden'}><label for="taskProjectLink">Linked project *</label><select id="taskProjectLink" name="projectLink"><option value="">Choose a project</option>${state.projects.map(p => `<option value="${esc(p.id)}"${r.linkId === p.id ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div>${taskCompanyField(r)}${source ? '' : taskProjectItemFields(r)}<div class="wide task-link-fields" data-task-link="Ticket"${type === 'Ticket' ? '' : ' hidden'}><label for="taskTicketLink">Linked ticket *</label><select id="taskTicketLink" name="ticketLink"><option value="">Choose a ticket</option>${state.tickets.map(t => `<option value="${esc(t.id)}"${r.linkId === t.id ? ' selected' : ''}>${esc(t.ticket + ' — ' + t.description.slice(0, 90))}</option>`).join('')}</select></div><div class="wide task-link-fields" data-task-link="Custom"${type === 'Custom' ? '' : ' hidden'}><label for="taskCustomLink">Custom link / reference</label><input id="taskCustomLink" name="customLink" maxlength="500" value="${esc(r.customLink || '')}" placeholder="e.g. Internal follow-up or meeting"></div>`
+    `<div class="wide task-link-fields" data-task-link="Project"${type === 'Project' ? '' : ' hidden'}><label for="taskProjectLink">Linked project *</label><select id="taskProjectLink" name="projectLink"><option value="">Choose a project</option>${state.projects.map(p => `<option value="${esc(p.id)}"${project === p.id ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div>${taskCompanyField(r)}${source ? issueTaskItemField(source) : taskProjectItemFields(r)}<div class="wide task-link-fields" data-task-link="Ticket"${type === 'Ticket' ? '' : ' hidden'}><label for="taskTicketLink">Linked ticket *</label><select id="taskTicketLink" name="ticketLink"><option value="">Choose a ticket</option>${state.tickets.map(t => `<option value="${esc(t.id)}"${r.linkId === t.id ? ' selected' : ''}>${esc(t.ticket + ' — ' + t.description.slice(0, 90))}</option>`).join('')}</select></div><div class="wide task-link-fields" data-task-link="Custom"${type === 'Custom' ? '' : ' hidden'}><label for="taskCustomLink">Custom link / reference</label><input id="taskCustomLink" name="customLink" maxlength="500" value="${esc(r.customLink || '')}" placeholder="e.g. Internal follow-up or meeting"></div>`
   );
 }
 function updateTaskLinkFields(form) {
@@ -1404,7 +1443,7 @@ function taskProjectItemFields(task) {
     </select>
     <div data-task-item-fields hidden>
       <label for="taskProjectItemChoice">Project item *</label>
-      <select name="projectItemChoice" id="taskProjectItemChoice" data-project-scope="${esc(task.linkId)}">
+      <select name="projectItemChoice" id="taskProjectItemChoice" data-project-scope="${esc(WorkHubTaskProjectItems.sourceProject(task) || task.linkId)}">
         <option value="${item ? 'item:' + esc(item.id) : ''}"></option>
       </select>
       <div data-task-item-create hidden><label for="taskProjectItemType">New item type</label>
@@ -1423,6 +1462,7 @@ function updateTaskProjectItemFields(form) {
   const picker = form.elements.namedItem('projectItemChoice');
   const newSource = taskSourceDrafts.has(form);
   const issue = WorkHubTaskProjectItems.issueForTask(state, old);
+  const previousProject = WorkHubTaskProjectItems.sourceProject(old);
   const keepIssue = !!old?.goLiveIssueId && (!!issue || (access && !access.can('specs')));
   let target = '';
   const shared = old?.projectItemId && WorkHubTaskProjectItems.itemForTask(state, old);
@@ -1468,17 +1508,19 @@ function updateTaskProjectItemFields(form) {
               : 'The item supplies the status. This task’s sub-items are added to it.'
             : 'General tasks appear under General project work in Daily stand-up.';
   }
-  const keepLink = picker
-    ? target === 'item:' + old?.projectItemId
-    : !!old?.projectItemId && type === 'Project' && projectId === old.linkId;
+  const keepLink =
+    !!old?.projectItemId &&
+    (keepIssue ||
+      !picker ||
+      type !== 'Project' ||
+      projectId !== previousProject ||
+      target === 'item:' + old.projectItemId);
   const changesItem = !!shared && !keepLink;
-  form.elements.taskType.disabled = newSource || keepIssue;
-  form.elements.projectLink.disabled = newSource || keepIssue;
   form.elements.boardStatus.disabled =
     newSource ||
     (keepIssue && (!canEdit || !issue)) ||
     (!keepLink && target.startsWith('item:')) ||
-    (keepLink && (!canEdit || !shared));
+    (keepLink && !keepIssue && (!canEdit || !shared));
   form.elements.doneDate.disabled = form.elements.boardStatus.disabled;
   const children = form.querySelector('[data-task-editor-children]');
   children.hidden = newSource || changesItem || (keepLink && (!canEdit || !shared));
@@ -2705,6 +2747,107 @@ function closeModal() {
   $('modal').close();
   if (CLOUD_MODE && cloud.refreshDeferred) void retryCloud();
 }
+
+function removeTaskRecord(d, id) {
+  for (const slot of d.schedule) {
+    if (slot.kind !== 'task' || slot.linkId !== id) continue;
+    slot.executionIdentity ||= window.WorkHubScheduleEngine.identity(slot, d);
+    slot.text = scheduleDisplayText(slot, d);
+    slot.kind = 'custom';
+    slot.linkId = '';
+    slot.activity = '';
+  }
+  d.tasks = d.tasks.filter(task => task.id !== id);
+}
+
+function removeProjectItemRecord(d, item) {
+  d.specs = d.specs.filter(row => row.id !== item.id);
+  for (const feedback of d.projectFeedback) {
+    if (!feedback.ricefwIds.includes(item.id)) continue;
+    feedback.ricefwIds = feedback.ricefwIds.filter(id => id !== item.id);
+    feedback.history.push(
+      feedbackHistory(`Project-item link removed because ${projectItemLabel(item)} was deleted.`)
+    );
+  }
+}
+
+function linkedWork(d, kind, id, projectId) {
+  const links = WorkHubTaskProjectItems;
+  let task, item, issue;
+  if (kind === 'task') {
+    task = d.tasks.find(row => row.id === id);
+    projectId = links.sourceProject(task);
+    item = links.itemForTask(d, task);
+    issue = links.issueForTask(d, task);
+  } else if (kind === 'item') {
+    item = d.specs.find(row => row.id === id);
+    projectId = item?.projectId;
+    task = item && links.taskForItem(d, item);
+  }
+  const project = d.projects.find(row => row.id === projectId);
+  issue ||= project?.goLiveIssues?.find(
+    row => row.id === (kind === 'issue' ? id : item?.goLiveIssueId)
+  );
+  if (issue) {
+    task ||= links.taskForIssue(d, projectId, issue.id);
+    item ||= links.itemForIssue(d, projectId, issue.id);
+  }
+  return { task, item, issue, projectId };
+}
+
+async function deleteLinkedWork(kind, id, projectId) {
+  const linked = linkedWork(state, kind, id, projectId);
+  const { task, issue, item } = linked;
+  if (!issue && !task?.goLiveIssueId && !item?.goLiveIssueId) return false;
+  const hasSource = task?.projectItemId || task?.goLiveIssueId || item?.goLiveIssueId;
+  if (
+    access &&
+    (((hasSource || item || issue) && !access.can('specs')) ||
+      (issue?.linkedTaskId && !access.can('tasks', 'delete')))
+  )
+    throw Error('Access to all linked records is required to delete this work.');
+  if ([task, item, issue].filter(Boolean).length < 2) return false;
+  if (
+    access &&
+    ((task && !access.can('tasks', 'delete')) ||
+      (item && !access.can('specs', 'delete')) ||
+      (issue && !access.can('specs', 'edit')))
+  )
+    throw Error('Permission to delete all linked records is required.');
+
+  const account = cloud.user?.id,
+    generation = cloud.generation;
+  const snapshot = JSON.stringify(linked);
+  const names = [
+    issue && `Go-Live issue “${issue.title}”`,
+    task && `task “${task.task}”`,
+    item && `Project Item “${item.description}”`,
+  ].filter(Boolean);
+  const count = issue
+    ? WorkHubTaskProjectItems.sharedChildren(issue, task).length
+    : (item?.subItems || task?.subTasks || []).length;
+  const message = `Delete ${names.join(', ')} together? The shared list contains ${count} sub-item${count === 1 ? '' : 's'}.`;
+  if (!(await window.WorkHubDialogs.confirm(message))) return true;
+  if (account !== cloud.user?.id || generation !== cloud.generation)
+    throw Error('Reopen this record in the current account.');
+  const ok = mutate(d => {
+    const latest = linkedWork(d, kind, id, projectId);
+    if (JSON.stringify(latest) !== snapshot)
+      throw Error('The linked work changed. Review it again before deleting.');
+    if (task) removeTaskRecord(d, task.id);
+    if (item) removeProjectItemRecord(d, item);
+    if (issue) {
+      const project = d.projects.find(row => row.id === linked.projectId);
+      project.goLiveIssues = project.goLiveIssues.filter(row => row.id !== issue.id);
+    }
+  });
+  if (ok) {
+    if ($('modal').open) closeModal();
+    tell('Linked work deleted.');
+  }
+  return true;
+}
+
 /** Route data-action buttons to their editor/status handlers. A button label can change while its action stays the same. */
 async function action(b) {
   const a = b.dataset.action,
@@ -2749,6 +2892,7 @@ async function action(b) {
       break;
     }
     case 'delete':
+      if (g === 'tasks' && (await deleteLinkedWork('task', id))) break;
       if (
         await window.WorkHubDialogs.confirm(
           `Delete this ${g === 'tickets' ? 'ticket and its progress tracker' : 'record'}?`
@@ -2757,16 +2901,7 @@ async function action(b) {
         const ok = mutate(d => {
           const old = d[g].find(t => t.id === id);
           if (!old) throw Error('Record not found.');
-          if (g === 'tasks')
-            d.schedule.forEach(s => {
-              if (s.kind === 'task' && s.linkId === id) {
-                s.executionIdentity ||= window.WorkHubScheduleEngine.identity(s, d);
-                s.text = scheduleDisplayText(s, d);
-                s.kind = 'custom';
-                s.linkId = '';
-                s.activity = '';
-              }
-            });
+          if (g === 'tasks') removeTaskRecord(d, id);
           if (g === 'tickets')
             d.schedule.forEach(s => {
               if (s.kind === 'ticket' && s.linkId === id) {
@@ -2784,7 +2919,7 @@ async function action(b) {
                 t.customLink = 'Former ticket: ' + old.ticket;
                 t.linkId = '';
               }
-          d[g] = d[g].filter(t => t.id !== id);
+          if (g !== 'tasks') d[g] = d[g].filter(t => t.id !== id);
           if (g === 'tickets') d.trackers = d.trackers.filter(t => t.ticket !== old.ticket);
         });
         closeModal();
@@ -3977,6 +4112,8 @@ function editRecord(group, id, source) {
       });
     }
     window.WorkHubTaskWorkspace.attachEditor(form, old);
+    if (source?.kind === 'issue' && (!access || access.can('specs', 'create')))
+      form.elements.issueTaskItem.value = 'new';
     updateTaskProjectItemFields(form);
     return;
   }
@@ -4001,11 +4138,12 @@ function saveEdit(form) {
     if (
       draft.owner !== cloud.user?.id ||
       draft.generation !== cloud.generation ||
-      (access && (!access.can('specs') || !access.can('tasks', 'create')))
+      (access && (!access.can('specs') || !access.can('tasks', old ? 'edit' : 'create')))
     )
       throw Error('Reopen the task form from its project after signing in.');
     source = projectTaskSource(draft.projectId, draft.kind, draft.id);
-    if (source.task) throw Error('This project record already has a linked task.');
+    if (source.task && source.task.id !== old?.id)
+      throw Error('This project record already has a linked task.');
     if (JSON.stringify(source.record) !== draft.snapshot)
       throw Error('The project record changed. Reopen the task form for its latest details.');
   }
@@ -4029,7 +4167,9 @@ function saveEdit(form) {
     }
   }
   let itemChoice = '',
-    itemType = '';
+    itemType = '',
+    issueItemChoice = '',
+    savedId = r.id;
   if (group === 'tasks') {
     const workspace = window.WorkHubTaskWorkspace;
     workspace.syncAccount(cloud.user?.id || '', cloud.generation);
@@ -4040,7 +4180,7 @@ function saveEdit(form) {
       new Date().toISOString(),
       !form.querySelector('[data-task-editor-children]').hidden
     );
-    const sourceTask = source && taskFromProjectSource(source);
+    const sourceTask = source && (old || taskFromProjectSource(source));
     window.WorkHubTaskCompletion.setStatus(
       r,
       sourceTask?.boardStatus || form.elements.boardStatus.value,
@@ -4055,11 +4195,20 @@ function saveEdit(form) {
           ? form.elements.namedItem('ticketLink')?.value || ''
           : '';
     if (source) {
-      r.taskType = 'Project';
-      r.linkId = source.projectId;
+      r.sourceProjectId = source.projectId;
       r.doneDate = sourceTask.doneDate;
       if (source.kind === 'item') r.projectItemId = source.record.id;
-      else r.goLiveIssueId = source.record.id;
+      else {
+        issueItemChoice = form.elements.namedItem('issueTaskItem').value;
+        if (!issueItemChoice) throw Error('Choose the Project Item to link to the issue.');
+        if (
+          access &&
+          (!access.can('specs', 'edit') ||
+            (issueItemChoice === 'new' && !access.can('specs', 'create')))
+        )
+          throw Error('Project permissions are required to link this work.');
+        r.goLiveIssueId = source.record.id;
+      }
     }
     r.customLink =
       r.taskType === 'Custom' ? form.elements.namedItem('customLink')?.value.trim() || '' : '';
@@ -4080,6 +4229,13 @@ function saveEdit(form) {
       throw Error('Choose an active company belonging to the linked project.');
     r.references = readTaskReferences(form);
     const kind = form.elements.namedItem('projectWorkType');
+    const previousProject = WorkHubTaskProjectItems.sourceProject(old);
+    if (old?.goLiveIssueId && !source) {
+      r.goLiveIssueId = old.goLiveIssueId;
+      r.sourceProjectId = previousProject;
+      if (old.projectItemId) r.projectItemId = old.projectItemId;
+    }
+    if (old?._issueTaskValues) r._issueTaskValues = old._issueTaskValues;
     if (r.taskType === 'Project' && kind?.value === 'item') {
       itemChoice = form.elements.namedItem('projectItemChoice').value;
       if (!itemChoice) throw Error('Choose a project item or create one from this task.');
@@ -4090,20 +4246,18 @@ function saveEdit(form) {
         if (!state.lists.projectItemTypes.includes(itemType))
           throw Error('Choose a project item type.');
       } else if (!itemChoice.startsWith('item:')) throw Error('Choose a valid project item.');
-    } else if (!kind && old?.projectItemId && r.linkId === old.linkId && r.taskType === 'Project') {
+    } else if (
+      old?.projectItemId &&
+      (!kind || r.taskType !== 'Project' || r.linkId !== previousProject)
+    ) {
       itemChoice = 'item:' + old.projectItemId;
     }
-    if (
-      old?.goLiveIssueId &&
-      (WorkHubTaskProjectItems.issueForTask(state, old) || (access && !access.can('specs')))
-    ) {
-      if (r.taskType !== 'Project' || r.linkId !== old.linkId)
-        throw Error('The task belongs to its linked Go-Live issue’s project.');
-      r.goLiveIssueId = old.goLiveIssueId;
-    }
-    if (old?.projectItemId && itemChoice !== 'item:' + old.projectItemId) r.subTasks = [];
-    if (old?.projectItemId && itemChoice === 'item:' + old.projectItemId)
+    if (old?.projectItemId && itemChoice === 'item:' + old.projectItemId) {
       r.projectItemId = old.projectItemId;
+      r.sourceProjectId = previousProject;
+    } else if (old?.projectItemId && !r.projectItemId) {
+      r.subTasks = [];
+    }
     if (r.archived && !r.done) {
       r.archived = false;
       r.archivedAt = '';
@@ -4118,6 +4272,11 @@ function saveEdit(form) {
     r.itemId = r.itemId.trim();
     r.ricefw = r.itemId;
     r.subItems = clone(old?.subItems || []);
+    if (old?.goLiveIssueId) {
+      if (r.projectId !== old.projectId)
+        throw Error('This Project Item belongs to its linked Go-Live issue’s project.');
+      r.goLiveIssueId = old.goLiveIssueId;
+    }
     r._completeSubItems = r.status === 'Completed';
     if (!state.lists.projectItemTypes.includes(r.itemType))
       throw Error('Choose a project item type from the built-in list.');
@@ -4139,6 +4298,21 @@ function saveEdit(form) {
       throw Error('That item ID already exists for this item type in the project.');
   }
   const ok = mutate(d => {
+    if (issueItemChoice) {
+      if (issueItemChoice === 'new' && d.specs.length >= LIMIT)
+        throw Error('The Project Items section is full.');
+      const target = WorkHubTaskProjectItems.connectIssue(
+        d,
+        r,
+        source.projectId,
+        source.record.id,
+        issueItemChoice,
+        { itemType: d.lists.projectItemTypes[0], prefill: old || taskFromProjectSource(source) },
+        uid
+      );
+      savedId = target.id;
+      if (target !== r) return;
+    }
     if (itemChoice === 'create') {
       if (d.specs.length >= LIMIT) throw Error('The Project Items section is full.');
       WorkHubTaskCompletion.prepare(
@@ -4148,10 +4322,12 @@ function saveEdit(form) {
         new Date().toISOString()
       );
       r.projectItemId = WorkHubTaskProjectItems.create(d, r, itemType, uid());
+      r.sourceProjectId = r.linkId;
     } else if (itemChoice && !r.projectItemId) {
       if (r.subTasks.length && access && !access.can('specs', 'edit'))
         throw Error('Project item edit access is required to transfer these sub-items.');
       r.projectItemId = WorkHubTaskProjectItems.attach(d, r, itemChoice.slice(5), uid);
+      r.sourceProjectId = r.linkId;
     }
     if (old) d[group] = d[group].map(t => (t.id === id ? r : t));
     else {
@@ -4177,7 +4353,7 @@ function saveEdit(form) {
     );
   if (ok) {
     const completed =
-      group === 'tasks' && !old?.done && state.tasks.find(task => task.id === r.id)?.done;
+      group === 'tasks' && !old?.done && state.tasks.find(task => task.id === savedId)?.done;
     tell(completed ? 'Task and sub-items saved. View the task in Completed tasks.' : 'Saved.');
   }
 }
@@ -4653,15 +4829,27 @@ async function enhancementAction(b) {
   if (await workhubAction(b)) return true;
   const a = b.dataset.action,
     id = b.dataset.id;
-  if (a === 'project-source-task') {
+  if (a === 'project-source-task' || a === 'project-link-issue-item') {
     if (access && (!access.can('specs') || !access.can('tasks')))
       throw Error('Projects and Tasks access are required to open this link.');
     const source = projectTaskSource(b.dataset.project, b.dataset.source, id);
-    if (source.task) {
+    if (a === 'project-link-issue-item') {
+      if (
+        !source.task ||
+        source.item ||
+        (access && (!access.can('tasks', 'edit') || !access.can('specs', 'edit')))
+      )
+        throw Error('Open an issue with a task to link a Project Item.');
+      editRecord('tasks', source.task.id, source);
+    } else if (source.task) {
       await hub.handle({ dataset: { hub: 'task-detail', id: source.task.id } });
     } else {
-      if (access && !access.can('tasks', 'create'))
-        throw Error('Your account cannot create tasks.');
+      if (
+        access &&
+        (!access.can('tasks', 'create') ||
+          (source.kind === 'issue' && !access.can('specs', 'edit')))
+      )
+        throw Error('Your account cannot create this linked task.');
       editRecord('tasks', '', source);
     }
     return true;
@@ -6520,15 +6708,20 @@ async function deleteProject(id) {
     d.projectProcessMappings = d.projectProcessMappings.filter(x => x.projectId !== id);
     d.phaseGates = d.phaseGates.filter(x => x.projectId !== id);
     d.projectFeedback = d.projectFeedback.filter(x => x.projectId !== id);
-    for (const t of d.tasks)
+    for (const t of d.tasks) {
+      if (WorkHubTaskProjectItems.sourceProject(t) === id) {
+        delete t.sourceProjectId;
+        delete t.projectItemId;
+        delete t.goLiveIssueId;
+        delete t._issueTaskValues;
+      }
       if (t.taskType === 'Project' && t.linkId === id) {
         t.taskType = 'Custom';
         t.customLink = 'Former project: ' + p.name;
         t.linkId = '';
         t.companyId = '';
-        delete t.projectItemId;
-        delete t.goLiveIssueId;
       }
+    }
     if (!d.projects.length)
       d.projects.push({
         id: uid(),
@@ -6861,6 +7054,7 @@ async function workhubAction(b) {
   }
   if (a === 'delete' && b.dataset.group === 'specs') {
     const item = state.specs.find(x => x.id === id);
+    if (item && (await deleteLinkedWork('item', id))) return true;
     if (
       item &&
       (await window.WorkHubDialogs.confirm(
@@ -6868,16 +7062,7 @@ async function workhubAction(b) {
       ))
     ) {
       const ok = mutate(d => {
-        d.specs = d.specs.filter(x => x.id !== id);
-        for (const f of d.projectFeedback)
-          if (f.ricefwIds.includes(id)) {
-            f.ricefwIds = f.ricefwIds.filter(x => x !== id);
-            f.history.push(
-              feedbackHistory(
-                `Project-item link removed because ${projectItemLabel(item)} was deleted.`
-              )
-            );
-          }
+        removeProjectItemRecord(d, item);
       });
       closeModal();
       if (ok) tell('Project item deleted; linked feedback was preserved.');
@@ -7017,6 +7202,12 @@ document.addEventListener('submit', async e => {
 // 5. Project sub-items, tasks and precise Schedule times
 // =============================================================================
 const SUBITEM_STATUSES = ['Not started', 'In Progress', 'Blocked', 'Completed'];
+const optionalSubItemType = value =>
+  value === undefined || value === '' || WorkHubTaskProjectItems.TYPES.includes(value);
+
+function subItemTypeField(prefix, value) {
+  return `<div><label for="${prefix}Type">Task type</label><select id="${prefix}Type" name="taskType">${selectOptions(WorkHubTaskProjectItems.TYPES, value || '', 'Use main task type')}</select></div>`;
+}
 
 function normalizeGoLiveDate(value) {
   const raw = String(value ?? '').trim();
@@ -7043,6 +7234,7 @@ function upgradeFeatures(d) {
           id,
           title: String(sub.title || sub.name || '').slice(0, 500),
           status,
+          ...(sub.taskType ? { taskType: sub.taskType } : {}),
           remarks: String(sub.remarks || '').slice(0, 32767),
           feedback: sub.feedback === undefined ? '' : sub.feedback,
           owner: String(sub.owner || '').slice(0, 200),
@@ -7065,7 +7257,14 @@ function validateFeatures(d) {
   validateFeaturesV8(d);
   let total = 0;
   const ids = new Set();
+  const issueItems = new Set();
   for (const item of d.specs) {
+    if (item.goLiveIssueId !== undefined) {
+      const key = JSON.stringify([item.projectId, item.goLiveIssueId]);
+      if (!checkText(item.goLiveIssueId, 100) || !item.goLiveIssueId || issueItems.has(key))
+        throw Error('Each Go-Live issue can have one linked Project Item.');
+      issueItems.add(key);
+    }
     const subItems = Array.isArray(item.subItems) ? item.subItems : [];
     if (subItems.length > 500) throw Error('Each project item supports up to 500 sub-items.');
     total += subItems.length;
@@ -7078,6 +7277,7 @@ function validateFeatures(d) {
         !checkText(sub.title, 500) ||
         !sub.title.trim() ||
         !SUBITEM_STATUSES.includes(sub.status) ||
+        !optionalSubItemType(sub.taskType) ||
         !checkText(sub.remarks) ||
         !checkText(sub.feedback) ||
         !checkText(sub.owner, 200) ||
@@ -7402,7 +7602,7 @@ function openSubItems(parentId) {
   const m = subItemMetrics(item);
   openModal(
     `Sub-items · ${projectItemLabel(item)}`,
-    `<div class="subitem-hero"><div><span class="eyebrow">${esc(item.description)}</span><h2>${m.completed} of ${m.rows.length} completed</h2><p>${m.blocked} blocked · ${m.overdue} overdue</p></div><div class="subitem-ring" style="--completion:${m.percent}%"><strong>${m.percent}%</strong></div></div><div class="subitem-manager-list">${m.rows.map(sub => `<div class="subitem-manager-row${sub.status === 'Blocked' ? ' blocked' : ''}${sub.status !== 'Completed' && sub.dueDate && sub.dueDate < today() ? ' overdue' : ''}"><div><strong>${esc(sub.title)}</strong><small>${sub.owner ? `Owner: ${esc(sub.owner)}` : 'No owner'}${sub.dueDate ? ` · Due ${esc(sub.dueDate)}` : ''}</small>${sub.remarks ? `<p class="prewrap">${esc(sub.remarks)}</p>` : ''}${projectItemFeedbackPanel(item, sub)}${subItemTrackedTime(item.id, sub.id)}</div><select data-subitem-status="${esc(parentId)}" data-subitem-id="${esc(sub.id)}" aria-label="Status for ${esc(sub.title)}">${SUBITEM_STATUSES.map(v => `<option${v === sub.status ? ' selected' : ''}>${esc(v)}</option>`).join('')}</select><div class="actions subitem-work-actions">${subItemTimerButton(item, sub)}<button class="small" data-action="edit-subitem" data-parent="${esc(parentId)}" data-id="${esc(sub.id)}">Edit</button><button class="small danger" data-action="delete-subitem" data-parent="${esc(parentId)}" data-id="${esc(sub.id)}">Delete</button></div></div>`).join('') || '<div class="governance-empty"><strong>No sub-items yet</strong><p>Break this deliverable into smaller trackable actions.</p></div>'}</div><div class="modal-actions"><button type="button" data-action="cancel">Close</button><button class="primary" data-action="new-subitem" data-parent="${esc(parentId)}">+ Add sub-item</button></div>`
+    `<div class="subitem-hero"><div><span class="eyebrow">${esc(item.description)}</span><h2>${m.completed} of ${m.rows.length} completed</h2><p>${m.blocked} blocked · ${m.overdue} overdue</p></div><div class="subitem-ring" style="--completion:${m.percent}%"><strong>${m.percent}%</strong></div></div><div class="subitem-manager-list">${m.rows.map(sub => `<div class="subitem-manager-row${sub.status === 'Blocked' ? ' blocked' : ''}${sub.status !== 'Completed' && sub.dueDate && sub.dueDate < today() ? ' overdue' : ''}"><div><strong>${esc(sub.title)}</strong><small>${sub.taskType ? esc(sub.taskType) + ' · ' : ''}${sub.owner ? `Owner: ${esc(sub.owner)}` : 'No owner'}${sub.dueDate ? ` · Due ${esc(sub.dueDate)}` : ''}</small>${sub.remarks ? `<p class="prewrap">${esc(sub.remarks)}</p>` : ''}${projectItemFeedbackPanel(item, sub)}${subItemTrackedTime(item.id, sub.id)}</div><select data-subitem-status="${esc(parentId)}" data-subitem-id="${esc(sub.id)}" aria-label="Status for ${esc(sub.title)}">${SUBITEM_STATUSES.map(v => `<option${v === sub.status ? ' selected' : ''}>${esc(v)}</option>`).join('')}</select><div class="actions subitem-work-actions">${subItemTimerButton(item, sub)}<button class="small" data-action="edit-subitem" data-parent="${esc(parentId)}" data-id="${esc(sub.id)}">Edit</button><button class="small danger" data-action="delete-subitem" data-parent="${esc(parentId)}" data-id="${esc(sub.id)}">Delete</button></div></div>`).join('') || '<div class="governance-empty"><strong>No sub-items yet</strong><p>Break this deliverable into smaller trackable actions.</p></div>'}</div><div class="modal-actions"><button type="button" data-action="cancel">Close</button><button class="primary" data-action="new-subitem" data-parent="${esc(parentId)}">+ Add sub-item</button></div>`
   );
 }
 
@@ -7414,7 +7614,7 @@ function editSubItem(parentId, id = '') {
   const row = old || { title: '', status: 'Not started', owner: '', dueDate: '' };
   openModal(
     old ? 'Edit sub-item' : 'Add sub-item',
-    `<form id="subItemForm" data-parent="${esc(parentId)}" data-id="${esc(id)}"><div class="manual-entry-hero"><span class="eyebrow">Parent item</span><strong>${esc(projectItemLabel(item))} · ${esc(item.description)}</strong></div><div class="form-grid"><div class="wide"><label for="subItemTitle">Sub-item *</label><input id="subItemTitle" name="title" maxlength="500" value="${esc(row.title)}" required placeholder="Describe the smaller action or deliverable"></div><div><label for="subItemStatus">Status *</label><select id="subItemStatus" name="status" required>${SUBITEM_STATUSES.map(v => `<option${v === row.status ? ' selected' : ''}>${esc(v)}</option>`).join('')}</select></div><div><label for="subItemOwner">Owner</label><input id="subItemOwner" name="owner" maxlength="200" value="${esc(row.owner)}"></div><div><label for="subItemDue">Due date</label><input id="subItemDue" name="dueDate" type="date" min="1900-01-01" max="9999-12-31" value="${esc(row.dueDate)}"></div><div class="wide"><label for="subItemRemarks">Remarks</label><textarea id="subItemRemarks" name="remarks" maxlength="32767">${esc(row.remarks || '')}</textarea></div><div class="wide"><label for="subItemFeedback">Feedback updates</label><textarea id="subItemFeedback" name="feedback" maxlength="32767">${esc(row.feedback || '')}</textarea></div></div><div class="modal-actions"><button type="button" data-action="subitem-back" data-parent="${esc(parentId)}">Back to sub-items</button><button class="primary" type="submit">Save sub-item</button></div></form>`
+    `<form id="subItemForm" data-parent="${esc(parentId)}" data-id="${esc(id)}"><div class="manual-entry-hero"><span class="eyebrow">Parent item</span><strong>${esc(projectItemLabel(item))} · ${esc(item.description)}</strong></div><div class="form-grid"><div class="wide"><label for="subItemTitle">Sub-item *</label><input id="subItemTitle" name="title" maxlength="500" value="${esc(row.title)}" required placeholder="Describe the smaller action or deliverable"></div><div><label for="subItemStatus">Status *</label><select id="subItemStatus" name="status" required>${SUBITEM_STATUSES.map(v => `<option${v === row.status ? ' selected' : ''}>${esc(v)}</option>`).join('')}</select></div>${subItemTypeField('subItem', row.taskType)}<div><label for="subItemOwner">Owner</label><input id="subItemOwner" name="owner" maxlength="200" value="${esc(row.owner)}"></div><div><label for="subItemDue">Due date</label><input id="subItemDue" name="dueDate" type="date" min="1900-01-01" max="9999-12-31" value="${esc(row.dueDate)}"></div><div class="wide"><label for="subItemRemarks">Remarks</label><textarea id="subItemRemarks" name="remarks" maxlength="32767">${esc(row.remarks || '')}</textarea></div><div class="wide"><label for="subItemFeedback">Feedback updates</label><textarea id="subItemFeedback" name="feedback" maxlength="32767">${esc(row.feedback || '')}</textarea></div></div><div class="modal-actions"><button type="button" data-action="subitem-back" data-parent="${esc(parentId)}">Back to sub-items</button><button class="primary" type="submit">Save sub-item</button></div></form>`
   );
 }
 
@@ -7436,6 +7636,7 @@ function saveSubItem(form) {
     status,
     remarks: value('remarks').trim(),
     feedback: form.elements.namedItem('feedback')?.value ?? old?.feedback ?? '',
+    taskType: value('taskType'),
     owner: value('owner').trim(),
     dueDate: value('dueDate'),
     createdAt: old?.createdAt || now,
@@ -7921,22 +8122,21 @@ function validatePreciseRecords(d) {
   const represented = new Set();
   const issueTasks = new Set();
   for (const task of d.tasks) {
+    const project = WorkHubTaskProjectItems.sourceProject(task);
+    if (
+      task.sourceProjectId !== undefined &&
+      (!checkText(task.sourceProjectId, 100) ||
+        !d.projects.some(row => row.id === task.sourceProjectId))
+    )
+      throw Error('Check the task’s source project.');
     if (task.goLiveIssueId !== undefined) {
-      if (
-        !checkText(task.goLiveIssueId, 100) ||
-        !task.goLiveIssueId ||
-        task.taskType !== 'Project' ||
-        task.projectItemId
-      )
+      if (!checkText(task.goLiveIssueId, 100) || !task.goLiveIssueId || !project)
         throw Error('Check the linked Go-Live issue.');
-      const key = JSON.stringify([task.linkId, task.goLiveIssueId]);
+      const key = JSON.stringify([project, task.goLiveIssueId]);
       if (issueTasks.has(key)) throw Error('Each Go-Live issue can have one linked task.');
       issueTasks.add(key);
     }
-    if (
-      task.projectItemId !== undefined &&
-      (!checkText(task.projectItemId, 100) || task.taskType !== 'Project')
-    )
+    if (task.projectItemId !== undefined && (!checkText(task.projectItemId, 100) || !project))
       throw Error('Check the linked project item.');
     const linkedItem = WorkHubTaskProjectItems.itemForTask(d, task);
     if (linkedItem) {
@@ -7956,6 +8156,7 @@ function validatePreciseRecords(d) {
         !checkText(sub.title, 500) ||
         !sub.title.trim() ||
         !SUBITEM_STATUSES.includes(sub.status) ||
+        !optionalSubItemType(sub.taskType) ||
         !checkText(sub.remarks) ||
         !checkText(sub.feedback) ||
         !checkText(sub.createdAt, 50) ||
@@ -8071,7 +8272,7 @@ function viewBooking(date, time) {
   );
 }
 function subTaskCard(task, sub) {
-  return `<article class="task-child status-${statusClass(sub.status)}" data-subtask-id="${esc(sub.id)}"><div class="task-child-head"><strong>${esc(sub.title)}</strong>${tag(sub.status)}${WorkHubStudio.subtaskCompletionButton(task, sub)}<button class="small" data-action="edit-task-sub" data-parent="${esc(task.id)}" data-id="${esc(sub.id)}">Edit</button></div><dl class="task-child-notes"><div><dt>Remarks</dt><dd>${esc(sub.remarks) || 'No remarks yet'}</dd></div><div><dt>Feedback</dt><dd>${esc(sub.feedback) || 'No feedback yet'}</dd></div></dl><div class="task-child-actions">${WorkHubStudio.subtaskFeedbackButton(task, sub)}</div></article>`;
+  return `<article class="task-child status-${statusClass(sub.status)}" data-subtask-id="${esc(sub.id)}"><div class="task-child-head"><strong>${esc(sub.title)}</strong>${tag(sub.status)}${sub.taskType ? `<small>${esc(sub.taskType)}</small>` : ''}${WorkHubStudio.subtaskCompletionButton(task, sub)}<button class="small" data-action="edit-task-sub" data-parent="${esc(task.id)}" data-id="${esc(sub.id)}">Edit</button></div><dl class="task-child-notes"><div><dt>Remarks</dt><dd>${esc(sub.remarks) || 'No remarks yet'}</dd></div><div><dt>Feedback</dt><dd>${esc(sub.feedback) || 'No feedback yet'}</dd></div></dl><div class="task-child-actions">${WorkHubStudio.subtaskFeedbackButton(task, sub)}</div></article>`;
 }
 function editTaskSub(parentId, id = '') {
   const task = state.tasks.find(task => task.id === parentId),
@@ -8081,7 +8282,7 @@ function editTaskSub(parentId, id = '') {
   const sub = old || { title: '', status: SUB_STATUS[status(task)], remarks: '', feedback: '' };
   openModal(
     old ? 'Edit sub-task' : 'Add sub-task',
-    `<form id="taskSubForm" data-parent="${esc(parentId)}" data-id="${esc(id)}"><div class="manual-entry-hero"><span class="eyebrow">Main task${task.number ? ' · ' + esc(task.number) : ''}</span><strong>${esc(task.task)}</strong></div><div class="form-grid"><div class="wide"><label for="taskSubTitle">Sub-task *</label><input id="taskSubTitle" name="title" maxlength="500" required value="${esc(sub.title)}"></div><div><label for="taskSubStatus">Status *</label><select id="taskSubStatus" name="status">${SUBITEM_STATUSES.map(status => `<option${status === sub.status ? ' selected' : ''}>${esc(status)}</option>`).join('')}</select></div><div class="wide"><label for="taskSubRemarks">Remarks</label><textarea id="taskSubRemarks" name="remarks" maxlength="32767">${esc(sub.remarks)}</textarea></div><div class="wide"><label for="taskSubFeedback">Feedback</label><textarea id="taskSubFeedback" name="feedback" maxlength="32767">${esc(sub.feedback)}</textarea></div></div><p class="hint">Remarks and feedback belong only to this sub-task. Completing the last unfinished sub-task also completes its main task.</p><div class="modal-actions"><div>${old ? `<button type="button" class="danger" data-action="delete-task-sub" data-parent="${esc(parentId)}" data-id="${esc(id)}">Delete sub-task</button>` : ''}</div><div class="actions"><button type="button" data-action="cancel">Cancel</button><button type="submit" class="primary">Save sub-task</button></div></div></form>`
+    `<form id="taskSubForm" data-parent="${esc(parentId)}" data-id="${esc(id)}"><div class="manual-entry-hero"><span class="eyebrow">Main task${task.number ? ' · ' + esc(task.number) : ''}</span><strong>${esc(task.task)}</strong></div><div class="form-grid"><div class="wide"><label for="taskSubTitle">Sub-task *</label><input id="taskSubTitle" name="title" maxlength="500" required value="${esc(sub.title)}"></div><div><label for="taskSubStatus">Status *</label><select id="taskSubStatus" name="status">${SUBITEM_STATUSES.map(status => `<option${status === sub.status ? ' selected' : ''}>${esc(status)}</option>`).join('')}</select></div>${subItemTypeField('taskSub', sub.taskType)}<div class="wide"><label for="taskSubRemarks">Remarks</label><textarea id="taskSubRemarks" name="remarks" maxlength="32767">${esc(sub.remarks)}</textarea></div><div class="wide"><label for="taskSubFeedback">Feedback</label><textarea id="taskSubFeedback" name="feedback" maxlength="32767">${esc(sub.feedback)}</textarea></div></div><p class="hint">Remarks and feedback belong only to this sub-task. Completing the last unfinished sub-task also completes its main task.</p><div class="modal-actions"><div>${old ? `<button type="button" class="danger" data-action="delete-task-sub" data-parent="${esc(parentId)}" data-id="${esc(id)}">Delete sub-task</button>` : ''}</div><div class="actions"><button type="button" data-action="cancel">Cancel</button><button type="submit" class="primary">Save sub-task</button></div></div></form>`
   );
 }
 function saveTaskSub(form) {
@@ -8098,7 +8299,9 @@ function saveTaskSub(form) {
     const old = task.subTasks.find(sub => sub.id === id);
     if (form.dataset.id && !old) throw Error('Sub-task no longer exists.');
     const sub = {
+      ...old,
       id,
+      taskType: value('taskType'),
       title,
       status,
       remarks: value('remarks').trim(),
@@ -10715,6 +10918,7 @@ handoverWorkspace = WorkHubHandover.install(fileWorkspaceAdapter);
 hub = WorkHubStudio.install({
   can: fileWorkspaceAdapter.can,
   projectSourceTaskButton,
+  deleteLinkedWork,
   saveDriveFile: fileWorkspaceAdapter.saveDriveFile,
   driveReady: () => filesLibrary.api.connected(),
   openDriveUpload: file => filesLibrary.uploadDialog(file),

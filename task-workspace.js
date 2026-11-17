@@ -16,7 +16,7 @@
     document.body.dataset.motion !== 'off' &&
     !document.body.matches('.hub-private,.hub-present,.rest-room-open');
   const limit = 500;
-  const childFields = ['title', 'status', 'remarks', 'feedback'];
+  const childFields = ['title', 'status', 'remarks', 'feedback', 'taskType'];
   const drafts = new WeakMap();
   const expanded = new Set();
   const effects = new Set();
@@ -150,6 +150,7 @@
     return `<article class="task-draft-row" data-task-draft="${esc(row.id)}"><div class="task-draft-main">
       <label>Sub-item title<input data-task-field="title" maxlength="500" value="${esc(row.title)}" required></label>
       <label>Status<select data-task-field="status">${choices}</select></label>
+      <label>Task type<select data-task-field="taskType"><option value="">Use main task type</option>${root.WorkHubTaskProjectItems.TYPES.map(type => `<option${type === row.taskType ? ' selected' : ''}>${type}</option>`).join('')}</select></label>
       <button type="button" class="small task-draft-remove" data-action="task-draft-discard">Remove row</button>
       </div><details class="task-draft-notes"><summary>Remarks and feedback</summary><div class="task-draft-note-fields">
       <label>Remarks<textarea data-task-field="remarks" maxlength="32767">\n${esc(row.remarks)}</textarea></label>
@@ -254,7 +255,7 @@
           const value = field.dataset.taskStatusDraft ?? field.value;
           return [
             key,
-            previous && previous[key].replace(/\r\n?/g, '\n') === value
+            previous && (previous[key] || '').replace(/\r\n?/g, '\n') === value
               ? previous[key]
               : value.trim(),
           ];

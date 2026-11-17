@@ -137,9 +137,44 @@
             : '';
       return `<label class="gli-field${multiline ? ' gli-wide' : ''}"><span>${esc(label)}${name === 'title' ? ' *' : ''}</span>${multiline ? `<textarea id="gliEdit-${name}" data-gli-field="${name}" rows="3" maxlength="${name === 'title' ? 500 : 32000}">${esc(value)}</textarea>` : `<input id="gliEdit-${name}" data-gli-field="${name}" value="${esc(value)}" maxlength="${name === 'title' ? 500 : 32000}"${more}${name === 'title' ? ' required' : ''}>`}</label>`;
     }
+    function subItemEditor() {
+      return `<section class="gli-wide gli-subitem-editor"><h4>Sub-items</h4>${editor.subItems
+        .map(
+          (sub, index) => `
+        <div class="gli-subitem-row" data-gli-sub-index="${index}"><div class="gli-form-grid">
+          <label class="gli-field gli-wide"><span>Title *</span><input data-gli-sub="title" maxlength="500" value="${esc(sub.title)}" required></label>
+          <label class="gli-field"><span>Status</span><select data-gli-sub="status">${E.SUB_STATUSES.map(v => option(v, v, sub.status)).join('')}</select></label>
+          <label class="gli-field"><span>Task type</span><select data-gli-sub="taskType">${option('', 'Use main task type', sub.taskType || '')}${E.SUB_TYPES.map(v => option(v, v, sub.taskType)).join('')}</select></label>
+        </div><details><summary>Owner, due date and notes</summary><div class="gli-form-grid">
+          <label class="gli-field"><span>Owner</span><input data-gli-sub="owner" maxlength="200" value="${esc(sub.owner)}"></label>
+          <label class="gli-field"><span>Due date</span><input type="date" data-gli-sub="dueDate" value="${esc(sub.dueDate)}"></label>
+          <label class="gli-field gli-wide"><span>Remarks</span><textarea data-gli-sub="remarks" maxlength="32767">${esc(sub.remarks)}</textarea></label>
+          <label class="gli-field gli-wide"><span>Feedback</span><textarea data-gli-sub="feedback" maxlength="32767">${esc(sub.feedback)}</textarea></label>
+        </div></details>${btn('remove-sub-item', 'Remove sub-item', `data-index="${index}"`, 'gli-quiet gli-danger')}</div>`
+        )
+        .join('')}
+        ${btn('add-sub-item', '＋ Add sub-item', '', 'gli-secondary')}</section>`;
+    }
+    function issueSubItems(issue) {
+      const task = root.WorkHubTaskProjectItems?.taskForIssue(state(), pid, issue.id);
+      return (
+        root.WorkHubTaskProjectItems?.sharedChildren(issue, task) || copy(issue.subItems || [])
+      );
+    }
+    function subItemList(issue) {
+      const rows = issueSubItems(issue);
+      if (!rows.length) return '';
+      const done = rows.filter(sub => sub.status === 'Completed').length;
+      return `<details class="gli-extra gli-subitems"><summary>Sub-items · ${done}/${rows.length} complete</summary>${rows
+        .map(
+          sub =>
+            `<div><strong>${esc(sub.title)}</strong><p>${esc(sub.status)}${sub.taskType ? ' · ' + esc(sub.taskType) : ''}</p>${sub.remarks ? `<p>${esc(sub.remarks)}</p>` : ''}</div>`
+        )
+        .join('')}</details>`;
+    }
     function editorView() {
       if (!editor) return '';
-      return `<section class="gli-panel gli-editor"><div class="gli-panel-head"><div><span class="gli-eyebrow">ISSUE DETAILS</span><h3>${original ? 'Edit issue' : 'Add an issue'}</h3><p>Capture the issue and update it as work progresses.</p></div>${btn('cancel-editor', 'Close', '', 'gli-quiet')}</div><form id="gliIssueForm"><div class="gli-form-grid">${E.FIELDS.map(([key, label]) => field(key, label, editor[key], ['title', 'description', 'resolution'].includes(key))).join('')}${editor.extras.map((x, i) => `<label class="gli-field gli-wide"><span>${esc(x.header)} · imported column</span><textarea id="gliExtra-${i}" data-gli-extra="${i}" rows="2" maxlength="32000">${esc(x.value)}</textarea></label>`).join('')}</div><datalist id="gliStatusOptions"><option>Open</option><option>In progress</option><option>Resolved</option><option>Closed</option><option>On hold</option></datalist><datalist id="gliPriorityOptions"><option>Low</option><option>Medium</option><option>High</option><option>Critical</option></datalist><div class="gli-actions"><button type="submit" class="gli-button gli-primary">Save issue</button>${btn('cancel-editor', 'Cancel', '', 'gli-quiet')}</div></form></section>`;
+      return `<section class="gli-panel gli-editor"><div class="gli-panel-head"><div><span class="gli-eyebrow">ISSUE DETAILS</span><h3>${original ? 'Edit issue' : 'Add an issue'}</h3><p>Capture the issue and update it as work progresses.</p></div>${btn('cancel-editor', 'Close', '', 'gli-quiet')}</div><form id="gliIssueForm"><div class="gli-form-grid">${E.FIELDS.map(([key, label]) => field(key, label, editor[key], ['title', 'description', 'resolution'].includes(key))).join('')}<label class="gli-field"><span>Due date</span><input id="gliEdit-dueDate" type="date" data-gli-field="dueDate" value="${esc(editor.dueDate)}"></label>${editor.extras.map((x, i) => `<label class="gli-field gli-wide"><span>${esc(x.header)} · imported column</span><textarea id="gliExtra-${i}" data-gli-extra="${i}" rows="2" maxlength="32000">${esc(x.value)}</textarea></label>`).join('')}</div>${subItemEditor()}<datalist id="gliStatusOptions"><option>Open</option><option>In progress</option><option>Resolved</option><option>Closed</option><option>On hold</option></datalist><datalist id="gliPriorityOptions"><option>Low</option><option>Medium</option><option>High</option><option>Critical</option></datalist><div class="gli-actions"><button type="submit" class="gli-button gli-primary">Save issue</button>${btn('cancel-editor', 'Cancel', '', 'gli-quiet')}</div></form></section>`;
     }
     function currentSheet() {
       return book?.sheets[sheetIndex];
@@ -190,7 +225,7 @@
           ? btn('edit', 'Edit', `data-id="${esc(issue.id)}"`, 'gli-quiet') +
             btn('delete', 'Delete', `data-id="${esc(issue.id)}"`, 'gli-quiet gli-danger')
           : '';
-      return `<article class="gli-issue" style="--gli-order:${Math.min(index, 8)}"><div class="gli-issue-top"><span class="gli-number">${esc(issue.reference || '#' + String(index + 1).padStart(2, '0'))}</span><div class="gli-tags"><span class="gli-status gli-status-${status}">${esc(issue.status || 'Status not set')}</span>${issue.priority ? `<span class="gli-priority">${esc(issue.priority)}</span>` : ''}</div></div><h3>${esc(issue.title)}</h3>${issue.description ? `<p class="gli-description">${esc(issue.description)}</p>` : ''}<div class="gli-meta"><span>◌ ${esc(issue.owner || 'Owner not set')}</span>${issue.reported ? `<span>◷ ${esc(issue.reported)}</span>` : ''}${extra ? `<span>＋ ${extra} additional detail${extra === 1 ? '' : 's'}</span>` : ''}</div>${issue.resolution ? `<div class="gli-resolution"><strong>Resolution / remarks</strong><p>${esc(issue.resolution)}</p></div>` : ''}${issue.extras.length ? `<details class="gli-extra"><summary>View additional details</summary>${issue.extras.map(x => `<div><strong>${esc(x.header)}</strong><p>${esc(x.value)}</p></div>`).join('')}</details>` : ''}${taskButton || actions ? `<div class="gli-issue-actions">${taskButton}${actions}</div>` : ''}</article>`;
+      return `<article class="gli-issue" style="--gli-order:${Math.min(index, 8)}"><div class="gli-issue-top"><span class="gli-number">${esc(issue.reference || '#' + String(index + 1).padStart(2, '0'))}</span><div class="gli-tags"><span class="gli-status gli-status-${status}">${esc(issue.status || 'Status not set')}</span>${issue.priority ? `<span class="gli-priority">${esc(issue.priority)}</span>` : ''}</div></div><h3>${esc(issue.title)}</h3>${issue.description ? `<p class="gli-description">${esc(issue.description)}</p>` : ''}<div class="gli-meta"><span>◌ ${esc(issue.owner || 'Owner not set')}</span>${issue.reported ? `<span>◷ ${esc(issue.reported)}</span>` : ''}${issue.dueDate ? `<span>Due ${esc(issue.dueDate)}</span>` : ''}${extra ? `<span>＋ ${extra} additional detail${extra === 1 ? '' : 's'}</span>` : ''}</div>${issue.resolution ? `<div class="gli-resolution"><strong>Resolution / remarks</strong><p>${esc(issue.resolution)}</p></div>` : ''}${issue.extras.length ? `<details class="gli-extra"><summary>View additional details</summary>${issue.extras.map(x => `<div><strong>${esc(x.header)}</strong><p>${esc(x.value)}</p></div>`).join('')}</details>` : ''}${subItemList(issue)}${taskButton || actions ? `<div class="gli-issue-actions">${taskButton}${actions}</div>` : ''}</article>`;
     }
     function render(projectId) {
       sync();
@@ -217,6 +252,7 @@
             ['extras', []],
           ]);
       original = issue ? JSON.stringify(issue) : '';
+      editor.subItems = issue ? issueSubItems(issue) : [];
     }
     function saveIssue() {
       guard('edit');
@@ -415,6 +451,31 @@
       } else if (action === 'cancel-editor') {
         editor = null;
         original = '';
+      } else if (action === 'add-sub-item') {
+        guard('edit');
+        if (!editor || editor.subItems.length >= 500)
+          throw Error('Each Go-Live issue supports up to 500 sub-items.');
+        const at = new Date().toISOString();
+        editor.subItems.push({
+          id: uid(),
+          title: '',
+          status: 'Not started',
+          taskType: '',
+          owner: '',
+          dueDate: '',
+          remarks: '',
+          feedback: '',
+          createdAt: at,
+          updatedAt: at,
+        });
+        refresh();
+        $('gliWorkspace')
+          ?.querySelector(`[data-gli-sub-index="${editor.subItems.length - 1}"] input`)
+          ?.focus();
+        return;
+      } else if (action === 'remove-sub-item') {
+        guard('edit');
+        if (editor) editor.subItems.splice(Number(el.dataset.index), 1);
       } else if (action === 'open-import') {
         guard('edit');
         importing = true;
@@ -445,6 +506,7 @@
           id = pid,
           item = records().find(x => x.id === el.dataset.id);
         if (!item) throw Error('Issue no longer exists.');
+        if (await a.deleteLinkedWork?.('issue', item.id, id)) return;
         if (
           !(await root.WorkHubDialogs.confirm('Delete this Go-Live issue? This cannot be undone.'))
         )
@@ -477,7 +539,14 @@
       const el = event.target;
       if (!el.closest?.('#gliWorkspace')) return;
       if (el.dataset.gliField && editor) editor[el.dataset.gliField] = el.value;
-      else if (el.dataset.gliExtra !== undefined && editor)
+      else if (el.dataset.gliSub && editor) {
+        const row =
+          editor.subItems[Number(el.closest('[data-gli-sub-index]')?.dataset.gliSubIndex)];
+        if (row && row[el.dataset.gliSub] !== el.value) {
+          row[el.dataset.gliSub] = el.value;
+          row.updatedAt = new Date().toISOString();
+        }
+      } else if (el.dataset.gliExtra !== undefined && editor)
         editor.extras[Number(el.dataset.gliExtra)].value = el.value;
       else if (el.id === 'gliPaste') paste = el.value;
       else if (el.id === 'gliQuery') {
