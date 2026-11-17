@@ -1225,6 +1225,7 @@ function render() {
     (tab === 'processhub' && hub?.procedures?.patchRender()) ||
     (tab === 'lab' && hub?.workbench?.workshop?.patchRender()) ||
     (tab === 'validator' && hub?.validator?.patchRender()) ||
+    (tab === 'knowledge' && hub?.patchKnowledge()) ||
     (tab === 'studio' &&
       !hidden.has('studio.' + hub?.currentTool()) &&
       (!access || access.can('studio.' + hub.currentTool())) &&

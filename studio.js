@@ -349,6 +349,7 @@
       workSchedule = null,
       websiteDesigns = null,
       visualRefinement = null,
+      mmKnowledge = null,
       taskCompletion = null;
     const reminders = root.WorkHubReminders?.install({
       ...a,
@@ -1420,6 +1421,7 @@
       );
     }
     function knowledge() {
+      if (mmKnowledge?.selected()) return mmKnowledge.render();
       const rows = data().notes.filter(
         n =>
           (n.title + ' ' + n.body + ' ' + n.tags + ' ' + n.tcodes + ' ' + n.errors)
@@ -1427,7 +1429,7 @@
             .includes(search.toLowerCase()) &&
           (!batchA || batchA.matches('notes', n.id))
       );
-      return `<section class="hub">${head('YOUR SAP MM REFERENCE', 'Knowledge notebook', 'Keep the solution. Find it the next time.', btn('note-edit', '＋ New note', '', 'primary'))}<div class="hub-toolbar"><input id="hubSearch" type="search" value="${esc(search)}" placeholder="Search titles, tags, T-codes and solutions" aria-label="Search knowledge"></div><div class="hub-grid">${rows.map(n => `<article class="hub-card"><span class="hub-kicker">${esc(n.tags) || 'KNOWLEDGE NOTE'}</span><h3 class="hub-sensitive">${esc(n.title)}</h3><p>${esc(n.body.slice(0, 180))}${n.body.length > 180 ? '…' : ''}</p><div class="hub-tags"><span class="hub-badge">${esc(n.tcodes) || 'No T-code'}</span><span class="hub-meta">${esc(projectName(n.projectId))}</span></div><div class="actions">${btn('note-view', 'Read note', 'data-id="' + esc(n.id) + '"')}${btn('note-edit', 'Edit', 'data-id="' + esc(n.id) + '"', 'small')}</div></article>`).join('') || empty('Your own reference library', 'Add a fix, configuration note, test checklist or T-code reference.', btn('note-edit', 'Create your first note'))}</div></section>`;
+      return `${mmKnowledge?.tabs() || ''}<section class="hub">${head('YOUR SAP MM REFERENCE', 'Knowledge notebook', 'Keep the solution. Find it the next time.', btn('note-edit', '＋ New note', '', 'primary'))}<div class="hub-toolbar"><input id="hubSearch" type="search" value="${esc(search)}" placeholder="Search titles, tags, T-codes and solutions" aria-label="Search knowledge"></div><div class="hub-grid">${rows.map(n => `<article class="hub-card"><span class="hub-kicker">${esc(n.tags) || 'KNOWLEDGE NOTE'}</span><h3 class="hub-sensitive">${esc(n.title)}</h3><p>${esc(n.body.slice(0, 180))}${n.body.length > 180 ? '…' : ''}</p><div class="hub-tags"><span class="hub-badge">${esc(n.tcodes) || 'No T-code'}</span><span class="hub-meta">${esc(projectName(n.projectId))}</span></div><div class="actions">${btn('note-view', 'Read note', 'data-id="' + esc(n.id) + '"')}${btn('note-edit', 'Edit', 'data-id="' + esc(n.id) + '"', 'small')}</div></article>`).join('') || empty('Your own reference library', 'Add a fix, configuration note, test checklist or T-code reference.', btn('note-edit', 'Create your first note'))}</div></section>`;
     }
     function noteEditor(id = '') {
       const n = data().notes.find(n => n.id === id) || {};
@@ -3132,6 +3134,7 @@
       if (sorting && !sorting.source.isConnected) clearSort();
       if (tab !== 'processhub') clearTimeout(walkTimer);
       viewTab = tab;
+      mmKnowledge?.sync();
       const processAccount = a.cloud().ready ? a.cloud().user?.id || '' : '';
       if (processAccount !== processHubOwner) {
         processHubOwner = processAccount;
@@ -3144,7 +3147,7 @@
       taskCompletion?.mount(tab);
       reminders?.decorate(tab);
       projectDates?.decorate();
-      batchA?.mount(tab);
+      batchA?.mount(tab === 'knowledge' && mmKnowledge?.selected() ? '' : tab);
       library?.mount();
       notes?.mount();
       reader?.mount();
@@ -4489,6 +4492,14 @@
         currentTool === 'tables' &&
         !a.state().preferences.hiddenTabs?.includes('studio.tables'),
     });
+    mmKnowledge = root.WorkHubMmKnowledge?.install({
+      ...a,
+      active: () => viewTab === 'knowledge',
+      ready: () => a.cloud().ready,
+      canView: () => featureVisible('knowledge'),
+      owner: () => a.cloud().user?.id || '',
+      generation: () => a.cloud().generation,
+    });
     mmConfiguration = root.WorkHubMmConfiguration?.install({
       ...a,
       active: () =>
@@ -4740,6 +4751,7 @@
       notes,
       reader,
       patchReader: () => currentTool === 'reader' && reader?.patchRender(),
+      patchKnowledge: () => mmKnowledge?.patchRender(),
       batchC,
       standup,
       people,
