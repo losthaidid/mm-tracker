@@ -4087,7 +4087,7 @@ function editRecord(group, id, source) {
     };
     openModal(
       old ? 'Edit task' : 'Add task',
-      `<form id="editForm" class="task-editor" data-group="tasks" data-id="${esc(id || '')}" data-original-status="${currentStatus}">
+      `<form id="editForm" class="task-editor" data-group="tasks" data-id="${esc(id || '')}" data-original-status="${currentStatus}" data-context-source-item="${esc(source?.kind === 'item' ? source.record.id : '')}">
         <section class="task-editor-details" aria-labelledby="taskDetailsHeading"><h3 id="taskDetailsHeading">Main task</h3>
           <div class="form-grid">${taskField('task')}<div><label for="field-boardStatus">Status</label><select name="boardStatus" id="field-boardStatus">${values}</select></div>
           ${taskField('priority')}${taskField('dueDate')}${taskField('taskType')}${taskField('number')}<div data-task-finished-date>${taskField('doneDate')}</div>${taskLinkFields(r, source)}
@@ -4311,7 +4311,10 @@ function saveEdit(form) {
         uid
       );
       savedId = target.id;
-      if (target !== r) return;
+      if (target !== r) {
+        hub?.batchA?.capture(d, form, group, target.id);
+        return;
+      }
     }
     if (itemChoice === 'create') {
       if (d.specs.length >= LIMIT) throw Error('The Project Items section is full.');

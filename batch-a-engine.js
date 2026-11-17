@@ -38,6 +38,7 @@
   const key = (kind, id) => kind + ':' + id;
   const store = d => d.workhub.batchA;
   const meta = (d, kind, id) => store(d).records.find(r => r.id === key(kind, id));
+  const systemFields = ['environmentId', 'systemId', 'client'];
   const title = (r, kind) =>
     kind === 'tasks'
       ? r.task
@@ -103,6 +104,47 @@
     const m = touch(d, kind, id);
     Object.assign(m, values, { updatedAt: iso() });
     return m;
+  }
+  function contextPeer(d, kind, id) {
+    const links = root.WorkHubTaskProjectItems;
+    if (!links || !id) return;
+    if (kind === 'tasks') {
+      const item = links.itemForTask(d, record(d, kind, id));
+      if (item) return { kind: 'specs', id: item.id };
+    }
+    if (kind === 'specs') {
+      const item = record(d, kind, id);
+      const task = item && links.taskForItem(d, item);
+      if (task) return { kind: 'tasks', id: task.id };
+    }
+  }
+  function resolveContext(d, kind, id, peer) {
+    const local = meta(d, kind, id),
+      linked = peer && meta(d, peer.kind, peer.id),
+      [first, second] = peer?.kind === 'tasks' ? [linked, local] : [local, linked],
+      // Legacy pairs can have different settings. Keep the environment, system and client together.
+      system = systemFields.some(name => first?.[name]) ? first : second;
+    return {
+      environmentId: system?.environmentId || '',
+      systemId: system?.systemId || '',
+      client: system?.client || '',
+      labelIds: first?.labelIds.length ? first.labelIds : second?.labelIds || [],
+    };
+  }
+  function workContext(d, kind, id, includeLinked = true) {
+    return resolveContext(d, kind, id, includeLinked ? contextPeer(d, kind, id) : undefined);
+  }
+  function patchContext(d, kind, id, values, includeLinked = true) {
+    const peer = includeLinked && contextPeer(d, kind, id);
+    if (!peer) return patch(d, kind, id, values);
+    const shared = {};
+    if (systemFields.some(name => Object.hasOwn(values, name))) {
+      const saved = resolveContext(d, kind, id, peer);
+      for (const name of systemFields) shared[name] = values[name] ?? saved[name];
+    }
+    if (Object.hasOwn(values, 'labelIds')) shared.labelIds = [...values.labelIds];
+    if (Object.keys(shared).length) patch(d, peer.kind, peer.id, shared);
+    return patch(d, kind, id, { ...shared, ...values });
   }
   function dependencyState(d, dep) {
     if (dep.type === 'task') {
@@ -447,6 +489,8 @@
     upgrade,
     touch,
     patch,
+    workContext,
+    patchContext,
     dependencyState,
     blockers,
     validate,
