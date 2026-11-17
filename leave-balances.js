@@ -12,6 +12,7 @@
       return t ? t.name + ' · ' + t.code : 'Saved leave';
     },
     number = n => (n === null ? 'Not set' : String(n)),
+    earnedDateLabel = new Intl.DateTimeFormat('en-MY', { dateStyle: 'medium', timeZone: 'UTC' }),
     DAYS = [
       [1, 'Mon'],
       [2, 'Tue'],
@@ -164,7 +165,7 @@
         )
           .map(
             t =>
-              `<article class="leave-type-row"><span class="leave-type-code">${esc(t.code)}</span><div><h3>${esc(t.name)}</h3><p>${t.archived ? 'Archived · available on existing bookings' : 'Active · available in Schedule'}${Object.hasOwn(E.TYPES, t.id) ? ' · original type' : ''}</p></div><button type="button" data-leave-balance="edit-type" data-kind="${t.id}" aria-label="Edit ${esc(t.name)}">Edit</button></article>`
+              `<article class="leave-type-row"><span class="leave-type-code">${esc(t.code)}</span><div><h3>${esc(t.name)}</h3><p>${t.archived ? 'Archived · available on existing bookings' : 'Active · available in Schedule'}${Object.hasOwn(E.TYPES, t.id) ? ' · original type' : ''}</p>${t.earnedDate ? `<p>Date earned <time datetime="${esc(t.earnedDate)}">${esc(earnedDateLabel.format(new Date(t.earnedDate + 'T00:00:00Z')))}</time></p>` : ''}</div><button type="button" data-leave-balance="edit-type" data-kind="${t.id}" aria-label="Edit ${esc(t.name)}">Edit</button></article>`
           )
           .join(
             ''
@@ -176,9 +177,12 @@
       const old = id ? E.type(a.state(), id) : null;
       if (id && !old) throw Error('This leave type is no longer available. Reopen the list.');
       typeDraft = { owner: a.owner(), id, snapshot: old ? JSON.stringify(old) : '' };
+      const earnedDateField = Object.hasOwn(E.TYPES, id)
+        ? ''
+        : `<div><label for="leaveTypeEarnedDate">Date earned <span class="muted">(optional)</span></label><input id="leaveTypeEarnedDate" name="earnedDate" type="date" max="9999-12-31" value="${esc(old?.earnedDate || '')}" aria-describedby="leaveTypeEarnedHint"><p class="hint" id="leaveTypeEarnedHint">Visible only in Leave Types maintenance.</p></div>`;
       a.openModal(
         old ? 'Edit leave type' : 'Add leave type',
-        `<form id="leaveTypeForm"><div class="form-grid"><div class="span2"><label for="leaveTypeName">Leave type name *</label><input id="leaveTypeName" name="name" maxlength="80" value="${esc(old?.name || '')}" placeholder="e.g. Compassionate Leave" required></div><div><label for="leaveTypeCode">Short code *</label><input id="leaveTypeCode" name="code" maxlength="12" pattern="[A-Za-z0-9][A-Za-z0-9-]{0,11}" value="${esc(old?.code || '')}" placeholder="e.g. CL" required></div>${old ? `<div class="wide"><label class="check-label"><input type="checkbox" name="archived"${old.archived ? ' checked' : ''}>Archive this leave type</label></div>` : ''}</div><p class="hint">A leave type has its own yearly allowance and earlier-usage total. Set those in Leave allowances & balances after saving. Existing calendar titles and hours are preserved when a type is renamed.</p><div class="modal-actions"><button type="button" data-leave-balance="types">Back to leave types</button><button type="submit" class="primary">Save leave type</button></div></form>`
+        `<form id="leaveTypeForm"><div class="form-grid"><div class="span2"><label for="leaveTypeName">Leave type name *</label><input id="leaveTypeName" name="name" maxlength="80" value="${esc(old?.name || '')}" placeholder="e.g. Compassionate Leave" required></div><div><label for="leaveTypeCode">Short code *</label><input id="leaveTypeCode" name="code" maxlength="12" pattern="[A-Za-z0-9][A-Za-z0-9-]{0,11}" value="${esc(old?.code || '')}" placeholder="e.g. CL" required></div>${earnedDateField}${old ? `<div class="wide"><label class="check-label"><input type="checkbox" name="archived"${old.archived ? ' checked' : ''}>Archive this leave type</label></div>` : ''}</div><p class="hint">A leave type has its own yearly allowance and earlier-usage total. Set those in Leave allowances & balances after saving. Existing calendar titles and hours are preserved when a type is renamed.</p><div class="modal-actions"><button type="button" data-leave-balance="types">Back to leave types</button><button type="submit" class="primary">Save leave type</button></div></form>`
       );
     }
     function saveType(form) {
@@ -197,6 +201,8 @@
         code: form.elements.namedItem('code').value.trim().toUpperCase(),
         archived: !!form.elements.namedItem('archived')?.checked,
       };
+      const earnedDate = form.elements.namedItem('earnedDate')?.value;
+      if (earnedDate) row.earnedDate = earnedDate;
       const rows = old
         ? E.types(a.state()).map(t => (t.id === old.id ? row : t))
         : [...E.types(a.state()), row];
