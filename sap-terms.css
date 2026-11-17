@@ -59,7 +59,7 @@ body #view .sapt-hero p {
   font-size: 15px;
 }
 .sapt-walkthrough {
-  margin: 17px 0 4px;
+  margin: 0 0 14px;
 }
 .sapt-scenario {
   margin: 0 1px 11px;
@@ -111,11 +111,23 @@ body #view .sapt-hero p {
   border-radius: 50%;
   background: currentColor;
 }
+.sapt-player .sapt-scenes {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
 .sapt-scene {
   display: grid;
   grid-template-columns: minmax(0, 0.85fr) 32px minmax(0, 2fr);
   align-items: center;
-  min-height: 132px;
+  padding: 7px;
+  border: 1px solid var(--hub-border);
+  border-radius: 10px;
+}
+.sapt-scene[aria-current='step'] {
+  border-color: var(--sapt-active);
 }
 .sapt-trigger,
 .sapt-ledger-side,
@@ -130,7 +142,7 @@ body #view .sapt-hero p {
   font-size: 15px;
   overflow-wrap: anywhere;
 }
-.sapt-player[data-phase='trigger'] .sapt-trigger {
+.sapt-player[data-phase='trigger'] .sapt-scene[aria-current='step'] .sapt-trigger {
   border-color: var(--sapt-active);
   box-shadow: inset 3px 0 var(--sapt-active);
 }
@@ -193,7 +205,9 @@ body #view .sapt-hero p {
 .sapt-account[data-key-match='true'] {
   background: var(--mmk-tint);
 }
-.sapt-player[data-phase='posting'] .sapt-account[data-key-match='true'] {
+.sapt-player[data-phase='posting']
+  .sapt-scene[aria-current='step']
+  .sapt-account[data-key-match='true'] {
   border-color: var(--sapt-active);
   box-shadow: inset 2px 0 var(--sapt-active);
 }
@@ -237,8 +251,31 @@ body #modal .sapt-controls-row .sapt-play:not(:disabled) {
   }
 }
 @media (max-width: 460px) {
-  .sapt-ledger {
+  .sapt-player {
+    padding: 9px;
+  }
+  .sapt-scene {
+    padding: 5px;
+  }
+  .sapt-trigger,
+  .sapt-ledger-side {
+    padding: 8px;
+  }
+  .sapt-trigger p {
+    font-size: 12px;
+    line-height: 1.45;
+  }
+  .sapt-ledger-side h4 {
+    margin-bottom: 5px;
+  }
+  .sapt-ledger-side li {
     grid-template-columns: minmax(0, 1fr);
+    gap: 3px;
+    padding: 5px;
+  }
+  .sapt-signal {
+    --sapt-down: 7px;
+    height: 14px;
   }
   body #modal .sapt-controls-row button {
     min-height: 44px;
@@ -246,11 +283,16 @@ body #modal .sapt-controls-row .sapt-play:not(:disabled) {
   }
 }
 @media (prefers-reduced-motion: no-preference) {
-  body:not([data-motion='off']) .sapt-player[data-playing='true'] .sapt-signal i {
+  body:not([data-motion='off'])
+    .sapt-player[data-playing='true']
+    .sapt-scene[aria-current='step']
+    .sapt-signal
+    i {
     animation: sapt-signal 1.6s linear infinite;
   }
   body:not([data-motion='off'])
     .sapt-player[data-playing='true'][data-phase='posting']
+    .sapt-scene[aria-current='step']
     .sapt-account[data-key-match='true'] {
     animation: sapt-account 2.6s ease-in-out infinite;
   }

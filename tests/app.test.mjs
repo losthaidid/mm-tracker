@@ -4533,7 +4533,7 @@ test('MM Knowledge: live note search preserves the page, switches editions and r
   assert.equal(db.calls.length, writes);
 });
 
-test('SAP Terms: key lookup opens the worked posting, supports manual steps and links to the configuration guide', async t => {
+test('SAP Terms: key lookup keeps every posting visible as the active step changes', async t => {
   const { api, document, window, db } = await app(t);
   api.showTab('knowledge');
   document.querySelector('.mmk-tabs [data-mode="terms"]').click();
@@ -4547,16 +4547,22 @@ test('SAP Terms: key lookup opens the worked posting, supports manual steps and 
   api.showTab('knowledge');
   assert.equal(document.querySelector('.sapt-hero'), hero);
   document.querySelector('[data-sapt-card="WRX"] button').click();
-  assert.equal(document.getElementById('saptPosition').textContent, 'Step 1 of 4');
-  assert.match(document.querySelector('.sapt-ledger [data-key-match="true"]').textContent, /GR\/IR clearingWRX/);
+  const [receipt, invoice] = document.getElementById('saptScenes').children;
+  assert.equal(document.getElementById('saptPosition').textContent, 'Step 1 of 2');
+  assert.equal(receipt.getAttribute('aria-current'), 'step');
+  assert.match(receipt.querySelector('.sapt-ledger').textContent, /DebitInventoryBSX.+CreditGR\/IR clearingWRX/);
+  assert.match(invoice.querySelector('.sapt-ledger').textContent, /DebitGR\/IR clearingWRX.+CreditVendor payable/);
   const pause = document.querySelector('[data-sapt="play"]');
   pause.click();
   assert.equal(pause.textContent, 'Play');
   assert.equal(document.getElementById('saptPlayer').dataset.playing, 'false');
   document.querySelector('[data-sapt="next"]').click();
-  document.querySelector('[data-sapt="next"]').click();
-  assert.match(document.querySelector('.sapt-trigger').textContent, /matching invoice/);
-  assert.match(document.querySelector('.sapt-ledger').textContent, /DebitGR\/IR clearingWRX.+CreditVendor payable/);
+  assert.equal(document.getElementById('saptPosition').textContent, 'Step 2 of 2');
+  assert.equal(receipt.getAttribute('aria-current'), null);
+  assert.equal(invoice.getAttribute('aria-current'), 'step');
+  assert.deepEqual([...document.getElementById('saptScenes').children], [receipt, invoice]);
+  document.querySelector('[data-sapt="previous"]').click();
+  assert.equal(receipt.getAttribute('aria-current'), 'step');
   document.querySelector('[data-sapt="guide"][data-id="gr-ir-clearing"]').click();
   assert.equal(document.querySelector('.mmk-tabs [data-mode="reference"]').getAttribute('aria-pressed'), 'true');
   assert.ok(document.querySelector('.mmk-reader[data-guide="gr-ir-clearing"]'));
