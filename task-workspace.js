@@ -228,7 +228,7 @@
     updateEditor(form);
   }
 
-  function readEditor(form, current, uid, at) {
+  function readEditor(form, current, uid, at, readChildren = true) {
     const draft = drafts.get(form);
     if (
       !draft ||
@@ -242,6 +242,7 @@
       throw Error(
         'This task changed while the editor was open. Reopen it to see the latest changes.'
       );
+    if (!readChildren) return current?.subTasks || [];
     const saved = new Map((current?.subTasks || []).map(row => [row.id, row]));
     const rows = [...form.querySelectorAll('[data-task-draft]')];
     if (rows.length > limit) throw Error(`Each main task supports up to ${limit} sub-items.`);

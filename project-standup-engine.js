@@ -230,11 +230,60 @@
           : { todo: 'To do', doing: 'In progress', blocked: 'Blocked', done: 'Completed' }[
               t.boardStatus
             ] || 'To do';
-  // Search real report fields, rather than repeated UI labels such as “Remarks”.
-  // Keep each parent and its children together so a sub-item never loses its context.
-  function search(d, projectId, query = '') {
-    const terms = String(query).trim().toLowerCase().split(/\s+/).filter(Boolean),
-      tasks = new Map(d.tasks.map(t => [t.id, t])),
+  function generalTasks(d, projectId) {
+    const itemIds = new Set(
+      d.specs.filter(item => item.projectId === projectId).map(item => item.id)
+    );
+    const actionIds = new Set(data(d).actions.map(action => action.taskId));
+    return d.tasks.filter(
+      task =>
+        task.taskType === 'Project' &&
+        task.linkId === projectId &&
+        !task.archived &&
+        !itemIds.has(task.projectItemId) &&
+        !actionIds.has(task.id)
+    );
+  }
+  function matcher(query) {
+    const terms = String(query).trim().toLowerCase().split(/\s+/).filter(Boolean);
+    return fields => {
+      const value = fields.filter(Boolean).join(' ').toLowerCase();
+      return terms.every(term => value.includes(term));
+    };
+  }
+  function searchTasks(tasks, query) {
+    const matches = matcher(query);
+    return tasks
+      .map(task => {
+        const heading = [task.task, task.number];
+        const taskMatch = matches([
+          ...heading,
+          taskStatus(task),
+          task.remarks,
+          task.feedback,
+          task.dueDate,
+        ]);
+        const subItemIds = (task.subTasks || [])
+          .filter(sub => matches([...heading, sub.title, sub.status, sub.remarks, sub.feedback]))
+          .map(sub => sub.id);
+        return { taskId: task.id, taskMatch, subItemIds };
+      })
+      .filter(result => result.taskMatch || result.subItemIds.length);
+  }
+  // Search report fields while keeping each matching sub-item with its parent.
+  function search(d, projectId, query = '', includeTasks = true) {
+    const matches = matcher(query),
+      tasks = new Map(includeTasks ? d.tasks.map(t => [t.id, t]) : []),
+      itemTasks = new Map(
+        includeTasks
+          ? d.tasks
+              .filter(
+                task =>
+                  task.taskType === 'Project' && task.linkId === projectId && task.projectItemId
+              )
+              .map(task => [task.projectItemId, task.task])
+          : []
+      ),
       linked = new Map();
     for (const action of data(d).actions) {
       if (action.projectId !== projectId) continue;
@@ -250,14 +299,16 @@
         ].join(' ')
       );
     }
-    const matches = fields => {
-      const value = fields.filter(Boolean).join(' ').toLowerCase();
-      return terms.every(term => value.includes(term));
-    };
     return d.specs
       .filter(item => item.projectId === projectId)
       .map(item => {
-        const heading = [item.itemId, item.ricefw, item.itemType, item.description],
+        const heading = [
+            item.itemId,
+            item.ricefw,
+            item.itemType,
+            item.description,
+            itemTasks.get(item.id),
+          ],
           itemMatch = matches([...heading, item.status, item.remarks, linked.get(key(item.id))]),
           subItemIds = (item.subItems || [])
             .filter(sub =>
@@ -285,6 +336,8 @@
     updateTime,
     upsertAction,
     taskStatus,
+    generalTasks,
+    searchTasks,
     search,
   };
 })(window);
