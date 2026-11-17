@@ -1897,5 +1897,5 @@
     }
   );
 
-  root.WorkHubSapTermsData = Object.freeze({ entries, refs });
+  root.WorkHubSapTermsData = Object.freeze({ entries, refs, example, line, posting, pair });
 })(typeof window === 'undefined' ? globalThis : window);

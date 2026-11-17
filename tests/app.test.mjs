@@ -4575,3 +4575,39 @@ test('SAP Terms: key lookup keeps every posting visible as the active step chang
   assert.equal(document.getElementById('saptPlayer').dataset.playing, 'false');
   assert.equal(db.calls.length, writes);
 });
+
+test('SAP Terms: transaction selection opens the matching example and supports material-document-only movements', async t => {
+  const { api, document, window, db } = await app(t);
+  const writes = db.calls.length;
+  api.showTab('knowledge');
+  document.querySelector('.mmk-tabs [data-mode="terms"]').click();
+  const select = document.getElementById('saptTransaction');
+  assert.ok(select.querySelector('optgroup[label="Goods receipt"] option[value="without-po"]'));
+  const choose = (control, value) => {
+    control.value = value;
+    control.dispatchEvent(new window.Event('change', { bubbles: true }));
+  };
+  const openStock = () => document.querySelector('[data-sapt-card="BSX"] button').click();
+  choose(select, 'without-po');
+  assert.match(document.getElementById('saptContextHeading').textContent, /Without PO.+501/);
+  assert.equal(document.querySelector('[data-sapt-card="WRX"]'), null);
+  openStock();
+  assert.equal(document.querySelector('.sapt-reader').dataset.saptScenario, 'without-po');
+  assert.match(document.getElementById('saptScenes').textContent, /501.+DebitInventoryBSX.+CreditReceipt without PO offsetGBB\/ZOB/);
+  api.closeModal();
+  choose(select, 'fixed-asset');
+  openStock();
+  assert.match(document.getElementById('saptScenes').textContent, /241.+DebitAsset acquisition.+CreditInventoryBSX/);
+  api.closeModal();
+  choose(select, 'storage-one');
+  assert.equal(document.getElementById('saptTermResults').hidden, true);
+  document.querySelector('[data-sapt="scenario"]').click();
+  assert.match(document.getElementById('saptScenes').textContent, /311.+Document resultMaterial document/);
+  assert.equal(document.querySelector('.sapt-ledger'), null);
+  api.closeModal();
+  choose(document.getElementById('saptEdition'), 'historical');
+  assert.equal(select.value, '');
+  assert.ok(select.querySelector('[value="legacy-gr-ir"]'));
+  assert.equal(select.querySelector('[value="fixed-asset"]'), null);
+  assert.equal(db.calls.length, writes);
+});
