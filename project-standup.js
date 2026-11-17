@@ -205,9 +205,7 @@
         linked = new Map(
           a.can('tasks')
             ? state.tasks
-                .filter(
-                  task => task.taskType === 'Project' && task.linkId === id && task.projectItemId
-                )
+                .filter(task => links.sourceProject(task) === id && task.projectItemId)
                 .map(task => [task.projectItemId, task])
             : []
         );

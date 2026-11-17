@@ -239,6 +239,8 @@
           : { todo: 'To do', doing: 'In progress', blocked: 'Blocked', done: 'Completed' }[
               t.boardStatus
             ] || 'To do';
+  const sourceProject = task =>
+    task.sourceProjectId || (task.taskType === 'Project' ? task.linkId : '');
   function generalTasks(d, projectId) {
     const itemIds = new Set(
       d.specs.filter(item => item.projectId === projectId).map(item => item.id)
@@ -246,8 +248,7 @@
     const actionIds = new Set(data(d).actions.map(action => action.taskId));
     return d.tasks.filter(
       task =>
-        task.taskType === 'Project' &&
-        task.linkId === projectId &&
+        sourceProject(task) === projectId &&
         !task.archived &&
         !itemIds.has(task.projectItemId) &&
         !actionIds.has(task.id)
@@ -286,10 +287,7 @@
       itemTasks = new Map(
         includeTasks
           ? d.tasks
-              .filter(
-                task =>
-                  task.taskType === 'Project' && task.linkId === projectId && task.projectItemId
-              )
+              .filter(task => sourceProject(task) === projectId && task.projectItemId)
               .map(task => [task.projectItemId, task.task])
           : []
       ),
