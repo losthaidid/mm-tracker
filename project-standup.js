@@ -18,6 +18,7 @@
   };
   const itemName = item =>
     [item.itemId || item.ricefw, item.description].filter(Boolean).join(' · ') || 'Untitled item';
+  const itemType = item => item.itemType || 'RICEFW ID';
   function install(a) {
     let owner = '',
       projectId = '',
@@ -109,9 +110,7 @@
     }
     function itemCard(item, task) {
       const subs = item.subItems || [],
-        label = [item.itemType || 'Project item', item.itemId, task && 'Linked task']
-          .filter(Boolean)
-          .join(' · ');
+        label = [itemType(item), item.itemId, task && 'Linked task'].filter(Boolean).join(' · ');
       return `<details class="standup-item" data-report-item="${esc(item.id)}" data-report-row="item:${esc(item.id)}">${rowHeading('▤', label, item.description || 'Untitled item', item.status, subs)}<div class="standup-item-body">${task ? `<div class="standup-linked-task"><span class="standup-task-title"><small>Linked task</small><strong>${esc(task.task)}</strong></span>${button('task', 'Open task ↗', `data-id="${esc(task.id)}"`)}</div>` : ''}${row(item)}${subs.length ? `<div class="standup-sub-list">${subs.map(sub => row(item, sub)).join('')}</div>` : ''}</div></details>`;
     }
     function taskNotes(record) {
@@ -209,7 +208,23 @@
                 .map(task => [task.projectItemId, task])
             : []
         );
-      return `<div class="standup-report" data-owner="${esc(a.owner())}" data-project="${esc(id)}"><div class="standup-hero"><h2>${esc(project.name)}</h2></div>${strip(id)}${searchBar()}<div class="standup-items"><div class="standup-blank standup-no-results" hidden><strong>No matching items or updates</strong><p>Try another keyword, or clear your search.</p></div><section class="standup-group" aria-labelledby="standupItemsTitle"><h3 class="standup-group-title" id="standupItemsTitle">Project items <span>${items.length}</span></h3>${items.map(item => itemCard(item, linked.get(item.id))).join('') || '<div class="standup-blank"><strong>No project items yet</strong></div>'}</section>${a.can('tasks') ? `<section class="standup-group" aria-labelledby="standupGeneralTitle"><h3 class="standup-group-title" id="standupGeneralTitle">General project work <span>${tasks.length}</span></h3>${tasks.map(taskCard).join('') || '<div class="standup-blank"><strong>No general project tasks yet</strong></div>'}</section>` : ''}</div><footer class="standup-footer">Actions stay linked to Tasks. Completing an Action’s task leaves the project item’s own status unchanged.</footer></div>`;
+      return `<div class="standup-report" data-owner="${esc(a.owner())}" data-project="${esc(id)}"><div class="standup-hero"><h2>${esc(project.name)}</h2></div>${strip(id)}${searchBar()}<div class="standup-items"><div class="standup-blank standup-no-results" hidden><strong>No matching items or updates</strong><p>Try another keyword, or clear your search.</p></div>${itemGroups(items, linked)}${a.can('tasks') ? `<section class="standup-group" aria-labelledby="standupGeneralTitle"><h3 class="standup-group-title" id="standupGeneralTitle">General project work <span>${tasks.length}</span></h3>${tasks.map(taskCard).join('') || '<div class="standup-blank"><strong>No general project tasks yet</strong></div>'}</section>` : ''}</div><footer class="standup-footer">Actions stay linked to Tasks. Completing an Action’s task leaves the project item’s own status unchanged.</footer></div>`;
+    }
+    function itemGroups(items, linked) {
+      if (!items.length)
+        return '<div class="standup-group"><div class="standup-blank"><strong>No project items yet</strong></div></div>';
+      const groups = new Map();
+      for (const item of items) {
+        const type = itemType(item);
+        if (!groups.has(type)) groups.set(type, []);
+        groups.get(type).push(item);
+      }
+      return [...groups]
+        .map(([type, rows], i) => {
+          const headingId = `standupItemType${i}`;
+          return `<section class="standup-group" data-item-type="${esc(type)}" aria-labelledby="${headingId}"><h3 class="standup-group-title" id="${headingId}">${esc(type)} <span>${rows.length}</span></h3>${rows.map(item => itemCard(item, linked.get(item.id))).join('')}</section>`;
+        })
+        .join('');
     }
     function open(id, itemId = '', retainSearch = false) {
       guard(a.owner());

@@ -489,11 +489,17 @@ test('Project tasks: create from an item with prefilled details and open the sam
  assert.ok(getItem().subItems.every(row=>row.status==='Completed'));
 });
 
-test('stand-up: latest Project Item creation comes first even after older items are edited', async t => {
- const {api,document}=await app(t);
+test('stand-up: saved item types group the newest items first and follow type edits', async t => {
+ const {api,document,window}=await app(t);
  const older=standupFixture(api,document);
+ const customType='Cutover & readiness';
+ api.mutate(d=>d.lists.projectItemTypes.push(customType));
  api.editRecord('specs');
- fill(document.getElementById('editForm'),{description:'Newest issue review'});
+ fill(document.getElementById('editForm'),{description:'Confirm cutover checklist',itemType:customType});
+ api.saveEdit(document.getElementById('editForm'));
+ const middle=api.state().specs.at(-1);
+ api.editRecord('specs');
+ fill(document.getElementById('editForm'),{description:'Newest issue review',itemType:older.itemType});
  api.saveEdit(document.getElementById('editForm'));
  await settle();
  const newer=api.state().specs.at(-1);
@@ -506,8 +512,24 @@ test('stand-up: latest Project Item creation comes first even after older items 
  await settle();
  assert.equal(api.state().specs.find(row=>row.id===older.id).createdAt,older.createdAt);
  api.hub.standup.open(older.projectId);
- assert.deepEqual([...document.querySelectorAll('[data-report-item]')].map(el=>el.dataset.reportItem),[newer.id,older.id]);
+ const groups=()=>[...document.querySelectorAll('.standup-group[data-item-type]')];
+ const rows=group=>[...group.querySelectorAll('[data-report-item]')].map(el=>el.dataset.reportItem);
+ assert.deepEqual(groups().map(group=>group.dataset.itemType),[older.itemType,customType]);
+ assert.deepEqual(rows(groups()[0]),[newer.id,older.id]);
+ assert.deepEqual(rows(groups()[1]),[middle.id]);
+ assert.match(groups()[1].querySelector('h3').textContent,/^Cutover & readiness/);
  assert.ok([...document.querySelectorAll('[data-report-item]')].every(el=>!el.open));
+
+ const search=document.getElementById('standupSearch');
+ search.value='cutover & readiness';
+ search.dispatchEvent(new window.Event('input',{bubbles:true}));
+ assert.deepEqual(groups().filter(group=>!group.hidden).map(group=>group.dataset.itemType),[customType]);
+ document.querySelector('[data-standup="clear-search"]').click();
+ document.querySelector(`[data-report-item="${older.id}"]`).open=true;
+ api.mutate(d=>{d.specs.find(row=>row.id===older.id).itemType=customType;});
+ assert.deepEqual(rows(groups()[0]),[newer.id]);
+ assert.deepEqual(rows(groups()[1]),[middle.id,older.id]);
+ assert.equal(document.querySelector(`[data-report-item="${older.id}"]`).open,true);
 });
 
 test('Project tasks: role restrictions protect shared progress and exclude unavailable task details', async t => {
@@ -831,6 +853,77 @@ test('Batch A context survives base editors, cloud reopen and JSON backup restor
  assert.equal(E.meta(api.state(),'tasks',id).outcome,'workaround');assert.equal(E.meta(api.state(),'tasks',id).environmentId,'qas');
  const restored=api.parseBackup(api.payload(api.state()));assert.equal(restored.workhub.batchA.records.find(x=>x.recordId===id).outcomeNote,'Approved interim approach');
  const reopened=await app(t,{remote:copy(db.row),login:false});await reopened.api.loadCloud(sessionUser);await settle();assert.equal(reopened.api.state().workhub.batchA.records.find(x=>x.recordId===id).environmentId,'qas');
+});
+
+test('Batch A linked Project Items use saved Task work context and sync changes from either editor', async t=>{
+ const {api,document,window,db}=await app(t),E=window.WorkHubBatchEngine;
+ const item=standupFixture(api,document),taskId=addMainTask(api,document,'Verify purchasing design');
+ const label={id:'uat-review',name:'UAT review'};
+ const original={environmentId:'qas',systemId:'S4Q',client:'210',labelIds:[label.id]};
+ api.mutate(d=>{
+  Object.assign(d.tasks.find(task=>task.id===taskId),{taskType:'Project',linkId:item.projectId,projectItemId:item.id});
+  d.workhub.batchA.labels.push(label);
+  E.patch(d,'tasks',taskId,{...original,outcome:'workaround',outcomeNote:'Task closure details'});
+ });
+ await settle();
+ assert.equal(E.meta(api.state(),'specs',item.id).environmentId,'');
+ api.showProjectItems();
+ assert.match(document.querySelector('.item-card .batch-environment').textContent,/QAS S4Q \/ 210/);
+ assert.equal(document.querySelector('.item-card .batch-label').textContent,label.name);
+ const filter=document.querySelector('[name="batchFilterLabel"]');
+ filter.value=label.id;
+ filter.dispatchEvent(new window.Event('change',{bubbles:true}));
+ assert.ok(document.querySelector('.item-card'));
+
+ api.editRecord('specs',item.id);
+ let form=document.getElementById('editForm');
+ assert.equal(form.elements.batchEnvironment.value,'qas');
+ assert.equal(form.elements.batchSystem.value,'S4Q');
+ assert.equal(form.elements.batchClient.value,'210');
+ assert.equal(form.elements.batchLabel.checked,true);
+ fill(form,{batchClient:'310',batchLabel:false});
+ api.saveEdit(form);
+ await settle();
+ assert.equal(E.meta(api.state(),'tasks',taskId).outcomeNote,'Task closure details');
+
+ api.editRecord('tasks',taskId);
+ form=document.getElementById('editForm');
+ assert.equal(form.elements.batchEnvironment.value,'qas');
+ assert.equal(form.elements.batchClient.value,'310');
+ assert.equal(form.elements.batchLabel.checked,false);
+ fill(form,{batchEnvironment:'',batchSystem:'',batchClient:'',batchLabel:true});
+ api.saveEdit(form);
+ await settle();
+ const reopened=await app(t,{remote:copy(db.row),login:false});
+ await reopened.api.loadCloud(sessionUser);
+ reopened.api.editRecord('specs',item.id);
+ form=reopened.document.getElementById('editForm');
+ assert.equal(form.elements.batchEnvironment.value,'');
+ assert.equal(form.elements.batchSystem.value,'');
+ assert.equal(form.elements.batchClient.value,'');
+ assert.equal(form.elements.batchLabel.checked,true);
+});
+
+test('Batch A creating a Task from a Project Item prefills and preserves the existing work context',async t=>{
+ const {api,document}=await app(t);
+ const item=standupFixture(api,document);
+ api.editRecord('specs',item.id);
+ let form=document.getElementById('editForm');
+ fill(form,{batchEnvironment:'dev',batchSystem:'S4D',batchClient:'100'});
+ api.saveEdit(form);
+ api.showProjectItems();
+ await api.action(document.querySelector('[data-action="project-source-task"]'));
+ form=document.getElementById('editForm');
+ assert.equal(form.elements.batchEnvironment.value,'dev');
+ assert.equal(form.elements.batchSystem.value,'S4D');
+ assert.equal(form.elements.batchClient.value,'100');
+ api.saveEdit(form);
+ await settle();
+ api.editRecord('tasks',api.state().tasks[0].id);
+ assert.equal(document.getElementById('editForm').elements.batchSystem.value,'S4D');
+ api.closeModal();
+ api.editRecord('specs',item.id);
+ assert.equal(document.getElementById('editForm').elements.batchSystem.value,'S4D');
 });
 
 test('Batch A shared-label filters affect list, board and knowledge while preserving normal filters',async t=>{

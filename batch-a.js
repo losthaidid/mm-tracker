@@ -83,7 +83,12 @@
   function install(a) {
     const $ = id => document.getElementById(id),
       state = () => a.state(),
-      data = () => state().workhub.batchA;
+      data = () => state().workhub.batchA,
+      contextDrafts = new WeakMap(),
+      peerVisible = kind =>
+        (kind === 'tasks' || kind === 'specs') &&
+        (!a.can || a.can(kind === 'tasks' ? 'specs' : 'tasks')),
+      workContext = (kind, id) => E.workContext(state(), kind, id, peerVisible(kind));
     let owner = '',
       filters = {},
       glossaryQuery = '',
@@ -142,33 +147,41 @@
       );
     }
     function matches(kind, id) {
-      const f = filters[kind] || {},
-        m = E.meta(state(), kind, id);
+      const f = filters[kind];
+      if (!f?.label && !f?.environment) return true;
+      const context = workContext(kind, id);
       return (
-        (!f.label || m?.labelIds.includes(f.label)) &&
-        (!f.environment || m?.environmentId === f.environment)
+        (!f.label || context.labelIds.includes(f.label)) &&
+        (!f.environment || context.environmentId === f.environment)
       );
     }
-    function fields(kind, id) {
-      const m = E.meta(state(), kind, id) || {},
-        labelIds = m.labelIds || [];
+    function fields(kind, id, sourceItemId = '') {
+      const sourceItem = !id && sourceItemId && peerVisible(kind),
+        context = sourceItem ? workContext('specs', sourceItemId) : workContext(kind, id),
+        m = E.meta(state(), kind, id);
       return (
         '<section data-batch-fields class="batch-form-context batch-wide"><div class="batch-section-label"><span>WORK CONTEXT</span><small>Shared across projects</small></div><div class="batch-form">' +
         select(
           'batchEnvironment',
           'Environment',
           data().environments.map(x => [x.id, x.name]),
-          m.environmentId,
+          context.environmentId,
           'No environment'
         ) +
         input(
           'batchSystem',
           'System ID',
-          m.systemId,
+          context.systemId,
           'text',
           'maxlength="80" placeholder="e.g. S4D"'
         ) +
-        input('batchClient', 'Client', m.client, 'text', 'maxlength="40" placeholder="e.g. 100"') +
+        input(
+          'batchClient',
+          'Client',
+          context.client,
+          'text',
+          'maxlength="40" placeholder="e.g. 100"'
+        ) +
         '</div><fieldset class="batch-label-choices"><legend>Shared labels</legend>' +
         (data().labels.length
           ? data()
@@ -177,7 +190,7 @@
                   '<label><input type="checkbox" name="batchLabel" value="' +
                   esc(l.id) +
                   '"' +
-                  (labelIds.includes(l.id) ? ' checked' : '') +
+                  (context.labelIds.includes(l.id) ? ' checked' : '') +
                   '>' +
                   esc(l.name) +
                   '</label>'
@@ -192,18 +205,16 @@
               'batchOutcome',
               'Closure outcome',
               Object.entries(E.OUTCOMES),
-              m.outcome,
+              m?.outcome,
               'Choose when closing'
             ) +
-            area('batchOutcomeNote', 'Outcome notes', m.outcomeNote) +
+            area('batchOutcomeNote', 'Outcome notes', m?.outcomeNote) +
             '</div>'
           : '') +
         '</section>'
       );
     }
-    function capture(d, form, kind, id) {
-      if (!form.querySelector('[data-batch-fields]') || (a.can && !a.can('workspace', 'edit')))
-        return;
+    function contextValues(form, kind) {
       const v = new FormData(form),
         values = {
           environmentId: v.get('batchEnvironment') || '',
@@ -215,7 +226,18 @@
         values.outcome = v.get('batchOutcome') || '';
         values.outcomeNote = (v.get('batchOutcomeNote') || '').trim();
       }
-      E.patch(d, kind, id, values);
+      return values;
+    }
+    function capture(d, form, kind, id) {
+      if (!form.querySelector('[data-batch-fields]') || (a.can && !a.can('workspace', 'edit')))
+        return;
+      // The link can change while this form is open. Only apply the context fields the user edited.
+      const before = contextDrafts.get(form),
+        changes = Object.entries(contextValues(form, kind)).filter(
+          ([name, value]) => JSON.stringify(value) !== JSON.stringify(before?.[name])
+        );
+      if (changes.length)
+        E.patchContext(d, kind, id, Object.fromEntries(changes), peerVisible(kind));
     }
     function decorateModal() {
       const modal = $('modal'),
@@ -238,7 +260,13 @@
               : formEl.dataset.group;
         if (E.KINDS.includes(kind)) {
           const grid = formEl.querySelector('.form-grid');
-          if (grid) grid.insertAdjacentHTML('beforeend', fields(kind, formEl.dataset.id || ''));
+          if (grid) {
+            grid.insertAdjacentHTML(
+              'beforeend',
+              fields(kind, formEl.dataset.id || '', formEl.dataset.contextSourceItem)
+            );
+            contextDrafts.set(formEl, contextValues(formEl, kind));
+          }
         }
       }
       if (
@@ -298,25 +326,24 @@
         r = E.record(d, kind, id),
         m = E.meta(d, kind, id);
       if (!r) return '';
-      const env = data().environments.find(x => x.id === m?.environmentId),
-        labels = (m?.labelIds || [])
-          .map(id => data().labels.find(l => l.id === id))
-          .filter(Boolean),
+      const { environmentId, systemId, client, labelIds } = workContext(kind, id),
+        env = data().environments.find(x => x.id === environmentId),
+        labels = labelIds.map(id => data().labels.find(l => l.id === id)).filter(Boolean),
         deps = kind === 'tasks' ? E.blockers(d, id) : [];
       return (
         '<div class="batch-record-context">' +
         (env
           ? '<span class="batch-chip batch-environment" title="' +
-            esc([m.systemId, m.client ? 'Client ' + m.client : ''].filter(Boolean).join(' · ')) +
+            esc([systemId, client ? 'Client ' + client : ''].filter(Boolean).join(' · ')) +
             '">' +
             esc(env.name) +
-            ([m.systemId, m.client].filter(Boolean).length
-              ? ' <small>' + esc([m.systemId, m.client].filter(Boolean).join(' / ')) + '</small>'
+            (systemId || client
+              ? ' <small>' + esc([systemId, client].filter(Boolean).join(' / ')) + '</small>'
               : '') +
             '</span>'
-          : m?.systemId || m?.client
+          : systemId || client
             ? '<span class="batch-chip">' +
-              esc([m.systemId, m.client ? 'Client ' + m.client : ''].filter(Boolean).join(' · ')) +
+              esc([systemId, client ? 'Client ' + client : ''].filter(Boolean).join(' · ')) +
               '</span>'
             : '') +
         labels
@@ -444,6 +471,8 @@
           area('nextStep', 'The next small step', m?.nextStep),
         'data-kind="' + kind + '" data-id="' + esc(id) + '"'
       );
+      const editor = $('batchContext');
+      contextDrafts.set(editor, contextValues(editor, kind));
     }
     function dependencyList(id) {
       const m = E.meta(state(), 'tasks', id),
@@ -600,7 +629,7 @@
       if (!label) throw Error('This label no longer exists.');
       const found = E.KINDS.flatMap(kind =>
         E.rows(state(), kind)
-          .filter(r => E.meta(state(), kind, r.id)?.labelIds.includes(id))
+          .filter(r => workContext(kind, r.id).labelIds.includes(id))
           .map(r => ({ kind, r }))
       );
       open(
