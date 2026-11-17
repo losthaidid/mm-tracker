@@ -152,7 +152,7 @@
       return `<div class="sapt-ledger">${column('Debit', data.debit)}${column('Credit', data.credit)}</div>`;
     }
     function scene(entry, data) {
-      return `<div class="sapt-trigger"><h4>${esc(data.title)}</h4><p>${esc(data.effect)}</p></div><div class="sapt-signal" aria-hidden="true"><i></i></div>${ledger(entry, data)}`;
+      return `<li class="sapt-scene"><div class="sapt-trigger"><h4>${esc(data.title)}</h4><p>${esc(data.effect)}</p></div><div class="sapt-signal" aria-hidden="true"><i></i></div>${ledger(entry, data)}</li>`;
     }
     function routes(entry) {
       if (entry.historical)
@@ -189,6 +189,7 @@
       return result;
     }
     function details(entry) {
+      const navigation = entry.demo.postings.length > 1 ? 'step' : 'phase';
       const related =
         entry.kind === 'key'
           ? entries.filter(
@@ -200,20 +201,20 @@
       const guideButton = id =>
         `<button type="button" class="small" data-sapt="guide" data-id="${esc(id)}">${esc(byGuide.get(id).title)} ↗</button>`;
       return `<article class="mmk-reader sapt-reader" data-access-feature="knowledge" data-sapt-entry="${esc(entry.id)}">
-        <div class="sapt-lead"><div><span class="mmk-topic">${kinds[entry.kind]}</span><p id="saptExplanation" tabindex="-1">${esc(entry.explanation)}</p></div>${availability(entry)}</div>
-        <section class="sapt-walkthrough" aria-label="Worked example">
-          <div class="sapt-scenario"><h3>Worked example</h3><p>${esc(entry.demo.setup)}</p></div>
+        <section class="sapt-walkthrough" aria-labelledby="saptExampleTitle">
+          <div class="sapt-scenario"><h3 id="saptExampleTitle" tabindex="-1">Worked example</h3><p>${esc(entry.demo.setup)}</p></div>
           <div id="saptPlayer" class="sapt-player" data-phase="trigger" data-playing="false">
             <div class="sapt-phase"><span id="saptPhase"></span><span id="saptPosition"></span></div>
-            <div id="saptScene" class="sapt-scene"></div>
+            <ol id="saptScenes" class="sapt-scenes" role="list" aria-label="Example steps">${entry.demo.postings.map(data => scene(entry, data)).join('')}</ol>
             <div class="sapt-controls-row" role="group" aria-label="Playback controls">
-              <button type="button" class="small" data-sapt="previous">Previous step</button>
+              <button type="button" class="small" data-sapt="previous">Previous ${navigation}</button>
               <button type="button" class="small sapt-play" data-sapt="play">Pause</button>
-              <button type="button" class="small" data-sapt="next">Next step</button>
+              <button type="button" class="small" data-sapt="next">Next ${navigation}</button>
               <button type="button" class="small" data-sapt="restart">Restart</button>
             </div>
           </div>
         </section>
+        <div class="sapt-lead"><div><span class="mmk-topic">${kinds[entry.kind]}</span><p>${esc(entry.explanation)}</p></div>${availability(entry)}</div>
         <section class="mmk-section"><h3>Where to check in SAP</h3>${routes(entry)
           .map(path => `<div class="mmk-route"><p>${esc(path)}</p></div>`)
           .join('')}<p>${esc(entry.check)}</p></section>
@@ -253,31 +254,33 @@
     }
     function go(step) {
       if (!open()) return;
-      const { entry } = playback;
-      const total = entry.demo.postings.length * 2;
-      playback.step = (step + total) % total;
+      const { postings } = playback.entry.demo;
+      const phases = postings.length * 2;
+      playback.step = (step + phases) % phases;
       const position = Math.floor(playback.step / 2);
-      const data = entry.demo.postings[position];
-      if (position !== playback.shown) {
-        $('saptScene').innerHTML = scene(entry, data);
-        playback.shown = position;
+      const scenes = $('saptScenes');
+      const active = scenes.querySelector('[aria-current="step"]');
+      const next = scenes.children[position];
+      if (active !== next) {
+        active?.removeAttribute('aria-current');
+        next.setAttribute('aria-current', 'step');
       }
       const isTrigger = playback.step % 2 === 0;
       $('saptPlayer').dataset.phase = isTrigger ? 'trigger' : 'posting';
       $('saptPhase').textContent = isTrigger
         ? 'Trigger'
-        : data.lookup
+        : postings[position].lookup
           ? 'Account determination'
           : 'FI posting';
-      $('saptPosition').textContent = 'Step ' + (playback.step + 1) + ' of ' + total;
+      $('saptPosition').textContent = 'Step ' + (position + 1) + ' of ' + postings.length;
       schedule();
     }
     function show(entry) {
       stop();
-      playback = { entry, step: 0, shown: -1, paused: false };
+      playback = { entry, step: 0, paused: false };
       a.openModal(displayCode(entry) + ' · ' + entry.title, details(entry));
       $('modalBody').scrollTop = 0;
-      $('saptExplanation').focus({ preventScroll: true });
+      $('saptExampleTitle').focus({ preventScroll: true });
       go(allowsMotion() ? 0 : 1);
     }
     function sync() {
@@ -319,7 +322,10 @@
         playback.paused = !playback.paused;
         schedule();
       } else if (action === 'previous' || action === 'next' || action === 'restart') {
-        go(action === 'restart' ? 0 : playback.step + (action === 'previous' ? -1 : 1));
+        const distance = playback.entry.demo.postings.length > 1 ? 2 : 1;
+        go(
+          action === 'restart' ? 0 : playback.step + (action === 'previous' ? -distance : distance)
+        );
       }
     });
     document.addEventListener('visibilitychange', sync);
