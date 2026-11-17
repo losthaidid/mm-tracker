@@ -98,6 +98,13 @@
       subs = rows.flatMap(s => s.subItems || []);
     return { items: counts(rows), subs: counts(subs), all: counts([...rows, ...subs]) };
   }
+  function newestItems(d, projectId) {
+    // Saved insertion order is the fallback for items created before timestamps were recorded.
+    return d.specs
+      .filter(item => item.projectId === projectId)
+      .reverse()
+      .sort((a, b) => (Date.parse(b.createdAt) || 0) - (Date.parse(a.createdAt) || 0));
+  }
   function prepare(next, previous, restoring = false, now = new Date().toISOString()) {
     if (restoring || !previous) return;
     const h = data(next),
@@ -107,6 +114,8 @@
     for (const item of next.specs) {
       const old = oldItems.get(item.id),
         oldSubs = new Map((old?.subItems || []).map(r => [r.id, r]));
+      if (!old) item.createdAt = now;
+      else if (old.createdAt) item.createdAt = old.createdAt;
       for (const [row, before, subItemId] of [
         [item, old, ''],
         ...(item.subItems || []).map(s => [s, oldSubs.get(s.id), s.id]),
@@ -332,6 +341,7 @@
     source,
     category,
     metrics,
+    newestItems,
     prepare,
     updateTime,
     upsertAction,

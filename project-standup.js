@@ -121,6 +121,7 @@
       const subs = task.subTasks || [],
         label = [
           task.number && 'Task ' + task.number,
+          links.issueForTask(a.state(), task) && 'Go-Live issue',
           a.taskCompanyLabel(task),
           task.dueDate && 'Due ' + task.dueDate,
         ]
@@ -199,7 +200,7 @@
       const state = a.state(),
         project = state.projects.find(p => p.id === id);
       if (!project) throw Error('Project no longer exists.');
-      const items = state.specs.filter(s => s.projectId === id),
+      const items = E.newestItems(state, id),
         tasks = generalTasks(id),
         linked = new Map(
           a.can('tasks')
@@ -276,6 +277,12 @@
       if (!r) {
         const state = a.state(),
           task = state.tasks.find(row => row.id === taskId);
+        if (task?.goLiveIssueId) {
+          const issue = links.issueForTask(state, task);
+          return issue
+            ? `<div class="standup-task-context wide"><span class="standup-kicker">GO-LIVE ISSUE</span><strong class="hub-sensitive">${esc([issue.reference, issue.title].filter(Boolean).join(' · '))}</strong></div>`
+            : '<p class="standup-task-context wide">Linked Go-Live issue unavailable.</p>';
+        }
         const item = links.itemForTask(state, task);
         if (!item)
           return task?.projectItemId

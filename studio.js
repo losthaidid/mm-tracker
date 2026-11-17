@@ -2997,7 +2997,13 @@
       root.WorkHubClaimsEngine.prepare(next, previous, restoring);
       root.WorkHubValidatorEngine?.prepare(next, previous, restoring);
       root.WorkHubTaskCompletion.prepare(next, previous, today(), now(), restoring);
-      root.WorkHubTaskProjectItems.prepare(next, previous, a.can('specs', 'edit'), restoring);
+      root.WorkHubTaskProjectItems.prepare(
+        next,
+        previous,
+        a.can('specs', 'edit'),
+        restoring,
+        today()
+      );
       root.WorkHubProjectDates.prepare(next, previous, today(), restoring);
       root.WorkHubProjectStandupEngine?.prepare(next, previous, restoring);
       root.WorkHubProjectPeopleEngine?.prepare(next, previous, restoring);
