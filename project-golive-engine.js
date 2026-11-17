@@ -175,6 +175,8 @@
         if (!validText(issue[field], field === 'title' ? LIMITS.title : LIMITS.text))
           throw Error('Check the Go-Live issue ' + field + ' field length or characters.');
       if (!issue.title.trim()) throw Error('Every Go-Live issue needs an issue or summary.');
+      if (issue.resolvedDate !== undefined && !root.WorkHubReminders?.validDate(issue.resolvedDate))
+        throw Error('Check the date the Go-Live issue was resolved.');
       if (
         !Array.isArray(issue.extras) ||
         issue.extras.length > LIMITS.columns ||

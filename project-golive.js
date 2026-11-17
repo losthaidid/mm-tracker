@@ -183,8 +183,14 @@
     }
     function issueCard(issue, index) {
       const status = E.category(issue.status),
-        extra = issue.extras.length;
-      return `<article class="gli-issue" style="--gli-order:${Math.min(index, 8)}"><div class="gli-issue-top"><span class="gli-number">${esc(issue.reference || '#' + String(index + 1).padStart(2, '0'))}</span><div class="gli-tags"><span class="gli-status gli-status-${status}">${esc(issue.status || 'Status not set')}</span>${issue.priority ? `<span class="gli-priority">${esc(issue.priority)}</span>` : ''}</div></div><h3>${esc(issue.title)}</h3>${issue.description ? `<p class="gli-description">${esc(issue.description)}</p>` : ''}<div class="gli-meta"><span>◌ ${esc(issue.owner || 'Owner not set')}</span>${issue.reported ? `<span>◷ ${esc(issue.reported)}</span>` : ''}${extra ? `<span>＋ ${extra} additional detail${extra === 1 ? '' : 's'}</span>` : ''}</div>${issue.resolution ? `<div class="gli-resolution"><strong>Resolution / remarks</strong><p>${esc(issue.resolution)}</p></div>` : ''}${issue.extras.length ? `<details class="gli-extra"><summary>View additional details</summary>${issue.extras.map(x => `<div><strong>${esc(x.header)}</strong><p>${esc(x.value)}</p></div>`).join('')}</details>` : ''}${can('edit') ? `<div class="gli-issue-actions">${btn('edit', 'Edit', `data-id="${esc(issue.id)}"`, 'gli-quiet')}${btn('delete', 'Delete', `data-id="${esc(issue.id)}"`, 'gli-quiet gli-danger')}</div>` : ''}</article>`;
+        extra = issue.extras.length,
+        taskButton =
+          a.projectSourceTaskButton?.(pid, 'issue', issue.id, 'gli-button gli-quiet') || '',
+        actions = can('edit')
+          ? btn('edit', 'Edit', `data-id="${esc(issue.id)}"`, 'gli-quiet') +
+            btn('delete', 'Delete', `data-id="${esc(issue.id)}"`, 'gli-quiet gli-danger')
+          : '';
+      return `<article class="gli-issue" style="--gli-order:${Math.min(index, 8)}"><div class="gli-issue-top"><span class="gli-number">${esc(issue.reference || '#' + String(index + 1).padStart(2, '0'))}</span><div class="gli-tags"><span class="gli-status gli-status-${status}">${esc(issue.status || 'Status not set')}</span>${issue.priority ? `<span class="gli-priority">${esc(issue.priority)}</span>` : ''}</div></div><h3>${esc(issue.title)}</h3>${issue.description ? `<p class="gli-description">${esc(issue.description)}</p>` : ''}<div class="gli-meta"><span>◌ ${esc(issue.owner || 'Owner not set')}</span>${issue.reported ? `<span>◷ ${esc(issue.reported)}</span>` : ''}${extra ? `<span>＋ ${extra} additional detail${extra === 1 ? '' : 's'}</span>` : ''}</div>${issue.resolution ? `<div class="gli-resolution"><strong>Resolution / remarks</strong><p>${esc(issue.resolution)}</p></div>` : ''}${issue.extras.length ? `<details class="gli-extra"><summary>View additional details</summary>${issue.extras.map(x => `<div><strong>${esc(x.header)}</strong><p>${esc(x.value)}</p></div>`).join('')}</details>` : ''}${taskButton || actions ? `<div class="gli-issue-actions">${taskButton}${actions}</div>` : ''}</article>`;
     }
     function render(projectId) {
       sync();

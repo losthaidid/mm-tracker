@@ -449,6 +449,67 @@ test('Project tasks: existing items and general work appear once in stand-up wit
  assert.equal(api.state().tasks[0].subTasks.length,0);
 });
 
+test('Project tasks: create from an item with prefilled details and open the same linked task', async t => {
+ const {api,document}=await app(t);
+ addCompany(api,document,'Receiving company');
+ const company=api.state().projectCompanies.at(-1);
+ const item=standupFixture(api,document);
+ api.mutate(d=>Object.assign(d.specs[0],{companyId:company.id,dueDate:'2026-11-24',priority:'A'}));
+ await settle();
+ const getItem=()=>api.state().specs.find(row=>row.id===item.id);
+ const itemBefore=copy(getItem());
+ api.showProjectItems();
+ const source=()=>document.querySelector('[data-action="project-source-task"][data-id="'+item.id+'"]');
+ assert.match(source().textContent,/Create task/);
+ await api.action(source());
+ const form=document.getElementById('editForm');
+ assert.equal(form.elements.task.value,item.description);
+ assert.equal(form.elements.taskType.value,'Project');
+ assert.equal(form.elements.projectLink.value,item.projectId);
+ assert.equal(form.elements.companyId.value,company.id);
+ assert.equal(form.elements.dueDate.value,'2026-11-24');
+ assert.equal(form.elements.priority.value,'High');
+ assert.equal(form.elements.boardStatus.value,'doing');
+ api.saveEdit(form);
+ await settle();
+ const task=api.state().tasks[0];
+ assert.equal(task.projectItemId,item.id);
+ assert.deepEqual(copy(task.subTasks),copy(getItem().subItems));
+ assert.deepEqual(copy(getItem()),itemBefore);
+ document.querySelector('[data-pi="layout"][data-value="table"]').click();
+ await settle();
+ assert.equal(source().textContent,'Open task');
+ await api.action(source());
+ assert.match(document.getElementById('modalBody').textContent,/PO configuration/);
+ assert.equal(api.state().tasks.length,1);
+ api.closeModal();
+ api.hub.moveTask(task.id,'done');
+ await settle();
+ assert.equal(getItem().status,'Completed');
+ assert.ok(getItem().subItems.every(row=>row.status==='Completed'));
+});
+
+test('stand-up: latest Project Item creation comes first even after older items are edited', async t => {
+ const {api,document}=await app(t);
+ const older=standupFixture(api,document);
+ api.editRecord('specs');
+ fill(document.getElementById('editForm'),{description:'Newest issue review'});
+ api.saveEdit(document.getElementById('editForm'));
+ await settle();
+ const newer=api.state().specs.at(-1);
+ assert.ok(Date.parse(older.createdAt)<Date.parse(newer.createdAt));
+ // An unrelated order change and a full edit both preserve the creation order.
+ api.mutate(d=>d.specs.reverse());
+ api.editRecord('specs',older.id);
+ fill(document.getElementById('editForm'),{status:'Testing',remarks:'Updated just now'});
+ api.saveEdit(document.getElementById('editForm'));
+ await settle();
+ assert.equal(api.state().specs.find(row=>row.id===older.id).createdAt,older.createdAt);
+ api.hub.standup.open(older.projectId);
+ assert.deepEqual([...document.querySelectorAll('[data-report-item]')].map(el=>el.dataset.reportItem),[newer.id,older.id]);
+ assert.ok([...document.querySelectorAll('[data-report-item]')].every(el=>!el.open));
+});
+
 test('Project tasks: role restrictions protect shared progress and exclude unavailable task details', async t => {
  const {api,document,window,db}=await app(t),item=standupFixture(api,document);
  api.editRecord('tasks');
@@ -4409,6 +4470,66 @@ test('Go-Live issues integrate into Projects and survive save and backup', async
   assert.equal(project.goLiveIssues[0].extras[0].value,'0007');
   assert.equal(api.parseBackup(api.payload(api.state())).projects.find(p=>p.id===project.id).goLiveIssues[1].title,'Printer issue');
   assert.ok(db.calls.length>0);
+});
+
+test('Go-Live issues link one task and synchronize status from either editor', async t => {
+ const {api,document,window,db}=await app(t);
+ api.showTab('specs');
+ await api.action(document.querySelector('[data-action="project-view"][data-view="go-live-issues"]'));
+ const ui=api.hub.goLiveIssues;
+ await ui.handle(document.querySelector('[data-gli="new"]'));
+ const issueField=(name,value)=>{
+  const el=document.getElementById('gliEdit-'+name);
+  el.value=value;
+  el.dispatchEvent(new window.Event('input',{bubbles:true}));
+ };
+ issueField('title','Printer labels unavailable');
+ issueField('status','On hold');
+ issueField('priority','High');
+ submitLocal(window,document.getElementById('gliIssueForm'));
+ await settle();
+ const projectId=api.state().activeProjectId;
+ const issue=()=>api.state().projects.find(project=>project.id===projectId).goLiveIssues[0];
+ const button=()=>document.querySelector('[data-action="project-source-task"][data-source="issue"]');
+ assert.match(button().textContent,/Create task/);
+ await api.action(button());
+ const form=document.getElementById('editForm');
+ assert.equal(form.elements.task.value,'Printer labels unavailable');
+ assert.equal(form.elements.priority.value,'High');
+ assert.equal(form.elements.boardStatus.value,'blocked');
+ api.saveEdit(form);
+ await settle();
+ const taskId=api.state().tasks[0].id;
+ const task=()=>api.state().tasks.find(row=>row.id===taskId);
+ assert.equal(task().goLiveIssueId,issue().id);
+ assert.equal(task().linkId,projectId);
+ assert.equal(button().textContent,'Open task');
+ await api.action(button());
+ assert.match(document.getElementById('modalBody').textContent,/GO-LIVE ISSUE/);
+ assert.equal(api.state().tasks.length,1);
+ api.closeModal();
+
+ api.hub.moveTask(taskId,'doing');
+ await settle();
+ assert.equal(issue().status,'In progress');
+ const savedTask=copy(db.row.document.data.tasks[0]);
+ await ui.handle(document.querySelector('[data-gli="edit"]'));
+ issueField('status','Resolved');
+ submitLocal(window,document.getElementById('gliIssueForm'));
+ await settle();
+ assert.equal(task().done,true);
+ assert.ok(task().doneDate);
+ assert.deepEqual(db.row.document.data.tasks[0],savedTask);
+ assert.equal(api.parseBackup(api.payload(api.state())).tasks[0].boardStatus,'done');
+
+ api.hub.moveTask(taskId,'todo');
+ await settle();
+ assert.equal(issue().status,'Open');
+ assert.equal(task().doneDate,'');
+ api.hub.standup.open(projectId);
+ const row=document.querySelector('[data-report-task]');
+ assert.match(row.querySelector('summary').textContent,/Go-Live issue/);
+ assert.equal(row.open,false);
 });
 
 test('Excel Report opens inside Validation Studio and does not save uploaded data', async t => {
