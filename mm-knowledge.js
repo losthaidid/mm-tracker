@@ -142,7 +142,20 @@
       edition = '',
       area = '';
     const mayRead = () => a.ready() && a.canView();
-    const selected = () => mode === 'reference' && mayRead();
+    const selected = () => mode !== 'notes' && mayRead();
+    const referenceSelected = () => mode === 'reference' && mayRead();
+    const terms = root.WorkHubSapTerms?.install(
+      {
+        ...a,
+        active: () => mode === 'terms' && a.active() && mayRead(),
+        openGuide(id, preferredEdition) {
+          mode = 'reference';
+          a.render();
+          openGuide(byId.get(id), preferredEdition);
+        },
+      },
+      { esc, option, badges, reference }
+    );
 
     function sync() {
       const now = mayRead() ? JSON.stringify([a.owner(), a.generation()]) : '';
@@ -151,8 +164,10 @@
         identity = now;
         mode = 'notes';
         query = edition = area = '';
+        terms?.reset();
       }
       if (!a.active() && document.querySelector('#modal[open] .mmk-reader')) a.closeModal();
+      terms?.sync();
     }
 
     function tabs() {
@@ -161,6 +176,7 @@
       return `<div class="mmk-tabs" role="group" aria-label="Knowledge section" data-access-feature="knowledge">${[
         ['notes', 'Knowledge notes'],
         ['reference', 'MM Configuration'],
+        ...(terms ? [['terms', 'SAP Terms']] : []),
       ]
         .map(
           ([id, title]) =>
@@ -183,6 +199,7 @@
     function render() {
       const switcher = tabs();
       if (!selected()) return '';
+      if (mode === 'terms') return switcher + terms.render();
       const results = search(query, edition, area);
       return `${switcher}<section class="mmk-workspace" data-access-feature="knowledge"><header class="mmk-hero"><div><h2>SAP MM Configuration</h2><p>Look up the settings, maintenance screens, and checks for your SAP process.</p></div><div class="mmk-orbit" aria-hidden="true"><i></i><i></i><i></i></div></header>
       <div class="mmk-controls"><label>Search the reference<input id="mmkQuery" type="search" placeholder="Try batch maintenance, earliest expiry, or OBYC" maxlength="200" value="${esc(query)}" autocomplete="off"></label><label>SAP edition<select id="mmkEdition">${option('', 'All editions', edition)}${Object.entries(
@@ -232,14 +249,15 @@
       const action = button.dataset.mmk;
       if (action === 'tab') {
         const next = button.dataset.mode;
-        if (!['notes', 'reference'].includes(next) || next === mode) return;
+        if (!['notes', 'reference', ...(terms ? ['terms'] : [])].includes(next) || next === mode)
+          return;
         mode = next;
         a.render();
         document.querySelector('.mmk-tabs [aria-pressed="true"]')?.focus({ preventScroll: true });
-      } else if (selected() && action === 'open') {
+      } else if (referenceSelected() && action === 'open') {
         const guide = byId.get(button.dataset.id);
         if (guide) openGuide(guide, $('mmkGuideEdition')?.value ?? edition);
-      } else if (selected() && action === 'reset') {
+      } else if (referenceSelected() && action === 'reset') {
         $('mmkQuery').value = query = '';
         $('mmkEdition').value = edition = '';
         $('mmkArea').value = area = '';
@@ -248,13 +266,13 @@
       }
     });
     document.addEventListener('input', event => {
-      if (event.target.id === 'mmkQuery' && selected()) {
+      if (event.target.id === 'mmkQuery' && referenceSelected()) {
         query = event.target.value;
         updateResults();
       }
     });
     document.addEventListener('change', event => {
-      if (!selected()) return;
+      if (!referenceSelected()) return;
       const control = event.target;
       if (control.id === 'mmkGuideEdition') {
         const guide = byId.get(control.closest('.mmk-reader')?.dataset.guide);
@@ -276,7 +294,7 @@
       selected,
       patchRender() {
         sync();
-        return selected() && !!$('mmkResults');
+        return selected() && !!$(mode === 'terms' ? 'saptResults' : 'mmkResults');
       },
     };
   }
