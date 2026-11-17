@@ -21,9 +21,17 @@
   function install(a) {
     let owner = '',
       projectId = '',
-      searchQuery = '',
-      searchClosed = null;
+      searchQuery = '';
     const $ = id => document.getElementById(id);
+    const links = root.WorkHubTaskProjectItems;
+    const generalTasks = id => (a.can('tasks') ? E.generalTasks(a.state(), id) : []);
+    const reportRows = report => [...report.querySelectorAll('[data-report-row]')];
+    const openRows = report =>
+      new Set(
+        reportRows(report)
+          .filter(row => row.open)
+          .map(row => row.dataset.reportRow)
+      );
     const attrs = (item, sub = '') =>
       `data-project="${esc(item.projectId)}" data-item="${esc(item.id)}" data-sub="${esc(sub)}"`;
     const button = (action, label, attributes = '', cls = 'small') =>
@@ -54,16 +62,17 @@
         )
         .join(
           ''
-        )}</div><p class="standup-note">Status totals include project items and sub-items. Completion is shown separately below.</p><div class="standup-progress-pair">${progress('Project items', m.items)}${progress('Sub-items', m.subs)}</div></section>`;
+        )}</div><p class="standup-note">Totals cover project items and their sub-items.</p><div class="standup-progress-pair">${progress('Project items', m.items)}${progress('Sub-items', m.subs)}</div></section>`;
     }
     function card(id) {
       const m = E.metrics(a.state(), id),
         actions = E.data(a.state()).actions.filter(r => r.projectId === id),
-        tasks = new Map(a.state().tasks.map(t => [t.id, t])),
+        tasks = new Map(a.can('tasks') ? a.state().tasks.map(t => [t.id, t]) : []),
+        general = generalTasks(id).length,
         open = actions.filter(
           r => tasks.has(r.taskId) && !tasks.get(r.taskId).done && !tasks.get(r.taskId).archived
         ).length;
-      return `<button type="button" class="standup-overview-card" data-standup="open" data-project="${esc(id)}"><span class="standup-card-icon" aria-hidden="true">▤</span><span class="standup-card-copy"><span class="standup-kicker">READY FOR YOUR DAILY UPDATE</span><strong>Daily stand-up</strong><span>Project items, sub-items, remarks &amp; Actions</span><span class="standup-card-counts"><span>${m.items.total} items</span><span>${m.subs.total} sub-items</span><span>${open} open Actions</span></span></span><span class="standup-card-progress"><strong>${m.items.percent}%</strong><span>items completed</span></span><span class="standup-card-arrow" aria-hidden="true">↗</span></button>`;
+      return `<button type="button" class="standup-overview-card" data-standup="open" data-project="${esc(id)}"><span class="standup-card-icon" aria-hidden="true">▤</span><span class="standup-card-copy"><span class="standup-kicker">READY FOR YOUR DAILY UPDATE</span><strong>Daily stand-up</strong><span>Project items, tasks, remarks &amp; Actions</span><span class="standup-card-counts"><span>${m.items.total} items</span><span>${m.subs.total} sub-items</span>${general ? `<span>${general} general task${general === 1 ? '' : 's'}</span>` : ''}<span>${open} open Actions</span></span></span><span class="standup-card-progress"><strong>${m.items.percent}%</strong><span>items completed</span></span><span class="standup-card-arrow" aria-hidden="true">↗</span></button>`;
     }
     function stamp(item, sub) {
       const times = E.updateTime(a.state(), item, sub),
@@ -77,7 +86,7 @@
             r.itemId === item.id &&
             r.subItemId === (sub?.id || '')
         ),
-        tasks = new Map(a.state().tasks.map(t => [t.id, t]));
+        tasks = new Map(a.can('tasks') ? a.state().tasks.map(t => [t.id, t]) : []);
       return `<section class="standup-actions"><div class="standup-actions-head"><h4>Actions <span>${rows.length || ''}</span></h4>${button('add', '+ Add action', attrs(item, sub?.id))}</div>${
         rows.length
           ? `<ul>${rows
@@ -94,18 +103,38 @@
       const r = sub || item;
       return `<div class="standup-row${sub ? ' standup-sub-row' : ''}" ${attrs(item, sub?.id)}>${sub ? `<div class="standup-sub-heading"><span class="standup-sub-marker" aria-hidden="true">↳</span><h3>${esc(sub.title)}</h3>${badge(sub.status)}</div>` : ''}<div class="standup-row-columns"><section class="standup-remarks"><h4>Remarks</h4><p${r.remarks ? '' : ' class="is-empty"'}>${esc(r.remarks) || 'No remarks yet.'}</p>${stamp(item, sub)}</section>${actions(item, sub)}</div></div>`;
     }
-    function itemCard(item) {
+    function rowHeading(symbol, label, title, status, subs) {
+      const complete = subs.filter(sub => E.category(sub.status) === 'completed').length;
+      return `<summary><span class="standup-item-symbol" aria-hidden="true">${symbol}</span><span class="standup-item-heading"><small>${esc(label)}</small><strong>${esc(title)}</strong><span>${subs.length ? `${complete}/${subs.length} sub-items completed` : 'No sub-items'}</span></span>${badge(status)}<span class="standup-chevron" aria-hidden="true">⌄</span></summary>`;
+    }
+    function itemCard(item, task) {
       const subs = item.subItems || [],
-        complete = subs.filter(s => E.category(s.status) === 'completed').length;
-      return `<details class="standup-item" open data-report-item="${esc(item.id)}"><summary><span class="standup-item-symbol" aria-hidden="true">▤</span><span class="standup-item-heading"><small>${esc(item.itemType || 'Project item')}${item.itemId ? ' · ' + esc(item.itemId) : ''}</small><strong>${esc(item.description) || 'Untitled item'}</strong><span>${subs.length ? `${complete}/${subs.length} sub-items completed` : 'No sub-items'}</span></span>${badge(item.status)}<span class="standup-chevron" aria-hidden="true">⌄</span></summary><div class="standup-item-body">${row(item)}${subs.length ? `<div class="standup-sub-list">${subs.map(sub => row(item, sub)).join('')}</div>` : ''}</div></details>`;
+        label = [item.itemType || 'Project item', item.itemId, task && 'Linked task']
+          .filter(Boolean)
+          .join(' · ');
+      return `<details class="standup-item" data-report-item="${esc(item.id)}" data-report-row="item:${esc(item.id)}">${rowHeading('▤', label, item.description || 'Untitled item', item.status, subs)}<div class="standup-item-body">${task ? `<div class="standup-linked-task"><span class="standup-task-title"><small>Linked task</small><strong>${esc(task.task)}</strong></span>${button('task', 'Open task ↗', `data-id="${esc(task.id)}"`)}</div>` : ''}${row(item)}${subs.length ? `<div class="standup-sub-list">${subs.map(sub => row(item, sub)).join('')}</div>` : ''}</div></details>`;
+    }
+    function taskNotes(record) {
+      return `<section class="standup-remarks"><h4>Remarks</h4><p${record.remarks ? '' : ' class="is-empty"'}>${esc(record.remarks) || 'No remarks yet.'}</p>${record.feedback ? `<h4>Feedback</h4><p>${esc(record.feedback)}</p>` : ''}</section>`;
+    }
+    function taskCard(task) {
+      const subs = task.subTasks || [],
+        label = [
+          task.number && 'Task ' + task.number,
+          a.taskCompanyLabel(task),
+          task.dueDate && 'Due ' + task.dueDate,
+        ]
+          .filter(Boolean)
+          .join(' · ');
+      return `<details class="standup-item standup-general-task" data-report-task="${esc(task.id)}" data-report-row="task:${esc(task.id)}">${rowHeading('☷', label || 'General project task', task.task, E.taskStatus(task), subs)}<div class="standup-item-body"><div class="standup-row standup-row-columns">${taskNotes(task)}${button('task', 'Open task ↗', `data-id="${esc(task.id)}"`)}</div>${subs.length ? `<div class="standup-sub-list">${subs.map(sub => `<div class="standup-row standup-sub-row" data-sub="${esc(sub.id)}"><div class="standup-sub-heading"><span class="standup-sub-marker" aria-hidden="true">↳</span><h3>${esc(sub.title)}</h3>${badge(sub.status)}</div>${sub.remarks || sub.feedback ? taskNotes(sub) : ''}</div>`).join('')}</div>` : ''}</div></details>`;
     }
     function searchBar() {
-      return `<section class="standup-search" role="search" aria-label="Search daily stand-up"><label for="standupSearch">Find an item or update</label><div class="standup-search-field"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="standupSearch" type="search" maxlength="200" autocomplete="off" placeholder="Search items, remarks or Actions…" aria-describedby="standupSearchHint standupSearchResults" value="${esc(searchQuery)}">${button('clear-search', 'Clear', 'hidden', 'small standup-search-clear')}</div><p id="standupSearchHint">Search IDs, names, statuses, remarks &amp; Actions. Matching items keep their sub-items.</p><p id="standupSearchResults" role="status" aria-live="polite" aria-atomic="true"></p></section>`;
+      return `<section class="standup-search" role="search" aria-label="Search daily stand-up"><div class="standup-search-toolbar"><label for="standupSearch">Find an item, task or update</label><div class="actions">${button('expand', 'Expand all')}${button('collapse', 'Collapse all')}</div></div><div class="standup-search-field"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="standupSearch" type="search" maxlength="200" autocomplete="off" placeholder="Search tasks, items, remarks or Actions…" aria-describedby="standupSearchResults" value="${esc(searchQuery)}">${button('clear-search', 'Clear', 'hidden', 'small standup-search-clear')}</div><p id="standupSearchResults" role="status" aria-live="polite" aria-atomic="true"></p></section>`;
     }
     function highlight(report, terms) {
       // Build marks as text nodes: punctuation and pasted HTML are always literal text.
       const targets = report.querySelectorAll(
-        '.standup-item-heading small, .standup-item-heading strong, .standup-sub-heading h3, .standup-status, .standup-remarks > p:not(.is-empty), .standup-action-text > p, .standup-action-meta > span:not(.standup-status)'
+        '.standup-item-heading small, .standup-item-heading strong, .standup-task-title strong, .standup-sub-heading h3, .standup-status, .standup-remarks > p:not(.is-empty), .standup-action-text > p, .standup-action-meta > span:not(.standup-status)'
       );
       for (const el of targets) {
         const value = el.textContent,
@@ -133,20 +162,19 @@
       searchQuery = report.querySelector('#standupSearch').value;
       const terms = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean),
         active = !!terms.length,
-        cards = [...report.querySelectorAll('[data-report-item]')],
-        matches = new Map(
-          E.search(a.state(), report.dataset.project, searchQuery).map(r => [r.itemId, r])
-        );
-      if (active && !searchClosed)
-        searchClosed = new Set(
-          cards.filter(card => !card.open).map(card => card.dataset.reportItem)
-        );
+        id = report.dataset.project,
+        cards = reportRows(report),
+        tasks = generalTasks(id),
+        itemMatches = E.search(a.state(), id, searchQuery, a.can('tasks')),
+        taskMatches = E.searchTasks(tasks, searchQuery),
+        matches = new Map([
+          ...itemMatches.map(row => ['item:' + row.itemId, row]),
+          ...taskMatches.map(row => ['task:' + row.taskId, row]),
+        ]);
       let subMatches = 0;
       for (const card of cards) {
-        const match = matches.get(card.dataset.reportItem);
+        const match = matches.get(card.dataset.reportRow);
         card.hidden = !match;
-        if (active && match) card.open = true;
-        else if (!active && searchClosed) card.open = !searchClosed.has(card.dataset.reportItem);
         for (const sub of card.querySelectorAll('.standup-sub-row'))
           sub.classList.toggle(
             'is-search-match',
@@ -154,33 +182,52 @@
           );
         subMatches += match?.subItemIds.length || 0;
       }
-      if (!active) searchClosed = null;
+      for (const group of report.querySelectorAll('.standup-group'))
+        group.hidden = active && !group.querySelector('[data-report-row]:not([hidden])');
       report.querySelector('[data-standup="clear-search"]').hidden = !searchQuery;
       report.querySelector('.standup-no-results').hidden = !active || !!matches.size;
-      report.querySelector('#standupSearchResults').textContent = active
-        ? `${matches.size} of ${cards.length} project items · ${subMatches} matching sub-item${subMatches === 1 ? '' : 's'}`
-        : `Showing all ${cards.length} project item${cards.length === 1 ? '' : 's'} · ${subMatches} sub-item${subMatches === 1 ? '' : 's'}`;
+      const itemCount = cards.length - tasks.length,
+        taskCount = tasks.length
+          ? ` · ${active ? taskMatches.length + ' of ' : ''}${tasks.length} general task${tasks.length === 1 ? '' : 's'}`
+          : '',
+        subCount = `${subMatches} ${active ? 'matching ' : ''}sub-item${subMatches === 1 ? '' : 's'}`;
+      report.querySelector('#standupSearchResults').textContent =
+        `${active ? itemMatches.length + ' of ' : 'Showing '}${itemCount} project item${itemCount === 1 ? '' : 's'}${taskCount} · ${subCount}`;
       highlight(report, terms);
     }
     function body(id) {
-      const project = a.state().projects.find(p => p.id === id);
+      const state = a.state(),
+        project = state.projects.find(p => p.id === id);
       if (!project) throw Error('Project no longer exists.');
-      const items = a.state().specs.filter(s => s.projectId === id);
-      return `<div class="standup-report" data-owner="${esc(a.owner())}" data-project="${esc(id)}"><header class="standup-hero"><span class="standup-kicker">PROJECT OVERVIEW · DAILY STAND-UP</span><h2>${esc(project.name)}</h2><p>Every item. Every update. Your next Actions.</p></header>${strip(id)}<div class="standup-report-toolbar"><div><h3>Items &amp; updates</h3><span>All remarks shown in full · Times in Malaysia (MYT)</span></div><div class="actions">${button('expand', 'Expand all')}${button('collapse', 'Collapse all')}</div></div>${searchBar()}<div class="standup-items"><div class="standup-blank standup-no-results" hidden><strong>No matching items or updates</strong><p>Try another keyword, or clear your search to see every item.</p></div>${items.map(itemCard).join('') || '<div class="standup-blank"><strong>No project items yet</strong><p>Add project items to see their statuses, remarks and Actions here.</p></div>'}</div><footer class="standup-footer">Actions stay linked to Tasks. Completing an Action’s task leaves the project item’s own status unchanged.</footer></div>`;
+      const items = state.specs.filter(s => s.projectId === id),
+        tasks = generalTasks(id),
+        linked = new Map(
+          a.can('tasks')
+            ? state.tasks
+                .filter(
+                  task => task.taskType === 'Project' && task.linkId === id && task.projectItemId
+                )
+                .map(task => [task.projectItemId, task])
+            : []
+        );
+      return `<div class="standup-report" data-owner="${esc(a.owner())}" data-project="${esc(id)}"><div class="standup-hero"><h2>${esc(project.name)}</h2></div>${strip(id)}${searchBar()}<div class="standup-items"><div class="standup-blank standup-no-results" hidden><strong>No matching items or updates</strong><p>Try another keyword, or clear your search.</p></div><section class="standup-group" aria-labelledby="standupItemsTitle"><h3 class="standup-group-title" id="standupItemsTitle">Project items <span>${items.length}</span></h3>${items.map(item => itemCard(item, linked.get(item.id))).join('') || '<div class="standup-blank"><strong>No project items yet</strong></div>'}</section>${a.can('tasks') ? `<section class="standup-group" aria-labelledby="standupGeneralTitle"><h3 class="standup-group-title" id="standupGeneralTitle">General project work <span>${tasks.length}</span></h3>${tasks.map(taskCard).join('') || '<div class="standup-blank"><strong>No general project tasks yet</strong></div>'}</section>` : ''}</div><footer class="standup-footer">Actions stay linked to Tasks. Completing an Action’s task leaves the project item’s own status unchanged.</footer></div>`;
     }
     function open(id, itemId = '', retainSearch = false) {
       guard(a.owner());
-      if (!retainSearch || owner !== a.owner() || projectId !== id) {
-        searchQuery = '';
-        searchClosed = null;
-      }
+      const currentReport = document.querySelector('.standup-report'),
+        keep = retainSearch && owner === a.owner() && projectId === id && currentReport,
+        opened = keep ? openRows(currentReport) : new Set();
+      if (!keep) searchQuery = '';
+      if (itemId) opened.add('item:' + itemId);
       owner = a.owner();
       projectId = id;
       a.openModal('Daily stand-up', body(id));
-      applySearch(document.querySelector('.standup-report'));
+      const report = document.querySelector('.standup-report');
+      for (const row of reportRows(report)) row.open = opened.has(row.dataset.reportRow);
+      applySearch(report);
       if (itemId)
-        [...document.querySelectorAll('[data-report-item]')]
-          .find(el => el.dataset.reportItem === itemId)
+        reportRows(report)
+          .find(row => row.dataset.reportItem === itemId)
           ?.scrollIntoView?.({ block: 'nearest' });
     }
     function editor(itemId, subItemId = '', actionId = '') {
@@ -225,7 +272,20 @@
     }
     function taskContext(taskId) {
       const r = E.data(a.state()).actions.find(r => r.taskId === taskId);
-      if (!r) return '';
+      if (!a.can('specs')) return '';
+      if (!r) {
+        const state = a.state(),
+          task = state.tasks.find(row => row.id === taskId);
+        const item = links.itemForTask(state, task);
+        if (!item)
+          return task?.projectItemId
+            ? '<p class="standup-task-context wide">Linked project item unavailable.</p>'
+            : '';
+        const open = a.can('projects.standup')
+          ? button('source', 'Open in Daily stand-up ↗', attrs(item))
+          : `<button type="button" class="small" data-action="manage-subitems" data-access-feature="specs" data-id="${esc(item.id)}">Open project sub-items ↗</button>`;
+        return `<div class="standup-task-context wide"><span class="standup-kicker">PROJECT ITEM</span><strong class="hub-sensitive">${esc(itemName(item))}</strong>${open}</div>`;
+      }
       let src;
       try {
         src = E.source(a.state(), r.projectId, r.itemId, r.subItemId);
@@ -241,7 +301,6 @@
         owner = '';
         projectId = '';
         searchQuery = '';
-        searchClosed = null;
         return;
       }
       if (report && !a.state().projects.some(p => p.id === report.dataset.project)) {
@@ -249,18 +308,16 @@
         return;
       }
       if (report && !$('standupActionForm')) {
-        const closed = [...report.querySelectorAll('details:not([open])')].map(
-            el => el.dataset.reportItem
-          ),
+        const opened = openRows(report),
           scroll = $('modalBody').scrollTop,
           input = $('standupSearch'),
           focused = document.activeElement === input,
           selection = [input.selectionStart, input.selectionEnd];
         searchQuery = input.value;
         report.outerHTML = body(report.dataset.project);
-        for (const el of document.querySelectorAll('[data-report-item]'))
-          if (closed.includes(el.dataset.reportItem)) el.open = false;
-        applySearch(document.querySelector('.standup-report'));
+        const updated = document.querySelector('.standup-report');
+        for (const row of reportRows(updated)) row.open = opened.has(row.dataset.reportRow);
+        applySearch(updated);
         if (focused) {
           $('standupSearch').focus({ preventScroll: true });
           $('standupSearch').setSelectionRange(...selection);
@@ -290,7 +347,7 @@
         guard();
         if (action === 'add' || action === 'edit')
           editor(el.dataset.item, el.dataset.sub, action === 'edit' ? el.dataset.id : '');
-        else if (action === 'task')
+        else if (action === 'task' && a.can('tasks'))
           a.hubAction({ dataset: { hub: 'task-detail', id: el.dataset.id } });
         else if (action === 'cancel-action') el.closest('.standup-composer-slot').innerHTML = '';
         else if (action === 'clear-search') {
@@ -298,7 +355,7 @@
           applySearch(el.closest('.standup-report'));
           $('standupSearch').focus({ preventScroll: true });
         } else if (action === 'expand' || action === 'collapse')
-          document.querySelectorAll('[data-report-item]:not([hidden])').forEach(item => {
+          document.querySelectorAll('[data-report-row]:not([hidden])').forEach(item => {
             item.open = action === 'expand';
           });
       } catch (err) {
