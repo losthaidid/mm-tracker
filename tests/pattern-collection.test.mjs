@@ -6,7 +6,7 @@ import { JSDOM } from 'jsdom';
 function fixture(t) {
   const dom = new JSDOM('<body></body>', { runScripts: 'outside-only' });
   t.after(() => dom.window.close());
-  for (const name of ['pattern-collection.js', 'workspace-upgrades.js']) dom.window.eval(readFileSync(new URL('../' + name, import.meta.url), 'utf8'));
+  for (const name of ['pattern-characters.js', 'pattern-collection.js', 'workspace-upgrades.js']) dom.window.eval(readFileSync(new URL('../' + name, import.meta.url), 'utf8'));
   return { window: dom.window, document: dom.window.document, collection: dom.window.WorkHubPatternCollection };
 }
 function contrast(a, b) {
@@ -17,6 +17,8 @@ function contrast(a, b) {
 test('Pattern collections contain exactly 20 anime and 20 cartoon sets with distinct safe repeat tiles', t => {
   const { window, collection: c } = fixture(t);
   assert.equal(c.SETS.length, 40);
+  assert.equal(Object.keys(window.WorkHubPatternCharacters).length, 40);
+  assert.equal(Object.values(window.WorkHubPatternCharacters).filter(c=>c.original).length, 20);
   assert.equal(c.SETS.filter(s => s.group === 'anime').length, 20);
   assert.equal(c.SETS.filter(s => s.group === 'cartoon').length, 20);
   assert.equal(new Set(c.SETS.map(s => s.id)).size, 40);
@@ -28,9 +30,11 @@ test('Pattern collections contain exactly 20 anime and 20 cartoon sets with dist
     const xml = new window.DOMParser().parseFromString(svg, 'image/svg+xml');
     assert.equal(xml.querySelector('parsererror'), null, set.id);
     assert.equal(xml.documentElement.getAttribute('viewBox'), '0 0 280 220');
-    assert.equal(xml.querySelectorAll('image,script,foreignObject,animate,filter').length, 0);
-    assert.doesNotMatch(svg, /undefined|NaN|https?:\/\/(?!www.w3.org)/);
-    assert.ok(url.length < 5000, set.id + ' uses a small repeat tile');
+    assert.equal(xml.querySelectorAll('script,foreignObject,animate,filter').length, 0);
+    assert.doesNotMatch(svg.replace(/data:image\/png;base64,[A-Za-z0-9+/=]+/g, ''), /undefined|NaN|https?:\/\/(?!www.w3.org)/);
+    assert.ok(url.length < 30000, set.id + ' uses a compressed repeat tile');
+    assert.match(xml.querySelector('image').getAttribute('href'), /^data:image\/png;base64,/);
+    const plain = decodeURIComponent(c.image(set.id, 70, false)); assert.doesNotMatch(plain, /<image /);
   }
   assert.equal(c.image('foreign-upload'), '');
 });
@@ -49,7 +53,7 @@ test('Pattern preferences validate optional legacy values and reject invalid imp
   const { collection: c } = fixture(t);
   c.validate({}); c.validate({ patternSet: '', patternStrength: 20, patternScale: 180, patternTypography: false });
   for (const set of c.SETS) c.validate({ patternSet: set.id, patternStrength: 70, patternScale: 100, patternTypography: true });
-  for (const values of [{ patternSet: '<script>' }, { patternSet: null }, { patternStrength: 0 }, { patternStrength: 101 }, { patternStrength: '70' }, { patternScale: 59 }, { patternScale: 181 }, { patternScale: 100.2 }, { patternTypography: 'true' }]) assert.throws(() => c.validate(values), /pattern collection/);
+  for (const values of [{ patternSet: '<script>' }, { patternSet: null }, { patternStrength: 0 }, { patternStrength: 101 }, { patternStrength: '70' }, { patternScale: 59 }, { patternScale: 181 }, { patternScale: 100.2 }, { patternTypography: 'true' }, { patternCharacters: 'true' }]) assert.throws(() => c.validate(values), /pattern collection/);
 });
 test('Pattern controls choose complete coordinated sets and switch galleries without changing another form', t => {
   const { document, collection: c } = fixture(t);

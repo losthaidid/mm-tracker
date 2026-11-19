@@ -336,6 +336,7 @@
       recipients = null,
       settingsPanel = null,
       experienceAppearance = null,
+      iconCreator = null,
       commandPalette = null,
       fileLauncher = null,
       summaryCards = null,
@@ -2141,7 +2142,7 @@
         )
         .join(
           ''
-        )}</div>${currentTool === 'reader' ? reader?.render() || '' : currentTool === 'screenshots' ? batchC?.cards() || '' : currentTool === 'theme' ? themeStudio() : currentTool === 'tcodes' ? tcodes?.render() || '' : currentTool === 'tables' ? sapTables?.render() || '' : currentTool === 'focus' ? `<section class="hub-card">${focusWidget()}${prefs().desk ? desk() : ''}</section>` : currentTool === 'journey' ? `<section class="hub-card">${journey()}</section>` : currentTool === 'scrapbook' ? scrapbook() : currentTool === 'wrap' ? dailySummary() : sessionsView()}</section>`;
+        )}${iconCreator && a.can('studio.theme', 'edit') && a.can('workspace', 'edit') && !a.state().preferences.hiddenTabs.includes('studio.theme') ? '<button type="button" data-ic="open">Icon Creator</button>' : ''}</div>${currentTool === 'reader' ? reader?.render() || '' : currentTool === 'screenshots' ? batchC?.cards() || '' : currentTool === 'theme' ? themeStudio() : currentTool === 'tcodes' ? tcodes?.render() || '' : currentTool === 'tables' ? sapTables?.render() || '' : currentTool === 'focus' ? `<section class="hub-card">${focusWidget()}${prefs().desk ? desk() : ''}</section>` : currentTool === 'journey' ? `<section class="hub-card">${journey()}</section>` : currentTool === 'scrapbook' ? scrapbook() : currentTool === 'wrap' ? dailySummary() : sessionsView()}</section>`;
     }
     function timerKey() {
       return a.cloud().user ? 'mm-tracker.timer.v1:' + a.cloud().user.id : null;
@@ -3199,6 +3200,7 @@
       experience?.mount();
       settingsPanel?.mount();
       experienceAppearance?.mount(themePreview || prefs());
+      iconCreator?.sync();
       fileLauncher?.sync();
       summaryCards?.sync();
       rehearsal?.mount();
@@ -4715,6 +4717,23 @@
       owner: () => a.cloud().user?.id || '',
     });
     experienceAppearance = root.WorkHubExperienceAppearance.install(a);
+    iconCreator = root.WorkHubIconCreator?.install({
+      ...a,
+      ready: () => a.cloud().ready,
+      owner: () => a.cloud().user?.id || '',
+      generation: () => a.cloud().generation,
+      prefs,
+      previewBranding: () => (themePreview || prefs()).branding,
+      applied(branding) {
+        if (themePreview) themePreview.branding = { ...branding };
+        const form = $('hubTheme');
+        if (form) {
+          form.elements.namedItem('brandImage').value = branding.image;
+          form.elements.namedItem('brandMode').value = branding.mode;
+        }
+        applyTheme();
+      },
+    });
     commandPalette = root.WorkHubCommandPalette.install();
     const unfinished = () =>
       !!document.querySelector(
@@ -4785,6 +4804,7 @@
       batchC,
       standup,
       people,
+      iconCreator,
       goLiveIssues,
       solution,
       rehearsal,

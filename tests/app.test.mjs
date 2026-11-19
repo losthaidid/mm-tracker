@@ -1497,6 +1497,7 @@ test('Pattern sets: both 20-set galleries preview coordinated colours and type w
  document.querySelector('[data-hub="pattern-group"][data-group="cartoon"]').click();assert.equal(document.querySelector('[data-pattern-group="anime"]').hidden,true);assert.equal(document.querySelector('[data-pattern-group="cartoon"]').hidden,false);
  document.querySelector('[data-hub="pattern-set"][data-id="spongebob-bottom"]').click();assert.equal(document.body.dataset.hubPatternSet,'spongebob-bottom');assert.equal(document.querySelectorAll('[data-hub="pattern-set"][aria-pressed="true"]').length,1);assert.equal(document.getElementById('hubTheme'),form);
  form.elements.patternTypography.checked=false;form.elements.patternTypography.dispatchEvent(new window.Event('change',{bubbles:true}));assert.equal(document.body.hasAttribute('data-hub-pattern-typography'),false);
+ form.elements.patternCharacters.checked=false;form.elements.patternCharacters.dispatchEvent(new window.Event('change',{bubbles:true}));assert.doesNotMatch(decodeURIComponent(document.body.style.getPropertyValue('--pc-image')),/<image /);
  assert.equal(db.calls.length,calls);assert.deepEqual(copy(api.state()),before);
  document.querySelector('[data-hub="theme-reset-preview"]').click();await settle();assert.equal(document.body.hasAttribute('data-hub-pattern-set'),false);assert.equal(document.body.style.getPropertyValue('--pc-image'),'');assert.deepEqual(copy(api.state()),before);assert.equal(document.body.dataset.hubTheme,before.workhub.preferences.theme);assert.equal(db.calls.length,calls);
 });
@@ -1504,9 +1505,9 @@ test('Pattern sets: both 20-set galleries preview coordinated colours and type w
 test('Pattern sets: a saved set persists once, survives cloud reopen and backup, and validates imported preferences',async t=>{
  const {api,document,window,db}=await app(t);api.hub.setTool('theme');api.showTab('studio');
  document.querySelector('[data-hub="pattern-group"][data-group="cartoon"]').click();document.querySelector('[data-hub="pattern-set"][data-id="avatar-elements"]').click();
- let form=document.getElementById('hubTheme');form.elements.patternStrength.value='85';form.elements.patternScale.value='130';form.elements.patternStrength.dispatchEvent(new window.Event('input',{bubbles:true}));
+ let form=document.getElementById('hubTheme');form.elements.patternCharacters.checked=false;form.elements.patternStrength.value='85';form.elements.patternScale.value='130';form.elements.patternStrength.dispatchEvent(new window.Event('input',{bubbles:true}));
  const before=db.calls.length;api.hub.submit(form);await settle();assert.equal(db.calls.length,before+1);
- const p=copy(api.state().workhub.preferences);assert.equal(p.patternSet,'avatar-elements');assert.equal(p.patternStrength,85);assert.equal(p.patternScale,130);assert.equal(p.patternTypography,true);assert.equal(db.row.document.data.workhub.preferences.patternSet,p.patternSet);
+ const p=copy(api.state().workhub.preferences);assert.equal(p.patternSet,'avatar-elements');assert.equal(p.patternStrength,85);assert.equal(p.patternScale,130);assert.equal(p.patternTypography,true);assert.equal(p.patternCharacters,false);assert.equal(db.row.document.data.workhub.preferences.patternSet,p.patternSet);
  assert.equal(api.parseBackup(api.payload(api.state())).workhub.preferences.patternSet,p.patternSet);assert.ok(JSON.stringify(p).length<12000);assert.doesNotMatch(JSON.stringify(p),/data:image\/svg|<svg/);
  api.showTab('tasks');assert.equal(document.body.dataset.hubPatternSet,p.patternSet);api.showTab('studio');assert.equal(document.getElementById('hubTheme').elements.patternSet.value,p.patternSet);assert.equal(db.calls.length,before+1);
  const reopened=await app(t,{remote:copy(db.row),login:false});await reopened.api.loadCloud(sessionUser);await settle();assert.equal(reopened.document.body.dataset.hubPatternSet,p.patternSet);assert.equal(reopened.api.state().workhub.preferences.patternScale,130);assert.equal(reopened.db.calls.length,0);
@@ -1522,6 +1523,18 @@ test('Pattern sets: original backgrounds and typography remain selectable after 
  form.elements.background.value='petals';form.elements.background.dispatchEvent(new window.Event('change',{bubbles:true}));assert.equal(form.elements.patternSet.value,'');assert.equal(document.body.hasAttribute('data-hub-pattern-set'),false);assert.equal(document.body.dataset.hubBackground,'petals');
  choose();form.elements.font.value='serif';form.elements.font.dispatchEvent(new window.Event('change',{bubbles:true}));assert.equal(form.elements.patternTypography.checked,false);assert.equal(document.body.hasAttribute('data-hub-pattern-typography'),false);assert.equal(document.documentElement.style.getPropertyValue('--hub-font'),'Georgia,serif');
  document.querySelector('[data-hub="pattern-clear"]').click();assert.equal(document.body.hasAttribute('data-hub-pattern-set'),false);assert.equal(document.body.style.getPropertyValue('--pc-image'),'');assert.equal(db.calls.length,calls);
+});
+
+test('Icon Creator: Studio opens the editor and applies only branding while preserving a pending theme preview',async t=>{
+ const {api,document,window,db}=await app(t);
+ const png='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j3ioAAAAASUVORK5CYII=';
+ const context=new Proxy({}, {get:(o,key)=>key in o?o[key]:(()=>{})});window.HTMLCanvasElement.prototype.getContext=()=>context;window.HTMLCanvasElement.prototype.toDataURL=()=>png;
+ api.hub.setTool('theme');api.showTab('studio');assert.ok(document.querySelector('.hub-toolbar [data-ic="open"]'));assert.ok(document.querySelector('#hubTheme [data-ic="open"]'));
+ document.querySelector('[data-theme-choice="dark"]').click();assert.equal(document.body.dataset.hubTheme,'dark');const before=copy(api.state()),calls=db.calls.length;
+ const ui=api.hub.iconCreator;await ui.open();const text=document.querySelector('[data-ic-field="text"]');text.value='AB';text.dispatchEvent(new window.Event('change',{bubbles:true}));assert.equal(db.calls.length,calls);
+ assert.equal(ui.apply(),true);await settle();assert.equal(db.calls.length,calls+1);const expected=copy(before);expected.workhub.preferences.branding={mode:'logo',initials:'WH',image:png};assert.deepEqual(copy(api.state()),expected);assert.equal(db.row.document.data.workhub.preferences.theme,'ocean');assert.equal(document.body.dataset.hubTheme,'dark');assert.equal(document.querySelector('.hub-brand-mark [data-ea-icon] img').src,png);assert.equal(document.querySelector('link[rel~="icon"]').href,png);
+ const form=document.getElementById('hubTheme');assert.equal(form.elements.brandImage.value,png);assert.equal(form.elements.brandMode.value,'logo');api.hub.submit(form);await settle();assert.equal(api.state().workhub.preferences.theme,'dark');assert.equal(api.state().workhub.preferences.branding.image,png);assert.equal(api.parseBackup(api.payload(api.state())).workhub.preferences.branding.image,png);
+ await api.loadCloud(null);assert.equal(document.getElementById('iconCreatorRoom'),null);assert.equal(ui.snapshot(),null);
 });
 
 test('theme preview stays local until saved and imported settings are validated',async t=>{

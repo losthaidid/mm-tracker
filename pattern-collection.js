@@ -567,10 +567,11 @@
     return paths[name];
   }
   const images = new Map();
-  function image(id, strength = 70) {
+  function image(id, strength = 70, characters = true) {
     const set = byId.get(id);
     if (!set) return '';
-    const key = id + ':' + strength;
+    const portrait = characters ? root.WorkHubPatternCharacters?.[id] : null;
+    const key = id + ':' + strength + ':' + !!portrait;
     if (images.has(key)) return images.get(key);
     const shape = motif(
       set.motif,
@@ -578,7 +579,10 @@
       set.colors.secondary,
       set.dark ? '#f6eee1' : '#263347'
     );
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="280" height="220" viewBox="0 0 280 220"><g opacity="${Math.max(0.2, Math.min(1, strength / 100))}"><g transform="translate(66 63) rotate(-8)">${shape}</g><g transform="translate(210 169) rotate(12) scale(.82)">${shape}</g><path d="m211 42 3 8 8 3-8 3-3 8-3-8-8-3 8-3Z M65 166l3 7 7 3-7 3-3 7-3-7-7-3 7-3Z" fill="${set.colors.secondary}"/></g></svg>`;
+    const second = portrait
+      ? `<image href="${esc(portrait.image)}" x="126" y="70" width="130" height="146" preserveAspectRatio="xMidYMid meet"/>`
+      : `<g transform="translate(210 169) rotate(12) scale(.82)">${shape}</g>`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="280" height="220" viewBox="0 0 280 220"><g opacity="${Math.max(0.2, Math.min(1, strength / 100))}"><g transform="translate(66 63) rotate(-8)">${shape}</g>${second}<path d="m211 42 3 8 8 3-8 3-3 8-3-8-8-3 8-3Z M65 166l3 7 7 3-7 3-3 7-3-7-7-3 7-3Z" fill="${set.colors.secondary}"/></g></svg>`;
     const result = 'url("data:image/svg+xml,' + encodeURIComponent(svg) + '")';
     if (images.size > 180) images.clear();
     images.set(key, result);
@@ -593,7 +597,8 @@
           p.patternStrength > 100)) ||
       (p.patternScale !== undefined &&
         (!Number.isInteger(p.patternScale) || p.patternScale < 60 || p.patternScale > 180)) ||
-      (p.patternTypography !== undefined && typeof p.patternTypography !== 'boolean')
+      (p.patternTypography !== undefined && typeof p.patternTypography !== 'boolean') ||
+      (p.patternCharacters !== undefined && typeof p.patternCharacters !== 'boolean')
     )
       throw Error('Check your pattern collection, strength, size and typography.');
   }
@@ -606,12 +611,14 @@
       patternScale: Number(form.elements.namedItem('patternScale')?.value ?? p.patternScale ?? 100),
       patternTypography:
         form.elements.namedItem('patternTypography')?.checked ?? p.patternTypography ?? true,
+      patternCharacters:
+        form.elements.namedItem('patternCharacters')?.checked ?? p.patternCharacters ?? true,
     };
   }
   function fields(p) {
     const active = byId.get(p.patternSet),
       group = active?.group || 'anime';
-    return `<section class="hub-theme-section pc-collection" aria-labelledby="pcTitle"><div class="pc-intro"><span class="hub-kicker">40 WORLDS · ONE WORKSPACE</span><h4 id="pcTitle">Anime &amp; cartoon collections</h4><p>20 anime sets and 20 cartoon sets. Each pairs an original repeating motif with coordinated colours and heading typography.</p></div><input type="hidden" name="patternSet" value="${esc(p.patternSet || '')}"><div class="pc-tabs" role="group" aria-label="Pattern collection"><button type="button" data-hub="pattern-group" data-group="anime" aria-pressed="${group === 'anime'}">Anime · 20</button><button type="button" data-hub="pattern-group" data-group="cartoon" aria-pressed="${group === 'cartoon'}">Cartoons · 20</button></div>${[
+    return `<section class="hub-theme-section pc-collection" aria-labelledby="pcTitle"><div class="pc-intro"><span class="hub-kicker">40 WORLDS · ONE WORKSPACE</span><h4 id="pcTitle">Anime &amp; cartoon collections</h4><p>20 anime sets and 20 cartoon sets. Each pairs character artwork and repeating motifs with coordinated colours and heading typography. Cartoon portraits are original illustrated characters.</p></div><input type="hidden" name="patternSet" value="${esc(p.patternSet || '')}"><div class="pc-tabs" role="group" aria-label="Pattern collection"><button type="button" data-hub="pattern-group" data-group="anime" aria-pressed="${group === 'anime'}">Anime · 20</button><button type="button" data-hub="pattern-group" data-group="cartoon" aria-pressed="${group === 'cartoon'}">Cartoons · 20</button></div>${[
       'anime',
       'cartoon',
     ]
@@ -622,13 +629,13 @@
           )
             .map(
               set =>
-                `<button type="button" class="pc-set" data-hub="pattern-set" data-id="${set.id}" aria-pressed="${p.patternSet === set.id}" aria-label="Preview ${esc(set.series)}: ${esc(set.name)}"><span class="pc-art" style="--pc-card-image:${esc(image(set.id, 90))};--pc-card-page:${set.colors.page};--pc-card-ink:${set.dark ? '#f1f5fc' : '#243449'};--pc-card-font:${esc(TYPE[set.type].family)}"><span>Aa</span></span><span class="pc-card-copy"><strong>${esc(set.series)}</strong><span>${esc(set.name)}</span><span class="pc-swatches" aria-hidden="true"><i style="background:${set.accent}"></i><i style="background:${set.colors.secondary}"></i><i style="background:${set.colors.page}"></i></span><small>${TYPE[set.type].label}</small></span></button>`
+                `<button type="button" class="pc-set" data-hub="pattern-set" data-id="${set.id}" aria-pressed="${p.patternSet === set.id}" aria-label="Preview ${esc(set.series)}: ${esc(set.name)}"><span class="pc-art" style="--pc-card-image:${esc(image(set.id, 90))};--pc-card-page:${set.colors.page};--pc-card-ink:${set.dark ? '#f1f5fc' : '#243449'};--pc-card-font:${esc(TYPE[set.type].family)}"><span>Aa</span></span><span class="pc-card-copy"><strong>${esc(set.series)}</strong><span>${esc(set.name)}</span><span class="pc-swatches" aria-hidden="true"><i style="background:${set.accent}"></i><i style="background:${set.colors.secondary}"></i><i style="background:${set.colors.page}"></i></span><small>${TYPE[set.type].label}</small><small>${esc(root.WorkHubPatternCharacters?.[set.id]?.name || '')}</small></span></button>`
             )
             .join('')}</div>`
       )
       .join(
         ''
-      )}<p id="pcSelection" class="pc-selection" role="status">${active ? esc(active.series + ' · ' + active.name) : 'Choose a set to preview its pattern, colours and typography.'}</p><div class="pc-adjustments"><label>Pattern strength <output id="pcStrengthValue">${p.patternStrength ?? 70}%</output><input type="range" name="patternStrength" min="20" max="100" step="5" value="${p.patternStrength ?? 70}"></label><label>Pattern size <output id="pcScaleValue">${p.patternScale ?? 100}%</output><input type="range" name="patternScale" min="60" max="180" step="10" value="${p.patternScale ?? 100}"></label></div><label class="check-label"><input type="checkbox" name="patternTypography"${p.patternTypography !== false ? ' checked' : ''}> Use the set’s heading typography</label><div class="actions"><button type="button" data-hub="pattern-clear">Use original background</button></div>${['page', 'both'].includes(document.body.dataset.photoBackground) ? '<p class="hub-meta">A background picture is active. Open My background pictures and choose Use theme background to show the pattern on your page. The preview card shows your selected set.</p>' : ''}<p class="hub-meta">Preview first, then use Save theme to keep your choice. Body text stays readable; available display fonts follow your device.</p></section>`;
+      )}<p id="pcSelection" class="pc-selection" role="status">${active ? esc(active.series + ' · ' + active.name) : 'Choose a set to preview its pattern, colours and typography.'}</p><div class="pc-adjustments"><label>Pattern strength <output id="pcStrengthValue">${p.patternStrength ?? 70}%</output><input type="range" name="patternStrength" min="20" max="100" step="5" value="${p.patternStrength ?? 70}"></label><label>Pattern size <output id="pcScaleValue">${p.patternScale ?? 100}%</output><input type="range" name="patternScale" min="60" max="180" step="10" value="${p.patternScale ?? 100}"></label></div><label class="check-label"><input type="checkbox" name="patternTypography"${p.patternTypography !== false ? ' checked' : ''}> Use the set’s heading typography</label><label class="check-label"><input type="checkbox" name="patternCharacters"${p.patternCharacters !== false ? ' checked' : ''}> Show characters in the background</label><div class="actions"><button type="button" data-hub="pattern-clear">Use original background</button></div>${['page', 'both'].includes(document.body.dataset.photoBackground) ? '<p class="hub-meta">A background picture is active. Open My background pictures and choose Use theme background to show the pattern on your page. The preview card shows your selected set.</p>' : ''}<p class="hub-meta">Preview first, then use Save theme to keep your choice. Body text stays readable; available display fonts follow your device.</p></section>`;
   }
   function choose(form, id) {
     const set = byId.get(id);
@@ -644,6 +651,8 @@
     put('font', set.font);
     for (const [name, value] of Object.entries(set.colors)) put('color-' + name, value);
     form.elements.namedItem('patternTypography').checked = true;
+    if (form.elements.namedItem('patternCharacters'))
+      form.elements.namedItem('patternCharacters').checked = true;
   }
   function showGroup(form, group) {
     if (!['anime', 'cartoon'].includes(group)) return;
@@ -676,7 +685,13 @@
   let applied = '';
   function apply(p) {
     const set = byId.get(p.patternSet),
-      key = JSON.stringify([set?.id, p.patternStrength, p.patternScale, p.patternTypography]);
+      key = JSON.stringify([
+        set?.id,
+        p.patternStrength,
+        p.patternScale,
+        p.patternTypography,
+        p.patternCharacters,
+      ]);
     if (key === applied) return;
     applied = key;
     const body = document.body,
@@ -690,7 +705,10 @@
     }
     body.dataset.hubPatternSet = set.id;
     body.toggleAttribute('data-hub-pattern-typography', p.patternTypography !== false);
-    style.setProperty('--pc-image', image(set.id, p.patternStrength ?? 70));
+    style.setProperty(
+      '--pc-image',
+      image(set.id, p.patternStrength ?? 70, p.patternCharacters !== false)
+    );
     const scale = (p.patternScale ?? 100) / 100;
     style.setProperty('--pc-size', 280 * scale + 'px ' + 220 * scale + 'px');
     style.setProperty('--pc-heading-font', TYPE[set.type].family);
