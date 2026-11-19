@@ -10054,7 +10054,7 @@ function cloudNotice() {
   $('workspaceResetButton').disabled = !cloud.ready || !!cloud.resetting;
   $('storageManagerButton').disabled = !cloud.ready;
   $('storageManagerButton').hidden = !cloud.ready;
-  $('cloudRetry').hidden = !signed || cloud.conflict;
+  $('cloudRetry').hidden = (!signed && !cloud.error) || cloud.conflict;
   $('cloudReload').hidden = !signed;
   $('cloudSignOut').hidden = !signed;
   browserMigrationNotice();
@@ -10147,6 +10147,26 @@ function queueCloudReview(row, cache) {
   );
   return { document: local, pending: cache.pending || null, inFlight, conflict };
 }
+/** Bound SDK session/lock waits as well as ordinary network requests. */
+function cloudOpening(operation, message) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(Object.assign(Error(message), { code: 'TIMEOUT' })),
+      30000
+    );
+    Promise.resolve(operation).then(
+      value => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      error => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
+}
+
 /** Load one signed-in account. Generation checks reject responses from a previous account/session. */
 async function loadCloud(session) {
   if (!session?.user) {
@@ -10168,7 +10188,7 @@ async function loadCloud(session) {
     closeModal();
     notice();
     render();
-    window.WorkHubStartup?.finish();
+    window.WorkHubStartup?.finish({ ready: true });
     return;
   }
   if (cloud.user?.id === session.user.id && (cloud.ready || cloud.loading)) {
@@ -10205,15 +10225,20 @@ async function loadCloud(session) {
     cloud.lastCache = null;
     temporary = true;
   }
+  let verifiedAccess = false;
   try {
-    const profile = await access.load(session.user);
+    const profile = await cloudOpening(
+      access.load(session.user),
+      'Account verification timed out. Please retry.'
+    );
     if (generation !== cloud.generation) return;
+    verifiedAccess = true;
     if (profile.needsPassword) {
       cloud.loading = false;
       cloud.status = 'Set your password to finish account setup.';
       notice();
       openInitialPassword();
-      window.WorkHubStartup?.finish();
+      window.WorkHubStartup?.finish({ ready: true });
       return;
     }
     if (profile.role !== 'owner' && cache?.accessVersion !== profile.version) {
@@ -10221,7 +10246,10 @@ async function loadCloud(session) {
       localStorage.removeItem(cloud.key);
       cloud.lastCache = null;
     }
-    const row = await fetchCloudRow();
+    const row = await cloudOpening(
+      fetchCloudRow(),
+      'Opening your records timed out. Please retry.'
+    );
     if (generation !== cloud.generation) return;
     const reviewed =
       cache && (cache.pending || cache.inFlight)
@@ -10244,10 +10272,16 @@ async function loadCloud(session) {
     persistCloudCache();
     notice();
     render();
-    window.WorkHubStartup?.finish();
+    window.WorkHubStartup?.finish({ ready: true });
     if (!cloud.conflict) void flushCloud();
   } catch (err) {
     if (generation !== cloud.generation) return;
+    if (!verifiedAccess) {
+      access.clear();
+      err.accessDenied = true;
+    }
+    // Invalidate a timed-out request before a retry can open a newer account/document.
+    if (err.code === 'TIMEOUT') cloud.generation++;
     cloud.loading = false;
     cloud.error = true;
     if (cache && !err.accessDenied && !['42501', 'PGRST301', 'PGRST302'].includes(err.code)) {
@@ -10265,7 +10299,7 @@ async function loadCloud(session) {
       cloud.status = 'Could not open cloud records. ' + cloudErrorMessage(err);
       notice();
     }
-    window.WorkHubStartup?.finish();
+    window.WorkHubStartup?.finish({ ready: true });
     scheduleCloudRetry();
   }
 }
@@ -10498,12 +10532,9 @@ async function refreshCloud(force = false) {
   }
 }
 async function retryCloud() {
-  if (!cloud.user) return;
+  if (!cloud.client || cloud.loading || (!cloud.user && !cloud.error)) return;
   if (!cloud.ready) {
-    cloud.user = null;
-    const { data, error } = await cloud.client.auth.getSession();
-    if (error) throw error;
-    return loadCloud(data.session);
+    return openCloudSession();
   }
   await refreshCloud();
   if (!cloud.conflict && (cloud.pending || cloud.inFlight)) return flushCloud();
@@ -10786,12 +10817,39 @@ function cloudFetch(input, init = {}) {
   });
 }
 /** Create the Supabase client and subscribe to auth, connectivity and cross-tab changes. */
+let cloudSessionCheck = null;
+function openCloudSession() {
+  if (cloudSessionCheck) return cloudSessionCheck;
+  const generation = cloud.generation;
+  cloudSessionCheck = cloudOpening(
+    Promise.resolve().then(() => cloud.client.auth.getSession()),
+    'Sign-in verification timed out. Check your connection and try again.'
+  )
+    .then(({ data, error }) => {
+      if (generation !== cloud.generation) return;
+      if (error) throw error;
+      return loadCloud(data.session);
+    })
+    .catch(error => {
+      if (generation !== cloud.generation) return;
+      cloud.error = true;
+      cloud.status =
+        error.message ||
+        'Cloud sign-in could not open. Check your connection and refresh this page.';
+      notice();
+      window.WorkHubStartup?.finish({ ready: true });
+    })
+    .finally(() => {
+      cloudSessionCheck = null;
+    });
+  return cloudSessionCheck;
+}
 function startCloud() {
   if (!window.MMTrackerSupabase?.createClient) {
     cloud.error = true;
     cloud.status = 'Cloud sign-in could not load. Refresh this page.';
     notice();
-    window.WorkHubStartup?.finish();
+    window.WorkHubStartup?.finish({ ready: true });
     return;
   }
   cloud.client = window.MMTrackerSupabase.createClient(
@@ -10858,22 +10916,7 @@ function startCloud() {
   setInterval(() => {
     if (!document.hidden) void retryCloud();
   }, 20000);
-  cloud.client.auth
-    .getSession()
-    .then(({ data, error }) => {
-      if (error) {
-        cloud.error = true;
-        cloud.status = error.message;
-        notice();
-        window.WorkHubStartup?.finish();
-      } else void loadCloud(data.session);
-    })
-    .catch(() => {
-      cloud.error = true;
-      cloud.status = 'Cloud sign-in could not open. Check your connection and refresh this page.';
-      notice();
-      window.WorkHubStartup?.finish();
-    });
+  void openCloudSession();
 }
 
 // =============================================================================
@@ -11268,7 +11311,7 @@ render();
 if (CLOUD_MODE) {
   window.WorkHubStartup?.phase('account', 'Connecting your account…');
   startCloud();
-} else window.WorkHubStartup?.finish();
+} else window.WorkHubStartup?.finish({ ready: true });
 if (document.modelContext?.registerTool) {
   try {
     Promise.resolve(

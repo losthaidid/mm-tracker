@@ -201,6 +201,27 @@ test('startup shows real opening stages without a fabricated percentage or minim
   window.WorkHubStartup.finish();assert.equal(document.documentElement.hasAttribute('data-workhub-startup'),false);assert.equal([...timers.values()].filter(t=>t.delay!==220).length,0);
 });
 
+test('a nonessential runtime or external integration error cannot block a confirmed ready workspace', t => {
+  for (const external of [false, true]) {
+    const {window,document}=startup(t);
+    if (external) {
+      const script=document.createElement('script');script.src='https://accounts.google.com/gsi/client';document.body.append(script);script.dispatchEvent(new window.Event('error'));
+    } else window.dispatchEvent(new window.ErrorEvent('error',{message:'An optional animation failed'}));
+    assert.equal(document.documentElement.dataset.workhubStartupState,'error');
+    window.WorkHubStartup.finish({ready:true});
+    assert.equal(document.documentElement.hasAttribute('data-workhub-startup'),false);
+  }
+});
+test('confirmed readiness does not uncover an app with failed required local assets', t => {
+  for (const selector of ['script[src]','link[rel="stylesheet"]']) {
+    const {window,document}=startup(t);
+    document.querySelector(selector).dispatchEvent(new window.Event('error'));
+    window.WorkHubStartup.finish({ready:true});
+    assert.equal(document.documentElement.dataset.workhubStartupState,'error');
+    assert.equal(window.getComputedStyle(document.querySelector('body > header')).visibility,'hidden');
+  }
+});
+
 
 test('startup star interaction replays a finite burst, cleans up on completion, and never adds a readiness delay', t => {
   const { window, document, timers } = startup(t), button = document.querySelector('.startup-spark-button'), scene = button.closest('.startup-scene');
