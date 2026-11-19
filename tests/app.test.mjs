@@ -282,6 +282,64 @@ test('people: pointer movement saves once, keyboard arrangement preserves assign
  document.body.classList.add('hub-private');await assert.rejects(ui.exportFile('excel'),/screen privacy/);document.body.classList.remove('hub-private');
 });
 
+function peoplePointer(window,type,target,x,y,id=21){
+ const event=new window.Event(type,{bubbles:true,cancelable:true});
+ for(const [key,value]of Object.entries({pointerId:id,button:0,clientX:x,clientY:y}))Object.defineProperty(event,key,{value});
+ target.dispatchEvent(event);
+}
+
+test('people: repeated card drags retain the page, cards, focus and scroll while saving each drop once',async t=>{
+ const {api,document,window,db}=await app(t),{buyer}=peopleFixture(api,document,window);await settle();
+ document.querySelector('[data-pe="chart"]').click();
+ const page=document.getElementById('view').firstElementChild,workspace=document.getElementById('peWorkspace'),viewport=document.getElementById('peViewport'),tray=document.querySelector('.pe-area-list'),card=document.querySelector('[data-pe-person="'+buyer.id+'"]'),handle=card.querySelector('[data-pe-move]'),links=document.getElementById('peLinks'),path=links.querySelector('path'),original=copy(api.state().workhub.projectPeople.people.find(p=>p.id===buyer.id)),calls=db.calls.length;
+ viewport.scrollLeft=180;viewport.scrollTop=120;viewport.dispatchEvent(new window.Event('scroll'));tray.scrollTop=80;tray.dispatchEvent(new window.Event('scroll'));handle.focus();
+ let paths=path.getAttribute('d');
+ for(let i=1;i<=2;i++){
+  peoplePointer(window,'pointerdown',handle,100,100);peoplePointer(window,'pointermove',document,160,145);await settle();assert.equal(db.calls.length,calls+i-1);
+  peoplePointer(window,'pointerup',document,160,145);await settle();
+  assert.equal(db.calls.length,calls+i);assert.equal(document.getElementById('view').firstElementChild,page);assert.equal(document.getElementById('peWorkspace'),workspace);assert.equal(document.getElementById('peViewport'),viewport);assert.equal(document.querySelector('.pe-area-list'),tray);assert.equal(document.querySelector('[data-pe-person="'+buyer.id+'"]'),card);assert.equal(card.querySelector('[data-pe-move]'),handle);assert.equal(document.activeElement,handle);
+  assert.equal(viewport.scrollLeft,180);assert.equal(viewport.scrollTop,120);assert.equal(tray.scrollTop,80);assert.equal(card.classList.contains('is-moving'),false);assert.equal(card.style.getPropertyValue('--pe-x'),original.x+i*60+'px');assert.equal(card.style.getPropertyValue('--pe-y'),original.y+i*45+'px');assert.equal(document.getElementById('peLinks'),links);assert.notEqual(links.querySelector('path').getAttribute('d'),paths);paths=links.querySelector('path').getAttribute('d');
+ }
+ handle.dispatchEvent(new window.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true}));await settle();assert.equal(db.calls.length,calls+3);assert.equal(document.activeElement,handle);assert.equal(document.querySelector('[data-pe-person="'+buyer.id+'"]'),card);assert.equal(card.style.getPropertyValue('--pe-x'),original.x+144+'px');
+});
+
+test('people: cancelled and rejected moves restore the same card without a save or page replacement',async t=>{
+ const {api,document,window,db}=await app(t),{buyer}=peopleFixture(api,document,window);await settle();
+ const workspace=document.getElementById('peWorkspace'),card=document.querySelector('[data-pe-person="'+buyer.id+'"]'),handle=card.querySelector('[data-pe-move]'),original=copy(api.state().workhub.projectPeople.people.find(p=>p.id===buyer.id)),calls=db.calls.length;
+ for(const finish of ['pointercancel','pointerup']){
+  peoplePointer(window,'pointerdown',handle,100,100);peoplePointer(window,'pointermove',document,200,180);
+  if(finish==='pointerup')api.cloud.conflict=true;
+  peoplePointer(window,finish,document,200,180);await settle();
+  assert.equal(document.getElementById('peWorkspace'),workspace);assert.equal(document.querySelector('[data-pe-person="'+buyer.id+'"]'),card);assert.equal(card.style.getPropertyValue('--pe-x'),original.x+'px');assert.equal(card.style.getPropertyValue('--pe-y'),original.y+'px');assert.equal(card.classList.contains('is-moving'),false);assert.equal(db.calls.length,calls);assert.deepEqual(copy(api.state().workhub.projectPeople.people.find(p=>p.id===buyer.id)),original);
+ }
+ api.cloud.conflict=false;peoplePointer(window,'pointerdown',handle,100,100);peoplePointer(window,'pointerup',document,100,100);await settle();assert.equal(db.calls.length,calls);assert.equal(document.querySelector('[data-pe-person="'+buyer.id+'"]'),card);
+});
+
+test('people: responsibility drops keep stable targets and border sizes across nested card content',async t=>{
+ const {api,document,window,db}=await app(t),{buyer,activity}=peopleFixture(api,document,window);await settle();
+ const css=document.createElement('style');css.textContent=readFileSync(new URL('../project-people.css',import.meta.url),'utf8');document.head.append(css);
+ const workspace=document.getElementById('peWorkspace'),viewport=document.getElementById('peViewport'),cards=[...document.querySelectorAll('[data-pe-person]')],card=cards.find(c=>c.dataset.pePerson===buyer.id),name=card.querySelector('.pe-person-name'),job=card.querySelector('.pe-job'),chip=document.querySelector('[data-chip-type="activity"][data-id="'+activity.id+'"]'),width=window.getComputedStyle(card).borderTopWidth,calls=db.calls.length;
+ const payload={owner:api.cloud.user.id,projectId:api.state().activeProjectId,type:'activity',id:activity.id},transfer={types:['application/x-workhub-responsibility'],getData:()=>JSON.stringify(payload),setData(){}};
+ function drag(type,target,relatedTarget=null){const event=new window.Event(type,{bubbles:true,cancelable:true});Object.defineProperties(event,{dataTransfer:{value:transfer},relatedTarget:{value:relatedTarget}});target.dispatchEvent(event);}
+ drag('dragstart',chip);drag('dragover',name);assert.ok(card.classList.contains('is-over'));assert.equal(window.getComputedStyle(card).borderTopWidth,width);
+ drag('dragleave',name,job);assert.ok(card.classList.contains('is-over'));drag('dragover',job);assert.ok(card.classList.contains('is-over'));
+ drag('dragleave',job,document.body);assert.equal(card.classList.contains('is-over'),false);drag('dragover',name);drag('drop',name);await settle();
+ assert.equal(db.calls.length,calls+1);assert.equal(api.state().workhub.projectPeople.assignments.length,1);assert.equal(document.getElementById('peWorkspace'),workspace);assert.equal(document.getElementById('peViewport'),viewport);assert.deepEqual([...document.querySelectorAll('[data-pe-person]')],cards);assert.equal(card.querySelector('.pe-person-name'),name);assert.match(card.querySelector('.pe-person-assignments').textContent,/Create PO/);assert.equal(document.querySelectorAll('.pe-person.is-over').length,0);assert.equal(workspace.classList.contains('is-dropping'),false);assert.equal(document.querySelector('.pe-metrics>div:nth-child(3) strong').textContent,'1');assert.equal(chip.closest('.pe-chip-row').querySelector('.pe-activity-state').textContent,'✓');
+ drag('drop',name);await settle();assert.equal(db.calls.length,calls+1);assert.equal(api.state().workhub.projectPeople.assignments.length,1);
+});
+
+test('people: pointer assignments update the unassigned tray and keep the filtered board and search focus',async t=>{
+ const {api,document,window,db}=await app(t),{ui,buyer,activity}=peopleFixture(api,document,window);
+ ui.activityEditor();const form=document.getElementById('peForm');form.elements.namedItem('name').value='Review PO';ui.submit(form);await settle();
+ const remainingId=api.state().workhub.projectPeople.activities.find(a=>a.name==='Review PO').id,remainingChip=document.querySelector('[data-chip-type="activity"][data-id="'+remainingId+'"]');
+ const search=document.getElementById('peSearch');search.value='Daniel';search.focus();search.dispatchEvent(new window.Event('input',{bubbles:true}));assert.equal(document.activeElement,search);assert.equal(document.getElementById('peSearch'),search);
+ const unassigned=document.getElementById('peUnassigned');unassigned.checked=true;unassigned.dispatchEvent(new window.Event('change',{bubbles:true}));
+ const workspace=document.getElementById('peWorkspace'),viewport=document.getElementById('peViewport'),card=document.querySelector('[data-pe-person="'+buyer.id+'"]'),chip=document.querySelector('[data-chip-type="activity"][data-id="'+activity.id+'"]'),calls=db.calls.length;
+ document.elementFromPoint=()=>card.querySelector('.pe-person-name');
+ peoplePointer(window,'pointerdown',chip,20,20);peoplePointer(window,'pointermove',document,160,80);assert.ok(card.classList.contains('is-over'));peoplePointer(window,'pointerup',document,160,80);await settle();
+ assert.equal(db.calls.length,calls+1);assert.equal(document.getElementById('peWorkspace'),workspace);assert.equal(document.getElementById('peViewport'),viewport);assert.equal(document.querySelector('[data-pe-person="'+buyer.id+'"]'),card);assert.equal(document.getElementById('peSearch'),search);assert.equal(document.activeElement,search);assert.equal(search.value,'Daniel');assert.equal(document.querySelectorAll('[data-pe-person]').length,1);assert.equal(document.querySelector('[data-chip-type="activity"][data-id="'+activity.id+'"]'),null);assert.equal(document.querySelector('[data-chip-type="activity"][data-id="'+remainingId+'"]'),remainingChip);assert.ok(unassigned.checked);assert.equal(document.querySelector('.pe-drag-ghost'),null);assert.equal(document.body.classList.contains('pe-is-assigning'),false);assert.match(card.textContent,/Create PO/);
+});
+
 test('people: Excel is project-scoped, text-safe, complete and cancelled if the account changes',async t=>{
  const {api,document,window}=await app(t),{ui,buyer,activity}=peopleFixture(api,document,window);ui.place(buyer.id,{type:'activity',id:activity.id});await settle();
  const E=window.WorkHubProjectPeopleEngine,sheets=E.sheets(api.state(),api.state().activeProjectId);assert.deepEqual(Array.from(sheets,s=>s.name),['People','Responsibility Assignments','Unassigned Activities','Area Coverage']);
