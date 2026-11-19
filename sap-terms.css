@@ -1,4 +1,4 @@
-/* SAP Terms builds on the Knowledge reference surfaces and adds a posting walkthrough. */
+/* Transaction keys and account modifiers build on the Knowledge reference surfaces. */
 .sapt-hero {
   background:
     radial-gradient(ellipse at 90% 20%, #75506e 0, transparent 52%),
@@ -8,7 +8,40 @@ body #view .sapt-hero p {
   color: #e7e5f4;
 }
 .mmk-controls.sapt-controls {
-  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1.4fr) repeat(2, minmax(0, 0.85fr));
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.35fr) minmax(0, 1.4fr) repeat(
+      2,
+      minmax(0, 0.85fr)
+    );
+}
+.sapt-entry-group + .sapt-entry-group {
+  margin-top: 25px;
+}
+.sapt-group-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin: 18px 0 12px;
+}
+.sapt-group-heading h4 {
+  margin: 0;
+  font-size: 17px;
+}
+.sapt-group-heading > span,
+.sapt-category-note {
+  color: var(--hub-muted);
+  font-size: 12px;
+}
+.sapt-category {
+  display: inline-block;
+  max-width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--hub-border);
+  border-radius: 6px;
+  background: var(--mmk-tint);
+  color: var(--mmk-edge);
+  font-size: 11px;
+  overflow-wrap: anywhere;
 }
 .sapt-context {
   display: flex;

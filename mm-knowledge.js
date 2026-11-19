@@ -176,7 +176,7 @@
       return `<div class="mmk-tabs" role="group" aria-label="Knowledge section" data-access-feature="knowledge">${[
         ['notes', 'Knowledge notes'],
         ['reference', 'MM Configuration'],
-        ...(terms ? [['terms', 'SAP Terms']] : []),
+        ...(terms ? [['terms', 'Transaction Keys & Account Modifiers']] : []),
       ]
         .map(
           ([id, title]) =>

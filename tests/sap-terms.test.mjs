@@ -65,6 +65,27 @@ test('SAP Terms search finds codes, context, and the right edition and kind', ()
   assert.equal(hit('TM1', '', 'ecc').length, 0);
 });
 
+test('Account reference categories cover the catalog once and combine with scenario, edition, type and search', () => {
+  const { categories } = context.WorkHubSapTermsData;
+  const categorized = Object.keys(categories).flatMap(category => {
+    const rows = Array.from(search('', '', '', '', category));
+    assert.ok(rows.length, category + ' must contain entries');
+    assert.ok(rows.every(row => row.category === category));
+    return rows.map(row => row.id);
+  });
+  assert.equal(new Set(categorized).size, entries.length);
+  assert.equal(categorized.length, entries.length);
+  assert.deepEqual(categorized.sort(), Array.from(ids).sort());
+  const hit = (...args) => Array.from(search(...args), row => row.id);
+  assert.deepEqual(hit('501', 'modifier', 'ecc', 'without-po', 'inventory'), ['GBB/ZOB']);
+  assert.deepEqual(hit('', 'key', 'cloud', 'fixed-asset', 'inventory'), ['BSX']);
+  assert.deepEqual(hit('551', 'modifier', 'ecc', '', 'consumption'), ['GBB/VNG']);
+  assert.deepEqual(hit('WRX', '', '', '', 'inventory'), []);
+  assert.deepEqual(hit('', '', 'historical', '', 'historical').sort(), ['KDV', 'PRP', 'PRQ', 'PRV', 'WRY']);
+  assert.deepEqual(hit('', 'modifier', '', '', 'historical'), []);
+  assert.deepEqual(hit('', '', '', '', 'unknown-category'), []);
+});
+
 test('Transaction scenarios cover the Terms catalog, configuration models, and their movements and reversals', () => {
   const { scenarios, groups } = context.WorkHubSapTransactionScenarios;
   const config = context.WorkHubMmConfigurationData;

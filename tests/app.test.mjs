@@ -5335,6 +5335,56 @@ test('MM Knowledge: live note search preserves the page, switches editions and r
   assert.equal(db.calls.length, writes);
 });
 
+test('Account reference: category browsing groups keys and modifiers, combines filters and resets without saving', async t => {
+  const { api, document, window, db } = await app(t);
+  const writes = db.calls.length, records = copy(api.state());
+  api.showTab('knowledge');
+  const tab = document.querySelector('.mmk-tabs [data-mode="terms"]');
+  assert.equal(tab.textContent, 'Transaction Keys & Account Modifiers');
+  tab.click();
+  assert.equal(document.querySelector('.sapt-hero h2').textContent, tab.textContent);
+  const { entries, categories } = window.WorkHubSapTermsData;
+  const category = document.getElementById('saptCategory'), query = document.getElementById('saptQuery');
+  assert.equal(category.options.length, Object.keys(categories).length + 1);
+  assert.equal(document.querySelectorAll('.sapt-card').length, entries.length);
+  for (const type of ['key', 'modifier']) {
+    const section = document.querySelector('[data-sapt-kind="' + type + '"]');
+    assert.equal(section.querySelectorAll('.sapt-card').length, entries.filter(row => row.kind === type).length);
+    assert.ok([...section.querySelectorAll('.sapt-card')].every(card => entries.find(row => row.id === card.dataset.saptCard).kind === type));
+  }
+  assert.ok([...document.querySelectorAll('.sapt-card')].every(card => card.querySelector('.sapt-category').textContent));
+  const choose = (id, value) => { const control = document.getElementById(id); control.value = value; control.dispatchEvent(new window.Event('change', { bubbles: true })); };
+  const visible = () => [...document.querySelectorAll('.sapt-card')].map(card => card.dataset.saptCard);
+  choose('saptCategory', 'inventory');
+  choose('saptTransaction', 'without-po');
+  assert.deepEqual(visible(), ['BSX', 'GBB/ZOB']);
+  choose('saptKind', 'modifier');
+  assert.deepEqual(visible(), ['GBB/ZOB']);
+  assert.equal(document.querySelector('[data-sapt-kind="key"]'), null);
+  assert.equal(document.getElementById('saptCount').textContent, '1 entry');
+  api.showTab('knowledge');
+  assert.equal(document.getElementById('saptCategory'), category);
+  assert.equal(category.value, 'inventory');
+  document.querySelector('[data-sapt-card="GBB/ZOB"] button').click();
+  assert.equal(document.querySelector('.sapt-reader').dataset.saptScenario, 'without-po');
+  assert.match(document.getElementById('saptScenes').textContent, /501.+GBB\/ZOB/);
+  api.closeModal();
+  query.value = 'WRX'; query.dispatchEvent(new window.Event('input', { bubbles: true }));
+  assert.equal(visible().length, 0);
+  assert.match(document.querySelector('#saptResults .mmk-empty').textContent, /No matching keys or modifiers/);
+  document.querySelector('[data-sapt="reset"]').click();
+  for (const id of ['saptQuery', 'saptCategory', 'saptKind', 'saptEdition', 'saptTransaction']) assert.equal(document.getElementById(id).value, '');
+  assert.equal(document.activeElement, query);
+  assert.equal(document.querySelectorAll('.sapt-entry-group').length, 2);
+  assert.equal(visible().length, entries.length);
+  choose('saptCategory', 'historical'); choose('saptEdition', 'ecc');
+  assert.equal(visible().length, 0);
+  choose('saptEdition', 'historical');
+  assert.deepEqual(visible().sort(), ['KDV', 'PRP', 'PRQ', 'PRV', 'WRY']);
+  assert.equal(db.calls.length, writes);
+  assert.deepEqual(copy(api.state()), records);
+});
+
 test('SAP Terms: key lookup keeps every posting visible as the active step changes', async t => {
   const { api, document, window, db } = await app(t);
   api.showTab('knowledge');
