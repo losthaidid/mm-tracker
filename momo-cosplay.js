@@ -12,20 +12,68 @@
     }))
   );
   const byKey = new Map(looks.map(row => [row.key, row]));
+  // Pattern IDs are stable; display names can differ in spelling or punctuation.
+  const BACKGROUND_SERIES = Object.freeze({
+    'naruto-clouds': 'naruto',
+    'one-piece-voyage': 'one-piece',
+    'dragon-ball-orbs': 'dragon-ball',
+    'demon-slayer-checks': 'demon-slayer',
+    'sailor-moon-prism': 'sailor-moon',
+    'pokemon-trainer': 'pokemon',
+    'doraemon-pocket': 'doraemon',
+    'totoro-forest': 'my-neighbor-totoro',
+    'spirited-lanterns': 'spirited-away',
+    'howl-starlight': 'howls-moving-castle',
+    'jujutsu-charms': 'jujutsu-kaisen',
+    'titan-wings': 'attack-on-titan',
+    'bleach-butterflies': 'bleach',
+    'one-punch-impact': 'one-punch-man',
+    'spy-family-signals': 'spy-family',
+    'haikyu-court': 'haikyu',
+    'hero-academia-panels': 'my-hero-academia',
+    'fullmetal-alchemy': 'fullmetal-alchemist',
+    'evangelion-grid': 'neon-genesis-evangelion',
+    'sakura-clow': 'cardcaptor-sakura',
+    'spongebob-bottom': 'spongebob-squarepants',
+    'adventure-candy': 'adventure-time',
+    'simpsons-skies': 'the-simpsons',
+    'powerpuff-sparks': 'the-powerpuff-girls',
+    'avatar-elements': 'avatar-the-last-airbender',
+    'steven-gems': 'steven-universe',
+    'gravity-pines': 'gravity-falls',
+    'rick-portals': 'rick-and-morty',
+    'tom-jerry-chase': 'tom-and-jerry',
+    'looney-rings': 'looney-tunes',
+    'scooby-mystery': 'scooby-doo',
+    'titans-tower': 'teen-titans',
+    'ben-alien': 'ben-10',
+    'dexter-lab': 'dexters-laboratory',
+    'courage-twilight': 'courage-the-cowardly-dog',
+    'flintstones-bedrock': 'the-flintstones',
+    'jetsons-orbit': 'the-jetsons',
+    'ducktales-treasure': 'ducktales',
+    'pooh-honey': 'winnie-the-pooh',
+    'mickey-classic': 'mickey-and-friends',
+  });
+  const pools = new Map(
+    [...series.keys()].map(id => [id, looks.filter(row => row.series.id === id)])
+  );
   const STORE = 'mm-tracker.momo-cosplay.v1:';
-  const runtime = { owner: null, current: null, recent: [], nextRotation: 0 };
+  const runtime = { owner: null, seriesId: '', current: null, recent: [], nextRotation: 0 };
   const esc = value =>
     String(value ?? '').replace(
       /[&<>"']/g,
       c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
     );
   const enabled = p => p.cosplayEnabled !== false;
+  const selectedSeries = p => series.get(BACKGROUND_SERIES[p.patternSet]) || null;
+  const activeFor = p => enabled(p) && !!selectedSeries(p);
   const delayRotation = () => Date.now() + 480000 + Math.random() * 240000;
   function save() {
     if (!runtime.owner || !runtime.current) return;
     try {
       root.localStorage.setItem(
-        STORE + runtime.owner,
+        STORE + runtime.owner + ':' + runtime.seriesId,
         JSON.stringify({ key: runtime.current.key, recent: runtime.recent.slice(-8) })
       );
     } catch (_) {
@@ -33,42 +81,54 @@
     }
   }
   function choose() {
-    const candidates = looks.filter(
+    const candidates = (pools.get(runtime.seriesId) || []).filter(
       row => row.character.id !== runtime.current?.character.id && !runtime.recent.includes(row.key)
     );
+    if (!candidates.length) return null;
     runtime.current = candidates[Math.floor(Math.random() * candidates.length)];
     runtime.recent = [...runtime.recent, runtime.current.key].slice(-8);
     runtime.nextRotation = delayRotation();
     save();
     return runtime.current;
   }
-  function ensure(owner) {
-    if (runtime.owner === owner) return runtime.current;
+  function ensure(owner, seriesId) {
+    if (runtime.owner === owner && runtime.seriesId === seriesId) return runtime.current;
     runtime.owner = owner || '';
+    runtime.seriesId = seriesId || '';
     runtime.current = null;
     runtime.recent = [];
-    if (!owner) return null;
+    if (!owner || !seriesId) return null;
     try {
-      const stored = JSON.parse(root.localStorage.getItem(STORE + owner) || 'null');
-      runtime.current = byKey.get(stored?.key) || null;
+      // Adopt an earlier unrestricted look only if it belongs to this collection.
+      const stored = JSON.parse(
+        root.localStorage.getItem(STORE + owner + ':' + seriesId) ||
+          root.localStorage.getItem(STORE + owner) ||
+          'null'
+      );
+      const restored = byKey.get(stored?.key);
+      runtime.current = restored?.series.id === seriesId ? restored : null;
       runtime.recent = Array.isArray(stored?.recent)
-        ? stored.recent.filter(key => byKey.has(key)).slice(-8)
+        ? stored.recent.filter(key => byKey.get(key)?.series.id === seriesId).slice(-8)
         : [];
     } catch (_) {
       /* Ignore stale local data. */
     }
     if (!runtime.current) choose();
+    else save();
     runtime.nextRotation = delayRotation();
     return runtime.current;
   }
   function apply(p, owner) {
     const pet = document.getElementById('hubPet');
-    if (!enabled(p) || !owner) {
+    const currentOwner = owner || '',
+      seriesId = owner && activeFor(p) ? selectedSeries(p).id : '';
+    if (runtime.owner !== currentOwner || runtime.seriesId !== seriesId)
+      root.dispatchEvent(new root.Event('workhub:momo-cosplay-context'));
+    const current = ensure(currentOwner, seriesId);
+    if (!current) {
       root.WorkHubMomoCosplayArt.clear(pet);
-      if (!owner) ensure('');
       return false;
     }
-    const current = ensure(owner);
     return root.WorkHubMomoCosplayArt.render(pet, current, p.mascotName || 'Momo');
   }
   function validate(p) {
@@ -77,7 +137,7 @@
         throw Error('Check automatic cosplay and character moves.');
   }
   function fields(p) {
-    return `<label class="hub-check"><input type="checkbox" name="cosplayEnabled"${enabled(p) ? ' checked' : ''}> Automatic anime & cartoon outfits</label><label class="hub-check"><input type="checkbox" name="cosplayMoves"${p.cosplayMoves !== false ? ' checked' : ''}> Character moves & temporary transformations</label><p class="hub-meta">Surprise outfits from 40 collections, with matching clothes and accessories. Changes wait for a quiet moment every 8–12 minutes. Turn off automatic cosplay to use the wardrobe below.</p>`;
+    return `<label class="hub-check"><input type="checkbox" name="cosplayEnabled"${enabled(p) ? ' checked' : ''}> Match companion to anime & cartoon backgrounds</label><label class="hub-check"><input type="checkbox" name="cosplayMoves"${p.cosplayMoves !== false ? ' checked' : ''}> Character moves & temporary transformations</label><p class="hub-meta">Choose an anime or cartoon background above. Your companion randomly wears matching clothes and accessories and imitates only that collection's characters. Outfits change at quiet moments every 8–12 minutes. Ordinary backgrounds use his regular wardrobe and hobbies.</p>`;
   }
   const PROFILES = {
     stretch: ['Rubber-arm stretch', 'stretch', 6400],
@@ -114,6 +174,7 @@
   };
   function install(a) {
     let owner = '',
+      background = '',
       active = null,
       lastInteraction = Date.now() - 20000;
     let nextMove = Date.now() + 60000,
@@ -130,7 +191,7 @@
       return !!(
         a.ready() &&
         a.owner() &&
-        enabled(p) &&
+        activeFor(p) &&
         p.mascot &&
         node?.querySelector('.momo-anime-art') &&
         !node.hidden &&
@@ -172,7 +233,7 @@
     function play(auto = false) {
       mount();
       if (!motion() || !available() || (auto && Date.now() - lastInteraction < 12000)) return false;
-      const current = ensure(owner);
+      const current = ensure(owner, background);
       if (!current) return false;
       const choices = current.character.moves.filter(id => id !== lastMove);
       const moves = choices.length ? choices : current.character.moves;
@@ -193,6 +254,7 @@
     }
     function rotate() {
       mount();
+      if (!activeFor(a.prefs())) return false;
       pendingRotation = true;
       if (!available()) return false;
       choose();
@@ -203,16 +265,18 @@
     }
     function mount() {
       const currentOwner = a.ready() ? a.owner() : '';
-      if (owner !== currentOwner) {
+      const currentBackground =
+        currentOwner && activeFor(a.prefs()) ? selectedSeries(a.prefs()).id : '';
+      if (owner !== currentOwner || background !== currentBackground) {
         finish();
         owner = currentOwner;
+        background = currentBackground;
         pendingRotation = false;
         lastMove = '';
         nextMove = Date.now() + 60000;
-        ensure(owner);
         root.WorkHubMomoCosplayArt.clear(pet());
       }
-      if (!enabled(a.prefs())) {
+      if (!activeFor(a.prefs())) {
         finish();
         pendingRotation = false;
       }
@@ -248,6 +312,12 @@
       interact();
     });
     root.addEventListener('pagehide', interact);
+    root.addEventListener('workhub:momo-cosplay-context', () => {
+      finish();
+      pendingRotation = false;
+      lastMove = '';
+      nextMove = Date.now() + 60000;
+    });
     const reduced = root.matchMedia?.('(prefers-reduced-motion: reduce)');
     reduced?.addEventListener?.('change', () => {
       if (reduced.matches) finish();
@@ -260,14 +330,26 @@
       finish,
       snapshot: () => ({
         active: active?.move || null,
-        look: owner && enabled(a.prefs()) ? runtime.current : null,
+        look: owner && activeFor(a.prefs()) ? runtime.current : null,
         pendingRotation,
       }),
       gallery: () => {
-        const current = ensure(owner);
-        return `<span class="hub-kicker">AUTOMATIC COSPLAY</span><h3>${current ? esc(current.character.name) + ' · ' + esc(current.outfit.label) : 'Anime & cartoon wardrobe'}</h3><p>${current ? esc(current.series.name) + '. ' : ''}40 collections · 200 characters · 600 coordinated looks. Each character has three outfit variations with matching accessories. Your companion picks a new character at quiet intervals, without needing you to choose.</p><p>Character moves are brief and stay in his corner. They pause for your work, respect reduced motion, and never wake a requested nap.</p><div class="actions"><button type="button" data-momo-style="cosplay-random">Another random outfit</button><button type="button" data-momo-style="cosplay-move">Try his character move</button><button type="button" data-momo-style="appearance">Appearance settings</button></div>`;
+        mount();
+        const current = ensure(owner, background);
+        return `<span class="hub-kicker">MATCHING YOUR BACKGROUND</span><h3>${current ? esc(current.character.name) + ' · ' + esc(current.outfit.label) : 'Anime & cartoon wardrobe'}</h3><p>${current ? esc(current.series.name) + ' background · 5 characters · 15 coordinated looks. ' : ''}Your companion randomly picks characters, clothes, accessories and moves from this collection. Choose another background in Theme Studio to change the cast.</p><p>Character moves are brief and stay in his corner. They pause for your work, respect reduced motion, and never wake a requested nap.</p><div class="actions"><button type="button" data-momo-style="cosplay-random">Another random outfit</button><button type="button" data-momo-style="cosplay-move">Try his character move</button><button type="button" data-momo-style="appearance">Appearance settings</button></div>`;
       },
     };
   }
-  root.WorkHubMomoCosplay = { apply, validate, fields, install, enabled, PROFILES, looks };
+  root.WorkHubMomoCosplay = {
+    apply,
+    validate,
+    fields,
+    install,
+    enabled,
+    activeFor,
+    selectedSeries,
+    BACKGROUND_SERIES,
+    PROFILES,
+    looks,
+  };
 })(window);
