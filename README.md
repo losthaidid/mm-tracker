@@ -28,7 +28,7 @@ The TNG statement extractor and automatically looping Troubleshooting Lab result
 
 No terminal or build tools are needed to use the tracker.
 
-Opening the website shows a small illustrated loading screen while the current layout and sign-in state prepare. Returning users stay on it until their cloud records (or an available offline copy) open. Signed-out users see the styled sign-in screen. Interrupted downloads show a reload option instead of uncovering the old HTML layout; reduced-motion preferences are respected. This screen creates no database records.
+Opening the website shows a small illustrated loading screen while the current layout and sign-in state prepare. Returning users stay on it until their cloud records (or an available offline copy) open. Signed-out users see the styled sign-in screen. Interrupted downloads show a reload option instead of uncovering the old HTML layout; reduced-motion preferences are respected. This screen creates no database records. Account/session verification and record loading each have a 30-second deadline. A stalled request opens a retry notice; a verified account can use its existing offline copy while reconnecting. Background retries do not restart an opening account, and late responses cannot replace a newer load. Optional runtime/integration errors cannot pin the cover after the application confirms that its workspace or recovery screen has rendered. Failed required local assets retain the reload screen.
 
 ## Cloud login
 

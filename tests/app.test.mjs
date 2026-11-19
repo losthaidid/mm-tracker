@@ -14,13 +14,13 @@ async function atmosphereChoices(ctx,values={},meet=false){
  const submitter=form.querySelector('[value="'+(meet?'visit':'save')+'"]');form.dispatchEvent(new window.SubmitEvent('submit',{bubbles:true,cancelable:true,submitter}));await settle();
 }
 
-async function app(t,{storage={},rpcError=null,remote=null,login=true,styles=false,adventures=false,sessionLookup=null,read=null,cloudClient=true}={}){
+async function app(t,{storage={},rpcError=null,remote=null,login=true,styles=false,adventures=false,sessionLookup=null,read=null,cloudClient=true,startupTimers=null}={}){
  const dom=new JSDOM(html,{url:'https://losthaidid.github.io/mm-tracker/',runScripts:'outside-only',pretendToBeVisual:true});
  const {window}=dom;
  t.after(()=>window.close());
  window.TextEncoder=TextEncoder;window.TextDecoder=TextDecoder;window.Blob=Blob;window.setImmediate=setImmediate;window.clearImmediate=clearImmediate;
  const intervals=[],frames=new Map();let nextFrame=1;
- window.setTimeout=()=>0;window.setInterval=(callback,ms)=>{intervals.push({callback,ms});return intervals.length;};
+ if(startupTimers){let timeoutId=0;window.setTimeout=(callback,delay)=>{startupTimers.set(++timeoutId,{callback,delay});return timeoutId;};window.clearTimeout=id=>startupTimers.delete(id);}else window.setTimeout=()=>0;window.setInterval=(callback,ms)=>{intervals.push({callback,ms});return intervals.length;};
  window.requestAnimationFrame=callback=>{const id=nextFrame++;frames.set(id,callback);return id;};window.cancelAnimationFrame=id=>frames.delete(id);
  const baseStyle=window.document.createElement('style');baseStyle.textContent=readFileSync(new URL('../base.css',import.meta.url),'utf8');window.document.head.append(baseStyle);
  if(styles){const style=window.document.createElement('style');style.textContent=[...window.document.querySelectorAll('link[rel="stylesheet"]')].map(link=>new URL(link.href).pathname.split('/').at(-1)).filter(file=>file!=='base.css').map(file=>readFileSync(new URL('../'+file,import.meta.url),'utf8')).join('\n');window.document.head.append(style);}
@@ -34,6 +34,7 @@ async function app(t,{storage={},rpcError=null,remote=null,login=true,styles=fal
   auth:{getSession:sessionLookup||(async()=>({data:{session:null},error:null})),onAuthStateChange:()=>({data:{subscription:{unsubscribe(){}}}})},
   from:()=>({select:columns=>{db.selects.push(columns);return{eq:()=>({maybeSingle:async()=>db.read?db.read():({data:copy(db.row),error:null})})};}}),
   rpc:async(name,args)=>{
+   if(name==='workhub_my_access'&&db.accessRead)return db.accessRead();
    if(name==='workhub_my_access')return{data:db.access||{userId:window.api?.cloud.user?.id||'11111111-1111-4111-8111-111111111111',role:'owner',status:'active',version:1,permissions:window.WorkHubAccessCatalog.preset(),needsPassword:false},error:db.accessError||null};
    if(name==='load_mm_tracker'||name==='load_mm_tracker_revision')return{data:db.row?[copy(db.row)]:[],error:null};
    if(name==='workhub_storage_usage')return{data:{recordBytes:1234,storedDocumentBytes:456,revision:db.row?.revision||0,project:{databaseBytes:1000000}},error:null};
@@ -59,6 +60,8 @@ async function app(t,{storage={},rpcError=null,remote=null,login=true,styles=fal
   showCompanies(){tab='specs';projectView='companies';render();}
  };`);
  await settle();
+ // Flush the initial auth promise chain without resolving deliberately stalled requests.
+ await new Promise(resolve=>setImmediate(resolve));
  if(login)await window.api.login();
  return{window,document:window.document,api:window.api,db,intervals,frames};
 }
@@ -579,6 +582,83 @@ test('Project tasks: role restrictions protect shared progress and exclude unava
 test('stand-up: cancelled drafts do not create tasks and account changes close the private report',async t=>{
  const {api,document}=await app(t),item=standupFixture(api,document),ui=api.hub.standup;ui.open(item.projectId);document.querySelector('[data-standup="add"]').click();const form=document.getElementById('standupActionForm');form.elements.namedItem('text').value='Private draft';document.querySelector('[data-standup="cancel-action"]').click();assert.equal(api.state().tasks.length,0);assert.equal(api.state().workhub.projectStandup.actions.length,0);
  document.querySelector('[data-standup="add"]').click();const stale=document.getElementById('standupActionForm');stale.elements.namedItem('text').value='Old account instruction';api.cloud.user={id:'22222222-2222-4222-8222-222222222222'};api.showTab('home');assert.equal(document.getElementById('modal').open,false);assert.throws(()=>ui.saveAction(stale),/signing in/);assert.equal(api.state().tasks.length,0);
+});
+
+function expireOpening(timers) {
+ const timer=[...timers.values()].find(timer=>timer.delay===30000);
+ assert.ok(timer,'an opening deadline is armed');timer.callback();
+}
+test('startup: a stalled session check opens retry controls, ignores its late result and can recover',async t=>{
+ let resolveSession,retrying=false;
+ const waiting=new Promise(resolve=>resolveSession=resolve),timers=new Map();
+ const {api,document,db}=await app(t,{login:false,startupTimers:timers,sessionLookup:()=>retrying?Promise.resolve({data:{session:null},error:null}):waiting});
+ expireOpening(timers);await settle();
+ assert.equal(document.documentElement.hasAttribute('data-workhub-startup'),false);
+ assert.match(api.cloud.status,/Sign-in verification timed out/);
+ assert.equal(document.getElementById('cloudRetry').hidden,false);
+ resolveSession({data:{session:sessionUser},error:null});await settle();
+ assert.equal(api.cloud.user,null);assert.equal(api.cloud.ready,false);assert.equal(db.calls.length,0);
+ retrying=true;await api.retryCloud();await settle();
+ assert.equal(api.cloud.error,false);assert.equal(document.getElementById('cloudGate').hidden,false);
+});
+test('startup: failed optional code cannot pin the cover once the sign-in screen is ready',async t=>{
+ let resolveSession;const waiting=new Promise(resolve=>resolveSession=resolve);
+ const {api,document,window}=await app(t,{login:false,sessionLookup:()=>waiting});
+ window.dispatchEvent(new window.ErrorEvent('error',{message:'Optional visual effect failed'}));
+ resolveSession({data:{session:null},error:null});await settle();
+ assert.equal(document.documentElement.hasAttribute('data-workhub-startup'),false);
+ assert.equal(document.getElementById('cloudGate').hidden,false);assert.equal(api.cloud.ready,false);
+});
+test('startup: background retries never clear the account during its initial records request',async t=>{
+ let resolveRow;const waiting=new Promise(resolve=>resolveRow=resolve);
+ const {api,document}=await app(t,{login:false,sessionLookup:async()=>({data:{session:sessionUser},error:null}),read:()=>waiting});
+ const generation=api.cloud.generation;
+ assert.equal(api.cloud.loading,true);await api.retryCloud();await api.retryCloud();
+ assert.equal(api.cloud.user.id,sessionUser.user.id);assert.equal(api.cloud.generation,generation);
+ resolveRow({data:null,error:null});await settle();
+ assert.equal(api.cloud.ready,true);assert.equal(document.documentElement.hasAttribute('data-workhub-startup'),false);
+});
+test('startup: an older initial session result cannot sign out an account that has already opened',async t=>{
+ let resolveSession;const waiting=new Promise(resolve=>resolveSession=resolve);
+ const {api,db}=await app(t,{login:false,sessionLookup:()=>waiting});
+ await api.loadCloud(sessionUser);
+ assert.equal(api.cloud.ready,true);
+ resolveSession({data:{session:null},error:null});await settle();
+ assert.equal(api.cloud.ready,true);assert.equal(api.cloud.user.id,sessionUser.user.id);assert.equal(db.calls.length,0);
+});
+test('startup: record timeouts recover the verified cache without accepting late document responses',async t=>{
+ const seed=await app(t,{login:false}),data=seed.api.emptyState();data.workhub.preferences.workspace='Protected local copy';
+ const key='mm-tracker.cloud.v1:aaotojqkiewbhtnrlcur:'+sessionUser.user.id;
+ const cache=JSON.stringify({document:JSON.parse(seed.api.payload(data)),revision:7,pending:null,inFlight:null,baseDocument:null});
+ for(const storage of [{[key]:cache},{}]) {
+  let resolveRow;const waiting=new Promise(resolve=>resolveRow=resolve),timers=new Map();
+  const {api,document,db}=await app(t,{login:false,storage,startupTimers:timers,sessionLookup:async()=>({data:{session:sessionUser},error:null}),read:()=>waiting});
+  assert.equal(api.cloud.loading,true);expireOpening(timers);await settle();
+  const cached=!!storage[key];
+  assert.equal(api.cloud.loading,false);assert.equal(api.cloud.ready,cached);
+  assert.equal(document.documentElement.hasAttribute('data-workhub-startup'),false);
+  assert.equal(document.getElementById('storageNotice').hidden,false);
+  if(cached)assert.equal(api.state().workhub.preferences.workspace,'Protected local copy');
+  const before=copy(api.state());
+  resolveRow({data:null,error:null});await settle();
+  assert.deepEqual(copy(api.state()),before);assert.equal(db.calls.length,0);
+ }
+});
+test('startup: access verification timeouts never expose a cache or accept late permissions',async t=>{
+ const seed=await app(t,{login:false}),key='mm-tracker.cloud.v1:aaotojqkiewbhtnrlcur:'+sessionUser.user.id;
+ const data=seed.api.emptyState();data.workhub.preferences.workspace='Private cached name';
+ const storage={[key]:JSON.stringify({document:JSON.parse(seed.api.payload(data)),revision:1})};
+ let resolveSession,resolveAccess;
+ const session=new Promise(resolve=>resolveSession=resolve),access=new Promise(resolve=>resolveAccess=resolve),timers=new Map();
+ const {api,db,document,window}=await app(t,{login:false,storage,startupTimers:timers,sessionLookup:()=>session});
+ db.accessRead=()=>access;
+ resolveSession({data:{session:sessionUser},error:null});await settle();
+ expireOpening(timers);await settle();
+ assert.equal(api.cloud.ready,false);assert.equal(api.access.snapshot(),null);
+ assert.equal(document.documentElement.hasAttribute('data-workhub-startup'),false);
+ assert.notEqual(api.state().workhub.preferences.workspace,'Private cached name');
+ resolveAccess({data:{userId:sessionUser.user.id,role:'owner',status:'active',version:1,permissions:window.WorkHubAccessCatalog.preset()},error:null});await settle();
+ assert.equal(api.access.snapshot(),null);assert.equal(api.cloud.ready,false);assert.equal(db.calls.length,0);
 });
 
 test('startup: signed-out visitors see the modern sign-in screen after layout preparation',async t=>{

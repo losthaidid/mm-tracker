@@ -12,6 +12,7 @@
   } catch {}
   let finished = false,
     blocked = false,
+    failedAsset = false,
     workspaceName = 'Your workspace',
     message = 'Getting your workspace ready…',
     stage = 'assets';
@@ -240,6 +241,11 @@
     const target = event.target;
     if (finished || (target !== root && !target?.matches?.('script[src],link[rel="stylesheet"]')))
       return;
+    if (target !== root) {
+      const source = target.src || target.href;
+      // External, on-demand integrations must not lock a successfully rendered workspace.
+      failedAsset ||= new URL(source, document.baseURI).origin === root.location.origin;
+    }
     blocked = true;
     page.dataset.workhubStartupState = 'error';
     showMessage('Your workspace could not finish opening. Check your connection and reload.');
@@ -312,8 +318,10 @@
     message(value) {
       if (!finished && !blocked) showMessage(value);
     },
-    finish() {
-      if (finished || blocked) return;
+    finish({ ready = false } = {}) {
+      // Only the application can confirm that its workspace or recovery screen rendered.
+      // Required local assets still keep partial markup covered when a download fails.
+      if (finished || (blocked && (!ready || failedAsset))) return;
       finished = true;
       root.clearTimeout(watchdog);
       root.removeEventListener('error', failed, true);
