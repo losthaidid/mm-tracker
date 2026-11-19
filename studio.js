@@ -334,6 +334,7 @@
       adventures = null,
       claims = null,
       leaveBalances = null,
+      toil = null,
       tng = null,
       recipients = null,
       settingsPanel = null,
@@ -3195,6 +3196,7 @@
       adventures?.mount();
       claims?.mount(tab);
       leaveBalances?.mount(tab);
+      toil?.mount(tab);
       tng?.mount(tab);
       recipients?.mount(tab);
       wardrobe?.mount();
@@ -4677,6 +4679,12 @@
       ready: () => a.cloud().ready,
       owner: () => a.cloud().user?.id || '',
     });
+    toil = root.WorkHubToil.install({
+      ...a,
+      ready: () => a.cloud().ready,
+      owner: () => a.cloud().user?.id || '',
+      allowances: (year, kind) => leaveBalances.settings(year, kind),
+    });
     tng = root.WorkHubTng.install({
       ...a,
       ready: () => a.cloud().ready,
@@ -4796,6 +4804,7 @@
       recipients,
       claims,
       leaveBalances,
+      toil,
       tng,
       adventures,
       batchA,

@@ -90,6 +90,11 @@
         (Object.hasOwn(TYPES, t.id) || !root.WorkHubReminders.validDate(t.earnedDate))
       )
         throw Error('Choose a valid date earned for the custom leave type.');
+      if (
+        t.toil !== undefined &&
+        (typeof t.toil !== 'boolean' || (t.toil && Object.hasOwn(TYPES, t.id)))
+      )
+        throw Error('TOIL tracking is available only for custom leave types.');
       ids.add(t.id);
       names.add(t.name.toLowerCase());
       codes.add(t.code);
@@ -144,6 +149,7 @@
           throw Error(
             'Enter leave days from 0 to 366 in half-day steps and choose the days that count.'
           );
+        if (p.toilEntries !== undefined) validateToilEntries(p.toilEntries, y.id, t);
       }
     }
     const hourlyBookings = new Map();
@@ -230,9 +236,83 @@
     }
     return roundDays([...dates.values()].reduce((sum, n) => sum + n, 0) / 2);
   }
-  function balance(d, year, kind) {
+  function localDate() {
+    const date = new Date();
+    return (
+      date.getFullYear() +
+      '-' +
+      String(date.getMonth() + 1).padStart(2, '0') +
+      '-' +
+      String(date.getDate()).padStart(2, '0')
+    );
+  }
+  function validateToilEntries(rows, year, leaveType) {
+    if (!leaveType.toil || !Array.isArray(rows) || rows.length > 1000)
+      throw Error('Use at most 1,000 earned or utilized entries per TOIL type and year.');
+    const ids = new Set();
+    for (const row of rows) {
+      if (
+        !row ||
+        typeof row.id !== 'string' ||
+        !/^[a-zA-Z0-9][a-zA-Z0-9-]{0,99}$/.test(row.id) ||
+        ids.has(row.id) ||
+        !root.WorkHubReminders.validDate(row.date) ||
+        !row.date.startsWith(year + '-') ||
+        !['earned', 'utilized'].includes(row.kind) ||
+        typeof row.days !== 'number' ||
+        !Number.isFinite(row.days) ||
+        row.days <= 0 ||
+        row.days > 366 ||
+        Math.abs(row.days - roundDays(row.days)) > 1e-9 ||
+        typeof row.note !== 'string' ||
+        row.note.length > 1000 ||
+        /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(row.note)
+      )
+        throw Error(
+          'TOIL entries need a unique ID, a date in the selected year, positive days and a note of up to 1,000 characters.'
+        );
+      ids.add(row.id);
+    }
+  }
+  function balance(d, year, kind, asOf = localDate()) {
     const p = policy(d, year, kind),
       booked = scheduled(d, year, kind);
+    if (type(d, kind)?.toil) {
+      const entries = p.toilEntries || [];
+      const sum = (entryKind, future = false) =>
+        roundDays(
+          entries
+            .filter(row => row.kind === entryKind && (future ? row.date > asOf : row.date <= asOf))
+            .reduce((n, row) => n + row.days, 0)
+        );
+      const earned = roundDays((p.allowance || 0) + sum('earned'));
+      const scheduledUtilized = scheduled(
+        {
+          ...d,
+          schedule: (d.schedule || []).filter(
+            row => row.date <= asOf && row.leave?.status === 'Approved'
+          ),
+        },
+        year,
+        kind
+      );
+      const utilized = roundDays(p.openingUsed + sum('utilized') + scheduledUtilized);
+      const reserved = roundDays(Math.max(0, booked - scheduledUtilized) + sum('utilized', true));
+      return {
+        year,
+        kind,
+        ...p,
+        toil: true,
+        allowance: earned,
+        openingEarned: p.allowance || 0,
+        earned,
+        utilized,
+        reserved,
+        pendingEarned: sum('earned', true),
+        scheduled: booked,
+        remaining: roundDays(earned - utilized - reserved),
+      };
+    }
     return {
       year,
       kind,
@@ -261,7 +341,7 @@
       : row.date === draft.originalDate && row.time === draft.originalTime;
   }
   /** Build the exact replacement for preview; exclude the old booking so edits do not double count. */
-  function preview(d, draft) {
+  function preview(d, draft, asOf) {
     const selectedDates = dates(draft.date, draft.endDate || draft.date),
       schedule = (d.schedule || []).filter(row => !sameBooking(row, draft)),
       base = { ...d, schedule },
@@ -282,8 +362,8 @@
       next,
       years,
       rows: years.map(year => {
-        const before = balance(base, year, draft.kind),
-          after = balance(next, year, draft.kind);
+        const before = balance(base, year, draft.kind, asOf),
+          after = balance(next, year, draft.kind, asOf);
         return {
           ...after,
           beforeRemaining: before.remaining,
@@ -293,15 +373,18 @@
     };
   }
   /** Quotas guard new/increased reservations, while allowing older overdrawn records to be reduced. */
-  function assertWithinBalance(previous, next) {
-    for (const y of next.workhub.leaveBalances)
+  function assertWithinBalance(previous, next, asOf) {
+    const years = new Set(next.workhub.leaveBalances.map(y => y.id));
+    for (const row of next.schedule || [])
+      if (type(next, row.kind)?.toil) years.add(row.date.slice(0, 4));
+    for (const year of years)
       for (const t of types(next)) {
         const kind = t.id;
-        const after = balance(next, y.id, kind),
-          before = balance(previous, y.id, kind);
+        const after = balance(next, year, kind, asOf),
+          before = balance(previous, year, kind, asOf);
         if (after.remaining !== null && after.remaining < 0 && after.scheduled > before.scheduled)
           throw Error(
-            `${typeLabel(next, kind)} for ${y.id}: only ${Math.max(0, before.remaining)} day(s) remain. Reduce this range or update your allowance in Settings.`
+            `${typeLabel(next, kind)} for ${year}: only ${Math.max(0, before.remaining)} day(s) remain. ${t.toil ? 'Record earned TOIL or reduce this range.' : 'Reduce this range or update your allowance in Settings.'}`
           );
       }
   }
@@ -312,6 +395,7 @@
     typeLabel,
     isKind,
     validateTypes,
+    validateToilEntries,
     defaults,
     upgrade,
     validate,

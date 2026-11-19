@@ -38,7 +38,7 @@ Solution Studio learning: [solution-guide.js](../solution-guide.js) contains the
 For feature-specific changes, find the matching file below. JavaScript (`.js`) controls behaviour;
 CSS (`.css`) controls appearance; HTML supplies the initial page structure.
 
-Current work-session filters, completed Schedule recordings, password-verified cloud reset, process marquee selection, three-period wardrobe and interactive header are documented in [WORKSPACE-TOOLS.md](WORKSPACE-TOOLS.md). `workspace-reset.js` owns the guarded review and isolated password session; its core adapter is in `app.js`. `brand-motion.js` / `brand-motion.css` provide the bounded, interactive header identity.
+Current work-session filters, completed Schedule recordings, password-verified cloud reset, process marquee selection, three-period wardrobe and interactive header are documented in [WORKSPACE-TOOLS.md](WORKSPACE-TOOLS.md). `workspace-reset.js` owns the guarded review and isolated password session; its core adapter is in `app.js`. `brand-motion.js` / `brand-motion.css` provide the bounded, interactive header identity. [toil.js](../toil.js) owns the earned/utilized TOIL ledger and cards; [leave-balance-engine.js](../leave-balance-engine.js) owns its counting and quota rules. See [LEAVE-BALANCES.md](LEAVE-BALANCES.md).
 
 ## Main page and coordination
 

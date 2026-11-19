@@ -1,5 +1,19 @@
 # Annual leave and MC balances
 
+## Earned and utilized TOIL
+
+Open **Settings → Work setup → TOIL earned & utilized**, or use **TOIL earned & utilized** in Schedule's leave-balance panel. Select a year and an existing custom TOIL/replacement leave type, or create a new TOIL type with your first saved entry. AL and MC cannot be converted to TOIL. Opening the ledger and editing previews do not save account records.
+
+Add **Earned TOIL** entries with a date, amount and optional reference/notes. Enter days directly, or choose hours and specify the working hours in a day: 3 hours ÷ 8 = 0.375 day. Fractions retain six decimal places. Add **Utilized outside Schedule** only for time not already recorded as a TOIL leave booking. Entries can be edited and deleted. The earlier leave-type **Date earned** field remains informational and does not create a credit.
+
+TOIL cards show **Earned**, **Utilized**, **Reserved**, and **days available**. The calculation is **earned − utilized − reserved = available**. Approved TOIL bookings dated today or earlier count as utilized. Other bookings reserve days, including future approved leave and requests awaiting approval. Editing or deleting a booking recalculates usage; time fragments count once. Future-dated earned entries become available on their date, while future-dated outside-Schedule usage remains reserved until its date. Scheduled weekend work is still highlighted separately and does not automatically create earned credits.
+
+Existing allowance and earlier-usage figures on a linked custom type become its **opening earned** and **opening utilized** totals. Manage those in Leave allowances & balances; keep dated ledger entries and Schedule usage out of the opening totals to avoid double counting. Each year remains separate. Carry over days explicitly as an opening balance or earned entry. Correcting historical credits can show a negative balance without deleting bookings; new or increased leave reservations cannot exceed the available earned TOIL.
+
+TOIL uses the existing account document: custom types have `toil: true`, and dated `{id, date, kind, days, note}` entries are kept in each yearly policy's `toilEntries` array. No new database tables or permissions are required. Account saves, JSON backups, reloads and conservative conflict merging preserve the history. Independent dated entries merge by ID; stale editors and wrong-account saves are rejected. TOIL follows the same per-type weekdays, public holidays and hourly leave rules as other leave.
+
+## Yearly leave allowances
+
 Open **Settings → Work setup → Leave allowances & balances** (or search Settings for “leave”). Choose a calendar year, then maintain the allowance and **Already taken outside Schedule** for AL and MC separately. Leave the allowance blank until it is known; **0** means no allowance. Half-day steps are supported.
 
 For a tracker started in October, enter the days already taken in earlier months in **Already taken outside Schedule**. For example, an AL allowance of 12 and earlier usage of 10 leaves 2 days before scheduled leave. Do not include days already represented in Schedule. You can revise this total later without creating historical bookings. Save each year before using **Open year** to switch years. Settings do not copy entitlements into a new year automatically.
