@@ -8223,6 +8223,7 @@ document.addEventListener('change', event => {
     if (!sent) date.value = '';
     else if (!date.value) date.value = today();
   }
+  hub?.leaveBalances?.updateRange(f);
 });
 function setBookingEnd(form, value) {
   form.elements.namedItem('endTime').value = value;

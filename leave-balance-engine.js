@@ -1,6 +1,6 @@
 /**
  * Yearly AL / MC allowances and Schedule reservations. Pure rules; no account writes.
- * Days use integer half-day units. Settings live in workhub.leaveBalances, keyed by year.
+ * Preset days and hourly absences share yearly balances in workhub.leaveBalances.
  * Existing bookings are counted without rewriting their saved hours or approval details.
  */
 (function (root) {
@@ -29,6 +29,23 @@
   const validYear = year => typeof year === 'string' && /^(19\d{2}|[2-9]\d{3})$/.test(year);
   const validDays = n =>
     typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 366 && Number.isInteger(n * 2);
+  const roundDays = n => Math.round(n * 1000000) / 1000000;
+  const validWorkday = n =>
+    typeof n === 'number' && Number.isFinite(n) && n >= 1 && n <= 24 && Number.isInteger(n * 4);
+  function clockMinutes(value, end = false) {
+    if (end && value === '24:00') return 1440;
+    if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value || '')) return NaN;
+    return Number(value.slice(0, 2)) * 60 + Number(value.slice(3));
+  }
+  function hourlyDays(start, end, hoursPerDay) {
+    const from = clockMinutes(start),
+      to = clockMinutes(end, true);
+    if (!validWorkday(hoursPerDay))
+      throw Error('Enter 1–24 working hours per day, in quarter-hour steps.');
+    if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from)
+      throw Error('Choose a start time and a later end time for hourly leave.');
+    return roundDays(Math.min(1, (to - from) / (hoursPerDay * 60)));
+  }
   function defaults(year, d) {
     return {
       id: year,
@@ -129,13 +146,24 @@
           );
       }
     }
-    for (const s of d.schedule || [])
-      if (
-        isKind(s.kind) &&
-        s.leave?.daysPerDate !== undefined &&
-        ![0.5, 1].includes(s.leave.daysPerDate)
-      )
+    const hourlyBookings = new Map();
+    for (const s of d.schedule || []) {
+      if (!isKind(s.kind)) continue;
+      const p = s.leave || {};
+      if (p.chargeMode !== undefined && !['days', 'hours'].includes(p.chargeMode))
+        throw Error('Choose days or selected hours for the leave balance.');
+      if (p.chargeMode === 'hours') {
+        if (p.portion !== 'custom' || p.daysPerDate !== undefined || !validWorkday(p.hoursPerDay))
+          throw Error('Hourly leave needs custom hours and a valid working-day length.');
+        hourlyDays(s.time, s.endTime, p.hoursPerDay);
+      } else if (p.daysPerDate !== undefined && ![0.5, 1].includes(p.daysPerDate))
         throw Error('Custom leave must charge either 0.5 or 1 day per date.');
+      const key = s.kind + '|' + (s.bookingId || s.planId || s.date),
+        mode = p.chargeMode === 'hours' ? 'hours:' + p.hoursPerDay : 'days';
+      if (hourlyBookings.has(key) && hourlyBookings.get(key) !== mode)
+        throw Error('Use the same leave calculation throughout a booking.');
+      hourlyBookings.set(key, mode);
+    }
     for (const s of d.schedule || [])
       if (isKind(s.kind) && !type(d, s.kind))
         throw Error(
@@ -176,12 +204,31 @@
         '|' +
         (row.bookingId || row.planId || 'legacy-' + (row.leave?.portion || 'full'));
       const current = groups.get(key);
-      if (!current || current.units < units(row))
+      if (row.leave?.chargeMode === 'hours') {
+        const group = current || {
+          date: row.date,
+          units: 0,
+          intervals: [],
+          hoursPerDay: row.leave.hoursPerDay,
+        };
+        group.intervals.push([clockMinutes(row.time), clockMinutes(row.endTime, true)]);
+        groups.set(key, group);
+      } else if (!current || current.units < units(row))
         groups.set(key, { date: row.date, units: units(row) });
     }
-    for (const row of groups.values())
+    for (const row of groups.values()) {
+      if (row.intervals) {
+        let minutes = 0,
+          end = -1;
+        for (const [start, finish] of row.intervals.sort((a, b) => a[0] - b[0])) {
+          minutes += Math.max(0, finish - Math.max(start, end));
+          end = Math.max(end, finish);
+        }
+        row.units = 2 * Math.min(1, minutes / (row.hoursPerDay * 60));
+      }
       dates.set(row.date, Math.min(2, (dates.get(row.date) || 0) + row.units));
-    return [...dates.values()].reduce((sum, n) => sum + n, 0) / 2;
+    }
+    return roundDays([...dates.values()].reduce((sum, n) => sum + n, 0) / 2);
   }
   function balance(d, year, kind) {
     const p = policy(d, year, kind),
@@ -191,7 +238,7 @@
       kind,
       ...p,
       scheduled: booked,
-      remaining: p.allowance === null ? null : p.allowance - p.openingUsed - booked,
+      remaining: p.allowance === null ? null : roundDays(p.allowance - p.openingUsed - booked),
     };
   }
   function dates(start, end) {
@@ -240,7 +287,7 @@
         return {
           ...after,
           beforeRemaining: before.remaining,
-          requested: after.scheduled - before.scheduled,
+          requested: roundDays(after.scheduled - before.scheduled),
         };
       }),
     };
@@ -270,6 +317,7 @@
     validate,
     validYear,
     policy,
+    hourlyDays,
     balance,
     scheduled,
     dates,

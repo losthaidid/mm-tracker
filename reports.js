@@ -515,6 +515,9 @@
                 s.title || linked,
                 s.text,
                 s.leave.contact ? 'Cover: ' + s.leave.contact : '',
+                s.leave.chargeMode === 'hours'
+                  ? 'Hourly leave · ' + s.leave.hoursPerDay + ' working hours = 1 day'
+                  : '',
                 s.kind === 'medical-leave'
                   ? s.leave.mcSubmitted
                     ? 'MC submitted to HR: ' + s.leave.mcSubmittedDate
