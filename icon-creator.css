@@ -1,0 +1,229 @@
+.ic-room {
+  width: min(1280px, calc(100vw - 24px));
+  max-width: none;
+  max-height: 94dvh;
+  padding: 0;
+  border: 1px solid var(--hub-border);
+  border-radius: 20px;
+  background: var(--hub-surface);
+  color: var(--hub-text);
+  overflow: auto;
+}
+.ic-room::backdrop {
+  background: #152132a8;
+}
+.ic-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--hub-surface-soft);
+  color: var(--hub-text);
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 20px;
+  padding: 22px 26px;
+  border-bottom: 1px solid var(--hub-border);
+}
+.ic-header h2 {
+  margin: 5px 0;
+  font-size: 1.7rem;
+}
+.ic-header p {
+  margin: 0;
+  color: var(--hub-muted);
+}
+.ic-layout {
+  display: grid;
+  grid-template-columns: 230px minmax(250px, 1fr) 210px;
+  gap: 22px;
+  padding: 22px;
+  align-items: start;
+}
+.ic-controls {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  max-height: calc(94dvh - 150px);
+  overflow-y: auto;
+  padding-right: 6px;
+  scrollbar-width: thin;
+}
+.ic-controls label,
+.ic-controls details {
+  display: grid;
+  gap: 7px;
+  font-size: 0.9rem;
+}
+.ic-controls details {
+  padding: 12px;
+  border: 1px solid var(--hub-border);
+  border-radius: 12px;
+}
+.ic-controls details > label {
+  margin-top: 12px;
+}
+.ic-controls summary {
+  cursor: pointer;
+  font-weight: 650;
+}
+.ic-controls :is(input, select) {
+  width: 100%;
+  min-width: 0;
+}
+.ic-controls input[type='color'] {
+  min-height: 38px;
+}
+.ic-controls output {
+  color: var(--hub-muted);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+.ic-tools,
+.ic-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 14px;
+}
+.ic-tools label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.875rem;
+}
+.ic-tools input {
+  width: 75px;
+}
+.ic-room button {
+  background: var(--hub-surface-soft);
+  color: var(--hub-text);
+  border: 1px solid var(--hub-border);
+  min-height: 44px;
+  font: inherit;
+  font-size: 0.875rem;
+  border-radius: 9px;
+}
+.ic-room button.primary {
+  background: var(--hub-accent);
+  color: var(--hub-on-accent);
+  border-color: var(--hub-accent);
+}
+.ic-room :is(input, select) {
+  background: var(--hub-surface);
+  color: var(--hub-text);
+  border-color: var(--hub-border);
+}
+.ic-tools button[aria-pressed='true'] {
+  background: var(--hub-accent);
+  color: var(--hub-on-accent);
+}
+.ic-canvas-wrap {
+  width: min(100%, 512px, 52dvh);
+  margin: 0 auto 16px;
+  border: 1px solid var(--hub-border);
+  border-radius: 14px;
+  overflow: hidden;
+  background-color: #fff;
+  background-image: conic-gradient(#dfe5eb 25%, transparent 0 50%, #dfe5eb 0 75%, transparent 0);
+  background-size: 20px 20px;
+}
+#icCanvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  touch-action: none;
+  cursor: grab;
+}
+#icCanvas[data-tool='draw'] {
+  cursor: crosshair;
+}
+#icCanvas[data-tool='erase'] {
+  cursor: cell;
+}
+.ic-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.55;
+  color: var(--hub-muted);
+}
+.ic-previews {
+  display: grid;
+  gap: 15px;
+}
+.ic-previews h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.ic-previews p {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--hub-muted);
+}
+.ic-site-preview,
+.ic-tab-preview,
+.ic-tiny-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px;
+  border: 1px solid var(--hub-border);
+  border-radius: 12px;
+  background: var(--hub-surface-soft);
+  font-size: 0.875rem;
+}
+.ic-site-preview canvas {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+}
+.ic-tab-preview canvas {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+.ic-tiny-preview canvas {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+#icStatus[data-error='true'] {
+  color: var(--hub-danger);
+}
+body.hub-private #iconCreatorRoom {
+  filter: blur(12px);
+}
+@media (max-width: 1000px) {
+  .ic-layout {
+    grid-template-columns: 210px minmax(0, 1fr);
+  }
+  .ic-previews {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .ic-previews > :is(h3, p) {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 650px) {
+  .ic-layout {
+    grid-template-columns: 1fr;
+    padding: 16px;
+    gap: 20px;
+  }
+  .ic-work {
+    grid-row: 1;
+  }
+  .ic-controls {
+    grid-row: 2;
+    max-height: none;
+    overflow: visible;
+  }
+  .ic-previews {
+    grid-template-columns: 1fr;
+  }
+  .ic-header {
+    padding: 18px;
+  }
+}

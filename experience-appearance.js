@@ -56,7 +56,7 @@
       .map(([v, l]) => `<option value="${v}"${v === b.mode ? ' selected' : ''}>${l}</option>`)
       .join(
         ''
-      )}</select></label><label>Initials · 1–3 characters<input name="brandInitials" maxlength="6" value="${esc(b.initials)}"></label></div><input type="hidden" name="brandImage" value="${esc(b.image)}"><div class="actions"><button type="button" data-ea="logo">Choose logo</button><button type="button" data-ea="remove-logo">Remove logo</button></div><p class="hub-meta">PNG, JPG or WebP · up to 10 MB. A small square copy is saved; the original stays on your device.</p><input hidden type="file" id="eaLogoFile" accept="image/png,image/jpeg,image/webp"><label>Loading screen<select name="loadingStyle">${[
+      )}</select></label><label>Initials · 1–3 characters<input name="brandInitials" maxlength="6" value="${esc(b.initials)}"></label></div><input type="hidden" name="brandImage" value="${esc(b.image)}"><div class="actions"><button type="button" data-ea="logo">Choose logo</button><button type="button" data-ic="open">Open Icon Creator</button><button type="button" data-ea="remove-logo">Remove logo</button></div><p class="hub-meta">PNG, JPG or WebP · up to 10 MB. A small square copy is saved; the original stays on your device.</p><input hidden type="file" id="eaLogoFile" accept="image/png,image/jpeg,image/webp"><label>Loading screen<select name="loadingStyle">${[
       ['minimal', 'Minimal · clean and quiet'],
       ['illustrated', 'Illustrated · still artwork'],
       ['animated', 'Animated · moving artwork'],
