@@ -1483,6 +1483,47 @@ test('dashboard selection, sizing and reordering persist as compact settings',as
  const {api,document}=await app(t);await hubAction(api,'widget-size',{id:'tasks'});await hubAction(api,'widget-up',{id:'tasks'});assert.equal(api.state().workhub.widgets[0].id,'tasks');assert.equal(api.state().workhub.widgets[0].span,'wide');await hubAction(api,'layout');const form=document.getElementById('hubLayout');form.querySelector('[value="desk"]').checked=false;assert.equal(form.querySelector('[value="focus"]'),null);form.querySelector('[value="knowledge"]').checked=true;api.hub.submit(form);await settle();assert.ok(!api.state().workhub.widgets.some(w=>w.id==='desk'));assert.ok(api.state().workhub.widgets.some(w=>w.id==='knowledge'));
 });
 
+test('Pattern sets: both 20-set galleries preview coordinated colours and type without saves, and discard restores the account',async t=>{
+ const {api,document,window,db}=await app(t);api.hub.setTool('theme');api.showTab('studio');
+ const before=copy(api.state()),calls=db.calls.length,form=document.getElementById('hubTheme'),c=window.WorkHubPatternCollection;
+ assert.equal(document.querySelectorAll('[data-pattern-group="anime"] [data-hub="pattern-set"]').length,20);
+ assert.equal(document.querySelectorAll('[data-pattern-group="cartoon"] [data-hub="pattern-set"]').length,20);
+ document.querySelector('[data-hub="pattern-set"][data-id="naruto-clouds"]').click();
+ const set=c.SETS.find(x=>x.id==='naruto-clouds');
+ assert.equal(document.body.dataset.hubPatternSet,set.id);assert.equal(document.body.dataset.hubTheme,'custom');assert.equal(document.documentElement.style.getPropertyValue('--hub-bg'),set.colors.page);assert.equal(form.elements.font.value,set.font);assert.ok(document.body.hasAttribute('data-hub-pattern-typography'));
+ for(const [name,value]of [['patternStrength','95'],['patternScale','160']]){const field=form.elements.namedItem(name);field.value=value;field.dispatchEvent(new window.Event('input',{bubbles:true}));}
+ assert.equal(document.getElementById('pcStrengthValue').textContent,'95%');assert.equal(document.getElementById('pcScaleValue').textContent,'160%');assert.equal(document.body.style.getPropertyValue('--pc-size'),'448px 352px');
+ assert.match(decodeURIComponent(document.body.style.getPropertyValue('--pc-image')),/opacity="0.95"/);
+ document.querySelector('[data-hub="pattern-group"][data-group="cartoon"]').click();assert.equal(document.querySelector('[data-pattern-group="anime"]').hidden,true);assert.equal(document.querySelector('[data-pattern-group="cartoon"]').hidden,false);
+ document.querySelector('[data-hub="pattern-set"][data-id="spongebob-bottom"]').click();assert.equal(document.body.dataset.hubPatternSet,'spongebob-bottom');assert.equal(document.querySelectorAll('[data-hub="pattern-set"][aria-pressed="true"]').length,1);assert.equal(document.getElementById('hubTheme'),form);
+ form.elements.patternTypography.checked=false;form.elements.patternTypography.dispatchEvent(new window.Event('change',{bubbles:true}));assert.equal(document.body.hasAttribute('data-hub-pattern-typography'),false);
+ assert.equal(db.calls.length,calls);assert.deepEqual(copy(api.state()),before);
+ document.querySelector('[data-hub="theme-reset-preview"]').click();await settle();assert.equal(document.body.hasAttribute('data-hub-pattern-set'),false);assert.equal(document.body.style.getPropertyValue('--pc-image'),'');assert.deepEqual(copy(api.state()),before);assert.equal(document.body.dataset.hubTheme,before.workhub.preferences.theme);assert.equal(db.calls.length,calls);
+});
+
+test('Pattern sets: a saved set persists once, survives cloud reopen and backup, and validates imported preferences',async t=>{
+ const {api,document,window,db}=await app(t);api.hub.setTool('theme');api.showTab('studio');
+ document.querySelector('[data-hub="pattern-group"][data-group="cartoon"]').click();document.querySelector('[data-hub="pattern-set"][data-id="avatar-elements"]').click();
+ let form=document.getElementById('hubTheme');form.elements.patternStrength.value='85';form.elements.patternScale.value='130';form.elements.patternStrength.dispatchEvent(new window.Event('input',{bubbles:true}));
+ const before=db.calls.length;api.hub.submit(form);await settle();assert.equal(db.calls.length,before+1);
+ const p=copy(api.state().workhub.preferences);assert.equal(p.patternSet,'avatar-elements');assert.equal(p.patternStrength,85);assert.equal(p.patternScale,130);assert.equal(p.patternTypography,true);assert.equal(db.row.document.data.workhub.preferences.patternSet,p.patternSet);
+ assert.equal(api.parseBackup(api.payload(api.state())).workhub.preferences.patternSet,p.patternSet);assert.ok(JSON.stringify(p).length<12000);assert.doesNotMatch(JSON.stringify(p),/data:image\/svg|<svg/);
+ api.showTab('tasks');assert.equal(document.body.dataset.hubPatternSet,p.patternSet);api.showTab('studio');assert.equal(document.getElementById('hubTheme').elements.patternSet.value,p.patternSet);assert.equal(db.calls.length,before+1);
+ const reopened=await app(t,{remote:copy(db.row),login:false});await reopened.api.loadCloud(sessionUser);await settle();assert.equal(reopened.document.body.dataset.hubPatternSet,p.patternSet);assert.equal(reopened.api.state().workhub.preferences.patternScale,130);assert.equal(reopened.db.calls.length,0);
+ const imported={...p,patternSet:'sailor-moon-prism',patternStrength:60,patternScale:110,patternTypography:false};await api.hub.importTheme({size:2000,text:async()=>JSON.stringify({app:'mm-tracker-theme',version:1,preferences:imported})});await settle();assert.equal(document.body.dataset.hubPatternSet,'sailor-moon-prism');assert.equal(document.body.hasAttribute('data-hub-pattern-typography'),false);
+ const writes=db.calls.length;for(const bad of [{patternSet:'external-svg'},{patternStrength:999},{patternScale:0},{patternTypography:'yes'}])await assert.rejects(api.hub.importTheme({size:2000,text:async()=>JSON.stringify({app:'mm-tracker-theme',version:1,preferences:{...p,...bad}})}),/pattern collection/);
+ assert.equal(db.calls.length,writes);assert.equal(api.state().workhub.preferences.patternSet,'sailor-moon-prism');
+ await api.loadCloud(null);assert.equal(document.body.hasAttribute('data-hub-pattern-set'),false);assert.equal(document.body.style.getPropertyValue('--pc-image'),'');
+});
+
+test('Pattern sets: original backgrounds and typography remain selectable after a collection preview',async t=>{
+ const {api,document,window,db}=await app(t);api.hub.setTool('theme');api.showTab('studio');const form=document.getElementById('hubTheme'),calls=db.calls.length;
+ const choose=()=>document.querySelector('[data-hub="pattern-set"][data-id="evangelion-grid"]').click();choose();
+ form.elements.background.value='petals';form.elements.background.dispatchEvent(new window.Event('change',{bubbles:true}));assert.equal(form.elements.patternSet.value,'');assert.equal(document.body.hasAttribute('data-hub-pattern-set'),false);assert.equal(document.body.dataset.hubBackground,'petals');
+ choose();form.elements.font.value='serif';form.elements.font.dispatchEvent(new window.Event('change',{bubbles:true}));assert.equal(form.elements.patternTypography.checked,false);assert.equal(document.body.hasAttribute('data-hub-pattern-typography'),false);assert.equal(document.documentElement.style.getPropertyValue('--hub-font'),'Georgia,serif');
+ document.querySelector('[data-hub="pattern-clear"]').click();assert.equal(document.body.hasAttribute('data-hub-pattern-set'),false);assert.equal(document.body.style.getPropertyValue('--pc-image'),'');assert.equal(db.calls.length,calls);
+});
+
 test('theme preview stays local until saved and imported settings are validated',async t=>{
  const {api,document,window,db}=await app(t);api.hub.setTool('theme');api.showTab('studio');const form=document.getElementById('hubTheme');fill(form,{theme:'dark',name:'Haidid',radius:'24',motion:'off'});form.elements.namedItem('theme').dispatchEvent(new window.Event('input',{bubbles:true}));assert.equal(document.body.dataset.hubTheme,'dark');assert.equal(api.state().workhub.preferences.theme,'ocean');assert.equal(db.calls.length,0);api.hub.submit(form);await settle();assert.equal(api.state().workhub.preferences.name,'Haidid');assert.equal(api.state().workhub.preferences.motion,'off');await assert.rejects(api.hub.importTheme({size:10,text:async()=>JSON.stringify({app:'mm-tracker-theme',version:1,preferences:{accent:'url(javascript:bad)'}})}),/theme settings/);
 });

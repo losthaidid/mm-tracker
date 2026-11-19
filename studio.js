@@ -470,6 +470,7 @@
       dataValue(document.body, 'motion', p.motion);
       dataValue(document.body, 'density', p.density);
       dataValue(document.body, 'hubBackground', p.background);
+      root.WorkHubPatternCollection?.apply(a.cloud().ready ? p : {});
       styleValue(document.documentElement, '--hub-radius', p.radius + 'px');
       styleValue(
         document.documentElement,
@@ -1845,7 +1846,7 @@
           ]),
           ['custom', 'Custom colours', p.accent],
         ];
-      return `<div class="hub-theme-layout"><section class="hub-card hub-theme-controls"><div class="flex-title"><div><span class="hub-kicker">MAKE YOURSELF AT HOME</span><h3>Your space, your style</h3><p>Try a look, then save it to your account.</p></div><div class="actions">${btn('theme-export', 'Export')}${btn('theme-import', 'Import')}</div></div><form id="hubTheme">${root.WorkHubWebsiteDesigns?.launcher(p) || ''}${root.WorkHubExperienceAppearance?.fields(p) || ''}<section class="hub-theme-section"><h4>Choose your colours</h4><input type="hidden" name="theme" value="${esc(p.theme)}"><div class="hub-palette-options" role="group" aria-label="Workspace colour palette">${palettes.map(([id, name, color]) => btn('theme-choice', '<span class="hub-palette-swatch" style="--palette:' + color + '"></span><span>' + name + '</span>', 'data-theme-choice="' + id + '" aria-pressed="' + (id === p.theme) + '"', 'hub-palette-choice')).join('')}</div><div class="form-grid">${field('accent', 'Your custom colour', p.accent, 'color')}${select('background', 'Page background', root.WorkHubAppearance.BACKGROUNDS, p.background, 'Choose background')}</div>${root.WorkHubAppearance.fields(p)}<div class="actions"><button type="button" data-photo="open">My background pictures</button></div></section><section class="hub-theme-section"><h4>Text & layout</h4><div class="form-grid">${select(
+      return `<div class="hub-theme-layout"><section class="hub-card hub-theme-controls"><div class="flex-title"><div><span class="hub-kicker">MAKE YOURSELF AT HOME</span><h3>Your space, your style</h3><p>Try a look, then save it to your account.</p></div><div class="actions">${btn('theme-export', 'Export')}${btn('theme-import', 'Import')}</div></div><form id="hubTheme">${root.WorkHubWebsiteDesigns?.launcher(p) || ''}${root.WorkHubPatternCollection?.fields(p) || ''}${root.WorkHubExperienceAppearance?.fields(p) || ''}<section class="hub-theme-section"><h4>Choose your colours</h4><input type="hidden" name="theme" value="${esc(p.theme)}"><div class="hub-palette-options" role="group" aria-label="Workspace colour palette">${palettes.map(([id, name, color]) => btn('theme-choice', '<span class="hub-palette-swatch" style="--palette:' + color + '"></span><span>' + name + '</span>', 'data-theme-choice="' + id + '" aria-pressed="' + (id === p.theme) + '"', 'hub-palette-choice')).join('')}</div><div class="form-grid">${field('accent', 'Your custom colour', p.accent, 'color')}${select('background', 'Page background', root.WorkHubAppearance.BACKGROUNDS, p.background, 'Choose background')}</div>${root.WorkHubAppearance.fields(p)}<div class="actions"><button type="button" data-photo="open">My background pictures</button></div></section><section class="hub-theme-section"><h4>Text & layout</h4><div class="form-grid">${select(
         'font',
         'Typography',
         [
@@ -1923,6 +1924,7 @@
       themePreview = p;
       applyTheme(p);
       syncThemePalette(form, p);
+      root.WorkHubPatternCollection?.sync(form, p);
       if ($('hubThemeStatus')) {
         $('hubThemeStatus').textContent = 'Preview only · save to keep this look.';
         $('hubThemeStatus').dataset.saved = 'false';
@@ -3263,6 +3265,7 @@
         ...Object.fromEntries(new FormData(form)),
         ...root.WorkHubAppearance.values(form, prefs()),
         ...root.WorkHubExperienceAppearance.values(form, prefs()),
+        ...root.WorkHubPatternCollection?.values(form, prefs()),
         design: prefs().design,
       };
       for (const k of Object.keys(v))
@@ -3593,6 +3596,19 @@
       if (action === 'theme-choice') {
         const form = $('hubTheme');
         form.elements.namedItem('theme').value = el.dataset.themeChoice;
+        previewTheme(form);
+        return;
+      }
+      if (action === 'pattern-group') {
+        const form = $('hubTheme');
+        if (form) root.WorkHubPatternCollection?.showGroup(form, el.dataset.group);
+        return;
+      }
+      if (action === 'pattern-set' || action === 'pattern-clear') {
+        const form = $('hubTheme');
+        if (!form) return;
+        if (action === 'pattern-set') root.WorkHubPatternCollection.choose(form, id);
+        else form.elements.namedItem('patternSet').value = '';
         previewTheme(form);
         return;
       }
@@ -4219,7 +4235,13 @@
       try {
         if (['hubItemFeedbackTarget', 'hubTaskFeedbackTarget'].includes(el.id))
           refreshFeedbackHistory(el.form);
-        if (el.form?.id === 'hubTheme') previewTheme(el.form);
+        if (el.form?.id === 'hubTheme') {
+          if (el.name === 'background' && el.form.elements.namedItem('patternSet'))
+            el.form.elements.namedItem('patternSet').value = '';
+          if (el.name === 'font' && el.form.elements.namedItem('patternTypography'))
+            el.form.elements.namedItem('patternTypography').checked = false;
+          previewTheme(el.form);
+        }
         if (el.dataset.hubMove) moveTask(el.dataset.hubMove, el.value);
         if (el.id === 'hubProcess') {
           clearTimeout(walkTimer);
