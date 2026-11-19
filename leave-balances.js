@@ -24,7 +24,7 @@
     ];
   const icon = kind =>
     `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${kind === 'annual-leave' ? '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>' : kind === 'medical-leave' ? '<rect x="4" y="4" width="16" height="16" rx="5"/><path d="M12 8v8m-4-4h8"/>' : '<rect x="3" y="5" width="18" height="16" rx="4"/><path d="M7 3v4m10-4v4M3 10h18m-13 5h3"/>'}</svg>`;
-  function cards(d, year, actionable = false) {
+  function balanceCards(d, year, actionable = false, asOf) {
     return `<div class="leave-balance-cards">${E.types(d)
       .filter(
         t =>
@@ -35,7 +35,9 @@
       )
       .map(t => {
         const kind = t.id;
-        const b = E.balance(d, year, kind),
+        if (t.toil && root.WorkHubToil)
+          return root.WorkHubToil.card(d, year, kind, asOf, actionable);
+        const b = E.balance(d, year, kind, asOf),
           configured = b.allowance !== null,
           used = b.openingUsed + b.scheduled,
           state = !configured
@@ -69,6 +71,7 @@
   }
   function install(a) {
     const $ = id => document.getElementById(id);
+    const cards = (d, year, actionable = false) => balanceCards(d, year, actionable, a.today());
     let owner = '',
       editingOwner = '',
       editingSnapshot = '',
@@ -192,6 +195,7 @@
       if (typeDraft.id && JSON.stringify(old) !== typeDraft.snapshot)
         throw Error('This leave type changed while the form was open. Reopen it before saving.');
       const row = {
+        ...(old?.toil ? { toil: true } : {}),
         id:
           old?.id ||
           'leave-' +
@@ -233,7 +237,7 @@
           .map(t => {
             const kind = t.id;
             const p = saved[kind];
-            return `<fieldset class="leave-allowance-type"><legend>${esc(label(kind, d))}${t.archived ? ' · archived' : ''}</legend><label for="${kind}-allowance">Yearly allowance (days)</label><input id="${kind}-allowance" name="${kind}-allowance" type="number" min="0" max="366" step="0.5" value="${p.allowance ?? ''}" placeholder="Not set"><label for="${kind}-used">Already taken outside Schedule (days)</label><input id="${kind}-used" name="${kind}-used" type="number" min="0" max="366" step="0.5" value="${p.openingUsed}" required><p class="hint">Enter leave taken in earlier months, or any leave not recorded in Schedule. Leave already in Schedule is counted automatically; do not include it again here.</p><span class="leave-days-label" id="${kind}-weekdays-label">Count leave on</span><div class="leave-weekdays" role="group" aria-labelledby="${kind}-weekdays-label">${DAYS.map(([day, name]) => `<label><input type="checkbox" name="${kind}-weekday" value="${day}"${p.weekdays.includes(day) ? ' checked' : ''}>${name}</label>`).join('')}</div><label class="check-label"><input type="checkbox" name="${kind}-holidays"${E.policy(d, year, kind).excludeHolidays ? ' checked' : ''}>Exclude maintained public holidays</label></fieldset>`;
+            return `<fieldset class="leave-allowance-type"><legend>${esc(label(kind, d))}${t.archived ? ' · archived' : ''}</legend><label for="${kind}-allowance">${t.toil ? 'Opening earned TOIL (days)' : 'Yearly allowance (days)'}</label><input id="${kind}-allowance" name="${kind}-allowance" type="number" min="0" max="366" step="0.5" value="${p.allowance ?? ''}" placeholder="Not set"><label for="${kind}-used">${t.toil ? 'Opening utilized TOIL (days)' : 'Already taken outside Schedule (days)'}</label><input id="${kind}-used" name="${kind}-used" type="number" min="0" max="366" step="0.5" value="${p.openingUsed}" required><p class="hint">${t.toil ? 'Opening totals are for history before the TOIL ledger. Do not include ledger entries or Schedule bookings again here. Add dated credits and outside-Schedule usage in TOIL earned & utilized.' : 'Enter leave taken in earlier months, or any leave not recorded in Schedule. Leave already in Schedule is counted automatically; do not include it again here.'}</p><span class="leave-days-label" id="${kind}-weekdays-label">Count leave on</span><div class="leave-weekdays" role="group" aria-labelledby="${kind}-weekdays-label">${DAYS.map(([day, name]) => `<label><input type="checkbox" name="${kind}-weekday" value="${day}"${p.weekdays.includes(day) ? ' checked' : ''}>${name}</label>`).join('')}</div><label class="check-label"><input type="checkbox" name="${kind}-holidays"${E.policy(d, year, kind).excludeHolidays ? ' checked' : ''}>Exclude maintained public holidays</label></fieldset>`;
           })
           .join(
             ''
@@ -257,6 +261,7 @@
           used = form.elements.namedItem(kind + '-used').value.trim();
         if (!used) throw Error('Enter the leave already used (0 if none).');
         row[kind] = {
+          ...E.policy(a.state(), year, kind),
           allowance: value === '' ? null : Number(value),
           openingUsed: Number(used),
           weekdays: [...form.querySelectorAll(`[name="${kind}-weekday"]:checked`)].map(el =>
@@ -359,14 +364,14 @@
             endTime: get('endTime'),
             leave,
           },
-          result = E.preview(a.state(), draft);
+          result = E.preview(a.state(), draft, a.today());
         form.querySelector('[data-leave-balance-years]').textContent = result.years.join(' / ');
         form.querySelector('[data-leave-range-current]').innerHTML = result.years
           .map(y => (result.years.length > 1 ? `<h4>${y}</h4>` : '') + cards(a.state(), y))
           .join('');
         let warning = '';
         try {
-          E.assertWithinBalance(a.state(), result.next);
+          E.assertWithinBalance(a.state(), result.next, a.today());
         } catch (error) {
           warning = error.message;
         }

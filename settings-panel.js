@@ -106,6 +106,11 @@
       'Add, rename or archive the leave types available in Schedule.',
       'leave types annual al medical mc sick unpaid compassionate emergency custom category',
     ],
+    toilSettingsButton: [
+      'work',
+      'Record TOIL earned and utilized; view reserved and available days.',
+      'toil time off in lieu replacement earned utilized utilised balance credits overtime',
+    ],
     recipientSettingsButton: [
       'work',
       'Company email lists, ready to copy.',

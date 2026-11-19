@@ -2411,7 +2411,7 @@ function saveRange(form) {
             : {}),
           ...(kind === 'custom' && oldBooking?.status ? { status: oldBooking.status } : {}),
         });
-    window.WorkHubLeaveBalancesEngine.assertWithinBalance(state, d);
+    window.WorkHubLeaveBalancesEngine.assertWithinBalance(state, d, today());
     d.calendarMonth = date.slice(0, 7);
   });
   month = state.calendarMonth;
@@ -10127,7 +10127,11 @@ function queueCloudReview(row, cache) {
       try {
         const document = { ...row.document, version: 9, data: result.data };
         parseBackup(JSON.stringify(document));
-        window.WorkHubLeaveBalancesEngine.assertWithinBalance(row.document.data, document.data);
+        window.WorkHubLeaveBalancesEngine.assertWithinBalance(
+          row.document.data,
+          document.data,
+          today()
+        );
         return {
           document,
           pending: MMTrackerMerge.sameRecords(document, row.document) ? null : document,

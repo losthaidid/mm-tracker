@@ -1,4 +1,75 @@
 /* Maintained leave types, balances and Schedule previews. */
+.toil-ledger > p {
+  max-width: 76ch;
+}
+.toil-context {
+  display: grid;
+  grid-template-columns: minmax(7rem, 0.5fr) minmax(12rem, 2fr) auto;
+  gap: 12px;
+  align-items: end;
+  margin: 20px 0 12px;
+}
+.toil-context label,
+.toil-entry-form label {
+  display: grid;
+  gap: 6px;
+}
+.toil-ledger .toil-balance-card {
+  margin: 18px 0;
+}
+.toil-balance-card {
+  --leave-soft: var(--hub-blue-soft);
+}
+.toil-balance-card h3 {
+  margin: 4px 0;
+}
+.toil-entry-form {
+  border-block: 1px solid var(--hub-border, var(--line));
+  padding: 18px 0;
+  margin: 20px 0;
+}
+.toil-setup-note {
+  padding: 16px;
+  background: var(--hub-surface-soft);
+  border-radius: 12px;
+}
+.toil-table-wrap {
+  overflow-x: auto;
+}
+.toil-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.toil-table th,
+.toil-table td {
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--hub-border, var(--line));
+  vertical-align: top;
+}
+.toil-table th {
+  color: var(--hub-muted);
+}
+.toil-note {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  min-width: 12rem;
+  max-width: 32rem;
+}
+.toil-table .actions {
+  flex-wrap: nowrap;
+}
+@media (max-width: 600px) {
+  .toil-context {
+    grid-template-columns: 1fr;
+  }
+  .toil-entry-form .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .toil-entry-form .wide {
+    grid-column: auto;
+  }
+}
 body .workspace-v10 .panel.leave-schedule-balances {
   padding: 24px;
   background: linear-gradient(

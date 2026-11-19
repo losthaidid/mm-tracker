@@ -3252,6 +3252,48 @@ async function maintainLeave(ctx, year='2026', annual=12, used=10, medical=14, m
  fill(f,{'annual-leave-allowance':String(annual),'annual-leave-used':String(used),'medical-leave-allowance':String(medical),'medical-leave-used':String(mcUsed)});
  api.hub.leaveBalances.saveSettings(f); await settle(); return f;
 }
+async function addToil(ctx,{kind,amount='2',unit='days',date='2026-10-17',entryKind='earned',note='Weekend support'}={}){
+ ctx.api.hub.toil.open('2026',kind);const form=ctx.document.getElementById('toilEntryForm');fill(form,{date,kind:entryKind,amount,unit,hoursPerDay:'8',note});ctx.api.hub.toil.save(form);await settle();return ctx.api.state().workhub.leaveTypes.find(row=>row.toil).id;
+}
+test('TOIL ledger: searchable Settings creates a TOIL type, converts hours and saves through cloud, backup and reload',async t=>{
+ const ctx=await app(t),{api,document,window,db}=ctx,button=document.getElementById('toilSettingsButton');assert.ok(button.closest('#settingsGroup-work'));
+ document.getElementById('settingsSearch').value='toil earned';document.getElementById('settingsSearch').dispatchEvent(new window.Event('input',{bubbles:true}));assert.equal(button.closest('.settings-entry').hidden,false);
+ api.hub.toil.open('2026');const form=document.getElementById('toilEntryForm'),calls=db.calls.length;fill(form,{date:'2026-10-17',amount:'16',unit:'hours',hoursPerDay:'8',note:'Support <img src=x>'});form.elements.unit.dispatchEvent(new window.Event('change',{bubbles:true}));assert.match(document.getElementById('toilEntryPreview').textContent,/2 day/);assert.equal(db.calls.length,calls);api.hub.toil.save(form);await settle();
+ const type=api.state().workhub.leaveTypes.find(row=>row.toil),year=api.state().workhub.leaveBalances.find(row=>row.id==='2026');assert.ok(type);assert.equal(year[type.id].toilEntries[0].days,2);assert.equal(document.querySelector('#toilLedger img'),null);assert.match(document.getElementById('toilLedger').textContent,/Support <img src=x>/);assert.throws(()=>api.hub.toil.save(form),/Reopen the TOIL ledger/);assert.equal(db.calls.length,calls+1);
+ const backup=api.parseBackup(api.payload(api.state()));assert.deepEqual(copy(backup.workhub.leaveBalances),copy(api.state().workhub.leaveBalances));api.closeModal();api.setMonth('2026-10');api.showTab('schedule');assert.equal(document.querySelector('[data-leave-kind="'+type.id+'"] [data-toil-value="earned"]').textContent,'2');assert.equal(document.querySelector('[data-leave-kind="'+type.id+'"] [data-toil-value="utilized"]').textContent,'0');
+ const restored=await app(t,{remote:copy(db.row),login:false});await restored.api.loadCloud(sessionUser);assert.equal(restored.window.WorkHubLeaveBalancesEngine.balance(restored.api.state(),'2026',type.id,'2026-11-20').remaining,2);assert.equal(restored.api.state().workhub.leaveTypes.find(row=>row.id===type.id).toil,true);
+});
+test('TOIL ledger: approved hourly leave is utilized once, planned leave is reserved and deletion releases usage',async t=>{
+ const ctx=await app(t),{api,document,window,db}=ctx,id=await addToil(ctx);api.closeModal();
+ let form=await leaveEditor(ctx,id,{date:'2026-10-20'});fill(form,{time:'15:00',endTime:'18:00',leavePortion:'custom',leaveChargeMode:'hours',leaveHoursPerDay:'8',leaveStatus:'Approved'});form.elements.leavePortion.dispatchEvent(new window.Event('change',{bubbles:true}));api.saveRange(form);await settle();
+ const E=window.WorkHubLeaveBalancesEngine;let b=E.balance(api.state(),'2026',id,'2026-11-20');assert.equal(b.utilized,.375);assert.equal(b.reserved,0);assert.equal(b.remaining,1.625);const booking=api.state().schedule[0].bookingId;
+ form=await leaveEditor(ctx,id,{date:'2026-10-21'});fill(form,{leavePortion:'morning',leaveStatus:'Planned'});form.elements.leavePortion.dispatchEvent(new window.Event('change',{bubbles:true}));api.saveRange(form);await settle();b=E.balance(api.state(),'2026',id,'2026-11-20');assert.equal(b.reserved,.5);assert.equal(b.remaining,1.125);
+ api.openRangeEditor('2026-10-20','15:00');form=document.getElementById('scheduleForm');fill(form,{leaveContact:'Handover'});api.saveRange(form);await settle();assert.equal(E.balance(api.state(),'2026',id,'2026-11-20').utilized,.375);
+ api.mutate(d=>d.schedule=d.schedule.filter(row=>row.bookingId!==booking));await settle();b=E.balance(api.state(),'2026',id,'2026-11-20');assert.equal(b.utilized,0);assert.equal(b.remaining,1.5);const calls=db.calls.length;
+ form=await leaveEditor(ctx,id,{date:'2026-10-26'});fill(form,{endDate:'2026-10-27'});assert.throws(()=>api.saveRange(form),/only 1.5 day/);assert.equal(db.calls.length,calls);
+});
+test('TOIL ledger: dated utilized entries, edits and deletes update balances without rewriting Schedule',async t=>{
+ const ctx=await app(t),{api,document,window}=ctx,id=await addToil(ctx);await addToil(ctx,{kind:id,amount:'2',unit:'hours',entryKind:'utilized',date:'2026-10-18',note:'Before tracking'});const E=window.WorkHubLeaveBalancesEngine;assert.equal(E.balance(api.state(),'2026',id,'2026-11-20').remaining,1.75);
+ const entries=api.state().workhub.leaveBalances[0][id].toilEntries,credit=entries.find(row=>row.kind==='earned'),used=entries.find(row=>row.kind==='utilized'),schedule=copy(api.state().schedule);
+ document.querySelector('[data-toil="edit"][data-id="'+credit.id+'"]').click();let form=document.getElementById('toilEntryForm');fill(form,{amount:'1.5'});api.hub.toil.save(form);await settle();assert.equal(E.balance(api.state(),'2026',id,'2026-11-20').remaining,1.25);
+ api.hub.toil.remove(used.id);await settle();assert.equal(E.balance(api.state(),'2026',id,'2026-11-20').remaining,1.5);assert.deepEqual(copy(api.state().schedule),schedule);
+ form=document.getElementById('toilEntryForm');fill(form,{date:'2026-10-19',amount:'0'});assert.throws(()=>api.hub.toil.save(form),/positive TOIL/);fill(form,{amount:'1',date:'2027-01-01'});assert.throws(()=>api.hub.toil.save(form),/selected year/);
+});
+test('TOIL ledger: linking an existing type preserves opening totals, and allowance or type edits keep dated entries',async t=>{
+ const ctx=await app(t),{api,document,window}=ctx,id=await addLeaveType(ctx,'Replacement Leave','RL');api.hub.leaveBalances.settings('2026');let form=document.getElementById('leaveBalanceForm');fill(form,{[id+'-allowance']:'3',[id+'-used']:'1'});api.hub.leaveBalances.saveSettings(form);await settle();
+ await addToil(ctx,{kind:id,amount:'.25'});const E=window.WorkHubLeaveBalancesEngine;assert.equal(E.balance(api.state(),'2026',id,'2026-11-20').earned,3.25);assert.equal(E.balance(api.state(),'2026',id,'2026-11-20').utilized,1);const entries=copy(api.state().workhub.leaveBalances[0][id].toilEntries);
+ api.hub.leaveBalances.settings('2026',id);form=document.getElementById('leaveBalanceForm');assert.match(form.textContent,/Opening earned TOIL/);api.hub.leaveBalances.saveSettings(form);await settle();assert.deepEqual(copy(api.state().workhub.leaveBalances[0][id].toilEntries),entries);
+ api.hub.leaveBalances.editType(id);form=document.getElementById('leaveTypeForm');fill(form,{name:'Replacement time off'});api.hub.leaveBalances.saveType(form);await settle();assert.equal(api.state().workhub.leaveTypes.find(row=>row.id===id).toil,true);assert.equal(E.balance(api.state(),'2026',id,'2026-11-20').remaining,2.25);
+});
+test('TOIL ledger: stale and wrong-account forms cannot save, and opening views does not write',async t=>{
+ const ctx=await app(t),{api,document,db}=ctx,id=await addToil(ctx);let form=document.getElementById('toilEntryForm'),calls=db.calls.length;api.hub.toil.open('2026',id);assert.equal(db.calls.length,calls);form=document.getElementById('toilEntryForm');
+ api.mutate(d=>d.workhub.leaveBalances[0][id].toilEntries.push({id:'remote-credit',date:'2026-10-19',kind:'earned',days:.5,note:'Another change'}));await settle();calls=db.calls.length;assert.throws(()=>api.hub.toil.save(form),/changed while this form/);assert.equal(db.calls.length,calls);
+ api.hub.toil.open('2026',id);form=document.getElementById('toilEntryForm');api.cloud.user={id:'22222222-2222-4222-8222-222222222222'};api.showTab('schedule');assert.equal(document.getElementById('modal').open,false);assert.throws(()=>api.hub.toil.save(form),/current account/);assert.equal(db.calls.length,calls);
+});
+test('TOIL ledger: read-only access can inspect balances but cannot create, edit or delete entries',async t=>{
+ const ctx=await app(t),{api,document,window,db}=ctx,id=await addToil(ctx),entry=api.state().workhub.leaveBalances[0][id].toilEntries[0],stale=document.getElementById('toilEntryForm'),before=copy(api.state()),calls=db.calls.length;
+ db.access={...api.access.snapshot(),role:'member',version:2,permissions:window.WorkHubAccessCatalog.preset('view')};await api.access.load(api.cloud.user);assert.throws(()=>api.hub.toil.save(stale),/cannot create TOIL/);assert.throws(()=>api.hub.toil.remove(entry.id),/cannot delete TOIL/);api.hub.toil.open('2026',id);assert.equal(document.getElementById('toilEntryForm').querySelector('[type="submit"]').disabled,true);assert.equal(document.querySelector('[data-toil="edit"]').disabled,true);assert.equal(document.querySelector('[data-toil="delete"]').disabled,true);assert.equal(db.calls.length,calls);assert.deepEqual(copy(api.state()),before);
+});
 test('leave allowances: searchable Settings saves yearly AL and MC balances through cloud, backup and reload',async t=>{
  const ctx=await app(t),{api,document,db,window}=ctx;
  const button=document.getElementById('leaveBalanceSettingsButton'); assert.ok(button); assert.ok(button.closest('#settingsGroup-work'));
