@@ -184,10 +184,10 @@ body #modal .mmk-guide-lead select {
   font-size: 11px;
   font-weight: 700;
 }
-.mmk-card h3 {
+.mmk-card :is(h3, h5) {
   margin: 0;
 }
-body #view .mmk-card h3 button {
+body #view .mmk-card :is(h3, h5) button {
   display: flex;
   align-items: start;
   justify-content: space-between;
@@ -206,7 +206,7 @@ body #view .mmk-card h3 button {
   line-height: 1.35;
   text-align: start;
 }
-body #view .mmk-card h3 button:hover {
+body #view .mmk-card :is(h3, h5) button:hover {
   color: var(--mmk-edge);
 }
 .mmk-card-title {
@@ -410,7 +410,7 @@ body dialog.hub-drawer:has(.mmk-reader) {
   body #view .mmk-tabs button {
     min-height: 44px;
   }
-  body #view .mmk-card h3 button {
+  body #view .mmk-card :is(h3, h5) button {
     min-height: 44px;
   }
 }

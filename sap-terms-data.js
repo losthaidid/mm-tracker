@@ -1897,5 +1897,47 @@
     }
   );
 
-  root.WorkHubSapTermsData = Object.freeze({ entries, refs, example, line, posting, pair });
+  // Browse by the entry's main purpose; a key can also appear in other worked scenarios.
+  const categories = {
+    inventory: 'Inventory & stock adjustments',
+    consumption: 'Consumption & goods issues',
+    purchasing: 'Purchasing & delivery costs',
+    invoice: 'GR/IR & invoice differences',
+    subcontracting: 'Subcontracting',
+    consignment: 'Consignment & pipeline',
+    valuation: 'Price differences & Material Ledger',
+    production: 'Production & work in progress',
+    settlement: 'Agency business, rebates & tax',
+    localization: 'Country-specific valuation',
+    historical: 'Historical keys',
+  };
+  const categoryEntries = {
+    inventory: 'BSX AUM BSD UMD UMB BSK GBB/BSA GBB/INV GBB/ZOB',
+    consumption: 'GBB GBB/VAX GBB/VAY GBB/VBR GBB/VKA GBB/VKP GBB/VNG GBB/VQP GBB/VQY',
+    purchasing: 'KBS FR1 FR2 FR3 FR4 RUE UPF EIN EKG FRE RUA TM1',
+    invoice: 'WRX DIF KDM KDR RKA RAP',
+    subcontracting: 'BSV FRL FRN GBB/VBO',
+    consignment: 'KON AKO KON/blank KON/PIP',
+    valuation: 'PRD LKW PRY COC PRL PRG KDG PRC PRD/blank PRD/PRA PRD/PRF PRD/PRU',
+    production: 'WPM WPA PRM PRA PRK KTR GBB/AUA GBB/AUF GBB/AUI GBB/ZOF',
+    settlement: 'AG1 AG2 AG3 DEL BO1 BO2 BO3 VST',
+    localization: 'TXO WGB WGI WGR',
+    historical: 'PRP PRQ PRV KDV WRY',
+  };
+  const categoryById = new Map(
+    Object.entries(categoryEntries).flatMap(([category, codes]) =>
+      codes.split(' ').map(id => [id, category])
+    )
+  );
+  for (const entry of entries) entry.category = categoryById.get(entry.id);
+
+  root.WorkHubSapTermsData = Object.freeze({
+    entries,
+    categories,
+    refs,
+    example,
+    line,
+    posting,
+    pair,
+  });
 })(typeof window === 'undefined' ? globalThis : window);

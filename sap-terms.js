@@ -2,13 +2,13 @@
 (function (root) {
   'use strict';
 
-  const { entries, refs } = root.WorkHubSapTermsData;
+  const { entries, categories, refs } = root.WorkHubSapTermsData;
   const { groups, scenarios, byId: scenariosById } = root.WorkHubSapTransactionScenarios;
   const { editions, guides } = root.WorkHubMmKnowledgeData;
   const byId = new Map(entries.map(entry => [entry.id, entry]));
   const byGuide = new Map(guides.map(guide => [guide.id, guide]));
-  const kindLabels = { key: 'Transaction/event keys', modifier: 'Account groupings' };
-  const kinds = { key: 'Transaction/event key', modifier: 'Account grouping' };
+  const kindLabels = { key: 'Transaction/Event Keys', modifier: 'Account Modifiers' };
+  const kinds = { key: 'Transaction/event key', modifier: 'Account modifier' };
   const inEdition = (entry, edition) =>
     !edition || (edition === 'historical' ? entry.historical : entry.editions.includes(edition));
   const scenarioInEdition = (scenario, edition) => !edition || scenario.editions.includes(edition);
@@ -34,6 +34,7 @@
       [entry.id, 30],
       [entry.id.replace('/', ''), 30],
       [entry.title, 16],
+      [categories[entry.category], 3],
       ...entry.keywords.map(text => [text, 14]),
       [
         entry.kind === 'key'
@@ -54,7 +55,7 @@
       new Set(entries.filter(entry => scenario.codes.some(code => highlights(entry, code)))),
     ])
   );
-  function search(query = '', kind = '', edition = '', transaction = '') {
+  function search(query = '', kind = '', edition = '', transaction = '', category = '') {
     const scenario = scenariosById.get(transaction);
     if (transaction && (!scenario || !scenarioInEdition(scenario, edition))) return [];
     const matched = scenarioTerms.get(transaction);
@@ -69,6 +70,7 @@
       .flatMap(({ entry, fields }) => {
         if (
           (kind && entry.kind !== kind) ||
+          (category && entry.category !== category) ||
           !inEdition(entry, edition) ||
           (matched && !matched.has(entry))
         )
@@ -122,6 +124,7 @@
     const getReader = () => document.querySelector('#modal[open] .sapt-reader');
     let query = '',
       kind = '',
+      category = '',
       edition = '',
       transaction = '',
       playback = null,
@@ -162,26 +165,32 @@
         : badges(edition && entry.editions.includes(edition) ? [edition] : entry.editions);
     function cards(results) {
       if (!results.length)
-        return '<div class="mmk-empty"><h3>No matching terms</h3><p>Try a shorter phrase or clear your filters.</p><button type="button" class="small" data-sapt="reset">Clear search and filters</button></div>';
-      return results
-        .map(
-          entry =>
-            `<article class="mmk-card sapt-card" data-sapt-card="${esc(entry.id)}"><div class="sapt-card-top"><code>${esc(displayCode(entry))}</code><span class="mmk-topic">${kinds[entry.kind]}</span></div><h3><button type="button" data-sapt="open" data-id="${esc(entry.id)}" aria-label="${esc(displayCode(entry) + ' · ' + entry.title)}"><span class="mmk-card-title">${esc(entry.title)}</span><span class="mmk-card-arrow" aria-hidden="true"></span></button></h3><p>${esc(entry.explanation)}</p>${availability(entry)}</article>`
-        )
+        return '<div class="mmk-empty"><h3>No matching keys or modifiers</h3><p>Try a shorter phrase or clear your filters.</p><button type="button" class="small" data-sapt="reset">Clear search and filters</button></div>';
+      return Object.entries(kindLabels)
+        .map(([type, label]) => {
+          const rows = results.filter(entry => entry.kind === type);
+          if (!rows.length) return '';
+          return `<section class="sapt-entry-group" data-sapt-kind="${type}" aria-labelledby="saptGroup-${type}"><header class="sapt-group-heading"><h4 id="saptGroup-${type}">${esc(label)}</h4><span>${count(rows)}</span></header><div class="mmk-grid">${rows
+            .map(
+              entry =>
+                `<article class="mmk-card sapt-card" data-sapt-card="${esc(entry.id)}"><div class="sapt-card-top"><code>${esc(displayCode(entry))}</code><span class="mmk-topic">${kinds[entry.kind]}</span></div><h5><button type="button" data-sapt="open" data-id="${esc(entry.id)}" aria-label="${esc(displayCode(entry) + ' · ' + entry.title)}"><span class="mmk-card-title">${esc(entry.title)}</span><span class="mmk-card-arrow" aria-hidden="true"></span></button></h5><p>${esc(entry.explanation)}</p><span class="sapt-category">${esc(categories[entry.category])}</span>${availability(entry)}</article>`
+            )
+            .join('')}</div></section>`;
+        })
         .join('');
     }
-    const count = results => results.length + (results.length === 1 ? ' term' : ' terms');
+    const count = results => results.length + (results.length === 1 ? ' entry' : ' entries');
     function render() {
-      const results = search(query, kind, edition, transaction);
+      const results = search(query, kind, edition, transaction, category);
       return `<section class="mmk-workspace sapt-workspace" data-access-feature="knowledge">
-        <header class="mmk-hero sapt-hero"><div><h2>SAP Terms</h2><p>Follow the transaction key or account grouping from the SAP event to its posting.</p></div><div class="mmk-orbit" aria-hidden="true"><i></i><i></i><i></i></div></header>
-        <div class="mmk-controls sapt-controls"><label>Search SAP terms<input id="saptQuery" type="search" maxlength="200" autocomplete="off" placeholder="Try GBB/VNG, 551, or freight clearing" value="${esc(query)}"></label><label>Transaction scenario<select id="saptTransaction">${scenarioOptions()}</select></label><label>Term type<select id="saptKind">${filters(kindLabels, kind, 'All terms')}</select></label><label>SAP edition<select id="saptEdition">${filters({ ...editions, historical: 'Historical' }, edition, 'All editions')}</select></label></div>
+        <header class="mmk-hero sapt-hero"><div><h2>Transaction Keys &amp; Account Modifiers</h2><p>Follow each transaction/event key and account modifier from the business event to its posting.</p></div><div class="mmk-orbit" aria-hidden="true"><i></i><i></i><i></i></div></header>
+        <div class="mmk-controls sapt-controls"><label>Search keys and modifiers<input id="saptQuery" type="search" maxlength="200" autocomplete="off" placeholder="Try GBB/VNG, 551, or freight clearing" value="${esc(query)}"></label><label>Business category<select id="saptCategory">${filters(categories, category, 'All categories')}</select></label><label>Transaction scenario<select id="saptTransaction">${scenarioOptions()}</select></label><label>Reference type<select id="saptKind">${filters(kindLabels, kind, 'All types')}</select></label><label>SAP edition<select id="saptEdition">${filters({ ...editions, historical: 'Historical' }, edition, 'All editions')}</select></label></div>
         <div id="saptContext">${scenarioContext()}</div>
-        <div id="saptTermResults"${canListTerms() ? '' : ' hidden'}><div class="mmk-results-head"><h3>Account determination terms</h3><span id="saptCount" role="status">${count(results)}</span></div><div id="saptResults" class="mmk-grid">${cards(results)}</div></div>
+        <div id="saptTermResults"${canListTerms() ? '' : ' hidden'}><div class="mmk-results-head"><h3>Browse keys and modifiers</h3><span id="saptCount" role="status">${count(results)}</span></div><p class="sapt-category-note">Categories follow each entry’s main purpose. A key may also be used in other transaction scenarios.</p><div id="saptResults">${cards(results)}</div></div>
       </section>`;
     }
     function updateResults() {
-      const results = search(query, kind, edition, transaction);
+      const results = search(query, kind, edition, transaction, category);
       $('saptTermResults').hidden = !canListTerms();
       $('saptCount').textContent = count(results);
       $('saptResults').innerHTML = cards(results);
@@ -279,7 +288,7 @@
           .join('')}<p>${esc(entry.check)}</p></section>`
             : ''
         }
-        ${related.length ? `<section class="mmk-section"><h3>${!entry ? 'Account determination terms' : entry.kind === 'key' ? 'Account groupings' : 'Transaction/event key'}</h3><div class="mmk-related">${related.map(relatedButton).join('')}</div></section>` : ''}
+        ${related.length ? `<section class="mmk-section"><h3>${!entry ? 'Keys and account modifiers' : entry.kind === 'key' ? 'Account modifiers' : 'Transaction/event key'}</h3><div class="mmk-related">${related.map(relatedButton).join('')}</div></section>` : ''}
         <section class="mmk-section"><h3>Related configuration guides</h3><div class="mmk-related">${guideIds.map(guideButton).join('')}</div></section>
         <section class="mmk-section"><h3>References</h3><ul class="mmk-sources">${sources.map(reference).join('')}</ul></section>
       </article>`;
@@ -364,8 +373,12 @@
       }
     });
     document.addEventListener('change', event => {
-      if (a.active() && ['saptKind', 'saptEdition', 'saptTransaction'].includes(event.target.id)) {
+      if (
+        a.active() &&
+        ['saptKind', 'saptCategory', 'saptEdition', 'saptTransaction'].includes(event.target.id)
+      ) {
         kind = $('saptKind').value;
+        category = $('saptCategory').value;
         edition = $('saptEdition').value;
         transaction = $('saptTransaction').value;
         if (event.target.id === 'saptEdition') {
@@ -386,6 +399,7 @@
       if (action === 'reset') {
         $('saptQuery').value = query = '';
         $('saptKind').value = kind = '';
+        $('saptCategory').value = category = '';
         $('saptEdition').value = edition = '';
         transaction = '';
         $('saptTransaction').innerHTML = scenarioOptions();
@@ -411,7 +425,7 @@
       render,
       sync,
       reset() {
-        query = kind = edition = transaction = '';
+        query = kind = category = edition = transaction = '';
       },
     };
   }
