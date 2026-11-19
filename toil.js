@@ -183,6 +183,7 @@
       if (!form || !draft) return;
       const hours = form.elements.unit.value === 'hours';
       form.querySelector('[data-toil-workday]').hidden = !hours;
+      form.elements.hoursPerDay.disabled = !hours;
       try {
         const row = readEntry(form);
         $('toilEntryPreview').textContent =
