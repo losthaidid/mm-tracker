@@ -2,6 +2,14 @@
 
 Open **Settings → Appearance & motion** or **Studio → Theme studio**.
 
+Automatic anime & cartoon cosplay is enabled by default. The companion randomly wears a complete coordinated look from 20 anime and 20 cartoon collections: five characters per collection, three garment/accessory variants per character, 600 looks total. These are character-inspired costumes for the original companion, including creative alternate looks.
+
+Outfits rotate after 8–12 minutes, waiting until he is awake and work is quiet. The last look and a short repeat-avoidance history stay in this browser for each account. Automatic rotations and routines do not save to Supabase. The two appearance switches **Automatic anime & cartoon outfits** and **Character moves & temporary transformations** save with the theme. Turn off automatic cosplay to use the manual wardrobe below.
+
+Tap the companion → **Wardrobe & hobbies** for **Another random outfit** or **Try his character move**. There is no character picker to maintain. Luffy can stretch and briefly use Gear Two/Four/Five-inspired poses; Goku can show gold, blue and silver transformations; Zoro has sword flourishes and three-sword practice; Sanji has kicks and a local flame-kick effect. Other characters use matching magic, elemental, ninja, sport, music, detective and other small routines. Transformations last at most eight seconds and restore the current costume afterward.
+
+Character moves stop for interaction, typing, dragging, dialogs, focus, privacy, presentation, hidden pages or an account change. Reduced motion and Animations Off retain static costumes and suppress these routines. Naps never end automatically. Props follow the existing arms and legs; effects remain around the companion rather than acting on page controls.
+
 - **Wardrobe:** 24 garment styles. Daily surprise chooses a stable combination for the local calendar day.
 - **Outfit colours:** 12 palettes. With both fields set to Daily surprise, the 288 garment/colour combinations do not repeat within a cycle. A manually selected style or palette stays selected.
 - **Momo’s accessory:** 33 accessories, plus None and Daily surprise. Party hat has its own artwork. Music headphones appear only when selected, or when selected by Daily surprise.

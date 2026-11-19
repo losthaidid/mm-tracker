@@ -155,6 +155,7 @@
     };
   }
   function validate(p) {
+    root.WorkHubMomoCosplay?.validate(p);
     if (
       !['daily', ...OUTFITS.map(x => x[0])].includes(p.outfit) ||
       !['daily', ...PALETTES.map(x => x[0])].includes(p.outfitPalette) ||
@@ -266,6 +267,7 @@
       '<path d="M54 111h35v15H54Z" fill="#d2bd96"/><path d="M54 116h35m-26-5v15m9-15v15m9-15v15" stroke="#9c8467"/><path class="mh-tool" d="m70 118 2-10h-3l6-9 4 2-2 7 2 10Z" fill="#56736f"/>',
   };
   function apply(p, owner) {
+    if (root.WorkHubMomoCosplay?.apply(p, owner)) return;
     const pet = document.getElementById('hubPet'),
       art = pet?.querySelector('.momo-anime-art');
     if (!art) return;
@@ -297,6 +299,7 @@
     const select = (name, label, rows, value) =>
       `<label>${label}<select name="${name}">${rows.map(([id, text]) => `<option value="${id}"${value === id ? ' selected' : ''}>${esc(text)}</option>`).join('')}</select></label>`;
     return (
+      (root.WorkHubMomoCosplay?.fields(p) || '') +
       select(
         'outfit',
         'Wardrobe',
@@ -312,6 +315,7 @@
     );
   }
   function install(a) {
+    const cosplay = root.WorkHubMomoCosplay?.install(a);
     let active = null,
       next = Date.now() + 80000,
       owner = '',
@@ -346,6 +350,10 @@
       )
         return false;
       if (!safe() || a.life()?.sleeping()) return false;
+      if (cosplay?.snapshot().active) {
+        if (auto) return false;
+        cosplay.finish();
+      }
       if (active) finish();
       if (
         !a.life()?.sceneAvailable() ||
@@ -368,6 +376,7 @@
       return true;
     }
     function mount() {
+      cosplay?.mount();
       const current = a.ready() ? a.owner() : '';
       if (current !== owner) {
         finish();
@@ -378,6 +387,7 @@
     }
     function tick() {
       mount();
+      cosplay?.tick();
       if (active) {
         if (
           !safe() ||
@@ -398,10 +408,12 @@
     function gallery() {
       mount();
       if (!owner) return;
+      finish();
+      cosplay?.finish();
       const current = look(a.prefs(), owner);
       a.openModal(
         'Wardrobe & hobbies',
-        `<section class="momo-wardrobe-gallery"><span class="hub-kicker">A LITTLE LIFE OF HIS OWN</span><h3>${esc(current.label)}</h3><p>Automatic wardrobe changes at 6 am, noon and 7 pm using your device’s local time. Morning and afternoon have different outfits; night brings one of 8 pajama designs in 12 colours, with a different design each night. The night outfit stays through midnight until 6 am. Choose Automatic in Appearance, or keep a fixed outfit. Headphones are optional.</p><button type="button" data-momo-style="appearance">Choose outfit & accessories</button><h3>His hobby shelf</h3><p>Try a quiet, in-place activity. Automatic hobbies wait while you work, type, focus or present, and never wake a requested nap.</p><div class="momo-hobby-grid">${HOBBIES.map(([id, label, icon]) => `<button type="button" data-momo-style="hobby" data-kind="${id}"><span aria-hidden="true">${icon}</span>${esc(label)}</button>`).join('')}</div></section>`
+        `<section class="momo-wardrobe-gallery">${cosplay && root.WorkHubMomoCosplay.enabled(a.prefs()) ? cosplay.gallery() : `<span class="hub-kicker">A LITTLE LIFE OF HIS OWN</span><h3>${esc(current.label)}</h3><p>Automatic wardrobe changes at 6 am, noon and 7 pm using your device’s local time. Morning and afternoon have different outfits; night brings one of 8 pajama designs in 12 colours, with a different design each night. The night outfit stays through midnight until 6 am. Choose Automatic in Appearance, or keep a fixed outfit. Headphones are optional.</p><button type="button" data-momo-style="appearance">Choose outfit & accessories</button>`}<h3>His hobby shelf</h3><p>Try a quiet, in-place activity. Automatic hobbies wait while you work, type, focus or present, and never wake a requested nap.</p><div class="momo-hobby-grid">${HOBBIES.map(([id, label, icon]) => `<button type="button" data-momo-style="hobby" data-kind="${id}"><span aria-hidden="true">${icon}</span>${esc(label)}</button>`).join('')}</div></section>`
       );
     }
     document.addEventListener('click', event => {
@@ -410,8 +422,23 @@
       if (b.dataset.momoStyle === 'gallery') gallery();
       else if (b.dataset.momoStyle === 'appearance') {
         finish();
+        cosplay?.finish();
         a.closeModal();
         a.appearance();
+      } else if (
+        b.dataset.momoStyle === 'cosplay-random' ||
+        b.dataset.momoStyle === 'cosplay-move'
+      ) {
+        a.closeModal();
+        if (b.dataset.momoStyle === 'cosplay-random') {
+          if (!cosplay?.rotate())
+            a.tell(
+              'The next surprise outfit will wait until your companion is awake and your work is quiet.'
+            );
+        } else if (!cosplay?.play())
+          a.tell(
+            'Character moves wait for a quiet moment and pause for naps, focus mode and reduced motion.'
+          );
       } else if (b.dataset.momoStyle === 'hobby') {
         const kind = b.dataset.kind;
         a.closeModal();
@@ -445,9 +472,11 @@
       gallery,
       play,
       finish,
+      cosplay,
       snapshot: () => ({
         active: active?.kind || null,
         look: owner ? look(a.prefs(), owner) : null,
+        cosplay: cosplay?.snapshot() || null,
       }),
     };
   }
