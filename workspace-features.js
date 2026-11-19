@@ -72,6 +72,13 @@
           throw Error('Check the leave details and MC submission date.');
       }
   }
+  function customLeaveFields(p) {
+    const hourly =
+      p.chargeMode === 'hours' ||
+      (p.portion !== 'custom' && p.daysPerDate === undefined && p.chargeMode === undefined);
+    const custom = p.portion === 'custom';
+    return `<div data-leave-custom-charge${custom ? '' : ' hidden'}><label for="leaveChargeMode">Calculate leave balance</label><select id="leaveChargeMode" name="leaveChargeMode"${custom ? '' : ' disabled'}><option value="hours"${hourly ? ' selected' : ''}>Based on selected hours</option><option value="days"${hourly ? '' : ' selected'}>Choose half or full day</option></select></div><div data-leave-custom-days${custom && !hourly ? '' : ' hidden'}><label for="leaveDaysPerDate">Leave days charged per date</label><input id="leaveDaysPerDate" name="leaveDaysPerDate" type="number" min="0.5" max="1" step="0.5" value="${esc(p.daysPerDate ?? 1)}"${custom && !hourly ? '' : ' disabled'} required><small>Choose 0.5 or 1 day according to your leave policy.</small></div><div data-leave-hourly${custom && hourly ? '' : ' hidden'}><label for="leaveHoursPerDay">Working hours in one day</label><input id="leaveHoursPerDay" name="leaveHoursPerDay" type="number" min="1" max="24" step="0.25" value="${esc(p.hoursPerDay ?? 8)}"${custom && hourly ? '' : ' disabled'} required><small>Exclude unpaid breaks. For example, 3 hours of leave ÷ 8 working hours = 0.375 day.</small></div>`;
+  }
   function leaveFields(s, d) {
     if (!isLeave(s.kind)) return '';
     const p = { ...LEAVE_DEFAULTS, ...s.leave };
@@ -84,7 +91,7 @@
       )
       .join(
         ''
-      )}</select></div><div data-leave-custom-days${p.portion === 'custom' ? '' : ' hidden'}><label for="leaveDaysPerDate">Leave days charged per date</label><input id="leaveDaysPerDate" name="leaveDaysPerDate" type="number" min="0.5" max="1" step="0.5" value="${esc(p.daysPerDate ?? 1)}"${p.portion === 'custom' ? '' : ' disabled'} required><small>Custom hours: choose 0.5 or 1 leave day.</small></div><div><label for="leaveStatus">Approval status</label><select id="leaveStatus" name="leaveStatus">${['Planned', 'Requested', 'Approved'].map(x => `<option${p.status === x ? ' selected' : ''}>${x}</option>`).join('')}</select></div><div class="wide"><label for="leaveTitle">Calendar title</label><input id="leaveTitle" name="leaveTitle" maxlength="500" value="${esc(s.title || name(s.kind, d))}" required></div><div><label for="leaveContact">Covering colleague / handover contact</label><input id="leaveContact" name="leaveContact" maxlength="200" value="${esc(p.contact)}" placeholder="Optional"></div><div><label for="leaveReference">Leave request reference</label><input id="leaveReference" name="leaveReference" maxlength="200" value="${esc(p.reference)}" placeholder="Optional"></div>${s.kind === 'medical-leave' ? `<section class="leave-mc wide"><h4>MC submission to HR</h4><div class="form-grid"><div><label for="mcSubmitted">Have you submitted the MC to HR?</label><select id="mcSubmitted" name="mcSubmitted"><option value="no"${!p.mcSubmitted ? ' selected' : ''}>Not yet</option><option value="yes"${p.mcSubmitted ? ' selected' : ''}>Yes, submitted</option></select></div><div id="mcDateField"${p.mcSubmitted ? '' : ' hidden'}><label for="mcSubmittedDate">Date submitted *</label><input id="mcSubmittedDate" name="mcSubmittedDate" type="date" min="1900-01-01" max="9999-12-31" value="${esc(p.mcSubmittedDate)}"${p.mcSubmitted ? ' required' : ''}></div></div><p class="hint">Keep the submission status here; send the actual document through your usual HR channel.</p></section>` : ''}</div><p class="hint">Full-day and half-day presets use working hours. Adjust the start/end times for your own workday. The same hours repeat on each selected date.</p></section>`;
+      )}</select></div>${customLeaveFields(p)}<div><label for="leaveStatus">Approval status</label><select id="leaveStatus" name="leaveStatus">${['Planned', 'Requested', 'Approved'].map(x => `<option${p.status === x ? ' selected' : ''}>${x}</option>`).join('')}</select></div><div class="wide"><label for="leaveTitle">Calendar title</label><input id="leaveTitle" name="leaveTitle" maxlength="500" value="${esc(s.title || name(s.kind, d))}" required></div><div><label for="leaveContact">Covering colleague / handover contact</label><input id="leaveContact" name="leaveContact" maxlength="200" value="${esc(p.contact)}" placeholder="Optional"></div><div><label for="leaveReference">Leave request reference</label><input id="leaveReference" name="leaveReference" maxlength="200" value="${esc(p.reference)}" placeholder="Optional"></div>${s.kind === 'medical-leave' ? `<section class="leave-mc wide"><h4>MC submission to HR</h4><div class="form-grid"><div><label for="mcSubmitted">Have you submitted the MC to HR?</label><select id="mcSubmitted" name="mcSubmitted"><option value="no"${!p.mcSubmitted ? ' selected' : ''}>Not yet</option><option value="yes"${p.mcSubmitted ? ' selected' : ''}>Yes, submitted</option></select></div><div id="mcDateField"${p.mcSubmitted ? '' : ' hidden'}><label for="mcSubmittedDate">Date submitted *</label><input id="mcSubmittedDate" name="mcSubmittedDate" type="date" min="1900-01-01" max="9999-12-31" value="${esc(p.mcSubmittedDate)}"${p.mcSubmitted ? ' required' : ''}></div></div><p class="hint">Keep the submission status here; send the actual document through your usual HR channel.</p></section>` : ''}</div><p class="hint">Full-day and half-day presets use working hours. Adjust the start/end times for your own workday. The same hours repeat on each selected date.</p></section>`;
   }
   function readLeave(form, kind, d) {
     if (!isLeave(kind)) return {};
@@ -92,6 +99,12 @@
       sent = kind === 'medical-leave' && value('mcSubmitted') === 'yes',
       date = sent ? value('mcSubmittedDate') : '';
     if (sent && !validDate(date)) throw Error('Enter the date you submitted the MC to HR.');
+    if (value('leavePortion') === 'custom' && value('leaveChargeMode') === 'hours')
+      root.WorkHubLeaveBalancesEngine.hourlyDays(
+        value('time'),
+        value('endTime'),
+        Number(value('leaveHoursPerDay'))
+      );
     return {
       title: value('leaveTitle').trim() || name(kind, d),
       leave: {
@@ -102,7 +115,9 @@
         mcSubmitted: sent,
         mcSubmittedDate: date,
         ...(value('leavePortion') === 'custom'
-          ? { daysPerDate: Number(value('leaveDaysPerDate')) }
+          ? value('leaveChargeMode') === 'hours'
+            ? { chargeMode: 'hours', hoursPerDay: Number(value('leaveHoursPerDay')) }
+            : { daysPerDate: Number(value('leaveDaysPerDate')) }
           : {}),
       },
     };
@@ -110,7 +125,7 @@
   function leaveDetails(slot, d) {
     if (!isLeave(slot.kind)) return '';
     const p = slot.leave;
-    return `<section class="leave-booking-details"><h3>Leave details</h3><dl class="booking-facts"><div><dt>Type</dt><dd>${esc(name(slot.kind, d))}</dd></div><div><dt>Approval</dt><dd>${esc(p.status)}</dd></div><div><dt>Duration</dt><dd>${esc(PORTIONS[p.portion][0].split(' · ')[0])}</dd></div><div><dt>Cover / handover</dt><dd>${esc(p.contact) || 'Not specified'}</dd></div>${p.reference ? `<div><dt>Request reference</dt><dd>${esc(p.reference)}</dd></div>` : ''}${slot.kind === 'medical-leave' ? `<div><dt>MC submitted to HR</dt><dd class="${p.mcSubmitted ? 'leave-mc-done' : 'leave-mc-pending'}">${p.mcSubmitted ? '✓ Submitted · ' + esc(p.mcSubmittedDate) : 'Not yet submitted'}</dd></div>` : ''}</dl></section>`;
+    return `<section class="leave-booking-details"><h3>Leave details</h3><dl class="booking-facts"><div><dt>Type</dt><dd>${esc(name(slot.kind, d))}</dd></div><div><dt>Approval</dt><dd>${esc(p.status)}</dd></div><div><dt>Duration</dt><dd>${esc(PORTIONS[p.portion][0].split(' · ')[0])}</dd></div>${p.chargeMode === 'hours' ? `<div><dt>Leave balance calculation</dt><dd>Based on selected hours · ${esc(p.hoursPerDay)} working hours = 1 day</dd></div>` : ''}<div><dt>Cover / handover</dt><dd>${esc(p.contact) || 'Not specified'}</dd></div>${p.reference ? `<div><dt>Request reference</dt><dd>${esc(p.reference)}</dd></div>` : ''}${slot.kind === 'medical-leave' ? `<div><dt>MC submitted to HR</dt><dd class="${p.mcSubmitted ? 'leave-mc-done' : 'leave-mc-pending'}">${p.mcSubmitted ? '✓ Submitted · ' + esc(p.mcSubmittedDate) : 'Not yet submitted'}</dd></div>` : ''}</dl></section>`;
   }
   root.WorkHubLeave = {
     TYPES: LEAVE,

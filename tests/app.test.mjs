@@ -2088,6 +2088,81 @@ test('Medical Leave requires the MC submission date and preserves submitted/not-
  const ctx=await app(t),{api,document,window,db}=ctx;let f=await leaveEditor(ctx,'medical-leave');assert.equal(document.getElementById('mcDateField').hidden,true);f.elements.namedItem('mcSubmitted').value='yes';f.elements.namedItem('mcSubmitted').dispatchEvent(new window.Event('change',{bubbles:true}));assert.equal(document.getElementById('mcDateField').hidden,false);assert.equal(f.elements.namedItem('mcSubmittedDate').required,true);f.elements.namedItem('mcSubmittedDate').value='';assert.throws(()=>api.saveRange(f),/date you submitted/);assert.equal(api.state().schedule.length,0);fill(f,{mcSubmittedDate:'2026-10-17',leaveStatus:'Approved',text:'Rest day'});api.saveRange(f);await settle();assert.ok(api.state().schedule.every(s=>s.leave.mcSubmitted&&s.leave.mcSubmittedDate==='2026-10-17'));api.viewBooking('2026-10-20','09:00');assert.match(document.getElementById('modalBody').textContent,/Submitted · 2026-10-17/);api.openRangeEditor('2026-10-20','09:00');f=document.getElementById('scheduleForm');assert.equal(f.elements.namedItem('mcSubmitted').value,'yes');f.elements.namedItem('mcSubmitted').value='no';f.elements.namedItem('mcSubmitted').dispatchEvent(new window.Event('change',{bubbles:true}));assert.equal(f.elements.namedItem('mcSubmittedDate').value,'');api.saveRange(f);await settle();assert.equal(db.row.document.data.schedule[0].leave.mcSubmitted,false);assert.equal(db.row.document.data.schedule[0].leave.mcSubmittedDate,'');api.viewBooking('2026-10-20','09:00');assert.match(document.getElementById('modalBody').textContent,/Not yet submitted/);const invalid=copy(api.state());invalid.schedule[0].leave.mcSubmitted=true;assert.throws(()=>api.validate(invalid),/leave details/);
 });
 
+test('Medical Leave hourly booking preserves 09:00–15:00 work and charges only 15:00–18:00 through save, edits, exports and reload', async t => {
+ const ctx=await app(t),{api,document,window,db}=ctx;
+ await maintainLeave(ctx,'2026',12,10,1,0);
+ addBooking(api,document,'09:00','15:00',{date:'2026-11-19',text:'Work before MC'});
+ await settle();
+ const work=copy(api.state().schedule);
+ let f=await leaveEditor(ctx,'medical-leave',{date:'2026-11-19',time:'15:00'});
+ fill(f,{time:'15:00',endTime:'18:00'});
+ f.elements.time.dispatchEvent(new window.Event('change',{bubbles:true}));
+ assert.equal(f.elements.leavePortion.value,'custom');
+ assert.equal(f.elements.leaveChargeMode.value,'hours');
+ assert.equal(f.querySelector('[data-leave-custom-days]').hidden,true);
+ assert.equal(f.elements.leaveHoursPerDay.value,'8');
+ assert.match(f.querySelector('[data-leave-range-preview]').textContent,/0.375 day\(s\) in this range.*0.625 day\(s\) remaining/s);
+ fill(f,{mcSubmitted:'yes',mcSubmittedDate:'2026-11-19',leaveStatus:'Approved'});
+ api.saveRange(f); await settle();
+ assert.deepEqual(copy(api.state().schedule.filter(s=>s.kind==='custom')),work);
+ const balance=()=>window.WorkHubLeaveBalancesEngine.balance(api.state(),'2026','medical-leave');
+ assert.equal(balance().scheduled,.375);
+ assert.equal(api.state().schedule.filter(s=>s.kind==='medical-leave').length,3);
+ api.viewBooking('2026-11-19','15:00');
+ assert.match(document.getElementById('modalBody').textContent,/Based on selected hours · 8 working hours = 1 day/);
+ api.openRangeEditor('2026-11-19','15:00');
+ f=document.getElementById('scheduleForm');
+ assert.equal(f.elements.leaveChargeMode.value,'hours');
+ assert.equal(f.elements.time.value,'15:00');
+ assert.equal(f.elements.endTime.value,'18:00');
+ fill(f,{leaveHoursPerDay:'7.5'});
+ f.elements.leaveHoursPerDay.dispatchEvent(new window.Event('input',{bubbles:true}));
+ assert.match(f.querySelector('[data-leave-range-preview]').textContent,/0.4 day\(s\) in this range/);
+ api.saveRange(f); await settle();
+ assert.equal(balance().remaining,.6);
+ const report=window.WorkHubReports.build(api.state(),{asOf:'2026-11-20',from:'2026-11-19',to:'2026-11-19'});
+ const rows=report.sheets.find(s=>s.name==='Schedule').rows;
+ assert.equal(rows.length,2);
+ assert.match(rows.find(r=>r.values[5]==='Medical Leave').values[4],/Hourly leave · 7.5 working hours/);
+ assert.equal(api.parseBackup(api.payload(api.state())).schedule.at(-1).leave.hoursPerDay,7.5);
+ const next=await app(t,{remote:copy(db.row),login:false});
+ await next.api.loadCloud(sessionUser); await settle();
+ assert.equal(next.window.WorkHubLeaveBalancesEngine.balance(next.api.state(),'2026','medical-leave').remaining,.6);
+ next.api.openRangeEditor('2026-11-19','15:00');
+ assert.equal(next.document.getElementById('scheduleForm').elements.leaveHoursPerDay.value,'7.5');
+ assert.equal(next.api.state().schedule.at(-1).leave.mcSubmitted,true);
+});
+
+test('Hourly leave is available for Annual, Medical and custom leave types and retains explicit day charging on older bookings', async t => {
+ const ctx=await app(t),{api,document,window}=ctx;
+ api.mutate(d=>d.workhub.leaveTypes.push({id:'leave-personal',name:'Personal leave',code:'PER',archived:false}));
+ const kinds=['annual-leave','medical-leave','leave-personal'];
+ for(const [i,kind] of kinds.entries()) {
+  const date='2026-11-'+(23+i);
+  let f=await leaveEditor(ctx,kind,{date});
+  f.elements.leavePortion.value='custom';
+  f.elements.leavePortion.dispatchEvent(new window.Event('change',{bubbles:true}));
+  fill(f,{time:'15:00',endTime:'18:00'});
+  f.elements.time.dispatchEvent(new window.Event('input',{bubbles:true}));
+  assert.equal(f.elements.leaveChargeMode.value,'hours');
+  assert.equal(f.elements.leaveHoursPerDay.disabled,false);
+  assert.match(f.querySelector('[data-leave-range-preview]').textContent,/0.375 day\(s\) in this range/);
+  api.saveRange(f); await settle();
+  assert.equal(window.WorkHubLeaveBalancesEngine.balance(api.state(),'2026',kind).scheduled,.375);
+  api.openRangeEditor(date,'15:00'); f=document.getElementById('scheduleForm');
+  fill(f,{leaveChargeMode:'days',leaveDaysPerDate:'0.5'});
+  f.elements.leaveChargeMode.dispatchEvent(new window.Event('change',{bubbles:true}));
+  assert.equal(f.elements.leaveDaysPerDate.disabled,false);
+  assert.equal(f.elements.leaveHoursPerDay.disabled,true);
+  api.saveRange(f); await settle();
+  api.openRangeEditor(date,'15:00'); f=document.getElementById('scheduleForm');
+  assert.equal(f.elements.leaveChargeMode.value,'days');
+  assert.equal(f.elements.leaveDaysPerDate.value,'0.5');
+  api.saveRange(f); await settle();
+  assert.equal(window.WorkHubLeaveBalancesEngine.balance(api.state(),'2026',kind).scheduled,.5);
+ }
+});
+
 test('leave custom minutes and overlap protection preserve existing work and require no migration of old bookings',async t=>{
  const ctx=await app(t),{api,document,window}=ctx;addBooking(api,document,'11:00','12:00',{date:'2026-10-20'});await settle();const existing=copy(api.state().schedule);let f=await leaveEditor(ctx);fill(f,{time:'10:15',endTime:'12:30',leavePortion:'custom'});assert.throws(()=>api.saveRange(f),/overlaps/);assert.deepEqual(copy(api.state().schedule),existing);fill(f,{time:'13:15',endTime:'14:45'});api.saveRange(f);await settle();const leave=api.state().schedule.filter(s=>s.kind==='annual-leave');assert.equal(leave[0].time,'13:15');assert.equal(leave.at(-1).endTime,'14:45');const report=window.WorkHubReports.build(api.state(),{asOf:'2026-10-20'});assert.equal(report.sheets.find(s=>s.name==='Schedule').rows.length,2);const old=api.parseBackup(JSON.stringify({app:'mm-ticket-tracker',version:9,data:{...copy(api.state()),schedule:existing}}));assert.equal(old.schedule[0].kind,'custom');assert.equal(old.schedule[0].leave,undefined);
 });
@@ -3013,7 +3088,7 @@ test('leave allowances: half-days, custom hours and MC use separate balances and
  const ctx=await app(t),{api,document,window}=ctx;await maintainLeave(ctx);
  let f=await leaveEditor(ctx,'annual-leave',{date:'2026-10-26'});f.elements.namedItem('leavePortion').value='morning';f.elements.namedItem('leavePortion').dispatchEvent(new window.Event('change',{bubbles:true}));
  assert.match(f.querySelector('[data-leave-range-preview]').textContent,/0.5 day\(s\) in this range.*1.5 day\(s\) remaining/s);api.saveRange(f);await settle();
- f=await leaveEditor(ctx,'annual-leave',{date:'2026-10-27'});f.querySelector('[data-action="booking-duration"][data-minutes="45"]').click();await settle();assert.equal(f.querySelector('[data-leave-custom-days]').hidden,false);
+ f=await leaveEditor(ctx,'annual-leave',{date:'2026-10-27'});f.querySelector('[data-action="booking-duration"][data-minutes="45"]').click();await settle();f.elements.leaveChargeMode.value='days';f.elements.leaveChargeMode.dispatchEvent(new window.Event('change',{bubbles:true}));assert.equal(f.querySelector('[data-leave-custom-days]').hidden,false);
  f.elements.namedItem('leaveDaysPerDate').value='0.5';f.elements.namedItem('leaveDaysPerDate').dispatchEvent(new window.Event('input',{bubbles:true}));assert.match(f.querySelector('[data-leave-range-preview]').textContent,/1 day\(s\) remaining after saving/);api.saveRange(f);await settle();assert.equal(api.state().schedule.at(-1).leave.daysPerDate,.5);
  f=await leaveEditor(ctx,'medical-leave',{date:'2026-10-28'});fill(f,{mcSubmitted:'yes',mcSubmittedDate:'2026-10-28'});api.saveRange(f);await settle();assert.equal(window.WorkHubLeaveBalancesEngine.balance(api.state(),'2026','medical-leave').remaining,2);assert.equal(window.WorkHubLeaveBalancesEngine.balance(api.state(),'2026','annual-leave').remaining,1);assert.equal(api.state().schedule.at(-1).leave.mcSubmitted,true);api.validate(api.state());
 });

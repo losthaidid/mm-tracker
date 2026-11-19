@@ -13,6 +13,53 @@ function state() {
 function add(d, date, kind = AL, portion = 'full', id = 'one', extra = {}) {
   for (const time of ['09:00', '10:00', '11:00', '12:00']) d.schedule.push({ date, time, endTime: String(Number(time.slice(0, 2)) + 1).padStart(2, '0') + ':00', bookingId: id, kind, leave: { portion, status: 'Planned', ...extra } });
 }
+test('hourly leave counts only the absence, unions fragments and keeps work before 15:00 separate', () => {
+  const d = state(); E.upgrade(d);
+  d.schedule.push({date:'2026-11-19',time:'09:00',endTime:'15:00',kind:'custom'});
+  const leave = {portion:'custom',chargeMode:'hours',hoursPerDay:8};
+  for (const [time,endTime] of [['15:00','16:00'],['16:00','17:00'],['17:00','18:00'],['16:00','17:00']])
+    d.schedule.push({date:'2026-11-19',time,endTime,kind:MC,bookingId:'mc',leave});
+  E.validate(d);
+  assert.equal(E.balance(d,'2026',MC).scheduled,.375);
+  assert.equal(E.balance(d,'2026',MC).remaining,2.625);
+  assert.equal(E.balance(d,'2026',AL).scheduled,0);
+  const edited = E.preview(d,{date:'2026-11-19',endDate:'2026-11-19',time:'15:00',endTime:'18:00',kind:MC,bookingId:'mc',leave:{...leave,hoursPerDay:7.5}});
+  assert.equal(edited.rows[0].requested,.4);
+  assert.equal(edited.rows[0].remaining,2.6);
+  assert.equal(d.schedule[0].endTime,'15:00');
+});
+test('hourly leave previews match saved quotas across years, configured holidays and same-date caps', () => {
+  const d = state(); E.upgrade(d);
+  d.workhub.leaveBalances[0][MC].allowance=.5;
+  d.workhub.leaveBalances[0][MC].openingUsed=0;
+  const draft={date:'2026-12-31',endDate:'2027-01-01',time:'15:00',endTime:'18:00',kind:MC,leave:{portion:'custom',chargeMode:'hours',hoursPerDay:8}};
+  const p=E.preview(d,draft);
+  assert.deepEqual(copy(p.rows.map(r=>r.requested)),[.375,.375]);
+  assert.equal(p.rows[0].remaining,.125);
+  E.assertWithinBalance(d,p.next);
+  const extra=E.preview(p.next,{...draft,date:'2026-12-30',endDate:'2026-12-30'});
+  assert.throws(()=>E.assertWithinBalance(p.next,extra.next),/only 0.125 day/);
+  p.next.workhub.publicHolidays=[{id:'2026-12-31',name:'Holiday'}];
+  p.next.workhub.leaveBalances[0][MC].excludeHolidays=true;
+  assert.equal(E.balance(p.next,'2026',MC).scheduled,0);
+  assert.equal(E.hourlyDays('09:00','18:00',8),1);
+  assert.equal(E.hourlyDays('23:00','24:00',8),.125);
+  assert.equal(E.hourlyDays('15:15','17:45',7.5),.333333);
+});
+test('hourly leave rejects invalid lengths, hours and inconsistent booking metadata', () => {
+  const d=state(); E.upgrade(d);
+  const row={date:'2026-11-19',time:'15:00',endTime:'18:00',kind:MC,bookingId:'mc',leave:{portion:'custom',chargeMode:'hours',hoursPerDay:8}};
+  for(const hoursPerDay of [0,-1,25,2.2,NaN,'8']) {
+    d.schedule=[{...row,leave:{...row.leave,hoursPerDay}}];
+    assert.throws(()=>E.validate(d),/working-day/);
+  }
+  for(const endTime of ['15:00','14:59','25:00','']) {
+    d.schedule=[{...row,endTime}];
+    assert.throws(()=>E.validate(d),/later end time/);
+  }
+  d.schedule=[row,{...row,time:'18:00',endTime:'19:00',leave:{...row.leave,hoursPerDay:7.5}}];
+  assert.throws(()=>E.validate(d),/same leave calculation/);
+});
 test('leave balances: the 12 allowed / 10 used example permits two days and rejects a third without writes', () => {
   const d = state(), before = JSON.stringify(d);
   assert.equal(E.balance(d, '2026', AL).remaining, 2);

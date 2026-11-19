@@ -11,7 +11,7 @@
       const t = E.type(d, kind);
       return t ? t.name + ' · ' + t.code : 'Saved leave';
     },
-    number = n => (n === null ? 'Not set' : String(n)),
+    number = n => (n === null ? 'Not set' : String(Math.round(n * 1000000) / 1000000)),
     earnedDateLabel = new Intl.DateTimeFormat('en-MY', { dateStyle: 'medium', timeZone: 'UTC' }),
     DAYS = [
       [1, 'Mon'],
@@ -237,7 +237,7 @@
           })
           .join(
             ''
-          )}</div><p class="hint">Full day = 1 day; morning / afternoon = 0.5 day. Custom hours let you choose 0.5 or 1 day. Dates outside the selected weekdays are not charged. Public holidays are maintained in your holiday calendar and excluded when selected above. A blank allowance keeps that type unlimited until you set it.</p><p class="hint">For example: 12 days allowed − 10 used outside Schedule = 2 days available before any scheduled leave. Removing a booking restores its reserved days.</p><div id="leaveSettingsPreview" class="leave-settings-preview" role="status" aria-live="polite"></div><div class="modal-actions"><button type="button" data-action="cancel">Cancel</button><button type="submit" class="primary">Save allowances</button></div></form>`
+          )}</div><p class="hint">Full day = 1 day; morning / afternoon = 0.5 day. Custom hours can calculate a fraction of a day from the selected hours and your working-day length, or charge 0.5 or 1 day. Dates outside the selected weekdays are not charged. Public holidays are maintained in your holiday calendar and excluded when selected above. A blank allowance keeps that type unlimited until you set it.</p><p class="hint">For example: 12 days allowed − 10 used outside Schedule = 2 days available before any scheduled leave. Removing a booking restores its reserved days.</p><div id="leaveSettingsPreview" class="leave-settings-preview" role="status" aria-live="polite"></div><div class="modal-actions"><button type="button" data-action="cancel">Cancel</button><button type="submit" class="primary">Save allowances</button></div></form>`
       );
       updateSettings($('leaveBalanceForm'));
       if (E.type(d, kind)) $(kind + '-allowance')?.focus();
@@ -322,11 +322,18 @@
       const get = k => form.elements.namedItem(k)?.value || '',
         kind = get('kind'),
         year = E.validYear(get('date').slice(0, 4)) ? get('date').slice(0, 4) : thisYear();
-      const custom = form.querySelector('[data-leave-custom-days]'),
-        customInput = form.elements.namedItem('leaveDaysPerDate');
-      if (custom) {
-        custom.hidden = get('leavePortion') !== 'custom';
-        customInput.disabled = custom.hidden;
+      const custom = get('leavePortion') === 'custom',
+        hourly = get('leaveChargeMode') === 'hours';
+      for (const [selector, name, visible] of [
+        ['[data-leave-custom-charge]', 'leaveChargeMode', custom],
+        ['[data-leave-custom-days]', 'leaveDaysPerDate', custom && !hourly],
+        ['[data-leave-hourly]', 'leaveHoursPerDay', custom && hourly],
+      ]) {
+        const field = form.querySelector(selector);
+        if (field) {
+          field.hidden = !visible;
+          form.elements.namedItem(name).disabled = !visible;
+        }
       }
       form.querySelector('[data-leave-balance-years]').textContent = year;
       form.querySelector('[data-leave-range-current]').innerHTML = cards(a.state(), year);
@@ -336,11 +343,12 @@
         return;
       }
       try {
-        const leave = {
-          portion: get('leavePortion'),
-          daysPerDate: Number(get('leaveDaysPerDate') || 1),
-        };
-        if (leave.portion === 'custom' && ![0.5, 1].includes(leave.daysPerDate))
+        const { leave } = root.WorkHubLeave.read(form, kind, a.state());
+        if (
+          leave.portion === 'custom' &&
+          leave.chargeMode !== 'hours' &&
+          ![0.5, 1].includes(leave.daysPerDate)
+        )
           throw Error('Choose 0.5 or 1 day for custom leave.');
         const draft = {
             ...rangeDraft,
@@ -348,6 +356,7 @@
             date: get('date'),
             endDate: get('endDate'),
             time: get('time'),
+            endTime: get('endTime'),
             leave,
           },
           result = E.preview(a.state(), draft);
@@ -361,7 +370,11 @@
         } catch (error) {
           warning = error.message;
         }
-        host.innerHTML = `<div class="leave-request-preview${warning ? ' leave-overdrawn' : ''}">${result.rows.map(b => `<p><strong>${b.year} · ${esc(label(kind, a.state()))}:</strong> ${number(b.requested)} day(s) in this range${b.remaining === null ? ' · set this year’s allowance to see a remaining balance.' : ' · <strong>' + number(b.remaining) + ' day(s) remaining after saving.</strong>'}</p>`).join('')}${warning ? `<p class="leave-limit-warning">${esc(warning)}</p>` : ''}<small>Existing bookings count once. Editing replaces this booking. Full days count as 1; half-days as 0.5. Only your configured weekdays are charged.</small></div>`;
+        const hours =
+          leave.chargeMode === 'hours'
+            ? `<p>Selected absence: <strong>${esc(get('time'))}–${esc(get('endTime'))}</strong> per date · ${number(E.hourlyDays(get('time'), get('endTime'), leave.hoursPerDay))} day at ${number(leave.hoursPerDay)} working hours per day.</p>`
+            : '';
+        host.innerHTML = `<div class="leave-request-preview${warning ? ' leave-overdrawn' : ''}">${hours}${result.rows.map(b => `<p><strong>${b.year} · ${esc(label(kind, a.state()))}:</strong> ${number(b.requested)} day(s) in this range${b.remaining === null ? ' · set this year’s allowance to see a remaining balance.' : ' · <strong>' + number(b.remaining) + ' day(s) remaining after saving.</strong>'}</p>`).join('')}${warning ? `<p class="leave-limit-warning">${esc(warning)}</p>` : ''}<small>Existing bookings count once. Editing replaces this booking. Full days count as 1; half-days as 0.5. Hourly leave uses the selected hours and working-day length, capped at 1 day per date. Only your configured weekdays are charged.</small></div>`;
       } catch (error) {
         host.textContent = error.message;
       }
