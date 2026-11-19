@@ -49,6 +49,7 @@
   }
   function appearanceValidate(p) {
     root.WorkHubExperienceAppearance?.validate(p);
+    root.WorkHubPatternCollection?.validate(p);
     if (
       (p.design !== undefined &&
         ![
