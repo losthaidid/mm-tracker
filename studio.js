@@ -58,6 +58,8 @@
     outfit: 'daily',
     outfitPalette: 'daily',
     hobbies: true,
+    cosplayEnabled: true,
+    cosplayMoves: true,
     displayMode: 'auto',
     density: 'comfortable',
     desk: true,
@@ -3276,6 +3278,8 @@
       v.radius = Number(v.radius);
       for (const k of ['sounds', 'mascot', 'roaming', 'desk', 'hobbies'])
         v[k] = form.elements.namedItem(k)?.checked ?? prefs()[k];
+      for (const k of ['cosplayEnabled', 'cosplayMoves'])
+        v[k] = form.elements.namedItem(k)?.checked ?? prefs()[k] ?? true;
       return v;
     }
     async function handle(el) {

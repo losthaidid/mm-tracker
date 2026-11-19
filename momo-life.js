@@ -1162,6 +1162,17 @@
       sleeping: () => nap,
       express,
       scene,
+      sceneOwner: () => sceneState?.source || '',
+      releaseScene(source) {
+        if (!source || sceneState?.source !== source) return false;
+        sceneState = null;
+        if (!nap) {
+          pose('idle');
+          express('content');
+          restUntil = Date.now() + 3000;
+        }
+        return true;
+      },
       clearForWork() {
         if (nap || held || homeDrag) return false;
         cancelTravel(true);
