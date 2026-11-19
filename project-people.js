@@ -16,7 +16,7 @@
   function install(a) {
     const $ = id => document.getElementById(id);
     let owner = '', pid = '', mode = root.innerWidth < 700 ? 'list' : 'chart', query = '', department = '', areaFilter = '', activityFilter = '',
-      selected = '', armed = null, onlyUnassigned = false, showHidden = false, zoom = 1, scroll = { left: 0, top: 0 }, trayScroll = 0, drag = null, chipDrag = null, suppressChipClick = 0, dialog = null, exporting = false, trayCollapsed = root.innerWidth < 700;
+      selected = '', armed = null, onlyUnassigned = false, showHidden = false, zoom = 1, scroll = { left: 0, top: 0 }, trayScroll = 0, drag = null, chipDrag = null, dropTarget = null, preservingWorkspace = false, suppressChipClick = 0, dialog = null, exporting = false, trayCollapsed = root.innerWidth < 700;
     const state = () => a.state(), records = () => E.records(state(), pid), person = id => records().people.find(p => p.id === id);
     function guard(expected = owner, projectId = pid) {
       if (!a.ready() || !a.owner() || a.owner() !== expected || state().activeProjectId !== projectId || !state().projects.some(p => p.id === projectId))
@@ -44,16 +44,50 @@
     }
     function refresh() {
       rememberScroll();
-      const focus = document.activeElement, focusId = focus?.id, start = focus?.selectionStart, end = focus?.selectionEnd;
+      const focus = document.activeElement, start = focus?.selectionStart, end = focus?.selectionEnd;
       const el = $('peWorkspace'); if (!el) { a.render(); return; }
-      el.outerHTML = render(pid); mount();
-      if (focusId && $(focusId)) { $(focusId).focus({ preventScroll: true }); if (typeof start === 'number') $(focusId).setSelectionRange?.(start, end); }
+      const template = document.createElement('template'); template.innerHTML = render(pid);
+      // Keep the workspace, cards and controls alive so saving cannot replay their entry animation.
+      patch(el, template.content.firstElementChild); mount();
+      if (focus?.isConnected) { if (document.activeElement !== focus) focus.focus({ preventScroll: true }); if (typeof start === 'number') focus.setSelectionRange?.(start, end); }
+    }
+    function nodeKey(node) {
+      if (node.nodeType !== 1) return '';
+      if (node.id) return 'id:' + node.id;
+      for (const name of ['pePerson', 'peMove', 'peArea', 'peChip']) if (node.dataset[name]) return name + ':' + node.dataset[name];
+      if (node.dataset.pe) return 'action:' + node.dataset.pe + ':' + (node.dataset.chipType || '') + ':' + (node.dataset.id || '');
+      return node.classList[0] || '';
+    }
+    function patch(node, next) {
+      if (node.nodeType !== 1) { if (node.nodeValue !== next.nodeValue) node.nodeValue = next.nodeValue; return; }
+      for (const attr of [...node.attributes]) if (!next.hasAttribute(attr.name)) node.removeAttribute(attr.name);
+      for (const attr of [...next.attributes]) if (node.getAttribute(attr.name) !== attr.value) node.setAttribute(attr.name, attr.value);
+      const old = [...node.childNodes], used = new Set(); let cursor = node.firstChild;
+      for (const child of [...next.childNodes]) {
+        const key = nodeKey(child);
+        let match = old.find(n => !used.has(n) && n.nodeType === child.nodeType && n.nodeName === child.nodeName && nodeKey(n) === key);
+        if (match) patch(match, child); else match = child.cloneNode(true);
+        used.add(match);
+        if (match !== cursor) node.insertBefore(match, cursor);
+        cursor = match.nextSibling;
+      }
+      for (const child of old) if (!used.has(child)) child.remove();
+      if (node.tagName === 'INPUT') { if (node.value !== next.value) node.value = next.value; node.checked = next.checked; }
+      else if (node.tagName === 'SELECT' && node.value !== next.value) node.value = next.value;
+    }
+    function patchRender() {
+      const el = $('peWorkspace');
+      if (!preservingWorkspace || !a.ready() || !el || el.dataset.owner !== a.owner() || el.dataset.project !== state().activeProjectId) return false;
+      refresh(); return true;
     }
     function save(fn, message) {
       guard(); rememberScroll();
-      const ok = a.mutate(fn);
-      if (ok && message) a.tell(message);
-      return ok;
+      preservingWorkspace = true;
+      try {
+        const ok = a.mutate(fn);
+        if (ok && message) a.tell(message);
+        return ok;
+      } finally { preservingWorkspace = false; }
     }
     function visiblePeople() { return E.filter(state(), pid, query, department, areaFilter, activityFilter); }
     function card(projectId) {
@@ -62,13 +96,13 @@
     }
     function chip(type, id, label, extra = '') {
       const on = armed?.type === type && armed.id === id;
-      return `<div class="pe-chip-row${on ? ' is-armed' : ''}">${button('arm', `<span class="pe-grip" aria-hidden="true">⠿</span><span>${esc(label)}</span>`, `draggable="true" data-chip-type="${type}" data-id="${esc(id)}" aria-pressed="${!!on}" title="Drag onto a person, or select and then choose a person"`, type === 'area' ? 'pe-area-chip' : 'pe-activity-chip')}${extra}</div>`;
+      return `<div class="pe-chip-row${on ? ' is-armed' : ''}" data-pe-chip="${type}:${esc(id)}">${button('arm', `<span class="pe-grip" aria-hidden="true">⠿</span><span>${esc(label)}</span>`, `draggable="true" data-chip-type="${type}" data-id="${esc(id)}" aria-pressed="${!!on}" title="Drag onto a person, or select and then choose a person"`, type === 'area' ? 'pe-area-chip' : 'pe-activity-chip')}${extra}</div>`;
     }
     function tray() {
       const r = records(), assigned = new Set(r.assignments.map(r => r.activityId));
       return `<aside class="pe-tray${trayCollapsed ? ' is-collapsed' : ''}" aria-label="MM areas and activities"><div class="pe-tray-heading"><span class="pe-eyebrow">DRAG · DROP · CONNECT</span><h3>Your responsibilities</h3><p>Drag an activity onto a person. On mobile, tap it and then choose a person.</p>${button('toggle-tray', trayCollapsed ? 'Show activities ↓' : 'Hide activities ↑', `aria-expanded="${!trayCollapsed}"`, 'pe-tray-toggle')}</div><div class="pe-tray-options"><label><input id="peUnassigned" type="checkbox"${onlyUnassigned ? ' checked' : ''}> Unassigned activities only</label><label><input id="peShowHidden" type="checkbox"${showHidden ? ' checked' : ''}> Include hidden MM areas</label></div><div class="pe-area-list">${E.project(state(), pid).mmAreas.filter(a => a.visible || showHidden).map(area => {
         const activities = r.activities.filter(t => t.areaId === area.id && t.kind === 'activity' && (!onlyUnassigned || !assigned.has(t.id)));
-        return `<section class="pe-area-group">${chip('area', area.id, area.name + (area.visible ? '' : ' · hidden'), button('lookup-area', '↗', `data-id="${esc(area.id)}" aria-label="Find people responsible for ${esc(area.name)}"`, 'pe-icon'))}<div class="pe-area-activities">${activities.map(t => chip('activity', t.id, t.name, `<span class="pe-activity-state${assigned.has(t.id) ? ' is-assigned' : ''}" title="${assigned.has(t.id) ? 'Assigned' : 'Unassigned'}">${assigned.has(t.id) ? '✓' : '○'}</span>${button('lookup-activity', '↗', `data-id="${esc(t.id)}" aria-label="Find people for ${esc(t.name)}"`, 'pe-icon')}${button('edit-activity', '⋯', `data-id="${esc(t.id)}" aria-label="Edit ${esc(t.name)}"`, 'pe-icon')}`)).join('') || `<p class="pe-tray-empty">${onlyUnassigned ? 'No unassigned activities here.' : 'Add an activity, or drag the entire area.'}</p>`}</div></section>`;
+        return `<section class="pe-area-group" data-pe-area="${esc(area.id)}">${chip('area', area.id, area.name + (area.visible ? '' : ' · hidden'), button('lookup-area', '↗', `data-id="${esc(area.id)}" aria-label="Find people responsible for ${esc(area.name)}"`, 'pe-icon'))}<div class="pe-area-activities">${activities.map(t => chip('activity', t.id, t.name, `<span class="pe-activity-state${assigned.has(t.id) ? ' is-assigned' : ''}" title="${assigned.has(t.id) ? 'Assigned' : 'Unassigned'}">${assigned.has(t.id) ? '✓' : '○'}</span>${button('lookup-activity', '↗', `data-id="${esc(t.id)}" aria-label="Find people for ${esc(t.name)}"`, 'pe-icon')}${button('edit-activity', '⋯', `data-id="${esc(t.id)}" aria-label="Edit ${esc(t.name)}"`, 'pe-icon')}`)).join('') || `<p class="pe-tray-empty">${onlyUnassigned ? 'No unassigned activities here.' : 'Add an activity, or drag the entire area.'}</p>`}</div></section>`;
       }).join('')}</div><div class="pe-tray-footer">${button('activity', '+ Add activity')}${button('areas', 'Manage MM areas ↗')}${button('starter', 'Add PR / PO / GR examples', '', 'pe-quiet')}</div></aside>`;
     }
     function personCard(p, index) {
@@ -181,7 +215,12 @@
     function clearChipDrag() {
       chipDrag?.ghost?.remove(); chipDrag = null;
       document.body.classList.remove('pe-is-assigning');
-      document.querySelectorAll('.pe-person.is-over').forEach(el => el.classList.remove('is-over'));
+      highlightDrop(null);
+    }
+    function highlightDrop(card) {
+      if (dropTarget === card) return;
+      dropTarget?.classList.remove('is-over'); dropTarget = card;
+      dropTarget?.classList.add('is-over');
     }
     function reuse(sourceId = '') {
       const sources = state().projects.filter(p => p.id !== pid && E.records(state(), p.id).people.length);
@@ -324,15 +363,18 @@
     });
     document.addEventListener('dragover', event => {
       const card = event.target.closest?.('[data-pe-person]'); if (!card || !event.dataTransfer?.types?.includes('application/x-workhub-responsibility')) return;
-      event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; card.classList.add('is-over');
+      event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; highlightDrop(card);
     });
-    document.addEventListener('dragleave', event => event.target.closest?.('[data-pe-person]')?.classList.remove('is-over'));
-    document.addEventListener('dragend', () => { $('peWorkspace')?.classList.remove('is-dropping'); document.querySelectorAll('.pe-person.is-over').forEach(el => el.classList.remove('is-over')); });
+    document.addEventListener('dragleave', event => {
+      const card = event.target.closest?.('[data-pe-person]');
+      if (card && card === dropTarget && !card.contains(event.relatedTarget)) highlightDrop(null);
+    });
+    document.addEventListener('dragend', () => { $('peWorkspace')?.classList.remove('is-dropping'); highlightDrop(null); });
     document.addEventListener('drop', event => {
       const card = event.target.closest?.('[data-pe-person]'); if (!card) return;
       event.preventDefault();
       try { guard(); place(card.dataset.pePerson, dropPayload(event)); } catch (err) { a.tell(err.message, true); }
-      $('peWorkspace')?.classList.remove('is-dropping'); card.classList.remove('is-over');
+      $('peWorkspace')?.classList.remove('is-dropping'); highlightDrop(null);
     });
     document.addEventListener('pointerdown', event => {
       const chip = event.target.closest?.('[data-chip-type]');
@@ -358,8 +400,7 @@
           const ghost = document.createElement('div'); ghost.className = 'pe-drag-ghost'; ghost.textContent = '＋ ' + chipDrag.label; document.body.append(ghost); chipDrag.ghost = ghost; document.body.classList.add('pe-is-assigning');
         }
         chipDrag.ghost.style.left = event.clientX + 14 + 'px'; chipDrag.ghost.style.top = event.clientY + 14 + 'px';
-        document.querySelectorAll('.pe-person.is-over').forEach(el => el.classList.remove('is-over'));
-        document.elementFromPoint?.(event.clientX, event.clientY)?.closest?.('[data-pe-person]')?.classList.add('is-over');
+        highlightDrop(document.elementFromPoint?.(event.clientX, event.clientY)?.closest?.('[data-pe-person]') || null);
         event.preventDefault(); return;
       }
       if (!drag || event.pointerId !== drag.pointerId) return;
@@ -400,7 +441,7 @@
       } catch (err) { a.tell(err.message, true); }
     });
     $('modal')?.addEventListener('close', () => { dialog = null; });
-    return { render, card, mount, sync, personEditor, activityEditor, assignmentEditor, details, submit, place, exportFile, arrange };
+    return { render, card, mount, sync, patchRender, personEditor, activityEditor, assignmentEditor, details, submit, place, exportFile, arrange };
   }
   root.WorkHubProjectPeople = { install };
 })(window);

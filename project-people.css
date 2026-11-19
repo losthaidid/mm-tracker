@@ -78,11 +78,11 @@ body .pe-chip-row .pe-icon{width:23px;min-width:23px;padding:2px;color:#a1ad8d;f
 .pe-links{position:absolute;left:0;top:0;overflow:visible;pointer-events:none;fill:none}
 .pe-links path{stroke:#b0c2a3;stroke-width:1.8;stroke-dasharray:6 5;animation:pe-connect 16s linear infinite}
 .pe-links circle{fill:#ccd8b6;stroke:#f7f9f1;stroke-width:2}
-.pe-person{position:absolute;left:0;top:0;width:264px;height:268px;transform:translate(var(--pe-x),var(--pe-y));padding:17px 16px 13px;border:1px solid #d6dfcd;border-radius:17px;background:#fffef9;box-shadow:0 6px 24px #50653e08,0 1px 3px #50653e08;z-index:1;transition:border-color .22s,box-shadow .22s;animation:pe-card-arrive .45s ease both;animation-delay:calc(var(--pe-order)*35ms)}
+.pe-person{position:absolute;left:0;top:0;width:264px;height:268px;transform:translate(var(--pe-x),var(--pe-y));padding:17px 16px 13px;border:1px solid #d6dfcd;border-radius:17px;background:#fffef9;box-shadow:0 6px 24px #50653e08,0 1px 3px #50653e08;z-index:1;transition:border-color .22s,box-shadow .22s}
 .pe-person:hover{border-color:#b6cba4;box-shadow:0 10px 28px #50653e13}
 .pe-person.is-selected{border-color:#b7a7d2;box-shadow:0 0 0 3px #b7a7d224,0 8px 26px #50653e10}
 .pe-person.is-target{border-style:dashed;border-color:#acc48e}
-.pe-person.is-over,.is-dropping .pe-person:hover{border:2px solid #94b275;background:#f8fcee;box-shadow:0 0 0 6px #b6ce9433,0 14px 35px #60813c18}
+.pe-person.is-over{border-color:#94b275;background:#f8fcee;box-shadow:inset 0 0 0 1px #94b275,0 0 0 6px #b6ce9433,0 14px 35px #60813c18}
 .pe-person.is-moving{box-shadow:0 20px 45px #42633824;border-color:#9db985;z-index:5;animation:none;transition:none;cursor:grabbing}
 .pe-person.just-assigned{animation:pe-assigned .65s cubic-bezier(.2,.8,.2,1)}
 .pe-person-top{display:flex;align-items:center;gap:11px;height:45px;position:relative}
@@ -161,7 +161,6 @@ body .pe-button.pe-assign-button{min-height:25px;padding:4px 7px;font-size:9px;b
 .pe-detail-assignments article>.actions{margin-top:13px}
 body.hub-private :is(.pe-workspace,.pe-overview-card,#peForm,.pe-person-detail,[data-pe-dialog=copy]){filter:blur(8px);user-select:none;pointer-events:none}
 @keyframes pe-arrive{from{opacity:0;transform:translateY(13px)}to{opacity:1;transform:translateY(0)}}
-@keyframes pe-card-arrive{from{opacity:0;filter:blur(3px)}to{opacity:1;filter:blur(0)}}
 @keyframes pe-connect{to{stroke-dashoffset:-88}}
 @keyframes pe-art-float{0%,100%{margin-top:0}50%{margin-top:-6px}}
 @keyframes pe-breathe{0%,100%{opacity:.65}50%{opacity:1}}
