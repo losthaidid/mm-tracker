@@ -344,7 +344,8 @@
     function play(kind, auto = false) {
       if (
         auto &&
-        (!a.prefs().hobbies ||
+        (root.WorkHubMomoCosplay?.activeFor(a.prefs()) ||
+          !a.prefs().hobbies ||
           a.prefs().motion === 'off' ||
           root.matchMedia?.('(prefers-reduced-motion: reduce)').matches)
       )
@@ -413,7 +414,7 @@
       const current = look(a.prefs(), owner);
       a.openModal(
         'Wardrobe & hobbies',
-        `<section class="momo-wardrobe-gallery">${cosplay && root.WorkHubMomoCosplay.enabled(a.prefs()) ? cosplay.gallery() : `<span class="hub-kicker">A LITTLE LIFE OF HIS OWN</span><h3>${esc(current.label)}</h3><p>Automatic wardrobe changes at 6 am, noon and 7 pm using your device’s local time. Morning and afternoon have different outfits; night brings one of 8 pajama designs in 12 colours, with a different design each night. The night outfit stays through midnight until 6 am. Choose Automatic in Appearance, or keep a fixed outfit. Headphones are optional.</p><button type="button" data-momo-style="appearance">Choose outfit & accessories</button>`}<h3>His hobby shelf</h3><p>Try a quiet, in-place activity. Automatic hobbies wait while you work, type, focus or present, and never wake a requested nap.</p><div class="momo-hobby-grid">${HOBBIES.map(([id, label, icon]) => `<button type="button" data-momo-style="hobby" data-kind="${id}"><span aria-hidden="true">${icon}</span>${esc(label)}</button>`).join('')}</div></section>`
+        `<section class="momo-wardrobe-gallery">${cosplay && root.WorkHubMomoCosplay.activeFor(a.prefs()) ? cosplay.gallery() : `<span class="hub-kicker">A LITTLE LIFE OF HIS OWN</span><h3>${esc(current.label)}</h3><p>Automatic wardrobe changes at 6 am, noon and 7 pm using your device’s local time. Morning and afternoon have different outfits; night brings one of 8 pajama designs in 12 colours, with a different design each night. The night outfit stays through midnight until 6 am. Choose Automatic in Appearance, or keep a fixed outfit. Headphones are optional.</p>${cosplay ? '<p>Choose an anime or cartoon background in Theme Studio for matching character outfits and moves.</p>' : ''}<button type="button" data-momo-style="appearance">Choose outfit & accessories</button>`}<h3>His hobby shelf</h3><p>Try a quiet, in-place activity. Automatic hobbies wait for ordinary backgrounds while matching character routines follow anime and cartoon backgrounds. You can try a hobby here at any time when he is awake.</p><div class="momo-hobby-grid">${HOBBIES.map(([id, label, icon]) => `<button type="button" data-momo-style="hobby" data-kind="${id}"><span aria-hidden="true">${icon}</span>${esc(label)}</button>`).join('')}</div></section>`
       );
     }
     document.addEventListener('click', event => {
@@ -466,6 +467,7 @@
       if (document.hidden) finish();
     });
     root.addEventListener('pagehide', finish);
+    root.addEventListener('workhub:momo-cosplay-context', finish);
     return {
       mount,
       tick,

@@ -6,18 +6,19 @@ const source=file=>readFileSync(new URL('../'+file,import.meta.url),'utf8');
 function setup(t) {
   const dom=new JSDOM('<body><div id="hubPet" style="left:40px;top:60px"><button></button></div><dialog id="modal"></dialog><input id="work"></body>',{url:'https://preview.test',runScripts:'outside-only',pretendToBeVisual:true});
   t.after(()=>dom.window.close());
-  const w=dom.window,d=w.document,p={mascot:true,motion:'calm',outfit:'daily',outfitPalette:'daily',accessory:'daily',hobbies:true};
+  const w=dom.window,d=w.document,p={mascot:true,motion:'calm',outfit:'daily',outfitPalette:'daily',accessory:'daily',hobbies:true,patternSet:'one-piece-voyage'};
   let now=100000,owner='first',sleeping=false,busy=false,scene=null,reduced=false,ready=true;
   const media={get matches(){return reduced;},addEventListener(){}};
   w.matchMedia=()=>media;w.Date.now=()=>now;
-  for(const file of ['momo-cosplay-data.js','momo-art.js','momo-cosplay-art.js','momo-cosplay.js','momo-wardrobe.js'])w.eval(source(file));
+  for(const file of ['momo-cosplay-data.js','pattern-collection.js','momo-art.js','momo-cosplay-art.js','momo-cosplay.js','momo-wardrobe.js'])w.eval(source(file));
   d.querySelector('#hubPet button').innerHTML=w.WorkHubMomoArt.svg('none');
   const life={sleeping:()=>sleeping,busy:()=>busy||!!scene,sceneAvailable:()=>!sleeping&&!busy&&!scene,hobbyAvailable:()=>!scene&&!sleeping&&!busy,sceneOwner:()=>scene?.source||'',scene(v){if(sleeping)return false;scene=v;},releaseScene(source){if(scene?.source===source)scene=null;},wake(){throw Error('Cosplay must never wake the companion');}};
   const ui=w.WorkHubMomoCosplay.install({ready:()=>ready,owner:()=>owner,prefs:()=>p,life:()=>life,tell(){}});
   ui.mount();
-  return {w,d,p,ui,life,E:w.WorkHubMomoCosplay,A:w.WorkHubMomoCosplayArt,D:w.WorkHubMomoCosplayData,pet:d.getElementById('hubPet'),advance:ms=>now+=ms,setOwner:value=>owner=value,setSleep:value=>sleeping=value,setBusy:value=>busy=value,setReduced:value=>reduced=value,setReady:value=>ready=value,
+  return {w,d,p,ui,life,E:w.WorkHubMomoCosplay,A:w.WorkHubMomoCosplayArt,D:w.WorkHubMomoCosplayData,pet:d.getElementById('hubPet'),advance:ms=>now+=ms,setOwner:value=>owner=value,getOwner:()=>owner,apply:()=>w.WorkHubMomoWardrobe.apply(p,owner),setSleep:value=>sleeping=value,setBusy:value=>busy=value,setReduced:value=>reduced=value,setReady:value=>ready=value,
     character(name,move,outfitIndex=0){
       ui.finish();const character=w.WorkHubMomoCosplayData.CHARACTERS.find(c=>c.name===name);assert.ok(character,name);
+      p.patternSet=Object.keys(w.WorkHubMomoCosplay.BACKGROUND_SERIES).find(id=>w.WorkHubMomoCosplay.BACKGROUND_SERIES[id]===character.seriesId);
       owner=name+'/'+move;w.localStorage.setItem('mm-tracker.momo-cosplay.v1:'+owner,JSON.stringify({key:character.id+'/'+character.outfits[outfitIndex].id}));ui.mount();
       const i=character.moves.indexOf(move);assert.ok(i>=0);w.Math.random=()=>((i+.1)/character.moves.length);return character;
     },
@@ -54,6 +55,44 @@ test('random rotation avoids the previous character and restores each account lo
   for(let i=0;i<15;i++){const previous=h.ui.snapshot().look;assert.equal(h.ui.rotate(),true);const current=h.ui.snapshot().look;assert.notEqual(current.character.id,previous.character.id);seen.add(current.key);assert.equal(h.pet.style.left,'40px');assert.equal(h.pet.style.top,'60px');}
   assert.ok(seen.size>=9);const saved=h.ui.snapshot().look.key;h.setOwner('second');h.ui.mount();h.setOwner('first');h.ui.mount();assert.equal(h.ui.snapshot().look.key,saved);
   h.setOwner('');h.ui.mount();assert.equal(h.ui.snapshot().look,null);assert.equal(h.pet.dataset.cosplay,undefined);assert.equal(h.pet.querySelector('.mc-leg'),null);
+});
+test('all 40 backgrounds restrict random outfits and routines to their own cast',t=>{
+  const h=setup(t),sets=h.w.WorkHubPatternCollection.SETS;
+  assert.equal(Object.keys(h.E.BACKGROUND_SERIES).length,sets.length);assert.equal(new Set(Object.values(h.E.BACKGROUND_SERIES)).size,40);
+  const normalize=s=>s.replaceAll('’',"'");
+  for(const set of sets){
+    h.p.patternSet=set.id;h.ui.mount();const expected=h.E.selectedSeries(h.p);assert.ok(expected,set.id);assert.equal(normalize(expected.name),normalize(set.series));assert.equal(expected.group,set.group);
+    const cast=h.D.CHARACTERS.filter(c=>c.seriesId===expected.id);assert.equal(cast.length,5);
+    for(let i=0;i<10;i++){
+      const previous=h.ui.snapshot().look;assert.equal(h.ui.rotate(),true);const current=h.ui.snapshot().look;
+      assert.equal(current.series.id,expected.id,set.id);assert.equal(current.character.seriesId,expected.id);assert.notEqual(current.character.id,previous.character.id);assert.ok(cast.includes(current.character));
+      assert.equal(h.ui.play(),true);assert.ok(current.character.moves.includes(h.ui.snapshot().active));h.ui.finish();
+    }
+  }
+});
+test('changing backgrounds immediately cancels the old transformation and restores each collection on return',t=>{
+  const h=setup(t);h.character('Goku','saiyan-blue');const goku=h.ui.snapshot().look.key;
+  assert.equal(h.ui.play(),true);assert.ok(h.pet.querySelector('.mc-transform-hair path'));
+  h.p.patternSet='one-piece-voyage';h.apply();assert.equal(h.ui.snapshot().active,null);assert.equal(h.life.sceneOwner(),'');assert.equal(h.pet.dataset.cosplayMove,undefined);assert.equal(h.pet.dataset.cosplaySeries,'one-piece');assert.equal(h.pet.querySelector('.mc-transform-hair').children.length,0);
+  h.ui.mount();const pirate=h.ui.snapshot().look.key;h.p.patternSet='dragon-ball-orbs';h.apply();assert.equal(h.ui.snapshot().look.key,goku);assert.equal(h.pet.dataset.cosplaySeries,'dragon-ball');
+  h.ui.mount();h.life.scene({source:'adventure'});h.p.patternSet='';h.apply();assert.equal(h.life.sceneOwner(),'adventure');assert.equal(h.pet.dataset.cosplay,undefined);assert.equal(h.pet.querySelector('.momo-cosplay-layer'),null);assert.equal(h.ui.play(),false);assert.equal(h.ui.rotate(),false);h.life.scene(null);
+  h.p.patternSet='one-piece-voyage';h.apply();assert.equal(h.ui.snapshot().look.key,pirate);h.ui.mount();
+  h.setSleep(true);h.p.patternSet='spongebob-bottom';h.apply();h.ui.mount();assert.equal(h.pet.dataset.cosplaySeries,'spongebob-squarepants');assert.equal(h.life.sleeping(),true);assert.equal(h.ui.play(),false);const asleep=h.ui.snapshot().look.key;h.advance(1000000);h.ui.tick();assert.equal(h.ui.snapshot().look.key,asleep);
+});
+test('old or malformed local selections never restore a character from another background',t=>{
+  const h=setup(t),goku=h.E.looks.find(l=>l.character.name==='Goku'),luffy=h.E.looks.find(l=>l.character.name==='Monkey D. Luffy');
+  for(const scoped of [false,true]){
+    const owner='foreign-'+scoped;h.w.localStorage.setItem('mm-tracker.momo-cosplay.v1:'+owner+(scoped?':one-piece':''),JSON.stringify({key:goku.key,recent:[goku.key,'missing',luffy.key]}));h.setOwner(owner);h.ui.mount();assert.equal(h.ui.snapshot().look.series.id,'one-piece');assert.notEqual(h.ui.snapshot().look.key,goku.key);
+    const saved=JSON.parse(h.w.localStorage.getItem('mm-tracker.momo-cosplay.v1:'+owner+':one-piece'));assert.ok(saved.recent.every(key=>h.E.looks.find(l=>l.key===key).series.id==='one-piece'));
+  }
+  h.w.localStorage.setItem('mm-tracker.momo-cosplay.v1:matching',JSON.stringify({key:luffy.key,recent:[goku.key,luffy.key]}));h.setOwner('matching');h.ui.mount();assert.equal(h.ui.snapshot().look.key,luffy.key);
+  h.p.patternSet='unknown-collection';h.apply();assert.equal(h.E.activeFor(h.p),false);assert.equal(h.pet.dataset.cosplay,undefined);assert.equal(h.ui.play(),false);
+});
+test('ordinary backgrounds use regular wardrobe and hobbies; collection changes end automatic hobbies',t=>{
+  const h=setup(t),wardrobe=h.w.WorkHubMomoWardrobe.install({ready:()=>true,owner:()=>h.getOwner(),prefs:()=>h.p,life:()=>h.life,tell(){},openModal(){},closeModal(){},appearance(){}});
+  wardrobe.mount();assert.equal(wardrobe.play('reading',true),false);assert.equal(wardrobe.play('reading'),true);
+  h.p.patternSet='';h.apply();wardrobe.mount();assert.equal(wardrobe.snapshot().active,null);assert.equal(h.pet.querySelector('.momo-hobby-prop'),null);assert.equal(h.pet.dataset.cosplay,undefined);assert.equal(wardrobe.play('reading',true),true);
+  h.p.patternSet='naruto-clouds';h.apply();wardrobe.mount();assert.equal(wardrobe.snapshot().active,null);assert.equal(h.pet.querySelector('.momo-hobby-prop'),null);assert.equal(h.pet.dataset.cosplaySeries,'naruto');assert.equal(wardrobe.play('reading',true),false);
 });
 test('signature moves are finite, keep props attached and fully restore temporary transformations',t=>{
   const h=setup(t);

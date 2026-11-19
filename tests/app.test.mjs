@@ -3818,12 +3818,24 @@ test('Feedback: atmosphere rain keeps flowing while typing and falling weather d
  const card=document.getElementById('hubAtmosphereCard'),rain=card.querySelector('.world-rain'),input=document.createElement('input');document.body.append(input);input.focus();api.hub.atmosphere.sync();assert.equal(card.dataset.paused,'false');assert.notEqual(window.getComputedStyle(rain).display,'none');
  document.body.classList.add('hub-focus');api.hub.atmosphere.sync();assert.equal(card.dataset.paused,'true');assert.equal(window.getComputedStyle(rain).display,'none');document.body.classList.remove('hub-focus');input.blur();api.hub.atmosphere.sync();assert.equal(card.dataset.paused,'false');assert.notEqual(window.getComputedStyle(rain).display,'none');
 });
+test('Companion background matching: previews switch the cast immediately, cancel old routines and discard without cloud writes',async t=>{
+ const {api,document,window,db}=await app(t),pet=document.getElementById('hubPet'),ui=api.hub.wardrobe.cosplay;
+ assert.equal(pet.dataset.cosplay,undefined);const before=copy(api.state()),calls=db.calls.length;
+ await api.hub.handle({dataset:{hub:'tool',tool:'theme'}});const form=document.getElementById('hubTheme');
+ const choose=id=>document.querySelector('[data-hub="pattern-set"][data-id="'+id+'"]').click();
+ choose('one-piece-voyage');assert.equal(pet.dataset.cosplaySeries,'one-piece');assert.equal(ui.snapshot().look.series.id,'one-piece');
+ let now=window.Date.now();window.Date.now=()=>now;document.activeElement?.blur();api.hub.life.clearForWork();now+=13000;assert.equal(ui.play(),true);
+ choose('dragon-ball-orbs');assert.equal(ui.snapshot().active,null);assert.equal(api.hub.life.sceneOwner(),'');assert.equal(pet.dataset.cosplayMove,undefined);assert.equal(pet.dataset.cosplaySeries,'dragon-ball');assert.equal(ui.snapshot().look.series.id,'dragon-ball');
+ choose('spongebob-bottom');assert.equal(pet.dataset.cosplaySeries,'spongebob-squarepants');const cartoon=ui.snapshot().look.key;form.elements.patternCharacters.checked=false;form.elements.patternCharacters.dispatchEvent(new window.Event('change',{bubbles:true}));assert.equal(ui.snapshot().look.key,cartoon);assert.equal(pet.dataset.cosplaySeries,'spongebob-squarepants');
+ document.querySelector('[data-hub="theme-reset-preview"]').click();await settle();assert.equal(pet.dataset.cosplay,undefined);assert.equal(ui.snapshot().look,null);assert.equal(pet.querySelector('.momo-cosplay-layer'),null);assert.equal(db.calls.length,calls);assert.deepEqual(copy(api.state()),before);
+});
 test('Companion cosplay: automatic costumes and routines use the real rig without cloud writes; switches survive backup and reload',async t=>{
  const {api,document,window,db}=await app(t),pet=document.getElementById('hubPet'),ui=api.hub.wardrobe.cosplay;
- assert.ok(ui);assert.ok(pet.dataset.cosplay);assert.equal(pet.querySelectorAll('.momo-part-image').length,6);assert.equal(api.state().workhub.preferences.cosplayEnabled,true);
+ assert.ok(ui);assert.equal(pet.dataset.cosplay,undefined);assert.equal(pet.querySelectorAll('.momo-part-image').length,6);assert.equal(api.state().workhub.preferences.cosplayEnabled,true);
+ await api.hub.handle({dataset:{hub:'tool',tool:'theme'}});document.querySelector('[data-hub="pattern-set"][data-id="one-piece-voyage"]').click();api.hub.submit(document.getElementById('hubTheme'));await settle();assert.equal(pet.dataset.cosplaySeries,'one-piece');
  let now=window.Date.now();window.Date.now=()=>now;document.activeElement?.blur();api.closeModal();api.hub.life.clearForWork();now+=13000;
  const before=api.payload(api.state()),calls=db.calls.length,images=[...pet.querySelectorAll('.momo-part-image')];let previous=ui.snapshot().look.character.id;
- for(let i=0;i<10;i++){assert.equal(ui.rotate(),true);assert.notEqual(ui.snapshot().look.character.id,previous);previous=ui.snapshot().look.character.id;}
+ for(let i=0;i<10;i++){assert.equal(ui.rotate(),true);assert.notEqual(ui.snapshot().look.character.id,previous);assert.equal(ui.snapshot().look.series.id,'one-piece');previous=ui.snapshot().look.character.id;}
  assert.equal(ui.play(),true);assert.equal(api.hub.life.sceneOwner(),'cosplay');now+=9000;ui.tick();assert.equal(ui.snapshot().active,null);assert.equal(api.hub.life.sceneOwner(),'');assert.deepEqual([...pet.querySelectorAll('.momo-part-image')],images);assert.equal(db.calls.length,calls);assert.deepEqual(JSON.parse(api.payload(api.state())).data,JSON.parse(before).data);
  await api.hub.handle({dataset:{hub:'tool',tool:'theme'}});const form=document.getElementById('hubTheme');assert.equal(form.elements.cosplayEnabled.checked,true);assert.equal(form.elements.cosplayMoves.checked,true);form.elements.cosplayEnabled.checked=false;form.elements.cosplayMoves.checked=false;form.elements.outfit.value='artist';form.elements.accessory.value='party';api.hub.submit(form);await settle();assert.equal(pet.dataset.cosplay,undefined);assert.equal(pet.dataset.outfit,'artist');
  const backup=api.parseBackup(api.payload(api.state()));assert.equal(backup.workhub.preferences.cosplayEnabled,false);assert.equal(backup.workhub.preferences.cosplayMoves,false);
