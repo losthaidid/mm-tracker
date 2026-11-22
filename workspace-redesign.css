@@ -155,12 +155,6 @@ body[data-hub-layout='renewed'] .wd-context-eyebrow {
   letter-spacing: 0.1em;
   margin-bottom: 3px;
 }
-body[data-hub-layout='renewed'] #wdWorkspaceBar > button {
-  min-height: 31px;
-  font-size: 11px;
-  padding: 5px 10px;
-  border-radius: 8px;
-}
 
 /* Frequent commands stay in reach; secondary commands have one accessible home. */
 body[data-hub-layout='renewed'] #hubToolbar {

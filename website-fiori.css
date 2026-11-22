@@ -252,9 +252,6 @@ body[data-hub-design='fiori'] #wdSectionTitle {
   font: 650 clamp(24px, 2.5vw, 30px) / 1.25 var(--hub-font);
   letter-spacing: -0.025em;
 }
-body[data-hub-design='fiori'] #wdWorkspaceBar > button {
-  border-radius: 4px;
-}
 body[data-hub-design='fiori'] #hubToolbar {
   min-width: 0;
   gap: 8px;

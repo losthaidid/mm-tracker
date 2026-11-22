@@ -1,6 +1,6 @@
 # Website designs
 
-Open **Settings → Website design**, select a card to preview, and choose **Use this design** to save. **Cancel preview**, Close or Escape returns to the saved design. The chooser is also available under **Appearance & motion**, above the colour choices. Alternate layouts include a **Change design** button beside the section heading.
+Open **Settings → Workspace → Change design**, select a layout to preview, and choose **Apply** to save. Choose **Cancel**, close the dialog, or press Escape to return to your previous appearance.
 
 | Design      | Desktop                                                                                      | Phone and narrow windows                                                                            |
 | ----------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
