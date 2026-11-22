@@ -39,7 +39,10 @@ listed and can be selected. Merged values remain in their top-left position;
 the other positions stay blank. Preview pages never restrict exported data.
 Each selected worksheet is exported separately, without combining unrelated rows.
 
-Every field is quoted with RFC-style doubled quotes and CRLF record separators.
+Ordinary values are unquoted: `something` exports as `something`, not `"something"`.
+Fields containing commas, quotation marks or line breaks are quoted, with embedded
+quotes doubled. A single-column empty cell is quoted as `""` so it remains a cell
+instead of an empty record. Records use CRLF separators.
 UTF-8 with a BOM preserves Unicode. Commas, quotes, spaces, embedded CR/LF and
 literal leading `=`, `+`, `-` or `@` are not modified. The source workbook and the
 validation/comparison workspaces remain unchanged; uploaded values and resulting
