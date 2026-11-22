@@ -23,11 +23,11 @@
   });
   const valueAt = (sheet, row, col) => String(sheet.rows[row]?.[col] ?? '');
 
-  // The encoder always quotes every field. This parser verifies the actual UTF-8
-  // bytes independently, including embedded quotes/newlines and blank edge rows.
+  // Verify quoted and unquoted fields independently against the source values,
+  // including embedded quotes/newlines and blank edge rows.
   async function verify(blob, sheet, { guard = () => {}, progress = () => {} } = {}) {
     const { rows, columns } = shape(sheet),
-      decoder = new root.TextDecoder('utf-8', { fatal: true });
+      decoder = new root.TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
     let state = 'field',
       cell = '',
       row = 0,
@@ -49,6 +49,16 @@
       column++;
       checked++;
     };
+    const separator = c => {
+      endCell();
+      if (c === ',') state = 'field';
+      else {
+        if (column !== columns) fail();
+        column = 0;
+        row++;
+        state = 'lf';
+      }
+    };
     const feed = text => {
       for (const c of text) {
         if (first) {
@@ -56,8 +66,22 @@
           if (c === '\uFEFF') continue;
         }
         if (state === 'field') {
-          if (c !== '"') fail();
-          state = 'quoted';
+          if (c === '"') state = 'quoted';
+          else if (c === ',' || c === '\r') {
+            // A bare blank record has no cells; a single empty cell needs "".
+            if (c === '\r' && column === 0) fail();
+            separator(c);
+          } else {
+            if (c === '\n') fail();
+            cell = c;
+            state = 'unquoted';
+          }
+        } else if (state === 'unquoted') {
+          if (c === ',' || c === '\r') separator(c);
+          else {
+            if (c === '"' || c === '\n') fail();
+            cell += c;
+          }
         } else if (state === 'quoted') {
           if (c === '"') state = 'close';
           else cell += c;
@@ -65,16 +89,8 @@
           if (c === '"') {
             cell += '"';
             state = 'quoted';
-          } else if (c === ',') {
-            endCell();
-            state = 'field';
-          } else if (c === '\r') {
-            endCell();
-            if (column !== columns) fail();
-            column = 0;
-            row++;
-            state = 'lf';
-          } else fail();
+          } else if (c === ',' || c === '\r') separator(c);
+          else fail();
         } else if (state === 'lf') {
           if (c !== '\n') fail();
           state = 'field';
@@ -112,7 +128,8 @@
   async function csv(sheet, { guard = () => {}, progress = () => {} } = {}) {
     const { rows, columns } = shape(sheet),
       encoder = new root.TextEncoder(),
-      parts = [];
+      parts = [],
+      special = /[",\r\n]/;
     if (rows > LIMITS.rows || columns > LIMITS.columns || rows * columns > LIMITS.cells)
       throw Error(
         'The worksheet exceeds the CSV conversion limits. No rows or columns were removed.'
@@ -131,10 +148,12 @@
     for (let row = 0; row < rows; row++) {
       guard();
       text +=
-        Array.from(
-          { length: columns },
-          (_, col) => '"' + valueAt(sheet, row, col).replace(/"/g, '""') + '"'
-        ).join(',') + '\r\n';
+        Array.from({ length: columns }, (_, col) => {
+          const value = valueAt(sheet, row, col);
+          return special.test(value) || (columns === 1 && value === '')
+            ? '"' + value.replace(/"/g, '""') + '"'
+            : value;
+        }).join(',') + '\r\n';
       if (text.length >= 262144) {
         flush();
         progress({
@@ -579,7 +598,7 @@
               : '') +
             '</section>'
           : '') +
-        '<details class="val-setup-details vcsv-guidance"><summary>Keeping values intact in Excel</summary><p>CSV stores plain text values and does not retain Excel cell types, styles, charts or images. Number and date displays follow the workbook’s stored formats, including their displayed rounding.</p><p>To preserve codes, long identifiers and formula-like text when opening the CSV in Excel, use <strong>Data → From Text/CSV</strong> and set those columns to <strong>Text</strong>. Double-clicking a CSV lets Excel guess the types.</p><p>UTF-8 with a byte-order mark preserves Unicode. Commas, quotes, spaces and embedded line breaks are quoted without adding apostrophes or formulas. Missing formula results and unsupported number formats stop conversion with a source-cell message.</p><p>Limits: 50 MB workbook · 25,001 worksheet rows · 1,000 columns · 6 million cells across the workbook · 250 MB combined CSV output.</p></details></section>'
+        '<details class="val-setup-details vcsv-guidance"><summary>Keeping values intact in Excel</summary><p>CSV stores plain text values and does not retain Excel cell types, styles, charts or images. Number and date displays follow the workbook’s stored formats, including their displayed rounding.</p><p>To preserve codes, long identifiers and formula-like text when opening the CSV in Excel, use <strong>Data → From Text/CSV</strong> and set those columns to <strong>Text</strong>. Double-clicking a CSV lets Excel guess the types.</p><p>Ordinary values export without added quotation marks. Fields containing commas, quotation marks or line breaks use CSV quoting to keep their contents intact. Spaces are preserved, and no apostrophes or formulas are added. UTF-8 with a byte-order mark preserves Unicode. Missing formula results and unsupported number formats stop conversion with a source-cell message.</p><p>Limits: 50 MB workbook · 25,001 worksheet rows · 1,000 columns · 6 million cells across the workbook · 250 MB combined CSV output.</p></details></section>'
       );
     }
     async function handle(el) {

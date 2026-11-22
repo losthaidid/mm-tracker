@@ -40,6 +40,7 @@ async function pythonCSV(blob) {
   assert.equal(result.status, 0, result.stderr);
   return JSON.parse(result.stdout);
 }
+const rawCSV = async blob => Buffer.from(await blob.arrayBuffer()).toString('utf8');
 
 test('formatted conversion preserves numeric codes, dates, percentages, booleans and cached formula results', async t => {
   const x = fixture(t), data = row(1, textCell('A1', 'ID') + textCell('B1', 'Value')) + row(2,
@@ -130,6 +131,52 @@ test('normal validation and standalone comparison readers retain their existing 
   assert.equal((await x.F.read(formula, { valuesOnly: true })).sheets[0].rows[0][0], '2');
 });
 
+test('ordinary CSV values are unquoted while delimiters, quotes and line breaks retain required quoting', async t => {
+  const x = fixture(t), rows = [
+    ['something', '12345', '000007', 'µL 界 😀'],
+    ['a,b', 'He said "Hi"', 'first\nsecond', ''],
+    ['', 'with\rcarriage', 'internal spaces', '  surrounding  '],
+    ['', '', '', ''],
+  ], sheet = { name:'Values', rows }, before = plain(sheet), result = await x.C.csv(sheet);
+  assert.equal(await rawCSV(result.blob), '\uFEFFsomething,12345,000007,µL 界 😀\r\n"a,b","He said ""Hi""","first\nsecond",\r\n,"with\rcarriage",internal spaces,  surrounding  \r\n,,,\r\n');
+  assert.deepEqual(await pythonCSV(result.blob), rows); assert.deepEqual(sheet,before); assert.equal(result.verified,true);
+});
+
+test('single-column empty cells and an original leading BOM remain intact with minimal quoting', async t => {
+  const x = fixture(t);
+  for (const rows of [[[''],['something'],[''],['"literal quotes"'],['']], [['\uFEFFfirst'],['\uFEFF'],['']], [[''],['']]]) {
+    const result = await x.C.csv({name:'One column',rows});
+    assert.deepEqual(await pythonCSV(result.blob),rows);assert.equal(result.verified,true);
+    assert.ok((await rawCSV(result.blob)).endsWith('""\r\n'));
+  }
+});
+
+test('mixed quoted and unquoted CSV verifies across every byte boundary and the non-streaming fallback', async t => {
+  const x = fixture(t), sheet = {name:'Streaming',rows:[['\uFEFFfirst','µL 😀','a,"b"\r\nc',''],['','end','','']]}, result = await x.C.csv(sheet);
+  const bytes = new Uint8Array(await result.blob.arrayBuffer());
+  for (const width of [1,2,3]) {
+    let offset=0,released=false;
+    const chunked={stream:()=>({getReader:()=>({async read(){if(offset>=bytes.length)return {done:true};const value=bytes.slice(offset,offset+width);offset+=width;return {done:false,value};},async cancel(){},releaseLock(){released=true;}})})};
+    assert.equal((await x.C.verify(chunked,sheet)).verified,true);assert.equal(released,true);
+  }
+  assert.equal((await x.C.verify({arrayBuffer:()=>result.blob.arrayBuffer()},sheet)).verified,true);
+  assert.equal((await x.C.verify(new Blob(['\uFEFF"x",plain,"a,b"\r\n']),{rows:[['x','plain','a,b']]})).verified,true);
+});
+
+test('verification rejects malformed unquoted fields, broken quote boundaries and ambiguous blank records', async t => {
+  const x = fixture(t);
+  for (const [text,rows] of [
+    ['\uFEFFsay"hi\r\n',[['say"hi']]],
+    ['\uFEFF"text"suffix\r\n',[['textsuffix']]],
+    ['\uFEFFtext\n',[['text']]],
+    ['\uFEFFtext\r',[['text']]],
+    ['\uFEFF"text\r\n',[['text']]],
+    ['\uFEFF\r\n',[['']]],
+    ['\uFEFFtext,\r\n',[['text']]],
+    ['\uFEFFtext\r\n',[['text','']]],
+  ]) await assert.rejects(x.C.verify(new Blob([text]),{rows}),/CSV verification failed/);
+});
+
 test('CSV bytes round-trip through Python with BOM, quotes, embedded CR/LF, Unicode and formula-like text untouched', async t => {
   const x = fixture(t), rows = [
     ['Code', 'Value', 'Blank', 'Blank'], ['00001', 'A, "quoted"\r\nµL 😀', '', ''],
@@ -155,6 +202,7 @@ test('multiple selected sheets become distinct ordered CSVs in a verified ZIP in
   assert.equal(output.name, 'Queue-csv.zip'); assert.equal(output.files.length, 3); assert.equal(output.cells, 4);
   assert.deepEqual(Object.keys(zip.files), ['Queue-A-B.csv', 'Queue-a-b-2.csv', 'Queue-Blank.csv']);
   for (const [i, entry] of Object.values(zip.files).entries()) assert.deepEqual(await pythonCSV(new Blob([await entry.async('uint8array')])), book.sheets[i].rows);
+  assert.equal(await rawCSV(new Blob([await zip.files['Queue-A-B.csv'].async('uint8array')])), '\uFEFF001,left\r\n');
   assert.deepEqual(book, before); assert.ok(output.files.every(f => !Object.hasOwn(f, 'blob')));
   await assert.rejects(x.C.prepare(book, [], 'bad.xlsx'), /Select at least one/);
   await assert.rejects(x.C.prepare(book, [0, 0], 'bad.xlsx'), /Select at least one/);
@@ -196,6 +244,7 @@ test('standalone CSV workspace works without a template beside comparison, verif
   x.ui.csvConverter.download(); x.ui.csvConverter.download();
   assert.equal(x.downloads.length, 2); assert.strictEqual(x.downloads[0].blob, x.downloads[1].blob); assert.match(x.d.querySelector('[data-vcsv="download"]').textContent, /Download again/);
   assert.deepEqual(await pythonCSV(x.downloads[0].blob), [['000007']]);
+  assert.equal(await rawCSV(x.downloads[0].blob), '\uFEFF000007\r\n');
   x.change(x.d.getElementById('valCSVPreviewSheet'), '1'); assert.ok(x.ui.csvConverter.snapshot().ready, 'preview-only selection retains verified download');
   x.change(x.d.querySelector('[data-vcsv-sheet="1"]'), true); assert.equal(x.ui.csvConverter.snapshot().ready, null);
   assert.throws(() => x.ui.csvConverter.download(), /Convert and verify/);
