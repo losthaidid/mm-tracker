@@ -1,29 +1,4 @@
 /* Alternate shells are scoped to an explicit choice. Current keeps its original rules. */
-.wd-appearance-entry {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 22px;
-  padding: 22px;
-  margin: 0 0 24px;
-  border: 1px solid var(--hub-border);
-  border-radius: 16px;
-  background: var(--hub-surface-soft);
-}
-.wd-appearance-entry h4 {
-  margin: 6px 0;
-  font-size: 20px;
-}
-.wd-appearance-entry p {
-  margin: 0 0 10px;
-  color: var(--hub-muted);
-}
-.wd-appearance-entry small {
-  color: var(--hub-muted);
-}
-.wd-appearance-entry button {
-  flex-shrink: 0;
-}
 #wdWorkspaceBar {
   display: flex;
   align-items: center;
@@ -49,10 +24,6 @@
   letter-spacing: -0.035em;
   line-height: 1.15;
   color: var(--hub-text);
-}
-#wdWorkspaceBar > button {
-  border-radius: 999px;
-  font-size: 11px;
 }
 .wd-chooser {
   width: min(1010px, calc(100% - 30px));
@@ -1107,18 +1078,10 @@ body.hub-present #wdWorkspaceBar {
   #wdWorkspaceBar {
     gap: 12px;
   }
-  #wdWorkspaceBar > button {
-    max-width: 115px;
-  }
   body[data-hub-design='modern-hub']
     #view
     :is(.hub-head:not(.mv-hero), .workspace-heading, .df-hero, .wl-hero, .val-head) {
     padding: 24px;
-  }
-  .wd-appearance-entry {
-    align-items: flex-start;
-    flex-direction: column;
-    padding: 20px;
   }
 }
 @media (max-width: 450px) {

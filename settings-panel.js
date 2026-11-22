@@ -48,7 +48,7 @@
     ],
     websiteDesignButton: [
       'workspace',
-      'Preview six website designs and save the layout that suits your work.',
+      'Preview website layouts and colours, then apply your choice.',
       'website design layout sidebar rail navigation appearance preview editorial canvas compact pro',
     ],
     appearance: [

@@ -82,13 +82,6 @@
       '" aria-hidden="true"><i class="wd-mini-head"></i><i class="wd-mini-nav"></i><i class="wd-mini-title"></i><i class="wd-mini-card wd-mini-one"></i><i class="wd-mini-card wd-mini-two"></i><i class="wd-mini-card wd-mini-three"></i></span>'
     );
   }
-  function launcher(p) {
-    return (
-      '<section class="wd-appearance-entry"><div><span class="hub-kicker">WEBSITE DESIGN</span><h4>A different way to feel at home.</h4><p>Keep your colours. Choose the layout that suits your day.</p><small>Active design: <strong data-wd-active-label>' +
-      DESIGNS[choice(p.design)].name +
-      '</strong></small></div><button type="button" data-website-design-open>Choose website design</button></section>'
-    );
-  }
   function colourPreview(p, sceneId, design = p.design) {
     const when = root.WorkHubMyDayVisuals?.period(new Date().getHours());
     return `<div class="hub-palette-preview" data-preview-design="${choice(design)}" role="img" aria-label="Header, navigation, buttons and My Day scenery">
@@ -423,7 +416,7 @@
         button.type = 'button';
         button.dataset.websiteDesignOpen = '';
         button.dataset.accessFeature = 'workspace';
-        button.textContent = 'Website design';
+        button.textContent = 'Change design';
         host.append(button);
       }
       const sidebar = $('hubSidebar');
@@ -443,14 +436,14 @@
         bar.id = 'wdWorkspaceBar';
         bar.hidden = true;
         bar.innerHTML =
-          '<div><span class="wd-context-eyebrow">YOUR WORKSPACE / <span data-wd-active-label></span></span><strong id="wdSectionTitle"></strong></div><button type="button" data-website-design-open>Change design</button>';
+          '<div><span class="wd-context-eyebrow">YOUR WORKSPACE / <span data-wd-active-label></span></span><strong id="wdSectionTitle"></strong></div>';
         page.prepend(bar);
       }
       if (dialog) paintChooser();
       if (colourChanged()) a.previewColours(draftColours);
       apply();
     }
-    function open() {
+    function open(returnFocus = document.activeElement) {
       mount();
       if (!valid()) throw Error('Sign in to choose a website design.');
       if (dialog) {
@@ -467,7 +460,7 @@
         savedColours = themeColours(a.prefs());
         draftColours = baseColours = themeColours(a.visibleAppearance());
       }
-      focus = document.activeElement;
+      focus = returnFocus;
       dialog = document.createElement('dialog');
       dialog.id = 'websiteDesignChooser';
       dialog.className = 'wd-chooser';
@@ -590,7 +583,7 @@
       const opener = e.target.closest?.('[data-website-design-open]');
       if (opener) {
         try {
-          open();
+          open($('settingsMenu')?.querySelector('summary') || opener);
         } catch (error) {
           a.tell(error.message, true);
         }
@@ -621,5 +614,5 @@
       }),
     };
   }
-  root.WorkHubWebsiteDesigns = { DESIGNS, choice, launcher, colourPreview, install };
+  root.WorkHubWebsiteDesigns = { DESIGNS, choice, colourPreview, install };
 })(globalThis);

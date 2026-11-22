@@ -4756,6 +4756,42 @@ test('Website designs: saving colours from an open preview retains the separatel
  const {api,document,window,db}=await app(t);api.hub.setTool('theme');api.showTab('studio');document.querySelector('[data-theme-choice="forest"]').click();const form=document.getElementById('hubTheme');assert.equal(api.state().workhub.preferences.theme,'ocean');const ui=api.hub.websiteDesigns;ui.open();const radio=document.querySelector('[name="websiteDesign"][value="clear-desk"]');radio.checked=true;radio.dispatchEvent(new window.Event('change',{bubbles:true}));document.querySelector('#websiteDesignChooser form').dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));await settle();assert.equal(document.getElementById('hubTheme'),form);assert.equal(api.state().workhub.preferences.theme,'ocean');assert.equal(document.body.dataset.hubTheme,'forest');api.hub.submit(form);await settle();assert.equal(api.state().workhub.preferences.theme,'forest');assert.equal(api.state().workhub.preferences.design,'clear-desk');assert.equal(document.body.dataset.hubDesign,'clear-desk');assert.equal(db.row.document.data.workhub.preferences.design,'clear-desk');
 });
 
+test('Website designs: Change design opens only from Workspace settings across layouts and in Theme Studio', async t => {
+  const { api, document, window, db } = await app(t);
+  const menu = document.getElementById('settingsMenu');
+  const summary = menu.querySelector('summary');
+  const button = menu.querySelector('#settingsGroup-workspace #websiteDesignButton');
+  const checkLocation = () =>
+    assert.deepEqual([...document.querySelectorAll('[data-website-design-open]')], [button]);
+  assert.equal(button.textContent, 'Change design');
+  checkLocation();
+
+  summary.click();
+  const search = document.getElementById('settingsSearch');
+  search.value = 'change design';
+  search.dispatchEvent(new window.Event('input', { bubbles: true }));
+  assert.equal(menu.open, true);
+  assert.equal(button.closest('.settings-entry').hidden, false);
+  button.click();
+  const chooser = document.getElementById('websiteDesignChooser');
+  assert.equal(chooser.open, true);
+  assert.equal(menu.open, false);
+  for (const radio of chooser.querySelectorAll('[name="websiteDesign"]')) {
+    radio.click();
+    assert.equal(document.body.dataset.hubDesign, radio.value);
+    checkLocation();
+  }
+  chooser.querySelector('[data-wd-close]').click();
+  assert.equal(document.activeElement, summary);
+
+  api.hub.setTool('theme');
+  api.showTab('studio');
+  await settle();
+  assert.ok(document.getElementById('hubTheme'));
+  checkLocation();
+  assert.equal(db.calls.length, 0);
+});
+
 test('Website designs: colours preview on the current shell and My Day without writes, then apply as one appearance save', async t => {
   const { api, document, window, db } = await app(t, { styles: true });
   const root = document.documentElement;
