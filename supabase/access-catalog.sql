@@ -5,7 +5,7 @@ insert into public.workhub_feature_catalog(id,name,parent,paths) values
 ('tasks','Tasks','',array['tasks']::text[]),
 ('schedule','Schedule','',array['schedule','projectPlans','workhub.daySchedule','workhub.publicHolidays','workhub.leaveBalances','workhub.leaveTypes','workhub.claims']::text[]),
 ('specs','Projects','',array['projects','activeProjectId','specs','projectCompanies','projectDecisions','projectProcessMappings','phaseGates','projectFeedback']::text[]),
-('knowledge','Knowledge','',array['workhub.notes']::text[]),
+('knowledge','Knowledge','',array['workhub.notes','workhub.knowledgeFolders','workhub.knowledgeChapters']::text[]),
 ('notes','Notes','',array['workhub.notebook']::text[]),
 ('processhub','Process Hub','',array['workhub.processes','workhub.rehearsal']::text[]),
 ('processhub.configuration','MM Configuration','processhub',array['workhub.mmConfiguration.materials','workhub.mmConfiguration.movements','workhub.mmConfiguration.plants','workhub.mmConfiguration.accounts']::text[]),

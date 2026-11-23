@@ -231,3 +231,35 @@ test('Access database: MM Configuration protects material, movement, plant and G
   const saved = (await db.query('select document from public.mm_tracker_documents where user_id=$1', [member])).rows[0].document;
   assert.deepEqual(saved.data.workhub.mmConfiguration, updated.data.workhub.mmConfiguration);
 });
+
+test('Access database: Knowledge folders and chapter changes persist, respect hidden access and survive unrelated saves', async t => {
+  const { db, sign, command, add } = await setup(t);
+  await db.exec("update public.workhub_feature_catalog set paths = array['workhub.notes'] where id='knowledge'");
+  const migration = read('supabase/migrations/20261123082531_knowledge_library_paths.sql');
+  await db.exec(migration);
+  await db.exec(migration);
+  const paths = (await db.query("select paths from public.workhub_feature_catalog where id='knowledge'")).rows[0].paths;
+  assert.deepEqual(paths, C.byId.get('knowledge').paths);
+  await add();
+  const full = doc({workhub:{notes:[],knowledgeFolders:[{id:'a',parentId:'',name:'Private reading'}],knowledgeChapters:{chapter:{folderId:'a',body:'Private case study'}}}});
+  await save(db,full,0);
+  const perms = C.preset('view');
+  perms.knowledge = {mode:'hidden'};
+  perms.tasks = C.preset().tasks;
+  await sign();
+  await command('permissions',member,{version:1,permissions:perms});
+  await sign(member);
+  const load = async () => (await db.query('select * from public.load_mm_tracker()')).rows[0].document;
+  const hidden = await load();
+  assert.doesNotMatch(JSON.stringify(hidden),/Private reading|Private case study/);
+  hidden.data.tasks.push({id:'task',task:'Prepare receipt'});
+  await save(db,hidden,1);
+  await sign();
+  perms.knowledge = {mode:'view'};
+  await command('permissions',member,{version:2,permissions:perms});
+  await sign(member);
+  const restored = await load();
+  assert.equal(restored.data.workhub.knowledgeChapters.chapter.body,'Private case study');
+  restored.data.workhub.knowledgeFolders[0].name = 'Another name';
+  await assert.rejects(save(db,restored,2),e=>e.code==='42501');
+});
