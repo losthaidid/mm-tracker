@@ -36,7 +36,13 @@
         'projectFeedback',
       ],
     ],
-    ['knowledge', 'Knowledge', 'Screens', '', ['workhub.notes']],
+    [
+      'knowledge',
+      'Knowledge',
+      'Screens',
+      '',
+      ['workhub.notes', 'workhub.knowledgeFolders', 'workhub.knowledgeChapters'],
+    ],
     ['notes', 'Notes', 'Screens', '', ['workhub.notebook']],
     ['processhub', 'Process Hub', 'Screens', '', ['workhub.processes', 'workhub.rehearsal']],
     [
@@ -164,12 +170,13 @@
           (f.parent && hidden(profile, f.parent))))
     );
   }
-  function get(data, path) {
+  function get(data, path, profile) {
     const value = path.split('.').reduce((v, k) => v?.[k], data);
     // A first entry is a record creation in workspaces that predate these collections.
     const recordCollection =
       path === 'workhub.sapTables.records' ||
       path === 'workhub.validator.profiles' ||
+      (path === 'workhub.knowledgeFolders' && profile && can(profile, 'knowledge', 'create')) ||
       path.startsWith('workhub.mmConfiguration.');
     return value === undefined && recordCollection ? [] : value;
   }
@@ -210,8 +217,8 @@
       throw Error('Your account does not have active access.');
     for (const f of features)
       for (const path of f.paths) {
-        const before = get(old, path),
-          after = get(next, path);
+        const before = get(old, path, profile),
+          after = get(next, path, profile);
         if (same(before, after)) continue;
         // A blocked field is restored from the server copy on save; it cannot be overwritten.
         if (!can(profile, f.id)) throw Error('Your account cannot change ' + f.name + '.');
@@ -232,8 +239,8 @@
     if (profile?.role === 'owner') return;
     for (const f of features)
       for (const path of f.paths) {
-        const before = get(old, path),
-          after = get(next, path);
+        const before = get(old, path, profile),
+          after = get(next, path, profile);
         if (same(before, after)) continue;
         const allowed = a =>
           can(profile, f.id, a) || (path === 'workhub.validator.runs' && can(profile, f.id, 'run'));

@@ -168,6 +168,8 @@
         if (!text(r.title || r.name || '', 500)) throw Error('Check the record title.');
       }
     }
+    root.WorkHubKnowledgeGarden?.validate(h);
+    root.WorkHubPurchasingGuide?.validate(h.tcodes);
     for (const n of h.notes)
       if (
         !n.title?.trim() ||
@@ -354,6 +356,8 @@
       websiteDesigns = null,
       visualRefinement = null,
       mmKnowledge = null,
+      knowledgeGarden = null,
+      purchasingGuide = null,
       taskCompletion = null;
     const reminders = root.WorkHubReminders?.install({
       ...a,
@@ -1427,14 +1431,17 @@
     }
     function knowledge() {
       if (mmKnowledge?.selected()) return mmKnowledge.render();
+      const folderPanel = knowledgeGarden?.panel(search) || '';
+      const chapters = knowledgeGarden?.cards(search) || { html: '', count: 0 };
       const rows = data().notes.filter(
         n =>
+          (!knowledgeGarden || knowledgeGarden.matchesNote(n, search)) &&
           (n.title + ' ' + n.body + ' ' + n.tags + ' ' + n.tcodes + ' ' + n.errors)
             .toLowerCase()
             .includes(search.toLowerCase()) &&
           (!batchA || batchA.matches('notes', n.id))
       );
-      return `${mmKnowledge?.tabs() || ''}<section class="hub">${head('YOUR SAP MM REFERENCE', 'Knowledge notebook', 'Keep the solution. Find it the next time.', btn('note-edit', '＋ New note', '', 'primary'))}<div class="hub-toolbar"><input id="hubSearch" type="search" value="${esc(search)}" placeholder="Search titles, tags, T-codes and solutions" aria-label="Search knowledge"></div><div class="hub-grid">${rows.map(n => `<article class="hub-card"><span class="hub-kicker">${esc(n.tags) || 'KNOWLEDGE NOTE'}</span><h3 class="hub-sensitive">${esc(n.title)}</h3><p>${esc(n.body.slice(0, 180))}${n.body.length > 180 ? '…' : ''}</p><div class="hub-tags"><span class="hub-badge">${esc(n.tcodes) || 'No T-code'}</span><span class="hub-meta">${esc(projectName(n.projectId))}</span></div><div class="actions">${btn('note-view', 'Read note', 'data-id="' + esc(n.id) + '"')}${btn('note-edit', 'Edit', 'data-id="' + esc(n.id) + '"', 'small')}</div></article>`).join('') || empty('Your own reference library', 'Add a fix, configuration note, test checklist or T-code reference.', btn('note-edit', 'Create your first note'))}</div></section>`;
+      return `${mmKnowledge?.tabs() || ''}<section class="hub">${head('YOUR SAP MM REFERENCE', 'Knowledge notebook', 'Keep the solution. Find it the next time.', btn('note-edit', '＋ New note', '', 'primary'))}${folderPanel}<div class="hub-toolbar"><input id="hubSearch" type="search" value="${esc(search)}" placeholder="Search titles, tags, T-codes and solutions" aria-label="Search knowledge"></div><div class="hub-grid">${chapters.html}${rows.map(n => `<article class="hub-card"><span class="hub-kicker">${esc(n.tags) || 'KNOWLEDGE NOTE'}</span><h3 class="hub-sensitive">${esc(n.title)}</h3><p>${esc(n.body.slice(0, 180))}${n.body.length > 180 ? '…' : ''}</p><div class="hub-tags"><span class="hub-badge">${esc(n.tcodes) || 'No T-code'}</span><span class="hub-meta">${esc(projectName(n.projectId))}</span></div><div class="actions">${btn('note-view', 'Read note', 'data-id="' + esc(n.id) + '"')}${btn('note-edit', 'Edit', 'data-id="' + esc(n.id) + '"', 'small')}</div></article>`).join('')}${rows.length || chapters.html || (!search && knowledgeGarden?.hasChildren()) ? '' : search ? empty('No matching notes', 'Try a different search or open a parent folder.') : empty('No notes in this folder', 'Add a personal note here or choose another reading level.', btn('note-edit', 'New note'))}</div></section>`;
     }
     function noteEditor(id = '') {
       const n = data().notes.find(n => n.id === id) || {};
@@ -1442,6 +1449,7 @@
         id ? 'Edit knowledge note' : 'New knowledge note',
         'hubNote',
         field('title', 'Title', n.title, 'text', true) +
+          (knowledgeGarden?.folderSelect(n) || '') +
           field('tags', 'Tags, separated by commas', n.tags) +
           field('tcodes', 'T-codes', n.tcodes) +
           field('body', 'Situation, cause and solution', n.body, 'textarea') +
@@ -1452,6 +1460,12 @@
         id,
         id ? btn('note-delete', 'Delete note', 'data-id="' + esc(id) + '"', 'danger') : ''
       );
+      const editor = $('hubNote');
+      if (editor && knowledgeGarden) {
+        editor.dataset.knowledgeSession = knowledgeGarden.session();
+        editor.dataset.knowledgeOriginal = JSON.stringify(id ? n : null);
+        editor.dataset.accessFeature = 'knowledge';
+      }
     }
     function recordLinks(r) {
       const s = a.state();
@@ -2145,7 +2159,7 @@
         )
         .join(
           ''
-        )}${iconCreator && a.can('studio.theme', 'edit') && a.can('workspace', 'edit') && !a.state().preferences.hiddenTabs.includes('studio.theme') ? '<button type="button" data-ic="open">Icon Creator</button>' : ''}</div>${currentTool === 'reader' ? reader?.render() || '' : currentTool === 'screenshots' ? batchC?.cards() || '' : currentTool === 'theme' ? themeStudio() : currentTool === 'tcodes' ? tcodes?.render() || '' : currentTool === 'tables' ? sapTables?.render() || '' : currentTool === 'focus' ? `<section class="hub-card">${focusWidget()}${prefs().desk ? desk() : ''}</section>` : currentTool === 'journey' ? `<section class="hub-card">${journey()}</section>` : currentTool === 'scrapbook' ? scrapbook() : currentTool === 'wrap' ? dailySummary() : sessionsView()}</section>`;
+        )}${iconCreator && a.can('studio.theme', 'edit') && a.can('workspace', 'edit') && !a.state().preferences.hiddenTabs.includes('studio.theme') ? '<button type="button" data-ic="open">Icon Creator</button>' : ''}</div>${currentTool === 'reader' ? reader?.render() || '' : currentTool === 'screenshots' ? batchC?.cards() || '' : currentTool === 'theme' ? themeStudio() : currentTool === 'tcodes' ? (purchasingGuide ? purchasingGuide.renderHome(() => tcodes?.render() || '') : tcodes?.render() || '') : currentTool === 'tables' ? sapTables?.render() || '' : currentTool === 'focus' ? `<section class="hub-card">${focusWidget()}${prefs().desk ? desk() : ''}</section>` : currentTool === 'journey' ? `<section class="hub-card">${journey()}</section>` : currentTool === 'scrapbook' ? scrapbook() : currentTool === 'wrap' ? dailySummary() : sessionsView()}</section>`;
     }
     function timerKey() {
       return a.cloud().user ? 'mm-tracker.timer.v1:' + a.cloud().user.id : null;
@@ -3149,6 +3163,8 @@
       if (tab !== 'processhub') clearTimeout(walkTimer);
       viewTab = tab;
       mmKnowledge?.sync();
+      knowledgeGarden?.sync();
+      purchasingGuide?.sync();
       const processAccount = a.cloud().ready ? a.cloud().user?.id || '' : '';
       if (processAccount !== processHubOwner) {
         processHubOwner = processAccount;
@@ -3858,8 +3874,17 @@
         return;
       }
       if (form.id === 'hubNote') {
+        const prior = data().notes.find(n => n.id === id);
+        if (
+          form.dataset.knowledgeSession !== undefined &&
+          (form !== $('hubNote') ||
+            form.dataset.knowledgeSession !== knowledgeGarden.session() ||
+            !a.can('knowledge', id ? 'edit' : 'create') ||
+            form.dataset.knowledgeOriginal !== JSON.stringify(prior || null))
+        )
+          throw Error('This note or account changed. Reopen the note before saving.');
         const n = {
-          ...data().notes.find(n => n.id === id),
+          ...prior,
           id: id || uid(),
           ...Object.fromEntries(
             [
@@ -3877,13 +3902,17 @@
           ),
           updatedAt: now(),
         };
-        save((h, d) => {
-          const i = h.notes.findIndex(x => x.id === id);
-          if (i >= 0) h.notes[i] = n;
-          else h.notes.push(n);
-          batchA?.capture(d, form, 'notes', n.id);
-        });
-        a.closeModal();
+        if (form.elements.folderId && (values.folderId || prior?.folderId))
+          n.folderId = values.folderId;
+        if (
+          save((h, d) => {
+            const i = h.notes.findIndex(x => x.id === id);
+            if (i >= 0) h.notes[i] = n;
+            else h.notes.push(n);
+            batchA?.capture(d, form, 'notes', n.id);
+          })
+        )
+          a.closeModal();
         return;
       }
       if (form.id === 'hubWaiting') {
@@ -4537,6 +4566,25 @@
       canView: () => featureVisible('knowledge'),
       owner: () => a.cloud().user?.id || '',
       generation: () => a.cloud().generation,
+    });
+    const learningSession = {
+      ...a,
+      ready: () => a.cloud().ready,
+      owner: () => a.cloud().user?.id || '',
+      generation: () => a.cloud().generation,
+    };
+    knowledgeGarden = root.WorkHubKnowledgeGarden?.install({
+      ...learningSession,
+      active: () =>
+        viewTab === 'knowledge' && featureVisible('knowledge') && !mmKnowledge?.selected(),
+      clearSearch: () => {
+        search = '';
+      },
+    });
+    purchasingGuide = root.WorkHubPurchasingGuide?.install({
+      ...learningSession,
+      active: () =>
+        viewTab === 'studio' && currentTool === 'tcodes' && featureVisible('studio.tcodes'),
     });
     mmConfiguration = root.WorkHubMmConfiguration?.install({
       ...a,

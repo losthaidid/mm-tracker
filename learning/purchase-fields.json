@@ -1,0 +1,2225 @@
+[
+  {
+    "groups": {
+      "layout": [
+        "Purchasing → [document] → Define Screen Layout at Document Level. Inspect transaction, activity, document type and item-category field-selection keys.",
+        "Standard PO example",
+        "Material Group can be filled from the material master and still be mandatory under PT0F.",
+        "Client document type",
+        "Compare every contributing key before attributing a grey or mandatory field to the Z type.",
+        "type group category",
+        "https://learning.sap.com/courses/purchasing-in-sap-s-4hana/setting-up-field-selection-in-purchasing-documents"
+      ],
+      "material": [
+        "Display the material with MM03 in the relevant organizational views. Review document item category and field selection separately.",
+        "Stock material",
+        "A material identifier supplies descriptions, unit and material-group proposals.",
+        "Free-text consumption",
+        "Enter the item specification and account assignment required by the client’s item design.",
+        "material text group unit",
+        "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/3a7eb65334e6b54ce10000000a174cb4.html"
+      ],
+      "org": [
+        "SPRO → Enterprise Structure → Definition / Assignment. Review plant, company code and purchasing-organization assignments. Purchasing groups are maintained under MM → Purchasing.",
+        "Single-plant purchase",
+        "The order is delivered to one specified plant.",
+        "Cross-plant purchasing",
+        "One organization may buy for multiple plants; check assignments and saved item values.",
+        "plant company porg buyer",
+        "https://help.sap.com/docs/SAP_ERP/cb7b96d71e9c486e897c8fb57d5669a8/a314c453f57eb44ce10000000a174cb4.html"
+      ],
+      "inventory": [
+        "Inspect plant/storage-location master data and stock categories. For inspection-relevant material also check QM inspection setup at the plant.",
+        "Own stock",
+        "Receiving must establish the actual stock segment and location.",
+        "Direct consumption",
+        "A receiving address can still matter even when no unrestricted-use stock is created.",
+        "plant storage stocktype gr",
+        "https://help.sap.com/docs/SAP_ERP/75c4b203fca64320b998cc04e2eb1468/b19ac7536e8e2a4be10000000a174cb4.html"
+      ],
+      "category": [
+        "SPRO → Materials Management → Purchasing → [document] → Define Document Types. Check allowed item categories and their standard process controls.",
+        "Standard stock",
+        "Ordinarily expects a stock receipt and invoice.",
+        "Consignment item",
+        "The vendor retains ownership until withdrawal or transfer to own stock; settlement follows the consignment process.",
+        "category account gr ir",
+        "https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/af9ef57f504840d2b81be8667206d485/a37eb65334e6b54ce10000000a174cb4.html"
+      ],
+      "assignment": [
+        "SPRO → Materials Management → Purchasing → Account Assignment → Maintain Account Assignment Categories (OME9). Review account-assignment field selection and relevant cost-object master data.",
+        "Stock item",
+        "An ordinary stock purchase generally uses a blank account assignment. Posting accounts are derived at the relevant goods movement.",
+        "K · cost centre",
+        "A cost centre and applicable consumption account identify who bears the expense and which G/L is charged.",
+        "account gl costcenter asset distribution splitpercent",
+        "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/b47db65334e6b54ce10000000a174cb4-103.html"
+      ],
+      "quantity": [
+        "Check item and schedule-line data, procurement status and the unit conversion. A reference can be adopted only in part.",
+        "Full reference",
+        "100 requested, 100 ordered: no residual request in this example.",
+        "Partial reference",
+        "100 requested, 80 ordered, 60 delivered: 20 outside this order and 20 open for delivery, subject to closing indicators.",
+        "qty unit delivery squantity",
+        "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/d97eb65334e6b54ce10000000a174cb4.html"
+      ],
+      "units": [
+        "Check the material’s additional units of measure, supplier-specific purchasing info and the conversion stored in the item.",
+        "Same unit",
+        "60 pieces priced per piece need no physical-unit conversion.",
+        "Different units",
+        "Five cartons at 12 pieces per carton equals 60 pieces. At 240 per 100 pieces the simple goods value is 144.",
+        "unit bprme per net prpriceunit",
+        "https://help.sap.com/docs/SAP_ERP_SPV/967e1c2a6a8c4183b7e07d28e7574445/af7eb65334e6b54ce10000000a174cb4.html"
+      ],
+      "schedule": [
+        "Check plant MRP data, factory calendar, purchasing processing time, supplier-specific lead time and the saved document dates, as relevant.",
+        "Manual request",
+        "A requester selects a required delivery date.",
+        "Planned requirement",
+        "Scheduling works backward from required availability using the applicable lead times and calendars.",
+        "delivery planned grtime releaseDate squantity",
+        "https://help.sap.com/docs/SAP_ERP/85d3fce10e264972a0155c8b46ecf93b/fb97b6535fe6b74ce10000000a174cb4.html"
+      ],
+      "pr": [
+        "Display the PR item and its status in ME53N. Inspect document type, field selection, origin, source and follow-on references before interpreting its worklist status.",
+        "Unconverted request",
+        "The item can still be awaiting approval or assignment to a source.",
+        "Partly ordered request",
+        "Compare referenced order quantity and closing indicator; a worklist is a filtered view.",
+        "closed prref tracking qty requester",
+        "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/9f7fb65334e6b54ce10000000a174cb4.html"
+      ],
+      "receipt": [
+        "Review the item category and OME9 for account-assigned items. In ME23N inspect Item details → Delivery and Invoice. For PRs inspect Valuation and the account assignment.",
+        "Standard own stock",
+        "Goods receipt is expected; a normal valuated stock receipt updates quantity and inventory value. GR non-valuated is not a general switch for stock purchasing.",
+        "K · direct consumption",
+        "The category and PO flags govern whether receipt is expected and valued. For a supported non-valuated receipt, cost recognition generally moves to invoice.",
+        "gr nonval ir grbased",
+        "https://help.sap.com/docs/PRODUCT_ID/91b21005dded4984bcccf4a69ae1300c/9763bd534f22b44ce10000000a174cb4.html"
+      ],
+      "invoice": [
+        "Inspect item category, account assignment controls in OME9 where relevant, invoice indicators and the actual invoice document. Consult Finance for tax and payment rules.",
+        "Ordinary invoiced item",
+        "The expected supplier invoice, its posting and eventual payment are distinct events.",
+        "Different settlement process",
+        "For supplier consignment, examine withdrawal and settlement instead of expecting an ordinary invoice against receipt.",
+        "ir grbased final gr tax",
+        "https://help.sap.com/docs/SAP_ERP/b704a8db767040a08100adc846218964/be5eb6531de6b64ce10000000a174cb4.html"
+      ],
+      "grbased": [
+        "Check the supplier’s purchasing data, the applicable purchasing info record and the saved PO’s Invoice tab. Inspect material-document references in invoice items.",
+        "PO-based IV",
+        "The PO item supplies the matching context.",
+        "GR-based IV",
+        "Two receipts against one item can be individually referenced in invoice verification.",
+        "grbased gr ir nonval",
+        "https://help.sap.com/docs/SAP_ERP/7de135920d6b44298b1d498e57882cf6/a97eb65334e6b54ce10000000a174cb4.html"
+      ],
+      "source": [
+        "Check source-list validity, quota arrangements, purchasing info records and contract validity for this material, plant and date. Inspect the source assigned to the actual item.",
+        "Vendor suggested",
+        "A preference on the PR can guide the buyer without establishing a firm source.",
+        "Source assigned",
+        "Check the fixed vendor or agreement item and its validity for the relevant requirement.",
+        "desired fixed agr inforec",
+        "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/ab7fb65334e6b54ce10000000a174cb4.html"
+      ],
+      "pricing": [
+        "MM → Purchasing → Conditions → Define Price Determination Process. Inspect document condition analysis, valid condition records and manual entry where applicable. For a PR estimate inspect its valuation data.",
+        "Master condition proposed",
+        "The effective date, organization, unit and quantity scale select the relevant condition.",
+        "Offer or reference price",
+        "A reference or permitted manual entry may produce a different saved price. Reconstruct the actual subtotal.",
+        "net per bprme cond currency estimate",
+        "https://help.sap.com/docs/SAP_ERP_SPV/967e1c2a6a8c4183b7e07d28e7574445/cf7fb65334e6b54ce10000000a174cb4.html"
+      ],
+      "supplier": [
+        "Inspect supplier general, purchasing organization and company-code data at the relevant levels, plus applicable partner functions.",
+        "Ordering supplier",
+        "Purchasing data can supply order-specific proposals.",
+        "Invoicing party",
+        "The actual invoicing partner and its company-code data determine the financial context.",
+        "vendor part terms porg company",
+        "https://help.sap.com/docs/SAP_ERP/72b431fb78a649da9c8b46951e64fb88/aae8d353ca9f4408e10000000a174cb4.html"
+      ],
+      "deliveryTerms": [
+        "Inspect supplier purchasing data, agreement and actual item/header delivery terms. Verify the named place or address on supplier output.",
+        "Delivery to plant",
+        "The ordered plant often supplies the receiving address.",
+        "Different destination or terms",
+        "An alternate address or different named place can change supplier instructions and freight comparison.",
+        "incoterm incoplace addr plant",
+        "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/b27eb65334e6b54ce10000000a174cb4.html"
+      ],
+      "tolerance": [
+        "Inspect the tolerance values on the saved PO item and applicable purchasing-value-key or source defaults. Invoice tolerance limits are a separate configuration area.",
+        "Short final delivery",
+        "98 of 100 may be accepted as complete under the applicable underdelivery tolerance and completion settings.",
+        "Excess delivery",
+        "105 of 100 may meet a 5% overdelivery tolerance; inspect any unlimited flag before predicting the next receipt.",
+        "under over unlimited delcomp final",
+        "https://help.sap.com/docs/SUPPORT_CONTENT/spmm/3362168122.html"
+      ],
+      "returns": [
+        "Review the original receipt, movement reference and invoice status. Match the selected purchasing return route with Inventory Management.",
+        "Posting error",
+        "Reverse or correct the erroneous document using the permitted reference.",
+        "Physical return",
+        "Use the authorized return process and trace the vendor credit separately.",
+        "return gr history ir",
+        "https://learning.sap.com/courses/inventory-management-and-physical-inventory-in-sap-s-4hana/posting-cancellations-return-deliveries-and-returns"
+      ],
+      "infoUpdate": [
+        "Review purchasing default values for buyers, the document type and the current info record at purchasing-organization and plant level.",
+        "Existing source data",
+        "Take a before snapshot of conditions and the price history.",
+        "After saving",
+        "Compare the actual update scope for this document category and selected value.",
+        "update inforec net porg",
+        "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/517fb65334e6b54ce10000000a174cb4.html"
+      ],
+      "contract": [
+        "Purchasing → Contract → Define Document Types and Define Screen Layout at Document Level. Review agreement/item scope and release documentation in ME33K.",
+        "Quantity agreement",
+        "Example target 1,000 pieces; releases of 250 and 300 leave 450 against the target before adjustments.",
+        "Value agreement",
+        "Example target 10,000; releases of 3,000 and 4,500 leave 2,500 on the stated common valuation basis.",
+        "agr agreementitem targetqty targetval start end relorders",
+        "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/037fb65334e6b54ce10000000a174cb4.html"
+      ],
+      "confirm": [
+        "Purchasing → Confirmations. Inspect the confirmation-control key, confirmation sequence and data received from the supplier.",
+        "Requested",
+        "A requirement for an acknowledgement says the buyer expects a response.",
+        "Confirmed",
+        "An actual confirmation line has its own reference, date and quantity.",
+        "conf ack acknum delivery",
+        "https://help.sap.com/docs/SAP_ERP_SPV/00b86df2555f4c83b47b97a5c1223904/7b8dbf53f106b44ce10000000a174cb4.html"
+      ],
+      "history": [
+        "Inspect the individual item and its referenced purchasing history in display mode. Date, sign, unit and reference are all material to interpreting a balance.",
+        "Before posting",
+        "An order can be saved without any receipt or invoice history.",
+        "After partial receipt / reversal",
+        "80 received less a reversal of 10 leaves 70 net. An invoice for 80 is ten above that figure.",
+        "history gr ir delcomp final delete",
+        "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/d97eb65334e6b54ce10000000a174cb4.html"
+      ],
+      "rfq": [
+        "Purchasing → RFQ and Quotation → document types and document-level screen layout. Inspect the invitation and the vendor’s recorded response.",
+        "Buyer invitation",
+        "Vendor-specific RFQ number, common requirement and quotation deadline.",
+        "Supplier response",
+        "ME47 records offered prices and terms against that invitation; each vendor response retains its identity.",
+        "collect deadline rfqvendor quotenum reject",
+        "https://help.sap.com/docs/SAP_ERP_SPV/967e1c2a6a8c4183b7e07d28e7574445/797eb65334e6b54ce10000000a174cb4.html"
+      ],
+      "compare": [
+        "Run the classic price comparison with the desired RFQ selection, currency and price basis. Inspect the underlying quotation conditions when ranking is unexpected.",
+        "Supplier A",
+        "600 pieces at 8.50 plus 240 freight totals 5,340 before tax.",
+        "Supplier B",
+        "87 per ten, freight included, gives 5,220 on the same delivered basis.",
+        "rfqnum collect compcur basis rank",
+        "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/917eb65334e6b54ce10000000a174cb4.html"
+      ],
+      "texts": [
+        "Purchasing → Texts for Purchasing Documents. Check relevant text types, copying rules and the output form where print behavior matters.",
+        "Adopted text",
+        "Compare text source and adoption settings for the item.",
+        "Changed output text",
+        "Read the actual issued output and distinguish a saved change from a reissued document.",
+        "itemtext headertext text",
+        "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/bd80b65334e6b54ce10000000a174cb4.html"
+      ],
+      "service": [
+        "Inspect classic External Services Management, document and item category, service specification, applicable limits and acceptance workflow.",
+        "Planned service",
+        "Specific service lines, quantities and agreed rates supply the basis for acceptance.",
+        "Unplanned work",
+        "The approved limit and actual entered/accepted services control the investigation.",
+        "sesch limit category account ir",
+        "https://help.sap.com/docs/SAP_ERP/b704a8db767040a08100adc846218964/1403b953495bb44ce10000000a174cb4.html"
+      ],
+      "approval": [
+        "Classic release procedure with classification in Purchasing. Compare strategy characteristics, prerequisites, release codes and indicator/changeability settings.",
+        "No strategy found",
+        "Test document characteristics and their actual values at the evaluation time.",
+        "Strategy found, release pending",
+        "Inspect release status, required codes, prerequisites and authorizations.",
+        "relstat type estimate company closed",
+        "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/4d7df1d4b5940f8be10000000a42189b.html"
+      ]
+    },
+    "fields": [
+      {
+        "id": "type",
+        "name": "Document type",
+        "places": {
+          "PR": [
+            "Document type",
+            "EBAN-BSART"
+          ],
+          "PO": [
+            "Document identification",
+            "EKKO-BSART"
+          ],
+          "RFQ": [
+            "Document identification",
+            "EKKO-BSART"
+          ],
+          "Contract": [
+            "Document identification",
+            "EKKO-BSART"
+          ]
+        },
+        "purpose": "Chooses the commercial document variant, including its number-range and field-selection context.",
+        "origin": "Create-screen default or an explicit selection. A copied document may propose a type.",
+        "control": "Choose an allowed type for this document category. A type used for a PO cannot simply turn it into an RFQ.",
+        "effect": "The type influences item categories, numbering and processing. Inspect the saved value when comparing standard and Z documents.",
+        "trace": "A PR and its follow-on PO each have their own type; a matching abbreviation does not establish the same configuration.",
+        "qa": "Create identical material items under a standard type and a client copy. Compare field selection and numbering separately.",
+        "topic": "layout"
+      },
+      {
+        "id": "material",
+        "name": "Material number",
+        "places": {
+          "PR": [
+            "Item overview",
+            "EBAN-MATNR"
+          ],
+          "PO": [
+            "Item overview",
+            "EKPO-MATNR"
+          ],
+          "RFQ": [
+            "Item overview",
+            "EKPO-MATNR"
+          ],
+          "Contract": [
+            "Item overview",
+            "EKPO-MATNR"
+          ]
+        },
+        "purpose": "Identifies the material to which the item refers and supplies a key to organization-specific master data.",
+        "origin": "Entered, searched from the catalog or copied from a referenced item. Relevant master data supplies proposals.",
+        "control": "An identified stock material and a permitted free-text consumable item use different minimum data. Item category and account assignment constrain the choice.",
+        "effect": "A valid number at client level may still lack required plant or valuation data.",
+        "trace": "Compare the material on PR, RFQ and saved PO. For a text item follow description, material group and references instead.",
+        "qa": "Compare a material item with a permissible text item in QA. Record which extra entries are requested.",
+        "topic": "material"
+      },
+      {
+        "id": "text",
+        "name": "Short text",
+        "places": {
+          "PR": [
+            "Item overview",
+            "EBAN-TXZ01"
+          ],
+          "PO": [
+            "Item overview",
+            "EKPO-TXZ01"
+          ],
+          "RFQ": [
+            "Item overview",
+            "EKPO-TXZ01"
+          ],
+          "Contract": [
+            "Item overview",
+            "EKPO-TXZ01"
+          ]
+        },
+        "purpose": "Describes what the buyer or supplier should recognize on this item.",
+        "origin": "Usually proposed from material description when a number is supplied; entered by the user for free text or copied from a reference.",
+        "control": "A free-text item needs a meaningful description. Display mode locks it even when text was editable at creation.",
+        "effect": "It communicates scope. A changed description does not redefine the technical material identity.",
+        "trace": "Compare the text on the saved order and its predecessor; later master-data changes do not prove the text changed on an existing document.",
+        "qa": "Create a free-text item and compare its saved description with the request and supplier output.",
+        "topic": "material"
+      },
+      {
+        "id": "group",
+        "name": "Material group",
+        "places": {
+          "PR": [
+            "Item overview",
+            "EBAN-MATKL"
+          ],
+          "PO": [
+            "Item overview",
+            "EKPO-MATKL"
+          ],
+          "RFQ": [
+            "Item overview",
+            "EKPO-MATKL"
+          ],
+          "Contract": [
+            "Item overview",
+            "EKPO-MATKL"
+          ]
+        },
+        "purpose": "Classifies spend or materials for buying and analysis. It is especially important when there is no material number.",
+        "origin": "Material master, referenced item or manual entry on a free-text line.",
+        "control": "A populated field can be required. Field-selection keys and item category determine the actual screen status; a master-data default may already satisfy it.",
+        "effect": "Buyers can group requirements and analyze purchasing by material group; additional client rules may also use it.",
+        "trace": "Compare the master-data group with the actual request and follow-on item. Check whether manual changes were permitted.",
+        "qa": "For an NB PO and standard item compare ME21N, AKTV, NBF and PT0F field selection for Material Group.",
+        "topic": "layout",
+        "scenarios": [
+          "NB · standard stock item",
+          "In SAP’s documented combination PT0F makes Material Group required. A material master may fill it automatically.",
+          "Text-based K item",
+          "Material master may supply no group. Enter the group when required by effective field selection and the item validations."
+        ]
+      },
+      {
+        "id": "plant",
+        "name": "Plant",
+        "places": {
+          "PR": [
+            "Item overview",
+            "EBAN-WERKS"
+          ],
+          "PO": [
+            "Item overview",
+            "EKPO-WERKS"
+          ],
+          "RFQ": [
+            "Item overview",
+            "EKPO-WERKS"
+          ],
+          "Contract": [
+            "Item overview",
+            "EKPO-WERKS"
+          ]
+        },
+        "purpose": "Identifies the site whose procurement or delivery requirement is being processed.",
+        "origin": "Can come from personal defaults, a reference or manual entry; material plant data helps validate the combination.",
+        "control": "Stock procurement needs a receiving plant. A centrally negotiated agreement can leave plant scope wider; the call-off must resolve it.",
+        "effect": "Plant affects sourcing, delivery address, available master data and valuation context.",
+        "trace": "Inspect the PR plant, agreement item restrictions and the plant on each actual PO item.",
+        "qa": "Use the same material in two plants. Check master-data extension and organization assignments before comparing prices.",
+        "topic": "org"
+      },
+      {
+        "id": "storage",
+        "name": "Storage location",
+        "places": {
+          "PR": [
+            "Item overview",
+            "EBAN-LGORT"
+          ],
+          "PO": [
+            "Item overview",
+            "EKPO-LGORT"
+          ]
+        },
+        "purpose": "Identifies the storage location within the plant intended for the receipt.",
+        "origin": "Entered or proposed from a reference or the client’s procurement defaults.",
+        "control": "Frequently optional when ordering ordinary stock. A receipt into own stock normally needs the location at posting. Direct consumption follows a different route.",
+        "effect": "The posted material document determines where the stock actually went.",
+        "trace": "Follow the proposed location from request to order and compare it with the material document.",
+        "qa": "Prepare a PO with an empty location and a receipt with a valid location. Record where the value was first required.",
+        "topic": "inventory"
+      },
+      {
+        "id": "category",
+        "name": "Item category",
+        "places": {
+          "PR": [
+            "Item overview",
+            "EBAN-PSTYP"
+          ],
+          "PO": [
+            "Item overview",
+            "EKPO-PSTYP"
+          ],
+          "RFQ": [
+            "Item overview",
+            "EKPO-PSTYP"
+          ],
+          "Contract": [
+            "Item overview",
+            "EKPO-PSTYP"
+          ]
+        },
+        "purpose": "Selects the procurement process for this line, such as standard goods, consignment, subcontracting or classic services.",
+        "origin": "User selection, document-type defaults or a permitted reference item.",
+        "control": "The document type limits permitted categories; item controls affect receipt, invoice and account assignment. A blank category displayed as Standard is meaningful.",
+        "effect": "The same material can follow a different inventory, ownership or service acceptance process.",
+        "trace": "Check the saved item category at each step and inspect the permitted conversions; code labels on screen can differ from stored internal values.",
+        "qa": "Compare standard and consignment items. Record which follow-on event makes the supplier payable in each case.",
+        "topic": "category"
+      },
+      {
+        "id": "account",
+        "name": "Account assignment category",
+        "places": {
+          "PR": [
+            "Item overview",
+            "EBAN-KNTTP"
+          ],
+          "PO": [
+            "Item overview",
+            "EKPO-KNTTP"
+          ],
+          "Contract": [
+            "Item overview",
+            "EKPO-KNTTP"
+          ]
+        },
+        "purpose": "States what kind of object receives the cost, for example K for cost centre or A for asset.",
+        "origin": "Entered on the requirement, proposed by the context, or copied into a follow-on document.",
+        "control": "Stock procurement can have a blank assignment. Consumption needs an appropriate category and its required account assignment details.",
+        "effect": "It determines the account assignment data and influences GR and IR settings. Asset and cost-centre cases have different accounting evidence.",
+        "trace": "Compare category, actual G/L and object on the PR, PO and accounting document; inspect the saved item before drawing a conclusion from current setup.",
+        "qa": "Create a stock line and a K line for the same material. Compare Account Assignment and Delivery sections.",
+        "topic": "assignment",
+        "scenarios": [
+          "Ordinary valuated stock",
+          "Blank account assignment; inventory account derived for a valuated receipt.",
+          "Direct consumption",
+          "K determines cost-centre account assignment, expense destination and applicable GR/IR defaults."
+        ]
+      },
+      {
+        "id": "costcenter",
+        "name": "Cost centre",
+        "places": {
+          "PR": [
+            "Account assignment",
+            "EBKN-KOSTL"
+          ],
+          "PO": [
+            "Account assignment",
+            "EKKN-KOSTL"
+          ],
+          "Contract": [
+            "Account assignment",
+            "EKKN-KOSTL"
+          ]
+        },
+        "purpose": "Identifies the organizational cost object to which consumption is assigned.",
+        "origin": "Entered, defaulted by client rules or carried from a referenced account assignment.",
+        "control": "Relevant to a K item; a stock purchase normally has no cost-centre line. Validate the controlling area and period of validity.",
+        "effect": "The expense account describes the nature of cost; this object identifies the responsible centre.",
+        "trace": "Compare the account assignment distribution lines and actual cost assignment at GR or IR.",
+        "qa": "Split one item between two valid centres. Check the amounts on a supported partial posting.",
+        "topic": "assignment",
+        "scenarios": [
+          "Standard stock purchase",
+          "No K cost-centre assignment line in the ordinary stock case.",
+          "K consumption",
+          "A valid cost centre is required for this example and must belong to the right controlling context."
+        ]
+      },
+      {
+        "id": "gl",
+        "name": "G/L account",
+        "places": {
+          "PR": [
+            "Account assignment",
+            "EBKN-SAKTO"
+          ],
+          "PO": [
+            "Account assignment",
+            "EKKN-SAKTO"
+          ],
+          "Contract": [
+            "Account assignment",
+            "EKKN-SAKTO"
+          ]
+        },
+        "purpose": "Identifies the expense or other applicable account on a purchasing account assignment.",
+        "origin": "Can be proposed by account determination or explicitly entered if the category and field controls allow.",
+        "control": "For a K line inspect OME9 and the actual G/L default. For ordinary stock, account determination supplies inventory postings during the movement.",
+        "effect": "Sets the expense-account destination for the account-assigned procurement case; verify the posted FI lines.",
+        "trace": "Trace the assignment from requisition to order. At posting check whether the expected account was taken from that assignment or determined for a stock transaction.",
+        "qa": "Compare a K line and a stock line of the same material. Identify the source of the account on each accounting document.",
+        "topic": "assignment",
+        "scenarios": [
+          "Stock movement",
+          "FI account arises from the posting rules, including BSX where relevant.",
+          "K consumption",
+          "The expense G/L belongs to the purchasing account assignment and may receive an automatic default."
+        ]
+      },
+      {
+        "id": "asset",
+        "name": "Asset number",
+        "places": {
+          "PR": [
+            "Account assignment",
+            "EBKN-ANLN1"
+          ],
+          "PO": [
+            "Account assignment",
+            "EKKN-ANLN1"
+          ],
+          "Contract": [
+            "Account assignment",
+            "EKKN-ANLN1"
+          ]
+        },
+        "purpose": "Identifies the capital asset in an asset-assigned purchase.",
+        "origin": "Selected from the asset master or copied with assignment data.",
+        "control": "Relevant for category A. Verify the correct company code and subnumber; observe the client’s acquisition and receipt-valuation design.",
+        "effect": "Links procurement to Asset Accounting. Acquisition timing can differ with the valuation treatment.",
+        "trace": "Follow asset and subnumber from the PO to the accounting and asset documents.",
+        "qa": "Compare the PO’s asset with its actual acquisition posting using a test asset and an approved QA scenario.",
+        "topic": "assignment"
+      },
+      {
+        "id": "orderobj",
+        "name": "Order as cost object",
+        "places": {
+          "PR": [
+            "Account assignment",
+            "EBKN-AUFNR"
+          ],
+          "PO": [
+            "Account assignment",
+            "EKKN-AUFNR"
+          ]
+        },
+        "purpose": "Charges consumption to the order recorded in the account assignment.",
+        "origin": "Entered or inherited from the request that created the purchasing requirement.",
+        "control": "Depends on the account assignment category and a valid order that accepts the relevant postings.",
+        "effect": "The order can accumulate actual costs or commitments according to integration settings.",
+        "trace": "Follow the assigned order from requisition account detail to the actual posting. Keep it distinct from the purchasing document number.",
+        "qa": "Compare the same consumable bought for a cost centre and for an order. Identify the cost-object field that changes.",
+        "topic": "assignment"
+      },
+      {
+        "id": "wbselem",
+        "name": "WBS element",
+        "places": {
+          "PR": [
+            "Account assignment",
+            "EBKN-PS_PSP_PNR"
+          ],
+          "PO": [
+            "Account assignment",
+            "EKKN-PS_PSP_PNR"
+          ]
+        },
+        "purpose": "Associates the procurement cost with a project work breakdown structure element.",
+        "origin": "Manual assignment or a project-related demand propagated to Purchasing.",
+        "control": "Depends on the project/account assignment scenario and object status. A project-consumption assignment and valuated project stock are different processes.",
+        "effect": "Controls the project context of commitments and actuals where active.",
+        "trace": "Compare the external WBS shown on-screen with the assignment in the subsequent document; F1 can show an internal identifier.",
+        "qa": "Trace the WBS on a QA project purchase through receipt and invoice and verify the object on the cost posting.",
+        "topic": "assignment"
+      },
+      {
+        "id": "qty",
+        "name": "Requested or ordered quantity",
+        "places": {
+          "PR": [
+            "Item overview",
+            "EBAN-MENGE"
+          ],
+          "PO": [
+            "Item overview",
+            "EKPO-MENGE"
+          ],
+          "RFQ": [
+            "Item overview",
+            ""
+          ]
+        },
+        "purpose": "States how many units the item calls for. Always read it together with its unit.",
+        "origin": "Entered, proposed by planning or adopted from the reference quantity, possibly only in part.",
+        "control": "A normal goods item needs a positive quantity. Limits and some service items use different value and quantity controls.",
+        "effect": "A partial reference or partial receipt leaves multiple open quantities at different stages.",
+        "trace": "Compare PR quantity, vendor quotation quantity, PO schedule lines and net receipt history in one unit.",
+        "qa": "Request 100, order 80 and receive 60. Calculate remaining demand and open delivery separately.",
+        "topic": "quantity"
+      },
+      {
+        "id": "unit",
+        "name": "Unit of measure",
+        "places": {
+          "PR": [
+            "Item overview",
+            "EBAN-MEINS"
+          ],
+          "PO": [
+            "Item overview",
+            "EKPO-MEINS"
+          ],
+          "RFQ": [
+            "Item overview",
+            "EKPO-MEINS"
+          ],
+          "Contract": [
+            "Item overview",
+            "EKPO-MEINS"
+          ]
+        },
+        "purpose": "Gives meaning to the item quantity. A box, a piece and a kilogram cannot be compared until a conversion is established.",
+        "origin": "Material base or order unit, supplier-specific data, reference document or explicit selection.",
+        "control": "Check whether the material permits the unit and whether a valid conversion to the base unit exists.",
+        "effect": "A unit mismatch can distort quantities and prices even when the numeric quantity appears correct.",
+        "trace": "Follow the registered unit and conversion on each document; the order-price unit can differ from the order unit.",
+        "qa": "Use five cartons of twelve pieces. Reconcile item quantity to sixty base pieces and compare the quoted price basis.",
+        "topic": "units"
+      },
+      {
+        "id": "delivery",
+        "name": "Delivery date",
+        "places": {
+          "PR": [
+            "Item overview",
+            "EBAN-LFDAT"
+          ],
+          "PO": [
+            "Delivery schedule",
+            "EKET-EINDT"
+          ],
+          "RFQ": [
+            "Delivery schedule",
+            "EKET-EINDT"
+          ]
+        },
+        "purpose": "States the required or agreed delivery date for the item or schedule line.",
+        "origin": "Entered on a request, derived by scheduling, proposed from lead time or copied/adapted from a reference.",
+        "control": "An item can have multiple dated schedule lines. The PR field and the PO schedule table have different technical names.",
+        "effect": "Used for delivery monitoring and supply planning. It can differ from the date the material is available for use.",
+        "trace": "Compare the requested date with the ordered schedule date and any later vendor confirmation before judging lateness.",
+        "qa": "Split a 100-unit PO into dated quantities 60 and 40. Read each date independently of total quantity.",
+        "topic": "schedule",
+        "scenarios": [
+          "One schedule line",
+          "100 expected on 20 June.",
+          "Split delivery",
+          "60 on 20 June and 40 on 27 June. Compare each promise with its own receipts."
+        ]
+      },
+      {
+        "id": "tracking",
+        "name": "Requirement tracking number",
+        "places": {
+          "PR": [
+            "Item overview",
+            "EBAN-BEDNR"
+          ],
+          "PO": [
+            "Item overview",
+            "EKPO-BEDNR"
+          ]
+        },
+        "purpose": "Adds a requester’s tracking reference shared by related purchasing items.",
+        "origin": "Entered manually or carried from the purchase requisition or reference item.",
+        "control": "Normally organizational, subject to the document’s field selection. It is separate from the system-generated PR number.",
+        "effect": "Supports finding related requirements; matching text alone is insufficient proof of a technical document link.",
+        "trace": "Compare copied references with the actual PR-item link in the PO.",
+        "qa": "Give two PR items the same tracking number and convert just one. Determine which item has a real PO reference.",
+        "topic": "pr"
+      },
+      {
+        "id": "gr",
+        "name": "Goods receipt",
+        "places": {
+          "PR": [
+            "Valuation",
+            "EBAN-WEPOS"
+          ],
+          "PO": [
+            "Delivery",
+            "EKPO-WEPOS"
+          ]
+        },
+        "purpose": "Tells Purchasing whether a receipt is expected for this item. A selected box describes the intended process; actual receipts appear in document history.",
+        "origin": "Item category and, for account-assigned items, the account assignment category’s receipt rules. Reference documents can supply proposed values.",
+        "control": "Ordinary standard stock procurement expects a GR. For K consumption inspect the authorized category settings in OME9 and the item. Display mode shows the saved choice.",
+        "effect": "Controls receipt relevance. The valuation of that receipt is governed separately, and GR-based invoice verification determines matching to specific deliveries.",
+        "trace": "Compare the item’s receipt indicator with MIGO eligibility and the later material document. A tick alone proves neither delivery nor an FI posting.",
+        "qa": "In QA compare a standard stock item with a K item. Predict quantity and value effects before posting a permitted receipt.",
+        "topic": "receipt",
+        "scenarios": [
+          "Stock PO · standard item",
+          "Receipt expected. Check item-category controls before assuming the selected box is editable.",
+          "Cost-centre PO · K",
+          "Receipt may be expected or optional according to OME9 and item controls; record the actual value and editability separately."
+        ]
+      },
+      {
+        "id": "nonval",
+        "name": "GR non-valuated",
+        "places": {
+          "PR": [
+            "Valuation",
+            "EBAN-WEUNB"
+          ],
+          "PO": [
+            "Delivery",
+            "EKPO-WEUNB"
+          ]
+        },
+        "purpose": "For applicable account-assigned purchases, specifies that the goods receipt is recorded without valuating that receipt.",
+        "origin": "The account assignment category can propose or constrain the value; check the actual saved item.",
+        "control": "Only applicable to supported item and account assignment combinations. It can be selected and non-editable due to process rules.",
+        "effect": "An applicable receipt records delivery without the normal value posting. Expense or acquisition recognition then follows the applicable invoice/asset process.",
+        "trace": "Compare the material or acceptance evidence at receipt with the FI documents at receipt and invoice. Do not infer this switch from the material type alone.",
+        "qa": "For a simple K purchase of 500, predict the expense posting for valuated and non-valuated GR. Compare the two accounting histories.",
+        "topic": "receipt",
+        "scenarios": [
+          "Stock PO · own valuated stock",
+          "Ordinary stock receipt carries valuation. This checkbox is generally inapplicable to the normal stock item.",
+          "K · supported non-valuated GR",
+          "Selected gives receipt evidence without the usual value posting at GR. The expense is recognized at invoice in the simple example."
+        ]
+      },
+      {
+        "id": "ir",
+        "name": "Invoice receipt",
+        "places": {
+          "PR": [
+            "Valuation",
+            "EBAN-REPOS"
+          ],
+          "PO": [
+            "Invoice",
+            "EKPO-REPOS"
+          ]
+        },
+        "purpose": "States whether an invoice is expected against the purchasing item.",
+        "origin": "Usually proposed from item category and account assignment settings, with changes governed by those rules.",
+        "control": "Standard external purchases are typically invoice-relevant. A supplier consignment PO follows a settlement route with different invoice expectations.",
+        "effect": "Controls invoice relevance of the item. It records intention rather than confirming receipt of an invoice.",
+        "trace": "Read the saved indicator and inspect invoice documents or the correct settlement process separately.",
+        "qa": "Compare a standard stock PO with a supplier consignment item, then explain how the supplier obligation arises.",
+        "topic": "invoice",
+        "scenarios": [
+          "Ordinary stock purchase",
+          "Supplier invoice generally expected.",
+          "Supplier consignment",
+          "Ordinary invoice receipt is not expected for the consignment item. Withdrawal and settlement establish the financial history."
+        ]
+      },
+      {
+        "id": "requester",
+        "name": "Requisitioner",
+        "places": {
+          "PR": [
+            "Item overview",
+            "EBAN-AFNAM"
+          ]
+        },
+        "purpose": "Names the person or requesting group who raised the requirement.",
+        "origin": "Manual entry, personal default or a generating process.",
+        "control": "Its input status depends on field selection. This field does not in itself authorize the request.",
+        "effect": "Gives the buyer a person or group to contact when scope is unclear.",
+        "trace": "Compare the requisitioner with creator and release authority; these can be three different people.",
+        "qa": "Open a requisition and locate evidence for requester, creator and approver separately.",
+        "topic": "pr"
+      },
+      {
+        "id": "desired",
+        "name": "Desired vendor",
+        "places": {
+          "PR": [
+            "Source of supply",
+            "EBAN-LIFNR"
+          ]
+        },
+        "purpose": "Records a supplier suggested by the requester.",
+        "origin": "Entered on the PR or populated by its origin.",
+        "control": "A preference is separate from firm source assignment. Check if the supplier is valid for the purchasing context.",
+        "effect": "Provides a suggestion for processing; it does not itself prove an order was issued to that supplier.",
+        "trace": "Compare the desired supplier, fixed vendor and actual PO supplier.",
+        "qa": "Enter a desired source on a test request and inspect what is actually assigned after sourcing.",
+        "topic": "source"
+      },
+      {
+        "id": "fixed",
+        "name": "Fixed vendor",
+        "places": {
+          "PR": [
+            "Source of supply",
+            "EBAN-FLIEF"
+          ]
+        },
+        "purpose": "Identifies the supplier assigned as the fixed source on the PR item.",
+        "origin": "Assigned by the buyer or applicable source determination.",
+        "control": "Requires a suitable source for the organizational and validity context. Compare against desired vendor.",
+        "effect": "Makes the sourcing decision visible for conversion; other conditions for automatic ordering may still apply.",
+        "trace": "Follow the fixed source to the resulting PO item and inspect its agreement or info-record reference.",
+        "qa": "Compare a merely desired vendor with an assigned fixed vendor on identical test demand.",
+        "topic": "source"
+      },
+      {
+        "id": "estimate",
+        "name": "Valuation price",
+        "places": {
+          "PR": [
+            "Valuation",
+            "EBAN-PREIS"
+          ]
+        },
+        "purpose": "Gives an estimated unit value for internal valuation of the requisition.",
+        "origin": "Material valuation, reference values or manual estimate depending on the item and settings.",
+        "control": "Read the price together with its price unit and currency. A populated estimate can be editable in one scenario and protected in another.",
+        "effect": "Supports approval or commitment valuation where configured. It does not guarantee the vendor’s PO price.",
+        "trace": "Compare the PR valuation price against the actual net price in the saved PO and explain any divergence.",
+        "qa": "Request 20 units at an estimate of 50; obtain a quote at 48 and distinguish the two document values.",
+        "topic": "pricing"
+      },
+      {
+        "id": "prpriceunit",
+        "name": "Price unit of estimate",
+        "places": {
+          "PR": [
+            "Valuation",
+            "EBAN-PEINH"
+          ]
+        },
+        "purpose": "Number of units for which the requisition valuation price is quoted.",
+        "origin": "Proposed with the valuation price or entered for the estimate.",
+        "control": "Read jointly with price and unit; a value per 100 must not be interpreted as per piece.",
+        "effect": "Affects the estimated requisition value used by later decisions.",
+        "trace": "Convert the PR estimate to per-piece value before comparing with the vendor quotation.",
+        "qa": "Compare 600 per 100 with 6 per 1 for a requisition of 50.",
+        "topic": "units"
+      },
+      {
+        "id": "closed",
+        "name": "Requisition closed",
+        "places": {
+          "PR": [
+            "Item status",
+            "EBAN-EBAKZ"
+          ]
+        },
+        "purpose": "Indicates that further purchasing against this requested quantity is no longer expected.",
+        "origin": "Buyer or document processing according to the closing behavior of the requisition.",
+        "control": "Investigate order references and the reason for closure when a partly ordered request disappears from an open list.",
+        "effect": "Changes handling of outstanding requirements. Closed status alone cannot tell how many units were actually ordered or received.",
+        "trace": "Compare PR closed status with cumulative referenced order quantity and separate PO receipt history.",
+        "qa": "Order eight out of twelve requested units and compare the open requirement before and after authorized closure.",
+        "topic": "pr"
+      },
+      {
+        "id": "vendor",
+        "name": "Vendor",
+        "places": {
+          "PO": [
+            "Header data",
+            "EKKO-LIFNR"
+          ],
+          "Contract": [
+            "Header data",
+            "EKKO-LIFNR"
+          ]
+        },
+        "purpose": "Identifies the supplier for this purchasing document.",
+        "origin": "Entered by the buyer, selected by source determination or adopted from the referenced agreement or quotation.",
+        "control": "A stock purchase and a consumption purchase can share the same vendor. Ordering, invoicing and supplying partners may differ.",
+        "effect": "Sets the commercial partner and influences terms, currency and source-specific pricing.",
+        "trace": "Identify the vendor on the invitation, the quotation and the issued order; verify invoicing party separately.",
+        "qa": "Compare two suppliers for the same material and identify which header defaults change.",
+        "topic": "supplier"
+      },
+      {
+        "id": "buyer",
+        "name": "Purchasing group",
+        "places": {
+          "PR": [
+            "Item overview",
+            "EBAN-EKGRP"
+          ],
+          "PO": [
+            "Organizational data",
+            "EKKO-EKGRP"
+          ],
+          "RFQ": [
+            "Organizational data",
+            "EKKO-EKGRP"
+          ],
+          "Contract": [
+            "Organizational data",
+            "EKKO-EKGRP"
+          ]
+        },
+        "purpose": "Identifies the buyer or team responsible for procurement.",
+        "origin": "Item or plant material data, user defaults or explicit entry; compare the saved value.",
+        "control": "In PR processing the group is item-specific. In an external purchasing document it belongs to the header.",
+        "effect": "Supports workload assignment, selection and reporting. It does not alone define the legal buying entity.",
+        "trace": "Check how several PR items from different buyer groups were consolidated on an order.",
+        "qa": "Compare the same material in two plants and locate the buyer group on each request and order.",
+        "topic": "org"
+      },
+      {
+        "id": "porg",
+        "name": "Purchasing organization",
+        "places": {
+          "PR": [
+            "Source of supply",
+            "EBAN-EKORG"
+          ],
+          "PO": [
+            "Organizational data",
+            "EKKO-EKORG"
+          ],
+          "RFQ": [
+            "Organizational data",
+            "EKKO-EKORG"
+          ],
+          "Contract": [
+            "Organizational data",
+            "EKKO-EKORG"
+          ]
+        },
+        "purpose": "Identifies the purchasing unit responsible for the supplier relationship and negotiated conditions.",
+        "origin": "Organizational defaults, assigned source or a reference document.",
+        "control": "A request may initially have limited sourcing data; an external purchasing document needs its purchasing organization resolved.",
+        "effect": "Determines the purchasing context for vendor and agreement eligibility.",
+        "trace": "Check supplier data and conditions for the organization actually used, especially for cross-plant procurement.",
+        "qa": "Attempt to reference an agreement from another purchasing organization in QA; record whether the organizational design permits it.",
+        "topic": "org"
+      },
+      {
+        "id": "company",
+        "name": "Company code",
+        "places": {
+          "PO": [
+            "Organizational data",
+            "EKKO-BUKRS"
+          ],
+          "Contract": [
+            "Organizational data",
+            "EKKO-BUKRS"
+          ]
+        },
+        "purpose": "Identifies the legal accounting entity for the purchasing document.",
+        "origin": "Organizational assignments, document context or explicit entry.",
+        "control": "Check compatibility between company code, plant and purchasing organization. A central agreement can have broader scope depending on design.",
+        "effect": "It defines the financial context for follow-on postings and the applicable company-code supplier data.",
+        "trace": "Compare the company code in the purchasing and accounting documents, including cross-company cases.",
+        "qa": "Compare one supplier’s purchasing data and company-code data and identify which set supports a payable.",
+        "topic": "org"
+      },
+      {
+        "id": "docdate",
+        "name": "Document date",
+        "places": {
+          "PO": [
+            "Header data",
+            "EKKO-BEDAT"
+          ],
+          "RFQ": [
+            "Header data",
+            "EKKO-BEDAT"
+          ],
+          "Contract": [
+            "Header data",
+            "EKKO-BEDAT"
+          ]
+        },
+        "purpose": "Records the purchasing document date.",
+        "origin": "Often proposed from the current date or inherited through document creation; inspect the saved date.",
+        "control": "Document date, creation timestamp, delivery date and accounting posting date represent different events.",
+        "effect": "Supports document history and can matter to date-dependent commercial decisions under the configured rules.",
+        "trace": "Compare offer, order and delivery dates with the condition validity and pricing date actually used.",
+        "qa": "Display a historical order and distinguish document creation, physical delivery and posting dates.",
+        "topic": "schedule"
+      },
+      {
+        "id": "currency",
+        "name": "Currency",
+        "places": {
+          "PO": [
+            "Delivery and payment terms",
+            "EKKO-WAERS"
+          ],
+          "Quotation": [
+            "Delivery and payment terms",
+            "EKKO-WAERS"
+          ],
+          "Contract": [
+            "Delivery and payment terms",
+            "EKKO-WAERS"
+          ]
+        },
+        "purpose": "Sets the currency for amounts in this purchasing document.",
+        "origin": "Supplier purchasing data, reference, or buyer entry depending on process.",
+        "control": "Compare currency with condition currency and company-code currency. The same numeral in two currencies has different value.",
+        "effect": "Affects comparisons and conversion to local-currency postings.",
+        "trace": "Trace a supplier’s foreign-currency price through the quotation, PO and local-currency documents.",
+        "qa": "Compare two quotes expressed in different currencies using a documented comparison date and rate.",
+        "topic": "pricing"
+      },
+      {
+        "id": "terms",
+        "name": "Payment terms",
+        "places": {
+          "PO": [
+            "Delivery and payment terms",
+            "EKKO-ZTERM"
+          ],
+          "Contract": [
+            "Delivery and payment terms",
+            "EKKO-ZTERM"
+          ]
+        },
+        "purpose": "Defines the agreed payment schedule and possible cash discount terms.",
+        "origin": "Often proposed from vendor purchasing data or a reference document; can be adjusted where allowed.",
+        "control": "Do not infer the due date from the bare key. The invoice baseline date and actual saved invoice terms matter.",
+        "effect": "Affects AP’s due-date and discount calculations according to invoice settings.",
+        "trace": "Compare terms on vendor, PO and posted invoice before diagnosing a missed discount.",
+        "qa": "Compare a 30-day term with a discounted term on two test invoices using the same baseline date.",
+        "topic": "supplier"
+      },
+      {
+        "id": "incoterm",
+        "name": "Incoterms",
+        "places": {
+          "PO": [
+            "Delivery and payment terms",
+            "EKKO-INCO1"
+          ],
+          "RFQ": [
+            "Delivery and payment terms",
+            "EKKO-INCO1"
+          ],
+          "Contract": [
+            "Delivery and payment terms",
+            "EKKO-INCO1"
+          ]
+        },
+        "purpose": "Records the delivery term agreed with the supplier; the named place supplies essential context.",
+        "origin": "Supplier data, agreement, quotation or manual entry.",
+        "control": "Check the term and place together. Presence of a term does not by itself create a freight condition.",
+        "effect": "Communicates delivery responsibilities and helps interpret freight-inclusive comparisons.",
+        "trace": "Follow delivery terms from the supplier offer into the PO and check whether freight was also priced separately.",
+        "qa": "Compare two offers with different delivery terms at the same named destination.",
+        "topic": "deliveryTerms"
+      },
+      {
+        "id": "incoplace",
+        "name": "Incoterms location",
+        "places": {
+          "PO": [
+            "Delivery and payment terms",
+            "EKKO-INCO2"
+          ],
+          "Contract": [
+            "Delivery and payment terms",
+            "EKKO-INCO2"
+          ]
+        },
+        "purpose": "Qualifies the delivery term with a named place in classic ECC.",
+        "origin": "Proposed with the term or entered according to the agreement.",
+        "control": "Use the actual agreed place; two identical Incoterms codes at different locations can have different commercial implications.",
+        "effect": "Supports a meaningful handoff to receiving, shipping and invoice review.",
+        "trace": "Compare the named place in quotation or contract, saved PO and output.",
+        "qa": "Review two PO copies with the same Incoterms code but different locations. Decide which further freight evidence is needed.",
+        "topic": "deliveryTerms"
+      },
+      {
+        "id": "net",
+        "name": "Net price",
+        "places": {
+          "PO": [
+            "Conditions",
+            "EKPO-NETPR"
+          ],
+          "Quotation": [
+            "Conditions",
+            "EKPO-NETPR"
+          ],
+          "Contract": [
+            "Conditions",
+            "EKPO-NETPR"
+          ]
+        },
+        "purpose": "States the item price for the specified price unit and order price unit.",
+        "origin": "Can be derived from conditions, an agreement, quotation, info record or manual price depending on scope.",
+        "control": "A calculated or locked item price can still have underlying editable condition lines. Check pricing and price-display permissions.",
+        "effect": "Affects commercial value and the reference used by invoice verification.",
+        "trace": "Trace the selected offer or agreement, the PO conditions and invoice comparison on the same unit basis.",
+        "qa": "Compare 12 per one and 1,200 per hundred. Confirm whether the PO derives the same goods value.",
+        "topic": "pricing"
+      },
+      {
+        "id": "per",
+        "name": "Price unit",
+        "places": {
+          "PO": [
+            "Conditions",
+            "EKPO-PEINH"
+          ],
+          "Quotation": [
+            "Conditions",
+            "EKPO-PEINH"
+          ],
+          "Contract": [
+            "Conditions",
+            "EKPO-PEINH"
+          ]
+        },
+        "purpose": "Numeric denominator for the quoted item price, such as 1 or 100.",
+        "origin": "Adopted with conditions or entered with the price.",
+        "control": "Always pair with the order price unit. Price per hundred pieces differs from price per hundred cartons.",
+        "effect": "An incorrect denominator scales the item value and invoice expectation.",
+        "trace": "Trace the denominator in offer, agreement and PO rather than comparing only net price.",
+        "qa": "Quote 240 per 100 pieces and order 60 pieces. Check the resulting 144 before additional conditions.",
+        "topic": "units"
+      },
+      {
+        "id": "bprme",
+        "name": "Order price unit",
+        "places": {
+          "PO": [
+            "Conditions",
+            "EKPO-BPRME"
+          ],
+          "Quotation": [
+            "Conditions",
+            "EKPO-BPRME"
+          ],
+          "Contract": [
+            "Conditions",
+            "EKPO-BPRME"
+          ]
+        },
+        "purpose": "Specifies the physical unit in which the vendor quotes the price.",
+        "origin": "Purchasing info record, conditions, reference document or explicit entry.",
+        "control": "May differ from the order unit. The item needs a consistent conversion between the two.",
+        "effect": "Changes the price quantity used in order and invoice comparison.",
+        "trace": "Read the unit relationship on the saved order and the actual price quantity used during invoicing.",
+        "qa": "Order cartons but price per piece. Verify both the unit conversion and numerical price unit.",
+        "topic": "units"
+      },
+      {
+        "id": "cond",
+        "name": "Condition type and amount",
+        "places": {
+          "PO": [
+            "Conditions",
+            "KONV-KSCHL"
+          ],
+          "Quotation": [
+            "Conditions",
+            "KONV-KSCHL"
+          ],
+          "Contract": [
+            "Conditions",
+            ""
+          ]
+        },
+        "purpose": "Identifies a pricing component such as base price, discount or freight.",
+        "origin": "Condition access can find a record valid for the date and key; commercial terms may also be entered manually.",
+        "control": "The schema, access sequence, validity and manual-entry settings govern individual conditions. Statistical lines may be displayed separately.",
+        "effect": "Conditions build the item price and effective comparison components. Use the pricing basis and subtotals to explain the arithmetic.",
+        "trace": "Compare the saved condition analysis with the source record valid at creation time.",
+        "qa": "Rebuild a line with a base of 1,200, discount of 120 and freight of 60; identify the subtotal being compared.",
+        "topic": "pricing"
+      },
+      {
+        "id": "grbased",
+        "name": "GR-based invoice verification",
+        "places": {
+          "PO": [
+            "Invoice",
+            "EKPO-WEBRE"
+          ]
+        },
+        "purpose": "Matches the invoice to individual goods receipts for the PO item.",
+        "origin": "Supplier purchasing data, applicable info record or purchase reference may propose it. Examine the actual item.",
+        "control": "The receipt must be relevant to the process. Check field selection, prerequisites and existing history before changing a saved PO.",
+        "effect": "Partial deliveries remain distinguishable for invoice matching. Selecting Goods Receipt alone does not establish GR-based IV.",
+        "trace": "Trace a delivery’s material document into invoice item references rather than matching only a PO total.",
+        "qa": "Receive 6 units and then 4. Open invoice entry for the PO and inspect how the deliveries are proposed.",
+        "topic": "grbased"
+      },
+      {
+        "id": "delcomp",
+        "name": "Delivery completed",
+        "places": {
+          "PO": [
+            "Delivery",
+            "EKPO-ELIKZ"
+          ]
+        },
+        "purpose": "Signals that further deliveries are no longer expected for this PO item.",
+        "origin": "Can be set by the user or by receiving logic, including client tolerance settings.",
+        "control": "It can be set on a short but accepted final delivery. It is a completion indicator; do not assume it prohibits every later posting.",
+        "effect": "Affects open-delivery quantity and monitoring. The actual received quantity still comes from history.",
+        "trace": "Compare the completion indicator and receipt history, including reversals.",
+        "qa": "Order 100, accept a last delivery totalling 98 within an agreed tolerance, and compare history with the open quantity report.",
+        "topic": "tolerance"
+      },
+      {
+        "id": "under",
+        "name": "Underdelivery tolerance",
+        "places": {
+          "PO": [
+            "Delivery",
+            "EKPO-UNTTO"
+          ]
+        },
+        "purpose": "Percentage shortfall acceptable relative to the ordered quantity for delivery completion.",
+        "origin": "Purchasing value key, source data, reference or item-specific entry depending on settings.",
+        "control": "The relevant percentage works with completion logic; a partial receipt is not automatically a business decision to close the PO.",
+        "effect": "Can affect whether a short final delivery qualifies for completion.",
+        "trace": "Compare ordered, received and still-expected quantities on the actual item.",
+        "qa": "Test 97, 98 and 99 against 100 ordered with a 2 percent underdelivery tolerance; record completion behavior.",
+        "topic": "tolerance"
+      },
+      {
+        "id": "over",
+        "name": "Overdelivery tolerance",
+        "places": {
+          "PO": [
+            "Delivery",
+            "EKPO-UEBTO"
+          ]
+        },
+        "purpose": "Percentage by which delivery can exceed ordered quantity under the item’s tolerance.",
+        "origin": "May be proposed from purchasing data or copied and adjusted.",
+        "control": "Check Unlimited overdelivery and actual message behavior before predicting acceptance.",
+        "effect": "Controls overdelivery checks at receiving; it is separate from invoice variance limits.",
+        "trace": "Compare cumulative net receipts with order quantity and this tolerance.",
+        "qa": "For 100 ordered with a 5 percent tolerance and unlimited off, compare proposed receipts totalling 105 and 106.",
+        "topic": "tolerance"
+      },
+      {
+        "id": "unlimited",
+        "name": "Unlimited overdelivery",
+        "places": {
+          "PO": [
+            "Delivery",
+            "EKPO-UEBTK"
+          ]
+        },
+        "purpose": "Permits delivery beyond the ordinary item percentage ceiling under the overdelivery check.",
+        "origin": "Item proposal or user setting where enabled.",
+        "control": "An unchecked indicator leaves the percentage limit relevant. Other validity, quantity and stock checks still apply.",
+        "effect": "Affects goods-receipt quantity checks without defining the invoice acceptance decision.",
+        "trace": "Read the indicator on the effective PO item, then separately review invoiced-versus-received history.",
+        "qa": "Repeat the same excess quantity in QA with the flag off and on, keeping every other input fixed.",
+        "topic": "tolerance"
+      },
+      {
+        "id": "final",
+        "name": "Final invoice",
+        "places": {
+          "PO": [
+            "Invoice",
+            "EKPO-EREKZ"
+          ]
+        },
+        "purpose": "Signals that no further invoice is expected for this purchasing item.",
+        "origin": "Set by invoice processing or on the PO as appropriate to the case.",
+        "control": "It does not establish that the vendor has been paid or that no future invoice can technically be entered.",
+        "effect": "Can affect outstanding commitment handling. GR/IR and the vendor account still require their own evidence.",
+        "trace": "Compare the final-invoice flag, open commitments, invoice history and payment clearing separately.",
+        "qa": "Find a PO item marked final invoice and determine what evidence proves actual vendor payment.",
+        "topic": "invoice"
+      },
+      {
+        "id": "tax",
+        "name": "Tax code",
+        "places": {
+          "PO": [
+            "Invoice",
+            "EKPO-MWSKZ"
+          ]
+        },
+        "purpose": "Identifies the input-tax treatment expected for the purchase in the client’s tax procedure.",
+        "origin": "May be proposed by purchasing data or determined/entered according to local configuration.",
+        "control": "Confirm the actual code with Finance for the company and transaction. A blank or zero-rate code has meaning only in its tax context.",
+        "effect": "Used in tax calculation and checking; deductions and postings depend on the configured tax treatment.",
+        "trace": "Compare PO tax information with the supplier invoice and FI tax lines.",
+        "qa": "In QA compare the same net value with two Finance-approved sample codes and inspect the tax basis.",
+        "topic": "invoice"
+      },
+      {
+        "id": "return",
+        "name": "Returns item",
+        "places": {
+          "PO": [
+            "Item overview",
+            "EKPO-RETPO"
+          ]
+        },
+        "purpose": "Marks the purchasing item as a returns-to-vendor process.",
+        "origin": "Selected for the returns PO item or copied from a suitable reference.",
+        "control": "It represents a commercial return, distinct from correcting an erroneously posted goods receipt.",
+        "effect": "Changes the expected direction of logistics and invoice/credit processing.",
+        "trace": "Trace the returns item to the actual goods movement and supplier credit; neither alone proves the other happened.",
+        "qa": "Compare a physical return of four goods with correction of an accidentally overstated receipt by four.",
+        "topic": "returns"
+      },
+      {
+        "id": "inforec",
+        "name": "Purchasing info record",
+        "places": {
+          "PO": [
+            "Item details",
+            "EKPO-INFNR"
+          ]
+        },
+        "purpose": "Identifies supplier/material purchasing information relevant to the item.",
+        "origin": "Proposed through source determination or selected by the buyer.",
+        "control": "Read the purchasing organization, plant scope, category and validity. Multiple sources of conditions can apply.",
+        "effect": "Supports order-unit, delivery and price proposals according to the actual source configuration.",
+        "trace": "Compare current info-record values with the condition analysis on a saved PO.",
+        "qa": "Check two orders on opposite sides of a condition-validity date and establish their actual price sources.",
+        "topic": "source"
+      },
+      {
+        "id": "update",
+        "name": "Info update",
+        "places": {
+          "PO": [
+            "Item details",
+            "EKPO-SPINF"
+          ],
+          "Quotation": [
+            "Item details",
+            "EKPO-SPINF"
+          ]
+        },
+        "purpose": "Controls whether purchasing information is updated by this document in the supported update context.",
+        "origin": "Purchasing default values or explicit selection; behavior depends on document type, release and existing info records.",
+        "control": "Review the exact indicator presentation in the transaction. A check mark does not guarantee every existing master condition is replaced.",
+        "effect": "Can influence purchasing info records or order-price history used in later buying.",
+        "trace": "Record the existing info-record data before saving the test document and compare the affected organizational level afterward.",
+        "qa": "Create two test documents differing only in Info update; compare resulting source data without assuming all fields update.",
+        "topic": "infoUpdate"
+      },
+      {
+        "id": "agr",
+        "name": "Agreement reference",
+        "places": {
+          "PO": [
+            "Item overview",
+            "EKPO-KONNR"
+          ],
+          "PR": [
+            "Source of supply",
+            "EBAN-KONNR"
+          ]
+        },
+        "purpose": "Identifies the outline agreement selected as the source of this item.",
+        "origin": "Sourcing, reference adoption or manual agreement assignment.",
+        "control": "Check vendor, organization, item and validity. Typing the supplier and price without a reference does not create a release against the contract.",
+        "effect": "Makes downstream release documentation and agreement consumption traceable.",
+        "trace": "Follow the PR source to the PO’s agreement number and item, then inspect contract release documentation.",
+        "qa": "Compare a referenced call-off with a standalone PO to the same supplier at the same price.",
+        "topic": "contract"
+      },
+      {
+        "id": "prref",
+        "name": "Purchase requisition reference",
+        "places": {
+          "PO": [
+            "Item details",
+            "EKPO-BANFN"
+          ]
+        },
+        "purpose": "Records the requisition from which the buyer adopted this PO item.",
+        "origin": "Set when the order item actually references the PR item.",
+        "control": "Read the requisition number and item together. Similar text or tracking numbers do not prove a reference.",
+        "effect": "Supports PR processing status and tracing ordered versus requested quantities.",
+        "trace": "Use the PO item’s requisition reference and compare the corresponding ordered quantity in the PR.",
+        "qa": "Compare a manually typed copy with an item adopted from the PR document overview.",
+        "topic": "pr"
+      },
+      {
+        "id": "conf",
+        "name": "Confirmation control key",
+        "places": {
+          "PO": [
+            "Confirmations",
+            "EKPO-BSTAE"
+          ]
+        },
+        "purpose": "Defines which supplier confirmations are expected and how they are processed.",
+        "origin": "May be proposed from the supplier or purchasing info record, depending on the setup.",
+        "control": "Check the configured confirmation sequence and the item. A requested date and a vendor-confirmed date are separate data.",
+        "effect": "Can influence monitoring and planning relevance of expected confirmations and inbound deliveries.",
+        "trace": "Compare the order schedule line, recorded acknowledgement and confirmed schedule quantities.",
+        "qa": "Record a sample order acknowledgement with a changed delivery date; identify each date separately.",
+        "topic": "confirm"
+      },
+      {
+        "id": "ack",
+        "name": "Acknowledgment required",
+        "places": {
+          "PO": [
+            "Confirmations",
+            "EKPO-KZABS"
+          ]
+        },
+        "purpose": "Requests a supplier order acknowledgement for the item.",
+        "origin": "Purchasing proposals, source data or item entry.",
+        "control": "A selected requirement does not itself record that an acknowledgement arrived.",
+        "effect": "Supports supplier follow-up and reminder handling in the configured process.",
+        "trace": "Trace requirement, actual confirmation and evidence of output to the vendor independently.",
+        "qa": "Review an item requiring acknowledgment and show what evidence would establish the supplier actually replied.",
+        "topic": "confirm"
+      },
+      {
+        "id": "planned",
+        "name": "Planned delivery time",
+        "places": {
+          "PO": [
+            "Delivery",
+            "EKPO-PLIFZ"
+          ]
+        },
+        "purpose": "Number of calendar days used for the supplier delivery interval in relevant scheduling.",
+        "origin": "Often proposed from applicable purchasing or material master data.",
+        "control": "Read alongside purchasing and GR processing times and their calendars. A planned interval is not a supplier confirmation.",
+        "effect": "Can influence dates and planning assumptions. It does not prove when the shipment will arrive.",
+        "trace": "Compare the master proposal, saved item and actual confirmed date.",
+        "qa": "Hold demand constant and vary the planned lead time on a QA planning example.",
+        "topic": "schedule"
+      },
+      {
+        "id": "grtime",
+        "name": "GR processing time",
+        "places": {
+          "PO": [
+            "Delivery",
+            "EKPO-WEBAZ"
+          ]
+        },
+        "purpose": "Time for internal receiving activities before material is available to use.",
+        "origin": "Usually supplied by material/plant planning data, subject to the procurement context.",
+        "control": "Distinguish working days for processing from the supplier’s planned delivery interval.",
+        "effect": "Helps explain why a required availability date can be later than receipt at the dock.",
+        "trace": "Work backwards from requirement date to receipt and procurement dates using the actual calendars.",
+        "qa": "Allow two receiving workdays and test a receipt just before a weekend.",
+        "topic": "schedule"
+      },
+      {
+        "id": "history",
+        "name": "Purchase order history",
+        "places": {
+          "PO": [
+            "Purchase order history",
+            ""
+          ]
+        },
+        "purpose": "Shows follow-on events referring to the selected order item.",
+        "origin": "Generated from posted receipts, reversals, invoices or other relevant follow-on documents.",
+        "control": "Display-only evidence. The History tab can be absent or empty before relevant postings exist.",
+        "effect": "Helps reconcile the ordered, delivered and invoiced quantities and values at item level.",
+        "trace": "Open individual material and invoice documents; apply the correct sign to reversals and use consistent units.",
+        "qa": "Receive 80, reverse 10, invoice 80 and explain the 10-piece discrepancy without using a header total.",
+        "topic": "history"
+      },
+      {
+        "id": "collect",
+        "name": "Collective RFQ number",
+        "places": {
+          "RFQ": [
+            "Header data",
+            "EKKO-SUBMI"
+          ],
+          "Comparison": [
+            "Report selection",
+            ""
+          ]
+        },
+        "purpose": "Groups separate vendor invitations belonging to the same sourcing event.",
+        "origin": "Typically entered by the buyer and reused on the participating RFQs; on the comparison screen it can be used for selection.",
+        "control": "A vendor-specific RFQ number remains distinct. Matching collective numbers do not guarantee identical items or conditions.",
+        "effect": "Helps retrieve all responses for the bid comparison.",
+        "trace": "Follow the collective number to each RFQ and quotation, then compare the actual material items and quantities.",
+        "qa": "Give two invitations the same collective number, enter one response and inspect the comparison selection.",
+        "topic": "rfq"
+      },
+      {
+        "id": "deadline",
+        "name": "Quotation deadline",
+        "places": {
+          "RFQ": [
+            "Header data",
+            "EKKO-ANGDT"
+          ]
+        },
+        "purpose": "Last requested date for the supplier’s offer.",
+        "origin": "Buyer enters it with the invitation or copies it from the RFQ being reused.",
+        "control": "It differs from the required delivery date and from the validity of the supplier’s quotation.",
+        "effect": "Defines the response timetable for purchasing follow-up.",
+        "trace": "Compare invited deadline, vendor response date and date the offer expires before evaluating timeliness.",
+        "qa": "Use the same response deadline with two different item delivery dates and explain which date the supplier must meet for each event.",
+        "topic": "rfq"
+      },
+      {
+        "id": "rfqvendor",
+        "name": "Invited vendor",
+        "places": {
+          "RFQ": [
+            "Vendor address",
+            "EKKO-LIFNR"
+          ]
+        },
+        "purpose": "Identifies the vendor addressed by this RFQ.",
+        "origin": "Selected when addressing the RFQ; multiple suppliers in a sourcing event generally have individually identifiable RFQs.",
+        "control": "Vendor master data and organizational context must support the invitation. A collective number can join invitations.",
+        "effect": "Provides the recipient and the reference under which its quotation is maintained.",
+        "trace": "Compare the vendor-specific invitation number with the ME47 quotation and collective comparison list.",
+        "qa": "Prepare two invitations for identical items; explain how the responses stay attributable to each vendor.",
+        "topic": "rfq"
+      },
+      {
+        "id": "quotenum",
+        "name": "Supplier quotation number",
+        "places": {
+          "Quotation": [
+            "Header data",
+            "EKKO-ANGNR"
+          ]
+        },
+        "purpose": "Records the supplier’s own offer reference.",
+        "origin": "Entered from the supplier’s response during quotation maintenance.",
+        "control": "Distinguish the vendor’s reference from the internal RFQ number and the collective RFQ number.",
+        "effect": "Helps identify the commercial evidence used in the award.",
+        "trace": "Compare the supplier PDF or letter with the saved offer reference and any reference carried forward.",
+        "qa": "Identify all three identifiers for a sample event and describe when each should be used.",
+        "topic": "rfq"
+      },
+      {
+        "id": "reject",
+        "name": "Rejection indicator",
+        "places": {
+          "Quotation": [
+            "Quotation details",
+            "EKPO-ABSKZ"
+          ]
+        },
+        "purpose": "Records the buyer’s rejection of the quotation item in the classic RFQ process.",
+        "origin": "Buyer’s evaluation decision after reviewing the offer.",
+        "control": "It is an item decision. Actual rejection communication depends on message/output processing.",
+        "effect": "Supports rejection follow-up and documenting which offer was declined.",
+        "trace": "Trace the offered item, comparison basis, saved rejection and any output separately.",
+        "qa": "Reject one line of a two-item test quotation and inspect which item and output are affected.",
+        "topic": "rfq",
+        "scenarios": [
+          "Maintain quotation",
+          "Buyer may record the rejection after evaluation.",
+          "Display quotation",
+          "Decision is displayed; a rejection record and outgoing rejection communication are separate evidence."
+        ]
+      },
+      {
+        "id": "rfqnum",
+        "name": "RFQ selection",
+        "places": {
+          "Comparison": [
+            "Report selection",
+            ""
+          ]
+        },
+        "purpose": "Identifies the invitations whose vendor responses will be compared.",
+        "origin": "Entered directly or selected using organizational or collective RFQ criteria.",
+        "control": "This is a reporting selection. The source RFQ and quotation records remain separate documents in the purchasing process.",
+        "effect": "Determines which offers enter the list; a missing offer can arise from selection or missing quotation data.",
+        "trace": "Trace each displayed comparison column back to its vendor-specific RFQ item.",
+        "qa": "Compare a search by RFQ number with the collective-number selection for the same event.",
+        "topic": "compare"
+      },
+      {
+        "id": "compcur",
+        "name": "Comparison currency",
+        "places": {
+          "Comparison": [
+            "Report selection",
+            ""
+          ]
+        },
+        "purpose": "Expresses prices from different offers on a common currency basis.",
+        "origin": "Entered or proposed for the comparison run.",
+        "control": "Review exchange rate basis and conversion date. A ranking in another currency can depend on exchange rates and rounding.",
+        "effect": "Changes the presentation and calculated comparisons, without changing the saved supplier quotations.",
+        "trace": "Recalculate one converted price from the supplier’s currency and documented rate.",
+        "qa": "Run the same two foreign-currency offers in a common currency and reconstruct one item manually.",
+        "topic": "compare"
+      },
+      {
+        "id": "basis",
+        "name": "Comparison price and scope",
+        "places": {
+          "Comparison": [
+            "Report selection",
+            ""
+          ]
+        },
+        "purpose": "Controls the price basis and optional components in a quotation comparison.",
+        "origin": "Selected for the comparison run according to the report’s available choices.",
+        "control": "Read which freight, delivery costs, discounts and other components are included. Time-dependent conditions and setup may limit comparison.",
+        "effect": "Influences the apparent cheapest offer. Delivery or quality trade-offs still require evaluation.",
+        "trace": "Rebuild the effective comparison value from the recorded quotation components.",
+        "qa": "Compare a low base price plus freight with a higher delivered price. Document the assumptions that reverse the ranking.",
+        "topic": "compare"
+      },
+      {
+        "id": "rank",
+        "name": "Rank and relative price",
+        "places": {
+          "Comparison": [
+            "Comparison list",
+            ""
+          ]
+        },
+        "purpose": "Shows a supplier’s relative position on the selected comparison basis.",
+        "origin": "Calculated by the report from the included offers and selection options.",
+        "control": "Display-only result. A missing price and a zero-price offer are different cases.",
+        "effect": "Supports evaluation but does not create an award, contract or PO.",
+        "trace": "Trace a surprising ranking to the actual quotation item, price unit, currency, validity and comparison selections.",
+        "qa": "Explain a ranking for 600 pieces priced per carton by one vendor and per piece by another.",
+        "topic": "compare"
+      },
+      {
+        "id": "start",
+        "name": "Validity begins",
+        "places": {
+          "Contract": [
+            "Header data",
+            "EKKO-KDATB"
+          ]
+        },
+        "purpose": "Starts the period in which the purchasing agreement is intended to apply.",
+        "origin": "Entered from negotiated terms.",
+        "control": "Compare the header interval with item condition validity. The commercial conditions can change within one agreement period.",
+        "effect": "Affects source selection and whether a call-off is within the agreed window.",
+        "trace": "Compare agreement validity, condition date and call-off document date.",
+        "qa": "Try one QA release order inside the interval and another outside; record the actual message and rule.",
+        "topic": "contract"
+      },
+      {
+        "id": "end",
+        "name": "Validity ends",
+        "places": {
+          "Contract": [
+            "Header data",
+            "EKKO-KDATE"
+          ]
+        },
+        "purpose": "Last date of the contract’s validity period.",
+        "origin": "Entered from the agreement or an approved extension.",
+        "control": "Inspect the actual date on the agreement and the relevant comparison or release-order date. Client message settings can influence processing.",
+        "effect": "Supports expiry follow-up and checks when referencing the agreement.",
+        "trace": "Distinguish an expired agreement from an agreement with valid header dates but expired price conditions.",
+        "qa": "Hold the item constant and vary only the date around the end of the interval.",
+        "topic": "contract"
+      },
+      {
+        "id": "targetqty",
+        "name": "Target quantity",
+        "places": {
+          "Contract": [
+            "Item overview",
+            "EKPO-KTMNG"
+          ]
+        },
+        "purpose": "Agreed target quantity for a quantity-contract item.",
+        "origin": "Entered from the negotiated volume and unit.",
+        "control": "Central to a quantity contract. A value contract is assessed chiefly by its target value.",
+        "effect": "Provides a basis for monitoring release-order quantities; goods receipt has separate status.",
+        "trace": "Compare 1,000 target units, 550 called off and 400 received. Agreement consumption and delivered quantity differ.",
+        "qa": "Create two referenced call-offs for 250 and 300 and review release documentation.",
+        "topic": "contract",
+        "scenarios": [
+          "Quantity contract",
+          "The agreed quantity is the primary target.",
+          "Value contract",
+          "Evaluate the monetary agreement target and release values."
+        ]
+      },
+      {
+        "id": "targetval",
+        "name": "Target value",
+        "places": {
+          "Contract": [
+            "Header data",
+            "EKKO-KTWRT"
+          ]
+        },
+        "purpose": "Monetary target of the value contract in its document currency.",
+        "origin": "Entered from the negotiated value ceiling.",
+        "control": "Especially relevant to value contracts. Never compare a target in one currency with a raw release total in another.",
+        "effect": "Supports monitoring value consumed against the agreement. Exceedance message behavior is client-dependent.",
+        "trace": "Compare referenced order values and subsequent order changes against the reported releases.",
+        "qa": "For a target of 10,000, inspect releases of 3,000 and 4,500 in the same currency and calculate the provisional remaining value.",
+        "topic": "contract",
+        "scenarios": [
+          "Value contract",
+          "Use target value with document currency and actual release values.",
+          "Quantity contract",
+          "Quantity is the negotiated target. A monetary report answers a different question."
+        ]
+      },
+      {
+        "id": "relorders",
+        "name": "Release documentation",
+        "places": {
+          "Contract": [
+            "Release documentation",
+            ""
+          ]
+        },
+        "purpose": "Shows call-offs created with reference to the contract or contract item.",
+        "origin": "Generated from referencing purchase orders and relevant changes.",
+        "control": "Read-only result; a separately created PO to the same vendor at the same price does not establish a release reference.",
+        "effect": "Shows agreement utilization, which differs from the physical quantity received.",
+        "trace": "Follow the release documentation into the actual PO item and then its receipt history.",
+        "qa": "Compare two otherwise identical POs, only one of which references the agreement.",
+        "topic": "contract"
+      },
+      {
+        "id": "validcond",
+        "name": "Condition validity period",
+        "places": {
+          "Contract": [
+            "Conditions",
+            ""
+          ],
+          "Quotation": [
+            "Conditions",
+            ""
+          ]
+        },
+        "purpose": "Marks the interval for which a time-dependent commercial condition applies.",
+        "origin": "Maintained with the condition record or negotiated terms where time-dependent conditions are used.",
+        "control": "Check document type and condition technique. Not all RFQ types use time-dependent conditions.",
+        "effect": "The same agreement can propose different prices for different pricing dates.",
+        "trace": "Trace the date on the PO pricing analysis to the matching validity interval.",
+        "qa": "Set up two non-overlapping test price periods and compare the resulting call-off prices.",
+        "topic": "pricing"
+      },
+      {
+        "id": "addr",
+        "name": "Delivery address",
+        "places": {
+          "PO": [
+            "Delivery address",
+            ""
+          ]
+        },
+        "purpose": "Specifies the destination for this item, including an alternate address when appropriate.",
+        "origin": "Often derived from the receiving plant or storage location, or entered as an alternative delivery address.",
+        "control": "Some processes, including third-party purchasing, determine the destination differently. Inspect the actual item.",
+        "effect": "Controls delivery instructions communicated to the supplier and can differ from the accounting company address.",
+        "trace": "Compare customer, plant and manually maintained addresses with the issued PO output.",
+        "qa": "In a test order compare a plant delivery and an alternate address. Confirm which destination appears on the supplier document.",
+        "topic": "deliveryTerms"
+      },
+      {
+        "id": "part",
+        "name": "Partner function",
+        "places": {
+          "PO": [
+            "Partners",
+            ""
+          ]
+        },
+        "purpose": "Distinguishes business roles such as ordering address, goods supplier or invoicing party.",
+        "origin": "Vendor partner data and the document’s partner schema can propose business partners.",
+        "control": "Only permitted partner roles appear; mandatory roles and allowed changes depend on the selected procedure.",
+        "effect": "A supplier name on the PO does not guarantee every subsequent communication or invoice uses the same partner.",
+        "trace": "Compare the vendor, partner role, actual output recipient and invoicing party.",
+        "qa": "Inspect an order with a separate invoicing party and show which partner is used for which purpose.",
+        "topic": "supplier"
+      },
+      {
+        "id": "itemtext",
+        "name": "Item long text",
+        "places": {
+          "PO": [
+            "Item texts",
+            ""
+          ],
+          "RFQ": [
+            "Item texts",
+            ""
+          ],
+          "Contract": [
+            "Item texts",
+            ""
+          ]
+        },
+        "purpose": "Adds item-specific instructions that exceed the short description.",
+        "origin": "Copied or proposed according to text determination, from material or purchasing master data, a reference or user entry.",
+        "control": "Different text types have different adoption and printing rules. Visibility in SAP does not promise printing.",
+        "effect": "Can communicate technical specifications or delivery instructions through the applicable output.",
+        "trace": "Compare the saved text ID and supplier output; header text and item text can follow different rules.",
+        "qa": "Add distinctive QA text to a print-relevant and internal text type; review a test output.",
+        "topic": "texts"
+      },
+      {
+        "id": "headertext",
+        "name": "Header long text",
+        "places": {
+          "PO": [
+            "Header texts",
+            ""
+          ]
+        },
+        "purpose": "Carries terms or instructions common to the order.",
+        "origin": "Text types and copying rules, master or predecessor document, or manual entry.",
+        "control": "The text displayed on-screen and the text selected by the form depend on configuration and output design.",
+        "effect": "Provides supplier-facing or internal information according to the chosen text type.",
+        "trace": "Trace changed text on the saved PO to a newly generated test output version.",
+        "qa": "Change a header text in a QA copy and identify whether all items share the statement and whether it prints.",
+        "topic": "texts"
+      },
+      {
+        "id": "acknum",
+        "name": "Supplier acknowledgement reference",
+        "places": {
+          "PO": [
+            "Confirmations",
+            ""
+          ]
+        },
+        "purpose": "Records an external acknowledgement or confirmation identifier where used.",
+        "origin": "Entered from the supplier response or populated by an inbound interface.",
+        "control": "Read the confirmation category and relevant reference. A buyer’s tick requesting confirmation is a different field.",
+        "effect": "Allows the business to identify an actual acknowledgement against the order.",
+        "trace": "Match the response reference and date to the PO item and confirmation line.",
+        "qa": "Identify the evidence of an actual supplier response for a partial confirmation.",
+        "topic": "confirm"
+      },
+      {
+        "id": "squantity",
+        "name": "Schedule line quantity",
+        "places": {
+          "PO": [
+            "Delivery schedule",
+            "EKET-MENGE"
+          ]
+        },
+        "purpose": "Portion of the ordered quantity assigned to a particular date.",
+        "origin": "Proposed from the item quantity and maintained on one or more lines.",
+        "control": "Quantities across lines need to be consistent with the item total; received or confirmed history can restrict later changes.",
+        "effect": "Used for delivery scheduling and open requirements by date.",
+        "trace": "Compare the item total with individual schedule quantities, supplier confirmations and net receipts.",
+        "qa": "Split 100 into 60 this month and 40 next month, then show what the buyer should chase after receiving 60.",
+        "topic": "schedule",
+        "scenarios": [
+          "One delivery",
+          "100 units on the single confirmed or required date.",
+          "Two deliveries",
+          "60 and 40 on separate dates still total 100. Track each open line."
+        ]
+      },
+      {
+        "id": "condkey",
+        "name": "Pricing date control",
+        "places": {
+          "PO": [
+            "Conditions",
+            ""
+          ]
+        },
+        "purpose": "Determines which relevant date is used to find conditions in the applicable pricing scenario.",
+        "origin": "Pricing-date rules and supplier or info-record proposals where used.",
+        "control": "A PO document date and chosen pricing date need not be identical. Review item behavior before forcing a new price.",
+        "effect": "Changes the validity record used when determining a price. A revised setup does not retroactively explain an old saved price.",
+        "trace": "Use the condition analysis and actual dates to reproduce the price rather than querying only current conditions.",
+        "qa": "Use two validity periods and compare a fresh determination on each side of the boundary.",
+        "topic": "pricing"
+      },
+      {
+        "id": "distribution",
+        "name": "Account assignment distribution",
+        "places": {
+          "PR": [
+            "Account assignment",
+            "EBAN-VRTKZ"
+          ],
+          "PO": [
+            "Account assignment",
+            "EKPO-VRTKZ"
+          ]
+        },
+        "purpose": "Defines how multiple assignment lines share a purchasing item.",
+        "origin": "Set with the item’s multiple account assignments.",
+        "control": "Use supported quantity, percentage or value options as offered by the document and release. Partial postings have additional distribution rules.",
+        "effect": "A balancing item total can still allocate an incorrect amount to each cost object.",
+        "trace": "Compare saved distribution lines with the actual split in a partial receipt or invoice.",
+        "qa": "Split 1,000 at 60/40, post a supported partial 500 and compare proportional versus sequential distribution if available.",
+        "topic": "assignment"
+      },
+      {
+        "id": "prdate",
+        "name": "Requisition date",
+        "places": {
+          "PR": [
+            "Item overview",
+            "EBAN-BADAT"
+          ]
+        },
+        "purpose": "Records the date of the internal request.",
+        "origin": "Proposed on creation or supplied by the originating process.",
+        "control": "Different from the required delivery date and the date at which a release decision is needed.",
+        "effect": "Useful for tracking elapsed processing time and identifying the age of demand.",
+        "trace": "Compare PR date, approval timestamp and date of the first referenced order.",
+        "qa": "Read a historical PR and distinguish age of demand from days until delivery.",
+        "topic": "pr"
+      },
+      {
+        "id": "releaseDate",
+        "name": "Release date for procurement",
+        "places": {
+          "PR": [
+            "Dates",
+            "EBAN-FRGDT"
+          ]
+        },
+        "purpose": "Scheduling date by which procurement processing should start for the requirement.",
+        "origin": "Scheduling can calculate this from requirement timing and procurement lead times.",
+        "control": "Distinguish this planning date from the timestamp at which a person approved the requisition.",
+        "effect": "Supports scheduling and worklist timing; it is not proof that the PR passed release strategy.",
+        "trace": "Compare planned release date with actual approval history and PO creation date.",
+        "qa": "In a planned PR record all three dates and explain why they can differ.",
+        "topic": "schedule"
+      },
+      {
+        "id": "store",
+        "name": "Valuation currency",
+        "places": {
+          "PR": [
+            "Valuation",
+            "EBAN-WAERS"
+          ]
+        },
+        "purpose": "Currency for the estimated requisition value.",
+        "origin": "Derived or proposed from the relevant organizational context and valuation data.",
+        "control": "It belongs to the planning estimate. A supplier may later quote in a different currency.",
+        "effect": "Affects how a buyer compares the estimate with quotations and approval thresholds.",
+        "trace": "Carry the currency and price denominator when comparing estimated and ordered values.",
+        "qa": "Use one local-currency estimate and a foreign-currency quote. Document the rate used in your comparison.",
+        "topic": "pricing"
+      },
+      {
+        "id": "stocktype",
+        "name": "Stock type at receipt",
+        "places": {
+          "PO": [
+            "Delivery",
+            "EKPO-INSMK"
+          ]
+        },
+        "purpose": "Indicates the planned stock category for the receipt, for example whether material is intended for inspection.",
+        "origin": "Item, material quality settings and receiving process can influence the proposal.",
+        "control": "QM integration and active inspection settings can determine the effective posting. Check both indicators and actual receipt.",
+        "effect": "Physical inventory can increase while unrestricted-use quantity remains unchanged.",
+        "trace": "Trace the purchase item to the actual material-document stock category and any inspection lot or stock transfer.",
+        "qa": "Receive a test inspection-relevant item and identify why production cannot immediately withdraw the whole quantity.",
+        "topic": "inventory"
+      },
+      {
+        "id": "splitpercent",
+        "name": "Distribution percentage",
+        "places": {
+          "PR": [
+            "Account assignment",
+            "EBKN-VPROZ"
+          ],
+          "PO": [
+            "Account assignment",
+            "EKKN-VPROZ"
+          ]
+        },
+        "purpose": "Share of item cost associated with one assignment line under percentage distribution.",
+        "origin": "Entered on each account assignment or copied from a referenced item.",
+        "control": "Only relevant to the applicable distribution mode. Check that the complete set reconciles to 100 percent.",
+        "effect": "Directs how value is apportioned across cost objects under the appropriate partial-posting rules.",
+        "trace": "Read the percentages together with the distribution rule and the posted account assignments.",
+        "qa": "Use 60 and 40 percent on two centres and verify a 500 partial receipt against the actual partial-distribution setting.",
+        "topic": "assignment"
+      },
+      {
+        "id": "sesch",
+        "name": "Service specification",
+        "places": {
+          "PO": [
+            "Services",
+            ""
+          ]
+        },
+        "purpose": "Defines planned services, quantities, units and rates on a classic service PO.",
+        "origin": "Entered, adopted from PR/service specifications, or drawn from allowed master and contract data.",
+        "control": "Available for applicable classic service items. Planned service lines and unplanned service limits have different controls.",
+        "effect": "Forms the basis for entry and acceptance of services and later invoice checking.",
+        "trace": "Follow the ordered service line into the entry sheet and accepted quantity.",
+        "qa": "Order 80 hours, record 50 hours of work and compare the actually accepted amount with the original order.",
+        "topic": "service"
+      },
+      {
+        "id": "limit",
+        "name": "Overall limit and expected value",
+        "places": {
+          "PO": [
+            "Limits",
+            ""
+          ],
+          "PR": [
+            "Limits",
+            ""
+          ]
+        },
+        "purpose": "Sets a value ceiling and a planning expectation for the applicable unplanned-service or limit process.",
+        "origin": "Buyer or requester enters values according to the required service scope and client approval policy.",
+        "control": "Relevant for the supported item category and release. Distinguish the absolute overall limit from expected value.",
+        "effect": "Allows control over actual unplanned work and estimated order value; acceptance and invoicing still require their own evidence.",
+        "trace": "Compare the saved limits with actual entries, business approval and invoice amount.",
+        "qa": "Set different overall and expected values and compare the order value with the allowed entry scenario.",
+        "topic": "service"
+      },
+      {
+        "id": "relstat",
+        "name": "Release status and strategy",
+        "places": {
+          "PO": [
+            "Release strategy",
+            ""
+          ],
+          "PR": [
+            "Release strategy",
+            ""
+          ]
+        },
+        "purpose": "Shows approval information for a purchasing document under classic release procedure.",
+        "origin": "Determined from configured strategy, characteristics and release actions when the procedure applies.",
+        "control": "Status information is read-only in the ordinary document view. Performing a release uses the appropriate action and authorization.",
+        "effect": "Can control further processing, issue or conversion according to the release indicator.",
+        "trace": "Trace classification values, the actual strategy found and which codes have acted. A delivery date is not an approval timestamp.",
+        "qa": "Compare two documents immediately below and above a client-approved test boundary and identify which characteristic selected the strategy.",
+        "topic": "approval",
+        "scenarios": [
+          "Create",
+          "Approval status may be unset or proposed until the document is saved.",
+          "Display",
+          "Read the selected strategy and completed release codes; approvals require the appropriate release function."
+        ]
+      },
+      {
+        "id": "rate",
+        "name": "Exchange rate",
+        "places": {
+          "PO": [
+            "Delivery and payment terms",
+            "EKKO-WKURS"
+          ]
+        },
+        "purpose": "Sets the document exchange-rate basis for foreign-currency purchasing.",
+        "origin": "Typically proposed from exchange-rate data for relevant currencies and date, or manually entered where allowed.",
+        "control": "Inspect the fixed-rate flag and actual follow-on posting rules before expecting the PO rate to appear in FI.",
+        "effect": "Influences conversion. A differing local amount may reflect date or rate treatment as well as unit price.",
+        "trace": "Compare the PO currency and rate to the exchange rate used on receipt and invoice.",
+        "qa": "Compare two otherwise identical foreign-currency orders on different dates; use simulated postings to identify effective rates.",
+        "topic": "pricing"
+      },
+      {
+        "id": "fixedrate",
+        "name": "Exchange rate fixed",
+        "places": {
+          "PO": [
+            "Delivery and payment terms",
+            "EKKO-KUFIX"
+          ]
+        },
+        "purpose": "Records whether a fixed exchange rate applies for this purchase order under the corresponding processing rules.",
+        "origin": "Buyer selection or document proposal where permitted.",
+        "control": "Depends on currency and client process. A tick without the actual saved rate is insufficient evidence.",
+        "effect": "Changes how relevant follow-on documents handle the order’s exchange rate.",
+        "trace": "Record PO rate, flag and actual posting dates before comparing GR and IR values.",
+        "qa": "Compare fixed and unfixed foreign-currency orders on a later posting date with a different maintained rate.",
+        "topic": "pricing",
+        "scenarios": [
+          "Fixed rate",
+          "Inspect the agreed saved rate and applicable follow-on rule.",
+          "Variable rate",
+          "A later posting date can use a different exchange rate. Compare actual FI evidence."
+        ]
+      },
+      {
+        "id": "mrpfix",
+        "name": "Fixed requisition",
+        "places": {
+          "PR": [
+            "Item status",
+            "EBAN-FIXKZ"
+          ]
+        },
+        "purpose": "Identifies a firmed requisition in the planning context.",
+        "origin": "Can result from manual processing or firming logic depending on how the PR was created.",
+        "control": "A firmed item and an approved item describe different decisions. Check the creation origin and planning settings.",
+        "effect": "Can affect whether subsequent planning changes an existing proposal.",
+        "trace": "Compare MRP-generated proposals before and after firming, then inspect approval independently.",
+        "qa": "Change a test requirement and rerun planning with controlled parameters to compare firmed and unfirmed proposals.",
+        "topic": "pr"
+      },
+      {
+        "id": "itemagr",
+        "name": "Contract item category for broad scope",
+        "places": {
+          "Contract": [
+            "Item overview",
+            "EKPO-PSTYP"
+          ]
+        },
+        "purpose": "Identifies a contract scope such as material unknown or material group where the category is permitted.",
+        "origin": "Chosen when the agreement intentionally covers more than one specifically coded material.",
+        "control": "For classic M and W categories inspect which fields are required at agreement stage and which must be specified at release. Applicability differs by contract type.",
+        "effect": "Allows a broad agreement to be made specific when a release order is entered.",
+        "trace": "Compare material, material group, quantity, unit and price requirements on the original contract with the release item.",
+        "qa": "Compare a designated material item with a permitted material-group contract item and record where exact material and price become known.",
+        "topic": "contract"
+      },
+      {
+        "id": "agreementitem",
+        "name": "Agreement item number",
+        "places": {
+          "PO": [
+            "Item overview",
+            "EKPO-KTPNR"
+          ]
+        },
+        "purpose": "Identifies the precise outline agreement line used as a purchasing source.",
+        "origin": "Adopted with an agreement reference.",
+        "control": "The agreement number alone is insufficient when there are many conditions or different contracted items.",
+        "effect": "Assigns the call-off to the correct release documentation and commercial terms.",
+        "trace": "Trace the PO to the specific contract item and its conditions, then to the release quantities.",
+        "qa": "Test two eligible items under one agreement and verify which release total changes.",
+        "topic": "contract"
+      },
+      {
+        "id": "delete",
+        "name": "Deletion indicator",
+        "places": {
+          "PR": [
+            "Item status",
+            "EBAN-LOEKZ"
+          ],
+          "PO": [
+            "Item overview",
+            "EKPO-LOEKZ"
+          ]
+        },
+        "purpose": "Marks the purchasing line for deletion within the supported document process.",
+        "origin": "Set by an authorized user or document process, subject to the state of the item.",
+        "control": "Restrictions depend on document processing and follow-on history. An indicator does not erase posted receipts or invoices.",
+        "effect": "Affects future use and worklists. Historical documents still need to be reconciled independently.",
+        "trace": "Compare deletion, delivery completion, final invoice and historical quantities independently.",
+        "qa": "Examine a completed or deleted QA item and list exactly which historic documents remain available.",
+        "topic": "history"
+      }
+    ]
+  }
+]
