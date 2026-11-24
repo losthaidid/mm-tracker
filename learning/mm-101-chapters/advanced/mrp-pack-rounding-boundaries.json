@@ -1,0 +1,110 @@
+{
+  "id": "mrp-pack-rounding-boundaries",
+  "level": "Advanced",
+  "shelf": "Purchasing",
+  "topic": "Lot sizing and packaging",
+  "title": "Find the exact step that turns a 61-piece shortage into a 72-piece proposal",
+  "lead": "A supplier ships a measuring probe in sealed trays of twelve. The plant asks for sixty-one more pieces, and its planning proposal calls for seventy-two. A colleague changes the order unit to a tray and expects the discrepancy to disappear. The quantities still look different, and the next requirement behaves differently again. Following the arithmetic from dated demand to supplier packaging shows which difference is deliberate and which change could introduce a real purchasing error.",
+  "keywords": [
+    "EX",
+    "lot-for-lot",
+    "rounding value",
+    "minimum lot size",
+    "rounding profile",
+    "procurement quantity",
+    "order unit",
+    "base unit"
+  ],
+  "sections": [
+    [
+      "Write the shortage in pieces before counting trays",
+      "An instrumentation workshop is preparing replacement kits. On the same date, two genuine requirements in the same planning segment call for 51 and 34 probes. The store has twelve usable probes and a firm receipt of another twelve available before that date. In this example all movements use the base unit piece. There is no separate safety stock requirement, no scrap, no competing demand, and no earlier unfixed proposal. Both requirements reach the same planning segment. These assumptions make the case reproducible without concealing a shortage in a different stock segment.\n\nStart with 85 required. Subtract the twelve already on hand and the twelve due in time. That leaves 61 pieces that planning must cover. The gross requirement, available coverage and shortage are three independent quantities. If someone starts by rounding 51 up to 60 and 34 up to 36 and then deducts stock, they obtain 72 by coincidence. Those invented rounded gross requirements cannot explain what happens when the two dates separate or the available stock changes. Standard lot-for-lot planning can group requirements for the same day. The appropriate starting point here is the uncovered quantity of 61 for the day.\n\nFor troubleshooting, add one column to the evidence sheet for each contributor to that 61. Show the element identifier for each requirement, the time-phased position of the existing receipt, and its unit as well as its amount. If the receipt arrives after the need, it cannot play the same role in this simple reconstruction. Dates and planning segment belong beside the arithmetic. Without them, a correct calculation in pieces could still answer the wrong shortage."
+    ],
+    [
+      "Apply the pack constraint to a procurement quantity",
+      "The material has lot-for-lot procedure EX, a simple rounding value of twelve pieces and no other lot-size limits. With exact sizing alone the receipt would be 61. Whole trays allow quantities of 12, 24, 36, 48, 60, 72 and so on. Five trays supply 60, leaving one kit incomplete, so the smallest acceptable receipt covering 61 pieces is six trays, or 72 pieces. When the requirements and both scheduled receipts have been accounted for, projected surplus is 11. It is possible to tell the store precisely where those eleven came from.\n\nA one-piece difference in demand can have an entire tray as its result. Repeat with shortages of 59, 60 and 61. The receipts are 60, 60 and 72, leaving one, zero and eleven pieces respectively. A spreadsheet that rounds to the nearest tray would return 60 for each case. That would undersupply the third case. Use integer quantities like these in acceptance tests because a visually plausible rounded result may still fail the requirement. If a procurement lead dislikes the jump from 60 to 72, the discussion is whether the supplier really requires sealed trays and whether the shortage can move in time.\n\nSAP describes rounding after lot sizing and applicable scrap calculation. The example uses zero scrap. If your QA element already contains a yield or scrap adjustment, restore the actual gross procurement quantity at that point in the calculation before comparing rounded amounts. An observation that SAP bought one additional tray does not establish a scrap rate. Identify the intermediate quantity that crossed the multiple and the field or procedure that generated that intermediate quantity."
+    ],
+    [
+      "Distinguish a minimum from a multiple",
+      "The buyer then discovers the supplier will not dispatch a shipment smaller than four trays. Translating that policy into the sketch gives a minimum of 48 pieces and a multiple of twelve. Consider an order need of 20 pieces. A minimum-only policy in this simple lot-for-lot example gives 48. A multiple-only policy gives 24. Applying both yields 48 because it satisfies the floor and is a valid pack multiple. A shortage of 49 gives a different diagnostic result. The floor is already satisfied, yet full trays require 60. Use both cases when interviewing the person who maintained the master. Either explanation fitted one of the numbers.\n\nThe material master can hold a minimum lot size, maximum lot size and a rounding value or applicable rounding profile, as well as the lot-sizing procedure. Determine whether the minimum belongs in plant-wide material planning or in a supplier-specific purchasing arrangement. Suppose supplier A requires four trays but supplier B will dispatch one. A plant rule that every planning proposal must contain at least 48 imposes supplier A’s policy even when another source can supply the small quantity economically. It can be a sensible policy, but it deserves a business owner and an explanation.\n\nA minimum has no maximum implied by it. A lot of 144 can satisfy both a four-tray minimum and a full-tray multiple. If the supplier also limits the number of trays per shipment, a maximum or delivery scheduling question has been introduced. Test it separately with a shortage above the stated limit. Select compatible minimum, maximum and pack quantities for the first positive test. Then test awkward boundary combinations against the actual lot-size procedure before promising a particular split of proposals or correcting a production master. These controls solve different physical problems."
+    ],
+    [
+      "Watch the eleven pieces affect the next date",
+      "Return to the first shortage of 61 and the resulting 72-piece receipt. The balance available after the initial date is eleven. Now a later requirement needs eight. If the earlier receipt is available and all the elements remain in the same planning segment, those eleven pieces cover the later eight. A separate order for one tray would overstate the need. The projected balance after the second date is three. A week later a further requirement of five would leave a two-piece shortage, for which twelve can be the appropriate rounded procurement quantity under this simple policy.\n\nDraw the same requirements under a different decision. If purchasing could buy single pieces and there were no rounding, the initial order would cover the first date exactly. The later eight would then require eight additional pieces unless another receipt intervened. Comparing the first requisitions alone would make full-tray procurement appear eleven pieces more expensive, although eight are soon consumed. Comparing only the total across both dates can conceal a late supply. Assess the timing of the residual and when the business will use it, particularly for items subject to expiry, engineering revision, or end-of-life support.\n\nImagine an engineering amendment makes the remaining eleven old probes unsuitable for a later requirement for the new material number. The arithmetic on the old material remains correct, yet the economic assessment changes. That difference belongs in the phase-out and buying decision. Reducing a global rounding value to fix one obsolete lot could create unsupported order quantities for hundreds of future replacements. A controlled last-time order, confirmed supplier agreement or revision-specific plan may be a better business response, subject to approval and the actual master-data design."
+    ],
+    [
+      "Trace what the purchase order says in its own units",
+      "Now let the PO use tray as its order unit with the maintained conversion one tray equals twelve pieces. Six trays on the PO and 72 pieces in the planning proposal describe the same physical supply. Confirm unit and numerator/denominator in the actual purchasing document and check how the supplier will interpret the output. Counting only the numeral six can produce a spurious claim that 66 pieces disappeared between planning and purchasing. Changing a price unit can produce another numerical difference on the screen without changing what the supplier is asked to deliver.\n\nSuppose the commercial quotation is 180 currency units per tray. Six trays at that price cost 1,080 before any taxes or other amounts. A quotation expressed as 15 per piece would yield the same value for 72 pieces. If a buyer entered 180 per piece while maintaining an order for six trays, the price expression would be wrong even though the physical order quantity is correct. Compare extended line value, order quantity and unit, order price quantity and unit, and the conversion recorded on the document. Fix the quantity owner only when the quantity is the part that diverged.\n\nSupplier B may have a ten-piece carton for the exact same physical probe. Reusing an ambiguous unit called box can make documents look perfectly plausible while supplier and warehouse mean different quantities. Agree on a usable representation and maintain the applicable conversion and purchasing arrangements. Verify what was copied into an existing order and what a new order proposes. A later source or master change does not reconstruct the evidence recorded on an older purchasing document. Trace the actual requisition and purchase order for the issue under review."
+    ],
+    [
+      "Turn the complaint into a small specification",
+      "Ask the process owner to complete three statements. What is the smallest quantity the plant is willing to replenish? In what physical multiples can its chosen suppliers deliver? Over what dates should requirements share supply? These answers identify potential ownership in lot sizing, unit conversion, sourcing and scheduling. A requirement that every order must have an economic value above a certain amount is another decision again. Converting a value policy into a fixed minimum number of pieces silently assumes a constant price.\n\nBuild a small QA set that includes an exact multiple, one piece below, one piece above, a demand below the minimum, and the later requirement that can consume residual stock. For each case preserve the start quantities, dated shortages, material and unit settings, resulting procurement proposal and any actual converted purchasing quantities. If a rounding profile is in use, obtain its maintained thresholds and rounding values and add cases immediately on each side of relevant thresholds. A single fixed-multiple spreadsheet cannot represent every profile. Include real supplier packaging and a warehouse receiving example so the result remains intelligible outside the planning team.\n\nThe business can now decide whether six trays for the first date are acceptable. In this case all six are deliverable, all 61 initially missing pieces are covered, and the remaining eleven have a visible use. A policy change would need to show which of those facts has changed. The explanation survives changes in numbers because the team can move from gross demand to dated shortage, from shortage to feasible buying lot, and from that lot to the quantities printed for the supplier."
+    ]
+  ],
+  "visual": {
+    "title": "Distinguishing minimum dispatch size from a full-tray multiple",
+    "headers": [
+      "Shortage (pieces)",
+      "Exact EX only",
+      "Minimum 48 only",
+      "Multiple of 12 only",
+      "Minimum 48 and multiple of 12"
+    ],
+    "rows": [
+      [
+        "20",
+        "20",
+        "48",
+        "24",
+        "48"
+      ],
+      [
+        "48",
+        "48",
+        "48",
+        "48",
+        "48"
+      ],
+      [
+        "49",
+        "49",
+        "49",
+        "60",
+        "60"
+      ],
+      [
+        "60",
+        "60",
+        "60",
+        "60",
+        "60"
+      ],
+      [
+        "61",
+        "61",
+        "61",
+        "72",
+        "72"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Lot-for-lot order quantity",
+      "https://help.sap.com/docs/SAP_ERP/66326f67e0e1416d83c0fdfa4060189d/c297b6535fe6b74ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Calculating procurement quantity",
+      "https://help.sap.com/docs/SAP_ERP/85d3fce10e264972a0155c8b46ecf93b/dca5bb53707db44ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Order of the rounding calculation",
+      "https://help.sap.com/docs/SAP_ERP_SPV/85d3fce10e264972a0155c8b46ecf93b/f297b6535fe6b74ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Units of measure in purchase orders",
+      "https://help.sap.com/docs/SAP_ERP_SPV/967e1c2a6a8c4183b7e07d28e7574445/af7eb65334e6b54ce10000000a174cb4.html"
+    ]
+  ],
+  "area": "planning"
+}

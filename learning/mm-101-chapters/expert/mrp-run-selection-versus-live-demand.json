@@ -1,0 +1,98 @@
+{
+  "id": "mrp-run-selection-versus-live-demand",
+  "level": "Expert",
+  "shelf": "Expert practice",
+  "topic": "Diagnosing classic MRP runs",
+  "title": "Did last night’s MRP run skip the material, or has the demand changed since?",
+  "lead": "At eight in the morning Purchasing sees a 40-piece shortage in the stock/requirements list. The overnight planning job finished successfully. A colleague proposes running regenerative planning across the plant. Before changing the workload or replacing proposals, establish the sequence of events. A job can complete successfully while a particular material lies outside its selection, an eligible material has an unresolved exception, or a new requirement has appeared after it was processed.",
+  "keywords": [
+    "NETCH",
+    "NETPL",
+    "NEUPL",
+    "planning file",
+    "planning horizon",
+    "planning mode",
+    "MD04",
+    "MD05",
+    "MRP area",
+    "net change planning"
+  ],
+  "sections": [
+    [
+      "Preserve two clocks and the identity of the shortage",
+      "At 08:00 a buyer finds a requirement for 100 and only 60 pieces of timely supply. Capture the material, plant and MRP area, unit, requirement element and line number, requirement date, and the identity and date of the 60. Note whether any display filter is active. An aggregate screenshot that omits the element dates cannot establish that the deficit is 40 on a particular day. In this reconstruction both elements are in the same segment, supply is usable in time and the material uses ordinary requirements planning with lot-for-lot sizing. The 40 is therefore an uncovered quantity worth investigating.\n\nThe two clocks are the business date of the requirement and the time at which the system learned about it. A production requirement due next Tuesday may have been raised at 07:30 this morning. Due next Tuesday does not mean visible to a job at 02:00. Obtain the change history or originating document evidence and the job's start, end, organizational scope and variant. Where the evidence permits, determine when the relevant material was processed within the job. A requirement entered while a long job is running can fall on either side of its material's processing time.\n\nUse the dynamic stock/requirements list for the current position. A classic MRP list, when one was created, preserves the planning situation from the run that generated it. Check the date and the area on that list. An older list can remain the available evidence if the latest run did not create one for the material. A blank result in MRP list evaluation is therefore ambiguous. Identify which lists were requested and retain the run log. State explicitly when the material-level processing time or the original demand state is unknown."
+    ],
+    [
+      "Reconstruct the overnight outcome before touching the settings",
+      "Assume the overnight job processed our material at 02:15. At that time confirmed relevant supply was 60 and demand was 60. At 07:30 the production planner increased that demand from 60 to 100. A saved planning list at 02:15 can legitimately show balance zero with no new proposal. The current dynamic list at 08:00 can legitimately show negative 40. These observations are compatible under the same configuration. Running a single-material plan in QA against the 08:00 state and obtaining 40 demonstrates that this later shortage can be planned. It does not show that the overnight job missed a 40-piece requirement that did not yet exist.\n\nMove the change to 23:30 the previous evening. Now the 100 existed before 02:15. Establish whether it created a planning-relevant change, whether it was in the selected horizon, and whether this particular area/material was actually processed. A job log proving plant 1100 ran is weaker than evidence that material A in area W was selected. If MRP areas are active, examine the relevant planning file entry for the area. A change to the plant-level situation and a change to the area-specific situation can have different records and planning consequences.\n\nFor a third variant keep the old and new demand equal, but delay a receipt from Monday to Friday. The material can show a shortage on Tuesday even though the total quantity of all receipts in the month remains equal to the total requirement. The investigative clock now belongs to the changed delivery or schedule line. This is why an expert account of the incident includes the identifiers and change evidence of both sides of the expected balance. The first item wearing a red indicator on the screen is not necessarily the item that changed."
+    ],
+    [
+      "Read the scheduling policy encoded by the processing key",
+      "In the classic ECC run, NEUPL, NETCH and NETPL answer different selection questions. Regenerative planning considers the materials in the planning file within the run's scope irrespective of change indicators. It does not imply that every material number ever created is eligible, nor does it select every plant automatically. NETCH uses the net-change indicator to identify relevant changes since earlier planning. NETPL uses the net-change-in-horizon indicator and the planning horizon. These distinctions matter greatly when a team serves today's factory and also makes long-lead buying decisions several months out.\n\nConsider a plant that runs NETPL nightly and NETCH at a longer interval. For a clean test material, introduce a new requirement beyond the maintained planning horizon. Record the flags before the next run and the due date relative to the actual horizon end. A distant change can be relevant to full net-change planning while falling outside a limited short-horizon run. If a long-lead buyer expects immediate action on that distant requirement, there may be a mismatch between the planning schedule and the business decision date. Widening a horizon or changing the run schedule has operational consequences for more than the one buyer.\n\nSAP documents clearing of planning file indicators after successful processing. Full net-change or regenerative processing clears the applicable net-change and horizon indicators, while a horizon-limited run clears the horizon indicator. A flag read several hours later is the state at that later time. Its absence can mean the item was processed and the indicator cleared, or that the expected change had never set it. Its presence may reflect a new change after the job. If planning terminates on a material, indicators can remain for a subsequent attempt, subject to error handling. Obtain before-and-after evidence in a repeatable case before attributing an incident to a broken planning file."
+    ],
+    [
+      "Distinguish selection from the treatment of old proposals",
+      "Planning mode addresses what to do with planning data and eligible existing proposals once planning takes place. A stronger re-explosion or recreation setting is a different lever from including a material in the population. Changing how old proposals will be handled cannot diagnose a missing planning-file entry by itself. Conversely, selecting a material regeneratively does not automatically remove the commercial or firming constraints around its existing supply elements. Capture the processing key and planning mode as separate job parameters and name which hypothesis each could affect.\n\nA classic example is a change to a purchasing processing time in plant configuration. SAP's documentation on planning mode discusses Customizing changes and their implications for recreation of proposals. A configured parameter can become effective without producing, for every potentially affected material, the same change record that an individual material-master edit would produce. Establish the field, scope, release and documented behavior of the actual change. Work out which materials use that value and which have relevant alternatives. A configuration timestamp and a successful job status are insufficient to establish that every outstanding proposal has been reconsidered using the changed time.\n\nThe proposed remedy should follow the failure. If a balanced Monday result became short only after 07:30, the question is when the next eligible run or approved manual intervention should occur. If the material predates plant MRP activation and is missing from the planning file, use the documented planning-file setup and checking procedures for the affected scope. If the entry exists and a short-horizon design omits far-future demand, decide whether planning frequency or horizon fits the purchasing lead time. If the item was processed and its proposal already covers the shortage at a later date, examine dates, firming and exceptions instead."
+    ],
+    [
+      "Build a diagnostic experiment the scheduler can repeat",
+      "Use three QA materials with identical baseline quantities and equivalent relevant planning data. Give each a firm supply of 60 and a requirement of 60, and plan them to balance. Enable the run evidence you intend to compare. For material A, increase the requirement by 40 inside the horizon before the run. Capture its planning file values before processing, then run the intended job with its ordinary scope and inspect the material's result. For material B, enter the same increase only after the material was processed. For material C, enter it well outside the horizon before the job. These trials make three genuinely different predictions about timing and eligibility under a short-horizon run.\n\nCompare both the calculated shortage and the act of processing. For A, demand was already visible and inside scope. For B, the current shortage is expected to postdate the run. For C, the horizon-limited outcome must be interpreted against the long-horizon control. If the next full net-change run processes C, preserve its pre-run flag and its material-level calculated result. If a test diverges, check the dates, effective planning parameters, area assignment and intervening changes before labeling a standard outcome defective. Keep validation to synthetic, disposable demand so that a bulk test never reschedules genuine supplier commitments.\n\nUse an unchanged control material to detect an overly broad diagnostic procedure. A trial that force-plans every material in isolation may give plausible quantities but cannot reproduce the nightly selection decision. Record how many materials the job selected, how many had errors and which documents the test created or adjusted. Compare duration and processing load if a proposed remedy broadens the population. A recommendation to run a whole plant more frequently should include evidence that this would deliver the required buying signal on time and at an acceptable operating cost."
+    ],
+    [
+      "Give the buyer an answer with a time and a boundary",
+      "For the 07:30 change, a defensible incident record can say that the prior run covered 60 pieces of demand with 60 pieces of supply, that the production requirement was subsequently raised to 100, and that the next buyer action concerns the new 40. Include the required availability date and the next job that can legitimately reconsider it. If that date leaves insufficient buying time, use the site's exception route and check for any newly created supply before ordering. This answer resolves the purchasing risk without attributing a defect to the overnight run.\n\nFor the pre-run outside-horizon variant, report the date the buyer must act as well as the date the part is needed. A 70-day supply lead and a six-week planning horizon warrant a joint decision about how far ahead to plan and how often the long-range plan runs. For a missing or inconsistent planning-file entry, record the affected population and confirm a successful controlled recovery on the representative area/material before discussing wider corrective action. Repeat the test after any change to show that the original eligibility failure actually disappeared.\n\nThe strongest conclusion separates what is known from what is reconstructed. A live list can prove today's 40. A dated run record can establish the conditions SAP processed. A recorded requirement change can join those two facts into a chronology. If one of the records is absent, state which alternative explanations survive and what evidence a future run should capture. The buyer obtains a decision on the urgent material, and the scheduler obtains a reproducible way to tell a missed plan from a newly changed world."
+    ]
+  ],
+  "visual": {
+    "title": "Three identical deficits with different histories",
+    "headers": [
+      "Demand increases from 60 to 100",
+      "What 02:15 planning could see",
+      "Evidence to obtain"
+    ],
+    "rows": [
+      [
+        "07:30 after material processed",
+        "60 required and 60 covered",
+        "Requirement change time and dated run result"
+      ],
+      [
+        "23:30 before run, due inside horizon",
+        "100 required, conditional on actual selection and scope",
+        "Pre-run area entry, processing key, material-level result"
+      ],
+      [
+        "23:30 before run, due beyond horizon",
+        "Distant requirement available but outside the stated short horizon",
+        "Horizon end, pre-run flags, full net-change control"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Planning run type and indicator clearing",
+      "https://help.sap.com/docs/SAP_ERP/66326f67e0e1416d83c0fdfa4060189d/a197b6535fe6b74ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Checking the planning file",
+      "https://help.sap.com/docs/SAP_ERP/85d3fce10e264972a0155c8b46ecf93b/9b97b6535fe6b74ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Setting up the planning file",
+      "https://help.sap.com/docs/SAP_ERP/85d3fce10e264972a0155c8b46ecf93b/ad97b6535fe6b74ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Planning file entries for MRP areas",
+      "https://help.sap.com/docs/SAP_ERP/66326f67e0e1416d83c0fdfa4060189d/2298b6535fe6b74ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Planning mode and changes affecting planning data",
+      "https://help.sap.com/docs/SAP_ERP/85d3fce10e264972a0155c8b46ecf93b/a497b6535fe6b74ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · MRP list and stock/requirements list",
+      "https://help.sap.com/docs/SAP_ERP/66326f67e0e1416d83c0fdfa4060189d/0819ba53422bb54ce10000000a174cb4.html"
+    ]
+  ],
+  "area": "planning"
+}

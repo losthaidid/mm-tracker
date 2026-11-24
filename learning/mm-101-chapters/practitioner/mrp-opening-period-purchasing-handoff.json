@@ -1,0 +1,97 @@
+{
+  "id": "mrp-opening-period-purchasing-handoff",
+  "level": "Practitioner",
+  "shelf": "Purchasing",
+  "topic": "Planning proposals and purchase requisitions",
+  "title": "Why does one shortage reach Purchasing while the next remains a planned order?",
+  "lead": "A buyer opens the morning requisition list for two identical pump couplings needed on different dates. She finds the nearer requirement. The planner can also see supply proposed for the later requirement, but it carries a planned order number. The missing purchasing entry can be an intentional handover between planning and buying. To explain it you need the proposal type, the calculated dates and the creation indicator that the ECC planning run actually used.",
+  "keywords": [
+    "opening period",
+    "creation indicator",
+    "purchase requisition",
+    "planned order",
+    "MRP group",
+    "scheduling margin key",
+    "external procurement"
+  ],
+  "sections": [
+    [
+      "Separate the buyer’s queue from the material plan",
+      "Picture a repair workshop reserving couplings for scheduled inspections. Its planner can adjust a later inspection if the equipment is still sound. Purchasing wants a short list of requirements that deserve supplier contact now. When the planning system finds a shortage, it can record a proposal early enough for capacity and stock discussions while postponing the formal handover to a buyer. The two teams can therefore have very different views of work ahead even when both are looking at the same plant and material.\n\nFor an externally procured material in classic ERP, the purchase requisition creation setting offers three broad policies. A run can create requisitions for the eligible shortages, retain planned orders, or use the opening period to distinguish the nearer proposals from the later ones. Limit this example to ordinary external procurement. Supply via a scheduling agreement has its own conditions and an indicator for schedule lines. An actual open purchase order can already cover a requirement before this choice arises. The exercise starts after the system has established that new supply is needed.\n\nAsk the buyer to identify precisely which list she opened. A purchasing list filtered by purchasing group, release status or assignment can omit an existing requisition. Ask the planner to open the receipt element for the same material in the stock/requirements list and read its category and number. Once the system has generated a planned order, looking through increasingly broad purchasing lists will never reveal that number as a purchase requisition. Following the element first avoids a lengthy investigation into buyer authorization for a document that has yet to be created."
+    ],
+    [
+      "Use a working-day calendar you can draw",
+      "Assume there are no holidays or shutdowns, the plant works Monday through Friday, and the current planning date is Monday 6 April 2026. These are conditions of a training case. The first requirement is for 12 couplings to be available on Wednesday 22 April. Our shipping and receiving assumptions are two working days for goods receipt processing, seven calendar days for planned delivery and one working day for purchasing processing. For an ordinary backwards-scheduled requirement, start at availability on Wednesday 22 April and count two working days back to Monday 20 April. That date is the planned delivery at the plant.\n\nAllow seven calendar days before 20 April for the supplier. The date is now Monday 13 April. Allow one working day for purchasing processing and arrive at Friday 10 April as the proposed start or requisition release date in this simple example. We use the word release here in the scheduling sense, the date for initiating procurement. A purchasing release strategy and its approval status answer another question. A date printed in this calculation gives no evidence that an approver has endorsed a requisition, let alone a supplier’s quotation.\n\nNow give the planned order a five-working-day opening period. Counting five working days back from Friday 10 April gives Friday 3 April under the stipulated calendar. On the Monday 6 April run this opening date has passed, although the line does not need the parts until the twenty-second. Under the policy that creates requisitions within the opening period, the earlier handover is understandable. The opening allowance gives the responsible person time to act before the start date. It is separate from supplier transit and from the internal time to make a received part usable."
+    ],
+    [
+      "Repeat with a requirement two weeks later",
+      "The second inspection needs 18 couplings on Wednesday 6 May. With the same calendar, two working days take the delivery date to Monday 4 May. Seven calendar days and one purchasing working day give Friday 24 April as the start. The five-working-day opening allowance produces Friday 17 April. On 6 April that opening date is still ahead. A planned order for the later shortage keeps it visible to the planner while the nearer requirement can already appear as a requisition for the buyer. There is no inconsistency in seeing a total of 30 proposed pieces across two types of element.\n\nMark each calculated date on a calendar beside its business meaning. A surprisingly common error is to subtract five working days directly from the material requirement date and call the result the opening date. That would skip the supplier and internal intervals that separate a requirement from the time procurement must get under way. Another error is to treat seven calendar days as seven plant working days. If the supplier or the relevant master data changes, use the dates on the actual proposal and reconstruct the applied values before proposing a correction.\n\nSuppose the workshop postpones the second inspection before anyone buys the coupling. The planner can examine the later supply proposal under the new demand dates. Now suppose a buyer has already issued a PO to a supplier for that inspection. There is a commercial conversation to be had about dates or quantity as well as a planning calculation. These two cases explain why a business might choose an opening period. Quantities can form part of the forward-looking plan while their supporting demand is still too uncertain to justify adding everything to the immediate purchasing workload."
+    ],
+    [
+      "Find the setting used by the actual run",
+      "Take the run variant or the recorded parameters used by the scheduled planning job and look up the creation indicator for purchase requisitions. Use the indicator text for the user’s installed version. For an ECC total planning run, creation settings maintained for the applicable MRP group can take precedence over the initial-screen setting. Inspect the material’s MRP group and its settings before attributing the result to what an operator remembers entering. In classic single-item planning, the initial-screen creation settings are used. A single-material demonstration can legitimately give a different handover when it runs with a different effective policy.\n\nConsider a support analyst who runs a single-item test with a policy for requisitions only. The later coupling requirement immediately produces a requisition in this test. That is evidence that the material can be planned for external procurement under those conditions. It is weak evidence about the scheduled total run that used an opening-period policy. Recreate comparable starting positions, identify how each run obtained its parameters, and write the effective settings next to the result. The decision to change the nightly job should be based on the policy the business wants in the nightly job.\n\nFind the scheduling margin key assigned to the material and the opening period used with it. Look for effective plant calendar and timing values, including any source-specific values actually applied in your environment. Retain dates with an explanation of the calendar rule that produced them. In the real calendar for a particular plant, early April or early May may include holidays. Carry that exception through each workday step. An apparent one-day difference in a screenshot may become entirely explicable without changing an opening period shared by many materials."
+    ],
+    [
+      "Choose between conversion and waiting",
+      "If the buyer needs to act on the later requirement immediately, inspect the planned order with the planner. Classic ECC supports converting an externally procured planned order to a purchase requisition. Verify that the requirement still exists, that the quantity is appropriate, that no new receipt has covered it, and that the document being converted is the one intended. Use the planned order conversion route so the supply under discussion is identifiable in the before-and-after picture. A separately entered manual requisition can coexist with the original proposal, requiring someone to determine how the next plan should treat both.\n\nA workshop might bring forward six of the 18 pieces to prepare a critical machine. If partial conversion is used, record the six handed to purchasing and inspect what remains in planning. Identify the remaining demand date and quantity explicitly. A statement that “the planned order was converted” is too broad for someone trying to account for all 18. If the business wants to expedite all 18, the buyer should also confirm delivery feasibility and follow the applicable sourcing and approval procedures. A requisition provides a purchasing requirement and cannot confirm that a supplier has accepted a date.\n\nWhen the second inspection remains flexible, waiting can preserve the intended division of work. Assign an owner to review the planned order as its opening date approaches. A date passing on a calendar alone does not establish that a material has been processed in a later run or that a previously firmed element has changed. Confirm the later run, inspect its results and account for any manual intervention. This gives the planner a clear action even when the correct answer on 6 April is to leave the later proposal in planning."
+    ],
+    [
+      "Test the explanation at a boundary that changes the answer",
+      "In a QA plant, start with separate comparable materials or restore equivalent test conditions between trials. Create two ordinary future requirements with no stock or receipts, no firming and lot-for-lot sizing. Choose start and opening dates well clear of the day of the run. Under the opening-period policy, the earlier line should be a candidate for a requisition and the later line for a planned order. Under a requisitions-only policy, the later requirement should now be a candidate for a requisition as well. Check the shortages and the quantities alongside the document types so that a missing proposal is not mistaken for a different choice of document.\n\nFor a final test, give the later material a firm open PO for its full quantity on time. The condition that made a new proposal necessary has now changed. If the existing supply covers the requirement, arguing about which new document should be created is beside the point. This branch is particularly valuable during training because it forces the team to ask about coverage before it inspects settings. In a different branch, let the actual requirement owner move the later date forward while leaving the procurement parameters alone and work out the new opening date before running planning.\n\nA useful handover to the buyer for the original case is short. Twelve couplings for the earlier inspection have reached the purchasing stage. Eighteen for the later inspection are visible in the plan, with an opening date of 17 April on the example calendar. The planner owns review of that second proposal. If the workshop wants purchasing action earlier, request a specific conversion or review the underlying policy for future requirements. Each action addresses a different business decision, and the buyer can trace either one back to a dated element."
+    ]
+  ],
+  "visual": {
+    "title": "Two requirements on the same 6 April planning run",
+    "headers": [
+      "Date or result",
+      "Earlier inspection",
+      "Later inspection"
+    ],
+    "rows": [
+      [
+        "Available for use",
+        "Wed 22 Apr",
+        "Wed 6 May"
+      ],
+      [
+        "Delivery at plant",
+        "Mon 20 Apr",
+        "Mon 4 May"
+      ],
+      [
+        "Start / requisition release",
+        "Fri 10 Apr",
+        "Fri 24 Apr"
+      ],
+      [
+        "Opening date",
+        "Fri 3 Apr",
+        "Fri 17 Apr"
+      ],
+      [
+        "Expected new element under opening-period policy",
+        "Purchase requisition",
+        "Planned order"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Creation indicator for external procurement",
+      "https://help.sap.com/docs/SAP_ERP/66326f67e0e1416d83c0fdfa4060189d/4098b6535fe6b74ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Total and single-item planning creation settings",
+      "https://help.sap.com/docs/SAP_ERP/66326f67e0e1416d83c0fdfa4060189d/4398b6535fe6b74ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Backward scheduling for external procurement",
+      "https://help.sap.com/docs/SAP_ERP/85d3fce10e264972a0155c8b46ecf93b/fb97b6535fe6b74ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Converting planned orders into purchase requisitions",
+      "https://help.sap.com/docs/SAP_ERP/66326f67e0e1416d83c0fdfa4060189d/76bbb853dcfcb44ce10000000a174cb4.html?version=6.17.latest"
+    ]
+  ],
+  "area": "planning"
+}

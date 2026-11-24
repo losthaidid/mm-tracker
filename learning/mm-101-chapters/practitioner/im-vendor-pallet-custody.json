@@ -1,0 +1,97 @@
+{
+  "id": "im-vendor-pallet-custody",
+  "shelf": "Inventory & special procurement",
+  "level": "Practitioner",
+  "topic": "Returnable transport packaging",
+  "title": "The goods arrived on twelve borrowed pallets. How many do we owe the supplier?",
+  "lead": "A lorry delivers 720 pump seals on twelve blue pallets. The buyer has ordered seals. The delivery note also says the pallets belong to Supplier A and will be collected. Next month the supplier asks where its remaining pallets are. The purchase order shows a complete delivery of 720 seals. That answers the buyer's question about merchandise. To answer the supplier, you need the custody record for a second material and the signed movements of that material at your premises. This chapter follows a single delivery through receipt, an internal move, collection and a disputed supplier statement in classic SAP ERP Inventory Management.",
+  "keywords": [
+    "RTP",
+    "special stock M",
+    "vendor-owned pallets",
+    "501 M",
+    "storage location",
+    "packing slip",
+    "returnable transport packaging"
+  ],
+  "sections": [
+    [
+      "Read the agreement before choosing a stock category",
+      "Start with the object the parties expect back. The pallet in this example has a stable material identifier, is reusable, remains the vendor's property and is tracked by quantity. Supplier A will accept any matching blue pallet from its pool. The twelve pallets do not each need an individual history for the purpose of this agreement. A transfer of custody takes place when the receiving team accepts them. The price of the pump seals belongs on the purchasing document for the seals. A potential charge for missing equipment is a separate contractual question. A quantity appearing on a supplier's packaging account does not itself authorize a payable invoice.\n\nLook for contrary evidence before applying this interpretation to another delivery. A carton sold with the product can be disposable packaging. A pallet explicitly bought as a separate priced item can become company-owned stock. A supplier might charge a refundable deposit for its own container. In that case purchasing and finance still need the commercial terms for the deposit even when the warehouse uses special stock to count containers. Ask who owns the empty item, which party can demand its return, and what event ends the obligation to account for it. A picture of the pallet or the phrase “packaging included” leaves those decisions open."
+    ],
+    [
+      "Build an opening balance that a second person can reproduce",
+      "For this example, plant P100 uses storage location DOCK for receiving and EMPTY for the yard. The pallet material has a base unit of one pallet. Supplier A has eight pallets at DOCK and three at EMPTY before today's delivery. Supplier B has six at DOCK and four at EMPTY under the same packaging material number. Write those four quantities down with the plant, storage location and supplier and with a time boundary. Someone reproducing the result tomorrow needs to know whether to include tonight's collections.\n\nSAP ERP manages vendor returnable transport packaging as externally owned special stock, identified by M. The balance distinguishes vendors at storage-location level. A normal display of company-owned pallet stock can therefore show zero even while the site is physically full of blue pallets. The special-stock data for a vendor and location arises through movements. A user looking for a place to type a new closing balance in master data is looking at the wrong business event. The quantity originates in a receipt, issue, transfer or inventory posting. A discrepancy calls for the history and the physical evidence behind those movements."
+    ],
+    [
+      "Record two quantities at the receiving door",
+      "The receiver counts the seals using the commercial delivery unit and counts twelve load carriers independently. Verify that the twelve are pallets of the agreed type belonging to Supplier A. A consignment could arrive on ten supplier pallets and two exchange carriers belonging to a transport company. Treating all twelve alike would create an incorrect owner balance even if the physical count was impeccable. Store the supplier's delivery note number both with the purchase receipt as appropriate and in the available receipt reference or supporting evidence for the packaging. The carrier's vehicle registration can help distinguish two deliveries using the same delivery date.\n\nFor the purchased material, the accepted quantity is 720 seals against the PO item. For the additional packaging, classic SAP ERP documentation describes entering a separate item without purchase order reference during receipt, with 501 and special-stock indicator M as an example. Use the goods-movement entry supported by your site and check the resulting document items. The product receipt should identify the PO, the seal material and the receipt quantity. The packaging entry should identify the pallet material, twelve pallets, location DOCK and the correct vendor stock assignment. A commercial receipt of 732 pieces would combine two unrelated units and overstate the delivery of seals.\n\nThe expected stock after this truck is twenty A pallets at DOCK and three A pallets at EMPTY. The packaging quantity has increased by twelve in vendor special stock. These borrowed carriers add no value to the company's valuated inventory. The PO goods receipt for the purchased seals follows the valuation rules for that PO. The material document can tell both stories while each line has a different accounting meaning. SAP also documents the effect on packaging output: a packaging item entered without PO reference lacks PO item data for a receipt slip. Retaining the delivery note with the pallet count closes an important evidence gap."
+    ],
+    [
+      "Follow the nine pallets that change location",
+      "Later the team unpacks nine pallets and puts the empties in the yard. The other three incoming pallets are still supporting sealed product at the dock. Record the internal transfer in the vendor's packaging stock with the appropriate issuing and receiving storage locations. A's position becomes eleven at DOCK and twelve at EMPTY. The supplier still has twenty-three pallets on site. A spreadsheet that records only collections and receipts could match the vendor's total and still send a driver to the wrong entrance.\n\nThere is a useful distinction between a storage location in SAP Inventory Management and a physical parking bay. This case uses a separate storage location for the yard, which makes the movement visible in the special-stock balance. At a smaller plant, both areas might share a single storage location. A move across a painted line in that layout need not create the same IM transfer. The local warehouse system or custody log may supply the missing position within the storage location. Write the control around the plant's actual model. Insisting on a two-location posting in a one-location design can lead operators to select an unrelated location just to complete a form."
+    ],
+    [
+      "Record collection at the event the supplier recognizes",
+      "The next driver takes eight empties from the yard for Supplier A. The dispatch clerk counts eight onto the vehicle and obtains a signed collection note. For this agreement the authorized carrier accepts custody at dispatch. The team posts the corresponding outgoing RTP quantity for Supplier A at EMPTY. The expected end balance is four at EMPTY and eleven at DOCK, fifteen in total. Supplier B still owns ten. If the agreement transferred custody upon confirmed delivery to a distant depot, the dispatch record and proof at the depot would need separate attention during statement reconciliation. Record the actual handoff specified in the agreement.\n\nA common mistake is to return eight against the vendor on the next PO visible on the operator's screen. Suppose that vendor is B. Its yard balance was four, so the posting may encounter a stock deficit. Where negative RTP balances are allowed, the error can survive long enough to appear on a statement. If that wrong transaction posts, A still shows twenty-three across the plant and B shows two. Both vendors together still show twenty-five pallets, exactly matching the physical total after the truck departed. A plant-level count therefore fails to reveal the eight-pallet ownership error. The two supplier balances expose it immediately."
+    ],
+    [
+      "Reconcile a statement that says only seven came back",
+      "Supplier A's statement confirms the receipt of seven returns. Assume its opening balance and new deliveries agree with ours. Its closing claim would then be sixteen pallets against our fifteen. Begin with the one event on which the statements disagree. Check the carrier note, the location of departure, who signed for receipt, whether a damaged pallet was separately recorded, and the statements' closing times. If the eighth return was booked after the supplier's cutoff, retain that item for matching in the following statement. Changing an accurate warehouse issue would erase the explanation for the timing difference.\n\nIf the signed note itself records seven, compare the dock tally to the vehicle load list and recount the four pallets supposedly left in the yard. Finding five would support an overposted issue of one. The agreed correction must preserve the relationship to the original movement and the approval for the adjustment. If the signed count is eight and the carrier records delivery of seven, the difference belongs in a transport claim or a commercial discussion according to the agreement. The warehouse should be able to say which document establishes dispatch of the eighth pallet while the other parties investigate what happened on the road."
+    ],
+    [
+      "Handle damage and agree a closing test",
+      "One of the four A pallets remaining in the yard has a broken runner. Place it in the designated damaged area and document the condition. Standard vendor RTP stock in this ECC model is unrestricted-use packaging stock. It has no separate RTP blocked or quality-inspection stock type. A separate physical bay, a suitable location-level process or a damage register can identify the exception while the business decides whether to return or compensate the supplier. The fact that the pallet cannot carry a safe load changes its physical usability. Its owner still expects an account of it. Record the event that actually changes custody and let purchasing approve any charge separately.\n\nTo accept a new process, run one receipt containing merchandise and packaging, move part of the packaging between the two locations, then record a partial collection. Have a second operator reconstruct the four balances from the opening positions and signed events. Ask finance to identify which line added company-owned stock value. Ask the buyer to locate the delivery of the seals from the order history. Finally ask the yard team to point to the four remaining empties and identify the damaged one. The result gives three people a common audit trail for a purchase, a reusable object and a possible financial claim, each with its own quantity and supporting document."
+    ]
+  ],
+  "visual": {
+    "title": "Pallet custody by supplier and location, in pallets",
+    "headers": [
+      "Event",
+      "Supplier A at dock",
+      "Supplier A in empties yard",
+      "Supplier B total"
+    ],
+    "rows": [
+      [
+        "Opening balance",
+        "8",
+        "3",
+        "10"
+      ],
+      [
+        "A delivers 12",
+        "20",
+        "3",
+        "10"
+      ],
+      [
+        "Move 9 from dock to yard",
+        "11",
+        "12",
+        "10"
+      ],
+      [
+        "Carrier collects 8 for A",
+        "11",
+        "4",
+        "10"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Returnable transport packaging",
+      "https://help.sap.com/docs/SAP_ERP/96bf9ad642cf4b26a29595e3d573fb8c/4062bd534f22b44ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Record packaging alongside a purchase order goods receipt",
+      "https://help.sap.com/docs/SAP_ERP_SPV/96bf9ad642cf4b26a29595e3d573fb8c/4662bd534f22b44ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Externally owned special stocks",
+      "https://help.sap.com/docs/SAP_ERP/b704a8db767040a08100adc846218964/a361bd534f22b44ce10000000a174cb4.html?version=6.18.latest"
+    ]
+  ],
+  "area": "special"
+}

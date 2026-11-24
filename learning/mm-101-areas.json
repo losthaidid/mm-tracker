@@ -1,0 +1,906 @@
+[
+  {
+    "id": "master",
+    "name": "Organization and master data",
+    "subjects": [
+      "Plant and company-code assignments",
+      "Central and plant-specific views",
+      "Purchasing value keys and proposed tolerances",
+      "Order units and conversions",
+      "Supplier purchasing data and partner roles",
+      "Material status and extension"
+    ],
+    "references": [
+      [
+        "Organizational Structure of the Material Master Record",
+        "https://help.sap.com/docs/SAP_ERP_SPV/a428aae377ba4a1199c3ecc8b7f5f33d/048bc95360267214e10000000a174cb4.html?locale=en-US"
+      ],
+      [
+        "Configuring Field Selection for Material Master Data",
+        "https://learning.sap.com/courses/exploring-cross-functional-customizing-in-sap-s-4hana-cloud-private-edition/configuring-field-selection-for-material-master-data_d73a44d2-0e7d-41d1-bda0-3e91cd2b3d68"
+      ]
+    ]
+  },
+  {
+    "id": "planning",
+    "name": "Consumption-based planning and MRP",
+    "subjects": [
+      "Manual and automatic reorder points",
+      "Safety stock and forecasting",
+      "Planning file and net change",
+      "Lot sizing and rounding",
+      "Replenishment lead times and calendars",
+      "Firming and planning time fences",
+      "MRP areas and segments"
+    ],
+    "references": [
+      [
+        "Consumption-Based Planning",
+        "https://help.sap.com/docs/SAP_ERP_SPV/66326f67e0e1416d83c0fdfa4060189d/eee9b853dcfcb44ce10000000a174cb4.html"
+      ],
+      [
+        "Lot-for-Lot Order Quantity",
+        "https://help.sap.com/docs/SAP_ERP/66326f67e0e1416d83c0fdfa4060189d/c297b6535fe6b74ce10000000a174cb4.html"
+      ]
+    ]
+  },
+  {
+    "id": "pr",
+    "name": "Purchase requisitions",
+    "subjects": [
+      "Requester and source ownership",
+      "Item creation and field selection",
+      "Assignment versus conversion",
+      "Source assignment and release",
+      "Partial conversion and closure",
+      "External procurement proposals"
+    ],
+    "references": [
+      [
+        "Release Procedure with Classification (Purchase Requisitions and Purchasing Documents)",
+        "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/4d7df1d4b5940f8be10000000a42189b.html"
+      ],
+      [
+        "Consumption-Based Planning",
+        "https://help.sap.com/docs/SAP_ERP_SPV/66326f67e0e1416d83c0fdfa4060189d/eee9b853dcfcb44ce10000000a174cb4.html"
+      ]
+    ]
+  },
+  {
+    "id": "sources",
+    "name": "Sources of supply",
+    "subjects": [
+      "Source-list validity and fixed sources",
+      "Quota base and allocated quantity",
+      "Info record selection",
+      "Competing outline agreements",
+      "Different dates for planning and purchasing",
+      "Blocked sources"
+    ],
+    "references": [
+      [
+        "Supply Source Determination: Evaluating Quota Arrangements",
+        "https://help.sap.com/docs/SAP_ERP/65b1545de4cf409db91e81c6da53db5a/31a0c7536e8e2a4be10000000a174cb4.html"
+      ],
+      [
+        "Creating Purchase Orders with Source Determination",
+        "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/ab7fb65334e6b54ce10000000a174cb4.html"
+      ]
+    ]
+  },
+  {
+    "id": "rfq",
+    "name": "RFQs and supplier quotations",
+    "subjects": [
+      "Invitation and collective RFQ number",
+      "Quotation deadline and validity",
+      "Missing offers on individual lines",
+      "Price basis and landed-cost comparison",
+      "Item-level award",
+      "Quotation rejection and follow-on reference"
+    ],
+    "references": [
+      [
+        "Issuing RFQs and Obtaining Quotations",
+        "https://help.sap.com/docs/SAP_ERP_SPV/967e1c2a6a8c4183b7e07d28e7574445/797eb65334e6b54ce10000000a174cb4.html"
+      ],
+      [
+        "RFQ and Quotation (MM-PUR-RFQ)",
+        "https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/af9ef57f504840d2b81be8667206d485/707eb65334e6b54ce10000000a174cb4.html"
+      ]
+    ]
+  },
+  {
+    "id": "contracts",
+    "name": "Contracts and scheduling agreements",
+    "subjects": [
+      "Quantity and value contracts",
+      "Material-unknown and material-group items",
+      "Release order history",
+      "Schedule lines and releases",
+      "Forecast and JIT schedules",
+      "Firm and trade-off zones"
+    ],
+    "references": [
+      [
+        "Contract",
+        "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/037fb65334e6b54ce10000000a174cb4.html?locale=en-us"
+      ],
+      [
+        "Process Scheduling Agreements (MM-PUR)",
+        "https://help.sap.com/docs/SAP_ERP/6cfdc7caaef746cd9c7543e32e7e87c0/8607b753128eb44ce10000000a174cb4.html"
+      ]
+    ]
+  },
+  {
+    "id": "po",
+    "name": "Purchase orders and document history",
+    "subjects": [
+      "Header and item dependencies",
+      "Goods receipt and invoice receipt controls",
+      "Partial delivery and final invoice flags",
+      "Order units and order price units",
+      "Changes after follow-on documents",
+      "Returns and reversal history"
+    ],
+    "references": [
+      [
+        "Displaying the Purchase Order History",
+        "https://help.sap.com/docs/SAP_ERP/a58165ba587b4a7ebd5930c381a11649/8181cf535b804808e10000000a174cb4.html"
+      ],
+      [
+        "Vendor Confirmations (MM-PUR)",
+        "https://help.sap.com/docs/SAP_ERP/6cfdc7caaef746cd9c7543e32e7e87c0/f906b753128eb44ce10000000a174cb4.html"
+      ]
+    ]
+  },
+  {
+    "id": "pricing",
+    "name": "Conditions and pricing",
+    "subjects": [
+      "Condition records and access sequences",
+      "Scales and price units",
+      "Pricing dates",
+      "Manual and statistical conditions",
+      "Header allocation",
+      "Time-dependent conditions"
+    ],
+    "references": [
+      [
+        "Conditions and Price Determination (MM-PUR-VM)",
+        "https://help.sap.com/docs/SAP_ERP_SPV/967e1c2a6a8c4183b7e07d28e7574445/cf7fb65334e6b54ce10000000a174cb4.html"
+      ],
+      [
+        "Time-Dependent Conditions",
+        "https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/af9ef57f504840d2b81be8667206d485/d27fb65334e6b54ce10000000a174cb4.html"
+      ]
+    ]
+  },
+  {
+    "id": "approval",
+    "name": "Purchasing approvals",
+    "subjects": [
+      "Classification characteristics",
+      "Release codes, prerequisites and indicators",
+      "Overall and item release",
+      "Value changes after approval",
+      "Currency and classification at release",
+      "Changeability and reset"
+    ],
+    "references": [
+      [
+        "Release Conditions",
+        "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/3880b65334e6b54ce10000000a174cb4.html"
+      ],
+      [
+        "Operation of Release Procedure w. Classification",
+        "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/4e80b65334e6b54ce10000000a174cb4.html?locale=en-US&state=PRODUCTION&version=6.18.latest"
+      ]
+    ]
+  },
+  {
+    "id": "confirmation",
+    "name": "Order acknowledgments and delivery schedules",
+    "subjects": [
+      "Confirmation control keys",
+      "Acknowledgment to shipping notification",
+      "MRP relevance",
+      "GR assignment",
+      "Confirmed versus scheduled dates",
+      "Monitoring missing confirmations"
+    ],
+    "references": [
+      [
+        "Vendor Confirmations (MM-PUR)",
+        "https://help.sap.com/docs/SAP_ERP/6cfdc7caaef746cd9c7543e32e7e87c0/f906b753128eb44ce10000000a174cb4.html"
+      ],
+      [
+        "Monitoring Vendor Confirmations",
+        "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/907db65334e6b54ce10000000a174cb4.html?q=ME81"
+      ]
+    ]
+  },
+  {
+    "id": "output",
+    "name": "Purchasing document output",
+    "subjects": [
+      "Message determination by document",
+      "Medium, partner and dispatch time",
+      "Output changes and repeat issue",
+      "Printed changes and version",
+      "Supplier receipt evidence",
+      "Document vs output processing date"
+    ],
+    "references": [
+      [
+        "Messages",
+        "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/b77fb65334e6b54ce10000000a174cb4.html?locale=en-"
+      ],
+      [
+        "Outputting Purchasing Documents (MM-PUR)",
+        "https://help.sap.com/docs/SAP_ERP/666b7ae6edfe4c05a90ac0150637f964/d506b753128eb44ce10000000a174cb4.html"
+      ]
+    ]
+  },
+  {
+    "id": "services",
+    "name": "Services and limits",
+    "subjects": [
+      "Service specification and hierarchy",
+      "Planned and unplanned services",
+      "Overall limit and expected value",
+      "Service entry and acceptance",
+      "Reversing acceptance",
+      "Classic versus lean services"
+    ],
+    "references": [
+      [
+        "Maintaining Data for Services",
+        "https://help.sap.com/docs/SAP_ERP/01032ef9a74b4326998a66f9c408d6d2/fa75bb53707db44ce10000000a174cb4.html?version=6.06.latest"
+      ],
+      [
+        "Entry of Services Performed",
+        "https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/af9ef57f504840d2b81be8667206d485/0ad9bb53707db44ce10000000a174cb4.html"
+      ]
+    ]
+  },
+  {
+    "id": "inventory",
+    "name": "Goods receipts and stock transfers",
+    "subjects": [
+      "Valuated and nonvaluated receipts",
+      "Unrestricted, blocked and inspection stocks",
+      "Transfer posting versus physical transfer",
+      "Two-step movements",
+      "Movement types and references",
+      "Stock overview by unit and location"
+    ],
+    "references": [
+      [
+        "Goods Movement",
+        "https://help.sap.com/docs/SAP_ERP/61f8c51bfee94fa78c8835db685249eb/1063bd534f22b44ce10000000a174cb4.html?locale=en-US&state=PRODUCTION&version=6.18.latest"
+      ],
+      [
+        "Transfer Postings and Stock Transfers: Overview",
+        "https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/91b21005dded4984bcccf4a69ae1300c/9e64bd534f22b44ce10000000a174cb4.html"
+      ]
+    ]
+  },
+  {
+    "id": "balance",
+    "name": "Goods issues and reservations",
+    "subjects": [
+      "Reservation availability and goods issue",
+      "Cost center versus order consumption",
+      "Final issue",
+      "Components and backflush",
+      "Account determination at issue",
+      "Reversal with reference"
+    ],
+    "references": [
+      [
+        "Reservation",
+        "https://help.sap.com/docs/SAP_ERP/c8f06b9bc95747ca832ad21e94f577fb/ade0ba538c95b54ce10000000a174cb4.html"
+      ],
+      [
+        "Goods Movement",
+        "https://help.sap.com/docs/SAP_ERP/61f8c51bfee94fa78c8835db685249eb/1063bd534f22b44ce10000000a174cb4.html?locale=en-US&state=PRODUCTION&version=6.18.latest"
+      ]
+    ]
+  },
+  {
+    "id": "physical",
+    "name": "Physical inventory",
+    "subjects": [
+      "Count document scope",
+      "Posting block versus frozen book inventory",
+      "Recount and zero count",
+      "Differences and authorization",
+      "Count cut-off by period",
+      "Cycle counting and inventory sampling"
+    ],
+    "references": [
+      [
+        "Physical Inventory: Differences",
+        "https://help.sap.com/docs/SAP_ERP/75c4b203fca64320b998cc04e2eb1468/fa9bc7536e8e2a4be10000000a174cb4.html?locale=en-US"
+      ],
+      [
+        "Posting Inventory Differences",
+        "https://help.sap.com/docs/SAP_ERP_SPV/96bf9ad642cf4b26a29595e3d573fb8c/5161bd534f22b44ce10000000a174cb4.html"
+      ]
+    ]
+  },
+  {
+    "id": "batch",
+    "name": "Batch management and determination",
+    "subjects": [
+      "Batch level and identification",
+      "Shelf-life dates",
+      "Classification and selection criteria",
+      "Sort rules and search procedure",
+      "Restricted batch status",
+      "Batch traceability"
+    ],
+    "references": [
+      [
+        "Working with Batches",
+        "https://help.sap.com/docs/SAP_ERP/96bf9ad642cf4b26a29595e3d573fb8c/d664bd534f22b44ce10000000a174cb4.html"
+      ],
+      [
+        "Trouble Shooting in Batch Determination",
+        "https://help.sap.com/docs/SUPPORT_CONTENT/batchman/3363505730.html"
+      ]
+    ]
+  },
+  {
+    "id": "serial",
+    "name": "Serial numbers",
+    "subjects": [
+      "Serial profile at receipt",
+      "Serial identities and equal total stock",
+      "Stock check and equipment status",
+      "Stock transfers across locations",
+      "Return and replacement",
+      "Serial history"
+    ],
+    "references": [
+      [
+        "Serial Numbers in Inventory Management",
+        "https://help.sap.com/docs/SAP_ERP_SPV/248c3cdd7e6548999a7f5b95118f4522/e40eb753128eb44ce10000000a174cb4.html"
+      ],
+      [
+        "Serial Numbers in Goods Movements",
+        "https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/91b21005dded4984bcccf4a69ae1300c/1f4fb853ff98b44ce10000000a174cb4.html"
+      ]
+    ]
+  },
+  {
+    "id": "special",
+    "name": "Special procurement and ownership",
+    "subjects": [
+      "Vendor consignment and settlement",
+      "Subcontractor components and by-products",
+      "Returnable packaging",
+      "Pipeline procurement",
+      "Special-stock owner keys",
+      "Stock provided to vendor"
+    ],
+    "references": [
+      [
+        "Managing Special Stocks (MM-IM)",
+        "https://help.sap.com/docs/SAP_ERP/b704a8db767040a08100adc846218964/00e8b853dcfcb44ce10000000a174cb4.html?version=6.18.latest"
+      ],
+      [
+        "Special Procurement Types",
+        "https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/91b21005dded4984bcccf4a69ae1300c/9a61bd534f22b44ce10000000a174cb4.html?ai=true"
+      ]
+    ]
+  },
+  {
+    "id": "sto",
+    "name": "Stock transport orders",
+    "subjects": [
+      "Intra-company and cross-company scenarios",
+      "With and without outbound delivery",
+      "Stock in transit by item",
+      "Partial receipts and reversals",
+      "Shipping data and plant assignments",
+      "Cross-company billing"
+    ],
+    "references": [
+      [
+        "Goods Receipt for a Stock Transport Order",
+        "https://help.sap.com/docs/SAP_ERP/b704a8db767040a08100adc846218964/1e62bd534f22b44ce10000000a174cb4.html"
+      ],
+      [
+        "Goods Issue for the Delivery",
+        "https://help.sap.com/docs/SAP_ERP/248c3cdd7e6548999a7f5b95118f4522/9668b65334e6b54ce10000000a174cb4.html"
+      ]
+    ]
+  },
+  {
+    "id": "repairs",
+    "name": "Returns and cancellations",
+    "subjects": [
+      "Reversal with original reference",
+      "Return delivery versus returns PO",
+      "Partial return after invoice",
+      "Quality-related supplier return",
+      "Replacement and credit",
+      "Return in a later period"
+    ],
+    "references": [
+      [
+        "Returns Purchase Order",
+        "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/de6a3d45bb814393b04cff7fd6b9aefd.html"
+      ],
+      [
+        "Cancellation of Returns Steps",
+        "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/12f8fc0b7fab4091bb06a50a78c0b905.html?locale=en-US&state=PRODUCTION&version=6.18.latest"
+      ]
+    ]
+  },
+  {
+    "id": "invoice",
+    "name": "Logistics invoice verification",
+    "subjects": [
+      "GR-based invoice assignment",
+      "Quantity, price and date variances",
+      "Payment blocks and release",
+      "Subsequent debits and credits",
+      "Invoice reductions and credit memos",
+      "Evaluated receipt settlement",
+      "Duplicate checks and invoice reversals"
+    ],
+    "references": [
+      [
+        "Releasing Invoices",
+        "https://help.sap.com/docs/SAP_ERP/98eed63ea3a544af84eb972dc68b0e84/6d71b6531de6b64ce10000000a174cb4.html"
+      ],
+      [
+        "Variance in an Invoice Item",
+        "https://help.sap.com/docs/SAP_ERP/98eed63ea3a544af84eb972dc68b0e84/7b70b6531de6b64ce10000000a174cb4.html"
+      ]
+    ]
+  },
+  {
+    "id": "tax",
+    "name": "Delivery costs, currency and tax",
+    "subjects": [
+      "Planned freight and clearing",
+      "Unplanned delivery-cost distribution",
+      "Foreign currency translation",
+      "Fixed exchange rate and date",
+      "Tax-code provenance",
+      "Gross versus net posting"
+    ],
+    "references": [
+      [
+        "Unplanned Delivery Costs",
+        "https://help.sap.com/docs/SAP_ERP_SPV/98eed63ea3a544af84eb972dc68b0e84/c970b6531de6b64ce10000000a174cb4.html"
+      ],
+      [
+        "Foreign Currency Translation",
+        "https://help.sap.com/docs/SAP_ERP/98eed63ea3a544af84eb972dc68b0e84/0871b6531de6b64ce10000000a174cb4.html?locale=en-US&state=PRODUCTION&version=6.06.latest"
+      ]
+    ]
+  },
+  {
+    "id": "grir",
+    "name": "GR/IR and period-end reconciliation",
+    "subjects": [
+      "Receipt-first and invoice-first sequences",
+      "Open quantities and values",
+      "Freight clearing and GR/IR",
+      "Account maintenance",
+      "Cutoff and foreign currency",
+      "Vendor payment versus clearing evidence"
+    ],
+    "references": [
+      [
+        "GR/IR Clearing Account Maintenance",
+        "https://help.sap.com/docs/SAP_ERP/c587d5cadece40a285ce9a6d4a2a4908/d95eb6531de6b64ce10000000a174cb4.html?locale=en-US&state=PRODUCTION&version=6.17.latest"
+      ],
+      [
+        "Variance in an Invoice Item",
+        "https://help.sap.com/docs/SAP_ERP/98eed63ea3a544af84eb972dc68b0e84/7b70b6531de6b64ce10000000a174cb4.html"
+      ]
+    ]
+  },
+  {
+    "id": "stockval",
+    "name": "Material valuation",
+    "subjects": [
+      "Valuation area and stock value",
+      "Material type quantity and value updating",
+      "Standard and moving average price",
+      "Split valuation types",
+      "Stock coverage at invoice",
+      "Price changes and period boundaries"
+    ],
+    "references": [
+      [
+        "How Split Valuation Is Controlled",
+        "https://help.sap.com/docs/SAP_ERP/5507a8b592ea4caf86487201a44b0e74/7a98c7536e8e2a4be10000000a174cb4.html"
+      ],
+      [
+        "Valuation Structure",
+        "https://help.sap.com/docs/SAP_ERP/c587d5cadece40a285ce9a6d4a2a4908/585eb6531de6b64ce10000000a174cb4.html"
+      ]
+    ]
+  },
+  {
+    "id": "account",
+    "name": "Automatic account determination",
+    "subjects": [
+      "Valuation classes and grouping codes",
+      "Inventory posting and GR/IR",
+      "GBB and account modifiers",
+      "Price differences and clearing keys",
+      "Consumption account versus cost object",
+      "Cross-company chart-of-accounts differences"
+    ],
+    "references": [
+      [
+        "Setting Up Account Determination for Specific Transactions",
+        "https://learning.sap.com/courses/cross-functional-customizing-in-sap-s-4hana-materials-management/setting-up-account-determination-for-specific-transactions"
+      ],
+      [
+        "Adjusting Account Determination for Special Cases",
+        "https://learning.sap.com/courses/cross-functional-customizing-in-sap-s-4hana-materials-management/adjusting-account-determination-for-special-cases"
+      ]
+    ]
+  },
+  {
+    "id": "ml",
+    "name": "Material Ledger and actual costing",
+    "subjects": [
+      "Material price analysis",
+      "Currencies and valuations",
+      "Single-level price determination",
+      "Multilevel allocation",
+      "Consumption revaluation",
+      "Closing entries and reconciliation"
+    ],
+    "references": [
+      [
+        "Performing Single-Level Material Price Determination",
+        "https://help.sap.com/docs/SAP_ERP/56f7319a9048445eb86221af73cab72b/dcf1d353ca9f4408e10000000a174cb4.html"
+      ],
+      [
+        "Prices and Inventory Values",
+        "https://help.sap.com/docs/SAP_ERP/56f7319a9048445eb86221af73cab72b/58c7d45398184308e10000000a174cb4.html"
+      ]
+    ]
+  },
+  {
+    "id": "quality",
+    "name": "Quality management at procurement",
+    "subjects": [
+      "Quality info record and release",
+      "Inspection types",
+      "Inspection lot and stock category",
+      "Usage decision and stock posting",
+      "Source inspection",
+      "Supplier block versus material block"
+    ],
+    "references": [
+      [
+        "Goods Receipt When Quality Management (QM) is Active",
+        "https://help.sap.com/docs/SAP_ERP/96bf9ad642cf4b26a29595e3d573fb8c/d363bd534f22b44ce10000000a174cb4.html"
+      ],
+      [
+        "Inspection for a Goods Receipt",
+        "https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/2bc3ee8d1c83404e8cf62418640004f2/2514c453f57eb44ce10000000a174cb4.html"
+      ]
+    ]
+  },
+  {
+    "id": "warehouse",
+    "name": "Inventory and warehouse integration",
+    "subjects": [
+      "IM posting versus warehouse handling",
+      "Interim storage",
+      "Transfer requirement and transfer order",
+      "Stock differences across locations",
+      "Delivery-based receipt",
+      "EWM integration scope"
+    ],
+    "references": [
+      [
+        "Order of Postings in Integrated WM",
+        "https://help.sap.com/docs/SAP_ERP/34fc810a607e4ae5a287b6e233b8566f/038fc95360267214e10000000a174cb4.html?version=6.18.latest"
+      ],
+      [
+        "Inventory Management and the Warehouse Management System",
+        "https://help.sap.com/docs/PRODUCT_ID/349992fb60854a62a264d716ad5c8f54/37e05c540fe1033de10000000a441470.html"
+      ]
+    ]
+  },
+  {
+    "id": "integrate",
+    "name": "Account assignment and cross-module procurement",
+    "subjects": [
+      "Cost centers, orders, projects and assets",
+      "Multiple account assignment and distribution",
+      "Third-party procurement and individual customer stock",
+      "External processing for production operations",
+      "FI/CO reconciliation",
+      "MM, SD and project-system document links"
+    ],
+    "references": [
+      [
+        "Account Assignment",
+        "https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/5e23dc8fe9be4fd496f8ab556667ea05/cd7eb65334e6b54ce10000000a174cb4.html?locale=en-US&state=PRODUCTION&version=2025.001"
+      ],
+      [
+        "Entering Account Assignments",
+        "https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/af9ef57f504840d2b81be8667206d485/b47db65334e6b54ce10000000a174cb4.html"
+      ]
+    ]
+  },
+  {
+    "id": "evaluation",
+    "name": "Supplier evaluation",
+    "subjects": [
+      "Main criteria and subcriteria",
+      "Automatic versus manually maintained scores",
+      "On-time and quantity performance",
+      "Population and evaluation period",
+      "Effects of delivery history",
+      "Scores versus purchasing decisions"
+    ],
+    "references": [
+      [
+        "Lists for Vendor Evaluation (MM-PUR)",
+        "https://help.sap.com/docs/SAP_ERP/666b7ae6edfe4c05a90ac0150637f964/9507b753128eb44ce10000000a174cb4.html"
+      ],
+      [
+        "Vendor Evaluation in Purchasing",
+        "https://help.sap.com/docs/SUPPORT_CONTENT/spmm/3362167877.html?version=1.0"
+      ]
+    ]
+  },
+  {
+    "id": "integration",
+    "name": "Purchasing and invoice interfaces",
+    "subjects": [
+      "EDI order confirmations and invoices",
+      "Document references and partner roles",
+      "Order-unit conversion in inbound data",
+      "Duplicate transmission versus duplicate invoice",
+      "Interface status and business posting",
+      "Reprocessing and reconciliation"
+    ],
+    "references": [
+      [
+        "Invoices Received via EDI (MM-IV)",
+        "https://help.sap.com/docs/SAP_ERP_SPV/98eed63ea3a544af84eb972dc68b0e84/2d6fb6531de6b64ce10000000a174cb4.html?version=6.06.34"
+      ],
+      [
+        "Logistics Invoice Verification (MM-IV-LIV)",
+        "https://help.sap.com/docs/SAP_ERP_SPV/98eed63ea3a544af84eb972dc68b0e84?locale=en-US&state=PRODUCTION&version=6.18.26"
+      ]
+    ]
+  },
+  {
+    "id": "analytics",
+    "name": "Reporting and analytics",
+    "subjects": [
+      "Open purchase orders",
+      "Purchasing spend and date filters",
+      "PO history versus header totals",
+      "On-time performance",
+      "Inventory snapshots versus movements",
+      "Report-to-document reconciliation"
+    ],
+    "references": [
+      [
+        "Introducing Procurement Analytics and Procurement Overview Page",
+        "https://learning.sap.com/courses/implementing-sap-s-4hana-cloud-public-edition-sourcing-and-procurement/introducing-procurement-overview-page-and-real-time-reporting-and-monitoring-for-procurement_b1220cd8-8141-476c-bd30-0de739fdb2f6"
+      ],
+      [
+        "Displaying the Purchase Order History",
+        "https://help.sap.com/docs/SAP_ERP/a58165ba587b4a7ebd5930c381a11649/8181cf535b804808e10000000a174cb4.html"
+      ]
+    ]
+  },
+  {
+    "id": "data",
+    "name": "Migration and conversion",
+    "subjects": [
+      "Master-data dependency sequence",
+      "Purchasing info record migration",
+      "Open purchase orders",
+      "Opening stock by owner and value",
+      "Cutover reconciliation",
+      "Release-specific migration objects"
+    ],
+    "references": [
+      [
+        "MM - Purchasing info record",
+        "https://help.sap.com/docs/SAP_S4HANA_CLOUD/d5699934e7004d048c4801b552f3b013/d87398e566fd4ee2a850f9a3d66ea173.html"
+      ],
+      [
+        "What Data Can Be Migrated?",
+        "https://help.sap.com/docs/SAP_S4HANA_CLOUD/d5699934e7004d048c4801b552f3b013/886e1b9bf25245d093a98e0c635818e5.html"
+      ]
+    ]
+  },
+  {
+    "id": "security",
+    "name": "Purchasing authorizations and responsibilities",
+    "subjects": [
+      "Organizational restrictions",
+      "Release authority",
+      "Change versus display",
+      "Movement and warehouse authorization",
+      "Separation of responsibilities",
+      "Diagnosing the first failing authorization check"
+    ],
+    "references": [
+      [
+        "Release Procedure with Classification (Purchase Requisitions and Purchasing Documents)",
+        "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/4d7df1d4b5940f8be10000000a42189b.html?version=6.06.latest"
+      ],
+      [
+        "Displaying Release Information",
+        "https://help.sap.com/docs/SAP_ERP_SPV/967e1c2a6a8c4183b7e07d28e7574445/5a80b65334e6b54ce10000000a174cb4.html"
+      ]
+    ]
+  },
+  {
+    "id": "retail",
+    "name": "Retail procurement and other industry scenarios",
+    "subjects": [
+      "Article and assortment",
+      "Site listing and validity",
+      "Distribution-center supply",
+      "Store returns",
+      "Industry-specific units and ownership",
+      "Release and industry prerequisites"
+    ],
+    "references": [
+      [
+        "Assortment",
+        "https://help.sap.com/docs/SAP_ERP_SPV/82265744ff764efb8b48ef431235214c/305ac353b677b44ce10000000a174cb4.html"
+      ],
+      [
+        "Basic Listing Procedures",
+        "https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/9905622a5c1f49ba84e9076fc83a9c2c/74a5c7536e8e2a4be10000000a174cb4.html"
+      ]
+    ]
+  },
+  {
+    "id": "archiving",
+    "name": "Document retention and archiving",
+    "subjects": [
+      "Document dependencies",
+      "Residence time and final status",
+      "Open items and follow-on documents",
+      "Archive and information retrieval",
+      "Reconciliations before archiving",
+      "Diagnosing ineligible purchasing items"
+    ],
+    "references": [
+      [
+        "Dependencies MM_EKKO (MM-PUR)",
+        "https://help.sap.com/docs/SAP_ERP/c6ef916aeac74db0a6bec2142bc00248/c580c1536ca9b54ce10000000a174cb4.html?locale=en-US"
+      ],
+      [
+        "Dependencies MM_EKKO (MM-PUR)",
+        "https://help.sap.com/docs/SAP_ERP/b704a8db767040a08100adc846218964/c580c1536ca9b54ce10000000a174cb4.html"
+      ]
+    ]
+  },
+  {
+    "id": "local",
+    "name": "Country-specific purchasing and invoicing",
+    "subjects": [
+      "Identifying the applicable localization",
+      "Tax date and determination",
+      "Input tax and non-deductible cost",
+      "Jurisdiction data",
+      "Supplier invoice matching",
+      "Documented release limitations"
+    ],
+    "references": [
+      [
+        "Tax Calculation in MM and FI",
+        "https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/8999cee59b7c44fdb53fbbb4d703f8e6/9b6bd0531d8b4208e10000000a174cb4.html"
+      ],
+      [
+        "Taxes",
+        "https://help.sap.com/docs/SAP_S4HANA_CLOUD/af9ef57f504840d2b81be8667206d485/9980b65334e6b54ce10000000a174cb4.html"
+      ]
+    ]
+  },
+  {
+    "id": "edition",
+    "name": "SAP S/4HANA on-premise and Private Edition",
+    "subjects": [
+      "Business partner and supplier roles",
+      "Flexible workflow",
+      "Fiori and GUI process differences",
+      "Classic and lean services",
+      "Material Ledger prerequisites",
+      "Inventory reporting and data model"
+    ],
+    "references": [
+      [
+        "How to Configure the Flexible Workflow for Purchase Orders",
+        "https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/af9ef57f504840d2b81be8667206d485/c1acc9fa4c2041be952bb7c1c8f902ae.html?locale=en-us"
+      ],
+      [
+        "Exploring Procurement Analytics in SAP S/4HANA",
+        "https://learning.sap.com/courses/procurement-process-overview/exploring-procurement-analytics-in-sap-s-4hana"
+      ]
+    ]
+  },
+  {
+    "id": "cloud",
+    "name": "SAP S/4HANA Cloud Public Edition",
+    "subjects": [
+      "Scope activation and configuration activities",
+      "Procurement workflows",
+      "Business roles and Fiori applications",
+      "Extensibility and released interfaces",
+      "Migration objects",
+      "Release-specific availability"
+    ],
+    "references": [
+      [
+        "Implementing SAP S/4HANA Cloud Public Edition, Sourcing and Procu",
+        "https://learning.sap.com/learning-journeys/implement-sap-s-4hana-cloud-public-edition-for-sourcing-and-procurement"
+      ],
+      [
+        "Defining Workflows In Sourcing and Procurement",
+        "https://learning.sap.com/courses/implementing-sap-s-4hana-cloud-public-edition-sourcing-and-procurement/defining-workflows-in-sourcing-and-procurement_a17030df-33b7-4c0e-a8c6-31ec490618e9"
+      ]
+    ]
+  },
+  {
+    "id": "development",
+    "name": "Purchasing enhancements and extensions",
+    "subjects": [
+      "Documenting standard versus custom behavior",
+      "Defaults and validation points",
+      "Custom fields and copying",
+      "Released extension points",
+      "Interface and interactive consistency",
+      "Regression evidence across upgrades"
+    ],
+    "references": [
+      [
+        "BADIs for Purchasing",
+        "https://help.sap.com/docs/SUPPORT_CONTENT/spmm/3362167798.html"
+      ],
+      [
+        "App Extensibility: Manage Purchase Orders",
+        "https://help.sap.com/docs/SAP_S4HANA_CLOUD/0e602d466b99490187fcbb30d1dc897c/8676e556cca85267e10000000a441470.html"
+      ]
+    ]
+  },
+  {
+    "id": "project",
+    "name": "Implementation, testing and operations",
+    "subjects": [
+      "Fit-to-standard decisions",
+      "Purchasing configuration transports",
+      "End-to-end testing",
+      "Cutover ownership",
+      "Incidents and controlled reproduction",
+      "Post-go-live reconciliation"
+    ],
+    "references": [
+      [
+        "Preparing for Cutover",
+        "https://learning.sap.com/courses/cloud-onboarding-for-sap-ariba-sap-fieldglass-and-sap-business-network-for-procurement/preparing-for-cutover_e0a6bd7a-d06f-4a82-8060-296506a2dbd4"
+      ],
+      [
+        "Executing the Production Cutover",
+        "https://learning.sap.com/courses/managing-human-capital-management-implementations-with-sap-activate/executing-the-production-cutover_e41274f6-02a0-4e73-ac13-654f399ff241"
+      ]
+    ]
+  }
+]

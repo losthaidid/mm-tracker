@@ -1,0 +1,96 @@
+{
+  "id": "val-mr11-terminal-quantity-difference",
+  "level": "Advanced",
+  "shelf": "Valuation & invoice verification",
+  "topic": "GR/IR account maintenance",
+  "title": "Decide what to do with the final eight units on GR/IR",
+  "lead": "A buyer asks for an old credit of 200 to be cleared. The purchase order shows 120 seals received and 112 invoiced at 25 each. Inventory has already issued most of the material. Posting the outstanding invoice, correcting a receiving error and performing GR/IR account maintenance are three materially different decisions. Use the evidence in this ECC case to decide which one the documents support and to predict where the offsetting amount will go if account maintenance is justified.",
+  "keywords": [
+    "MR11",
+    "GR/IR account maintenance",
+    "delivery surplus",
+    "invoice surplus",
+    "stock coverage",
+    "moving average",
+    "WRX",
+    "price difference"
+  ],
+  "sections": [
+    [
+      "Translate the residual into a claim that can be checked",
+      "Start with the two business assertions hidden inside the request. One says that 120 seals really entered company-owned stock. The other says the supplier has finished billing at 112 pieces and that the business accepts this as final. The purchasing system can show you which documents have been posted. It cannot telephone the supplier, count a pallet delivered three months ago, or decide whether a missing bill has been waived. Capture the names of the people responsible for each assertion. A report of items older than ninety days gives a useful investigation list, but age alone answers neither question.\n\nSuppose the order price is 25 per piece in local currency. The 120-piece valuated receipt credited the GR/IR clearing account by 3,000. Posted invoices have debited it by 2,800. There are no reversals, taxes affecting this comparison, delivery costs, exchange differences or price changes on the order. Eight pieces therefore explain the outstanding credit of 200. Give the business this exact statement, including item number and currency. It makes a concrete prediction. If the vendor now supplies a valid additional invoice for eight pieces at 25, ordinary invoice receipt would debit GR/IR by 200 and establish a vendor liability. A proposed GR/IR maintenance entry has a different counterparty and accounting effect."
+    ],
+    [
+      "Decide whether a source document needs repair",
+      "Read the receiving evidence first. Match the purchase order history against the packing list, signed quantity, unit conversion and any later return or cancellation documents. A receiving clerk could have keyed 120 pieces for ten boxes packed with a different number of seals. A return might physically have left the plant while the system still shows all 120. If the recorded receipt overstates what the plant accepted, an authorized material document correction or return process addresses the source condition. It will also affect the material quantity or related stock position. Posting a value-only adjustment would leave that quantity error in the warehouse records.\n\nThen compare the commercial documents. A partially billed contract, a final freight invoice from a different supplier, a disputed quality claim and a permanent quantity difference are different situations. Read the supplier's final statement and confirm whether another invoice or credit is expected. If a legitimate invoice is still on its way, the outstanding GR/IR amount describes the timing of the liability. If the vendor invoice itself was posted against an incorrect item or quantity, accounts payable should investigate the invoice correction. A purchase order flag telling users that receipt or invoicing is complete is evidence of process intent. Verify the actual documents separately. A flag cannot by itself prove agreement over the supplier's final claim or repair an incorrect document reference."
+    ],
+    [
+      "Apply the commercial conclusion to the account",
+      "For the worked case, the warehouse verifies all 120 pieces and Purchasing obtains written confirmation that the agreed final billing covers only 112. Accounts payable checks for invoices still in its workflow. The responsible finance owner accepts a permanent eight-piece delivery surplus in this specific case. Classic SAP Logistics Invoice Verification provides GR/IR account maintenance, commonly through MR11, for such differences. Review the selected item, the quantity difference and the proposed amount in the company's normal review process. The expected direction here is a debit of 200 to GR/IR. It removes the credit that no further vendor invoice will offset.\n\nFollow the other side before saying the item is ready to close. SAP's standard treatment depends in part on the procurement and material valuation. A moving-average stock item can pass the adjustment to the stock account to the extent of stock coverage. A standard-price stock item normally sends it to a price difference account. An account-assigned procurement can follow the specified consumption account. The business meaning of the same 200 therefore changes with the purchase order and material. Obtain the account assignment, price control and valuation record, and compare with an eligible test item. Use the posting proposal and actual accounting document to verify the final account numbers. A blanket journal entry prescribed for every GR/IR credit overlooks how the material subledger accounts for procurement costs."
+    ],
+    [
+      "Reconstruct why only 125 can reach this stock account",
+      "This plant holds the seals as its own moving-average stock. Just before the purchase it held 120 identical pieces valued at 6,600. The new 120 at 25 added 3,000. Together the plant had 240 pieces worth 9,600, or 40 per piece. Subsequent issues totalling 235 pieces at 40 removed 9,400. There are five pieces worth 200 left in the valuation area when the maintenance is posted. The supplier invoice at the agreed unit price created no additional purchase-price variance in this simplified history. Tie these amounts to the material valuation record before applying the example to a live item.\n\nThe remaining difference concerns eight pieces, each with a clearing value of 25. Only five of those eight are covered by current stock in this case. The portion attributable to that stock is five times 25, or 125. The remaining three times 25, or 75, is credited to a price difference account. Together the credits of 125 and 75 balance the 200 debit to GR/IR. Inventory now carries 75 for five pieces, an average of 15 per piece. The new average follows from the remaining total value divided by the remaining quantity. The operation creates no physical issue of eight pieces. Another quick check is that the closing inventory quantity stays at five while the stock G/L decreases from 200 to 75 for this material in this example."
+    ],
+    [
+      "Predict the outcome under different evidence",
+      "If eight or more pieces were available with sufficient stock value and the same moving-average conditions, the entire 200 adjustment could be credited to inventory. With zero stock coverage the entire 200 would go to price differences. For standard-price stock, clearing the same terminal delivery surplus would credit the price difference account in the example, and the standard valuation per piece would stay at its existing amount. These are predictions for specified facts. A negative-stock situation, different valuation type, currency conversion or separately treated delivery costs can change the document you need to explain. Check the relevant valuation unit and actual line postings before comparing your prediction with another plant.\n\nNow change the direction of the business difference. Suppose the plant correctly received 112, an invoice for 120 has already been settled commercially, and there will be no additional delivery. The GR/IR balance is a debit of 200 under the same price assumptions. An approved terminal invoice surplus would credit the clearing account by 200. The applicable stock, expense or difference accounts take debits. In many real cases an overbilled quantity should instead lead to an invoice correction or supplier credit, so verify the commercial decision before using this branch of the analysis. The reversed signs do not turn an unsupported vendor claim into an accepted purchase cost."
+    ],
+    [
+      "Read the audit trail after maintenance",
+      "SAP creates an account maintenance document recording the adjustment. Follow its purchase order reference and its accounting document, and reconcile the quantities and values against the review that authorized it. In classic ECC the display or cancellation route for account maintenance documents can be available through MR11SHOW. Confirm the available function and authority for the relevant release and role. The account maintenance document gives a later reviewer a route back to what was decided about the difference. A summation of GR/IR G/L lines alone cannot show that the vendor specifically agreed to bill fewer pieces.\n\nIf an invoice for the eight seals arrives unexpectedly a week later, reconstruct the new facts. First confirm that it belongs to the same item and that the earlier waiver or final agreement has actually changed. Then identify the account maintenance document and examine whether it must be cancelled under the approved process before posting the valid invoice. Check period availability and the current material valuation when forecasting the effect. Silently entering another compensating journal would make it harder to relate the new payable to the original receipt and write-off. Do not infer automatic cancellation from the appearance of a late invoice. The business and FI owners need a consistent decision and a documented chain of postings."
+    ],
+    [
+      "Separate three different meanings of cleared",
+      "Buying may use cleared to mean that it expects no further vendor correspondence. Logistics Invoice Verification may use it to describe account maintenance of a final quantity difference. Finance may use it for the open-item clearing status in the G/L account. Document the effect relevant to each team. For this order there really were 120 received and 112 invoiced. Those facts remain visible in the purchase order history. Account maintenance explains the terminal difference. Normal FI clearing procedures can subsequently group eligible balanced financial lines according to account settings. Paying the vendor settles the vendor open item and has a different purpose again.\n\nA concise close note for this case names the eight-piece delivery surplus, the 200 residual, the written final settlement and the five pieces of stock coverage. It identifies the debit to GR/IR, the two offsetting credits, and the maintenance document. It also identifies the person who will review any future invoice against the closed item. On a later sample, ask the trainee to change just one fact, such as a signed receipt for only 112 pieces. The eight-piece difference and 200 balance would look similar on the original report, but the recommended action would move to the receiving team. That sensitivity to evidence is the practical value of understanding MR11."
+    ]
+  ],
+  "visual": {
+    "title": "An authorized 200 delivery surplus under three stock conditions",
+    "headers": [
+      "Price control and coverage",
+      "GR/IR debit",
+      "Inventory credit",
+      "Price difference credit"
+    ],
+    "rows": [
+      [
+        "Moving average, 8 or more pieces and adequate value",
+        "200",
+        "200",
+        "0"
+      ],
+      [
+        "Moving average, 5 pieces",
+        "200",
+        "125",
+        "75"
+      ],
+      [
+        "Standard price, or moving average with zero coverage",
+        "200",
+        "0",
+        "200"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · GR/IR clearing account maintenance and stock coverage",
+      "https://help.sap.com/docs/SAP_ERP/c587d5cadece40a285ce9a6d4a2a4908/d95eb6531de6b64ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Account movements from account maintenance",
+      "https://help.sap.com/docs/SAP_ERP_SPV/b704a8db767040a08100adc846218964/3a73b6535fe6b74ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Account maintenance document",
+      "https://help.sap.com/docs/SAP_ERP/b704a8db767040a08100adc846218964/3473b6535fe6b74ce10000000a174cb4.html"
+    ],
+    [
+      "SAP S/4HANA on-premise · MR11 and alternatives for handling quantity differences",
+      "https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/af9ef57f504840d2b81be8667206d485/72256b54f94c8f4ce10000000a4450e5.html"
+    ]
+  ],
+  "area": "grir"
+}

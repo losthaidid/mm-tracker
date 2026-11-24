@@ -1,0 +1,101 @@
+{
+  "id": "mrp-area-stock-transfer-double-buy",
+  "level": "Expert",
+  "shelf": "Expert practice",
+  "topic": "MRP areas and replenishment design",
+  "title": "One plant has enough stock. Why is the workshop asking for an external purchase?",
+  "lead": "A distribution centre holds 80 instrument kits while its in-plant workshop holds five. The workshop needs 30 kits on Thursday. A purchasing proposal for 25 appears even though a forklift can move 25 kits across the yard. Management calls it a duplicate purchase. Before suppressing the proposal, determine which planning area owns each piece of stock, which area owns the requirement, and whether SAP has been told that the warehouse may supply the workshop.",
+  "keywords": [
+    "MRP area",
+    "storage location",
+    "stock transfer reservation",
+    "special procurement",
+    "MRP area segment",
+    "stock requirements list",
+    "internal replenishment"
+  ],
+  "sections": [
+    [
+      "A plant total cannot identify the source of supply",
+      "Plant 1100 has a main stores location and a workshop location. The workshop is an independently planned storage-location MRP area for the kit. Main stores belongs to the plant MRP area. The quantities in the example are unrestricted, there are no other relevant requirements or receipts, and lot-for-lot planning is feasible on the required dates. The workshop demand is recorded with its workshop issuing location. Main stores and the workshop are physically in the same plant. That fact alone does not define an internal replenishment relationship in planning.\n\nCombine both physical locations and the plant has 85 kits. Deduct Thursday's 30 and the company's inventory picture suggests a residual 55. Split the same facts by planning responsibility and the picture changes. Main stores has 80 for its own obligations. The workshop has five against demand of 30 and needs another 25 by Thursday. Both views reconcile. The unresolved question is whether those 25 should be bought from a vendor, transferred internally, or supplied in a way agreed outside this example. An independently planned area does a useful job by identifying the shortage where the kits will be needed.\n\nA buyer should therefore resist both easy conclusions. The proposal is not automatically a purchasing mistake because the company has stock elsewhere. Equally, its presence does not prove that an external purchase is the right business outcome. There may be test certificates, ownership rules or physical handling delays that prevent transfer. Confirm the actual supplier of last resort and the transfer lead time with the inventory and workshop leads. In this case the warehouse owns the kits, can transfer them by Wednesday, and is intended to replenish the workshop as a matter of policy."
+    ],
+    [
+      "Reconstruct what each planning area actually contains",
+      "List the material, plant, storage locations and MRP areas as separate identifiers. Obtain the area definition and storage-location assignments, then the material's area-specific segment. A location can belong to a defined area while a material still has no area-specific planning segment there. Check one actual material, particularly after mass extension. A plant-level screenshot from a well-maintained reference material is weak evidence about a different material affected by the incident. Retrieve the controls for the problem kit in both the plant and the workshop area.\n\nOpen the stock/requirements view separately for the plant area and workshop area. Identify each visible receipt and issue by document and location. In standard assignment, a receipt is allocated using its receiving storage location and a requirement using its issuing storage location when determined. If the system cannot determine a location, the documented fallback is to the plant MRP area. This creates an important test. A requirement for 30 with a blank or incorrectly determined location can appear in the plant segment even while the workshop stock is planned independently. Copying that display into a workshop report would reverse the diagnosis.\n\nReconcile each element to the relevant source document. For a maintenance or production requirement, identify the issuing location actually carried by that component or reservation. For an external purchase proposal, inspect the planned receiving location and data used to determine it. A person may describe an item as physically “for the workshop” while the document still points to main stores. Follow the value on the document and the location determination that produced it. Relabeling an MRP area on a report cannot correct a receipt or requirement posted to the wrong location."
+    ],
+    [
+      "Choose the internal supply relationship deliberately",
+      "Assume the workshop really is a separate planning area and the internal supplier is confirmed. SAP ECC documents a specific stock-transfer-from-plant-to-MRP-area arrangement. Configure an appropriate special procurement key for the relevant plant and assign it in the material's workshop MRP area segment. The documented definition uses external procurement type F with special procurement U for stock transfer and the plant to which the area belongs. Read the full definition in the client. A local numeric key has meaning only through the parameters assigned to it. A familiar key number from another system is insufficient evidence.\n\nOne subtlety causes genuine confusion. The letter F in this arrangement describes the procurement type used with the special procurement key. With the stock-transfer definition it supports internal supply from the plant. The purchasing result cannot be inferred by translating F in isolation. The special procurement settings, area master and receiving location together establish the path. Compare with an area set to ordinary external procurement, where a shortage could instead result in a purchasing proposal under the relevant creation setting. Document the contrast using the actual generated element categories.\n\nFor receiving location, SAP uses the external procurement storage location specified in the area segment for this process and falls back to the receiving location in the area definition when that field is empty. Confirm that the resulting location belongs to the workshop area. If the wrong destination was chosen for an existing purchasing document, establishing the desired setting on the material does not automatically reroute an already placed supplier commitment. Separate the master-data change for new proposals from the decision on any open purchasing or transfer document. That distinction becomes central during a cutover with live material in transit."
+    ],
+    [
+      "Read one physical intention through two planning entries",
+      "In the intended scenario, planning the 25-kit shortage can generate a stock transfer reservation in the workshop area and the corresponding material reservation in the plant MRP area. These entries describe the receiving and supplying sides of one internal requirement. They should not be added as two company-wide purchases. On the workshop side, five plus an expected 25 covers 30. On the plant side, 80 less its obligation to supply 25 leaves 55. A reservation represents expected movement. Until the warehouse posts the physical transfer the stock still sits at its original location.\n\nWhen the warehouse transfers the 25 with reference to the reservation, reconcile the posting and the reduced outstanding quantities. With no other events, the physical balances become 55 in main stores and 30 in the workshop. Their sum remains 85. The workshop's subsequent issue of 30 reduces its physical stock to zero and the combined total to 55. Take a snapshot before the transfer, after the transfer, and after the workshop issue. Mixing pre-transfer reserved quantities with post-transfer stock in the same calculation can produce a convincing but entirely false additional shortage.\n\nNow change one condition. Give main stores a separate requirement for 70 kits before it can replenish. Its 80 against 70 leaves ten for transfer, but the workshop needs 25. A shortage of 15 can legitimately emerge at the internal source when the transfer requirement is included. This is a new plant supply decision. The desired architecture relocates the procurement question to the source responsible for it. It does not give the combined plant infinite supply. This counterexample is more useful than a demonstration in which abundant main-store stock makes every proposal disappear."
+    ],
+    [
+      "Rehearse the failure modes that look identical to a buyer",
+      "Prepare three independent QA materials or return the test material to a documented baseline between runs. In the first trial, maintain the separate workshop segment, its demand and ordinary external procurement. Verify the area shortage of 25 and the type of external proposal produced. In the second trial retain the warehouse and area arrangement but route the component issue to main stores. Predict the demand location and area before running planning. A demand landing in the wrong place points to document or location determination. Changing the special procurement key would be an indirect and ineffective response to that fault.\n\nIn the third trial, use the intended workshop issue location and apply the internal area replenishment policy. Inspect both sides of the proposed transfer and compare the base quantities and dates. The same 25 should be traceable across the two planning views. Record the origin of the receiving storage location. After a real posting in QA, reconcile physical totals and outstanding reservations, including partial execution if the storeroom commonly moves material in small batches. A half-completed transfer is where a planner most needs to distinguish committed, outstanding and physically delivered quantities.\n\nAdd a deliberately late internal transfer. The warehouse may have all 25 available but no authorized staff on the required day. A logically correct supply route can still leave a time shortage. In this branch the warehouse and workshop may choose to reprioritize transfers or approve a vendor expedite. The configured area boundary and planning logic can be correct even when the process cannot fulfill the requirement by Thursday. Building this branch into acceptance puts the responsibility for validating actual movement time with the people who control the movement."
+    ],
+    [
+      "Introduce the design without creating duplicate obligations",
+      "Review the population before changing the first productive segment. Count materials genuinely supplied by the warehouse, exceptions bought directly for the workshop and items that can follow either path. For representative materials, list open supplier orders, partially received items, firmed planning elements, and open internal reservations. Decide who will review a potential duplicate after replanning. A workshop requisition created yesterday and a transfer reservation created today are both outstanding commitments until their owners resolve them through the appropriate processes. Automatic deletion of every old purchasing document would ignore supplier commitments and legitimate exceptions.\n\nGive production support an evidence trail it can use without reconstructing the design meeting. For each reported shortage capture the material and area, issuing location on the requirement, receiving location on proposed supply, area-segment procurement settings and the other side of any transfer reservation. Include one signed example showing main-store shortage propagating from the workshop, so that support can distinguish a necessary external buy at the plant from the original wrong-area purchase. State the SAP edition and process. A same-plant MRP-area reservation has different execution evidence from a stock transport order between plants.\n\nThe design succeeds if the workshop's 25 becomes visible to the warehouse in time, the buyer sees an external shortage only where the chosen process requires it, and inventory control can explain the 85 kits throughout the movement. The final cross-check belongs to the people executing the flow. Ask the storekeeper which reservation to fulfill and the planner where a genuine plant shortage of 15 would appear. If each can point to the corresponding element and reconcile the quantities, the procurement policy is expressed in the system as well as in the design document."
+    ]
+  ],
+  "visual": {
+    "title": "Reconciliation of the internal supply decision",
+    "headers": [
+      "Moment",
+      "Main stores",
+      "Workshop",
+      "What is still open"
+    ],
+    "rows": [
+      [
+        "Before transfer",
+        "80 pieces physically",
+        "5 pieces physically",
+        "25 due to workshop, 30 required there"
+      ],
+      [
+        "25 transferred",
+        "55 pieces physically",
+        "30 pieces physically",
+        "Workshop still consumes 30"
+      ],
+      [
+        "Workshop issues 30",
+        "55 pieces physically",
+        "0 pieces physically",
+        "No demand left in this case"
+      ],
+      [
+        "Separate alternative before posting",
+        "80 on hand, 70 needed in main stores",
+        "5 on hand, 30 needed in workshop",
+        "Plant must cover remaining 15 after internal obligation"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Definition and types of MRP area",
+      "https://help.sap.com/docs/SAP_ERP/66326f67e0e1416d83c0fdfa4060189d/667ac053f89eb64ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Assigning issue and receipt elements using storage locations",
+      "https://help.sap.com/docs/SAP_ERP/85d3fce10e264972a0155c8b46ecf93b/2e98b6535fe6b74ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Stock transfer from plant to MRP area",
+      "https://help.sap.com/docs/SAP_ERP/85d3fce10e264972a0155c8b46ecf93b/3498b6535fe6b74ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Planning file entries for area materials",
+      "https://help.sap.com/docs/SAP_ERP/66326f67e0e1416d83c0fdfa4060189d/2298b6535fe6b74ce10000000a174cb4.html"
+    ],
+    [
+      "SAP S/4HANA on-premise · Material master MRP area segments",
+      "https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/fe39e10a9a864a8f8dc9537704f0fa13/6c7ac053f89eb64ce10000000a174cb4.html"
+    ]
+  ],
+  "area": "planning"
+}

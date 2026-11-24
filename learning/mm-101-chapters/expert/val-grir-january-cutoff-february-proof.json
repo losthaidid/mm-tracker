@@ -1,0 +1,108 @@
+{
+  "id": "val-grir-january-cutoff-february-proof",
+  "level": "Expert",
+  "area": "grir",
+  "topic": "Month-end GR/IR reconciliation",
+  "title": "Prove a January GR/IR balance after February has already cleared it",
+  "lead": "At January close the GR/IR G/L shows a credit of 400. By the time the auditor asks for support, every purchase order involved appears complete and the current account balance is zero. The auditor also questions why a schedule for goods received and not invoiced shows 640 when the closing trial balance shows only 400. Reconstruct the item balances and then use February's postings as evidence. The reasoning applies to classic ECC financial closing and is independent of whether the client presents the analysis through SAP GUI or a reporting extract.",
+  "keywords": [
+    "GR/IR",
+    "cutoff",
+    "key date",
+    "reclassification",
+    "goods received not invoiced",
+    "goods invoiced not received",
+    "February posting",
+    "F.19",
+    "FBL3N"
+  ],
+  "sections": [
+    [
+      "Set the boundary before collecting the documents",
+      "The trial balance concerns one company code, one local currency, one GR/IR clearing G/L and the fiscal period ending 31 January. The business uses calendar months for this case. Use debits as positive and credits as negative in the working paper. A closing credit of 400 will therefore appear as minus 400. Finance confirms the previous closing balance was zero, and the three order items in the case make up the entire movement on this account in January and February. There are no taxes in the amounts compared, no delivery-cost accrual accounts, no exchange-rate effects and no permanent write-offs. Where the close creates presentation entries, the example reconciles the underlying transaction account separately from those entries.\n\nObtain the trial balance, all relevant G/L postings through the second key date, the purchasing histories and the original material and invoice documents. Preserve the query criteria and extraction time. Identify posting date, document date, entry date, clearing date and fiscal year in the financial documents. A supplier may date a bill in January while the accounting posting belongs to February. A document may be entered in February with an authorized January posting date. Ask whether the period was reopened for late entries and whether the January extract used by the auditor preceded any such posting. A reconciliation to a frozen closing pack and a fresh historical query can legitimately identify different populations if the state of the closed period changed."
+    ],
+    [
+      "Build the January population at item level",
+      "Call the three purchasing items A, B and C. On A the plant received 100 units at 10 each and the supplier invoiced 60 at the same price by the cutoff. Receipt created a 1,000 credit and invoicing produced a 600 debit to GR/IR. A therefore contributes minus 400. On B the supplier invoiced 30 pieces at 8 before the goods arrived. For this item the process permits invoice-before-receipt, the invoice really posted, and the accounting document debited GR/IR by 240. Its January contribution is plus 240. B is an asset-side explanation in the simple purchase scenario, a different direction from A even though all three items use the same G/L.\n\nOn C the warehouse posted a receipt of 20 units at 12. No invoice had posted by the key date. Its contribution is minus 240. Add the three item balances. Minus 400 plus 240 minus 240 gives minus 400, reconciling the credit in the trial balance. Now classify them by their own signs. Credit items A and C total 640 in magnitude. Debit item B totals 240. A reporting schedule showing 640 delivered but unbilled and a separate 240 billed but undelivered therefore has a net of 400 credit. A request to reduce the 640 schedule by 240 would conceal one delivered order behind a wholly unrelated undelivered order."
+    ],
+    [
+      "Ask which February events extinguished each position",
+      "On 3 February the supplier invoices the remaining 40 units of A at 10. A gets a 400 debit on GR/IR. On 5 February the warehouse receipts all 30 units of B at 8. B gets a 240 credit. On 7 February the warehouse cancels its entire 20-unit receipt for C after confirming it was entered against this order in error. The reversal of C's January receipt produces a 240 debit on GR/IR in February. Neither side invents a supplier invoice for C. The evidence closing this item is the authorized reversal, with a link to the original receipt and an explanation of where the receiving error arose.\n\nFebruary's net movement is a 400 debit because 400 minus 240 plus 240 equals 400. Add it to the January closing credit of 400 and the February balance is zero. At the individual level A, B and C also each net to zero. The reversal in February does not erase the original January accounting entry from the January ledger. It supplies subsequent evidence that the original receipt was wrong. In a close this distinction has consequences. Finance must judge whether the error was known or should be reflected in January, whether the period remains open and what financial reporting treatment is appropriate. The consultant establishes dates, amounts and links and explains the impact of each permissible correction date. A zero February balance does not prove January was correctly recognized."
+    ],
+    [
+      "Tie the operational evidence to FI evidence",
+      "Create a line for each clearing-account posting with its company code, fiscal year, financial document and item, purchase order and item, signed local amount and accounting posting date. Annotate each with the source document, including the reversal pair for C. Confirm the connection by drilling from the purchasing history into the underlying accounting documents. When an invoice covers several purchase order items, a vendor line gives a document-level liability. The applicable GR/IR lines show the amounts attributable to the relevant purchasing positions. Tax or separate price-difference postings may make the document total different from the clearing amount in a live client.\n\nRun the FI line-item view using January's key date and compare it with the current open-item list. A line can carry a later clearing date while still having been open at the earlier key date. Open-item reports may therefore legitimately show a line in the historical population that no longer appears in today's open list. Equally, a group may economically balance yet have no FI clearing document until the clearing procedure executes. Trace both sides of each matched group and check the actual clearing attributes. The signed posted amounts establish the key-date business residual. The clearing document tells you about FI matching status. Preserve the two observations in separate columns to avoid letting a current green status change a historical conclusion."
+    ],
+    [
+      "Reconcile the report that classifies the balances",
+      "In ECC, financial closing includes analysis of GR/IR clearing accounts for financial statement presentation. The classic environment can use an account-analysis or adjustment process such as F.19 under the appropriate configuration. Confirm which report your Finance team actually runs and obtain its variant, grouping criteria and output. SAP describes analysis in the context of reconciliation accounts and assignment information. Trace the effective assignment for each purchasing item in the output. Do not assume the report's grouping key from a purchase order field displayed on a screen. In this example A, B and C are separately identifiable normal purchase positions and the source transactions support the classifications above.\n\nWhere the procedure generates adjustment postings for presentation, tie those documents to the designated adjustment and target accounts. Check the period and any reversing documents used by that close. A posting designed to show delivered-but-unbilled balances separately from billed-but-undelivered balances in the financial statements has a different purpose from posting a material receipt or an invoice against an order. Include only the correct set in the bridge under review. A common reporting error is to sum the base GR/IR account and both sides of its presentation schedule as though they were additional purchasing activity. Show the source subtotal and the presentation entries on their own lines. The underlying January purchase transactions still reconcile to a credit of 400 regardless of which reporting accounts display their classification."
+    ],
+    [
+      "Investigate two ways the same signed total can mislead",
+      "Imagine the order for C had not been received for the wrong order. Instead, all 20 units really arrived on 30 January and the supplier invoiced on 7 February. January would still have a 240 credit on C and February a 240 debit. The two trial balances would be identical to the original example. In this alternative the subsequent invoice supports the January recognition of a genuine receipt. In the original case the subsequent reversal raises a cutoff or existence question. That is why evidence of the source event and the physical goods is important even after the numerical reconciliation is complete.\n\nAnother possible mistake occurs when the report translates document currencies during extraction. Suppose B was billed in a supplier currency. Comparing the supplier-currency debit to the local-currency credit would produce an apparent residual even if the actual local clearing lines match. Choose the same currency column on both sides, then reconcile other currency views separately if requested. A further discrepancy may come from omitting an item already cleared in February when reconstructing January. Compare the trial balance to all posted items by posting date first, and use the open-at-key-date view to study clearing status. If the controls and extracted population differ, identify the missing document before classifying any supposed variance."
+    ],
+    [
+      "Write three conclusions instead of a single green tick",
+      "For A, 400 credit at January is supported by the 100-unit receipt and the 60-unit invoice, followed by the final 40-unit invoice in February. For B, 240 debit is supported by an invoice on 30 pieces with no January receipt and by the February receipt. For C, 240 credit is supported as a January ledger balance, but the February cancellation identifies an error requiring the receiving owner and Finance to evaluate the appropriate period treatment. These conclusions distinguish proof of recorded figures from evidence about whether the original transactions were commercially valid. The reporting schedule can agree exactly to the G/L while an individual receipt still merits correction.\n\nDeliver the signed bridge, both key dates, document links and the debit/credit classification to the controller. Include the original January extract version and subsequent posting dates. Explain why no generic GR/IR write-off follows from the current zero balance. For two items the later counterpart is already present. For the third there is an actual reversal and an outstanding reporting judgment about January. Stating those outcomes allows the auditor to test each hypothesis independently and gives the business an actionable answer without creating new postings merely to match a month-end display."
+    ]
+  ],
+  "visual": {
+    "title": "January classification and February movements in local currency",
+    "headers": [
+      "PO item",
+      "January receipts / invoices on GR/IR",
+      "January closing balance",
+      "February counterpart",
+      "February closing balance"
+    ],
+    "rows": [
+      [
+        "A",
+        "1,000 Cr / 600 Dr",
+        "400 Cr",
+        "Final invoice 400 Dr",
+        "0"
+      ],
+      [
+        "B",
+        "0 / 240 Dr",
+        "240 Dr",
+        "Receipt 240 Cr",
+        "0"
+      ],
+      [
+        "C",
+        "240 Cr / 0",
+        "240 Cr",
+        "Receipt reversal 240 Dr",
+        "0"
+      ],
+      [
+        "Net",
+        "1,240 Cr / 840 Dr",
+        "400 Cr",
+        "400 Dr net",
+        "0"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Financial statement analysis of GR/IR accounts",
+      "https://help.sap.com/docs/SAP_ERP/17ec785ed2294431b933daf9a926af80/f47fd1538cdf4608e10000000a174cb4.html"
+    ],
+    [
+      "SAP Knowledge Base · Clearing status in open-at-key-date line-item reports",
+      "https://userapps.support.sap.com/sap/support/knowledge/en/2457349"
+    ],
+    [
+      "SAP ERP · Criteria for automatic clearing of open items",
+      "https://help.sap.com/docs/SAP_ERP/c587d5cadece40a285ce9a6d4a2a4908/2264d153c9684608e10000000a174cb4.html"
+    ],
+    [
+      "SAP S/4HANA Cloud Public Edition · Key-date GR/IR analysis and classification",
+      "https://help.sap.com/docs/SAP_S4HANA_CLOUD/0fa84c9d9c634132b7c4abb9ffdd8f06/3c4386576d360722e10000000a44147b.html"
+    ]
+  ],
+  "shelf": "Valuation & invoice verification"
+}

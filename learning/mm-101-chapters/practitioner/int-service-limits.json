@@ -1,0 +1,108 @@
+{
+  "id": "int-service-limits",
+  "level": "Practitioner",
+  "shelf": "Purchasing",
+  "topic": "External services management",
+  "title": "How much extra work can a technician enter against this service order?",
+  "keywords": [
+    "MM-SRV",
+    "ML81N",
+    "planned services",
+    "unplanned services",
+    "expected value",
+    "overall limit",
+    "contract limits",
+    "service specification"
+  ],
+  "visual": {
+    "title": "Chiller maintenance order in company currency",
+    "headers": [
+      "Entry or control",
+      "Planned work",
+      "Unplanned work",
+      "Meaning for the next sheet"
+    ],
+    "rows": [
+      [
+        "Four visits ordered at 500",
+        "2,000",
+        "—",
+        "Agreed visits have their own specification"
+      ],
+      [
+        "Expected value and overall limit",
+        "—",
+        "600 expected / 1,200 limit",
+        "Estimate and ceiling answer different questions"
+      ],
+      [
+        "First two accepted sheets",
+        "1,000",
+        "320 + 330 = 650",
+        "550 remains against the unplanned ceiling"
+      ],
+      [
+        "Third visit and requested extra work",
+        "500",
+        "560",
+        "The proposed extra exceeds the remaining limit by 10"
+      ],
+      [
+        "Corrected extra after evidence review",
+        "500",
+        "520",
+        "Cumulative extras become 1,170, leaving 30"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Options for planned and unplanned services",
+      "https://help.sap.com/docs/SAP_ERP_SPV/b704a8db767040a08100adc846218964/a71dbf53d25ab64ce10000000a174cb4.html"
+    ],
+    [
+      "SAP Support · Expected value, overall limit and unplanned services, KBA 2239502",
+      "https://userapps.support.sap.com/sap/support/knowledge/en/2239502"
+    ],
+    [
+      "SAP Support · Service limits and sublimits, KBA 2239484",
+      "https://userapps.support.sap.com/sap/support/knowledge/en/2239484"
+    ],
+    [
+      "SAP ERP · Account assignment for services",
+      "https://help.sap.com/docs/SAP_ERP_SPV/b704a8db767040a08100adc846218964/8839b953495bb44ce10000000a174cb4.html"
+    ]
+  ],
+  "lead": "A chiller mechanic has finished the third of four maintenance visits. The buyer opens the purchase order and sees one whole visit still to come after this one. The service coordinator tries to enter the third visit and some extra work, and receives a limit message. Both people can be looking at the correct order. The visit belongs to a priced specification. The extra work belongs to a value limit. To decide what can be recorded, identify the piece of work, the purchasing authority that covers it, and the work already charged against that authority. This chapter follows one classic SAP ECC external services order from the work ticket to the decision about a ten-unit excess.",
+  "sections": [
+    [
+      "Establish what the supplier agreed to do",
+      "The maintenance contract calls for four quarterly inspections at 500 each. Each visit covers travel to the site, a visual inspection, a pressure check, and the inspection report. The buyer enters that service in the purchase order as a planned line with a quantity of four visits and a price of 500 per visit. The order also allows additional diagnostic work if a fault is found on site. The buyer cannot identify the faults or predict the exact hours when raising the order, so the item contains limits for unplanned services. All amounts in this example are net and in one currency. There are no price changes, credits or service entry sheets awaiting a decision in the opening balances.\n\nRead the description and any governing agreement before classifying a technician’s line. Particularly for a fixed-price visit, the time spent delivering an included task can appear on a timesheet even though the customer has already bought it in the visit price. A separately chargeable diagnostic test should have evidence that it falls outside the included scope. Ask for the equipment identifier, the finding that triggered the extra work, and the person who requested it. These details connect a value entered in SAP with a service someone can identify after the engineer has left the premises."
+    ],
+    [
+      "Read the two values on the limits tab",
+      "In the example the expected value of unplanned work is 600 and the overall unplanned limit is 1,200. The expected value expresses what Purchasing anticipates across the item’s unplanned work. The overall limit supplies the ceiling used here when entering that work. The two can legitimately differ. The planned specification separately accounts for four times 500, or 2,000. A manager preparing a forecast might therefore combine 2,000 of planned work and 600 of expected extras to estimate 2,600. That estimate answers a forecasting question. The service coordinator has to read the applicable limit and consumption to determine whether a particular entry fits.\n\nDisplay the actual item in ME23N. Start with the service specification and then inspect the limits attached to the same item. If an order has separate items for two plants, a generous limit on the first item says nothing about the capacity on the second. If separate restrictions apply to a contract item, identify that contract item too. SAP permits combinations that range from fully specified services to services subsequently selected against contract limits. The simple arithmetic below assumes one overall limit and no additional sublimit. An order with narrower authority needs an additional check against that authority."
+    ],
+    [
+      "Build the opening position from accepted work",
+      "At the first visit the supplier earned the fixed fee and performed 320 of approved additional tests. At the second it earned another fixed fee and performed 330 of additional diagnostics. Start with both accepted service entry sheets, their purchase order item references and their individual service lines. The approved fixed fees total 1,000. Accumulated unplanned work is 650. Subtract 650 from 1,200 to obtain 550 available for extra work. A total-spend report displaying 1,650 is correct for both categories together. Deducting all 1,650 from the unplanned limit would give a false deficit of 450.\n\nKeep document numbers beside the values during this exercise. If another coordinator has already recorded the same work, two sheets with similar descriptions might be independent deliveries or duplicate entries. Compare the service dates, technician tickets and line descriptions. Check acceptance, cancellation and reversal status before treating an entry as final. When a live order contains open sheets, inspect what the current SAP limit check includes at that processing stage in your system. A spreadsheet made solely from final supplier invoices can lag behind service entry. A spreadsheet built from every printed job ticket can count cancelled work. The reconciliation needs an explicit cutoff and a named set of documents."
+    ],
+    [
+      "Deal with the apparent excess at the third visit",
+      "The third visit is evidenced and falls within the four agreed visits. Its planned fee of 500 belongs on the appropriate planned line. The vendor also submits 560 of extra work. In a sheet for this order, the proposed unplanned total is now 650 plus 560, or 1,210. It exceeds the ceiling by 10. The planned quantity remaining after the third visit would be one. Neither the remaining visit nor its 500 price makes those extra ten units available. If SAP presents a limit message, capture its exact wording and the item and service line on which it arose. A quantity or price message for the planned line would lead to a different investigation.\n\nThe supervisor checks the work ticket. It contains 300 for additional electrical tests, 220 for leak tracing and 40 described as the standard inspection report. The report is already included in the fixed fee. Once the supplier confirms the corrected breakdown, the separate charge is 520. The charge now fits. The unplanned total becomes 1,170 and the balance is 30. The corrected figures follow from a documented commercial clarification. If the supplier had demonstrated that the full 560 represented genuinely additional approved work, the same ten-unit excess would still have to be addressed through the buyer’s change procedure."
+    ],
+    [
+      "Decide whether a purchase order change is needed",
+      "Consider the alternative in which all 560 is chargeable. A second sheet for the last ten would still relate to the same work and the same overall ceiling. Posting the ten against a nearby purchase order item would associate it with a different authorization. The appropriate decision belongs with the buyer and the budget holder. They can examine why the authorized allowance was insufficient, whether the expense was approved under the agreement, and how an approved amendment affects future visits. The service coordinator can provide the evidence for that decision while keeping the quantities and values they enter faithful to the work performed.\n\nThe organization may decide to extend the ceiling to 1,350 after review. With the original 560 accepted, a cumulative 1,210 would leave 140. That new amount would be available for future qualifying extras within the remaining terms. A change to the expected value alone would leave the arithmetic against the original ceiling at 1,210 versus 1,200. Ask the buyer to identify the exact field changed, the approved amendment, its applicable item and effective release status. An unsigned email mentioning another 150 can explain the commercial conversation, but the coordinator still needs a released purchasing document that reflects the agreed authority where release applies."
+    ],
+    [
+      "Follow restrictions below the overall limit",
+      "A different buyer might allow planned inspections plus extras selected from a contract rate card. A positive overall balance tells you how much total authority remains. The rate card and contract item determine which tasks and rates are available under that authority. An on-site vibration analysis may qualify against one contract item, while an unrelated parts refurbishment falls outside it. Inspect the reference carried into service entry. A service with a similar description in a different contract item may have a different unit, price basis or scope. Vendor identity and a similar price are weak substitutes for the actual contract line.\n\nA useful practice case uses an overall balance of 550 and a particular contract-based sublimit with only 300 left. Suppose all 350 on the next ticket must draw on that sublimit. The total passes the overall test and exceeds its narrower allowance by 50. The useful support question becomes which reference and which limit caused the message. Increasing the overall ceiling would leave the narrower comparison unchanged. Before suggesting any change, establish whether the work really belongs to that contract category, whether another reference was accidentally selected, and whether earlier accepted quantities have already consumed the allocation for that type of work."
+    ],
+    [
+      "Turn the decision into a reproducible service record",
+      "During entry, adopt the planned visit from the order and describe the extras at the level needed to identify the work, unit, quantity, price and recipient. Classic service entry captures what the supplier performed. Formal acceptance gives the responsible person a separate opportunity to check what the organization received. Record the ticket identifying the third visit and the supplier’s agreed correction. Someone reviewing the fixed charge and both extra charges should be able to reproduce the 1,020 net total for that visit and the 30 still available for unplanned work. The open fourth visit remains a separate delivery obligation on the planned specification.\n\nA concise handover reads as follows. Three visits have been performed. Prior unplanned services consumed 650. The latest approved tests consumed another 520. The supplier removed an included report charge of 40. One planned visit and 30 of unplanned authority remain. This account tells the next coordinator which work has been bought, how much room is left, and which document will substantiate the adjustment. It also answers the manager who saw an expected value of 600. The buyer expected a smaller total for extras when placing the order. The higher, explicitly authorized ceiling and the accepted work explain the actual result."
+    ]
+  ],
+  "area": "services"
+}

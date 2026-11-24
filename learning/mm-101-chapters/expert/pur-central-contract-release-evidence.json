@@ -1,0 +1,104 @@
+{
+  "id": "pur-central-contract-release-evidence",
+  "level": "Expert",
+  "shelf": "Purchasing",
+  "area": "contracts",
+  "topic": "Central contracts and ALE",
+  "title": "Reconcile local release orders when the central contract shows unused capacity",
+  "lead": "A group buyer receives two incompatible reports. The contract monitor shows room for another 300 filter assemblies. The local buyers have counted their orders and say only 240 remain. A contract negotiation is due at noon. Granting another plant permission to use the extra sixty could exceed the negotiated quantity, while freezing every release would interrupt operations. To settle the question, identify how the contract reaches the local buyer and how that buyer's release reaches the central record. Identical-looking contract numbers across two systems do not establish either relationship.",
+  "keywords": [
+    "reference purchasing organization",
+    "central contract",
+    "contract distribution",
+    "ALE",
+    "BLAREL",
+    "release documentation",
+    "contract target",
+    "release order"
+  ],
+  "sections": [
+    [
+      "Distinguish two architectures that a buyer might call central",
+      "An ERP centrally agreed contract can be maintained without naming one receiving plant at agreement creation. One purchasing organization can procure for several plants, or a reference purchasing organization can make contracts available to associated purchasing organizations. The release order identifies the relevant receiving plant. Commercial terms can include factors that vary by plant. A shared negotiation therefore does not establish that every release will have the same unit price or that all users can buy against it. In a single ERP system the first investigation is the organizational relationship and the stored reference between the purchasing documents.\n\nA distributed contract adds a different problem. A central organization makes agreement data available in another system, the local organization raises its own release orders, and information on those releases is returned to the central system. The local register and the central release documentation can disagree at a particular instant if part of that flow is incomplete. Determine whether the plants log on to the same client and logical system and whether local copies of the agreement exist. Ask one buyer to display the order and identify the system that owns it. Establish the central contract and item, the local agreement and item where applicable, and the mechanism for returning the release information. Start interface diagnosis only when that architecture actually applies."
+    ],
+    [
+      "Set the reference population and the time of the comparison",
+      "The group in this example uses classic ECC distributed quantity contracts. One central item covers 1,000 assemblies. Fitters consume identical assemblies in three plants. East raised referenced releases for 420 pieces, West for 280 and South for 60. The three local totals add to 760, so the commercial team's expected remaining quantity is 240. At 10:00 central release documentation accounts for 700, leaving an apparent 300. The sixty-piece difference equals the South order quantity. This equality is a clue for an investigation. Two unrelated errors of twenty and forty could produce exactly the same headline.\n\nTake one cut of the data. Record the cutoff time with a time zone, the central contract validity and item, and the included purchasing organizations. Work in the contract's unit. If South orders six cartons of ten pieces, convert six cartons to sixty pieces using the conversion applicable to that order. Check whether the local report shows current ordered quantities, receipts, invoiced values or originally created lines. A central contract release is created in the purchasing process. A supplier that has shipped only thirty pieces does not make a properly referenced sixty-piece release into thirty for the purpose of this simple order-based reconciliation. Follow documented system treatment for changes, cancellations and document types in the actual client."
+    ],
+    [
+      "Prove the South order is a call-off before tracing an interface",
+      "Display the South PO item. Identify its active quantity, order unit, plant, purchasing organization, agreement reference and agreement item. Follow the reference in the local system. Is this the distributed copy of the intended group item? The supplier, price and material can all match the group agreement on a manually created order that never referenced it. Counting such an order as group contract consumption in a management report may express a commercial opinion, yet SAP release documentation has no corresponding contractual document link to report. If its use was intended, investigate the order's status and permissible corrective procedure with the local buyer.\n\nIn the worked case the order is for six cartons, the local contract item is the one mapped to central item ten, and the conversion is ten pieces per carton. The saved order existed before the 10:00 cutoff. Its local release documentation also shows the call-off. Capture the PO item, the relevant local agreement and the mapping to the central agreement as one evidence set. The same numeric PO range can be used independently by East, West and South. Build the evidence key from the originating system, PO number and item. Add the associated agreement reference and unit as business checks. A join on PO number alone can silently discard or merge valid local releases."
+    ],
+    [
+      "Trace the return message in its business context",
+      "For the classic distributed process documented by SAP, receipt of a release order IDoc of message category BLAREL updates central release documentation and the quantity or value released against the distributed contract. Establish from the actual distribution setup that the South route uses this message. Search the authorized monitoring tools by sender, receiver, business reference and the relevant time window. Inspect the payload's local PO item and contract reference. The presence of an IDoc somewhere in the time window is weak evidence in a plant processing hundreds of releases per hour.\n\nSuppose the South outbound record exists at 09:47 and its application-level evidence identifies the required item. An inbound record at the central recipient is still awaiting application processing at 10:00. The central view at 10:00 can then correctly reflect the records it has applied and still understate the group's already ordered quantity. Preserve both timestamps and the application result. Another incident could show an application error from an unrecognized contract mapping or an absent recipient. In those cases waiting for a queue to drain cannot repair incorrect business data. Likewise, a technically dispatched outbound message does not establish that the central purchasing application updated the intended contract item. Inspect the result through central release documentation after processing."
+    ],
+    [
+      "Choose the recovery that matches the first break",
+      "If the item reference is missing at the South order, work with the local buying team. Establish the effect of release, output, receipts and invoices before altering or replacing a purchasing document. If the reference and local documentation are correct but the return message was never created, inspect the distribution relationship and the event that should send the change. If an inbound message is waiting in the expected application route, establish why and coordinate the approved reprocessing procedure with the integration owner. These decisions involve different owners and different risks. Creating a duplicate local purchase order would increase supplier exposure while leaving a central inbound problem untouched.\n\nTake a snapshot of the central documentation before recovery. Determine whether an earlier message for the same item already applied and whether a newer amendment is in flight. Restore events in the order required by the interface design and the business state. A blind replay on the basis of a PO number can apply an old representation after a current change or prompt another team to send a second document. The practical success criterion is one correctly linked current business release of sixty pieces at the central item, with East and West still represented correctly. Technical success on a monitoring screen alone is insufficient to authorize the next purchasing decision."
+    ],
+    [
+      "Use a counterexample to test the proposed control",
+      "Now suppose South's return message was processed before 10:00, the central entry exists for sixty, and the group total still shows 700. Instead of repeatedly resending South's line, reconcile every contributing line. The South receipt may be offset by a genuine sixty-piece reduction in an East PO that did not reach the spreadsheet. Alternatively, the analyst may have filtered central data to one releasing company code or a different contract item. Separate the question “did this South event reach central?” from the question “does the population total agree?” The second requires a reconciliation of all relevant items and changes.\n\nA value contract introduces another reason why the same arithmetic cannot be reused. Its target and release measures involve value. Price conditions, currency, order price unit and plant-specific terms then affect explanation of what was released. Comparing one thousand pieces in an operational report with a currency target would produce an impressive percentage with no economic meaning. Even a purchase for the same material can have a different value because the agreement permits plant-specific commercial conditions. Investigate the contract type and the evidence displayed for it. SAP's classic release IDoc documentation describes different central release information for quantity and value agreements and for agreements with or without a plant."
+    ],
+    [
+      "Give the negotiator a usable number and a reproducible sign-off",
+      "While the South release is unapplied, tell the negotiator the two amounts in terms that identify the cutoff. At 10:00 the central application shows 700 pieces released and 300 open. The three verified local release populations contain 760 pieces including the South sixty, leaving 240 against the negotiated 1,000. If no other orders are outstanding, 240 is the usable quantity in this decision. Explain any local buying freeze or reservation explicitly. Without such a cutoff, a further local release can make the figure stale before the new allocation is approved.\n\nAfter the return event is processed, re-read the same central item. Match South's item to sixty pieces and reconcile the group total to 760. Retain the before-and-after figures and the event trace. A durable operational report can show three categories separately: locally released and represented centrally, locally released and awaiting central evidence, and amounts requiring investigation for conflicting references or quantities. Set exception age according to the agreed interface schedule and the procurement risk. A ten-minute delay matters much more near a hard commercial limit than it does midway through a generous agreement. This gives the group buyer a way to make the next allocation and gives both purchasing and integration teams a shared definition of completion."
+    ]
+  ],
+  "visual": {
+    "title": "A distributed quantity contract at the 10:00 cutoff",
+    "headers": [
+      "Origin",
+      "Local referenced quantity",
+      "Central quantity represented",
+      "Difference"
+    ],
+    "rows": [
+      [
+        "East",
+        "420 pieces",
+        "420 pieces",
+        "0"
+      ],
+      [
+        "West",
+        "280 pieces",
+        "280 pieces",
+        "0"
+      ],
+      [
+        "South",
+        "6 cartons × 10 = 60 pieces",
+        "0 at cutoff",
+        "60 pieces"
+      ],
+      [
+        "Group ordered",
+        "760 pieces",
+        "700 pieces",
+        "60 pieces"
+      ],
+      [
+        "Open against 1,000",
+        "240 pieces",
+        "300 apparent",
+        "60 pieces of overstatement"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP Purchasing · ERP central contract and plant-specific conditions",
+      "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/0c7fb65334e6b54ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Distribution of contracts in ALE",
+      "https://help.sap.com/docs/SAP_ERP/be79bfef64c049f88262cf6cb5de1c1f/8619bf53d25ab64ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP Purchasing · Receiving a release order IDoc",
+      "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/a6e5b853dcfcb44ce10000000a174cb4.html"
+    ]
+  ]
+}

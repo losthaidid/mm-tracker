@@ -1,0 +1,116 @@
+{
+  "id": "pur-quota-midperiod-entry",
+  "level": "Advanced",
+  "shelf": "Purchasing",
+  "area": "sources",
+  "topic": "Requisition sourcing",
+  "title": "Introduce a new quota source halfway through a purchasing period",
+  "lead": "A purchasing manager gives a new supplier a 20 percent share of a material and expects roughly one requisition in five to go there. Instead, six consecutive lots go to the newcomer. The source determination log and the commercial instruction can both be internally consistent. The commercial share defines a ratio across quantities, and the existing suppliers entered the change with procurement already allocated to them. To predict the first order after the change, reconstruct the numbers the allocation procedure will actually compare.",
+  "keywords": [
+    "quota arrangement",
+    "quota base quantity",
+    "quota rating",
+    "quota-allocated quantity",
+    "MEQ3",
+    "MEQ4",
+    "MEQ6",
+    "allocation",
+    "splitting quota",
+    "MRP 2"
+  ],
+  "sections": [
+    [
+      "Read what the proposed shares mean",
+      "A plant buys a machined pin in pieces. In the running quota period, Alder and Birch already supplied the sourcing process with two options. A third source, Cedar, has completed qualification. The proposed weights in the revised arrangement are five for Alder, three for Birch and two for Cedar. Since the weights sum to ten, the intended long-run quantity shares are fifty, thirty and twenty percent. Changing the weights does not physically transfer earlier orders or stock from one vendor to another. The purchasing manager wants the new arrangement to influence future requirements.\n\nDefine the event being measured before assigning an owner to the change. A requested share of PO quantities, of quantities arriving on time, and of the number of requisition lines can produce three separate percentages. One order for 300 pieces carries the same number of item records as one order for ten. A quality hold may prevent receipt even though a source was assigned correctly. In the case here, the team is designing the assignment of complete procurement lots under classic ECC. Delivery reliability and spend will be measured separately. This statement gives the consultant a concrete object on which to demonstrate the new supplier's initial run of assignments."
+    ],
+    [
+      "Identify the starting state used by the allocation",
+      "Display the material and plant in MEQ3. Record the validity interval and take a dated snapshot of the sources, quotas, allocated quantities, base quantities and any restriction that may affect eligibility. Use the actual unit relevant to the material. Read the material's quota arrangement usage and the corresponding definition in Purchasing Customizing. In ECC the usage can select which procurement activities contribute. Counting receipts from PO history or combining every requisition with its follow-on PO is a poor way to guess the data used by the quota calculation. Inspect the allocated quantity itself and then explain its origin with the relevant documents.\n\nFor the worked case the initial allocated quantities are 520 pieces for Alder, 327 for Birch and zero for Cedar. All are eligible, the dates fall in the same arrangement, and the two incumbent base quantities are zero. Assume a single procurement lot goes to one source and is counted once in the illustrated allocation. No maximum lot or release quantity, source block, priority, procurement-type distinction or capacity boundary changes these choices. These assumptions are test-case inputs. A supplier entering the system for the first time may still face a production ramp-up requirement. A commercial limit of 100 pieces per week needs a suitable capacity design or explicit buying control of its own."
+    ],
+    [
+      "Predict the run with a zero starting base",
+      "For each eligible source add its allocated quantity to its quota base quantity, then divide by its quota. With the revised weights Alder's rating is 520 divided by five, giving 104. Birch has 327 divided by three, giving 109. Cedar starts at zero. In this allocation procedure the lowest rating takes the next requirement. The first forty-piece lot therefore goes to Cedar. Once that lot has been counted, Cedar's rating rises to 20. It remains well below Alder and Birch.\n\nFollow six separate forty-piece lots and update the state after every assignment. Cedar's ratings immediately before the six decisions are zero, 20, 40, 60, 80 and 100. All six values are below 104. Once the sixth lot is counted, Cedar has 240 allocated pieces and a rating of 120. The next eligible lot now goes to Alder. Looking only at the six new requisitions gives Cedar 100 percent of incoming quantity, yet the calculations implement the designated weights over a starting state with two mature suppliers. The outcome becomes intelligible as soon as the snapshot includes the 847 pieces already allocated to the incumbents. A concern about Cedar's capacity may be entirely justified even though the source determination arithmetic is correct."
+    ],
+    [
+      "Set an entry position that matches the commercial intention",
+      "The quota base quantity lets an incoming source participate at a chosen starting position in the allocation calculation. For an illustrative negotiated startup, suppose the buyer wants Cedar to receive the first small requirement, after which the incumbents should compete for the next. Give Cedar a starting base of 202 pieces. Its initial rating is then 101, slightly lower than Alder's 104. A forty-piece procurement takes Cedar's rating to 121 because its numerator is now 202 plus 40. The next fifty-piece lot goes to Alder, taking Alder from 104 to 114. Birch then has the lowest remaining rating at 109 and takes an eighteen-piece lot, ending at 115.\n\nThose 202 pieces represent an arithmetic starting position. There is no delivery for 202, no inventory value for 202, and no new vendor liability created by the decision. The first actual Cedar procurement in this run is forty pieces. Record who selected the base, what first sequence the buyer expected, and which candidate quantities were tested. SAP also documents the option of calculating a suitable starting base for a new source. Inspect the proposal and resulting ratings in the actual system. A policy that deliberately gives the new supplier the first small order may justify a different value from one that seeks to place the supplier just behind the current next source."
+    ],
+    [
+      "Disprove two tempting alternative explanations",
+      "A buyer asks why the next order for 100 pieces was not distributed as fifty, thirty and twenty. In the worked case the system assigned a whole lot according to ratings. Classic MRP also supports a splitting quota procedure when the applicable lot-sizing procedure is configured for it. With a qualifying lot of 100, the same weights, compatible units, and no further lot restrictions, that separate process can divide the quantity into 50, 30 and 20. The dividing calculation uses the shares of the requirement, so the historic 520 and 327 quantities play a different role from the one they played in the allocation sequence. Inspect the planning procedure before using either prediction.\n\nA second buyer blames the number of orders created by yesterday's automatic conversion. Check the usage settings, then follow a small test from an eligible requirement to its subsequent processing. Capture the quota record before the requirement is assigned, after it has been saved, and after conversion. Identify which event actually changed the counted quantity in this setup. If multiple buyers or a planning job act concurrently, use document timestamps and controlled test data before inferring causation from a daily total. A before-and-after comparison across a whole plant can easily include procurement changes for different users, periods or material variants."
+    ],
+    [
+      "Test the boundary that matters to the supplier",
+      "Use two copies of the same initial scenario in QA, or reset the test data to a known, documented position between runs. In one run start Cedar at zero base, and in the other use the illustrative 202. Hold validity, quota weights, eligibility and quantity sequence constant. Record the source and updated quantity for each lot. A test that first runs a zero-base case with real assignments and then changes the base on the already advanced data has altered two variables. A different seventh order could be caused by the accumulated allocations even when the base adjustment itself has no bearing on that choice.\n\nNext, vary order sizes. With the base at 202, a single first lot of 300 goes to Cedar under the assumptions and makes its rating 251 immediately afterward. A fifty-twenty-thirty distribution across that individual lot was never promised, yet 300 pieces may exceed Cedar's onboarding capacity. This is the point to test a meaningful business boundary or establish an approval for large first releases. Document the largest realistic lot and how the buyer handles it. A rating can determine which source has the lowest value before selection while the size of the lot assigned to that source is driven by another part of the procurement design."
+    ],
+    [
+      "Close the change with two different reconciliations",
+      "After go-live, compare the actual sequence of source assignments with the calculated sequence under the actual arrival order of requirements. Use change history such as MEQ4, the quota figures, the material and plant, and evidence for the activity that updated each figure. Establish whether someone changed a source or a quota during the period. A snapshot from the following week may include a vendor block or a new base quantity. Applying that later state to the previous Friday will yield a convincing but incorrect reconstruction. Escalate to configuration or enhancement analysis only after the standard inputs have been reconstructed.\n\nFor the supplier review, count the real pieces ordered and received by each source over the agreed reporting interval. Keep the synthetic base value outside physical purchasing totals. Explain startup effects, time boundaries and any capacity exceptions in ordinary commercial language. Cedar may legitimately win the first lot and still deliver less than twenty percent by the end of the month if it ships late. The sourcing team owns the first explanation, while supplier performance and receiving records answer the second. The case is closed when the procurement owner can predict the next eligible assignment from a dated snapshot and can justify the supplier's measured share using the business measure originally agreed."
+    ]
+  ],
+  "visual": {
+    "title": "Starting a source at a chosen quota rating",
+    "headers": [
+      "Decision point",
+      "Alder (quota 5)",
+      "Birch (quota 3)",
+      "Cedar (quota 2)",
+      "Next allocation"
+    ],
+    "rows": [
+      [
+        "Starting base zero",
+        "520 ÷ 5 = 104",
+        "327 ÷ 3 = 109",
+        "0 ÷ 2 = 0",
+        "Cedar"
+      ],
+      [
+        "After six lots of 40 on zero base",
+        "104",
+        "109",
+        "240 ÷ 2 = 120",
+        "Alder"
+      ],
+      [
+        "Alternative startup with base 202",
+        "104",
+        "109",
+        "202 ÷ 2 = 101",
+        "Cedar"
+      ],
+      [
+        "After Cedar receives a lot of 40",
+        "104",
+        "109",
+        "242 ÷ 2 = 121",
+        "Alder"
+      ],
+      [
+        "After Alder receives a lot of 50",
+        "570 ÷ 5 = 114",
+        "109",
+        "121",
+        "Birch"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP Purchasing · Determining the source under a quota arrangement",
+      "https://help.sap.com/docs/SAP_ERP_SPV/967e1c2a6a8c4183b7e07d28e7574445/907fb65334e6b54ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP Consumption-Based Planning · Quota arrangement usage",
+      "https://help.sap.com/docs/SAP_ERP/66326f67e0e1416d83c0fdfa4060189d/7d97b6535fe6b74ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP Consumption-Based Planning · Splitting quota arrangement",
+      "https://help.sap.com/docs/SAP_ERP/66326f67e0e1416d83c0fdfa4060189d/8697b6535fe6b74ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Quota arrangement transactions",
+      "https://help.sap.com/docs/SAP_ERP/4008ec9d4d724301829bdafd8abf0ed4/f006b753128eb44ce10000000a174cb4.html"
+    ]
+  ]
+}

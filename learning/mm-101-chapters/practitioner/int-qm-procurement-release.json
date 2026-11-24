@@ -1,0 +1,100 @@
+{
+  "id": "int-qm-procurement-release",
+  "level": "Practitioner",
+  "shelf": "Purchasing",
+  "topic": "Quality management in procurement",
+  "title": "Why did a qualified supplier lose permission to take this purchase order?",
+  "keywords": [
+    "QM in procurement",
+    "quality information record",
+    "vendor release",
+    "release quantity",
+    "procurement control key",
+    "QI03",
+    "material and plant"
+  ],
+  "visual": {
+    "title": "What the buyer can infer from three observations",
+    "headers": [
+      "Observation",
+      "What it establishes",
+      "Next evidence"
+    ],
+    "rows": [
+      [
+        "Ordinary gasket successfully ordered from the same supplier",
+        "Supplier can participate in at least one purchasing scenario",
+        "Compare the material’s QM procurement settings at the receiving plant"
+      ],
+      [
+        "Pilot seal relationship valid through 30 June",
+        "The existing approval has a time boundary",
+        "Check the actual evaluation date, quantity controls and purchasing block"
+      ],
+      [
+        "Q-info ordered quantity 900, stores received 620",
+        "The two reports measure different events",
+        "Locate the released PO quantities and the accepted qualification scope"
+      ],
+      [
+        "1 July order still fails after an inspection lot was accepted",
+        "A usage decision exists for a previously received lot",
+        "Ask QM for a documented extension for this supply relationship"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Activation of QM in procurement",
+      "https://help.sap.com/docs/SAP_ERP/250374f0514e4e0f9057066374265eba/7f17bf53d25ab64ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Quality information record",
+      "https://help.sap.com/docs/SAP_ERP/250374f0514e4e0f9057066374265eba/494cbf53f106b44ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Release criteria for procurement functions",
+      "https://help.sap.com/docs/SAP_ERP_SPV/250374f0514e4e0f9057066374265eba/9f17bf53d25ab64ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Customizing settings for QM in procurement",
+      "https://help.sap.com/docs/SAP_ERP/250374f0514e4e0f9057066374265eba/a817bf53d25ab64ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · The vendor master record in QM",
+      "https://help.sap.com/docs/SAP_ERP_SPV/250374f0514e4e0f9057066374265eba/9417bf53d25ab64ce10000000a174cb4.html"
+    ]
+  ],
+  "lead": "A buyer at plant 1100 can order standard gaskets from North Works this morning. She selects the same supplier for a compressor seal and encounters a quality release message. The supplier is still on the company’s approved list, and last month’s incoming inspection passed. To make progress, translate “approved” into a specific permission. Who authorized this supplier to supply this material to this plant, for which procurement step, for how long, and subject to what limit? In SAP ECC the data supporting those answers can be distributed across the material master, vendor master, quality information record and configured procurement control key.",
+  "sections": [
+    [
+      "Identify the purchasing event that failed",
+      "Ask the buyer to leave the message visible and record its number, long text, transaction, material, vendor and receiving plant. Capture the purchasing document type and the stage of processing. Checking a quotation, creating an order, attempting release and posting a receipt are different events. Document the date used for the comparison if the message identifies one. People can describe any of these situations as “SAP blocked my PO”. A screenshot cropped down to a red symbol omits most of the information needed to identify the controlling record.\n\nLocate a successful transaction that makes a useful comparison. The gasket purchase proves that this supplier and buyer can complete some procurement. It does little to establish the permitted supply relationship for a compressor seal. A seal ordered in the same plant last week, from the same vendor, with the same document type, provides a closer comparison. Preserve the document date, release timing and ordered quantity of that case. A qualification can expire between two orders, and the available release quantity can change with business activity. Two apparently identical orders may therefore meet different conditions at the time of their checks.\n\nA purchase order for the same material at a sister plant supplies a useful second comparator. Write the receiving plant beside the purchasing organization in the incident record. A centralized buyer can order for both sites while the quality departments hold different pilot approvals and apply different procurement controls."
+    ],
+    [
+      "Read the material from the receiving plant’s perspective",
+      "Open the material’s quality management data for the plant on the PO item. SAP documents a client-level activation for procurement QM and plant-level procurement data for the remaining settings. This distinction matters when a buyer shows the quality settings for the right material in the wrong organizational unit. Write down the actual QM procurement control key for the seal and the one for the gasket. A key code such as a customer-defined four-character value has meaning in this system only after you inspect its definition. Capture the description and ask which vendor release or agreement checks it invokes.\n\nThe purchasing department may also have a purchasing info record containing prices, order units and delivery conditions. The quality team maintains a different kind of info record for the supply relationship. A valid price for the seal can coexist with an expired quality release. The two records serve different decisions and may have different owners. When a ticket says “info record exists”, request the name of the transaction or screen, the displayed keys and the purpose of the record. This simple request can save a buyer from spending an afternoon rebuilding purchasing conditions for a quality decision."
+    ],
+    [
+      "Reconstruct the qualified relationship",
+      "Assume the existing quality information record shows a pilot approval through 30 June for North Works, the seal, and plant 1100. Quantity-based release is active with a limit of 1,000 pieces. The stored ordered quantity is 900. These data describe a limited qualification. The supplier may have a broad commercial agreement and other approved products while this particular seal remains in a pilot. Check the vendor number carefully. A different legal supplier or a new purchasing account following a business reorganization may have a similar name. Also check the material number and any identifying block or status shown on the record.\n\nThe buyer needs 60 pieces on 1 July. Numerically the recorded limit appears to have 100 pieces of headroom, but the documented qualification period has ended. An accepted inspection lot for 80 seals received in June records an inspection outcome for that delivery. It supplies useful evidence to the engineer deciding whether to extend the pilot. It does not itself provide a later validity date in the procurement record. Compare the date and circumstances against the actual message in the buyer’s system. If the failing check names a separate vendor block, investigate that block even if the qualification also appears to have expired."
+    ],
+    [
+      "Explain why the warehouse count disagrees",
+      "Stores shows only 620 pieces received. The quality team shows 900 ordered. Purchasing believes that 380 pieces remain, calculated as 1,000 less 620. The procurement record's ordered quantity and a warehouse receipt report measure different events. SAP's documented release-quantity process accumulates ordered quantities when a purchase order is released. On the stated facts, the record shows 100 pieces of numerical headroom immediately before the new request. The 280-piece gap between 900 and 620 could be entirely open orders. It could also contain returns, changed order quantities, reversals or different report selections. An open-order hypothesis can be tested.\n\nList the purchase order items that were released within the qualification you are investigating. Normalize their units to pieces using the conversions on the documents. Examine release and change history, accepted deliveries and returns separately. In a simple example 500, 250 and 150 pieces were released. The first 500 and 120 of the second have arrived. That reconstructs 900 ordered, 620 received and 280 physically outstanding. If the actual system returns a different total, preserve the original figures and investigate the exact document lifecycle and unit handling. A consultant should be able to identify the last order that changed the position before suggesting a data correction."
+    ],
+    [
+      "Establish whether the restriction is wider than this product",
+      "A block can concern this material and vendor, or the supplier more generally. Identify which controls apply to quotations, purchase orders or receipts in the configured key and related QM settings. Check the vendor master and any quality blocks relevant to the transaction. In a test environment compare two materials that share the same supplying vendor and purchasing organization, changing only the material where practical. If both fail with a vendor-level block message, the vendor record is a strong lead. If just the seal fails and the message identifies the material-vendor relationship, look closely at the quality record and the requirements in the seal’s procurement data.\n\nConfiguration explains which rule gets evaluated. Master data supplies values for that evaluation. A consultant can inspect the configured key used for the seal and compare it with an approved reference design before considering any design change. The gasket might be permitted because its approved purchasing process requires different evidence. Making the seal use the gasket’s key would change the control on future orders. Ask whether the business approved a new quality policy for the seal or simply needs its existing qualification reviewed. In this incident the engineering file shows a pilot awaiting renewal, so the appropriate owner is the person accountable for supplier qualification."
+    ],
+    [
+      "Prepare a correction the quality team can defend",
+      "Suppose the qualification engineer reviews the June inspection, the pilot incident log and the renewal agreement. An extension is approved through 30 September with a total applicable quantity of 1,300 pieces on this relationship. Document whether the approved quantity is cumulative or a new allowance for a new period. If 1,300 is a cumulative limit and the existing recorded ordered quantity stays at 900, the arithmetic leaves 400 pieces before the new purchase. After the documented release of 60 pieces it would leave 340, assuming those are the only changes and all units are pieces. Someone else must be able to reproduce that reading from the retained evidence.\n\nECC also documents a mechanism to reset the ordered quantity on the quality info record. A reset changes how the next threshold comparison reads and therefore deserves a business reason. Resetting 900 to zero on a cumulative qualification would create a much larger allowance than the engineer approved. In cases where the business truly authorizes a fresh qualification period, record the previous accumulator, the approved cutover, outstanding orders against it and the basis for the new limit. This keeps a new pilot from inheriting or forgetting commitments simply because two users interpreted “renew” differently."
+    ],
+    [
+      "Demonstrate the fix at the correct stage",
+      "Retest the original case in an appropriate test client using the same material, vendor, plant and approval conditions. Document the order check and release result separately. A comparison just inside the authorized date or quantity range and a comparison deliberately outside it help establish that the intended control still operates. Choose dates and quantities with room around the boundary, then separately discover how the installed release evaluates a transaction exactly on that boundary. Capture the message and any change to the recorded ordered quantity at each relevant step. If a later receipt requires another approval or an incoming inspection, the receiving team needs to test its own step too.\n\nThe final answer to the buyer can be precise. The commercial vendor record and a successful gasket purchase are valid. The compressor seal was tied to a pilot quality relationship with its own expiry and ordered-quantity record. Warehouse receipts accounted for 620 of 900 released pieces. The quality engineer approved a documented extension, and Purchasing verified the original 60-piece order at the affected step. With these facts, the next analyst can distinguish a newly expired qualification, a genuinely exhausted quantity and a separately blocked vendor, even if all three are reported with the same opening sentence."
+    ]
+  ],
+  "area": "quality"
+}

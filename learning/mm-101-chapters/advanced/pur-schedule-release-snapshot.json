@@ -1,0 +1,110 @@
+{
+  "id": "pur-schedule-release-snapshot",
+  "level": "Advanced",
+  "shelf": "Purchasing",
+  "area": "contracts",
+  "topic": "Scheduling agreement releases",
+  "title": "Find the last schedule the supplier received after a delivery date changes",
+  "lead": "On Friday morning a buyer moves forty valve bodies from Wednesday to Monday. The current delivery schedule shows the new dates immediately. The supplier's dispatch sheet still shows the earlier plan. To resolve the dispute, follow four records with different jobs. The plant has a current requirement, SAP can create a dated release from that requirement, message processing transmits the release, and the supplier applies what it receives. The first record can be correct while the last still contains yesterday's numbers. This case follows a classic ECC scheduling agreement with release documentation and a separately operated supplier interface.",
+  "keywords": [
+    "scheduling agreement",
+    "release documentation",
+    "creation profile",
+    "forecast schedule",
+    "JIT schedule",
+    "aggregation horizon",
+    "output",
+    "delivery schedule lines"
+  ],
+  "sections": [
+    [
+      "Reconstruct the promised week in units the supplier recognizes",
+      "The supplier manufactures valve bodies to a plant specification. Its previous short-term release requested 60 bodies on Monday, 140 on Wednesday and 100 on Friday, for 300 across the week. After a production sequence change, the buyer wants 100 on Monday, 100 on Wednesday and 100 on Friday. The weekly total remains 300. The factory's issue is timing, so a weekly comparison of quantity or value alone cannot reveal it. Write down both daily sequences in the same order unit and plant calendar before comparing anything more complicated.\n\nEstablish which program the supplier uses to plan raw material and which one it uses to dispatch finished bodies. A forecast delivery schedule can express longer-horizon anticipated requirements in broader buckets. A just-in-time schedule can provide more immediate dates or times. In this example the partners agreed to use weekly forecast quantities for capacity and daily JIT quantities for dispatch. Keep that division explicit. “We sent 300” answers the capacity question but leaves Monday's truck unresolved. If the commercial agreement uses a different document as the shipping instruction, reconstruct that agreement's actual communication path. The terms forecast and JIT in a screen do not by themselves establish contractual liability for a production stoppage."
+    ],
+    [
+      "Read the scheduling agreement item and its internal lines",
+      "Display the exact scheduling agreement, item, material and receiving plant. Check the delivery unit and conversion if it differs from the component consumption unit. A supplier part number may serve several local materials or plants. An internal system screenshot without item identity can therefore match the right daily quantities for the wrong location. Inspect the current schedule lines and identify whether the dates changed manually or during planning. Record when the change was saved. A posted receipt for part of an earlier line, a backlog or an immediate requirement can also affect the quantities appearing in subsequent communications.\n\nThe example assumes the relevant item uses release documentation and the near-term process is configured to produce JIT releases. In classic SAP the chosen scheduling agreement type and the item's settings matter. In a process without release documentation, delivery schedule output follows another route. Before investigating missing releases, establish that the buyer is looking at an item for which releases are expected at all. For this item the current lines correctly show 100 on each of the three days. That establishes the new internal requirement. It does not date a communication or tell the supplier's dispatcher when a truck instruction changed."
+    ],
+    [
+      "Place release creation on the same time axis",
+      "Obtain the release history for the item. Compare release type, sequence or identifying reference, creation time and the dates and quantities captured at creation. In the example the morning job ran at 06:15. Its JIT release captured 60, 140 and 100. The buyer saved the change at 06:24. The captured lines correctly reflected the schedule that existed nine minutes earlier. Reprinting or retransmitting that same release would communicate the old distribution faithfully. A newly printed timestamp on identical quantities would give the buyer no evidence that the revised Monday requirement had been captured.\n\nSAP describes a scheduling agreement release as a snapshot of the schedule for an item. The creation profile can control such matters as aggregation, a release horizon, creation strategy, and the treatment of changes. The selections for the release creation run also matter. In the scheduling agreement area of Purchasing Customizing, examine the profile applied in the client and verify which release types the actual job selects. An apparently appropriate profile belonging to another agreement item can lead an analyst far from the real incident. Save the relevant job run and selection evidence. An executable job scheduled for noon gives the process an opportunity to create a new release, while its mere existence proves neither selection of this item nor a new document."
+    ],
+    [
+      "Explain why a changed schedule might look identical",
+      "Imagine a second version of the case in which the buyer inspects a forecast release created at noon after the change. Its weekly bucket still shows 300. Aggregation has combined daily changes of plus forty and minus forty into the same weekly total. Comparing that release to the old weekly version can correctly show no net difference. To test the supplier's dispatch instruction, inspect release type, release horizon, and the daily JIT buckets that cover Monday and Wednesday. A wide aggregation suitable for raw-material planning can suppress the very daily distinction dispatch needs.\n\nTolerance settings merit a specific test. Determine whether a particular creation run uses a date-based strategy, a change-based strategy or a combination, and how the configured check evaluates changes. Establish both the comparison interval and the level at which quantities are compared. Never assume that a 40-piece move between days produces one universal percentage across all clients. A comparison of weekly totals starts with zero change here. A comparison of Monday alone starts with a change of 40 against an original 60, about 66.7 percent. These are calculations on the sample data. Which one is relevant depends on the maintained strategy and horizon. Use the SAP example of a release creation profile to identify the controls, then test the actual settings with documented input and output."
+    ],
+    [
+      "Separate a new release from a transmitted message",
+      "At 12:00 the selected job creates a new JIT release in this case. It now shows 100 on Monday, 100 on Wednesday and 100 on Friday. Capture its identifier and inspect the output associated with that release. Check the recipient, dispatch method, processing status, time and the content actually produced. A successfully completed job for a group of agreements can coexist with a message for one item still awaiting processing. A supplier may also receive messages through different addresses for planning and dispatch. Check the partner who needs Monday's instruction.\n\nSuppose the transmitted message carries the correct three daily quantities and the outbound processing shows success. That records what left the relevant stage in SAP. For an EDI route, investigate the available interface identifier, middleware receipt, vendor acknowledgement or equivalent evidence supported by the trading arrangement. An outbound identifier can prove that a payload was issued while a partner mapping failure prevents it from entering the supplier's dispatch system. Conversely, if the payload contains a single weekly bucket, no downstream team can reconstruct a unique Monday requirement from the number 300. Route a content problem back to release selection or mapping as appropriate, using the actual payload and stored SAP release to identify the first divergence."
+    ],
+    [
+      "Work the immediate shortage without corrupting the schedule",
+      "Monday's production requires 100 bodies. The plant expects to start with 20 unrestricted usable pieces and no other receipts or issues before that operation. If the old supplier instruction brings 60, available quantity reaches 80 and the immediate shortage is 20. If the corrected instruction brings 100, the plant covers production and retains the planned buffer of 20. The changed truck quantity is forty, whereas the minimum emergency quantity required to keep the line running under those assumptions is twenty. Tell the supplier which number the plant is asking it to expedite and how that emergency arrangement affects Wednesday's remaining quantity.\n\nBefore adding an extra line, check whether the supplier has already packed against the twelve o'clock release or received an exceptional phone instruction. A new schedule plus a manual request for the same forty pieces could trigger two shipments if the two parties do not agree which instruction supersedes the other. Capture the confirmed dispatch quantity, the shipment identification and the person who accepted the plan. Keep the internal requirement aligned with authorized planning data rather than moving dates again solely to make the screen match an obsolete supplier print. If management accepts a temporary exception, document its effect on the buffer and the later delivery dates."
+    ],
+    [
+      "Test the handoff deliberately",
+      "For a controlled retest choose one QA item and a supplier test endpoint. Establish a baseline release and retain its daily quantities. Make one change before the release job and a second change after its cutoff in a separate run. Compare schedule, newly created snapshot, message payload and partner acknowledgement in that sequence. Repeat with a move between days inside a common forecast bucket and then across a forecast-bucket boundary. The first run should help explain an unchanged weekly total. The second shows whether the aggregated view can reveal movement across weeks. Carry the relevant plant workdays and time zone through every record.\n\nDocument the earliest record that differs from the approved requirement. If the current lines are wrong, planning or manual maintenance owns the first investigation. If current lines are correct and the new release captured the wrong granularity, review release type, profile and selections. If the release is correct and the payload or destination differs, take the two versions to output or integration support. If the supplier received the correct version and planned against an older one, resolve version handling with the trading partner. This sequence gives production a reasoned recovery date, and it gives the consultant a reproducible defect or a documented timing explanation that can be verified the next time a truck schedule changes."
+    ]
+  ],
+  "visual": {
+    "title": "Four views of the same 300 valve bodies",
+    "headers": [
+      "Evidence",
+      "Monday",
+      "Wednesday",
+      "Friday",
+      "What it establishes"
+    ],
+    "rows": [
+      [
+        "06:15 JIT release",
+        "60",
+        "140",
+        "100",
+        "Daily request captured before the move"
+      ],
+      [
+        "06:24 internal lines",
+        "100",
+        "100",
+        "100",
+        "Revised plan saved in the plant"
+      ],
+      [
+        "Weekly forecast representation",
+        "300 across the week",
+        "Included",
+        "Included",
+        "Weekly capacity total"
+      ],
+      [
+        "Noon JIT release",
+        "100",
+        "100",
+        "100",
+        "Daily revision captured in a new release"
+      ],
+      [
+        "Supplier dispatch view",
+        "Check received version",
+        "Check received version",
+        "Check received version",
+        "External handling requires supplier or interface evidence"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Scheduling agreement release creation and transmission",
+      "https://help.sap.com/docs/SAP_ERP/15f6005df5a343d096f63b554e47e14a/c3d4c353b677b44ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Forecast and JIT delivery schedules",
+      "https://help.sap.com/docs/SAP_ERP/15f6005df5a343d096f63b554e47e14a/337fb65334e6b54ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Worked release creation profile example",
+      "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/a87db65334e6b54ce10000000a174cb4.html"
+    ]
+  ]
+}
