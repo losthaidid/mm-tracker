@@ -1,0 +1,98 @@
+{
+  "id": "im-receipt-remaining-shelf-life",
+  "level": "Practitioner",
+  "area": "quality",
+  "topic": "Shelf-life checks at goods receipt",
+  "title": "Which date should the receiver enter when the supplier delivers a short-dated lot?",
+  "keywords": [
+    "minimum remaining shelf life",
+    "total shelf life",
+    "SLED",
+    "BBD",
+    "date of manufacture",
+    "goods receipt",
+    "MIGO",
+    "batch master"
+  ],
+  "visual": {
+    "title": "Compare two lots at receipt on 10 June, with a 30-day requirement",
+    "headers": [
+      "Lot",
+      "Expiry on supplier evidence",
+      "Days remaining in the example",
+      "Action to evaluate"
+    ],
+    "rows": [
+      [
+        "A",
+        "25 June",
+        "15",
+        "Investigate short remaining life"
+      ],
+      [
+        "B",
+        "20 July",
+        "40",
+        "Meets the stated time requirement"
+      ],
+      [
+        "C",
+        "10 July",
+        "30",
+        "Boundary test with calendar-day settings"
+      ],
+      [
+        "D",
+        "Missing or unreadable",
+        "Unknown",
+        "Obtain reliable production or expiry evidence"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Shelf life expiration date check",
+      "https://help.sap.com/docs/SAP_ERP/96bf9ad642cf4b26a29595e3d573fb8c/c163bd534f22b44ce10000000a174cb4.html?version=6.06.latest"
+    ],
+    [
+      "SAP ERP · Receipt checks for materials without a batch-management requirement",
+      "https://help.sap.com/docs/SAP_ERP/96bf9ad642cf4b26a29595e3d573fb8c/c463bd534f22b44ce10000000a174cb4.html"
+    ],
+    [
+      "SAP S/4HANA on-premise · Receipt checks for materials handled in batches",
+      "https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/91b21005dded4984bcccf4a69ae1300c/c763bd534f22b44ce10000000a174cb4.html"
+    ]
+  ],
+  "shelf": "Inventory & special procurement",
+  "lead": "A plant orders a sealant with at least thirty usable days remaining at receipt. The truck arrives on 10 June carrying six pails of lot A and four of lot B. A expires on 25 June and B on 20 July. The supplier calls the whole load “in date.” Both labels do indeed show a future expiry, yet only one lot comfortably gives production the thirty days it requested. The receiver needs a defensible decision for each lot, and the consultant needs to explain why one SAP client stops the item while another allows a warning to be acknowledged.",
+  "sections": [
+    [
+      "Separate a product's full lifetime from the time it has left",
+      "Total shelf life describes the assumed duration between manufacture and expiry under the conditions used for the material. Minimum remaining shelf life describes how much of that duration must still be available when the material is received. Suppose a formulation has a defined life of ninety calendar days from manufacture. A pail produced seventy-five days before delivery can still be physically unexpired while providing only about fifteen days for storage, planning, picking and production. A purchase specification promising thirty days at delivery gives the buyer a basis to challenge that shipment.\n\nIn ECC, view the relevant storage data in the material master and inspect the purchase order item actually being received. SAP documents that the minimum remaining life can be maintained in the material master or the PO. Record the value relevant to the order and the unit or period settings used in the test. The buyer may have agreed a more demanding shelf-life requirement on a particular purchase than operators remember from a previous order. If the figures differ, investigate which requirement the actual saved item carries and the documented behavior of the transaction in that client. A screenshot of a current master record alone is weak evidence of what a receipt against an earlier item requested."
+    ],
+    [
+      "Decide which mark on the package belongs in the input field",
+      "Classic goods receipt takes different inputs depending on whether total shelf life is maintained. If the total is specified, the date of manufacture supplies the starting point and SAP can calculate the expiry. If no total is entered, the operator enters the expiry itself. Read the item's field label and the manufacturer documentation together. A pail can carry a fill date, a packing date, a use-by date and a production lot printed in a pattern resembling a date. Writing the expiry into a field that expects manufacture can give the stock an extra full lifetime on paper.\n\nUse a simple QA example with a total of sixty calendar days, date of manufacture 1 June, and no period rounding. An expiry computed by adding sixty days is 31 July. If the receiver accidentally enters the printed 31 July as the production date, another sixty days are added to the wrong starting point. The apparent remaining life lengthens without any physical change. At the other extreme, entering 1 June into a direct expiry field could make fresh goods appear already expired on 10 June. In both cases correcting the date's meaning is more important than changing message severity. Use the supplier's dated certificate if the label is abbreviated or unreadable. Guessing a date creates evidence the supplier never supplied."
+    ],
+    [
+      "Work through the delivery by material, lot and quantity",
+      "Use 10 June for the physical receipt, posting and entry dates in this worked example so that date-selection and backdating questions do not obscure the comparison. From 10 June to 25 June the difference is fifteen days. From 10 June to 20 July it is forty. Six pails in A provide less than the agreed thirty days. The four in B provide more. Averaging the two expiry dates or approving ten pails because one label extends into July would assign a property of one batch to another. Keep the two item quantities, lot identifiers and source documents distinct throughout receiving.\n\nA third test lot expires on 10 July, exactly thirty calendar days from the receipt date. Use it to establish the equality boundary under your stated time-unit and period settings. Keep one test lot just either side of the boundary as well. Those examples can reveal an unexpected month rounding rule, a date-entry format error or a different effective PO threshold. If a user reports that the same label failed on one day and passed on another, capture posting and entry dates, the actual receipt date, the document and the date parameters before repeating the calculation. A new test performed on today's date is a different experiment."
+    ],
+    [
+      "Locate the controlling settings behind a missing or unexpected message",
+      "The ECC shelf-life check requires the relevant minimum life and activation in Inventory Management for the plant and movement type. Start with a saved PO item and choose the specific receiving transaction used by the plant. Identify the actual movement type and destination plant, then compare the plant and movement settings with an otherwise matching successful test. A plant in which a commercial agreement calls for thirty days can still have a gap in SAP controls if the activation or master data do not reflect the agreement. Conversely a short-dated lot may prompt an error even when its supplier is approved and has delivered it successfully elsewhere.\n\nRecord the message class, number, text and severity, together with the threshold and entered dates. SAP documents that insufficient remaining life can produce a warning or an error depending on configuration. A warning that permits processing still informs the receiver of a commercial or quality issue. The ability to acknowledge it is distinct from authority to accept a supplier deviation. Identify who can approve that decision, whether a partial receipt is allowed and how to keep disputed pails identifiable. The receiving team should know how to bring short-dated stock to that decision without fabricating a later expiry or leaving the dock with no record of the truck."
+    ],
+    [
+      "Read back what the posting proves",
+      "For a material without a batch-management requirement, SAP documents storage of the entered or determined expiry on the material document when the GR posts. This supports a receipt-level audit. It does not by itself give a clerk a batch-level identity for each future withdrawal once quantities are mixed. Where the material is batch-managed, inspect the batch master and material document for the receipt as well. The S/4HANA on-premise description explicitly identifies both destinations and the consistency check when receiving into an existing batch. Validate the precise screens and messages for the ECC release and process used by your plant.\n\nConsider a repeat delivery reported as the same supplier batch but bearing a different expiry. Do not simply create a second internal number to silence a consistency message. Inspect how the supplier lot maps to the internal batch, whether the date represents manufacture or expiry, and whether the product has been retested or relabelled under a controlled process. An incorrect overwrite could change what the warehouse believes about material already received under that identity. Let the quality owner decide whether there is new evidence about the same lot, a different lot, or an outright supplier labelling error. A missing document date and a genuine change in product disposition require different correction paths."
+    ],
+    [
+      "Distinguish acceptance of new stock from the choice of stock to issue",
+      "After the buyer accepts lot B, production may still request a batch with more than forty remaining days because the finished product will travel internationally. The GR check answered whether B met this order's receipt condition on 10 June. A later batch search at goods issue can have its own requirements and sorting rules. Stock that passed the receipt threshold can become too short-dated for a particular customer, production order or ship date. Changing the original receipt date would confuse these independent decisions. Examine the issue requirement and the real date on which the stock will be used.\n\nA supplier may also give a customer-specific shelf-life guarantee measured to arrival at the customer's site. Transit then consumes part of the remaining life available at your own dock. Document the acceptance point in the purchasing agreement and in the process design. For example, a thirty-day promise measured at the customer's plant and an expected ten days of onward transport may justify a different inbound policy, depending on the business agreement. That is a design discussion between purchasing, quality and planning. The standard calculation cannot infer a transport promise from a field containing only a number of days."
+    ],
+    [
+      "Report the exception so that the next delivery is easier",
+      "Close the receiving issue with the PO and item, material, both lot identifiers, the manufacturer evidence for each date and the quantities accepted, held or returned under the site's process. Include the date field actually entered and whether expiry was supplied directly or calculated. Ask the buyer to use this information when challenging the short-dated six pails, and have the warehouse demonstrate that the four accepted pails can be identified for later issue. If weak master or configuration settings allowed the exception to pass invisibly, test the proposed correction against all three lots before applying it more widely.\n\nFor the next inbound delivery, give the operator an example showing the field label beside the corresponding label on a real supplier package. Pair it with an example from the other input mode and with a legible certificate for an exceptional lot. This small distinction is operationally important: a valid future date, a valid production date and sufficient remaining shelf life are three different facts. The receiving evidence should establish all the facts needed for this particular material and order before the stock enters the process that depends on them."
+    ]
+  ]
+}

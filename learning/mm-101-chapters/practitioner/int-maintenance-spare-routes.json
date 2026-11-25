@@ -1,0 +1,98 @@
+{
+  "id": "int-maintenance-spare-routes",
+  "level": "Practitioner",
+  "shelf": "Purchasing",
+  "area": "integrate",
+  "topic": "Maintenance order components and purchasing",
+  "title": "Which spare on a shutdown order should the buyer actually chase?",
+  "keywords": [
+    "plant maintenance",
+    "stock component",
+    "non-stock component",
+    "reservation",
+    "maintenance order",
+    "purchase requisition",
+    "purchase order",
+    "goods issue",
+    "spare parts",
+    "IW33"
+  ],
+  "visual": {
+    "title": "Compressor shutdown on Thursday",
+    "headers": [
+      "Job requirement",
+      "Procurement evidence",
+      "Current gap",
+      "Next owner"
+    ],
+    "rows": [
+      [
+        "Two stock bearings, 84 each",
+        "Reservation for two and one posted issue",
+        "One issue outstanding, eight physically available before issue",
+        "Warehouse checks the second withdrawal"
+      ],
+      [
+        "One direct-purchase pressure probe, 420",
+        "Requisition converted to PO, no goods receipt",
+        "One probe due from supplier",
+        "Buyer confirms the delivery and the goods recipient"
+      ],
+      [
+        "One mistaken extra order for two bearings",
+        "Separate manually issued PO",
+        "Potential duplicate replenishment or purchase",
+        "Buyer reviews stock requirement and order commitment"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · How maintenance orders use stock and non-stock materials",
+      "https://help.sap.com/docs/SAP_ERP/b4174aff4a234ed5be928a10c60997fb/a2c9b65334e6b54ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Withdrawing stock material for a maintenance order",
+      "https://help.sap.com/docs/SAP_ERP/b4174aff4a234ed5be928a10c60997fb/a5c9b65334e6b54ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Scheduling maintenance work with bills of material",
+      "https://help.sap.com/docs/SAP_ERP_SPV/b4174aff4a234ed5be928a10c60997fb/3dc9b65334e6b54ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Confirming external material or services",
+      "https://help.sap.com/docs/SAP_ERP/74e3a7c646574f0696d3eee0a1c8241a/f1a9ba53422bb54ce10000000a174cb4.html"
+    ]
+  ],
+  "lead": "A maintenance planner emails Purchasing a list headed “parts still needed for Thursday”. It contains two common bearings and a temperature-compensated pressure probe. Buying every line immediately could leave the company with two sets of bearings, while calling the warehouse about everything could leave the probe on the supplier’s shelf. A maintenance order can contain components that are supplied by different routes. Read the component, its operation and its downstream reference before deciding whom to chase. This example follows one released compressor shutdown order through a stock reservation, a goods issue, a requisition, a purchase order and an urgent change to the work scope.",
+  "sections": [
+    [
+      "Read the work order as a set of requirements",
+      "Open the maintenance order in display mode, using IW33 in a classic ECC system where your role permits it. Identify the equipment or functional location, the planned work date, the operation that needs each item and the plant responsible for supply. A compressor shutdown has an operation to replace the drive bearings and another to calibrate the pressure protection. Two components with different need dates may be listed under the same maintenance order number. An inquiry based solely on the earliest order-header start date can send an expeditor after a part that the job will not require until testing.\n\nThe bearings are supplied from existing maintenance stores. The probe is individually procured because its measuring range and connector must match this job. In the familiar standard categories the bearings can be entered as a stock component and the probe as a non-stock component. Refer to the actual item-category descriptions and status in the client. A non-stock component for a particular order is a statement about how that requirement is supplied. A vendor catalogue number, an internal material number or the ability to hold a similar part in the warehouse cannot on its own tell the buyer which route this component followed."
+    ],
+    [
+      "Follow the stock requirement to the reservation",
+      "The bearings have a material master, an issuing storage location and a maintenance order reservation for two pieces. The reservation expresses a future internal requirement. It gives the warehouse a part, quantity, date and recipient to prepare, and it is relevant to material planning under the applicable settings. Creating it does not mean the supplier has received an order or the job has consumed two physical bearings. In a system using shop papers the released order’s material pick list can help locate the requirement. Inspect the reservation and any related goods movement to determine what has actually left stores.\n\nBefore withdrawal the store has eight unrestricted bearings at the issuing location. The first shift issues one against the maintenance order reservation. The actual issue reduces stock from eight to seven in the simplified case and charges one part to the maintenance order. The reservation still shows a requirement for the other piece if no final-issue handling closed that item. Seven on hand is a physical stock balance, while a remaining requirement of one is a job-specific obligation. Other reservations can compete for those seven. Check availability, picking status and any bin or batch requirements before promising a delivery time to the maintenance team."
+    ],
+    [
+      "Follow the direct-purchase requirement to the supplier",
+      "The probe is a non-stock component with its technical description, required date, quantity of one and the receiving contact for the shutdown. The order drives a purchase requisition under the applicable order and release settings. Read its purchasing group, material group, account assignment, price estimate and delivery instructions. A requisition is an internal request to obtain the item. The supplier has a commercial commitment to deliver only once the external buying process has occurred. A requisition still waiting for conversion needs action from Purchasing even if the maintenance order is already scheduled for execution.\n\nIn this example the buyer has converted the probe requisition into a PO item for one unit at 420, account-assigned to the maintenance order. Follow the document reference from the component to the requisition and PO. Look at the item's delivery date and any supplier acknowledgment and compare that with the maintenance operation's need date. The later supplier-confirmed delivery may be a genuine problem even if the PO still displays the buyer’s originally requested date. The absence of a goods receipt means the system has no posted procurement receipt against that item as of the cutoff. The goods might still be in transit, physically at the gate or at the work site awaiting recording."
+    ],
+    [
+      "Reconcile planned cost, commitment and actual cost",
+      "Assume both bearings have an effective issue value of 84 each and the probe item has a valuated goods receipt. There is no tax, freight, price difference or currency conversion in this example. The maintenance team’s purchasing and stores estimate for the three parts is 588. The two bearings account for 168 and the probe accounts for 420. With one bearing actually issued and the probe still on order, the model predicts 84 of actual component cost for the job from these two requirements. The remaining 504 represents a mixture of another anticipated internal withdrawal and a purchased item still outstanding. It is not one overdue supplier delivery of 504.\n\nAfter the second issue and the valuated receipt for the direct-purchase probe, the expected actual cost from these components is 588, assuming the event values match the planning figures. Internal technician time or other consumption may increase the overall order cost. Compare the individual cost elements and source documents rather than comparing 588 with the entire maintenance order balance. A non-valuated receipt on the account-assigned purchasing item changes the point at which that purchase affects cost. Read the PO and the actual posting history before promising a financial result from a warehouse operation."
+    ],
+    [
+      "Diagnose an apparent shortage before buying again",
+      "Suppose the foreman has both bearings on the trolley, but SAP shows only the first issue. Determine whether the second part was physically picked, staged or actually withdrawn. A pick sheet may document preparation before a posting. Conversely an unplanned issue may have charged the correct maintenance order without consuming the specific reservation reference intended by the planner. Display material documents by material, order and posting date and compare the reference and signed quantity. Confirm what the storekeeper did and what the foreman received. An additional posting might be needed, or it might double charge the job for an issue that already exists.\n\nIf the store has genuinely run out of the stocked bearing, Purchasing may need to replenish inventory in time. Identify whether an existing replenishment proposal or PO will cover the shortage. An inventory replenishment order and a direct-purchase order account-assigned to the shutdown have different destinations and accounting. Buying a replacement directly for the order might be a valid decision under time pressure, but the team must also reconcile the original open reservation, the demand already included in planning and the intended goods recipient. Otherwise the direct purchase can arrive while a planning proposal also replenishes the same perceived shortage."
+    ],
+    [
+      "Investigate a missing requisition without changing the job",
+      "For the probe, confirm that the operation contains a saved non-stock component with the correct quantity and required purchasing data. Review the order status and the settings that govern when reservations and purchase requisitions become effective for that order type. A display captured while the planner is still editing an unsaved order is poor evidence of a failed integration. A deletion indicator on the component, an already converted requisition or a search restricted to the wrong purchasing group can also hide a valid document. Use the component’s own document navigation where available and keep the item identifiers in the support record.\n\nThe planner may have typed the technical specification into operation long text without creating a component. That text can tell a mechanic what to install, but a technical paragraph alone does not provide the purchasing item, quantity, account assignment and delivery details needed to buy a probe for the job. Check the approved work scope with the planner. If an actual purchasing requirement is missing, the planner should amend the correct order item and let the normal procurement process create or update its reference. A buyer manually buying from a copied paragraph can easily omit the temperature range or the correct shutdown delivery address."
+    ],
+    [
+      "Give the foreman a useful answer on Wednesday afternoon",
+      "Report the status in the units and documents that each team can act on. The bearings required two pieces. One issue is posted, seven remain in the specified stock location under the example assumptions, and Stores is checking whether the second is staged or still in the bin. The probe is on a specific vendor PO item for one, with the work site and receiving contact confirmed. The buyer is checking physical dispatch and the procurement receipt. If the probe arrives before the carrier’s notification, the site should use the actual PO reference and evidence of receipt under the company's receiving procedure.\n\nClose the purchasing question when the supplier item is accounted for and the maintenance requirement is genuinely satisfied. Close the inventory question when the physical withdrawals and reservation history agree. These events may occur on different shifts. Preserve the relation between each source item and the maintenance operation during closeout so that the next planner can tell which parts came from stores, what was bought specifically for the job and why. The original email contained three needed pieces. Reading the actual component routes revealed only one direct-purchase item for the buyer to chase."
+    ]
+  ]
+}

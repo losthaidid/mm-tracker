@@ -1,0 +1,104 @@
+{
+  "id": "pur-source-list-cutover",
+  "level": "Expert",
+  "shelf": "Purchasing",
+  "area": "sources",
+  "topic": "Source list and MRP cutover",
+  "title": "Switch sources at month-end while protecting existing requisitions and orders",
+  "lead": "A plant is moving its pump seal business from Alder to Birch. The buyer expects Birch to get “all December business.” The planner schedules the change for the evening of November 30. At 08:00 on December 1 an old purchase order still points to Alder, an unassigned requisition is waiting in the buyer's queue, and a new planning proposal points to Birch. Three records can legitimately hold three different answers because the commercial cutoff, master-data validity and a saved document each describe a different event. An expert cutover makes those distinctions visible before any system changes are made.",
+  "keywords": [
+    "source list",
+    "ME01",
+    "ME03",
+    "source list validity",
+    "MRP",
+    "ME53N",
+    "purchasing cutover",
+    "requisition delivery date",
+    "fixed source",
+    "existing orders"
+  ],
+  "sections": [
+    [
+      "Agree which December business is being transferred",
+      "The purchasing director means delivery dates from the first of December onward. The accounts payable team initially understands invoices entered from that date onward. The category lead thinks orders created after that date belong to the new supplier even when they describe an earlier requirement. These definitions diverge immediately. An order sent on November 20 for December 4 delivery would belong to Birch under a delivery-date interpretation and to Alder under an order-creation interpretation. An invoice received in January for it has a third date. Resolve the intended commercial scope with the contract owners and capture what happens to existing commitments.\n\nFor the worked case, new externally procured requirements due in December use Birch when they are eligible for automatic source assignment. The buyers must separately review old unconverted requisitions, while existing POs remain subject to their actual commercial commitments. The agreement applies to one material, one plant and one purchasing organization. Material and plant are particularly important because the ECC source list is maintained for that combination. Another plant may legitimately retain Alder through March. Identifying the exact item and plant gives planners and buyers a common population and prevents a well-intentioned cross-plant mass change from interfering with another contract."
+    ],
+    [
+      "Map the fields that influence a planning-generated proposal",
+      "In classic ERP planning, the documented source-list route for an externally procured material considers validity covering the delivery date of the requisition. The relevant source also has to be suitable for MRP. A scheduling agreement used to generate delivery schedule lines requires its own eligible entry and agreement. A maintained, applicable quota arrangement changes the investigation because planning can select sources according to the quota arrangement and its usage. Determine the actual planning procedure and participating master data. A fixed-source indicator visible to a buyer and the source-list field for MRP usage serve distinct purposes. Confirm each maintained value with field help in the installed release.\n\nFor this controlled cutover there is no quota arrangement, both suppliers are eligible for the same procurement type, and the material has one suitable MRP source for each required interval. The Alder entry ends on November 30. The Birch entry begins on December 1. Validate the supplier, purchasing organization, agreement and item if applicable, source block, and validity period on each entry. Verify that the relevant agreement and commercial conditions actually cover the requirement dates. A perfectly valid source-list entry referencing an expired commercial arrangement leaves the organization with a new problem at ordering time. Keep an example for each boundary date and a later date within December."
+    ],
+    [
+      "Inventory the commitments before changing source records",
+      "Freeze a working extract at an agreed time, or document a continuous change window with an owner checking for late activity. Split the population by current state. In a sample case there is an unconverted requisition for 80 seals due November 30, an assigned open requisition for 120 due December 3, and an already issued Alder PO for 50 due December 5. There is also a fresh, as-yet-uncovered need for 90 due December 7. Record the live document number and item for every existing line. For the fresh demand identify the requirement and plant so that a newly generated proposal can be connected to it after planning.\n\nEstablish whether the 120-piece request is still open in full. If 45 were already converted, the buyer has an existing purchasing commitment for those 45 and at most 75 pieces in the remaining requisition decision, subject to the actual document state. Loading a new 120-piece request for Birch would duplicate a portion of the requirement. Likewise, release status, processing status and an assigned source identify different properties. A request can be approved, assigned and entirely unconverted. Capture quantities and history alongside the labels. The internal cutover ledger should let someone calculate exactly how many pieces of demand are still available for reassignment under the commercial decision."
+    ],
+    [
+      "Construct a test that exposes a date error",
+      "Create independent QA requirements with delivery dates of November 30, December 1 and December 2. Make the planning run at a time that differs from all three delivery dates. Hold the material, plant, quantities, purchasing organization, planning parameters and available stock constant. Control other receipts and requirements so that netting really produces the expected proposals. If a test has ample stock, the absence of a requisition cannot establish a source determination failure. Provide opening stock and demand figures in the evidence so another planner can reconstruct why each creation event should have occurred.\n\nFor each proposal, inspect the date the planning procedure actually calculated and the stored source. A due date supplied on a sales order, a component requirement, or a project milestone may be different from the requisition's delivery date after scheduling and lead times. The cutover prediction must use the date examined by the applicable sourcing route. A proposal created in November with a December delivery date can therefore select Birch legitimately in this ECC example. A second test with overlapping eligible entries or a one-day validity gap is a useful negative control. Document the outcome of that tested combination rather than promising a unique automatic choice from ambiguous or missing candidates."
+    ],
+    [
+      "Give saved requisitions a named disposition",
+      "The 80-piece request due November 30 remains in Alder's period. Its buyer confirms eligibility and whether the requested date is still real. For the 120-piece request due December 3, inspect the assigned source and whether the item is still open, released and free of follow-on documents. A new source-list validity entry is evidence for future determination. It does not, by itself, prove that an already saved assignment on this requisition was updated. If reassignment is required, let the authorized buyer review and redetermine or assign the eligible source using the client's permitted processing route, then read the item back. A change of supplier may require another release or commercial review under local controls.\n\nIf the existing Alder PO for 50 has already been transmitted, ask Alder whether it has acknowledged the commitment and whether delivery has started. The category lead can choose to honour that order, negotiate a change, or stop the procurement under the applicable business procedure. Purchasing should communicate any accepted amendment, then verify the system reference and the supplier response. A source-list block introduced to direct future buying describes a master-data control and provides no external communication that rescinds a transmitted order. The invoice process should retain the actual source and order history for goods legitimately received under the historical commitment."
+    ],
+    [
+      "Use failures to choose the next diagnostic",
+      "Consider the unassigned December requisition reported after the switch. First establish its origin. A manually created item saved without a determination attempt points to a different test than a fresh planning proposal created with a valid sourcing setup. Check source-list change history, the calculated dates, material and plant, and the eligible entries at the time of the run. SAP's source-list monitoring includes tools for displaying changes, simulating a proposal for a date, and identifying missing coverage for materials subject to a source-list requirement. A successful present-day simulation is evidence for its current inputs. It cannot establish that yesterday's job used the same source data.\n\nNow examine the process boundary. A newly generated requisition may carry Birch correctly, yet automatic conversion to a PO can still fail for reasons associated with ordering data, authorization, pricing or client-specific processing checks. Preserve the original conversion message and attempt the same document through the corresponding authorized QA route. Conversely, a buyer may be able to create a manual PO for Birch while classic planning still generates an unassigned request because the source-list MRP usage is missing. Record separately what planning created, what the purchaser assigned and what the PO creation process accepted. An end-to-end screenshot of a successful manual order cannot validate all three mechanisms."
+    ],
+    [
+      "Reconcile the first morning and define an exit",
+      "At the cutover close, reconcile all four sample populations. The November request still has 80 eligible pieces with its agreed disposition. The December request has 120 pieces assigned or a documented split between an existing commitment and its real remaining quantity. The 50-piece transmitted order has an owner and supplier position. The fresh 90-piece December requirement has a dated, uniquely identified proposal from the planned creation route. If a late order or supplier confirmation arrived during the window, refresh the ledger and establish its effect before announcing completion. A report of zero open exceptions is only meaningful when the selection cutoff can be reproduced.\n\nAvoid a blanket rollback that restores yesterday's source list after several valid Birch orders have already been sent. Identify the first incorrect boundary, effective date or participation setting, correct it through the established master-data process, then re-evaluate just the affected open demand. Mark each real order and supplier communication that still needs individual action. Retain the version and source-list change history with the test results. When the next supplier transition is proposed, the business has a defensible way to separate future determination, past commitments and the small population needing deliberate intervention."
+    ]
+  ],
+  "visual": {
+    "title": "Disposition by delivery date and existing commitment",
+    "headers": [
+      "Population",
+      "Quantity",
+      "System evidence",
+      "Action in this case"
+    ],
+    "rows": [
+      [
+        "Unconverted request due Nov 30",
+        "80 pieces",
+        "Requisition item and current validity",
+        "Review and retain eligible Alder sourcing"
+      ],
+      [
+        "Assigned request due Dec 3",
+        "120 pieces",
+        "Open quantity, original assignment and PO links",
+        "Review and reassign eligible balance as approved"
+      ],
+      [
+        "Alder PO already issued, due Dec 5",
+        "50 pieces",
+        "Referenced order, output and supplier position",
+        "Handle the existing commitment individually"
+      ],
+      [
+        "New uncovered need due Dec 7",
+        "90 pieces",
+        "Fresh planning proposal and its delivery date",
+        "Verify Birch on the proposal"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP MRP · Determine the source for external procurement",
+      "https://help.sap.com/docs/sap_erp/85d3fce10e264972a0155c8b46ecf93b/79bbb853dcfcb44ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP Purchasing · Create a source list manually",
+      "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/7b7fb65334e6b54ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP Purchasing · Monitor and simulate the source list",
+      "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/877fb65334e6b54ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP Purchasing · Assign and process requisitions",
+      "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/9f7fb65334e6b54ce10000000a174cb4.html"
+    ]
+  ]
+}

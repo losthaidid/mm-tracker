@@ -1,0 +1,112 @@
+{
+  "id": "val-ml-follow-component-difference",
+  "level": "Expert",
+  "area": "ml",
+  "topic": "Multilevel actual costing",
+  "title": "Follow one component price difference into finished inventory and cost of sales",
+  "lead": "Purchasing accepts a month-end difference of 120 on a bought-in component. The controller finds only 36 of it in component inventory and asks where the other 84 went. The production manager sees 50 finished units, and Sales has already delivered most of them. Reconstruct the two levels of the actual quantity structure and decide which pieces of the difference belong to raw inventory, finished inventory and consumption. This example uses the classic ECC Material Ledger actual costing model, with enough detail to distinguish a calculated periodic value from a financial closing entry.",
+  "keywords": [
+    "Material Ledger",
+    "actual costing",
+    "CKMLCP",
+    "CKM3",
+    "multilevel price determination",
+    "actual quantity structure",
+    "periodic unit price",
+    "revaluation of consumption",
+    "closing entries"
+  ],
+  "sections": [
+    [
+      "Establish the period in which a difference can move",
+      "Use one plant, one legal valuation in local currency and a single closed production period. Both materials participate in periodic actual costing with price determination control 3 and standard price control S. Assume complete documents, sufficient quantity coverage, a successful costing run and a price unit of one for each material. The raw material is a replaceable sensor. The finished material is a tested kit using two sensors. There are no opening quantities of kits, no work in process, scrap, other outputs, exchange differences, rounding residuals or multilevel cycles. Those facts matter because each additional claimant to the difference would change the proportions.\n\nThe analyst needs access to the material price analyses, production order or cost collector evidence, goods movements, receipts, settlements and run log. Checking the material master alone establishes that a material is eligible for particular processing. It cannot demonstrate the cost actually transferred in one period. The standard price gives a preliminary valuation for movements during the period. Periodic actual costing can later distribute variances using recorded procurement and consumption relationships. The planned bill of material is useful context, especially if the factory intended to use two sensors per unit. Establish that actual issues and actual production receipts support the relationship before explaining a real month-end result."
+    ],
+    [
+      "Explain the sensor price on its own level",
+      "The period opens with 20 sensors at a total of 200, with no opening difference. The plant purchases 80 more. At the standard of 10 the preliminary valuation of receipts is 800. After all eligible purchase and invoice entries, the attributable procurement cost of those 80 is 920. There is therefore a positive purchase difference of 120. The period has 100 sensors available, worth 1,000 at preliminary prices and 1,120 at periodic actual cost. Dividing 1,120 by 100 gives a periodic unit price of 11.20. A calculation using only the 80 purchased units would give a procurement price of 11.50 for those receipts, but the periodic unit price includes opening inventory.\n\nThe quantity usage for this example is 30 sensors left in the raw store and 70 issued to production. The 1.20 increment above preliminary cost applies to both uses. Ending raw inventory takes 36 and becomes 336 for 30 sensors. The production issue carries 84 of additional component cost. The original preliminary value of the 70-piece issue was 700 and its periodic value is 784. Thirty-six plus 84 accounts for all 120. If a user sees 36 on the raw material inventory line, this is the first place to look. Do not ask for another 84 stock debit on that material. Those 70 sensors left the raw stock and their use identifies the next recipient."
+    ],
+    [
+      "Check what the production records actually produced",
+      "A draft report says production made 50 kits during the month. Two sensors per kit would imply 100 sensor issues. The material documents show only 70. Resolve this apparent inconsistency before approving an allocation. In the teaching case the period actually contains a production receipt of 35 new kits, all made with the 70 sensors. The other 15 in the commercial report are forecast kits included in a production dashboard. There is no goods receipt, no production output and no sensor issue for them in this period. That finding is independently testable by order reference, output material and posting period. The discrepancy would require further investigation if the 15 represented another actual procurement alternative or stock from another plant.\n\nThe 35 actual kits enter inventory at a standard of 30 each, for a preliminary total of 1,050. At standard the 70 sensors account for 700 of that cost. Assume other conversion costs for the 35 kits are exactly 350 and their production receipts and settlements yield no separate conversion variance. This is a deliberate simplification so the component variance can be traced. Seventeen minutes of planned labor per kit on a costing sheet would not establish this condition in production. Reconcile actual order debits, credits and settlement and determine whether other cost components or lower-level materials contribute differences. A material price analysis can contain several procurement alternatives with different actual inputs for the same output code."
+    ],
+    [
+      "Calculate the multilevel increment once",
+      "The 84 carried by the components is the only additional cost reaching the 35 kits. Add it to their preliminary 1,050 to get 1,134. The resulting periodic unit price is 32.40. An independent check uses individual cost components. Two sensors at their periodic price of 11.20 contribute 22.40 per kit. Conversion costs contribute 10 per kit. Their sum is again 32.40. The local increase over the kit's standard is 2.40 per piece. Applying the full component difference of 120 at the kit level would charge the kit for the 30 sensors still in the raw store. Dividing 84 by the dashboard's 50 would understate the increase and send 25.20 of cost to units without an actual receipt.\n\nDisplay the raw and finished materials side by side at the same stage of closing. The raw material should identify 120 in direct purchase differences, a portion left in ending stock and a portion following the relevant consumption. The kit should show the incoming lower-level component difference in the multilevel calculation. The display layouts can present a difference first on a receiving category and again on a use of the same material. Summing every instance of 84 on both analyses would count a transfer of cost twice. Identify the origin, internal transfer and final destination separately. Only amounts remaining at final destinations should be included in the overall reconciliation."
+    ],
+    [
+      "Follow the kits outside production",
+      "Sales delivered 25 of the 35 kits, leaving ten in the finished-goods store. The ten on hand carry 300 at standard and an extra 24 at the periodic unit price, for 324. The 25 consumed through the goods issue carried 750 at standard and are attributable another 60, for periodic consumption of 810. The original 120 now has three terminal destinations. Raw inventory carries 36, finished inventory carries 24, and final consumption carries 60. These amounts add to 120. The 84 previously reported by production has been redistributed as 24 and 60 at the finished level. It is an intermediate amount, so it does not appear as a fourth destination.\n\nThere is a second control using total economic value. Opening sensors and bought-in sensors together cost 1,120. Conversion adds 350, for a total of 1,470. The ending raw stock of 336, ending finished stock of 324 and final consumption of 810 add to 1,470. Perform this control in the same currency and valuation view as the two material analyses. If the system's raw and finished closing stock amounts agree but the 810 is absent from a cost-of-sales account, inspect the consumption revaluation configuration, movement categorization and actual closing postings. The cost distribution gives the amount attributable to consumption. The detailed posting to a particular original or collective account or cost object depends on the configured process and the closing options."
+    ],
+    [
+      "Locate a break in the observed cost chain",
+      "Work forward from the sensors if the kit shows a periodic price of 30. First verify that the raw-material analysis includes the 120 and calculate the 11.20 price from the actual cumulative quantity. Check the stage and status of single-level determination in the ECC costing run. Then inspect the 70-piece issue. A direct consumption against a departmental cost center could have the same movement quantity while lacking the relevant link to kit production. If the kit receipt was posted in the next period, the period and any intervening work in process merit specific attention. If the system used a different valuation type for a substitute sensor, the consumption might belong to a different material valuation record.\n\nContinue with the quantity structure, affected production orders, procurement alternatives and settlement evidence for the finished material. Missing or late settlement, additional outputs, returns and mixed procurement can invalidate the simple 84 divided by 35 model. Read the multilevel log and any undistributed or unallocated amounts before diagnosing missing configuration. A failed or incomplete calculation can be displayed beside successful amounts from an earlier stage. Recreating a component issue merely because the subsequent cost transfer is absent would duplicate material consumption. Establish the first financial or quantitative link that disagrees with its evidence, then address that link through the responsible MM, production or controlling process."
+    ],
+    [
+      "Know which result has reached the general ledger",
+      "Classic ECC separates material-price determination from the closing activities that apply its valuation decisions. A periodic price visible for information in the material master or price analysis is evidence of calculation. To prove an inventory revaluation or consumption posting, identify the run, posting status, documents and amounts. Verify whether the organization elected the relevant closing postings, and the currency and valuation they affect. Revaluating eligible consumption can update different accounts or assignments according to setup. If the controller asks whether a particular profitability report now reflects 60 more cost, trace the posting into that report's relevant ledger, account assignment and period.\n\nS/4HANA includes Material Ledger in inventory valuation, whereas actual costing requires separate activation. Some S/4HANA closing workflows consolidate steps that classic ECC presents separately. Retain the cost logic and use the actual release's run and posting evidence for operational instructions. The defensible answer to Purchasing is that 36 remains with unused sensors, 24 reaches unsold kits and 60 is attributable to the kits already issued. The defensible answer to Finance includes the distinction between this economic distribution and the accounts updated by the completed close. Together they explain the entire 120 once and preserve a trace from a single purchasing difference to its final use."
+    ]
+  ],
+  "visual": {
+    "title": "Terminal allocation of the 120 component difference",
+    "headers": [
+      "Destination",
+      "Quantity",
+      "Preliminary value",
+      "Additional cost",
+      "Periodic value"
+    ],
+    "rows": [
+      [
+        "Unused sensors",
+        "30 sensors",
+        "300",
+        "36",
+        "336"
+      ],
+      [
+        "Unsold kits",
+        "10 kits",
+        "300",
+        "24",
+        "324"
+      ],
+      [
+        "Issued kits",
+        "25 kits",
+        "750",
+        "60",
+        "810"
+      ],
+      [
+        "Total final destinations",
+        "Two material levels",
+        "1,350",
+        "120",
+        "1,470"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Value flow into actual costing",
+      "https://help.sap.com/docs/SAP_ERP/56f7319a9048445eb86221af73cab72b/43f1d353ca9f4408e10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Multilevel material price determination",
+      "https://help.sap.com/docs/SAP_ERP/56f7319a9048445eb86221af73cab72b/dff1d353ca9f4408e10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Multilevel quantity structures",
+      "https://help.sap.com/docs/SAP_ERP/56f7319a9048445eb86221af73cab72b/b8f1d353ca9f4408e10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Revaluation of consumption",
+      "https://help.sap.com/docs/SAP_ERP_SPV/56f7319a9048445eb86221af73cab72b/adf0d353ca9f4408e10000000a174cb4.html"
+    ],
+    [
+      "SAP Learning · Actual costing and multilevel price determination in S/4HANA",
+      "https://learning.sap.com/courses/product-cost-planning-in-sap-s-4hana/describing-material-ledger"
+    ]
+  ],
+  "shelf": "Valuation & invoice verification"
+}

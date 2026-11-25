@@ -1,0 +1,105 @@
+{
+  "id": "pur-price-scale-boundary",
+  "level": "Advanced",
+  "shelf": "Purchasing",
+  "area": "pricing",
+  "topic": "Purchasing price scales",
+  "title": "Rebuild the price break when a supplier orders by carton and quotes per hundred pieces",
+  "lead": "A replenishment buyer orders ten cartons of retaining clips and gets a unit cost below the figure displayed on the supplier info record. A second buyer orders nine cartons a day later and gets a higher rate. The supplier agrees with both orders. The purchasing manager sees two exceptions and proposes replacing the price in the master. Before changing anything, translate both orders into the unit on the scale and reconstruct the condition that priced each item. An identical supplier and material can legitimately produce two unit prices.",
+  "keywords": [
+    "ME13",
+    "ME23N",
+    "purchasing info record",
+    "price scale",
+    "scale base",
+    "order unit",
+    "order price unit",
+    "price unit",
+    "validity period"
+  ],
+  "sections": [
+    [
+      "Write the commercial rule in full",
+      "The supplier sells clips in cartons of 120 pieces. It quotes 36 currency units per 100 pieces for small orders, 33 per 100 from 1,200 pieces, and 31 per 100 from 2,400 pieces. For the worked example each threshold selects a single rate for the entire eligible PO item. There are no graduated brackets, pooled quantities, end-of-period rebates, freight, taxes or supplementary discounts in the example. The agreement uses one currency and a fixed conversion of 120 pieces per carton. A buyer can now predict a price before looking at SAP.\n\nObtain this wording from the agreed terms or price list. A supplier may instead grant the 33 rate only for pieces above the threshold, or pay a rebate later based on accumulated purchases for the year. Those terms have different consequences even when all three prices appear on the same page of a commercial offer. Read whether the threshold applies per order, per individual line, per shipment or after combining separately authorized purchases. If the business terms say “per shipment,” an order split into two dispatches can change what the supplier considers eligible. SAP configuration and condition records must represent the intended event. Testing a simple per-item scale is a deliberate choice for this case."
+    ],
+    [
+      "Put units on every number",
+      "Read the PO quantity together with its order unit. Ten cartons is 1,200 pieces. Read the order price unit and the numeric price unit as separate inputs. Quoting 33 per 100 pieces means one commercial rate applies to a block of 100 pieces. It is neither 33 per piece nor 33 per carton. In the sample the scale compares a quantity expressed in pieces. The resulting item value is the number of pieces divided by 100 and multiplied by the applicable rate. Substitute the units aloud if the labels on the screen are abbreviated.\n\nOne way to expose reversed factors is to price exactly one carton under the small-order tier. The purchaser expects 120 pieces times 0.36, or 43.20. A setup yielding 0.30, 36 or 4,320 currency units suggests that a physical or pricing conversion has been applied incorrectly or omitted. Consult the unit definitions in the material and purchasing info record, then inspect what the actual purchasing document adopted. Classic Purchasing can use an info record to propose its order unit, order price, order price unit and the associated conversion. The saved order is evidence of what happened in that case, even if someone changes the default afterward."
+    ],
+    [
+      "Compare the two real quantities at the threshold",
+      "Nine cartons contain 1,080 pieces. That is below the 1,200-piece threshold, so the first rate applies. The net merchandise amount is 1,080 divided by 100 times 36, giving 388.80. Ten cartons reach 1,200 pieces exactly, so the second rate applies to the full quantity under the agreement. The value is twelve hundreds times 33, or 396.00. One additional carton increases the total by just 7.20. The supplier still provides 120 extra pieces, but the discount now extends to the entire item. This is why comparing only the last carton at either unit rate gives the wrong difference.\n\nAn eleventh carton raises the quantity to 1,320 pieces without crossing another break. At 33 per hundred, the value is 435.60. The difference between ten and eleven cartons is now 39.60. Show both increments to the buyer. The first includes a change of rate on the original nine cartons, and the second applies the existing lower rate to a further 120 pieces. A sourcing decision can take advantage of the price break only when the business genuinely needs the additional quantity and can store it. The modest 7.20 incremental cost at the first break does not justify generating fictitious demand or ignoring shelf life, carrying cost and ordering authority."
+    ],
+    [
+      "Find the actual scale behind the document",
+      "In classic ECC, use ME13 to inspect the purchasing info record in the relevant purchasing organization and plant context. Identify the vendor-material combination, record type, validity period and applicable condition. Display its scales. Record the currency, rate, rate unit, threshold unit and the lowest applicable bracket. SAP documents that the net price visible in the info record and the PO's net price can differ because the order uses a price/quantity scale. A screenshot of the single info-record summary amount does not reveal how the specific ordered quantity was evaluated.\n\nRead the saved PO in ME23N and inspect the item conditions and the available pricing analysis or condition detail. Trace the active amount back to its source where the system provides it. Check for a contract reference, a manually entered rate, an earlier copied price, supplementary conditions, or a separate order-unit-dependent price. Any of these can invalidate the assumption that the same info-record record supplied both orders. Make note of the pricing date and check validity against the relevant condition period, rather than relying on today's master-data display. A record that was valid when the buyer placed the order may no longer be the one shown by default in the current screen."
+    ],
+    [
+      "Design a boundary test with a meaningful failure",
+      "Construct a fresh QA order for each of nine, ten and eleven cartons using the same vendor, plant, purchasing organization, material, dates and agreed buying unit. Use a consistent sourcing/reference route and capture the result before any manual change. For each test compare the order quantity, its piece equivalent, the selected rate and the calculated item net value. All four must match the prediction. If the price somehow comes out to 396 at ten cartons while the condition detail shows 36 per hundred plus a separate discount of 36, the financial result matches this one case but the mechanism differs. It could fail on the next quantity or validity interval.\n\nNow test an eligible small quantity. Suppose a maintained scale has a first qualifying row at 1,200 with no lower bracket for the condition. SAP's classic time-dependent conditions example explains why a scale may need an initial zero-quantity entry to cover smaller amounts. Under this sample design the nine-carton test must find the small-order rate. A different condition or a fallback price may still give the PO some price, which is why inspecting only whether the net value is nonzero is insufficient. The useful negative test proves that the specifically intended condition and bracket apply below the first commercial break."
+    ],
+    [
+      "Separate delivery splits from price eligibility",
+      "The ten-carton PO can be scheduled as two deliveries of five cartons on distinct dates. Under the explicit per-item assumption the buyer still ordered one 1,200-piece item. A second business arrangement might ask for two independently priced five-carton items. Each of those would contain 600 pieces and, under a straightforward independent item scale, cost six hundreds times 36, or 216. Together they would be 432, which exceeds the one-item price of 396 by 36. The buyer must understand why those purchasing structures differ before converting two separate requisitions or consolidating a requirement.\n\nDo not generalize the independent-line result to every implementation. The active conditions, scale basis, quantity aggregation and negotiated treatment can differ. If the commercial owner expects two separate items to earn a combined break, reproduce that exact pair in QA and inspect which quantity drove pricing. An annual purchase volume appearing in an analytics report does not establish a pricing basis for today's order. A later settlement or rebate agreement might reward spending over many documents while the visible purchase order still carries its own lower-volume rate. Distinguish a prospective correction to the master from a commercial adjustment owed for goods already ordered under historical terms."
+    ],
+    [
+      "State what should change and what the evidence supports",
+      "Suppose the nine-, ten- and eleven-carton tests return 388.80, 396 and 435.60, and the PO conditions and vendor terms substantiate each price. Close the incident as an explained quantity break and retain the arithmetic with the source record. The remaining work is to improve the buyer's comparison report if it treats every different unit price as an exception. Include quantity in scale units, pricing date and applicable rate basis beside the observed amount so the report can highlight a real mismatch. A high-volume buyer receiving a lower unit cost is now readily distinguishable from a document priced in the wrong unit.\n\nIf the ten-carton case instead prices at 432, isolate whether SAP saw 1,200 pieces in the scale comparison, whether the 1,200 break exists in the active record, and whether the PO used that record. Correct the first verified failure through the appropriate master-data or configuration owner and retest adjacent quantities. Treat already issued POs as separate commercial documents whose change and output status needs review. The condition correction should have a defined effective date, a demonstrated boundary result and a clear list of affected open commitments. The purchasing manager can then explain exactly why two orders share a price or why they legitimately differ."
+    ]
+  ],
+  "visual": {
+    "title": "A per-item quantity scale with 120 pieces per carton",
+    "headers": [
+      "Order quantity",
+      "Quantity on piece scale",
+      "Rate per 100 pieces",
+      "Item net value"
+    ],
+    "rows": [
+      [
+        "1 carton",
+        "120",
+        "36.00",
+        "43.20"
+      ],
+      [
+        "9 cartons",
+        "1,080",
+        "36.00",
+        "388.80"
+      ],
+      [
+        "10 cartons",
+        "1,200",
+        "33.00",
+        "396.00"
+      ],
+      [
+        "11 cartons",
+        "1,320",
+        "33.00",
+        "435.60"
+      ],
+      [
+        "20 cartons",
+        "2,400",
+        "31.00",
+        "744.00"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP Purchasing · Conditions in purchasing info records",
+      "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/4e7fb65334e6b54ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP Purchasing · Maintaining time-dependent conditions and scales",
+      "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/ea7fb65334e6b54ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP Purchasing · Units of measure in purchase orders",
+      "https://help.sap.com/docs/SAP_ERP_SPV/967e1c2a6a8c4183b7e07d28e7574445/af7eb65334e6b54ce10000000a174cb4.html"
+    ]
+  ]
+}

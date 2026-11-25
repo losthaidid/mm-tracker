@@ -1,0 +1,100 @@
+{
+  "id": "val-transfer-receiving-standard",
+  "level": "Advanced",
+  "area": "stockval",
+  "topic": "Valuation of plant-to-plant transfers",
+  "title": "Why did moving 50 pieces between our own plants produce an income posting?",
+  "lead": "The shipping plant and the receiving plant belong to the same company. No vendor sent an invoice and no customer bought the goods. Even so, an accountant reviewing a one-step stock transfer finds an income line of 150. The explanation lies in the relationship between the issuing valuation price and the receiving material's price control. Use one set of quantities to predict the entries, then adjust the facts to distinguish a legitimate valuation difference from an incorrect plant, an unexpected valuation type or a transfer posted with the wrong process.",
+  "keywords": [
+    "plant transfer",
+    "301",
+    "one-step transfer",
+    "valuation area",
+    "standard price",
+    "moving average",
+    "expense/income from stock transfer",
+    "AUM"
+  ],
+  "sections": [
+    [
+      "Identify which stock-transfer procedure actually occurred",
+      "A transfer between two storage bins, a transfer between two plants and an intercompany buying arrangement can all look like a truck moving boxes. The posting logic requires a more precise description. Begin with the material document and verify the issuing material, plant, storage location, receiving plant and movement type. For this ECC case both plants are in one company code, each is a distinct valuation area, and the plant posts an ordinary one-step transfer from its own unrestricted-use stock to the other plant's unrestricted-use stock. The classic inventory movement type for this path is 301. There is no stock transport order, delivery document, intercompany billing, split valuation, tax or exchange-rate effect.\n\nA one-step posting reduces the source quantity and increases the destination quantity in the same transfer event. It places no open in-transit step between them in this example. That matters because a report about outstanding goods in transit calls for different evidence. Ask the requester for the actual procedure instead of assuming every interplant movement was a transfer with an STO. Also verify that both material records are extended and valued as expected. The example concerns a valuated material and two different plant valuation records. Two departments using the same company code can legitimately maintain different prices on those records."
+    ],
+    [
+      "Reconcile the sending side before looking at the difference",
+      "Plant A has 100 units valued at a standard price of 18 per piece, total 1,800 in the company currency. The warehouse transfers 50 units to Plant B. The issuing valuation removes 900 from inventory, calculated as 50 times 18. A is left with 50 pieces and value of 900. This is the value leaving the source, regardless of the warehouse distance or the value the receiving plant uses for its own production costing. In the standard process the transfer value is based on the issuing material's valuation price. If A used moving average instead, use the actual valuation at that posting. The sender's current price next month is irrelevant to this historical document.\n\nCheck the price unit while reconstructing this number. An accounting price of 1,800 per hundred pieces has the same per-piece amount as 18 per one. A report printing only the first number can make the transfer look a hundred times too large. Confirm the material base unit and conversion if the warehouse moved five cartons of ten. Where a material document contains multiple positions carrying similar descriptions, isolate the exact sending and receiving item pair. A transfer of 50 pieces followed by a reversal and a new transfer of 45 would create a very different financial story from a single net quantity copied out of a period report."
+    ],
+    [
+      "Value the receipt at the receiving standard",
+      "Plant B begins with 20 pieces carrying a fixed standard of 21 per piece, total value 420. Its 50 new pieces must carry 1,050 at that standard. After the receipt Plant B holds 70 pieces and value of 1,470. Compare the two sides. Inventory receives a 1,050 debit in B while 900 is credited out of A. A credit of 150 is needed to balance those entries. Under the standard transfer posting with these assumptions it represents income from the valuation difference on stock transfer. The company has gained no pieces in total, but it now holds more of those pieces in a valuation area where the standard per piece is higher.\n\nThe before and after totals provide a control independent of the journal. Before posting the company holds 120 pieces worth 2,220, with 1,800 at A and 420 at B. Afterwards it still holds 120 pieces, with 900 at A and 1,470 at B, a total value of 2,370. The value rise of 150 agrees with the difference line. This explanation concerns the configured legal inventory values. It makes no statement about an external sales margin, a cash inflow or a supplier claim. A controller evaluating operational performance needs to know that the observed income accompanied a change in valuation location, rather than a negotiation that reduced purchase cost."
+    ],
+    [
+      "Predict the result when the receiving plant uses moving average",
+      "Keep A at 18 and keep the quantities identical, but suppose B's starting 420 on 20 pieces represents moving-average valuation. The receiving stock can absorb the 900 carried by the transfer. B now has 70 pieces valued at 1,320. Its new average is approximately 18.857143 per piece, compared with 21 before the transfer. Actual display rounding will depend on price unit and currency precision. Under these simple conditions there is no separate 150 income posting. A's reduction of 900 exactly matches B's increase of 900. The same company-wide starting stock value of 2,220 remains 2,220.\n\nExplain this comparison to a planner who calls B's price drop an error. B formerly owned only 20 pieces at a high average. It received another 50 at the sender's lower carrying value, so the pooled average decreased even though its inventory total increased. Multiplying the rounded screen price of 18.86 by 70 yields 1,320.20. The underlying total remains the 1,320 in the example. A small discrepancy introduced by a worksheet's rounded display should be distinguished from an actual posted accounting difference of 150. At a real site, negative stock, valuation changes or other events between the observations deserve their own reconstruction before using this no-residual expectation."
+    ],
+    [
+      "Use the direction of the posting as a diagnostic clue",
+      "Now suppose B's true standard had been 16 instead of 21. Its receiving debit on 50 pieces would be 800. Stock worth 900 would leave A. The transfer would need an expense debit of 100 to balance the 900 credit. The sign changes when the receiving standard goes from above to below the issuing valuation. An unexpected debit on a transfer the user expected to generate a credit should therefore prompt verification of which plant actually issued, the actual valuation price at the posting and the receiving valuation type. Swapping the labels on a spreadsheet can manufacture a contradiction that the material document resolves in seconds.\n\nExamine the FI document from the transfer and identify the inventory and difference accounts actually used. In classic automatic account determination the transaction or event key commonly associated with expense or revenue from stock transfer is AUM. Obtain the actual account determination or simulation evidence in the relevant system before naming a G/L number. The chart, valuation grouping, material classification and posting settings can vary. Where an account number is shared by both plants, amounts can appear netted or grouped in a financial view. The material and valuation records still let you reconstruct each side. A proposal to change an account in OBYC cannot explain why the signed value difference has its size. First establish the quantity and prices that generated it."
+    ],
+    [
+      "Reproduce the smallest distinction that matters",
+      "An effective quality-system demonstration uses two valued plants in one company code and a material whose valuation inputs are known. Read and record the source and destination stocks, fixed or moving prices, valuation unit and the destination price control. Prepare an authorized test movement with enough source quantity. Predict the source leaving value and destination carrying value in advance. After posting, read the material and FI documents and compare the two predictions. If B is configured for standard, deliberately choose different values in an appropriate disposable test material so that the direction of the difference can be observed. Existing live standards should be maintained only under the company's approved costing process.\n\nChange one condition in a separate test. Equal standards at the two plants eliminate the price differential in the simplified case. Moving stock between storage locations within a single plant normally preserves the same valuation record for ordinary, unchanged stock and valuation type. A two-step plant transfer, on the other hand, introduces a distinct sequence of quantity and valuation evidence. A stock transport order can add purchasing and shipping documents and different account flows, especially across company codes. The one-step 301 arithmetic demonstrates a specific valuation mechanism. Use its conditions as a decision point before applying it to a ticket involving delivery-based, cross-company, special-stock or differently valued transfers."
+    ],
+    [
+      "Explain the movement to the controller who saw income",
+      "Write the conclusion in the company's terms. Fifty pieces left A at 18, reducing its inventory by 900. The same fifty entered B at 21, increasing its standard-valued stock by 1,050. The 150 income is the amount that reconciles the two fixed valuation records. The truck changed where the inventory is valued. If both prices, plants and material identities were correct, the financial entry is consistent with the selected process. If one plant used an obsolete standard or the receiver chose the wrong valuation type, decide with the responsible owner how to correct the underlying record and any affected postings.\n\nKeep the material document number and year, both valuation records, and the accounting document with the explanation. When Finance asks whether anything should be cleared through GR/IR, use the actual journal as evidence. This one-step internal transfer has no vendor receipt and invoice pair to match. Creating a zero-price vendor order or a compensating invoice would add a separate commercial process with no basis in the physical movement. The business decision is whether the two plant standards and the chosen transfer route accurately reflect the company’s operation. Once those two questions are answered, the 150 can be explained and reproduced without inventing a supplier or a customer."
+    ]
+  ],
+  "visual": {
+    "title": "The receiver's price control changes the disposition of the same 900 transfer",
+    "headers": [
+      "B valuation",
+      "A inventory credit",
+      "B inventory debit",
+      "Difference on transfer",
+      "B ending value for 70"
+    ],
+    "rows": [
+      [
+        "Standard 21",
+        "900",
+        "1,050",
+        "150 credit",
+        "1,470"
+      ],
+      [
+        "Moving average, prior 420 on 20",
+        "900",
+        "900",
+        "0",
+        "1,320"
+      ],
+      [
+        "Standard 16, prior 320 on 20",
+        "900",
+        "800",
+        "100 debit",
+        "1,120"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Stock transfer between plants in one step",
+      "https://help.sap.com/docs/SAP_ERP_SPV/b704a8db767040a08100adc846218964/0262bd534f22b44ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Comparison of transfer procedures and movement types",
+      "https://help.sap.com/docs/SAP_ERP/96bf9ad642cf4b26a29595e3d573fb8c/5213b953495bb44ce10000000a174cb4.html"
+    ],
+    [
+      "SAP S/4HANA · How the receiving plant's price control treats the stock-transfer difference",
+      "https://help.sap.com/docs/SAP_S4HANA_CLOUD/af9ef57f504840d2b81be8667206d485/a35eb6531de6b64ce10000000a174cb4.html"
+    ],
+    [
+      "SAP S/4HANA on-premise · Stock transfer across valuation areas",
+      "https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/91b21005dded4984bcccf4a69ae1300c/b664bd534f22b44ce10000000a174cb4.html"
+    ]
+  ],
+  "shelf": "Valuation & invoice verification"
+}

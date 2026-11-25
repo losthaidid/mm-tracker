@@ -1,0 +1,101 @@
+{
+  "id": "mrp-dynamic-safety-stock-trigger",
+  "level": "Advanced",
+  "shelf": "Inventory & special procurement",
+  "topic": "Dynamic safety stock and coverage profiles",
+  "title": "Why did a two-piece fall in available stock trigger a 42-piece proposal?",
+  "lead": "A packaging cell still has 39 adhesive cartridges available for its future work, yet the planning run proposes another 41. A comparable cell showing 40 receives no additional proposal at that point. One more issue to 38 would produce a proposal of 42 under the assumptions in this chapter. The step change is the intended effect of a minimum range and a target range of coverage. The planner needs both numbers to explain the suggestion to Purchasing.",
+  "keywords": [
+    "range of coverage profile",
+    "dynamic safety stock",
+    "average daily requirement",
+    "minimum stock level",
+    "target range",
+    "statistical coverage",
+    "MRP"
+  ],
+  "sections": [
+    [
+      "Translate a policy in days into quantities on a date",
+      "The manufacturer uses a common adhesive cartridge across several packaging orders. Its procurement lead wants a buffer that follows the production programme. A single static number of cartridges would protect many days on a quiet line and very few during a high-volume campaign. The company therefore assigns an appropriate range of coverage profile to the material for this planning scenario. In classic SAP terminology, the target level calculated from the statistical range of coverage is a dynamic safety stock. At a given point in the requirements sequence, the system can use a minimum level to decide whether replenishment is required and a target level to determine the desired replenished position.\n\nUse two weekly requirement periods, 80 cartridges in the first week and 120 in the second. The illustrative profile uses five standard days per weekly period when calculating the average. Two hundred cartridges over ten days yield an average daily requirement of 20 cartridges. These values are requirements for the eligible planning segment and measurement window. They are not the number of cartridges actually issued yesterday or an annual average from a purchasing report. Gather the periods, requirement quantities, and day-count basis together before reconstructing a dynamic stock figure.\n\nFor the part of the horizon now being examined, let the minimum coverage be two days, target four and maximum six. The resulting stock levels are 40, 80 and 120 cartridges. A master-data owner can explain the rule as two, four and six days, but the planning check on this date sees these calculated quantities. The values are illustrative, not suggested SAP defaults. In an actual client check the effective profile, its date-specific settings, and the demands included in the average."
+    ],
+    [
+      "Run the test one cartridge either side of the minimum",
+      "First consider a specific planning element after which projected available stock is 41. No other shortfall, existing supply adjustment, buffer rule or lot-size constraint applies. The available position is above the calculated minimum of 40. The system therefore has no reason through this particular minimum-stock check to top up the balance to 80. It is possible for the projected balance to remain below target quite legitimately. Think of the target as the level to replenish to after intervention, with the minimum as the trigger for that intervention.\n\nAt 40, the position equals the minimum. SAP describes the trigger as falling below the minimum. At 39, the position is one cartridge below the minimum and 41 below the target. With exact lot sizing the illustrative new procurement quantity is therefore 41. At 38 it would be 42. If the team insists that only one extra cartridge was needed at 39, ask which business target one cartridge would restore. It would bring stock only to the minimum, leaving the very next withdrawal to trigger another tiny order. The chosen profile creates room between successive replenishment decisions.\n\nThe figures in the table are separate observations against the same average and thresholds. They are not consecutive releases of 41 and 42. In a real sequence once an eligible timely receipt has been created, consider it in the available position of subsequent elements. If an analyst adds both illustrative proposals to a production forecast, the result double counts a receipt that would already have altered the second calculation. Reconstruct one position at a time and include prior proposals in the order in which they actually provide available supply."
+    ],
+    [
+      "Identify which days supplied the denominator",
+      "A finance colleague has divided the same two weeks of demand by fourteen calendar days and produced an average of about 14.29 cartridges. On that basis two days of protection appear to require about 28.57 cartridges. A balance of 39 would appear safe. Both calculations started from a plausible 200, but only one used this example's configured denominator of ten. The day unit attached to a range needs to be consistent with the profile that produced the average. Recover the configuration and relevant planning dates instead of substituting a preferred definition of a trading week.\n\nA plant may have a local shutdown or a six-day factory calendar while the profile for the case uses a fixed period length. Changing the factory calendar, adjusting the profile's period definition and changing the demand dates are different interventions. For an investigation, write down which inputs would actually change if a production manager announces a shutdown. If requirements are rescheduled outside the measured periods the numerator can change. If the period length is defined independently of calendar days, counting the holiday again in your own divisor may create an artificial difference. Make the same calculation using the effective profile in the QA plant.\n\nA similar error occurs with the averaging horizon itself. Averaging only the quieter 80-cartridge first week over five days produces 16, a 32-piece minimum and a 64-piece target. Averaging only the busier 120-cartridge second week produces 24, a minimum of 48 and a target of 96. Neither reconstructs the 40/80 result of the example. If the material count on a support ticket seems to oscillate, inspect the whole observation window and the timing of the underlying requirements before attributing the difference to faulty purchasing master data."
+    ],
+    [
+      "Distinguish new demand from a newly calculated buffer",
+      "In a separate comparison, increase the second week's requirements from 120 to 160 and leave the standard day count at ten. The new average across the chosen periods is 24. The same two-, four- and six-day policy translates into levels of 48, 96 and 144. For a test position of 39 and exact lot sizing, a top-up to 96 calls for 57. Compare 57 with the earlier 41. The difference of 16 comes from the target moving from 80 to 96 with the changed demand rate. This isolates the buffer effect by holding the measured available position constant in the two trials.\n\nIn a live plan the newly added requirement can also change the projected available quantity at its own date. A single change to demand can therefore affect both the available balance and the intended buffer. To explain a real proposal, show the time sequence of issue and receipt elements as well as the average. One cannot reliably calculate all planned buys by multiplying the revised average by four and adding that target as a new requirement at every row. The target represents desired coverage that earlier receipts can already support.\n\nAnother configuration can vary the minimum, maximum and target ranges across periods or use date-specific ranges. A material might require a larger buffer before an annual plant closure and ordinary protection outside it. If the curve moves while the average daily requirement stays the same, look for a change in the applicable range. If the number of coverage days stays fixed, look for a changed average or starting position. These are different explanations even when both yield exactly the same final procurement quantity."
+    ],
+    [
+      "Resolve apparent excess without editing a committed order by assumption",
+      "Return to the original average of 20 and maximum level of 120. Suppose an additional already-committed receipt pushes the projected available balance to 135. The maximum is meaningful in this procedure, particularly when eligible unfirmed proposals can be adjusted. The commercial identity of a receipt matters. A calculated excess of 15 does not authorize reducing a supplier's accepted order by 15. Identify the category, date, quantity, firming and status of the contributing receipt, and examine exception or adjustment evidence on the actual planning result.\n\nFor a QA comparison, supply the same physical quantity once as an eligible adaptable proposal and once as a firm receipt or existing PO. Inspect whether the system can adjust a proposal or instead leaves an excess position for the planner to handle. A buyer may be able to negotiate a return, postpone delivery or use the stock elsewhere, each with its own commercial and inventory effects. A planner can also justify holding excess if a critical event is due sooner than the original requirements represented. The profile provides evidence of an exception, not a substitute for that decision.\n\nCheck the lot-sizing procedure before declaring the 80 target defective. If the only permitted procurement size is a full carton, the feasible proposed quantity can move projected stock beyond the simple exact target calculation. The calculated range of coverage still explains the intended intervention. Preserve the intermediate shortage and desired target, then account for lot sizing and rounding separately. For an initial test, choose units and limits that permit the exact top-up so the behavior of the range itself is observable."
+    ],
+    [
+      "Make the coverage decision intelligible to the people who carry the stock",
+      "Ask the packaging supervisor what four days of cover is intended to protect. It might be a short disruption in incoming supply during a stable production week. A long supplier outage, a sudden one-day surge, or cartridges whose shelf life is short may require a different policy. Average demand is an approximation. If the entire 200 cartridges must be issued on the first morning, a buffer calculated from a 20-per-day average is poor evidence of physical readiness on that morning. Show the actual dated requirement and confirmed supply alongside the range calculation. SAP distinguishes the statistical planning range from evaluations of the actual days of supply.\n\nFor acceptance, retain one case with a projected balance exactly equal to minimum, one just below it, a changed demand rate with the same coverage settings, and an excess with a firm receipt. Name the date and eligible planning segment for every observation. Confirm which decision belongs to the planner, which belongs to the material master owner and which needs buyer agreement. A coverage profile shared across many materials should be changed only after examining how each material converts its particular average daily quantity into stock.\n\nThe original purchasing proposal now has a concise explanation. Two hundred cartridges in ten assumed planning days produced a daily requirement of 20. Two days translated to a trigger of 40. Four days translated to a target of 80. At projected stock of 38 the run needed 42 for that target under the example's exact-lot assumptions. A warehouse count alone could never have reconstructed the 42 because the business chose to express protection in days of future demand."
+    ]
+  ],
+  "visual": {
+    "title": "Trigger and top-up with average daily demand of 20",
+    "headers": [
+      "Projected available before intervention",
+      "Below minimum 40?",
+      "New exact-lot quantity from this check",
+      "Projected balance afterwards"
+    ],
+    "rows": [
+      [
+        "41",
+        "No",
+        "0",
+        "41"
+      ],
+      [
+        "40",
+        "No",
+        "0",
+        "40"
+      ],
+      [
+        "39",
+        "Yes",
+        "41",
+        "80"
+      ],
+      [
+        "38",
+        "Yes",
+        "42",
+        "80"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Ranges of coverage in MRP",
+      "https://help.sap.com/docs/SAP_ERP/85d3fce10e264972a0155c8b46ecf93b/87aace5314894208e10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Statistical range of coverage",
+      "https://help.sap.com/docs/SAP_ERP/85d3fce10e264972a0155c8b46ecf93b/44acce5314894208e10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Minimum, maximum and target stock levels",
+      "https://help.sap.com/docs/SAP_ERP/85d3fce10e264972a0155c8b46ecf93b/4aacce5314894208e10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Calculating dynamic safety stock",
+      "https://help.sap.com/docs/SAP_ERP_SPV/85d3fce10e264972a0155c8b46ecf93b/4dacce5314894208e10000000a174cb4.html"
+    ],
+    [
+      "SAP S/4HANA on-premise · Worked statistical coverage calculation",
+      "https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/fe39e10a9a864a8f8dc9537704f0fa13/50acce5314894208e10000000a174cb4.html"
+    ]
+  ],
+  "area": "planning"
+}

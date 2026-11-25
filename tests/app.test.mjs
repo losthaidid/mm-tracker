@@ -5622,7 +5622,7 @@ test('SAP Terms: transaction selection opens the matching example and supports m
 function provideLearningContent(window, failFirst = false) {
   const requests = [];
   window.fetch = async url => {
-    const file = new URL(url, window.location.href).pathname.split('/').at(-1);
+    const file = new URL(url,window.location.href).pathname.split('/learning/').at(-1);
     requests.push(file);
     if (failFirst && requests.length === 1) throw Error('Offline');
     return { ok: true, json: async () => JSON.parse(readFileSync(new URL('../learning/' + file, import.meta.url), 'utf8')) };
@@ -5644,7 +5644,8 @@ test('SAP MM 101: browse without saving, edit and move a chapter, manage folders
   button('folder','sap-mm-101').click();
   assert.equal(document.querySelectorAll('.kg-shelf').length, 5);
   button('folder','sap-mm-101-valuation').click();
-  assert.equal(document.querySelectorAll('.kg-chapter').length, 13);
+  assert.ok(document.querySelectorAll('.kg-chapter').length >= 13);
+  assert.ok(document.querySelectorAll('.kg-chapter').length <= 24);
   button('read','garden-coverage').click();
   assert.ok(document.querySelector('.kg-reader meter'));
   assert.match(document.querySelector('.kg-reader').textContent, /140/);
@@ -5695,7 +5696,7 @@ test('SAP MM 101: browse without saving, edit and move a chapter, manage folders
   assert.equal(h.notes.find(n => n.id === note.id).folderId, 'sap-mm-101');
   assert.equal(h.knowledgeFolders.find(f => f.name === 'My evidence').parentId, 'sap-mm-101');
   assert.equal(db.row.document.data.workhub.knowledgeChapters['garden-coverage'].title, 'My invoice variance example');
-  assert.deepEqual(requests, ['mm-101.json', 'mm-101.json']);
+  assert.deepEqual(requests, ['mm-101-index.json', 'mm-101-index.json']);
   const restored = await app(t,{remote:copy(db.row)});
   provideLearningContent(restored.window);
   await restored.api.refreshCloud();
@@ -5819,4 +5820,100 @@ test('SAP MM 101: member access controls folder creation, chapter edits, view-on
   await rights({mode:'hidden'});
   assert.equal(document.getElementById('modal').open,false);
   assert.equal(document.getElementById('kgNav'),null);
+});
+
+test('SAP MM 101: long chapters open on demand, retry safely and keep edits without duplicating source text', async t => {
+  const { api, window, document, db } = await app(t);
+  const requests = provideLearningContent(window);
+  const fetchFile = window.fetch;
+  const id = 'liv-one-hundred-billed-sixty-received';
+  const path = 'mm-101-chapters/advanced/' + id + '.json';
+  let resolveFirst;
+  let attempts = 0;
+  window.fetch = async (url,settings) => {
+    if (url.includes(path) && ++attempts === 1) {
+      await new Promise(resolve => { resolveFirst = resolve; });
+      throw Error('Network interruption');
+    }
+    return fetchFile(url,settings);
+  };
+  const go = (op, entry) => document.querySelector('[data-kg="' + op + '"]' + (entry ? '[data-id="' + entry + '"]' : '')).click();
+  api.showTab('knowledge');
+  await settle();
+  const search = document.querySelector('#hubSearch');
+  search.value = 'one hundred ordered sixty received';
+  search.dispatchEvent(new window.Event('input', {bubbles:true}));
+  assert.deepEqual(requests,['mm-101-index.json']);
+  go('read',id);
+  await settle();
+  assert.ok(document.querySelector('#kgLoading'));
+  assert.equal(attempts,1);
+  resolveFirst();
+  await settle();
+  assert.match(document.querySelector('#kgLoading').textContent,/could not load/);
+  go('read',id);
+  await settle();
+  assert.equal(document.querySelector('.kg-reader table').rows.length > 2,true);
+  assert.ok(document.querySelectorAll('.kg-reader h3').length>3);
+  assert.ok(document.querySelector('.kg-reader a[href^="https://"]'));
+  assert.equal(db.calls.length,0);
+  go('edit',id);
+  await settle();
+  let form = document.querySelector('#kgEdit');
+  const original = form.elements.body.value;
+  assert.ok(original.split(/\s+/).length >= 1500);
+  form.elements.name.value='My receipt variance';
+  form.elements.folderId.value='sap-mm-101';
+  submitLocal(window,form);
+  await settle();
+  assert.deepEqual(copy(api.state().workhub.knowledgeChapters[id]),{folderId:'sap-mm-101',title:'My receipt variance'});
+  assert.equal(requests.filter(s=>s===path).length,1);
+  go('folder');
+  go('folder','sap-mm-101');
+  go('read',id);
+  await settle();
+  go('edit',id);
+  await settle();
+  form=document.querySelector('#kgEdit');
+  form.elements.body.value=original+'\n\nMy QA finding for this receipt.';
+  submitLocal(window,form);
+  await settle();
+  assert.match(db.row.document.data.workhub.knowledgeChapters[id].body,/My QA finding/);
+  assert.equal(requests.filter(s=>s===path).length,1);
+});
+
+test('SAP MM 101: a 3,000-chapter index paginates, filters and can be reorganized from metadata alone', async t => {
+  const {api,window,document,db} = await app(t);
+  const rows = Array.from({length:3000},(_,i)=>({
+    id:'reader-volume-'+i,title:'Worked purchasing question '+i,level:['Practitioner','Advanced','Expert'][i%3],
+    shelf:'Purchasing',area:i%2?'Receipt reconciliation':'Order processing',terms:'MIGO',
+    topic:'Goods movements',lead:'Read the evidence.',words:1750,revision:'abc123'
+  }));
+  let attempts=0;
+  window.fetch=async url=>{
+    assert.match(url,/mm-101-index\.json/);
+    attempts++;
+    return {ok:true,json:async()=>rows};
+  };
+  api.showTab('knowledge');
+  await settle();
+  const change = (id,value) => {
+    const input=document.getElementById(id);
+    input.value=value;
+    input.dispatchEvent(new window.Event('change',{bubbles:true}));
+  };
+  change('kgLevel','Expert');
+  assert.equal(document.querySelectorAll('.kg-chapter').length,24);
+  assert.match(document.querySelector('.kg-pager').textContent,/1–24 of 1000/);
+  document.querySelector('[data-kg="next"]').click();
+  assert.match(document.querySelector('.kg-pager').textContent,/25–48 of 1000/);
+  change('kgArea','Receipt reconciliation');
+  assert.match(document.querySelector('.kg-pager').textContent,/1–24 of 500/);
+  assert.equal(attempts,1);
+  assert.equal(db.calls.length,0);
+  const model = {notes:[]};
+  window.WorkHubKnowledgeGarden.removeFolder(model,'sap-mm-101-purchasing');
+  window.WorkHubKnowledgeGarden.validate(model);
+  assert.equal(Object.keys(model.knowledgeChapters).length,3000);
+  assert.ok(Object.values(model.knowledgeChapters).every(c=>c.folderId==='sap-mm-101' && !('body' in c)));
 });

@@ -1,0 +1,95 @@
+{
+  "id": "pur-confirmation-ladder",
+  "level": "Practitioner",
+  "shelf": "Purchasing",
+  "area": "po",
+  "topic": "Supplier confirmations",
+  "title": "Read an acknowledgment, an inbound delivery and a receipt without counting the same supply three times",
+  "lead": "The production planner sees an order for 240 drive belts, an acknowledgment for 240 and an inbound delivery for 150. A colleague adds the three quantities and reports 630 belts coming to the factory. A buyer looking only at the open PO says 240. The warehouse has actually received 100. Every number came from a real record. Understanding the week ahead depends on what each record represents and which quantity later events have already accounted for. This case follows one classic ECC PO item through the successive confirmations.",
+  "keywords": [
+    "order acknowledgment",
+    "confirmation control key",
+    "inbound delivery",
+    "ME23N",
+    "confirmation monitoring",
+    "MRP-relevant quantity",
+    "receipt quantity"
+  ],
+  "sections": [
+    [
+      "Start with the actual purchasing promise",
+      "The plant orders 240 drive belts from its usual supplier in one purchase order item, with delivery requested for Friday. An order acknowledgment received on Tuesday accepts 240 for Friday. On Thursday the supplier sends a shipping notification for 150 belts. On Friday morning the receiving team posts 100 against that inbound delivery. For this exercise, assume one item, the same unit throughout, a configured confirmation sequence in which both stages are relevant to planning, and correctly matched follow-on quantities. Ignore other POs, prior stock, returns and invoices until the event quantities reconcile.\n\nDisplay the PO in ME23N and identify the purchasing item, receiving plant, material and delivery schedule. Read quantity and unit together. A supplier might write “15” against ten-piece packages while the PO stores belts as individual pieces. A before-and-after comparison needs a common unit and item. Next inspect the confirmation control key and distinguish the date requested by the buyer from what the supplier acknowledged. In the example both show Friday. A different confirmed date changes the time-phased supply picture even if the total ordered quantity remains 240. Preserve both dates, because a factory waiting on Thursday cares about timing as much as the ultimate total."
+    ],
+    [
+      "Understand what the acknowledgment adds",
+      "An order acknowledgment records the supplier's response to the order. It may confirm a quantity and date, split a delivery, or reveal a discrepancy to resolve. In a client using a suitable confirmation control sequence, the acknowledgment can influence the planning view of the open order. It gives better evidence of the expected delivery than the original request alone. It does not increase plant stock. In this case the acknowledgment supports all 240 ordered pieces. Those are the belts already ordered, and the purchasing team can identify the confirmation category and the supplier acknowledgment reference.\n\nConfirm how the plant records the initial response. A business may ask for an acknowledgment on its PO while tracking only an acknowledgment reference. Another process uses categorized confirmations with expected quantities and dates. SAP's classic confirmation monitoring analyses depend on the item having a confirmation control key. Look at the actual item's settings and the procedure in use before expecting a list of date/quantity confirmations for every item. A buyer should also know who records an acknowledgment received outside an automated interface. An email in a personal inbox can explain what the supplier intended, but its presence alone does not update the date or quantity available to the planning process."
+    ],
+    [
+      "Follow the shipping notification into the inbound delivery",
+      "The shipping notification identifies a dispatch for 150 belts. Check the supplier reference, PO item, delivery date and unit against the inbound delivery. In the example it relates to part of the same 240-piece confirmation. It provides newer information on that portion of the requirement. Immediately after this first dispatch and before receipt, a simplified picture is 150 represented at the inbound-delivery stage and 90 remaining at the earlier acknowledgment stage. The original acknowledgment still records the supplier's overall response. Keeping that historic amount visible can look like double counting if the reader adds all the document lines together.\n\nStart with an elementary check on the quantities. One dispatch of 150 against an acknowledgment of 240 leaves 90 still to be dispatched under the worked assumptions. If another dispatch advice arrives for the same 150, establish whether it is a correction or a second shipment. Match the supplier's dispatch identifier, carrier reference, dates, and line quantities, then inspect how the inbound references were created. A duplicated notification can be an operational exception even when the basic subtraction is straightforward. Conversely, one supplier advice may legitimately refer to two trucks. Verify the actual documents before cancelling or creating an inbound delivery. The correct action depends on the event the supplier communicated."
+    ],
+    [
+      "Translate the receipt into remaining coverage",
+      "The receiving team counts and posts 100 belts against the inbound delivery for 150. Goods receipt is the physical posting event in this chain. Under the stated assumptions the open balance on that inbound delivery is now 50. Together with the 90 still acknowledged at the earlier stage, 140 belts remain expected from this PO. The compact reconciliation is 100 already received, plus 50 advised and outstanding, plus 90 awaiting dispatch advice, equalling the original 240. Those categories are mutually exclusive for this case. Showing them in separate columns makes the remaining uncertainty visible to production.\n\nNow add a scheduling detail. The 50 belts could still be at the receiving dock awaiting the next count, or the supplier may have shipped only 100 while erroneously advising 150. The document quantities alone do not decide which explanation is true. Ask receiving for its delivery note, any shortage notation and the matching material document. Ask the supplier to identify what was loaded and whether another vehicle carries the balance. If only 100 were sent and the supplier issues a correction, follow the authorized inbound adjustment process. A second goods receipt for fifty entered simply to make the document balance zero would create a stock claim unsupported by the physical count."
+    ],
+    [
+      "Use SAP's quantities relevant to planning",
+      "Classic Purchasing can display confirmation quantities relevant to MRP, quantities already reduced or offset with regard to MRP, and cumulative quantities. The list that answers “what is still expected?” is different from a list of everything ever confirmed for the item. In SAP's documented succession, a relevant acknowledgment can reduce the quantity at the PO schedule stage, an inbound delivery can reduce the corresponding acknowledged quantity, and a goods receipt can reduce the inbound quantity. The test case deliberately makes those relationships unambiguous. With several schedule lines, dates, partial reversals or differing client settings, inspect the system's actual allocation before applying the three-way arithmetic.\n\nRead the output with a date dimension. Suppose the remaining 90 belts get a confirmed delivery date of next Tuesday. The 50 linked to the existing shipment still have a Friday expectation, while the further 90 no longer support immediate production. The total remaining from this supplier is still 140 if all promises hold. A question about Monday's production has a different answer until the actual availability of the 50 is established. Purchasing can report both the gross outstanding quantity and a dated breakdown of the evidence for it. This lets the planner decide whether another supply option is needed for a particular production date."
+    ],
+    [
+      "Set a reminder for the missing event",
+      "The buyer wants to monitor the unadvised ninety pieces. Determine which confirmation category should arrive next, who is expected to send it, and the due date relative to the PO or requested delivery. In classic ECC Purchasing the confirmation sequence can define deadlines that support monitoring. A rule for acknowledgments a number of days after order creation answers a different question from a rule for shipping notifications a number of days before delivery. Select the appropriate category and purchasing population. An item absent from a particular monitoring run may be outside its configured scope or selection period.\n\nA useful buyer's note for this case would say that acknowledgment A-17 covers 240, dispatch advice D-9 covers 150, and 100 are posted against that inbound reference, with an investigation open on the fifty-piece difference. A second note should identify the planned dispatch date for the remaining ninety and who must confirm it. “Chased supplier” records effort but gives a planner no date or quantity to use. Where the organization sends a formal reminder, follow the output according to local practice. The production team needs evidence of the supplier's response in addition to evidence that a reminder left the company."
+    ],
+    [
+      "Close the item with evidence of the last quantity",
+      "Assume a recount confirms a short shipment of fifty and the supplier schedules both that shortage and the still-unadvised ninety for Tuesday. The purchasing team must reconcile the obsolete open inbound quantity with the corrected dispatch arrangements so the same fifty are not expected twice. The exact adjustment depends on the status and referencing of the client's documents. Keep the original delivery note and link the correction to its actual source. Once the balance is eventually shipped and received, reconcile the 240 ordered against signed goods movements, including any reversals. A confirmation describes what was expected at a point in time. A receipt and its reversal describe what was posted to inventory.\n\nThe working conclusion at Friday's cutoff is precise. The original order covers 240 belts. The supplier acknowledged 240, provided dispatch information for 150, and the warehouse posted 100. A further 140 are operationally outstanding in the simplified example, with different evidence for the fifty and the ninety. This is enough for the plant to discuss an immediate shortage with the carrier, a future dispatch with the supplier, and the remaining production risk with the planner without interpreting 630 as physical supply."
+    ]
+  ],
+  "visual": {
+    "title": "Keep the 240 belts in mutually exclusive stages",
+    "headers": [
+      "Cutoff",
+      "Received",
+      "At inbound stage, open",
+      "At acknowledgment stage, open",
+      "Total accounted for"
+    ],
+    "rows": [
+      [
+        "After acknowledgment",
+        "0",
+        "0",
+        "240",
+        "240"
+      ],
+      [
+        "After 150 advised",
+        "0",
+        "150",
+        "90",
+        "240"
+      ],
+      [
+        "After 100 received",
+        "100",
+        "50",
+        "90",
+        "240"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP Purchasing · Monitoring confirmations and their MRP offsets",
+      "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/2380b65334e6b54ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP Purchasing · Monitoring vendor confirmations and deadlines",
+      "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/907db65334e6b54ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP Purchasing · Creating an item with an acknowledgment requirement",
+      "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/1a80b65334e6b54ce10000000a174cb4.html"
+    ]
+  ]
+}

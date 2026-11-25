@@ -1,0 +1,108 @@
+{
+  "id": "val-ml-distribution-vs-allocation",
+  "level": "Expert",
+  "area": "ml",
+  "topic": "Actual costing close exceptions",
+  "title": "Find where a Material Ledger difference stopped before attempting a rerun",
+  "lead": "Two buyers send apparently identical closing tickets. Material U shows 90 of unexplained purchase differences and material D shows 30. Both amounts are visible in Material Price Analysis. The closing coordinator suggests rolling everything into the inventory price. One amount has no eligible current-period quantity over which it can be spread. The other has already entered the component price and is waiting for evidence about a production recipient. Learning to distinguish these points in the calculation prevents a tempting adjustment from placing cost on the wrong material or in the wrong period.",
+  "keywords": [
+    "Material Ledger",
+    "CKM3",
+    "CKMVFM",
+    "not distributed",
+    "not allocated",
+    "price limiter",
+    "stock coverage",
+    "single-level",
+    "multilevel",
+    "zero cumulative quantity"
+  ],
+  "sections": [
+    [
+      "Read the exception relative to the quantity structure",
+      "This is an ECC actual costing investigation. Inspect the material, plant, valuation type, fiscal period, currency and valuation view. The example materials use single-level or multilevel price determination with standard preliminary prices. In the price determination structure, beginning inventory and procurement inputs build the cumulative stock of a period. Eligible differences contribute to the periodic price of that cumulative stock. Consumption and ending inventory then represent uses of the available quantity. Consumption of a component by a higher-level material introduces another task, allocating the relevant component difference onward through the actual production relationship.\n\nSAP's Material Price Analysis distinguishes differences that cannot be distributed over the period's quantity from differences assigned to consumption but not yet allocated through multilevel price determination. The position of the exception relative to the cumulative inventory and consumption categories matters. Record the exact text and the point in the structure where you found it. A value shown before completion of a multilevel step can have a different interpretation from the same value remaining after every relevant step completed. Collect the current run status, job time and material-specific messages with the amounts. A screenshot of a difference account balance from the trial balance cannot determine which calculation or which material produced the unresolved amount."
+    ],
+    [
+      "Reconstruct a difference with no current-period denominator",
+      "Material U is a discontinued part. Its last 30 pieces were purchased and issued in the previous period. In the current period its opening quantity is zero, it has no material receipts and its cumulative available quantity is zero. A legitimate subsequent debit of 90 in the current period refers to the earlier supply. In this simplified case the 90 is recognized in the relevant difference analysis. There is no positive beginning value, current receipt or other activity that would provide quantity for a normal current-period average.\n\nAsk the proposed journal's author to calculate the per-piece increase. Dividing 90 by zero produces no periodic unit increment. Dividing by 30 gives three per previously purchased piece, a sensible historical explanation of the supplier charge. Those 30 pieces are not part of the current cumulative quantity, however, so a current-period calculation cannot use them merely because their purchase order is still navigable. A closing price shown by the system may arise from a fallback strategy when a normal price cannot be calculated. Read the relevant determination message and price basis. A visible number in the price field does not create an eligible inventory quantity. On the stated facts there is zero ending quantity to carry any portion of the 90 as closing inventory."
+    ],
+    [
+      "Distinguish zero ending stock from zero cumulative stock",
+      "Take a related case, U2. Its period opens with 30 pieces at a preliminary 20 each. It makes no new receipts, consumes all 30 during the period, and ends with zero stock. An eligible direct difference of 90 relates to those same 30 pieces. Assume sufficient cumulative coverage, no price limiter restriction and no other cost flows. The period calculation has 30 available pieces and a preliminary value of 600. Including 90 of eligible difference yields 690 divided by 30, or a periodic unit price of 23. All 90 can follow current consumption in this example; there is still nothing to assign to ending inventory.\n\nThe two warehouses look identical on the last day. Both show an empty shelf. Their period structures are radically different. U had no stock available in the period, whereas U2 used all the quantity it carried in. Going straight to the current stock report cannot distinguish these conditions. Build the beginning, receipts, cumulative, consumption and ending quantities for the period. When a genuine shortage exists, compare cumulative quantity with the reference quantity of transactions relevant to the stock coverage check, such as the relevant invoice or settlement. The price limiter can leave some differences undistributed to avoid distorting the material price. Read its actual amount and reference basis from the analysis. Current unrestricted stock alone cannot be substituted into a universal percentage formula."
+    ],
+    [
+      "Trace a difference that already entered the component price",
+      "Material D presents a different pattern. Twenty components are available in the period, each preliminarily valued at 10. Direct procurement differences total 60 and all are eligible for distribution. The material's actual cumulative cost becomes 260, so its periodic unit price is 13. Ten components remain in the raw stock and ten go to a production order. The direct difference can therefore be distributed as 30 to ending raw inventory and 30 to the batch consumed by production. The two amounts together account for all 60. There is no missing denominator on D and the component stock should take only its proper half.\n\nAt the point after single-level processing, the 30 attributed to the production consumption still needs its path through the higher-level material considered by multilevel determination. In the example five finished subassemblies are actually received, each consuming two of D. They have no other lower-level differences and their direct preliminary cost per output is 40, including the components at standard. If the whole 30 is passed to those five, each receives a further 6 and the completed multilevel price becomes 46 per subassembly. If all five remain on hand and closing revaluation is applied under the stated assumptions, their preliminary 200 increases by 30 to 230. Compare this with the raw material's 30 share to ensure the original 60 has been recognized exactly once at its ultimate destinations."
+    ],
+    [
+      "Find the break if D's 30 persists after the close",
+      "Start with the material-specific costing log. Did multilevel determination actually run for D and the receiving subassembly in the same period, and did each material complete successfully? Are you displaying an extract that predates the run? Look at D's consumption and the material, plant, order and posting period of that issue. Then check the actual goods receipt of five subassemblies and the production order or cost collector used to connect input and output. Verify the state of required settlement and any other procurement alternatives. A partner may have given you a bill of material listing two components per output. That describes planned production and is insufficient proof that the recorded cost flow used this order or this output.\n\nConsider an alternate production explanation. Suppose the ten components were actually issued to a maintenance cost center, while an unrelated supplier delivered the five subassemblies against an external purchase order. Their quantities line up perfectly with the planned bill of material, but no actual input-output link supports allocating D's 30 to the purchased assemblies. In that case review the consumption category and treatment of direct consumption with the controlling team. In another case the workshop has genuinely used the components but made no output receipt until the next month. That calls for examining work in process and the period-specific production flow. Applying the same correction to both cases solely to remove a visible amount would cost the wrong recipient."
+    ],
+    [
+      "Use the monitor to separate value flow from FI account balance",
+      "The classic value flow monitor is useful for finding materials with exceptions in a company code, period or costing run. In systems providing it, the price-difference-account monitoring report can also help analyze non-distributed differences. Use the monitor as an index into the material analyses, and keep its selection and threshold settings. The G/L account can include other materials, inactive actual costing materials, direct postings or other valuation contexts. A total on the financial account need not be identical to the sum of the single exception category currently displayed. Reconcile the population and posting status before asserting that an unexplained amount represents a missing accounting document.\n\nFor U, preserve the late subsequent debit and its original commercial reference, the zero cumulative quantity and the run's fallback or coverage message. Discuss the relevant period attribution and accounting treatment with Finance. For D, record the exact 30 consumed and the actual receiver or evidence that multilevel processing is still incomplete. If a rerun is justified by a corrected source document, identify which dependent steps and materials need recalculation. Assess existing close postings and the process for reversing or repeating them under the applicable release. A modification of a limiter setting or forced distribution affects the prices and recipients of value. It needs an explicit business rationale, especially where applying a negative difference would lead to an unrealistic or negative price."
+    ],
+    [
+      "State what is resolved and what still requires judgment",
+      "A reproducible answer for U says that the 90 belongs to a real purchase-price event booked in a period with zero cumulative units. There is no way to support an increase of current closing inventory from the facts given. Finance can assess the result in the context of its close policy and the originating period. For U2, the zero ending stock hides a positive cumulative quantity: the full 90 can belong to current usage in the defined case. For D the direct difference of 60 already entered the component price. Half belongs to its remaining raw inventory and the other half follows the verified production consumption or the actual alternative use.\n\nThese answers identify the calculation step at issue, what is mathematically possible and which record supports each destination. They also prevent a double count: summing D's 60 original difference with the two allocations of 30 would report 120 from a single 60 event. Keep calculations, run messages and accounting postings distinguishable. A closing coordinator can then decide whether an exception represents incomplete processing, legitimate prior-period economics or a source transaction needing correction. The success criterion is a defensible explanation of the amount and its recipient. A report with no visible exceptions is only meaningful when that explanation still holds after the close."
+    ]
+  ],
+  "visual": {
+    "title": "Three period quantity structures with different implications",
+    "headers": [
+      "Material",
+      "Cumulative / ending pieces",
+      "Relevant difference",
+      "Supported interpretation"
+    ],
+    "rows": [
+      [
+        "U",
+        "0 / 0",
+        "90",
+        "No ordinary current-period per-piece allocation"
+      ],
+      [
+        "U2",
+        "30 / 0",
+        "90",
+        "3 per unit, all 90 attributable to consumption under the assumptions"
+      ],
+      [
+        "D",
+        "20 / 10",
+        "60",
+        "30 ending raw stock and 30 used in production"
+      ],
+      [
+        "Finished subassembly from D",
+        "5 / 5",
+        "30 from lower level",
+        "6 per subassembly if the actual production link is valid"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Where undistributed and unallocated amounts appear in Material Price Analysis",
+      "https://help.sap.com/docs/SAP_ERP/56f7319a9048445eb86221af73cab72b/a787d353c6244308e10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Errors during multilevel price determination",
+      "https://help.sap.com/docs/SAP_ERP/56f7319a9048445eb86221af73cab72b/4ef0d353ca9f4408e10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Displaying the value flow monitor",
+      "https://help.sap.com/docs/SAP_ERP/56f7319a9048445eb86221af73cab72b/33f0d353ca9f4408e10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Monitor for price difference account balances",
+      "https://help.sap.com/docs/SAP_ERP/56f7319a9048445eb86221af73cab72b/bb5cdfce59c443d3bcbcca4fdcf80f04.html"
+    ],
+    [
+      "SAP S/4HANA on-premise · Settlement exceptions and fallback prices",
+      "https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/5e23dc8fe9be4fd496f8ab556667ea05/4ef0d353ca9f4408e10000000a174cb4.html"
+    ]
+  ],
+  "shelf": "Valuation & invoice verification"
+}

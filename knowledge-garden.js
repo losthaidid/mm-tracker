@@ -1,7 +1,53 @@
 (function knowledgeGarden(root) {
   'use strict';
   const { escape: esc, option, matrix, references, button } = root.WorkHubLearning;
-  const catalog = root.WorkHubLearning.asset('mm-101.json');
+  const catalog = root.WorkHubLearning.asset('mm-101-index.json');
+  const chapterFiles = new Map();
+  const pageSize = 24;
+  function chapterFile(c) {
+    if (!c.revision) return Promise.resolve(c);
+    if (chapterFiles.has(c.id)) {
+      const pending = chapterFiles.get(c.id);
+      chapterFiles.delete(c.id);
+      chapterFiles.set(c.id, pending);
+      return pending;
+    }
+    if (
+      !/^[a-z0-9][a-z0-9-]{0,99}$/.test(c.id) ||
+      !['Practitioner', 'Advanced', 'Expert'].includes(c.level)
+    )
+      return Promise.reject(Error('This chapter has an invalid index entry.'));
+    const url =
+      './learning/mm-101-chapters/' +
+      c.level.toLowerCase() +
+      '/' +
+      c.id +
+      '.json?v=' +
+      encodeURIComponent(c.revision);
+    const pending = Promise.resolve()
+      .then(() => root.fetch(url, { credentials: 'same-origin' }))
+      .then(async response => {
+        if (!response.ok) throw Error('Chapter unavailable.');
+        const full = await response.json();
+        if (
+          full.id !== c.id ||
+          full.level !== c.level ||
+          full.shelf !== c.shelf ||
+          !Array.isArray(full.sections) ||
+          !full.visual ||
+          !Array.isArray(full.refs)
+        )
+          throw Error('Incomplete chapter.');
+        return full;
+      })
+      .catch(error => {
+        if (chapterFiles.get(c.id) === pending) chapterFiles.delete(c.id);
+        throw error;
+      });
+    chapterFiles.set(c.id, pending);
+    if (chapterFiles.size > 12) chapterFiles.delete(chapterFiles.keys().next().value);
+    return pending;
+  }
   const shelfIds = {
     Foundations: 'foundations',
     Purchasing: 'purchasing',
@@ -63,7 +109,7 @@
       !records ||
       typeof records !== 'object' ||
       Array.isArray(records) ||
-      Object.keys(records).length > 2000
+      Object.keys(records).length > 4096
     )
       throw Error('Check the knowledge chapters.');
     for (const [id, r] of Object.entries(records)) {
@@ -95,7 +141,7 @@
         return {
           id: c.id,
           title: user.title ?? c.title,
-          body: user.body ?? baseBody(c),
+          body: user.body ?? (c.revision ? c.lead : baseBody(c)),
           folderId: ids.has(folderId) ? folderId : '',
           level: c.level,
           source: c,
@@ -179,7 +225,23 @@
     let current = '',
       identity = '',
       level = '',
+      area = '',
+      page = 0,
+      lastFilter = '',
       editor = null;
+    let scopeList, scopeRoot, descendants;
+    function descendantOfCurrent(folder) {
+      if (!current) return true;
+      const list = folders(h());
+      if (scopeList !== list || scopeRoot !== current) {
+        scopeList = list;
+        scopeRoot = current;
+        descendants = new Set(
+          list.filter(f => trail(list, f.id).some(p => p.id === current)).map(f => f.id)
+        );
+      }
+      return descendants.has(folder);
+    }
     const h = () => a.state().workhub,
       token = () => (a.ready() ? JSON.stringify([a.owner(), a.generation()]) : '');
     const can = (op = 'view') => !!token() && a.can('knowledge', op);
@@ -187,7 +249,8 @@
     function sync() {
       const next = token();
       if (next !== identity) {
-        current = level = '';
+        current = level = area = lastFilter = '';
+        page = 0;
         identity = next;
         editor = null;
       }
@@ -215,13 +278,14 @@
       if (active() && document.getElementById('kgNav')) a.render();
     }
     function inScope(folderId, query) {
-      if (!query && !level) return (folderId || '') === current;
-      return !current || trail(folders(h()), folderId).some(f => f.id === current);
+      if (!query && !level && !area) return (folderId || '') === current;
+      return descendantOfCurrent(folderId);
     }
-    const matchesNote = (n, q) => !level && inScope(n.folderId, q);
+    const matchesNote = (n, q) => !level && !area && inScope(n.folderId, q);
     function navigate(id) {
       current = id;
-      level = '';
+      level = area = '';
+      page = 0;
       a.clearSearch();
       a.render();
       document.getElementById('kgNav')?.focus({ preventScroll: true });
@@ -234,10 +298,19 @@
         path = trail(fs, current),
         kids = fs.filter(f => f.parentId === current);
       const levels = ['Foundation', 'Practitioner', 'Advanced', 'Expert'];
+      const availableAreas = [
+        ...new Set(
+          chapterRows(h())
+            .filter(c => descendantOfCurrent(c.folderId) && (!level || c.level === level))
+            .map(c => c.source.area)
+            .filter(Boolean)
+        ),
+      ].sort();
+      if (area && !availableAreas.includes(area)) area = '';
       return `<section id="kgNav" class="kg-nav" data-access-feature="knowledge" tabindex="-1" aria-label="Knowledge folders" data-kg-session="${esc(identity)}"><nav aria-label="Folder location">${btn('folder', 'Library')}${path.map(f => `<span aria-hidden="true"> / </span>${btn('folder', f.name, f.id)}`).join('')}</nav>
         <div class="kg-bar"><h3>${esc(path.at(-1)?.name || 'My library')}</h3><div class="actions">${can('create') ? btn('add', 'New folder') : ''}${current && can('edit') ? btn('rename', 'Rename folder', current) : ''}${current && can('delete') ? btn('remove-folder', 'Delete folder', current) : ''}</div></div>
-        ${kids.length && !query && !level ? `<div class="kg-shelves">${kids.map(f => btn('folder', f.name, f.id, 'class="kg-shelf"')).join('')}</div>` : ''}
-        <label class="kg-level">Reading level <select id="kgLevel">${option('', 'All levels', level)}${levels.map(v => option(v, v, level)).join('')}</select></label></section>`;
+        ${kids.length && !query && !level && !area ? `<div class="kg-shelves">${kids.map(f => btn('folder', f.name, f.id, 'class="kg-shelf"')).join('')}</div>` : ''}
+        <div class="kg-filters"><label class="kg-level">Reading level <select id="kgLevel">${option('', 'All levels', level)}${levels.map(v => option(v, v, level)).join('')}</select></label>${availableAreas.length ? `<label class="kg-level">Subject <select id="kgArea">${option('', 'All subjects', area)}${availableAreas.map(v => option(v, v, area)).join('')}</select></label>` : ''}</div></section>`;
     }
     function cards(query) {
       const needle = query.trim().toLowerCase();
@@ -248,22 +321,85 @@
             : '<p role="status">Loading the reading collection…</p>',
           count: 0,
         };
-      const rows = chapterRows(h()).filter(
-        c =>
-          inScope(c.folderId, needle) &&
-          (!level || c.level === level) &&
-          (!needle ||
-            [c.title, c.body, c.level, c.source.shelf].join(' ').toLowerCase().includes(needle))
-      );
+      const filter = JSON.stringify([current, level, area, needle]);
+      if (filter !== lastFilter) {
+        lastFilter = filter;
+        page = 0;
+      }
+      const terms = needle.split(/\s+/u).filter(Boolean);
+      const rows = chapterRows(h()).filter(c => {
+        if (
+          !inScope(c.folderId, needle) ||
+          (level && c.level !== level) ||
+          (area && area !== c.source.area)
+        )
+          return false;
+        if (!terms.length) return true;
+        const corpus = [
+          c.title,
+          c.body,
+          c.level,
+          c.source.shelf,
+          c.source.area,
+          c.source.topic,
+          c.source.terms,
+        ]
+          .join(' ')
+          .toLowerCase();
+        return terms.every(term => corpus.includes(term));
+      });
+      const lastPage = Math.max(0, Math.ceil(rows.length / pageSize) - 1);
+      page = Math.max(0, Math.min(page, lastPage));
+      const start = page * pageSize,
+        shown = rows.slice(start, start + pageSize);
+      const pager = lastPage
+        ? `<nav class="kg-pager" aria-label="Chapter results">${btn('back', 'Previous page', '', page === 0 ? 'disabled' : '')}<span role="status">Chapters ${start + 1}–${start + shown.length} of ${rows.length}</span>${btn('next', 'Next page', '', page === lastPage ? 'disabled' : '')}</nav>`
+        : '';
       return {
         count: rows.length,
-        html: rows
-          .map(
-            c =>
-              `<article class="hub-card kg-chapter"><span class="kg-depth">${esc(c.level)}</span><h3>${esc(c.title)}</h3><p>${esc(c.body.split('\n')[0].slice(0, 205))}</p>${btn('read', 'Read chapter', c.id)}</article>`
-          )
-          .join(''),
+        html:
+          shown
+            .map(
+              c =>
+                `<article class="hub-card kg-chapter"><span class="kg-depth">${esc(c.level)}${c.source.area ? ' · ' + esc(c.source.area) : ''}</span><h3>${esc(c.title)}</h3><p>${esc(c.body.split('\n')[0].slice(0, 205))}</p>${btn('read', 'Read chapter', c.id)}</article>`
+            )
+            .join('') + pager,
       };
+    }
+    async function openChapter(id, action, key) {
+      const row = chapterRows(h()).find(r => r.id === id);
+      if (!row) throw Error('This chapter no longer exists.');
+      const show = c => (action === 'edit' ? edit('edit', id, c) : readChapter(c));
+      if (!row.source.revision) {
+        show(row);
+        return;
+      }
+      a.openModal(
+        row.title,
+        `<section id="kgLoading" data-access-feature="knowledge" data-kg-session="${esc(key)}"><p role="status">Loading chapter…</p>${btn('cancel', 'Close')}</section>`
+      );
+      const loading = document.getElementById('kgLoading');
+      const stillOpen = () =>
+        loading?.isConnected &&
+        document.getElementById('modal')?.open &&
+        token() === key &&
+        active();
+      let full;
+      try {
+        full = await chapterFile(row.source);
+      } catch {
+        if (stillOpen())
+          loading.innerHTML = `<p role="status">This chapter could not load.</p>${btn(action, 'Retry chapter', id)} ${btn('cancel', 'Close')}`;
+        return;
+      }
+      if (!stillOpen()) return;
+      guard(action === 'edit' ? 'edit' : 'view', key);
+      const updated = chapterRows(h()).find(r => r.id === id);
+      if (!updated) {
+        a.closeModal();
+        return;
+      }
+      show({ ...updated, source: full, body: h().knowledgeChapters?.[id]?.body ?? baseBody(full) });
     }
     function readChapter(c) {
       const body = c.body.split(/\n\n(?=## )/);
@@ -274,10 +410,10 @@
       );
       document.getElementById('modalBody').scrollTop = 0;
     }
-    function edit(action, id) {
+    function edit(action, id, loadedChapter) {
       const chapter = action === 'edit',
         list = folders(h()),
-        value = chapter ? chapterRows(h()).find(c => c.id === id) : list.find(f => f.id === id);
+        value = chapter ? loadedChapter : list.find(f => f.id === id);
       if (action !== 'add' && !value) throw Error('This entry no longer exists.');
       editor = {
         key: token(),
@@ -287,6 +423,7 @@
           ? JSON.stringify(h().knowledgeChapters?.[id] || null)
           : JSON.stringify(value || null),
         parent: current,
+        originalBody: chapter ? value.body : undefined,
       };
       const title = chapter ? 'Edit chapter' : action === 'add' ? 'New folder' : 'Rename folder';
       a.openModal(
@@ -316,9 +453,15 @@
           a.closeModal();
           return;
         }
-        if (action === 'read') {
-          const c = chapterRows(h()).find(r => r.id === id);
-          if (c) readChapter(c);
+        if (action === 'next' || action === 'back') {
+          page += action === 'next' ? 1 : -1;
+          a.render();
+          document.querySelector('.kg-chapter button')?.focus();
+          return;
+        }
+        if (action === 'read' || action === 'edit') {
+          guard(action === 'edit' ? 'edit' : 'view', key);
+          await openChapter(id, action, key);
           return;
         }
         if (action === 'remove-folder') {
@@ -338,7 +481,7 @@
           if (a.mutate(d => removeFolder(d.workhub, id))) navigate(folder.parentId);
           return;
         }
-        if (['add', 'edit', 'rename'].includes(action)) {
+        if (['add', 'rename'].includes(action)) {
           guard(action === 'add' ? 'create' : 'edit', key);
           edit(action, id);
         }
@@ -347,10 +490,11 @@
       }
     });
     document.addEventListener('change', ev => {
-      if (ev.target.id === 'kgLevel' && active()) {
-        level = ev.target.value;
+      if (['kgLevel', 'kgArea'].includes(ev.target.id) && active()) {
+        if (ev.target.id === 'kgLevel') level = ev.target.value;
+        else area = ev.target.value;
         a.render();
-        document.getElementById('kgLevel')?.focus();
+        document.getElementById(ev.target.id)?.focus();
       }
     });
     document.addEventListener('submit', ev => {
@@ -376,7 +520,7 @@
             const c = chapterRows(data).find(c => c.id === id);
             if (!c) throw Error('This chapter no longer exists.');
             const patch = { folderId };
-            if (body !== c.body) patch.body = body;
+            if (body !== editor.originalBody) patch.body = body;
             if (title !== c.title) patch.title = title;
             updateChapter(data, id, patch);
           } else if (action === 'add') {
@@ -413,7 +557,7 @@
         sync();
         return `<div><label for="kgNoteFolder">Folder</label><select id="kgNoteFolder" name="folderId">${folderOptions(h(), note.id ? note.folderId || '' : current)}</select></div>`;
       },
-      hasChildren: () => !level && folders(h()).some(f => f.parentId === current),
+      hasChildren: () => !level && !area && folders(h()).some(f => f.parentId === current),
     };
   }
   root.WorkHubKnowledgeGarden = Object.freeze({ install, validate, folders, trail, removeFolder });

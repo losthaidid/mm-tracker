@@ -1,0 +1,99 @@
+{
+  "id": "liv-read-service-lines-across-entry-sheets",
+  "level": "Advanced",
+  "topic": "Invoice verification for external services",
+  "title": "Two accepted service sheets have the same value and different unbilled work",
+  "lead": "An engineering supplier invoices a plant for inspection hours and calibration work. The service purchase order has one item, but its services and accepted entry sheets have different quantities, units and billing histories. Matching at PO-item value alone would approve a duplicate calibration charge. The example follows classic SAP ECC external services from acceptance through invoice allocation at service-line level.",
+  "keywords": [
+    "service-based invoice verification",
+    "GR-based IV",
+    "ML81N",
+    "MIRO",
+    "external services",
+    "service entry sheet",
+    "accepted service lines",
+    "EKPO-LEBRE",
+    "EKPO-WEBRE"
+  ],
+  "sections": [
+    [
+      "One PO item can buy several units of work",
+      "A maintenance team contracts a provider to inspect equipment at 80 currency units per hour and calibrate instruments at 120 per calibration. The buyer uses one classic service PO item with distinct service specifications. The order describes the work and prices. For this case, it also expects receipt, uses GR-based invoice verification and has service-based invoice verification selected. The contract allows staged acceptance and billing. Ignore tax, price changes and currency conversion. An hour can be compared with another hour and a calibration with another calibration. Adding the bare figures together would create a meaningless quantity of mixed work.\n\nIn the first week the provider performs six inspection hours and two calibrations. The accepting engineer verifies the time sheets and calibration certificates, and the first accepted service entry sheet records 480 plus 240, a total of 720. In the second week the same engineer accepts nine inspection hours and no calibrations, giving another 720. The grand total of accepted work is 1,440. The two sheets have identical values, yet they represent different services and evidence. The second sheet cannot support an additional calibration just because its total is large enough to cover one. For each line keep its unit, quantity and rate together with the service entry sheet identifier and PO item."
+    ],
+    [
+      "Read acceptance and invoice detail at the correct level",
+      "Display the service order and its history, then inspect the relevant service entry sheets in the classic client, for example using ML81N in display. Establish that each sheet reached the acceptance state expected in this process. A saved draft can document that the supplier submitted details, while acceptance records the receiving organization’s decision that the work is eligible for the next step. Check for revoked acceptance, reversals or corrections. If dates straddle an accounting period, distinguish when the contractor performed the work, when the organization accepted it and when postings were entered.\n\nOpen the PO structure in Logistics Invoice Verification. SAP ERP’s PO Structure reference describes how an external services PO using both goods-receipt-based and service-based invoice verification can be expanded by entry sheet to display the services, invoicing and subsequent value adjustments. This view helps answer two separate questions. Which sheet did the clerk assign, and which service on that sheet did the clerk charge? The original requisition and contract establish the business context, but the available invoice quantity in this scenario depends on the accepted and already invoiced detail. When a screen variant collapses the PO to one row, expand the relevant node or use appropriate item details. A collapsed display cannot establish that all service lines still have an open quantity."
+    ],
+    [
+      "Rebuild the balance before entering the new invoice",
+      "Assume the contractor invoiced the two first-week calibrations immediately for 240. AP allocated that bill correctly to the two calibrations on the first accepted sheet. No inspections have yet been invoiced. The first sheet has 480 of unbilled inspection hours and zero unbilled calibrations. The second has 720 of unbilled inspection hours and no calibration service. Together the unbilled accepted value is 1,200. Capture the posted invoice number for the 240, including any later credit or cancellation that might change the signed balance.\n\nA new invoice for 1,200 arrives. On its face it appears to match the grand total still open. Its detail says twelve inspection hours at 80, worth 960, and two calibrations at 120, worth 240. The accepted inspection work remaining is fifteen hours at 80, worth 1,200. The provider has billed three fewer inspection hours than are available and repeated two calibrations that appear to have already been billed. The two differences offset exactly in money. A three-way spreadsheet using only total order, total receipt and total invoices would show a perfect match. An invoice check at service level exposes both the potential duplicate charge and the three still-unbilled inspection hours."
+    ],
+    [
+      "Investigate the contractor’s description",
+      "Look beyond the copied line descriptions. Ask for the calibration certificates that the current invoice cites and the hours included on each dated time sheet. The two calibrations may be the same certificates paid before, a newly performed service awaiting formal acceptance, or a coding error in which the contractor labelled three inspection hours as a pair of calibrations. All three alternatives can produce the same 1,200 demand. The right correction depends on which service the customer actually received, accepted and agreed to pay for. A plausible explanation from the supplier’s billing desk does not replace the plant engineer’s acceptance of new work.\n\nSuppose the certificates match the first sheet exactly and the supplier confirms its billing system resent those services when drafting the monthly invoice. The original calibration charge remains valid. The appropriate commercial action is to obtain the agreed corrected billing for the remaining inspection hours or use the locally authorized complaint process. Suppose instead that the team can prove two new calibrations actually took place. They need their own acceptance and contractual entitlement under the service order before being settled by this route. Where the order price or service specification excludes the new calibration type, Purchasing may need a formal change. The invoice clerk should not create or approve a service entry purely to match a bill."
+    ],
+    [
+      "Compare the two purchasing-item indicators",
+      "Use a quality-system example to compare PO item invoice settings. GR-based invoice verification relates settlement to specific acceptance or receipt records in this service process. Service-based invoice verification enables checking at the level of individual services. In classic purchasing the relevant stored indicators include EKPO-WEBRE for GR-based verification and EKPO-LEBRE for service-based verification. Use F1 technical information on the actual item screen to confirm which field is displayed. A vendor default can explain how an indicator was proposed, while the saved purchasing item tells you which process was selected for the transaction.\n\nWith GR-based verification alone, the entry sheet is the relevant receipt-level unit of settlement. With service-based and GR-based verification together, inspect the services on each accepted sheet. SAP also documents an external-service scenario where service-based verification is used and a GR is not defined, with invoices visible by service under the order. Do not assume this alternative process is available for every existing service PO or that a user should switch to it to get around missing acceptance. Availability of invoice-before-entry-sheet processes and their prerequisites depends on the procurement arrangement and client setup. Decide which design matches the acceptance contract and control requirements, then confirm its behavior on representative quality-system documents. Two checkboxes with similar English names can encode different business decisions."
+    ],
+    [
+      "Keep quantity corrections apart from price corrections",
+      "A service provider may later correct a rate without delivering more work. Suppose the three unbilled inspection hours were agreed at a night rate of 100 under an approved amendment, while twelve regular hours stayed at 80. Their revised total would be 960 plus 300, or 1,260. Determine which hours qualify, the effective date of the agreement and the correct order or service pricing treatment. Treat the extra 60 as a rate question on real inspection hours. Inventing half of another calibration to reach the new value would undermine the quantity evidence and misreport the type of work on the cost object.\n\nThe service lines may also carry different account assignments or be relevant to different maintenance work. Even when the same cost center receives all charges in the simple example, recording calibration as inspection misstates operational reporting and the remaining order position. Inspect the actual assigned cost objects and posted account assignment distribution in the client. If a previous invoice was deliberately charged against a different sheet in error, document its disposition with AP, including posting periods and any vendor clearing. A subsequent debit or credit adjusts value in the appropriate circumstances. It does not by itself substitute the right accepted service for a wrongly referenced service quantity. Keep the original acceptance, invoice, any corrections and supplier correspondence tied to unambiguous line identities."
+    ],
+    [
+      "Set an acceptance test that can detect an offsetting error",
+      "A credible end-to-end test contains the two equal-value sheets and the correctly billed first pair of calibrations. Ask an AP tester to reconcile the contractor's later bill using the actual entry screen and PO structure the business will use. The expected finding is two calibration charges with no unbilled accepted calibration available and fifteen inspection hours with only twelve currently claimed. The tester must identify the original 240 invoice and distinguish the two separate 720 acceptance records. A screenshot showing a balanced header amount proves only arithmetic. A screenshot or extract of the expanded service and invoice references demonstrates the missing comparison.\n\nThen test a legitimate invoice for all fifteen inspection hours, split across the first and second accepted sheets exactly as received. Its amount is also 1,200. The two cases are financially identical at header level, which makes them a particularly effective test pair. Have the engineer confirm the accepted service quantities, the buyer confirm the contractual rates and AP confirm the remaining invoiced and unbilled balances after posting the legitimate case. A deployable process should allow each role to explain its part without asking another role to vouch for a quantity it cannot observe. The final question for an invoice containing several service types is always the same practical one. Can the organization trace every billed unit to accepted work that has not already been settled?"
+    ]
+  ],
+  "visual": {
+    "title": "The disputed invoice balances in value while its service quantities do not",
+    "headers": [
+      "Service and sheet",
+      "Accepted quantity",
+      "Previously invoiced",
+      "Still available before the new claim"
+    ],
+    "rows": [
+      [
+        "Inspection, first sheet",
+        "6 hours at 80",
+        "0",
+        "6 hours = 480"
+      ],
+      [
+        "Calibration, first sheet",
+        "2 at 120",
+        "2 = 240",
+        "0 calibrations"
+      ],
+      [
+        "Inspection, second sheet",
+        "9 hours at 80",
+        "0",
+        "9 hours = 720"
+      ],
+      [
+        "New claim across both",
+        "12 inspection hours and 2 calibrations",
+        "—",
+        "Claim 1,200 versus 1,200 open, with a different service mix"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · PO Structure in Logistics Invoice Verification",
+      "https://help.sap.com/docs/SAP_ERP/98eed63ea3a544af84eb972dc68b0e84/706fb6531de6b64ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Processing with Service Specifications",
+      "https://help.sap.com/docs/SAP_ERP_SPV/b4174aff4a234ed5be928a10c60997fb/47c7b65334e6b54ce10000000a174cb4.html"
+    ],
+    [
+      "SAP KBA 3193661 · Posting invoices before SES or GR for service purchase orders in ERP and S/4HANA",
+      "https://userapps.support.sap.com/sap/support/knowledge/en/3193661"
+    ]
+  ],
+  "shelf": "Valuation & invoice verification",
+  "area": "invoice"
+}

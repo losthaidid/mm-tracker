@@ -1,0 +1,106 @@
+{
+  "id": "mrp-forecast-consumption-period",
+  "level": "Practitioner",
+  "shelf": "Purchasing",
+  "topic": "Forecast-based planning",
+  "title": "Why did issuing 30 gloves reduce both stock and forecast demand?",
+  "lead": "Maintenance takes 30 pairs of protective gloves from stores. The planner expects the shortage in the stock/requirements list to grow by 30. Instead, the on-hand figure and the remaining forecast requirement both fall, and the monthly shortfall is exactly where it was before. For a plant using classic forecast-based planning with reduction by actual consumption, this can be a coherent result. The stock, forecast, and purchasing documents describe different parts of the same month.",
+  "keywords": [
+    "forecast-based planning",
+    "forecast reduction",
+    "total consumption",
+    "forecast requirements",
+    "daily split",
+    "period",
+    "withdrawal"
+  ],
+  "sections": [
+    [
+      "Recognize the forecast as an estimate of the month’s issues",
+      "The storeroom supplies gloves across several workshops. Recording an individual planned requirement every time a technician will need a pair would create considerable effort and little extra precision. A forecast based on recorded consumption can supply a practical basis for deciding how many pairs should be available. This method works best when someone owns the business meaning of consumption history. A shutdown restock, replacement of damaged stock and a normal week of maintenance do not necessarily say the same thing about the months ahead.\n\nThe planning team has a generated forecast of 120 pairs for a particular month. Interpret 120 as expected demand for the whole period. The figure includes the pairs the team expects people will already have used halfway through the month. Under a forecast-reduction setting based on relevant actual withdrawals, recording a withdrawal can fulfil part of that expectation. If the same 30 pairs counted both as actual issues taken from on-hand stock and as work still due from the original 120, the purchasing calculation would represent them twice.\n\nFor the case below, establish a forecast-based MRP type with reduction by the current period's qualifying consumption. Use one material, plant, planning segment and unit, a pair. Assume no buffer, pack rounding, other relevant demands or receipts, and no stock restrictions. The example first compares monthly totals without imposing dates inside the month. A later section restores the dates because they matter when deciding whether to expedite a purchase. Other SAP forecast reduction settings have different behavior, so confirm the method before using this explanation on a live issue."
+    ],
+    [
+      "Perform the two-column reconciliation",
+      "At the beginning of the month, the plant has 80 pairs and expects an open order for 20 to arrive in time. It can account for 100 pairs of supply against the monthly forecast of 120, giving a shortage of 20. For this small illustration treat the open order as an eligible firm receipt and assume no additional unfirmed proposal is present. Write down stock and remaining forecast separately. One quantity is counted or posted inventory, the other represents events still expected to happen.\n\nAfter a relevant issue of 30, the stock balance is 50. The remaining forecast is 90 because the total estimate was 120 and 30 qualifying pairs have now been consumed. Supply including the same open order is 70. The month-end shortfall is still 20. A warehouse clerk looking at stock alone has sound reason to say that stock went down. A buyer looking at expected remaining demand has sound reason to see no additional buying signal from this one ordinary issue. The withdrawal was part of the demand the previous forecast had already anticipated.\n\nTo test that explanation, introduce an independent change. The vendor cancels ten of the twenty open pairs and the purchasing document is adjusted accordingly. Stock stays at 50, the remaining forecast stays at 90, but eligible supply is now 60. The residual shortage increases to 30. Introduce another ordinary issue of five and the quantities become 45 on hand, ten due and 85 still expected to be consumed. The shortage stays at 30. This comparison shows exactly which development increased the month’s buying need. It was the loss of expected supply rather than the additional five pairs consumed as anticipated."
+    ],
+    [
+      "Distinguish an expected withdrawal from a discrepancy",
+      "Suppose the storekeeper counts only 45 pairs when the system still shows 50 after the first withdrawal. Investigate the five missing pairs through the site's inventory and consumption processes. A paper transfer, a physical inventory discrepancy and an ordinary department issue have different meanings. Determine how the actual movement and its settings update consumption history and planning stock. A change that reduces available stock without reducing the forecast balance would increase the net shortage. Converting a count discrepancy into an invented issue simply to make the equation balance would corrupt the history on which the next forecast depends.\n\nConsider the reverse mistake. A supervisor distributes a carton of 30 pairs to technicians but the issue has not yet been entered. The shelf may now hold only 50 while the system still reports 80, and the forecast remaining in the system may still read 120. An arithmetic comparison of the two system numbers alone can preserve the same monthly deficit while concealing an operational stock discrepancy. The physical count, material document and date of consumption are essential evidence even when the purchasing total seems reasonable.\n\nIn ECC the material master distinguishes total consumption and unplanned consumption. SAP documents the relationship of these histories to the planning procedure and the circumstances of withdrawal. A reservation that has been created represents an intention, while a material document records a posting. A forecast calculation, posted consumption, and reservations visible in a stock/requirements list should therefore be investigated through their respective data. For this particular forecast-based procedure, SAP describes forecast requirements as the issue quantities in the basic net calculation. The appearance of other demand documents on the display does not establish that each one was deducted from that calculation."
+    ],
+    [
+      "Read the period boundary deliberately",
+      "The initial 30 pairs belong to the same consumption period as the monthly forecast of 120 in the example. A document entered today with a different posting date warrants a separate check of the period to which the system assigned consumption. The time someone keyed the entry, the date when the warehouse physically handed out the gloves, and the posting date used in the document can differ. Preserve those facts on any support case involving a weekend, late entry, period close or correction.\n\nSuppose next month already has a forecast of 100. With the standard current-period reduction by actual consumption illustrated here, a withdrawal that exhausts this month’s remaining forecast does not automatically reduce next month’s requirement by the excess. If recorded consumption in the present month reaches 130 against a forecast of 120, ten pairs of demand have occurred beyond the estimate. The store has physically issued all 130. A remaining forecast for the current month cannot become an inexhaustible negative demand that provides coverage to a future month. Inspect the next period and the reduction setting before interpreting the overstated consumption as stock available for later use.\n\nIf the exceptional ten relate to a permanent change in the safety rule for a new maintenance shift, that fact belongs in the next forecasting review. If they relate to a one-off clean-up, it may be appropriate to identify the atypical history when preparing future forecasts. Either decision requires evidence. Changing the original historical record without a documented business basis can teach the forecast the wrong lesson. Separate a legitimate correction of a mistaken posting from the planning judgement that an accurately posted exceptional event is unlikely to recur."
+    ],
+    [
+      "Restore the dates before making a supplier promise",
+      "A forecast of 120 per month does not say exactly when every technician will visit the counter. In standard forecast-based planning, an unsplit period requirement can be assigned to the beginning of the period. SAP also provides splitting of forecast requirements into smaller periods. Under a daily split the reduced monthly balance can be spread over remaining working days. Identify the splitting indicator and planning calendar used for the material. Two screens can show the same remaining month quantity as one lump or as smaller dated amounts. The shape of the list affects when a planner sees pressure on supply.\n\nAssume a remaining requirement of 90 and 15 remaining working days. In a simple even split using whole pairs, that is six pairs per day. Starting from 50 pairs, and leaving the order for 20 aside for the moment, the stock can cover eight complete working days at that average before the ninth day's six exceed the two then left. If the outstanding order arrives earlier, it extends coverage. If the supplier promises a date later than the ninth day, the buyer may have a real availability problem within the period even though the end-of-month deficit was calculated correctly. Real withdrawals may also be uneven.\n\nAsk the workshop lead whether an upcoming shift inspection will take 24 pairs at once. An even spread used for procurement planning cannot promise availability at that counter on that day. A planner can flag the exceptional timing, confirm delivery dates and agree how the business should represent the exceptional need. Avoid introducing a second demand for the same gloves unless the selected planning design handles the relationship intentionally. The purpose of this discussion is to protect the actual work schedule while preserving a truthful description of the month’s requirements."
+    ],
+    [
+      "Explain a forecast change with the right documents",
+      "Collect the forecast run result for the period, the planning and splitting settings, current and previous eligible stock, outstanding purchase order quantity and date, and the material documents for representative withdrawals. Confirm that all quantities are pairs. A supplier may order gloves by a carton containing several pairs. Reconcile the purchasing unit to the base quantity before asserting that a twenty-pair open receipt covers twenty technician withdrawals. Where the actual unit is an individual glove, the conversion must be established from that material's real data.\n\nIn QA, record the starting 20-pair shortage, post one qualifying 30-pair withdrawal in the matching period and compare both columns. Then reduce the eligible open receipt by ten in a separate controlled step and predict the new shortage. Repeat on a material configured for another reduction method only once the first result is understood. The distinction is practical. A planner who can tell whether a change arose from a withdrawal, a revised forecast, a late receipt or an altered period assignment can call the correct owner the first time.\n\nThe reply to the buyer can now be precise. The forecast covered 120 pairs for the month. Thirty were issued as expected, leaving 90 to meet from 50 on hand and 20 on order. The month still needs another 20, subject to lot sizing and actual dates. That statement explains why the requirement and stock fell together and identifies the real checks still worth performing at the storeroom and with the supplier."
+    ]
+  ],
+  "visual": {
+    "title": "Reconciling actual consumption with remaining forecast",
+    "headers": [
+      "Event",
+      "On hand",
+      "Open receipt",
+      "Remaining forecast",
+      "Uncovered quantity"
+    ],
+    "rows": [
+      [
+        "Start",
+        "80",
+        "20",
+        "120",
+        "20"
+      ],
+      [
+        "Issue 30 against the month",
+        "50",
+        "20",
+        "90",
+        "20"
+      ],
+      [
+        "Supplier reduces open order by 10",
+        "50",
+        "10",
+        "90",
+        "30"
+      ],
+      [
+        "Issue another 5",
+        "45",
+        "10",
+        "85",
+        "30"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Forecast-based planning",
+      "https://help.sap.com/docs/SAP_ERP/85d3fce10e264972a0155c8b46ecf93b/5f97b6535fe6b74ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Reduction of forecast requirements",
+      "https://help.sap.com/docs/SAP_ERP/66326f67e0e1416d83c0fdfa4060189d/c16db6531de6b64ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Splitting forecast requirements",
+      "https://help.sap.com/docs/SAP_ERP/66326f67e0e1416d83c0fdfa4060189d/c76db6531de6b64ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Net requirements in forecast-based planning",
+      "https://help.sap.com/docs/SAP_ERP_SPV/66326f67e0e1416d83c0fdfa4060189d/b997b6535fe6b74ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Consumption values in material master records",
+      "https://help.sap.com/docs/SAP_ERP_SPV/cb7b96d71e9c486e897c8fb57d5669a8/c438c353b677b44ce10000000a174cb4.html"
+    ]
+  ],
+  "area": "planning"
+}

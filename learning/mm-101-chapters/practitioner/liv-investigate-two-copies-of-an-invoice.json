@@ -1,0 +1,93 @@
+{
+  "id": "liv-investigate-two-copies-of-an-invoice",
+  "level": "Practitioner",
+  "topic": "Duplicate invoice checks",
+  "title": "Two copies, two warnings, and one supplier claim",
+  "lead": "An emailed invoice arrives one day after the same supplier sends an electronic invoice. In one client MIRO warns that a similar document already exists. In another case the system accepts the entry without a message. Establishing whether AP owes the money requires comparing the commercial claim, existing SAP documents and the particular duplicate check that ran.",
+  "keywords": [
+    "duplicate invoice",
+    "MIRO",
+    "reference document number",
+    "invoice date",
+    "invoice verification",
+    "double invoice",
+    "supplier statement",
+    "FI vendor items"
+  ],
+  "sections": [
+    [
+      "Start with evidence on the two incoming copies",
+      "A supplier bills 360 replacement clips at 8 each. In this tax-free example the gross amount is 2,880 in the invoice currency. Both delivery and invoice cite purchase order item 10 and delivery note D77. Tuesday’s electronic invoice has supplier reference INV-6175. Wednesday’s PDF bears the same number and date. An AP clerk receives the paper image forwarded by the buyer and begins a fresh MIRO transaction. Two intake channels and two files exist, but so far the business has evidence of only one underlying delivery and one claim for payment.\n\nRead the references on the files themselves. File names, scanning timestamps and the date a buyer forwarded an email can differ while the invoice printed inside remains identical. Preserve the supplier’s punctuation and the leading zeros of the document reference according to the organization’s agreed capture practice. Also identify the legal invoicing entity. The vendor that sent the goods might be part of a group with a separate invoicing party. Comparing two supplier names typed by operators can obscure a match on the actual vendor account or falsely group subsidiaries. Put the invoice date, reference, gross amount, currency, company code and invoicing vendor side by side for the two copies. Then compare item and delivery references as commercial evidence, even where those fields are outside the standard duplicate comparison."
+    ],
+    [
+      "Understand what the ECC check is asking",
+      "SAP ERP allows the vendor’s accounting data to specify whether the duplicate invoice check is active. Review the actual vendor record for the company code involved. In Logistics Invoice Verification, enter the supplier reference and inspect the applicable IMG activity under Incoming Invoice for the duplicate check. The documented comparison uses the vendor, currency, gross invoice value, company code, reference and invoice document date, with options affecting whether reference, date and company code participate in the LIV comparison. The way your organization configured those choices matters to an explanation of a given warning. Record both their effective settings and the exact message that appeared.\n\nA counterintuitive consequence is that dropping a comparison characteristic can increase the number of matches. Suppose all checked attributes of two invoices are identical except the supplier reference. When reference participates, that difference can distinguish them. If the comparison ignores the reference, that distinguishing fact no longer separates the invoices. This is different from leaving the reference field blank on entry. SAP describes a populated reference as a prerequisite for the classic LIV duplicate check even where customizing changes the fields being compared. Explain the field that initiates the check separately from the fields used to match candidates. One warning or error under one setting does not predict how a second company code or a differently maintained vendor will behave."
+    ],
+    [
+      "Find the previous transaction before making another one",
+      "Search purchasing history for the actual PO item and read the invoice references, amounts, quantities and reversals. For the example, suppose it shows an active Logistics Invoice Verification document for 360 clips and 2,880, associated with the same delivery. Open it in display, compare its saved header against the supplier copy and follow the linked financial accounting document. In the vendor items check whether the obligation is still open, cleared by payment, reversed or offset by a credit. Record the fiscal year and company code alongside the document numbers. An FI document number reused in a new year is a different accounting document.\n\nCheck the inbound work queue as well as posted history. The electronic invoice may have failed validation and be awaiting correction, or a colleague may have parked a document pending approval. A second clerk posting the PDF can create a liability while the earlier message still has an outstanding route to posting. Assign one person to disposition both entries under the local AP process once identity is established. If the electronic invoice genuinely failed before posting and no replacement exists, the business still owes for the delivery. If it already posted successfully, the PDF is correspondence supporting the existing invoice. In both cases an informed operator can point to the surviving transaction that should ultimately be paid."
+    ],
+    [
+      "A candidate match can be an honest new bill",
+      "Consider a different supplier issuing two genuine invoices on the same date for 2,880 each. The first is for clips delivered to one plant and the second for a separate delivery to another. Both are payable by the same company code in the same currency, but their printed references and delivery notes differ. Where a broad LIV comparison omits the reference field and the remaining checked attributes match, the second legitimate bill can produce a candidate warning. Confirm receipt history on both order items and reconcile each copy to a separate commercial claim. The fact that the supplier charges a uniform price for a standard truckload makes identical totals unsurprising.\n\nThe reverse case is also possible. A scan operator types INV6175 instead of INV-6175 or records the receipt date as the invoice date. If one of those attributes is required to match, an economically identical claim can escape that particular comparison. An approved vendor invoice for 2,880 can also be duplicated under a second vendor master erroneously created for the same legal entity. A system comparison using vendor account numbers has no independent means to prove those entities represent the same supplier. Search the purchase reference, the invoice image and delivery detail if the evidence points to a duplicate. Reconcile bank-payment references only through authorized AP or Finance access, keeping sensitive banking details out of a general support note."
+    ],
+    [
+      "Include Financial Accounting in the investigation",
+      "The integrated process can consider Financial Accounting documents. The FI comparison rules described by SAP differ depending on whether a reference was provided. With a reference, the documented comparison includes vendor, company code, currency, document date and reference. Without a reference, it can compare the amount in document currency along with the other relevant attributes. These FI rules and the LIV-specific check should be investigated according to the transaction, document state and messages actually involved. A support ticket that simply says “duplicate invoice” leaves out the layer that raised the message.\n\nFor instance, someone may have posted the first PDF directly in FI as an expense. The supplier could already have an open or cleared payable even though the PO item has no matching logistics invoice entry. Posting a second document through MIRO in order to complete PO history can create a second payable. Search vendor items using the supplier’s original reference and amount, and inspect the source of any match. Involve Finance in correcting an existing FI document where needed, paying attention to posting periods and clearing status. The objective is a single legitimate payable with a defensible treatment of the purchasing obligation. A desired PO history pattern alone cannot authorize an extra accounting posting."
+    ],
+    [
+      "Choose the response to the message",
+      "When the system raises a warning, investigate it before following the configured warning override procedure. A warning reports a possible match and allows a decision under the organization’s controls. A hard error may instead stop the posting. Changing the reference by adding a space or a suffix to bypass the match destroys the reliability of the next search. Where a candidate is a genuine different invoice, keep both printed references and the PO and delivery evidence. Route the result through the established exception path for the exact message and configuration. Altering a vendor’s check setting for one disputed invoice risks weakening controls on every later invoice from that vendor.\n\nIf someone already posted the same valid claim twice, determine whether either entry has been paid. A reversal or cancellation of an unpaid duplicate and a recovery of an actual duplicate payment involve different work. Preserve the correctly supported posting and identify the original and erroneous document chains before correcting either. A cancelled invoice legitimately being re-entered is another distinct scenario. SAP describes treatment of previously cancelled documents in its duplication guidance. Use the cancellation link and document date to establish which entry is active. A document search returning three rows can represent one original, its cancellation and one correct replacement. Summing all three as positive claims would overstate the exposure."
+    ],
+    [
+      "Walk a reviewer through the final decision",
+      "For the original clips case, imagine the electronic invoice had already posted Tuesday. The vendor account has one open item of 2,880, the purchase order history has one invoice for 360 clips, and both supplier copies identify the same delivery D77. Record the existing invoice and FI document references against the Wednesday work item, then disposition the second copy under the agreed process. If the first invoice had already been cleared by payment, the settlement reference would help AP explain why the supplier should not expect another payment. If the first record had been parked instead, coordinate with its current processor to complete that record once rather than running two parallel approvals.\n\nAn effective regression test uses the real matching dimensions, with harmless fictional references in QA. Try the exact same header twice, then vary only the input date, then only the supplier reference, and finally introduce a valid second delivery with the same amount. Document which cases produce no message, a warning or an error and which document the check found. Verify outcomes for the actual interface as well as manual entry where both routes are used. A reliable process combines the configured control with a clear intake decision. The next clerk should be able to read the record and tell exactly which invoice remains payable, why the second file exists and how repeated payment was prevented."
+    ]
+  ],
+  "visual": {
+    "title": "What a document search can reveal",
+    "headers": [
+      "What the clerk finds",
+      "Question to settle",
+      "Evidence before acting"
+    ],
+    "rows": [
+      [
+        "Posted MIRO invoice for the same claim",
+        "Is the second file another copy?",
+        "Match vendor reference, date, delivery, amount and active document"
+      ],
+      [
+        "Parked or failed inbound item",
+        "Which existing work item will finish?",
+        "Inspect processing status, assign an owner and prevent parallel posting"
+      ],
+      [
+        "FI vendor item and no logistics invoice",
+        "Has a liability already been recognized?",
+        "Trace the FI source and payment/clearing status"
+      ],
+      [
+        "Matching amount on two different deliveries",
+        "Are these two genuine supplier claims?",
+        "Compare printed references, delivered items and receipt evidence"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Check for Duplication of Invoice Entry",
+      "https://help.sap.com/docs/SAP_ERP_SPV/98eed63ea3a544af84eb972dc68b0e84/a971b6531de6b64ce10000000a174cb4.html?version=6.17.28"
+    ],
+    [
+      "SAP Support · How duplicate invoice check works in FI",
+      "https://help.sap.com/docs/SUPPORT_CONTENT/fiaccounting/3361878522.html"
+    ],
+    [
+      "SAP ERP · Entering Document Header Data",
+      "https://help.sap.com/docs/sap_erp/98eed63ea3a544af84eb972dc68b0e84/c16fb6531de6b64ce10000000a174cb4.html"
+    ]
+  ],
+  "shelf": "Valuation & invoice verification",
+  "area": "invoice"
+}
