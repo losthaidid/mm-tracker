@@ -460,17 +460,15 @@ test('Project tasks: existing items and general work appear once in stand-up wit
   return form;
  };
  const linked=await editor('PO testing task','Spot check order types');
- linked.elements.projectWorkType.value='item';
- linked.elements.projectWorkType.dispatchEvent(new window.Event('change',{bubbles:true}));
  linked.elements.projectItemChoice.value='item:'+item.id;
  linked.elements.projectItemChoice.dispatchEvent(new window.Event('change',{bubbles:true}));
  api.saveEdit(linked);
  await settle();
  const linkedId=api.state().tasks[0].id;
- assert.equal(api.state().tasks[0].projectItemId,item.id);
+ assert.equal(api.state().tasks[0].parentItemId,item.id);
  assert.equal(api.state().specs.length,1);
- assert.equal(api.state().specs[0].subItems.length,3);
- assert.equal(api.state().tasks[0].boardStatus,'doing');
+ assert.equal(api.state().specs[0].subItems.length,2);
+ assert.equal(api.state().tasks[0].boardStatus,'todo');
 
  const general=await editor('Schedule alignment call','Check workshop availability');
  api.saveEdit(general);
@@ -501,53 +499,69 @@ test('Project tasks: existing items and general work appear once in stand-up wit
  // Linking an existing item keeps all the item’s children when the task is switched back.
  api.editRecord('tasks',linkedId);
  const unlink=document.getElementById('editForm');
- unlink.elements.projectWorkType.value='general';
- unlink.elements.projectWorkType.dispatchEvent(new window.Event('change',{bubbles:true}));
+ unlink.elements.projectItemChoice.value='';
+ unlink.elements.projectItemChoice.dispatchEvent(new window.Event('change',{bubbles:true}));
  api.saveEdit(unlink);
  await settle();
- assert.equal(api.state().tasks[0].projectItemId,undefined);
- assert.equal(api.state().specs[0].subItems.length,3);
- assert.equal(api.state().tasks[0].subTasks.length,0);
+ assert.equal(api.state().tasks[0].parentItemId,undefined);
+ assert.equal(api.state().specs[0].subItems.length,2);
+ assert.equal(api.state().tasks[0].subTasks[0].title,'Spot check order types');
 });
 
-test('Project tasks: create from an item with prefilled details and open the same linked task', async t => {
- const {api,document}=await app(t);
+test('Project tasks: creating another main task under the same item preserves completed work', async t => {
+ const {api,document,window,db}=await app(t);
  addCompany(api,document,'Receiving company');
  const company=api.state().projectCompanies.at(-1);
  const item=standupFixture(api,document);
- api.mutate(d=>Object.assign(d.specs[0],{companyId:company.id,dueDate:'2026-11-24',priority:'A'}));
+ api.mutate(d=>Object.assign(d.specs[0],{companyId:company.id,status:'Completed'}));
  await settle();
  const getItem=()=>api.state().specs.find(row=>row.id===item.id);
- const itemBefore=copy(getItem());
+ const parentBefore=copy(getItem());
  api.showProjectItems();
  const source=()=>document.querySelector('[data-action="project-source-task"][data-id="'+item.id+'"]');
- assert.match(source().textContent,/Create task/);
  await api.action(source());
- const form=document.getElementById('editForm');
- assert.equal(form.elements.task.value,item.description);
- assert.equal(form.elements.taskType.value,'Project');
+ let form=document.getElementById('editForm');
+ assert.equal(form.elements.task.value,'');
  assert.equal(form.elements.projectLink.value,item.projectId);
  assert.equal(form.elements.companyId.value,company.id);
- assert.equal(form.elements.dueDate.value,'2026-11-24');
- assert.equal(form.elements.priority.value,'High');
- assert.equal(form.elements.boardStatus.value,'doing');
+ assert.equal(form.elements.projectItemChoice.value,'item:'+item.id);
+ assert.equal(form.elements.boardStatus.value,'todo');
+ assert.equal(document.querySelectorAll('[data-task-draft]').length,0);
+ fill(form,{task:'First release check',remarks:'Keep my completed evidence',trNumber:'D01K900001'});
  api.saveEdit(form);
+ const firstId=api.state().tasks[0].id;
+ addTaskSub(api,document,firstId,'Only my first check','Evidence','Signed off');
+ api.hub.moveTask(firstId,'done');
  await settle();
- const task=api.state().tasks[0];
- assert.equal(task.projectItemId,item.id);
- assert.deepEqual(copy(task.subTasks),copy(getItem().subItems));
- assert.deepEqual(copy(getItem()),itemBefore);
- document.querySelector('[data-pi="layout"][data-value="table"]').click();
- await settle();
- assert.equal(source().textContent,'Open task');
- await api.action(source());
- assert.match(document.getElementById('modalBody').textContent,/PO configuration/);
- assert.equal(api.state().tasks.length,1);
- api.closeModal();
- api.hub.moveTask(task.id,'done');
- await settle();
- assert.equal(getItem().status,'Completed');
- assert.ok(getItem().subItems.every(row=>row.status==='Completed'));
+ const firstBefore=copy(api.state().tasks[0]),storedBefore=copy(db.row.document.data.tasks[0]);
+ assert.equal(firstBefore.done,true);
+ api.showTab('tasks');
+ await api.action(document.querySelector('.tasks-workspace [data-action="new"][data-group="tasks"]'));
+ form=document.getElementById('editForm');
+ const change=(name,value)=>{form.elements[name].value=value; form.elements[name].dispatchEvent(new window.Event('change',{bubbles:true}));};
+ change('taskType','Project');change('projectLink',item.projectId);change('companyId',company.id);
+ change('projectItemChoice','item:'+item.id);
+ assert.equal(form.elements.boardStatus.disabled,false);
+ assert.equal(form.querySelectorAll('[data-task-draft]').length,0);
+ assert.ok(!form.textContent.includes('Only my first check'));
+ fill(form,{task:'Second release check',trNumber:'D01K900002'});
+ api.saveEdit(form);await settle();
+ const second=api.state().tasks[1];
+ assert.notEqual(firstId,second.id);assert.notEqual(firstBefore.number,second.number);
+ assert.equal(second.parentItemId,item.id);assert.equal(second.done,false);
+ assert.deepEqual(copy(second.subTasks),[]);
+ addTaskSub(api,document,second.id,'Second task only','My notes','');
+ api.hub.moveTask(second.id,'doing');await settle();
+ assert.deepEqual(copy(getItem()),parentBefore);
+ assert.deepEqual(copy(api.state().tasks[0]),firstBefore);
+ assert.deepEqual(copy(db.row.document.data.tasks[0]),storedBefore);
+ const reopened=await app(t,{remote:copy(db.row),login:false});await reopened.api.loadCloud(sessionUser);
+ assert.deepEqual(copy(reopened.api.state().tasks[0]),firstBefore);
+ assert.equal(reopened.api.state().tasks[1].subTasks[0].title,'Second task only');
+ reopened.api.hub.standup.open(item.projectId);
+ const card=reopened.document.querySelector('[data-report-item]');
+ assert.match(card.textContent,/First release check/);assert.match(card.textContent,/Second release check/);
+ assert.equal(reopened.document.querySelectorAll('[data-report-task]').length,0);
 });
 
 test('stand-up: saved item types group the newest items first and follow type edits', async t => {
@@ -593,18 +607,11 @@ test('stand-up: saved item types group the newest items first and follow type ed
  assert.equal(document.querySelector(`[data-report-item="${older.id}"]`).open,true);
 });
 
-test('Project tasks: role restrictions protect shared progress and exclude unavailable task details', async t => {
+test('Project tasks: role restrictions protect legacy shared progress and exclude unavailable task details', async t => {
  const {api,document,window,db}=await app(t),item=standupFixture(api,document);
- api.editRecord('tasks');
- const form=document.getElementById('editForm');
- fill(form,{task:'Private delivery task',taskType:'Project',projectLink:item.projectId});
- form.elements.projectLink.dispatchEvent(new window.Event('change',{bubbles:true}));
- form.elements.projectWorkType.value='item';
- form.elements.projectWorkType.dispatchEvent(new window.Event('change',{bubbles:true}));
- form.elements.projectItemChoice.value='item:'+item.id;
- api.saveEdit(form);
+ const taskId=addMainTask(api,document,'Private delivery task');
+ api.mutate(d=>Object.assign(d.tasks[0],{taskType:'Project',linkId:item.projectId,sourceProjectId:item.projectId,projectItemId:item.id}));
  await settle();
- const taskId=api.state().tasks[0].id;
  const permissions=window.WorkHubAccessCatalog.preset();
  permissions.specs={mode:'view'};
  db.access={userId:api.cloud.user.id,role:'member',status:'active',version:2,permissions};
@@ -1055,6 +1062,7 @@ test('Batch A creating a Task from a Project Item prefills and preserves the exi
  assert.equal(form.elements.batchEnvironment.value,'dev');
  assert.equal(form.elements.batchSystem.value,'S4D');
  assert.equal(form.elements.batchClient.value,'100');
+ form.elements.task.value='Independent task';
  api.saveEdit(form);
  await settle();
  api.editRecord('tasks',api.state().tasks[0].id);
@@ -4028,6 +4036,75 @@ test('Task companies: deleting company or project unlinks only company assignmen
  await api.action({dataset:{action:'delete-company',id:'task-company-a'}});let task=api.state().tasks.find(t=>t.id===id);assert.equal(task.companyId,'');assert.equal(task.taskType,'Project');assert.equal(task.references.length,1);api.validate(api.state());
  api.editRecord('tasks',id);f=document.getElementById('editForm');f.elements.namedItem('companyId').value='task-company-b';api.saveEdit(f);await api.action({dataset:{action:'delete-project',id:pid}});task=api.state().tasks.find(t=>t.id===id);assert.equal(task.taskType,'Custom');assert.equal(task.companyId,'');assert.equal(task.references[0].url,'https://example.com/evidence');api.validate(api.state());
 });
+test('Task parent companies: only matching maintained project items can be selected or saved',async t=>{
+ const ctx=await app(t),{api,document,window,db}=ctx,project=taskCompanyFixture(api);
+ const make=(title,projectId,companyId)=>{
+  api.editRecord('specs');const f=document.getElementById('editForm');
+  f.elements.projectId.value=projectId;f.elements.projectId.dispatchEvent(new window.Event('change',{bubbles:true}));
+  fill(f,{description:title,companyId});api.saveEdit(f);return api.state().specs.at(-1).id;
+ };
+ const alpha=make('Stock interface',project,'task-company-a');
+ const beta=make('Stock interface',project,'task-company-b');
+ const general=make('Project-wide review',project,'');
+ const other=make('Other company item','task-other-project','task-company-other');
+ let f=chooseTaskProject(ctx,project,'task-company-a');
+ const change=(name,value)=>{f.elements[name].value=value;f.elements[name].dispatchEvent(new window.Event('change',{bubbles:true}));};
+ const options=()=>[...f.elements.projectItemChoice.options].map(o=>o.value);
+ change('companyId','task-company-a');
+ assert.deepEqual(options(),['','item:'+alpha]);
+ change('projectItemChoice','item:'+alpha);fill(f,{trNumber:'00123',remarks:'Keep this draft'});
+ change('companyId','task-company-b');
+ assert.deepEqual(options(),['','item:'+beta]);assert.equal(f.elements.projectItemChoice.value,'');
+ assert.equal(f.elements.remarks.value,'Keep this draft');assert.equal(f.elements.trNumber.value,'00123');
+ await settle();const writes=db.calls.length;
+ f.elements.projectItemChoice.add(new window.Option('Stale choice','item:'+alpha));f.elements.projectItemChoice.value='item:'+alpha;
+ assert.throws(()=>api.saveEdit(f),/selected company/);assert.equal(db.calls.length,writes);
+ change('companyId','');assert.deepEqual(options(),['','item:'+alpha,'item:'+beta,'item:'+general]);
+ change('projectLink','task-other-project');assert.deepEqual(options(),['','item:'+other]);
+ change('projectLink',project);change('companyId','task-company-b');change('projectItemChoice','item:'+beta);api.saveEdit(f);
+ api.editRecord('tasks',api.state().tasks.at(-1).id);f=document.getElementById('editForm');
+ assert.equal(f.elements.projectItemChoice.value,'item:'+beta);
+ assert.ok(!options().includes('item:'+alpha));assert.ok(!options().includes('item:'+general));
+});
+
+test('Task tracking: settings, transport references and independent task values survive rename, hiding and reload',async t=>{
+ const {api,document,window,db}=await app(t);
+ const openSettings=async()=>{await api.action(document.querySelector('#settingsMenu [data-action="task-custom-fields"]'));return document.getElementById('taskFieldSettingsForm');};
+ const submit=async f=>{submitLocal(window,f);await settle();};
+ let settings=await openSettings();
+ assert.equal(settings.querySelector('[name="fieldLabel"]').value,'ZTICKET');
+ await api.action(settings.querySelector('[data-action="task-field-add"]'));
+ let extra=settings.querySelector('[data-task-field-id]:last-child');
+ const key=extra.dataset.taskFieldId;
+ extra.querySelector('[name="fieldLabel"]').value='Change reference';
+ await submit(settings);
+ api.editRecord('tasks');let form=document.getElementById('editForm');
+ fill(form,{task:'Transport check',trNumber:'D01K900007',trDescription:'Release PO checks\nValidate output','custom-zticket':'000042',['custom-'+key]:'CHG-008'});
+ api.saveEdit(form);await settle();
+ const task=api.state().tasks.at(-1);
+ assert.equal(task.trNumber,'D01K900007');assert.equal(task.customFieldValues.zticket,'000042');
+ settings=await openSettings();
+ const row=settings.querySelector('[data-task-field-id="'+key+'"]');row.querySelector('[name="fieldLabel"]').value='Change request';
+ settings.querySelector('[data-task-field-id="zticket"] [name="fieldVisible"]').checked=false;
+ await submit(settings);
+ api.editRecord('tasks',task.id);form=document.getElementById('editForm');
+ assert.equal(form.elements.namedItem('custom-zticket'),null);
+ assert.equal(form.elements.namedItem('custom-'+key).value,'CHG-008');
+ assert.equal(form.elements.namedItem('trDescription').value,'Release PO checks\nValidate output');
+ form.elements.trDescription.value='';api.saveEdit(form);await settle();
+ const reopened=await app(t,{remote:copy(db.row),login:false});await reopened.api.loadCloud(sessionUser);
+ await reopened.api.hub.handle({dataset:{hub:'task-detail',id:task.id}});
+ const detail=reopened.document.querySelector('.hub-detail').textContent;
+ assert.match(detail,/ZTICKET000042/);assert.match(detail,/Change requestCHG-008/);assert.match(detail,/D01K900007/);
+ assert.equal(reopened.api.state().tasks[0].trDescription,undefined);
+ reopened.api.editRecord('tasks');form=reopened.document.getElementById('editForm');
+ assert.equal(form.elements.trNumber.value,'');assert.equal(form.elements.namedItem('custom-'+key).value,'');
+ settings=await openSettings();
+ settings.querySelector('[data-task-field-id="zticket"] [name="fieldVisible"]').checked=true;
+ await submit(settings);
+ api.editRecord('tasks',task.id);assert.equal(document.getElementById('editForm').elements.namedItem('custom-zticket').value,'000042');
+});
+
 test('Task companies: older backups gain active companies and empty optional task fields, malformed scopes remain rejected',async t=>{
  const ctx=await app(t),{api}=ctx,pid=taskCompanyFixture(api);api.saveEdit(chooseTaskProject(ctx,pid,'task-company-a'));const legacy=copy(api.state());delete legacy.tasks[0].companyId;delete legacy.tasks[0].references;delete legacy.projectCompanies[0].active;const restored=api.parseBackup(api.payload(legacy));assert.equal(restored.projectCompanies[0].active,true);assert.equal(restored.tasks[0].companyId,'');assert.deepEqual(copy(restored.tasks[0].references),[]);
  restored.tasks[0].companyId='task-company-other';assert.throws(()=>api.validate(restored),/linked project/);restored.tasks[0].companyId='';restored.projectCompanies[0].active='No';assert.throws(()=>api.validate(restored),/company details/);
@@ -5088,6 +5165,27 @@ test('Go-Live issues share editable fields and sub-items with Tasks and Project 
  api.hub.standup.open(linked.sourceProjectId);
  assert.equal(document.querySelector('[data-report-item="'+linked.projectItemId+'"]').open,false);
  assert.equal(document.querySelector('[data-report-task="'+linked.id+'"]'),null);
+});
+
+test('Go-Live issues: creating a task for an existing parent cannot adopt its completed task',async t=>{
+ const ctx=await app(t),{api,document,db}=ctx;
+ const item=standupFixture(api,document);
+ api.mutate(d=>{d.specs[0].status='Completed';});
+ const earlierId=addMainTask(api,document,'Completed rollout');
+ // Existing workspaces can have a task that shares the project item’s original progress.
+ api.mutate(d=>Object.assign(d.tasks[0],{taskType:'Project',linkId:item.projectId,sourceProjectId:item.projectId,projectItemId:item.id}));
+ await settle();
+ const previous=copy(api.state().tasks[0]),parent=copy(api.state().specs[0]);
+ assert.equal(previous.done,true);
+ const issueId=await addGoLiveForLinkedWork(ctx,'New rollout check','Only this issue step');
+ const created=await linkGoLiveItem(ctx,issueId,item.id);
+ assert.notEqual(created.id,earlierId);assert.equal(created.parentItemId,item.id);
+ assert.deepEqual(copy(created.subTasks.map(sub=>sub.title)),['Only this issue step']);
+ assert.equal(created.done,false);assert.equal(api.state().tasks.length,2);
+ assert.deepEqual(copy(api.state().tasks[0]),previous);assert.deepEqual(copy(api.state().specs[0]),parent);
+ const restored=api.parseBackup(JSON.stringify(db.row.document));
+ assert.deepEqual(copy(restored.tasks.find(t=>t.id===earlierId)),previous);
+ assert.equal(restored.tasks.find(t=>t.id===created.id).subTasks.length,1);
 });
 
 test('Go-Live issues can link an existing Project Item and keep the older task and both sub-item lists', async t=>{

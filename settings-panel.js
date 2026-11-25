@@ -81,6 +81,11 @@
       'Statuses, phases and reusable dropdown options.',
       'built in lists dropdown status phase options',
     ],
+    'task-custom-fields': [
+      'work',
+      'Add, rename or hide reference fields on your tasks.',
+      'tasks transport TR number description ZTICKET tracking custom fields',
+    ],
     'work-context': [
       'work',
       'Shared environments, labels and the context attached to your work.',

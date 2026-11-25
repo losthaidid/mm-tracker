@@ -108,10 +108,20 @@
       const complete = subs.filter(sub => E.category(sub.status) === 'completed').length;
       return `<summary><span class="standup-item-symbol" aria-hidden="true">${symbol}</span><span class="standup-item-heading"><small>${esc(label)}</small><strong>${esc(title)}</strong><span>${subs.length ? `${complete}/${subs.length} sub-items completed` : 'No sub-items'}</span></span>${badge(status)}<span class="standup-chevron" aria-hidden="true">⌄</span></summary>`;
     }
-    function itemCard(item, task) {
+    function itemCard(item, tasks = []) {
       const subs = item.subItems || [],
-        label = [itemType(item), item.itemId, task && 'Linked task'].filter(Boolean).join(' · ');
-      return `<details class="standup-item" data-report-item="${esc(item.id)}" data-report-row="item:${esc(item.id)}">${rowHeading('▤', label, item.description || 'Untitled item', item.status, subs)}<div class="standup-item-body">${task ? `<div class="standup-linked-task"><span class="standup-task-title"><small>Linked task</small><strong>${esc(task.task)}</strong></span>${button('task', 'Open task ↗', `data-id="${esc(task.id)}"`)}</div>` : ''}${row(item)}${subs.length ? `<div class="standup-sub-list">${subs.map(sub => row(item, sub)).join('')}</div>` : ''}</div></details>`;
+        label = [
+          itemType(item),
+          item.itemId,
+          tasks.length === 1
+            ? 'Linked task'
+            : tasks.length > 1
+              ? tasks.length + ' linked tasks'
+              : '',
+        ]
+          .filter(Boolean)
+          .join(' · ');
+      return `<details class="standup-item" data-report-item="${esc(item.id)}" data-report-row="item:${esc(item.id)}">${rowHeading('▤', label, item.description || 'Untitled item', item.status, subs)}<div class="standup-item-body">${tasks.map(task => `<div class="standup-linked-task"><span class="standup-task-title"><small>${esc(E.taskStatus(task))}</small><strong>${esc(task.task)}</strong></span>${button('task', 'Open task ↗', `data-id="${esc(task.id)}"`)}</div>`).join('')}${row(item)}${subs.length ? `<div class="standup-sub-list">${subs.map(sub => row(item, sub)).join('')}</div>` : ''}</div></details>`;
     }
     function taskNotes(record) {
       return `<section class="standup-remarks"><h4>Remarks</h4><p${record.remarks ? '' : ' class="is-empty"'}>${esc(record.remarks) || 'No remarks yet.'}</p>${record.feedback ? `<h4>Feedback</h4><p>${esc(record.feedback)}</p>` : ''}</section>`;
@@ -201,13 +211,7 @@
       if (!project) throw Error('Project no longer exists.');
       const items = E.newestItems(state, id),
         tasks = generalTasks(id),
-        linked = new Map(
-          a.can('tasks')
-            ? state.tasks
-                .filter(task => links.sourceProject(task) === id && task.projectItemId)
-                .map(task => [task.projectItemId, task])
-            : []
-        );
+        linked = a.can('tasks') ? E.tasksByItem(state, id) : new Map();
       return `<div class="standup-report" data-owner="${esc(a.owner())}" data-project="${esc(id)}"><div class="standup-hero"><h2>${esc(project.name)}</h2></div>${strip(id)}${searchBar()}<div class="standup-items"><div class="standup-blank standup-no-results" hidden><strong>No matching items or updates</strong><p>Try another keyword, or clear your search.</p></div>${itemGroups(items, linked)}${a.can('tasks') ? `<section class="standup-group" aria-labelledby="standupGeneralTitle"><h3 class="standup-group-title" id="standupGeneralTitle">General project work <span>${tasks.length}</span></h3>${tasks.map(taskCard).join('') || '<div class="standup-blank"><strong>No general project tasks yet</strong></div>'}</section>` : ''}</div><footer class="standup-footer">Actions stay linked to Tasks. Completing an Action’s task leaves the project item’s own status unchanged.</footer></div>`;
     }
     function itemGroups(items, linked) {
@@ -296,9 +300,9 @@
             ? `<div class="standup-task-context wide"><span class="standup-kicker">GO-LIVE ISSUE</span><strong class="hub-sensitive">${esc([issue.reference, issue.title].filter(Boolean).join(' · '))}</strong></div>`
             : '<p class="standup-task-context wide">Linked Go-Live issue unavailable.</p>';
         }
-        const item = links.itemForTask(state, task);
+        const item = links.relatedItem(state, task);
         if (!item)
-          return task?.projectItemId
+          return task?.projectItemId || task?.parentItemId
             ? '<p class="standup-task-context wide">Linked project item unavailable.</p>'
             : '';
         const open = a.can('projects.standup')

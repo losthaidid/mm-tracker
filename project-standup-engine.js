@@ -241,6 +241,16 @@
             ] || 'To do';
   const sourceProject = task =>
     task.sourceProjectId || (task.taskType === 'Project' ? task.linkId : '');
+  function tasksByItem(d, projectId) {
+    const groups = new Map();
+    for (const task of d.tasks) {
+      const itemId = task.parentItemId || task.projectItemId;
+      if (!itemId || sourceProject(task) !== projectId) continue;
+      if (!groups.has(itemId)) groups.set(itemId, []);
+      groups.get(itemId).push(task);
+    }
+    return groups;
+  }
   function generalTasks(d, projectId) {
     const itemIds = new Set(
       d.specs.filter(item => item.projectId === projectId).map(item => item.id)
@@ -250,7 +260,7 @@
       task =>
         sourceProject(task) === projectId &&
         !task.archived &&
-        !itemIds.has(task.projectItemId) &&
+        !itemIds.has(task.parentItemId || task.projectItemId) &&
         !actionIds.has(task.id)
     );
   }
@@ -284,13 +294,7 @@
   function search(d, projectId, query = '', includeTasks = true) {
     const matches = matcher(query),
       tasks = new Map(includeTasks ? d.tasks.map(t => [t.id, t]) : []),
-      itemTasks = new Map(
-        includeTasks
-          ? d.tasks
-              .filter(task => sourceProject(task) === projectId && task.projectItemId)
-              .map(task => [task.projectItemId, task.task])
-          : []
-      ),
+      itemTasks = includeTasks ? tasksByItem(d, projectId) : new Map(),
       linked = new Map();
     for (const action of data(d).actions) {
       if (action.projectId !== projectId) continue;
@@ -314,7 +318,7 @@
             item.ricefw,
             item.itemType,
             item.description,
-            itemTasks.get(item.id),
+            ...(itemTasks.get(item.id) || []).map(task => task.task),
           ],
           itemMatch = matches([...heading, item.status, item.remarks, linked.get(key(item.id))]),
           subItemIds = (item.subItems || [])
@@ -345,6 +349,7 @@
     upsertAction,
     taskStatus,
     generalTasks,
+    tasksByItem,
     searchTasks,
     search,
   };
