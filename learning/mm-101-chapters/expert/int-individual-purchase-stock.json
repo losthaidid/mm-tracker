@@ -1,0 +1,103 @@
+{
+  "id": "int-individual-purchase-stock",
+  "level": "Expert",
+  "shelf": "Expert practice",
+  "area": "integrate",
+  "topic": "Individual purchasing and sales order stock",
+  "title": "There are enough units in the plant. Why can Shipping pick only three for this sales order?",
+  "keywords": [
+    "individual purchase order",
+    "sales order stock",
+    "special stock E",
+    "TAB",
+    "BANC",
+    "sales order item",
+    "MMBE",
+    "customer-specific procurement",
+    "outbound delivery"
+  ],
+  "visual": {
+    "title": "A receiving dock with a correct total and one wrong assignment",
+    "headers": [
+      "Stock assignment and document",
+      "Recorded",
+      "Required by this arrival",
+      "Difference"
+    ],
+    "rows": [
+      [
+        "Sales order Alpha, item 10",
+        "3 units",
+        "6 units",
+        "3 short"
+      ],
+      [
+        "Sales order Bravo, item 10",
+        "7 units",
+        "4 units",
+        "3 excess"
+      ],
+      [
+        "Ordinary unrestricted stock",
+        "5 units",
+        "5 units already on hand",
+        "0"
+      ],
+      [
+        "Total across these segments",
+        "15 units",
+        "15 units",
+        "0"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Individual purchasing for customer orders",
+      "https://help.sap.com/docs/SAP_ERP/96bf9ad642cf4b26a29595e3d573fb8c/4866b65334e6b54ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Determining individual purchase order items in Sales",
+      "https://help.sap.com/docs/SAP_ERP/78e0627c34ef43879d72718e21ea517b/5166b65334e6b54ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Valuated sales order stock",
+      "https://help.sap.com/docs/SAP_ERP/4d35e322f79d4744abeda0b9caaab5a4/bba4b9537cceb44ce10000000a174cb4.html"
+    ],
+    [
+      "SAP Support · Make-to-order scenarios and sales order stock valuation",
+      "https://help.sap.com/docs/SUPPORT_CONTENT/ficontrolling/3361881737.html"
+    ]
+  ],
+  "lead": "Two customers order identical-looking valve actuators, and the vendor sends a mixed delivery to your warehouse. The dock count is correct. The material is unrestricted, and there are 15 pieces in the plant. Shipping can nevertheless identify only three pieces for a six-piece delivery to customer Alpha. In individual procurement for a customer order, SAP can manage stock by the sales document and item. A plant-level quantity is therefore an incomplete description of what Shipping can pick. The task is to establish whether the sales order expects individual stock, which document assigned the arriving units, and what quantities and values would change if you corrected the assignment.",
+  "sections": [
+    [
+      "Determine the physical route before looking up movement types",
+      "In the individual purchase order flow documented for SAP ERP, Sales creates an order for a customer requirement that will be satisfied by external procurement. Sales order entry creates a requisition item, Purchasing creates a purchase order from it, and the supplier delivers to your company. Your company then delivers the material to its customer. While on your premises, the procured units can be held as sales order stock for a specified item. In standard third-party processing the supplier instead ships directly to the customer. A vendor reference and a sales order on the same paperwork can occur in either flow. Identify the actual ship-to location, receipt process and outgoing delivery responsibility.\n\nRead the actual sales order item and schedule line and find the associated procurement reference. SAP’s classic Sales documentation uses BANC as an example item category group for individual purchasing and TAB as the resulting sales item category under the standard setup described there. Customers can configure item determination differently. Treat the observed sales order as evidence of what SAP selected. An item from stock, an individually procured item and a third-party item can share the same material description, particularly in a system where the business permits exceptions. Capture the plant, item category, requirements information and requisition document and item for each customer before interpreting the warehouse screen."
+    ],
+    [
+      "Build an inventory position by assignment",
+      "Assume plant 1100 and storage location FG01 hold five actuators of free stock from an earlier replenishment. They also hold three actuators in sales order stock for Alpha, item 10, and seven for Bravo, item 10. All quantities here are in pieces, and within their own segments the stock is unrestricted. The plant aggregate is 15. For the individual segment serving Alpha, only three appear. The ten units just purchased were intended to be six for Alpha and four for Bravo. The quantity discrepancy is exactly three units in opposite directions, and it disappears in a plant aggregate.\n\nOpen the stock overview and drill down through the plant and storage location to the applicable special stock and sales order item. Record the selling document number as well as the item number. Nearly every new order in the sample happens to use item 10, which has no meaning on its own. Also preserve batch, stock type and serial identity if those apply. The example isolates the sales order assignment deliberately. In a real plant there can be six units against the correct order with three in quality inspection, or a particular serial can be reserved for an approved customer configuration. Either explanation would leave different evidence in the detailed position."
+    ],
+    [
+      "Prove where the ten incoming units went",
+      "Follow Alpha’s sales item through its requisition to the purchased item. Do the same for Bravo, and compare vendor material identifiers, quantities and their individual sales order assignments. In this incident supplier cartons were labeled six for Alpha and four for Bravo. A warehouse clerk entered three against Alpha’s correct PO item, four against Bravo's correct item, and three more against Bravo while processing the remaining carton. Assume the client permitted this quantity on Bravo through an appropriate item tolerance or approved order quantity. Check that assumption against the real PO and receiving controls. A hard overdelivery check might make this exact error impossible in another client.\n\nIdentify the posted material document items, order references, stock assignment, signed quantities and dates. If the error hypothesis is right, the most recent three-piece receipt on Bravo should be supported by paperwork for Alpha, and Alpha’s own order should show the open quantity. Locate the three physical units on the floor or in the warehouse management system and check their identifiers. Cartons can be labeled incorrectly by the supplier. If the goods are actually configured for Bravo, a paper mismatch becomes a vendor delivery discrepancy, and moving inventory records to Alpha could cause shipment of the wrong specification. The commercial and physical evidence must agree before choosing the correction."
+    ],
+    [
+      "Distinguish an availability problem from a shipping problem",
+      "A sales order confirmation, an outbound delivery and the goods issue are different stages. An availability check can consider the defined scope, dates and other requirements; a confirmation can be based on expected supply. A delivery proposes and checks quantities under the relevant shipping configuration. Goods issue requires a real quantity in the appropriate assignment and status when stock posts. Ask which stage raised the message. If the stock snapshot shows only three unrestricted units for Alpha, that is strong evidence of its current stock position. It does not establish how many future units the sales order can confirm once open supplies and dates are considered.\n\nSuppose instead that Alpha's six units are already present against the correct segment, and the outbound delivery was created for three on an earlier date. Correcting the inventory assignment would then be misguided. Inspect delivery quantities, split deliveries, picking status, batch selection, availability dates, the document flow and any other open deliveries for that sales order item. A picking allocation already made on a second delivery can explain an apparent shortage despite a stock snapshot. Use the report and transaction time stamps carefully. An afternoon stock balance can include the receipt or goods issue that the morning delivery did not yet see."
+    ],
+    [
+      "Reconcile the financial view at the appropriate level",
+      "ECC supports valuation arrangements for sales order stock. A stock quantity held separately for an order does not, by itself, specify how that stock is valued or where costs and revenues are collected. Review the actual requirements class and account assignment design, then use the financial documents created in the test case. For valuated stock, reconcile the value and price treatment applicable to that sales order stock. For non-valuated sales order stock, follow the costs on the relevant cost object through the process designed for the installation. An unrestricted plant material price alone is insufficient to predict the result for every configuration.\n\nFor illustration, suppose the six Alpha units cost 140 apiece under the purchase, while the four Bravo units cost 110. The purchasing values expected across the two references amount to 840 and 440, or 1,280. If each posted quantity were valued at the stated price of the item against which it was received, the three and seven split would produce 420 and 770, or 1,190. The 90 difference exposes a commercial consequence that total pieces alone missed. Treat this as a comparison under explicit equal-currency, no-tax, no-freight assumptions. Standard-price logic or other valuation settings can produce different FI postings. Compare actual amounts and identify which portions hit inventory, expense or a price difference before prescribing any adjustment."
+    ],
+    [
+      "Correct the reference, the quantity and the commercial obligation",
+      "Once the team establishes that three Alpha units were received against Bravo, inspect the complete follow-on chain for both items. Has Bravo already shipped any of those three? Has the supplier invoiced Bravo’s procurement quantity? Are the serials in a handling unit or assigned to an outbound delivery? Which periods are open? The easiest-looking stock transfer may give Alpha three additional pieces but leave Bravo’s PO overstated, Alpha’s PO open, and any supplier invoice linked to the wrong receipt. A quantity correction alone solves only one part of the case. Purchasing, Shipping and Finance must agree which references the chosen documents restore.\n\nIn a clean QA copy with no follow-on usage, reproduce the incorrect posting, then test an authorized reversal of the wrong receipt and re-entry against Alpha's purchasing item. Verify six and four in the relevant segments, the unchanged five free units, the expected open quantities for both purchase items, and the correct amount on any valuation objects. Confirm Alpha's outbound process can use the appropriate stock. A different case arises if Bravo legitimately bought and owned the seven units under its order and Sales now wants to reallocate them. That requires a business decision about changing commitments and any financial consequences, rather than rewriting an originally correct delivery."
+    ],
+    [
+      "Design a test that catches the original error",
+      "Create two customer orders for one material at the same plant and storage location. Both must require individual procurement, and the ordered quantities should differ. Receive the supplies on separate purchasing references with identifiable cartons. Verify plant totals, customer-order positions and the sales order item available for picking. Then stage a controlled discrepancy and observe whether receiving controls reject it or allow it under the deliberately configured quantities. A single-order test with no unrestricted stock and no competing customer can make a poor reference look like a working design because there is nowhere else for the test pieces to land.\n\nThe final incident record should let a reader reconstruct all 15 pieces. Five were free stock before the delivery. Ten arrived for two customer orders. The dock counted correctly, and one three-piece posting assigned stock to the wrong purchasing reference. The more detailed evidence explains why the sales order shortage and plant total could both be true. The corrected purchasing history, resulting customer stock and verified shipping behavior together support the handover to Sales. At that point the 15-piece headline can serve as a useful control total again, because the individual quantities underneath it have also been proved."
+    ]
+  ]
+}

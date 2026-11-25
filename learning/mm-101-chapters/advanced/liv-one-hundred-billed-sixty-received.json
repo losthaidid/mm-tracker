@@ -1,0 +1,108 @@
+{
+  "id": "liv-one-hundred-billed-sixty-received",
+  "level": "Advanced",
+  "topic": "Quantity variance and receipt assignment",
+  "title": "One hundred ordered, sixty received and one hundred invoiced",
+  "lead": "A buyer sees that the invoice quantity agrees with the purchase order and asks why Accounts Payable cannot pay it. A warehouse clerk sees only sixty units and says the invoice is wrong. Both are comparing legitimate documents. Determine which quantity SAP proposed when the invoice was entered, what the supplier actually billed, whether a document was posted, and how the remaining forty units affect the comparison.",
+  "keywords": [
+    "100 ordered 60 received",
+    "GR-based invoice verification",
+    "quantity variance",
+    "partial receipt",
+    "DQ",
+    "DW",
+    "MRBR",
+    "MIRO",
+    "PO history",
+    "EKPO-WEBRE"
+  ],
+  "sections": [
+    [
+      "Reconstruct the position at invoice entry",
+      "Take one purchase order item for 100 pumps at 25 currency units per pump. Goods receipt and invoice receipt are expected. On Monday the warehouse posts 60 units against this item. On Tuesday the supplier sends an invoice for 100 units and 2,500. There is one currency, no tax or delivery costs in the illustration, and no prior invoice, return or reversal. Record Monday’s material document number, year and item, in addition to the PO item. At the start of Tuesday, the purchase commitment is 100, the posted delivery is 60, the supplier's claim is 100 and the previously posted invoice quantity is zero. The different figures have distinct business meanings.\n\nPerform the reconstruction as of the invoice entry time. ME23N today may show another receipt posted on Thursday and a credit memo entered a week later. Those documents can improve the position today without explaining what the posting user saw on Tuesday. A backdated posting adds another complication. The financial posting date may precede the invoice date although the user actually entered the receipt afterwards. Where chronology matters, capture available entry dates and times, original document references and reversal links. Start with signed quantities, so a cancelled receipt and its cancellation contribute zero instead of inflating the delivery total."
+    ],
+    [
+      "Switch on the receipt reference in a comparison order",
+      "With GR-based invoice verification selected on the PO item, the invoice is assigned to specific deliveries. In classic ECC, check the GR-based invoice verification indicator in the item’s invoice details. The stored purchasing item field is EKPO-WEBRE. The goods receipt indicator describes another part of the purchase process. Checking one box does not tell you the setting of the other. The safest comparison uses two otherwise identical quality-system orders set up before any history exists. Changing a productive item with documents already posted would confuse the diagnosis and may be restricted.\n\nFor the receipt-based item, Monday’s receipt gives the system a particular sixty-unit quantity to propose, less any invoiced quantity already assigned to that receipt. There has been none. Entering the PO number as the allocation on the invoice screen can still return a receipt-linked row. The number the user typed into the initial reference field does not establish the level at which the invoice was assigned. Inspect the returned row and its receipt or delivery reference. As additional deliveries arrive the same purchasing item may appear as multiple rows, each representing its own history. With no receipt at all, this process lacks the prerequisite receipt for the assignment. The available quantity from another order item cannot supply that prerequisite."
+    ],
+    [
+      "Read the PO-based proposal with the indicator cleared",
+      "For a comparable standard stock PO item with GR-based invoice verification cleared, invoice allocation groups the history at the PO item. In the stated receipt-first example the delivered total is sixty and the already invoiced total is zero. The resulting proposal can therefore also be sixty. This is why two users who compare a screenshot containing one PO and one receipt may think the indicator did nothing. The arithmetic agrees by coincidence because there is only one receipt. The difference becomes visible when the history can be allocated in more than one way.\n\nConsider a separate test state with deliveries of sixty and forty and a prior invoice of thirty assigned to the first delivery for the receipt-based process. The open quantities are thirty on the first delivery and forty on the second. A PO-based allocation can present a single cumulative seventy. Both presentations describe the same remaining total. Only the receipt-linked view tells you whether a supplier invoice for forty pieces refers to a delivery already partly invoiced or to the untouched second delivery. A workflow that approves invoices against signed delivery notes needs to preserve this association. Record supplier delivery note identifiers at goods receipt with enough precision to distinguish a second truckload from a duplicate reference."
+    ],
+    [
+      "Price the forty-unit variance before consulting the limit",
+      "Return to Tuesday and an invoice entry for all one hundred. The payable claimed is 2,500, while sixty received units at 25 support 1,500 at the contract rate. The excess quantity is forty and the value represented by that excess is 1,000. The price per pump is still 25. The invoice can match the ordered quantity exactly and still exceed the quantity available for invoice verification under the example. Likewise, a gross invoice balance of zero in MIRO establishes that header and item amounts balance. It does not settle the question of whether forty additional pumps have been evidenced.\n\nExamine the company code’s Logistics Invoice Verification tolerance settings in OMR6 or the corresponding IMG activity. DQ concerns quantity variance, including the value effect of the excess. DW addresses the distinct case where a receipt is expected and the receipt quantity is zero. A partial sixty-unit receipt is already on the item, so the two checks should not be treated as interchangeable explanations of this case. Read active limits, their currency or percentage basis, and the actual message and blocking reason captured for the invoice. With a deliberately configured absolute upper limit of 100 for the tested DQ check and no other relevant allowance, the example’s 1,000 exceeds that limit. Changing an organization's actual tolerances would affect many purchases and requires its own business decision. It does not establish the facts for this vendor bill."
+    ],
+    [
+      "Distinguish a rejected entry from a posted, blocked liability",
+      "Check the saved status and document evidence before sending the case to a release clerk. A hard message may have stopped entry, a clerk may have parked the invoice, or a posted invoice may carry a payment block. The procedures for those outcomes differ. A rejected posting has generated no posted liability from this transaction. A posted Logistics Invoice Verification document should be inspected with its related accounting document. The payment block for an invoice subject to an item variance can affect the vendor line for the total payable. A block of the claim can therefore keep all 2,500 out of payment even though the disputed quantity represents only 1,000.\n\nIf the quantity variance is permitted to post, use a simple PO-based posting to understand the potential balances. Initially goods receipt credits GR/IR by 1,500 and debits stock by 1,500. Posting the invoice for 100 at the same unit price debits GR/IR by 2,500 and credits the supplier by 2,500. The resulting debit balance of 1,000 is consistent with invoicing more units than have been received. This calculation assumes a valuated stock order, no extra conditions, and no exchange differences. The forty open units do not create stock through MIRO. A blocked liability still merits examination during close because the accounting document can exist before the invoice is released for payment."
+    ],
+    [
+      "What Thursday’s second receipt can resolve",
+      "On Thursday forty more pumps arrive and the warehouse records a genuine second receipt. For the PO-based quantity comparison, delivered and invoiced quantities for the item now each total one hundred. At the same price the new receipt also contributes the 1,000 credit that balances the arithmetic for GR/IR. A posted payment block may still be present. Use the authorized release process, ordinarily MRBR for blocked Logistics Invoice Verification documents, to reassess the relevant reasons. A clean recheck and a release do not pay the supplier. The vendor open item still has its normal due date and the payment run has its own selection and payment controls.\n\nWith GR-based verification active, examine the receipt actually assigned to the invoiced quantity. Charging all one hundred to the first sixty-unit delivery, where the client permits that posting, is materially different from charging sixty to the first delivery and forty to the second. Thursday's document is another reference. A total of one hundred in PO history can coexist with an overinvoiced first receipt and an uninvoiced second receipt. SAP documents this family of apparent mismatches in its MRBR knowledge base. Inspect the original and subsequent invoice items, cancellations, and receipt assignments before concluding the second receipt should release the document. A clerk choosing a manual release may authorize payment under local rules. That action does not reassign the historical quantities to the correct receipts."
+    ],
+    [
+      "Choose the correction from the commercial evidence",
+      "Ask the supplier for its dispatch quantities and the delivery notes cited on the bill. If all hundred physically arrived on Monday and forty were omitted from the receiving record, the warehouse can investigate and post the evidenced event according to local period controls. If only sixty arrived and the contract permits advance billing of the forty, identify the approved commercial and accounting treatment with Purchasing and Finance. A receipt posted to make an invoice payable would misstate both inventory and the date of delivery. If the supplier billed in error, AP can pursue a corrected invoice or the applicable complaint process. If AP assigned an otherwise valid invoice to the wrong receipt, document that specific error and use the approved correction route, considering period and clearing status before any reversal.\n\nClose the case with four answers in ordinary language. Which pumps were delivered by Tuesday? Which delivery did the supplier bill? Which quantity and reference did the clerk actually post? What remains true after Thursday's delivery? Attach the amounts and document identities that support each answer. The same discipline also handles a later return of ten pumps. The analyst must locate the return document and corresponding supplier credit, or document why one is still expected. It is entirely possible to have agreed contract prices, accurate invoice arithmetic and a genuinely important discrepancy. Finding its exact level is what makes the subsequent correction reliable."
+    ]
+  ],
+  "visual": {
+    "title": "Compare the evidence available on Tuesday and Thursday",
+    "headers": [
+      "Checkpoint",
+      "Delivered so far",
+      "Supplier invoice quantity",
+      "Evidence to inspect"
+    ],
+    "rows": [
+      [
+        "Tuesday before MIRO",
+        "60",
+        "100 claimed, none posted",
+        "Monday receipt and PO item settings"
+      ],
+      [
+        "Tuesday if 100 posted",
+        "60",
+        "100 posted",
+        "40 excess × 25 = 1,000, entry status and payment block"
+      ],
+      [
+        "Thursday with PO-based assignment",
+        "100",
+        "100 posted",
+        "Net item quantities, remaining blocking reasons"
+      ],
+      [
+        "Thursday with receipt-based assignment",
+        "60 on first receipt, 40 on second",
+        "Inspect allocation of the 100",
+        "Compare signed quantities per receipt reference"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Goods-Receipt-Based Invoice Verification",
+      "https://help.sap.com/docs/SAP_ERP/7de135920d6b44298b1d498e57882cf6/a97eb65334e6b54ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Editing Invoice Items",
+      "https://help.sap.com/docs/SAP_ERP/a58165ba587b4a7ebd5930c381a11649/1181cf535b804808e10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Variance in an Invoice Item",
+      "https://help.sap.com/docs/SAP_ERP/98eed63ea3a544af84eb972dc68b0e84/7b70b6531de6b64ce10000000a174cb4.html"
+    ],
+    [
+      "SAP Learning · Entering Invoices with Variances (S/4HANA, tolerance key reference)",
+      "https://learning.sap.com/courses/invoice-verification-in-sap-s-4hana/entering-invoices-with-variances-1"
+    ],
+    [
+      "SAP KBA 1933251 · MRBR determination logic for quantity variance in ERP and S/4HANA",
+      "https://userapps.support.sap.com/sap/support/knowledge/en/1933251"
+    ]
+  ],
+  "shelf": "Valuation & invoice verification",
+  "area": "invoice"
+}

@@ -1,0 +1,106 @@
+{
+  "id": "mrp-reorder-point-outstanding-receipt",
+  "level": "Practitioner",
+  "shelf": "Purchasing",
+  "topic": "Consumption-based planning",
+  "title": "The bin is below its reorder point. What is the open purchase order covering?",
+  "lead": "The storekeeper counts 74 filter cartridges against a reorder point of 100. She expects a purchase requisition before lunch. The planner opens the material and sees an outstanding purchase order for 40 cartridges. Both people have read a real number. The decision to buy depends on how those numbers fit together and whether the existing shipment can do the job. This chapter follows a filter from the counter in the storeroom to the planner’s decision at the end of the shift.",
+  "keywords": [
+    "reorder point",
+    "VB",
+    "open purchase order",
+    "firmed receipts",
+    "safety stock",
+    "MD04",
+    "external requirements"
+  ],
+  "sections": [
+    [
+      "Give the reorder point a business meaning",
+      "The cartridge fits a group of pumps used on the packing lines. Maintenance withdraws it as needed. An engineer can usually replace a failing filter immediately if the storeroom has one. The supplier makes regular deliveries, and individual withdrawals are difficult to schedule in advance. These are good reasons to investigate a consumption-based method. The central decision is how much protection to carry during replenishment. A filter that sits unused for a month costs little. A missing filter that stops the packing line can cost far more than its purchase price.\n\nFor the example, the maintenance planner expects to use eight cartridges per working day. The time from identifying a need to having replacement stock ready for issue averages ten working days. Expected consumption in that interval is 80. The team adds a buffer of 20 and maintains a manual reorder point of 100 in the plant material record. This arithmetic explains the chosen input. It does not imply that SAP calculates a manually maintained threshold from those three entries each time planning runs. With automatic reorder point planning, forecasting and its parameters take on another role. Record which method the plant actually uses before comparing a result with a spreadsheet.\n\nSuppose the storekeeper sees 74 in unrestricted stock. She has measured physical protection at this instant. Her figure matters for keeping the line running through today's shift. The planning question also considers replenishment already arranged. If each morning below 100 triggered a fresh unqualified purchase for the difference, cartridges already on order would make it easy to double buy."
+    ],
+    [
+      "Rebuild the quantity available to the planner",
+      "Use a single ECC plant with ordinary manual reorder point planning and one base unit, a piece. All 74 pieces in the example are relevant to this planning segment. There is no separate storage-location planning, special stock, other open receipt, or external requirement included by the selected MRP type. The only outstanding receipt is an external purchase order with an open quantity of 40. Under these assumptions the stock and firmed receipts together provide 114 pieces of coverage. That is 14 above the reorder point. A fresh proposal is unnecessary under the threshold test even though the quantity physically in the warehouse is 26 below the mark.\n\nOpen the stock/requirements list for the material and identify the purchase order item and its schedule lines. Follow it into the purchasing document. A buyer saying “we ordered 60” is useful only after checking how many remain to be supplied. If 20 of those 60 have already been received and are included in the 74, the open receipt contributes 40. Adding the original 60 to the current stock would count the received quantity twice. Use the relevant open planning element and reconcile it against the purchasing history where practical. An order number on its own cannot establish how much coverage the planner recognized.\n\nThe figure of 114 is a planning position. Someone picking a filter this morning can physically take at most the usable quantity on hand. If the existing delivery is overdue, the threshold calculation and a genuine supply risk can coexist. Record the delivery date and speak to the buyer about its credibility. A change in the expected date and a cancellation of open quantity represent different developments and merit different responses."
+    ],
+    [
+      "Follow a shift through the threshold",
+      "Maintenance takes 14 filters for a series of inspections. Once the issue has posted, on-hand stock is 60. Keep the remaining purchase order quantity at 40. Coverage is now exactly 100. In the standard reorder point test the trigger is falling below the reorder level. Equality supplies an especially good test boundary because a work instruction that says “at or below” predicts a different answer. With the example's assumptions, the next qualifying issue is what crosses the threshold. The distinction can matter on a low-volume spare with a threshold of only one or two units.\n\nA further issue of six takes stock to 54. Coverage drops to 94. The shortfall against the threshold is six pieces. This answers the narrow question of what the calculation lacks. The subsequent lot-sizing rule determines the proposal quantity. If a simple lot-for-lot calculation applies, with no minimum, rounding or other constraint, a proposal for six illustrates the result. With a fixed lot of 24 and the same shortage, a proposal for 24 can be a rational outcome. Write the shortfall and the lot quantity on separate lines of the investigation. Discovering a proposal for 24 after computing a deficit of six is a reason to examine lot sizing.\n\nNow suppose 40 pieces arrive against the original purchase order, with all 40 posted to relevant stock. The stock position increases by 40 and the open amount for that order falls by 40. Ignoring other movements, the sum of those two components stays at 94, while physical availability improves considerably. Replenishment has moved from a promise into the storeroom. If your reconstruction shows an 80-piece increase in total coverage during this receipt, look for an open order line that you failed to reduce or a receipt included twice."
+    ],
+    [
+      "Decide how to read the safety stock",
+      "It is tempting to subtract the 20-piece safety stock from the 94 before calculating the shortage. In the basic reorder point calculation illustrated here the threshold already includes that protection. Subtracting it again predicts a shortage of 26 and would lead to the wrong explanation of the next proposal. SAP documents the shortage calculation and the separate exception associated with stock falling below the safety stock level. Keep two questions available to the maintenance supervisor. How far below the reorder point is the planning position? How little stock can the storeroom physically issue before the next delivery arrives?\n\nAt 54 pieces on hand, the workshop could cover six full days at eight a day and part of the next day, assuming even consumption and no intervening receipts. That is a useful operational estimate with quite different assumptions from the proposal calculation. A shutdown campaign withdrawing 30 at once would invalidate the even-consumption assumption. Give the buyer a date and an expected demand pattern when escalating an overdue order. An explanation that only repeats “MRP did not buy” misses the decision the buyer can actually make.\n\nIf lead time persistently changes, maintain evidence for a master-data review. For instance, eight filters per day over thirteen working days gives expected demand of 104 during replenishment. Keeping the same illustrative buffer of 20 implies a candidate threshold of 124. Compare actual issue history, supplier deliveries, internal release time and receiving delay before adopting it. A one-off overdue truck and a lasting increase in procurement time have different implications for every future order of these filters."
+    ],
+    [
+      "Read a visible reservation in its planning context",
+      "A maintenance order reserves 18 cartridges for next week. Its requirement can appear in the stock/requirements list alongside the purchase order. Classic plain reorder point planning generally displays such future demands without deducting them in its basic shortage test. Historical consumption already influences the threshold. In the initial position an observer who mechanically subtracts the reservation obtains 96 and predicts a shortage of four. For the specific MRP type in the initial example, 114 remains the relevant position. This is a particularly revealing difference when someone submits a screenshot of every MD04 row as proof of a missing requisition.\n\nThere are documented reorder point procedures that include external requirements. In the MRP type settings, the treatment can depend on the requirement category and the time window. Before relying on the same calculation for a second plant, inspect the material’s MRP type and its effective configuration. An application specialist can compare a manual reservation inside the replenishment lead time with an otherwise identical reservation outside it. Keep the initial stock and order quantity stable. Look for a changed proposed quantity and record which entries the chosen procedure used. The presence of a visible item alone proves visibility.\n\nTake the distinction back to the maintenance coordinator. If a major overhaul is exceptional compared with normal filter use, the business may need a specific plan for it even when the usual threshold handles everyday issues well. Discuss the period and the consumption already represented in the threshold. Including every future reservation without reviewing how historical demand contributed to the reorder point can materially change stock levels."
+    ],
+    [
+      "Close the conversation with an action that fits the evidence",
+      "Agree on a common cut-off time for the numbers. Ask the storekeeper for the last posted goods issue and relevant storage location. Ask the buyer for the open order item, outstanding quantity, next expected delivery and any recent supplier cancellation. Ask the planner for the plant, material, MRP type, unit, reorder point and lot-sizing procedure. A screen captured before the issue and another after the receipt can tell apparently conflicting stories about the same material. If available, compare the saved MRP list for the run with the current stock/requirements list, which reflects subsequent changes.\n\nWith the initial 74 on hand and 40 genuinely expected, the action might be to confirm that shipment and monitor the next two withdrawals. If the buyer learns the supplier can deliver only ten, the working picture changes to 84 available against 100. Establish the open document quantity through the normal purchasing process, then review the next plan using the corrected position. If an issue went to the wrong material, correcting the inventory record addresses that problem at its origin. Manually adding requisitions against an unchanged open order can conceal both faults until excess stock arrives.\n\nAn effective handover in this example reads, “74 pieces in stock at the morning count, 40 still open on the order, threshold 100, supplier confirmation pending for Friday.” It gives the next person numbers they can check and a promise they can follow up. After the two issues the statement changes to 54, 40 and a six-piece shortfall before lot sizing. Following that short sequence teaches a durable habit for reorder point planning. Put the physical count, the outstanding supply and the replenishment policy on the same sheet before deciding what to buy."
+    ]
+  ],
+  "visual": {
+    "title": "How a store issue changes the reorder decision",
+    "headers": [
+      "Event",
+      "Planning stock",
+      "Open PO",
+      "Total coverage",
+      "Gap to 100"
+    ],
+    "rows": [
+      [
+        "Starting position",
+        "74",
+        "40",
+        "114",
+        "0"
+      ],
+      [
+        "Issue 14",
+        "60",
+        "40",
+        "100",
+        "0"
+      ],
+      [
+        "Issue 6 more",
+        "54",
+        "40",
+        "94",
+        "6"
+      ],
+      [
+        "Receive original PO in full",
+        "94",
+        "0",
+        "94",
+        "6"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Reorder point planning",
+      "https://help.sap.com/docs/SAP_ERP/66326f67e0e1416d83c0fdfa4060189d/5697b6535fe6b74ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Reorder point net requirements",
+      "https://help.sap.com/docs/SAP_ERP/66326f67e0e1416d83c0fdfa4060189d/b697b6535fe6b74ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Including external requirements",
+      "https://help.sap.com/docs/SAP_ERP/66326f67e0e1416d83c0fdfa4060189d/5c97b6535fe6b74ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Net requirements calculation and relevant stock",
+      "https://help.sap.com/docs/SAP_ERP_SPV/66326f67e0e1416d83c0fdfa4060189d/55fcbe532789b44ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Current stock/requirements list and MRP list",
+      "https://help.sap.com/docs/SAP_ERP/66326f67e0e1416d83c0fdfa4060189d/0819ba53422bb54ce10000000a174cb4.html"
+    ]
+  ],
+  "area": "planning"
+}

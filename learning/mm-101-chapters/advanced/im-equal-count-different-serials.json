@@ -1,0 +1,92 @@
+{
+  "id": "im-equal-count-different-serials",
+  "shelf": "Inventory & special procurement",
+  "level": "Advanced",
+  "topic": "Serialized stock and physical inventory",
+  "title": "The count agrees, yet two serial numbers are in the wrong storage locations",
+  "lead": "Four measuring pumps stand on the repair bench, exactly as the stock report predicts. The counter scans their serial plates and finds one pump assigned in SAP to the issue store. That store contains the missing repair-bench pump. Both storage locations have the correct number of units. Next week one of those pumps is due for service, and a technician expects to find it where its history says it is. A quantity-only signoff would leave the maintenance team looking for the wrong equipment. This case explains how to read a serialized physical inventory in SAP ERP and how to investigate a discrepancy that cancels out numerically.",
+  "keywords": [
+    "physical inventory",
+    "serial number",
+    "MI04",
+    "MMSL",
+    "stock check",
+    "recount",
+    "serial-number difference",
+    "equipment history"
+  ],
+  "sections": [
+    [
+      "Make the identity comparison before discussing a variance",
+      "Use a single material with identical base units, in one plant and one stock type. REPR and ISSU are two IM storage locations. For REPR the book lists P001, P002, P003 and P004. The independent count finds P001, P002, P003 and P006. For ISSU the book lists P005 and P006, while the count finds P004 and P005. Compare like-for-like sets. REPR has one expected serial absent and one unexpected serial present. ISSU has the complementary pair. At plant level every serial can be accounted for once. At storage-location level two identities disagree with the book.\n\nKeep these comparisons distinct on the count review. Quantity answers how many pumps of this material are physically present in a stock segment. The set of identities answers which individual pieces occupy that segment. Stock value, which may be the same per unit in this example, is a third question. A zero difference against the material quantity provides little evidence about the individual identities. Equally, finding an unexpected serial at the other location is only evidence of its physical presence at the observed time. That observation alone cannot say when the discrepancy started, who moved the pump or whether the system entry or the physical placement was the error."
+    ],
+    [
+      "Confirm the product actually carries serial-level stock control",
+      "Examine the serial number profile in the relevant plant's material data and open the settings for its IM usage. SAP describes use 03 for procedure MMSL as mandatory serial assignment for goods movements, and stock check 2 as the setting that rejects inconsistent stock data. Inspect those separately. A requirement to supply four serial strings on a screen is distinct from checking whether the four individual units can participate in the proposed transaction. Record any movement-type-group settings relevant to the particular goods movement. A successful test for a purchase receipt says little about the settings affecting an internal issue if the two movements have different controls.\n\nTake a sample serial through its history from receipt to the present. Look for the material, plant, location, stock type, document references and current status. If equipment records are in use, connect the observed serial plate to the right material/serial combination. A service label, an asset tag and the manufacturer's serial plate can carry three different numbers. The equipment team may recognize the asset tag even when it tells you nothing about how IM serial assignment is configured. Record which identifier the scanner captured and how any external identifier maps to the SAP serial. A label mapping problem requires attention at the input point before any retrospective stock correction."
+    ],
+    [
+      "Establish an independent observation",
+      "Timing matters even though the quantities balance. Write down when each location was counted. In our case REPR was counted at 09:00 and ISSU at 09:12. Between those times no authorized pump transfer occurred, according to the dispatch log. Check the maintenance bench and the handover area as well as the SAP movement list. A unit wheeled from one room to another between observations can appear in both lists, or in neither, depending on the direction. A second observer can re-read the permanent plates on P004 and P006 and confirm the material model. Keep each time and source attached to the relevant observation.\n\nThe clerk who entered the count may have supplied the right number of units and pasted a serial list taken from yesterday's report. That would erase the observation that the count was supposed to make. Compare the unedited scanner capture or signed count sheet to the entered serial list. Watch for duplicated scans, truncated prefixes and the letter O confused with the numeral zero. Then compare the two count lists with each other before consulting SAP's availability list. The operators can confirm that P004 really sits in ISSU without seeing which answer the system expects. Retain a record of corrected transcription errors and who verified the plate."
+    ],
+    [
+      "Enter the count and understand why posting can stop",
+      "In classic ECC the physical count can be entered with MI04 against the inventory document. Navigate to serial numbers for the item and record the observed serials according to the configured procedure. Recheck count quantity, plant, stock type and location on the document. Look at both items when the same material has been counted in two locations. A user rushing through a single combined entry and posting step can lose the opportunity to investigate the second location while both pieces are still accessible.\n\nSAP distinguishes a serial-only difference from an inconsistency that prevents posting. The system can record serial differences even with equal material quantities. A conflicting stock assignment can also cause the system to reject the difference posting. The same phrase from the business, “we counted four and SAP says four,” fits either situation. Preserve the message and the exact serial, location and status involved. Check whether the serial is already recorded in a different stock segment. A successful difference posting for a test material with a different profile does not explain the behavior of this item. Nor should a request to remove mandatory assignment be treated as the first correction to a single mislocated pump."
+    ],
+    [
+      "Reconstruct the last movement for the two disputed pieces",
+      "In our example a handover log shows that a week ago two pumps were inspected together. P004 was intended for the issue store, and P006 was intended to stay on the repair bench. Compare the last material documents and their serial lists to the instruction and the receiving signatures. One possible finding is that the warehouse physically followed the authorized routing, while the stock transfer recorded the other serial. Another is that the posted routing was correct, and a mechanic returned each pump to the other room after the inspection. Both findings reproduce today's sets. Their remedies are different.\n\nFor the first finding, the system needs a documented correction to the relevant serial assignment and the corresponding stock transfer record. For the second, the physical equipment may simply need to be returned to its intended place under the approved warehouse procedure. Check whether either pump has subsequently been issued to maintenance, installed or delivered according to its history. If a later business event exists for the wrong unit, coordinate with that application's owner before trying to repair the discrepancy at the count alone. A transfer that makes today's location look right could leave a service record certifying work on a different pump."
+    ],
+    [
+      "Preserve the recount trail and distinguish the two corrections",
+      "SAP's ECC guidance for a blocked difference caused by inconsistent serial stock assignment describes initiating a recount for the affected item, establishing a new physical inventory document and making the necessary transfer correction to restore consistency. The original inventory history can then show the recount relationship. Determine the appropriate documents and status handling in a test copy of the case with the stock owner. The transfer should record a movement or a correction supported by evidence. If two pieces are involved, verify the effect on each unit and both locations before finalizing the recount.\n\nA different case has four units physically present with one serial absent from the entire company and a newly observed serial among them. Investigate whether the unexpected piece was borrowed, replaced under warranty, returned from a customer or merely labelled with a supplier's serial format. A legitimate substitution may support the serial-only difference mechanism once identities and statuses agree with the facts. The internal swap pattern from REPR and ISSU would be the wrong explanation in that case. Confirm ownership first. Otherwise the company might silently adopt a customer's pump into its own count and hide an actual loss of a company-owned unit behind a zero quantity variance."
+    ],
+    [
+      "Prove recovery from the next user's point of view",
+      "After the approved correction and recount, start from the maintenance job for P004 and ask the receiving technician to find the unit. Check that the physical plate, material/serial selection, current storage location and documentary history all lead to the same piece. Repeat for P006. Verify the quantity of each location still agrees with its independent count. If the repair involved a stock transfer, find its posting date and explain why it differs from the original physical observation. If the business physically put each piece back instead, keep the handover evidence accompanying the recount. The final quantity by itself proves neither route.\n\nDesign the regression around the mistake that actually occurred. Have one operator select the transfer from a list of available serials while a second operator scans the outgoing plate. Substitute the other available pump under controlled test conditions. Both candidates can be legitimate members of the sending stock, so an IM stock consistency check may accept either. The scan-to-document comparison is what catches selection of a different eligible unit before dispatch. This distinction between eligibility and physical identity explains why a correctly configured serial profile still benefits from a disciplined handover at the bench."
+    ]
+  ],
+  "visual": {
+    "title": "Compare the identities as well as the quantities",
+    "headers": [
+      "Storage location",
+      "Book serials",
+      "Counted serials",
+      "Result"
+    ],
+    "rows": [
+      [
+        "REPR",
+        "P001, P002, P003, P004",
+        "P001, P002, P003, P006",
+        "4 = 4, but P004 is absent and P006 present"
+      ],
+      [
+        "ISSU",
+        "P005, P006",
+        "P004, P005",
+        "2 = 2, but P006 is absent and P004 present"
+      ],
+      [
+        "Whole plant",
+        "Six distinct units",
+        "Six distinct units",
+        "Identity/location mismatch, zero net quantity difference"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Serial numbers in physical inventory",
+      "https://help.sap.com/docs/SAP_ERP/248c3cdd7e6548999a7f5b95118f4522/c028b753128eb44ce10000000a174cb4.html?version=6.17.latest"
+    ],
+    [
+      "SAP ERP · Serial numbers in Inventory Management",
+      "https://help.sap.com/docs/SAP_ERP_SPV/248c3cdd7e6548999a7f5b95118f4522/e40eb753128eb44ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Serial number management across logistics processes",
+      "https://help.sap.com/docs/SAP_ERP/248c3cdd7e6548999a7f5b95118f4522/840eb753128eb44ce10000000a174cb4.html?version=6.18.latest"
+    ]
+  ],
+  "area": "serial"
+}

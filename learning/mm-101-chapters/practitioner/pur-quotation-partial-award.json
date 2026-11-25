@@ -1,0 +1,106 @@
+{
+  "id": "pur-quotation-partial-award",
+  "level": "Practitioner",
+  "shelf": "Purchasing",
+  "area": "rfq",
+  "topic": "RFQs and quotations",
+  "title": "Award individual RFQ items when suppliers quote only part of the basket",
+  "lead": "On Friday a buyer recommends placing an order with the two suppliers at the top of the item rankings. One offered the lowest price for a sleeve and another offered the lowest price for a gauge. On Monday the first supplier asks for a different sleeve price, and the second asks who will pay freight. Both numbers were visible before the award. The team compared the right numbers for the wrong combinations of items. This chapter follows the award back to the original replies, rebuilds the possible orders, and identifies what the buyer should enter and communicate in classic SAP ERP Purchasing.",
+  "keywords": [
+    "ME41",
+    "ME47",
+    "ME48",
+    "ME49",
+    "RFQ",
+    "quotation",
+    "partial bid",
+    "collective RFQ number",
+    "rejection indicator",
+    "package price",
+    "freight"
+  ],
+  "sections": [
+    [
+      "Reassemble the invitations before opening the ranking",
+      "A maintenance project needs 120 sleeves and 24 inspection gauges. Engineering has approved the same drawings for every bidder. The purchasing organization issued separate invitations to Arbor, Beacon and Cedar, using one collective RFQ number. Arbor priced both lines. Beacon priced only sleeves. Cedar priced only gauges. Each organization answered the invitations separately. The commercial decision is whether to buy the entire basket from Arbor or place a different order for each item. A report listing three suppliers cannot answer that question until the buyer establishes which of the proposed orders each supplier actually offered to fulfill.\n\nStart in the original invitations. Check the drawings, the quantities, delivery location and required delivery date for both items. Carry the SAP RFQ number and item into a working sheet, alongside the supplier's reply reference and revision. Classic ECC records the quotation by maintaining the supplier's RFQ. The document number therefore connects the invitation to the conditions recorded from the reply. The collective number brings invitations together for comparison. It cannot prove that every supplier received the same drawing revision. In this case the engineer confirms revision C for all three. If one bidder had received revision B, that discrepancy would belong on the comparison before any commercial ranking was presented."
+    ],
+    [
+      "Give a blank price its business meaning",
+      "Beacon writes “no bid on gauges.” Cedar writes “sleeves outside our range.” Neither statement is an offer to supply a free component. Record those responses in the award evidence and keep their original wording available. An unanswered question is a third possibility. A missing last page of Arbor's response could hide a real price, so the first action in that situation would be to obtain the complete reply. Treating every white cell as zero lets a supplier offering almost nothing appear to win the whole order.\n\nIn ME47 maintain the quoted prices and the applicable conditions against the proper invitation and item, subject to the client's field settings. Use ME48 to read back what was saved. Pay attention to the unit and the number of units covered by the price. The sleeves in this example are quoted per piece. A line quoted at 600 per hundred pieces would have the same economic rate as 6 per piece. Keep the original representation or a documented conversion. Entering 600 per piece and then relying on the comparison percentage would create a striking but entirely artificial outlier. Supply a separate explanation for any commercially important package qualification that the maintained conditions do not represent."
+    ],
+    [
+      "Read ME49 one line at a time",
+      "Select the three quotations in the price comparison list using the collective number or the individual document range. Confirm that the output includes the expected invitation from each supplier. An old invitation carrying a reused collective number would change the displayed population. Read the material and quantity beside the price. Arbor offers sleeves at 6.00 per piece. Beacon offers them at 6.40. Arbor offers gauges at 31.00 and Cedar offers them at 27.00. Assume one currency, identical delivery dates and comparable tax treatment for this exercise. Those assumptions let the buyer concentrate on the commercial qualifications.\n\nAn item comparison correctly puts Arbor first for sleeves and Cedar first for gauges. A reference quotation or a minimum-value comparison can make that spread visible. The minimum on each item can come from a different bidder. Ask which supplier, on which reply, actually offered to sell the combined basket at the implied minimum. The answer here is that nobody made that offer. A buyer can still assemble it using two orders if both sets of terms permit the split. Show the available candidates on each line and put the calculation of complete award options beside the SAP comparison. This preserves both the system result and the purchasing judgment."
+    ],
+    [
+      "Calculate the orders that can actually be placed",
+      "Using Arbor for everything gives 120 sleeves at 6.00, or 720, and 24 gauges at 31.00, or 744. The basket costs 1,464. Arbor includes ordinary freight for this complete order. The tempting split uses Arbor sleeves at 720 and Cedar gauges at 648. Adding those figures gives 1,368, apparently saving 96. This is the number that reached the original recommendation. It can be reproduced exactly from the item comparison, which explains why a second buyer checking only the arithmetic could endorse the same mistake.\n\nRead the qualifications on both signed replies. Arbor offers sleeves alone at 6.30 because the machine setup is shared with the gauge batch when it wins both items. Cedar charges 75 per shipment and can deliver the entire gauge quantity in one shipment. The executable split therefore costs 756 for sleeves, 648 for gauges and 75 for freight, giving 1,479. Arbor's complete offer costs 15 less. Consider the remaining candidate as well. Beacon's sleeves cost 768. Combining them with Cedar's delivered gauges at 723 gives 1,491, assuming Beacon includes freight. Record which freight terms were verified with Beacon. Rounding all three options to the nearest hundred would hide the decision even though the underlying calculations were correct."
+    ],
+    [
+      "Investigate a qualification at the point where it operates",
+      "The sleeve premium belongs to Arbor's decision to accept a smaller order. It is not the same thing as Cedar's shipment cost. A per-piece surcharge on Cedar gauges would depend on quantity, whereas Cedar's quoted freight depends on the number of dispatches. If the warehouse changed the requested schedule to two dispatches and Cedar charged freight twice, the split total would rise by a further 75. The correct question for the supplier is whether it guarantees one freight charge for the two dates. A spreadsheet distributing freight over units can present the cost neatly after those terms have been established.\n\nSuppose the supplier's reply only says that the sleeve price is “subject to full award.” The buyer cannot infer the alternative price of 6.30 from that statement. Request a revised written offer or evaluate just the quantities and combinations with firm prices. Preserve the date and revision of the clarification. When updating quotation conditions in the system, retain the evidence for the earlier decision as appropriate to the organization's document practices. A subsequent amendment does not explain what information was available to a reviewer on the original Friday. This distinction becomes important when a project manager asks why the cheaper option disappeared."
+    ],
+    [
+      "Translate the decision to item status and follow-on orders",
+      "Assume the procurement owner approves Arbor's complete offer and all bidders meet the delivery and technical requirements. The executable instruction identifies Arbor's RFQ and the two awarded items, the quantities, the confirmed prices and the delivery terms. Create the purchase order with reference to the supplier quotation where the client's process permits. Inspect the resulting items before release or transmission. In particular, check that the two lines and the freight treatment together represent the offer approved for 1,464. An independently typed PO at the same total may have different price units or quantities. The document link is useful when a different buyer must explain the purchase later.\n\nHandle the unsuccessful items deliberately. In classic quotation maintenance the rejection indicator is set at item level. A fast change can affect multiple items, which is convenient only when its selection matches the decision. A supplier that wins one line in a future competition could still lose another. Check the item status before saving and verify the applicable message processing before claiming that a supplier was informed. A stored rejection and an actually transmitted communication are different observations. In the example, retain the no-bid responses and follow local policy for acknowledging them. A rejection of a genuine competing offer and a supplier's voluntary decision to decline an item deserve different explanations in the award file."
+    ],
+    [
+      "Reopen the award when one fact changes",
+      "Two weeks later Cedar offers to include the shipment in its 27.00 unit price. Arbor still quotes sleeves alone at 6.30. A fresh split calculation gives 756 plus 648, or 1,404, which is 60 below the complete Arbor offer. If the bid window and procurement policy allow the revision, the recommendation can now change on evidence. Recheck availability and the expiry of the other offer. A discount agreed today for delivery next month cannot be combined casually with a price that expired yesterday. If an order has already been transmitted, the commercial owner must also establish what commitments already exist before pursuing a new award.\n\nA colleague reviewing this file should be able to answer four questions without recreating the competition from memory. Which lines did each supplier price? Which qualifications changed when the award was split? What arithmetic supports the selected combination? Which SAP items and supplier communications implemented it? If one answer is missing, identify the source that can resolve it. In this case the two decisive pieces of evidence were Arbor's stand-alone sleeve price and Cedar's shipment charge. They turn a reported saving into a small premium while leaving the original ME49 item rankings entirely intelligible."
+    ]
+  ],
+  "visual": {
+    "title": "Feasible award options for 120 sleeves and 24 gauges, in one currency",
+    "headers": [
+      "Award",
+      "Sleeves",
+      "Gauges",
+      "Additional freight",
+      "Total"
+    ],
+    "rows": [
+      [
+        "Arbor supplies both",
+        "120 × 6.00 = 720",
+        "24 × 31.00 = 744",
+        "Included",
+        "1,464"
+      ],
+      [
+        "Arbor sleeves and Cedar gauges",
+        "120 × 6.30 = 756",
+        "24 × 27.00 = 648",
+        "75",
+        "1,479"
+      ],
+      [
+        "Beacon sleeves and Cedar gauges",
+        "120 × 6.40 = 768",
+        "24 × 27.00 = 648",
+        "75",
+        "1,491"
+      ],
+      [
+        "Revised split if Cedar absorbs freight",
+        "756",
+        "648",
+        "Included",
+        "1,404"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP Purchasing · Issuing RFQs and obtaining quotations",
+      "https://help.sap.com/docs/SAP_ERP_SPV/967e1c2a6a8c4183b7e07d28e7574445/797eb65334e6b54ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP Purchasing · Comparing quotations",
+      "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/917eb65334e6b54ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP Purchasing · Rejecting quotations by item",
+      "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/947eb65334e6b54ce10000000a174cb4.html"
+    ]
+  ]
+}

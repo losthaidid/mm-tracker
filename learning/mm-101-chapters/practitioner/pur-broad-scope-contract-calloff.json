@@ -1,0 +1,97 @@
+{
+  "id": "pur-broad-scope-contract-calloff",
+  "level": "Practitioner",
+  "shelf": "Purchasing",
+  "area": "contracts",
+  "topic": "Contracts and release orders",
+  "title": "Choose the actual material at call-off against an M or W contract item",
+  "lead": "A workshop orders coloured inspection tags and assorted cutting tools from one supplier. The exact tag colour becomes known only when the job starts. The exact tool also becomes known then. A buyer proposes treating both purchases identically because neither request names a material when the contract is negotiated. Look one step further. The supplier knows the unit price for every tag in advance, while a replacement drill and a countersink carry different prices. That difference shapes what the buyer can promise in the contract and what the buyer must establish when making the release order.",
+  "keywords": [
+    "item category M",
+    "item category W",
+    "account assignment U",
+    "material unknown",
+    "material group",
+    "value contract",
+    "call-off",
+    "ME33K",
+    "ME21N"
+  ],
+  "sections": [
+    [
+      "Put three unknowns on separate lines",
+      "The tag supplier offers red, yellow and green versions of a serialized inspection tag at 18 currency units per box of 100. The tags share an agreed specification, and the box price remains the same for all three colours. The workshop expects to buy 240 boxes over a year. It wants to choose a colour for each call-off. Here the missing information concerns the identity of a material within a commercially consistent family. A contract item describing the family can already carry the unit, agreed price and target quantity.\n\nThe tools are different. A supplier catalogue covers a material group that includes drills, taps and deburring tools. The workshop agrees an annual purchasing ceiling with the supplier and will select individual tools from an approved price schedule as work arises. Quantities, units and prices vary by tool. Separately, the workshop may not know which cost centre or maintenance order will bear a particular purchase. Material identity, item-level commercial detail and account assignment are three independent questions. Write all three answers in the sourcing notes. A solution to the first question has no automatic authority to bypass a missing answer to the third."
+    ],
+    [
+      "Recognize an M item in the agreement",
+      "Display the contract in ME33K and go to the item used for the tags. In classic ECC Purchasing, category M supports a contract item for an as-yet unspecified material. SAP describes its use for similar articles with different material numbers and a common price. Read the supplier, validity, short description, unit, price basis and target quantity. In this example the description names the approved inspection-tag family, the order unit is a box, and the target is 240 boxes. Engineering's drawing revision and language requirements can sit in the agreement or referenced specification, according to local document practice.\n\nA description that simply says “materials as required” gives a later buyer little basis for selecting an eligible product. A tag with chemical-resistant adhesive looks similar but costs 24 per box and follows another drawing. Ask the contract owner whether that product belongs to the family. If it requires a distinct price and specification, forcing it through the 18-per-box item will produce a persuasive purchase history with the wrong commercial meaning. A product family is a useful shorthand only while its members genuinely share the terms expressed by the item. Preserve a list or specification that lets a new buyer recognize those members."
+    ],
+    [
+      "Create the first tag release and check its units",
+      "The job supervisor requests three boxes of red tags and two boxes of yellow tags. When creating the release order, reference the approved contract item, then identify the actual material on each PO item. A material number can identify a stocked variant. An appropriate short text can identify a permitted item without a material master when the procurement and account assignment process supports that route. SAP's classic release instructions specify the ordinary blank item category on the resulting PO item for these M and W cases. M describes how the contract represented the family.\n\nAssume both material records have a base unit of piece and an order unit conversion of 100 pieces to one box. Three red boxes represent 300 pieces, two yellow boxes represent 200 pieces, and the expected value is five times 18, or 90. Compare the quantity shown in the PO order unit, the price unit and the converted quantity available for receiving. A requisitioner typing 300 while the order field is set to boxes is requesting 30,000 pieces. The number 300 by itself looks familiar enough to pass a superficial review. Show the supplier-facing description and unit to the receiving clerk before the first call-off so that the labels on incoming packages can be matched to the order."
+    ],
+    [
+      "Read the commercial promise behind a W item",
+      "For the tools the contract owner chooses category W on a value contract. Classic ECC uses W for a material group and reserves that contract item category for value contracts. It allows the buyer to express the permitted group while leaving individual material, item quantity and item value for later determination. The overall value target belongs to the value agreement. A workshop may call its annual budget 48,000 in a planning workbook, but the buyer must still verify the approved contract target, currency, and validity shown in Purchasing. A budget, a contract target and the value of today's order describe different things.\n\nBefore selecting a tool, verify that its actual material group belongs to the contracted group and that the supplier list or commercial agreement covers the type and specification. The group on a material record can be broader than the commercial scope. An assortment agreement for standard high-speed-steel tools may exclude a diamond-coated cutter despite a shared material group in the master data. The system's ability to represent a call-off does not by itself settle that negotiation. If the tool sits outside the description, ask for an explicit agreement or use another authorized purchasing route. This is particularly important when a group was chosen for ease of reporting rather than as a detailed product classification."
+    ],
+    [
+      "Price the workshop basket at the time of the release",
+      "The job requests eight drills at 12.50 each and three countersinks at 36 each. Both belong to the participating tool group. The expected net merchandise amount is 100 plus 108, or 208. Assume the contract currency and the order currency match, and the price is quoted per individual tool. Enter or check the actual materials or suitable descriptions, order quantities and prices on the release items. Inspect what the system proposed before accepting it. The exact price determination depends on the available data and conditions in the system. Keep the vendor's approved catalogue revision or price confirmation with the working evidence.\n\nNow change only the packaging. The catalogue says 125 for a packet of ten drills. If the supplier sells sealed packets, the original request for eight may need a changed requirement for ten or a different buying source. A price unit of ten can represent a rate per ten while the physical order may still permit individual pieces. A sealed-packet sales term defines a purchasing restriction that the rate alone cannot tell you. Reconcile the quotation, the order unit, the price basis and the physical dispatch unit. Submitting a PO with eight packets at a packet price would turn a 100-unit drill estimate into a 1,000-unit order value before the countersinks were added. The check is cheap when performed before dispatch."
+    ],
+    [
+      "Resolve the cost object while the request owner is available",
+      "The red tags are issued directly to a workshop cost centre. A set of countersinks is charged to a maintenance order. At contract negotiation time, the departments and jobs were unknown. Account assignment category U can express that situation on the contract. At release, the classic procedure calls for the actual account assignment category and its appropriate data. The cost centre, an order or another object must be valid for the intended company and posting context. A contract item can have a known product and an unknown account assignment, or a broad product definition with the account assignment already established. Read both fields.\n\nAsk the requester what receives the cost and who authorized it. Compare that answer with the PO account assignment details and the delivery address. The maintenance planner receiving the shipment is not necessarily the owner of the cost centre. If the buyer uses a familiar default cost centre to get past a field check, a valid-looking order can later create expenditure against the wrong department. In a test client capture the actual message when the relevant cost object is missing, then enter the correct value and verify the subsequent accounting evidence where the scenario generates a posting. Required fields and available value helps should be documented for that tested combination of document type and master data."
+    ],
+    [
+      "Read the first release back from both directions",
+      "From the saved PO item, display the contract and contract item reference. From the agreement, inspect the release documentation for that same order. For the tag case, reconcile the five boxes by variant with the common family item, taking unit conversions into account. For the tool case, explain how a single contracted group produced two specific merchandise lines totaling 208 in this example. Keep each PO number and item because two different release orders may use the same contract in the same week. At receiving, the red tags, yellow tags and two tools must still be distinguishable even though the contract aggregated them.\n\nA later investigator may find five boxes of tags and an invoice for 90, but no release reference against the expected agreement. Trace the actual PO before changing the contract target. A buyer could have used a copied order or a new free item carrying identical text and price. Look at the relationship stored on the purchasing item and the corresponding release documentation. Recognizing the supplier merely from the invoice is insufficient. If a correction is required, consider the purchase order's release, output and follow-on history with the responsible buyer. Adding a retrospective explanation to the file preserves what happened even when the permitted correction path depends on the state of the documents."
+    ],
+    [
+      "Choose the next agreement structure from actual releases",
+      "After three months the contract owner can compare the family's assumptions with what buyers actually selected. If all tag variants continued at one price per box, the M item has expressed the agreement efficiently. If special coatings now account for many releases at different prices, a separate item with explicit terms may be easier to manage. For the W agreement, identify the few tools bought repeatedly in large quantities. A dedicated item for a stable high-volume drill may let the buyer negotiate better terms and simplify checking, while the wider assortment still serves occasional requirements.\n\nTake a small sample back to the workshop. Ask a receiver to identify the delivered article from each PO and a cost owner to explain the charge from its account assignment. Ask the contract owner to reconstruct each price and its source. These three people test three different promises. When all three answers agree, the design has kept flexibility at negotiation time and provided precise information when the purchase actually occurred."
+    ]
+  ],
+  "visual": {
+    "title": "What is known at agreement and call-off",
+    "headers": [
+      "Decision",
+      "M tag family",
+      "W tool group",
+      "U account assignment"
+    ],
+    "rows": [
+      [
+        "At negotiation",
+        "Common specification, 240 boxes, 18 per box",
+        "Permitted group, agreement validity and total target",
+        "Benefiting object to be identified later"
+      ],
+      [
+        "At release",
+        "Select red or yellow, quantity and unit",
+        "Specify drills or countersinks, quantity and price",
+        "Choose the applicable category and valid object"
+      ],
+      [
+        "Worked control",
+        "5 boxes = 500 tags = 90",
+        "8 × 12.50 + 3 × 36 = 208",
+        "Match the request owner's instruction to PO details"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP Purchasing · Item category and account assignment in contracts",
+      "https://help.sap.com/docs/SAP_ERP_SPV/967e1c2a6a8c4183b7e07d28e7574445/187fb65334e6b54ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP Purchasing · Creating a contract release order",
+      "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/1b7fb65334e6b54ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP Purchasing · Contracts",
+      "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/037fb65334e6b54ce10000000a174cb4.html"
+    ]
+  ]
+}

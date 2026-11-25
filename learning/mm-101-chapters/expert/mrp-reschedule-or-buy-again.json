@@ -1,0 +1,98 @@
+{
+  "id": "mrp-reschedule-or-buy-again",
+  "level": "Expert",
+  "shelf": "Expert practice",
+  "topic": "Firm receipts and rescheduling decisions",
+  "title": "A late PO could cover the order. Should the buyer expedite it or buy again?",
+  "lead": "A customer needs 100 valve assemblies on Wednesday. Stores can release 40. An open purchase order for the other 60 is expected on Friday. MRP suggests bringing the Friday receipt forward. The planner interprets that as coverage, while the buyer says the supplier has promised nothing for Wednesday. Both statements can be defensible. The difficult work is connecting the planning suggestion to a feasible supply decision without leaving two purchases for the same 60 assemblies.",
+  "keywords": [
+    "rescheduling check",
+    "bring process forward",
+    "postpone process",
+    "cancel process",
+    "rescheduling horizon",
+    "firmed receipt",
+    "exception message",
+    "MD04"
+  ],
+  "sections": [
+    [
+      "Establish the balance on the date someone has promised",
+      "Use a single normally planned plant segment, one unit per valve assembly, no quality or stock restrictions, no earlier requirements and no usable supply other than the 40 on hand and the Friday PO. Assume the purchasing document is for the correct material and location, remains open for 60, and represents a receipt category considered by the effective rescheduling check. For the numerical example the goods receipt processing time is zero. If incoming inspection or internal handling takes another day, move availability accordingly before repeating the analysis.\n\nAt Wednesday's point of use, 40 plus zero in-time receipts falls short of 100 by 60. By Friday, 40 plus the 60 on order is enough to meet the original demand in quantity. These two statements describe a timing gap. A planner looking only at end-of-week totals can miss the customer failure, while an expediter looking only at Wednesday morning's negative balance can initiate a duplicate order. Draw Wednesday and Friday as separate dates and show the open schedule line on Friday until a commercially credible change takes effect.\n\nSAP's rescheduling check can identify whether an existing firmed receipt is a candidate to cover a requirement if brought forward. Under the selected settings it gives the planner a suggested date and exception for that existing element. This tells Purchasing which receipt is worth investigating. It does not establish that the supplier has accepted a date change or physically dispatched the assemblies. The order detail, commercial correspondence and goods receipt each provide different evidence. Document the last supplier-confirmed date separately from the date the plan is asking for."
+    ],
+    [
+      "Prove why this receipt was a candidate",
+      "Retrieve the run or list date, effective plant or MRP group rescheduling settings, horizon for bringing receipts forward, and included receipt categories. Find the particular schedule line and outstanding amount. If the PO originally covered 100 and 40 were already received, its original quantity cannot be used as an additional 100 of supply. Check the open element represented in the planning list and the corresponding purchasing history. Validate whether the 40 in the warehouse came from that same earlier receipt. Visual recognition of a PO number does not establish independence between stock and the balance still to come.\n\nNext inspect the calendar of the proposed change. The scope for bringing forward an eligible fixed receipt is governed by the documented rescheduling logic, including the relevant horizon. Do not equate that with the period used to select materials for a NETPL run or the planning time fence used for proposal firming. For this worked case Friday is safely inside the applicable boundary. For a diagnosis close to the boundary retrieve the actual plant or group settings, applicable replenishment lead time where relevant, calendar and run date, and test dates just inside and just outside. A blanket statement such as “two days late is always rescheduled” omits the category and horizon conditions.\n\nTolerance settings can suppress an exception message for small date displacements. The underlying rescheduling proposal and the planner's visible message count therefore need separate checks. A team comparing an exception dashboard with a document list might otherwise conclude that a supply candidate disappeared. Read the rescheduling date on the relevant element, the dated available balance, and the chosen selection or display filters. Form a hypothesis that predicts an element, quantity and requested date. Merely predicting a red icon is too weak to guide a purchase."
+    ],
+    [
+      "Follow each supplier answer into the document flow",
+      "If the supplier can deliver all 60 in time, obtain its accepted date, update the appropriate purchasing records under the site's confirmation process, and establish when the assemblies become usable at the plant. Review the resulting plan. With 40 on hand and 60 genuinely available on Wednesday, the requirement of 100 is covered once. Retain the revised order or confirmation and eventual receipt as evidence. A buyer entering an optimistic delivery date before receiving a supplier response may remove a planning warning while leaving the actual delivery risk unchanged.\n\nNow take a partial answer. The supplier can provide 35 on Wednesday and 25 on Friday. The original PO quantity is still 60, but Wednesday coverage becomes 75 and the shortfall is 25. Represent the split in the purchasing process actually used by the company, respecting whether schedule lines, confirmations or other elements feed the planning view. Check how the current list represents the remaining 25 and the date of each element. Do not add the two supplier promises to the original 60 as three independent receipts. They describe how the original commitment is divided over time.\n\nA second supplier might offer the missing 25 on Wednesday. If the original supplier still intends to deliver all 60 and the second supplier receives a new PO for 25, total supply including the initial 40 becomes 125 for a requirement of 100. The extra 25 may be justifiable if there is later demand, a cancellation is impossible or customer penalties outweigh inventory cost. It is nevertheless a deliberate purchasing and inventory decision. Identify the owner of the residual supply and either gain agreement to reduce or postpone it or document how the business intends to consume the surplus. The rescheduling suggestion alone authorizes none of those commercial changes."
+    ],
+    [
+      "Use a controlled counterexample to test the explanation",
+      "Keep demand at 100 and stock at 40 in a QA baseline. First place one eligible PO receipt for 60 just after the requirement but clearly inside the effective horizon. Verify that the planning result considers the existing receipt and examine the suggested earlier date. Move that receipt well beyond the scope for the bring-forward check in a separate comparable test. If the earlier requirement is uncovered under the ordinary planning logic, a new procurement proposal can now be appropriate. Preserve the setup and the absence of other receipts. A second open requisition or a planning fence can otherwise make the comparison misleading.\n\nInstead change only the original PO's open quantity from 60 to 45 while leaving it eligible. The most that receipt can cover after expediting is 45. With 40 on hand the remaining shortage is 15. Under a simple lot-for-lot, feasible planning case the residual may generate a proposal for that balance. This is an important counterexample to the rule of thumb that any simultaneous PO exception and requisition means a duplicate. They may cover different portions of the same requirement. Reconcile the open receipt and the additional proposed quantity in the same base unit before deleting, delaying or converting either element.\n\nIf the observed new proposal is larger than 15, inspect minimum lot, rounding, other requirements and stock protection. Those controls act on the shortage and can make the replacement order larger without invalidating the rescheduling diagnosis. Conversely a quantity comparison across separate sales order stock or another MRP area can imply coverage that cannot be used by this demand. Confirm the segment and material as well as the unit for every compared element. Hold these independent controls steady while investigating horizon selection or message tolerances."
+    ],
+    [
+      "Read early and unnecessary receipts as their own business cases",
+      "Demand moves in both directions. Suppose the customer now asks for the 100 assemblies one week later. A firm receipt already due this Friday can create a suggestion to postpone it if the effective planning situation supports that action. The buyer needs the proposed date and the reason for changing it. A supplier that has already shipped might allow no postponement. In that case the warehouse plans to hold the assemblies and the working capital cost becomes visible. Pretending the truck will wait because the list says “postpone” weakens the reliability of both procurement and storage plans.\n\nAlternatively, cancel the demand altogether while the open PO remains. The plan may identify that this receipt has no corresponding need and suggest cancellation. The buyer must inspect cancellations or later requirements, minimum commercial commitments, physical dispatch and any goods receipts already booked. Cancellation of an uncovered purchasing balance and reversal of a posted receipt are different operations with different evidence. A suggestion for cancellation generated by planning does not unwind goods already received, invoices already posted or supplier obligations. Cross-check the PO history and outstanding quantities before entering any change.\n\nA useful design policy is to route the three decisions differently. An accelerate request needs a promise date and an owner prepared to accept expedite costs. A postpone request needs confirmation that warehouses and supplier can accept the new date. A cancellation request needs a check of contractual and execution status. All originate in mismatches between firm supply and dated needs, yet the consequences of acting automatically are quite different. This is why raw counts of messages make a poor proxy for purchasing team performance."
+    ],
+    [
+      "Use a shortage meeting to close the decision loop",
+      "Prepare a short exception record for the original valve case. Include Wednesday demand 100, stock 40, open PO balance 60 due Friday, proposed earlier availability date, supplier response, and owner for the customer commitment. If there is an expedited split, show Wednesday coverage and residual before considering any alternate order. Save a time stamp for current data and identify any relevant run snapshot used in reconstruction. A refreshing live list can change as other users enter receipts or revise requirements. The evidence presented at the meeting should remain intelligible after those later changes.\n\nIf the business decides to buy from an alternative source, attach the decision on the original remaining quantity and verify what the next planning view shows for both sources. If it decides to ship the customer part of the requirement instead, capture the revised demand or execution promise as appropriate. If the supplier agrees to the full earlier date, follow the first actual receipt and availability at the plant. A correction that removes a warning while the actual first 35 arrive a day late deserves further process review, not a claim that the planning parameter fixed supplier reliability.\n\nThe buyer's original decision is now explicit. Under the example's assumptions the Friday 60 is a plausible source to expedite, while Wednesday still has a real gap until delivery arrangements change. After a partial acceptance of 35, the actionable gap is 25. Reviewing the remainder protects the company from turning that 25-piece service problem into an unexplained 25-piece excess. A planning consultant earns trust here by preserving the time axis, the outstanding commercial obligation and the person empowered to change it."
+    ]
+  ],
+  "visual": {
+    "title": "Wednesday availability versus eventual supply",
+    "headers": [
+      "Supplier decision",
+      "Available by Wednesday",
+      "Gap to 100 then",
+      "Total including later supply"
+    ],
+    "rows": [
+      [
+        "Friday PO unchanged",
+        "40",
+        "60",
+        "100"
+      ],
+      [
+        "All 60 moved to Wednesday",
+        "100",
+        "0",
+        "100"
+      ],
+      [
+        "35 Wednesday, 25 Friday",
+        "75",
+        "25",
+        "100"
+      ],
+      [
+        "Add second PO for 25 Wednesday, original stays at 60",
+        "100",
+        "0",
+        "125 including 25 on Friday"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP Support · How the MRP rescheduling check works",
+      "https://help.sap.com/docs/SUPPORT_CONTENT/mrp/3138697863.html"
+    ],
+    [
+      "SAP ERP · MRP and stock/requirements list rescheduling evidence",
+      "https://help.sap.com/docs/SAP_ERP/00a552d4cb404d128ae92669b115e3a5/0819ba53422bb54ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Planning processes and exception handling",
+      "https://help.sap.com/docs/SAP_ERP_SPV/66326f67e0e1416d83c0fdfa4060189d/ce7eb6535fe6b74ce10000000a174cb4.html"
+    ],
+    [
+      "SAP S/4HANA on-premise · Rescheduling horizon, receipt eligibility and tolerances",
+      "https://help.sap.com/docs/PRODUCT_ID/fe39e10a9a864a8f8dc9537704f0fa13/0a98b6535fe6b74ce10000000a174cb4.html?locale=en-US&state=PRODUCTION&version=2023.latest"
+    ]
+  ],
+  "area": "planning"
+}

@@ -1,0 +1,102 @@
+{
+  "id": "im-subcontract-recoverable-yield",
+  "shelf": "Inventory & special procurement",
+  "level": "Advanced",
+  "area": "special",
+  "topic": "Subcontracting by-products and subsequent adjustments",
+  "title": "The subcontractor recovered more metal than planned. Where should the extra three kilograms appear?",
+  "lead": "A subcontractor machines brackets from your aluminum strip. Your agreement says that you own the recoverable machining chips and can collect them later. The plant receives sixty finished brackets and the system records eighteen kilograms of chips at the subcontractor. The vendor sends a signed scale ticket for twenty-one kilograms. A warehouse clerk proposes posting a goods receipt for three kilograms at the plant. The buyer proposes increasing the PO delivery quantity. Each proposal would place a correct number into the wrong business event. The subcontracting records need to show the additional yield at the location where your material actually lies.",
+  "keywords": [
+    "subcontracting",
+    "negative component",
+    "by-product",
+    "stock provided to vendor",
+    "subsequent adjustment",
+    "movement 542",
+    "recoverable scrap"
+  ],
+  "sections": [
+    [
+      "Specify the output the business expects back",
+      "On the subcontract order the ordered material is the finished bracket. The component list describes the quantities consumed to produce it. SAP ERP also supports a planned by-product by representing it as a component with a negative quantity. In this case the approved plan calls for 2.50 kilograms of strip and a recovered 0.30 kilograms of chips for each bracket. In a component list expressed against 100 brackets, that is a requirement of 250 kilograms of strip and a negative component quantity of thirty kilograms of chips. Recheck the basis quantity when reading the list. A perfectly plausible figure of thirty could otherwise be multiplied once too often.\n\nThe negative quantity represents material arising from the process. At the stage where raw material is provided to the subcontractor it generates no requirement to send chips from the plant. Establish whether the buyer actually owns this output. A service agreement under which the subcontractor keeps all offcuts for an agreed processing fee has a different commercial design. Also identify the output material: clean aluminum chips of a specified grade may be recoverable inventory, whereas contaminated sweepings may require measurement and disposal under other arrangements. A single calculated scrap percentage cannot distinguish a valuable by-product from unmeasured process loss."
+    ],
+    [
+      "Build three ledgers for one partial delivery",
+      "Assume the company has already transferred 260 kilograms of strip into its stock provided to this vendor. There are no opening chips at either location and no opening brackets in the test location. The subcontract order calls for 100 brackets. The first truck brings sixty. The plant's receiving count supports exactly sixty brackets, so the ordered material increases by sixty. The component proposal against that receipt consumes 150 kilograms of strip, leaving 110 at the subcontractor. At the planned yield the same receipt recognizes eighteen kilograms of chips in the stock provided to the vendor. No vehicle delivering chips to the plant has yet appeared.\n\nThe balances answer different questions. The bracket item tells purchasing how much of the ordered product has arrived. The strip balance tells the materials planner how much of the supplied input remains available at this vendor. The chip balance tells the company how much recoverable material it owns at that vendor. A report limited to unrestricted-use chips in the plant's receiving storage location can correctly show zero during this entire stage. Conversely an aggregate report for company-owned chips including vendor stock can correctly show eighteen. Before opening a ticket about two disagreeing reports, reproduce their scope and their date. The reports may be describing two different points in the same flow."
+    ],
+    [
+      "Read the receipt as a set of linked material lines",
+      "Display the subcontract PO item, its component detail and the posted receipt for the sixty brackets. Inspect the actual quantities in the material document and their direction. SAP proposes component amounts when entering the receipt and permits quantity changes according to the process. The order component list is a plan, so a later display of that list on its own cannot establish the quantities posted on a specific partial receipt. If a buyer adjusted requirements after the first delivery, the current plan can also differ from the plan at the time of posting. Link each quantity to its originating document item before calculating any correction.\n\nFollow the positive consumption of strip and the addition of chips to vendor stock separately. An automatic movement associated with the negative component may be represented using an opposite-sign component movement in the documented ECC process. Read the material, special stock, direction, quantity and originating receipt together when interpreting the movement type in your system. Searching only for standalone scraps received into the plant will miss the by-product recognized at the subcontractor. The reference connecting the generated lines to the same subcontract receipt is what makes a reconstruction of the partial production run possible."
+    ],
+    [
+      "Decide what the scale ticket actually measures",
+      "Ask for the ticket's job, weigh time, material grade, tare weight and unit. A twenty-one kilogram gross weight could include a three-kilogram bin, which would leave eighteen kilograms of net output and no adjustment. A cumulative ticket for two jobs could include three kilograms already recognized against another PO. The worked case assumes a separate, labeled bin with twenty-one kilograms of actual net chips from this sixty-bracket run, weighed before anything was collected. Check whether the plant already changed the chip proposal while posting the original receipt. Adjust the difference between the actual twenty-one and the posted quantity, rather than assuming every receipt used the planned eighteen.\n\nUnder these assumptions the vendor holds three kilograms more company-owned by-product than the system records. The ECC subsequent-adjustment process for a subcontract order supports correction of an excess or short by-product receipt after posting the finished-product receipt. Use the item and the direction that increase the recorded by-product at the vendor by three. Read the simulation, check the signed result and inspect the material documents after posting. An actual yield of fifteen instead of eighteen would require a decrease of three at the vendor. In both cases the number of bracket units accepted from the truck stays sixty."
+    ],
+    [
+      "Account for value with the same event boundaries",
+      "Suppose the subcontract processing price is 5.00 per bracket, strip carries 4.00 per kilogram and recoverable chips are valued at 1.50 per kilogram. For this simplified example the processing share on sixty brackets is 300.00, the strip consumed contributes 600.00 and the planned chips carry 27.00. The simplified net cost associated with the receipt is therefore 873.00. Recognizing a further three kilograms of valuable by-product adds 4.50 to the recovery and gives an illustrative net of 868.50 if all other inputs stay equal. These are calculations of the event's components. They are a starting point for reading the actual accounting documents.\n\nAsk finance how the bracket and by-product materials are valued. With a standard-price finished material, for example, the bracket stock is carried at its standard price and price differences may absorb the difference from the procurement values. An invoice for processing charges, a later price change or another valuation design adds further evidence. Tie the relevant valuation area, currency, price units, movement documents and posting periods to the calculation. Crediting the vendor's processing invoice by 4.50 without a contractual price change would confuse recovery of your own metal with a change to the fee for machining the brackets."
+    ],
+    [
+      "Model the trip that brings sixteen kilograms home",
+      "A carrier later collects sixteen kilograms of chips and delivers them to your plant. At this point the recorded balance at the subcontractor is twenty-one. SAP ERP documents movement 542 for moving the by-product quantity from stock provided to the vendor back into unrestricted-use plant stock. The event moves sixteen from the vendor segment into the receiving plant stock. The expected end positions for chips are five at the vendor and sixteen at the plant. The company still accounts for twenty-one kilograms across the two positions. Record the receiving location and reconcile the material and unit on the collection docket to those on the inventory transfer.\n\nThere are two common apparent shortcuts. A second receipt of sixteen as newly produced chips would give the company thirty-seven kilograms instead of twenty-one. Clearing all twenty-one from the vendor while posting sixteen at the plant would silently lose five kilograms still sitting at the subcontractor. A vendor certificate confirming twenty-one kilograms of recoverable output and a carrier receipt for sixteen kilograms are compatible evidence of two different events. The five-kilogram balance is an expected open item on this specific job. Whether it should be picked up next week, combined with another job's metal or processed on site is an operational decision supported by that balance."
+    ],
+    [
+      "Investigate a shortage against one of the four quantities",
+      "Suppose the subcontractor says its remaining strip is 102 kilograms. On our figures the strip balance is 110. The eight-kilogram discrepancy concerns input supplied to the vendor. A larger chip yield alone does not prove that exactly eight extra kilograms of strip were consumed. Check additional issues of strip, returns of unused strip, allocations to other orders, units on the weighbridge ticket and reported input consumption for the job. If the subcontractor confirms that 158 kilograms were consumed to make the sixty brackets, the input consumption may need its own subsequent adjustment. Record the evidence for that event separately from the three-kilogram increase in recovery.\n\nFor acceptance, have purchasing reconstruct the outstanding forty bracket units from order history, have materials planning independently reconcile the strip left at the vendor, and have the warehouse identify both chip positions with the weigh and collection documents. Review any difference between actual and planned recovery with the person responsible for component planning. A one-off scale correction belongs to a posted job. A persistent change in machining yield may justify changing future component quantities after engineering and commercial review. Keeping these two decisions separate prevents a master-data edit from being mistaken for a correction to inventory already recorded."
+    ]
+  ],
+  "visual": {
+    "title": "Separate the ordered delivery, component consumption and by-product collection",
+    "headers": [
+      "Posted event",
+      "Finished brackets at plant",
+      "Strip at vendor",
+      "Recoverable chips at vendor",
+      "Recoverable chips at plant"
+    ],
+    "rows": [
+      [
+        "260 kg strip provided",
+        "0 ea",
+        "260 kg",
+        "0 kg",
+        "0 kg"
+      ],
+      [
+        "Receive 60 brackets using planned component quantities",
+        "60 ea",
+        "110 kg",
+        "18 kg",
+        "0 kg"
+      ],
+      [
+        "Confirm actual by-product receipt of 21 kg",
+        "60 ea",
+        "110 kg",
+        "21 kg",
+        "0 kg"
+      ],
+      [
+        "Collect and receive 16 kg of chips",
+        "60 ea",
+        "110 kg",
+        "5 kg",
+        "16 kg"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · By-products in subcontracting",
+      "https://help.sap.com/docs/sap_erp_spv/96bf9ad642cf4b26a29595e3d573fb8c/f561bd534f22b44ce10000000a174cb4.html?locale=en-US"
+    ],
+    [
+      "SAP ERP · Entering goods receipt for the subcontract order",
+      "https://help.sap.com/docs/SAP_ERP/b704a8db767040a08100adc846218964/ec61bd534f22b44ce10000000a174cb4.html?version=6.18.latest"
+    ],
+    [
+      "SAP ERP · Posting a subsequent adjustment",
+      "https://help.sap.com/docs/SAP_ERP_SPV/96bf9ad642cf4b26a29595e3d573fb8c/ef61bd534f22b44ce10000000a174cb4.html"
+    ]
+  ]
+}

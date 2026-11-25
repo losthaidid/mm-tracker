@@ -1,0 +1,98 @@
+{
+  "id": "liv-match-a-carrier-invoice",
+  "level": "Practitioner",
+  "topic": "Planned delivery costs",
+  "title": "A carrier bills freight after the goods supplier has already been paid",
+  "lead": "A carrier sends an invoice for 360 currency units. Its reference is a vehicle registration and a delivery note. The buyer finds the purchase order and sees a paid supplier invoice for 7,200. Both invoices can be correct. This chapter follows a planned freight condition from its agreement in the order to the account that remains open for the carrier.",
+  "keywords": [
+    "planned delivery costs",
+    "freight vendor",
+    "condition vendor",
+    "clearing account",
+    "bill of lading",
+    "MIRO",
+    "purchase order conditions",
+    "partial receipt"
+  ],
+  "sections": [
+    [
+      "Two suppliers earn two different amounts",
+      "A factory buys 120 gear housings at 60 each. A haulage company agrees to move them at 3 per housing delivered. The buyer enters the goods price and the quantity-dependent freight condition on the purchase order. The manufacturer supplies the housings. The condition identifies the carrier as the vendor for freight. For the example, assume a valuated stock receipt, moving average price with adequate coverage, a single currency, zero tax and no rounding. The manufacturer’s invoice of 7,200 covers the goods alone. The freight agreement gives the carrier a separate claim of 360 when all 120 have moved.\n\nStart with the evidence each party can supply. The manufacturer can identify its delivery and commercial invoice. The warehouse can identify the 120 received housings and the material documents. The carrier can identify the vehicle, dates, origin and destinations, and the charge under its agreement. Assemble an explicit cross-reference between the carrier’s identifier and the PO item. An identical amount on another purchase order proves very little when the route and standard charge repeat every week. A signed transport note plus item and receipt references is a much better match. Where one trip served several orders, keep the allocation against each one."
+    ],
+    [
+      "Find which cost Purchasing planned",
+      "Open the order item in ME23N. Read the conditions with their units and scales. In this case, 3 currency units per housing produces 360 for 120 housings. A fixed price of 360 per consignment or a percentage of the goods value could display the same total for this particular order. The calculation method will matter if only part of the order has arrived. Inspect the details of the freight condition and identify its vendor. Record the goods vendor separately. A supplier's name printed in the header tells you who received the order, while the condition tells you which freight charge you can expect and who is associated with it.\n\nIf the buyer only mentioned freight in an item text, ask to see the agreed financial treatment. Text may document a commercial promise without creating a planned delivery cost that Invoice Verification can select. A freight charge embedded in the supplier’s gross price presents another possibility. Separate freight recovery in that case could pay for the same transport twice. Obtain the commercial breakdown and establish what Purchasing put into the order before choosing an invoice-entry field. In a real client, condition type names and ledger accounts reflect the local pricing procedure. Read their calculation and posting behavior in a known document."
+    ],
+    [
+      "Follow a delivery through both clearing accounts",
+      "The warehouse posts the first 80 housings. The goods component at the ordered price is 4,800 and the planned freight component is 240. In the simplified example the value entering stock is 5,040. The financial document has a credit of 4,800 to goods receipt/invoice receipt clearing for the merchandise and a separate credit of 240 for the planned freight. These credits anticipate different invoices. No amount is payable to the carrier through its vendor open items solely because the truck reached the factory. The receipt values the incoming purchase and records what the two invoice streams are expected to clear.\n\nA second receipt brings 40 housings, adding 2,400 of goods and 120 of freight. Across both receipts, the aggregate goods credit is 7,200 and the freight credit is 360. Read each material document together with its linked accounting document. The exact G/L numbers are determined in the client. Match the currencies and signs before adding the lines. If some merchandise left inventory between the two receipts, the stock balance as of today also includes those issues. The goods-receipt documents still show the two original acquisition values. They provide the basis for reconstructing the freight provision independently of subsequent warehouse movements."
+    ],
+    [
+      "Allocate the carrier’s invoice in MIRO",
+      "At invoice entry, use the carrier’s invoice reference, invoice date, currency and gross amount. Match the invoicing party to the planned cost. In classic Logistics Invoice Verification the allocation can use a purchase order, the freight vendor, or a bill of lading when captured at receipt. For this case the documented order is a reliable way into the item list. Select the planned delivery cost items and compare their amounts and quantities with the transport evidence. A vendor-based selection may show other freight entries for the same carrier. A date range narrows the list but several trucks can travel on the same day.\n\nSuppose the carrier bills all 120 housings on one invoice. The expected charge is 360. With the two receipts complete and both freight amounts outstanding, the selection should explain the full charge. The proposed rows may be presented differently depending on the reference and display. The test is whether you can reconcile 240 and 120 to the selected obligation without taking the goods amount a second time. Simulate the accounting before posting. Under the assumptions here the selected charge debits freight clearing for 360 and credits the carrier payable for 360. The goods supplier's settled payable has no role in that entry. Keep a record of both invoice document numbers so someone can later follow each supplier individually."
+    ],
+    [
+      "Read the opposite sequence without manufacturing a receipt",
+      "Move the carrier invoice earlier in the story. The carrier has billed 360 while only 80 housings have a posted receipt. At 3 per housing the recorded planned freight is 240. The 120 difference represents 40 housings’ worth of freight. Find out whether those 40 travelled on the same bill of lading and have actually been delivered. A proof of collection at the manufacturer's dock can be genuine while the goods are still in transit. The receipt at the factory must reflect the business event and the organization’s receipt process. An AP clerk cannot infer delivery of those 40 from the carrier’s total alone.\n\nSeveral outcomes now make sense. The warehouse may find a valid unposted arrival and complete the authorized receiving step. The carrier may have invoiced the second leg before the contracted billing event and agree to revise the invoice. The amount could also represent a minimum charge per trip, whose logic differs from the quantity-based PO condition. In the last case, send Purchasing the signed freight terms and include the 240 calculation. Forcing 360 into an unrelated charge field hides a discrepancy that may recur on every partial delivery. Put the invoice through the agreed local holding or exception process while the responsible parties establish the underlying event and commercial amount."
+    ],
+    [
+      "Detect a freight charge that entered twice",
+      "A month later the supplier statement shows a payment of 360 to the carrier, yet freight clearing still has a credit of 360 for this order. First establish the origin of the payment. The carrier may have been paid through a direct FI invoice debited to a transport expense. That entry can create a valid carrier payable and later payment without consuming the planned delivery cost in the PO history. A second MIRO posting against the freight condition would reduce the clearing credit but could create another carrier liability. A zero clearing balance after that second posting would conceal an overpayment risk.\n\nReconstruct the actual route using the carrier's reference, invoicing party and amount. Compare the PO history, clearing-account lines, FI invoice reference, vendor open and cleared items, and payment reference. Check whether the earlier document was reversed, credited or paid. If the FI invoice was the route taken, bring AP and Finance the entire document chain. They can determine the authorized correction and period treatment, including whether a document needs reversal or reclassification and how payment clearing affects the options. Specify the intended end state as one carrier charge of 360, one settlement of the planned cost and one payment. That makes each proposed correcting entry testable."
+    ],
+    [
+      "Prove the result across purchasing and accounts payable",
+      "For the completed case, read back the order as two parallel histories. Goods receipts valued the merchandise at 7,200 and the manufacturer’s invoice cleared that goods amount. Planned freight of 360 accrued on the same receipts and the carrier invoice cleared that amount. The receipt documents together contributed 7,560 to stock under our assumptions. Payment later clears the respective vendor open items according to Finance's process. The cash movement will not normally carry the full operational detail of which 80 housings belonged to the first truck. Retain the link through the invoice and order item.\n\nA practical sign-off is to hand the file to a colleague who did not enter either invoice. Ask them to identify who was entitled to the 360, where the 360 first entered the inventory value, and which document finally consumed the freight clearing entry. Then ask them to explain why a paid goods invoice did not settle the transport obligation. A correct reconstruction works even if the currency displayed by the ledger differs from the document currency, provided the colleague selects consistent amounts and separates any exchange differences. If their only evidence is that the carrier was paid, one of the three questions remains unanswered. Closing that gap is what makes the purchase defensible at the next account reconciliation."
+    ]
+  ],
+  "visual": {
+    "title": "One order creates a goods obligation and a freight obligation",
+    "headers": [
+      "Event",
+      "Goods clearing",
+      "Freight clearing",
+      "Result under the example assumptions"
+    ],
+    "rows": [
+      [
+        "Receipt of 80",
+        "Credit 4,800",
+        "Credit 240",
+        "Debit stock 5,040"
+      ],
+      [
+        "Receipt of 40",
+        "Credit 2,400",
+        "Credit 120",
+        "Debit stock 2,520"
+      ],
+      [
+        "Manufacturer bills goods",
+        "Debit 7,200",
+        "—",
+        "Credit manufacturer 7,200"
+      ],
+      [
+        "Carrier bills freight",
+        "—",
+        "Debit 360",
+        "Credit carrier 360"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Planned Delivery Costs",
+      "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/9c80b65334e6b54ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Example: Posting Planned Delivery Costs",
+      "https://help.sap.com/docs/SAP_ERP/98eed63ea3a544af84eb972dc68b0e84/936fb6531de6b64ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Entering Planned Delivery Costs",
+      "https://help.sap.com/docs/sap_erp/98eed63ea3a544af84eb972dc68b0e84/b571b6531de6b64ce10000000a174cb4.html"
+    ]
+  ],
+  "shelf": "Valuation & invoice verification",
+  "area": "tax"
+}

@@ -1,0 +1,90 @@
+{
+  "id": "val-price-change-without-receipt",
+  "level": "Practitioner",
+  "shelf": "Valuation & invoice verification",
+  "topic": "Inventory revaluation",
+  "title": "Explain a stock-value increase on a day when nothing arrived",
+  "lead": "The stores supervisor counted exactly 2,400 washers before lunch. The afternoon count is still 2,400. Finance sees a debit of 72 to the inventory account during the interval and asks which delivery it belongs to. A material price change can explain all three observations. Follow the price unit, valuation area, posting sequence and accounting document to decide whether that explanation fits the evidence in ECC. The same method also identifies cases in which an apparent price change is simply a misleading comparison between two reports.",
+  "keywords": [
+    "MR21",
+    "material price change",
+    "price unit",
+    "standard price",
+    "stock revaluation",
+    "valuation area",
+    "FI document",
+    "MM03"
+  ],
+  "sections": [
+    [
+      "Measure the object Finance valued",
+      "A warehouse count identifies physical stock in a particular place. Financial valuation groups material according to the configured valuation area and, when split valuation is used, its valuation type. Begin by asking which material, plant, valuation type, company code and currency the financial document concerns. A single G/L account can contain postings for many materials. Its balance at noon cannot identify 2,400 washers on its own. Open the accounting document and follow the material reference and valuation details it contains. Where a display groups several lines, obtain the underlying document and its posting date.\n\nSet the teaching case in a classic ECC system with plant-level valuation, one material valued under price control S, and no split valuation or actual costing activity for the material. All figures use local currency. Plant North owns 1,500 of the washers in one storage location and 900 in another. Both quantities are valued as the plant's own stock. There are no consignment pieces or separately valued project stocks in the example. The two locations contribute to one total of 2,400. Looking only at the larger location would understate the financial event. A second plant happens to hold the same material under its own valuation record. Its quantity needs a separate calculation."
+    ],
+    [
+      "Read the price together with its unit",
+      "In the accounting view of the material master, inspect the price control, the price and the price unit for this particular valuation area. A standard price of 18.00 with a price unit of 100 means 18 currency units for one hundred base units of material. Each washer is provisionally valued at 0.18. Record the complete expression on the worksheet. An isolated number such as 18 can easily be mistaken for the cost of one piece, especially when a supplier quotation or a cost estimate on the next screen uses a different unit.\n\nImmediately before the price change the stock value is 2,400 divided by 100 and multiplied by 18, which gives 432. The authorized new standard is 21.00 per 100 pieces, or 0.21 per piece. Applied to the same stock this gives 504. Subtract 432 from 504 to obtain a positive change of 72. A second calculation checks the result independently. There are 24 lots of 100 in stock, and each such lot gains 3 of value. Twenty-four times three is 72. There is no purchase order in this calculation. A supplier offering a new price next week can explain why someone decided to revise a standard, but the logistics document linking a physical receipt to a supplier has no role in the revaluation itself."
+    ],
+    [
+      "Find the event that applied the new price",
+      "Open the price change evidence for the valuation area and posting period. Ask which approved process established the price. A permitted manual price change, commonly maintained through MR21, is one possible source. A released standard cost estimate is another source of a new standard under the applicable costing and valuation settings. These routes have different owners and prerequisites. A spreadsheet announcing a new price is insufficient evidence that either route completed. Look for the old price, new price, price unit, posting date, person or batch process and documents created by the update.\n\nNow follow the accounting document. In the simple example inventory increases by 72 and an offsetting revaluation income or expense account receives a credit of 72. The account numbers depend on the chart, automatic posting configuration and any applicable revaluation account determination. Use the line actually posted to explain the result to Finance. A signed pair of entries provides a stronger explanation than a guess from the account name. In the warehouse, search the same time window for receipts, issues and transfers affecting this material. The absence of a quantity-changing movement fits the price-only event. If another movement did occur, place it explicitly in the sequence before committing to the 2,400-piece quantity in the calculation."
+    ],
+    [
+      "Explain why the next goods issue costs a different amount",
+      "After the revaluation the maintenance department takes 400 washers from North. At 21 per hundred the issue credits inventory by 84 and debits the receiving cost object through the applicable consumption posting. The remaining 2,000 pieces are worth 420. Start instead from the original opening value. Take 432, add 72 for the price change, then subtract 84 for the issue. The result is again 420. The quantity bridge runs separately from 2,400 to 2,000. Checking both bridges catches errors such as counting a price change as a receipt or charging an entire stock revaluation to the individual maintenance order.\n\nTry reversing the order of events on paper. Issue 400 while the standard is still 18 per hundred. Consumption now receives 72. The remaining 2,000 carry 360 of stock value. Raising their price by 3 per hundred adds 60, leaving closing inventory of 420 again. Both sequences lead to the same ending quantity and price, yet the expense of the issue differs by 12. The recorded revaluation amounts also differ by 12. That is why a closing balance or current material master alone cannot prove which sequence occurred. Recover the actual documents and effective posting periods. For postings entered close together, use the posting evidence and valuation applied to the issue rather than assuming the order from a printed date."
+    ],
+    [
+      "Resolve the plant, status and ownership differences",
+      "Plant South has 800 pieces of the same washer valued at 15 per hundred, giving 120. Under the assumed plant-level valuation, North's new standard changes North only. After the revaluation and before the issue, the two plants together carry 3,200 pieces worth 624. A report multiplying all 3,200 pieces by North's unit value of 0.21 would show 672. The 48 overstatement is entirely attributable to using North's price for South. It has no associated accounting entry. Ask for the organizational level of the valuation field before treating such a report as a control total.\n\nOwnership introduces a different discrepancy. If a storeroom contains 300 supplier-owned consignment pieces beside the company's own boxes, a physical count can legitimately include both. The stock for which the company records inventory value can be a different population. Identify the relevant special stock indicator and ownership arrangement, and compare like with like. Conversely, some company-owned stock outside the unrestricted-use balance can still form part of the valued quantity. A quality hold restricts use and does not by itself establish that stock has lost its supplier cost. Break the quantity into statuses and ownership groups as recorded on the relevant date. Then identify which groups contribute to the value figure being explained."
+    ],
+    [
+      "Decide whether the difference came from price, unit or reporting",
+      "Imagine that a master-data report shows yesterday's price as 18.00 and today's as 0.18. That looks like a dramatic reduction until the price-unit column shows 100 yesterday and one today. Both representations describe 0.18 per piece. A report that suppresses the unit has manufactured a change in economic value. A useful investigation records the effective unit price in an extra column while preserving the originally displayed amount and unit for traceability. If the issue relates to a price that rounds to a few decimal places, use the posted value and the system's currency precision to reconcile the amount. Multiplying a rounded display repeatedly can produce small residuals.\n\nThere is another trap in comparing today against a historical stock snapshot. A report might value an old quantity at today's price if its purpose is to estimate what that stock is worth now. The figure can be entirely suitable for a planning question and still differ from the amount actually booked historically. Read the date and valuation definition in the report documentation or field help. Run a controlled example around one known price change. If the historical quantity stays constant when the current price changes and the displayed historical value moves, that reproduction tells the reporting team exactly which definition needs to be clarified."
+    ],
+    [
+      "Close the investigation with the correct business owner",
+      "For North the documented conclusion names the material and valuation area, the old and new standards with their price units, the quantity valued at the moment of change and the accounting document for 72. It explains the following issue at 84 and reconciles the closing 420 to 2,000 pieces. The warehouse can confirm counts and movement timing. Cost accounting or the designated price owner can confirm the authorized standard and its effective date. General ledger staff can verify the offsetting account and the required reporting period. These are distinct sign-offs even in a small organization where one person holds several roles.\n\nIf the wrong price was used temporarily, reconstruct every intervening value-changing posting before considering a correction. Returning the master price to its original amount applies a change to the stock available at the later time. After the 400-piece issue, a decrease of 3 per hundred would act on 2,000 pieces and reduce inventory by 60. An earlier increase of 72 and a later decrease of 60 would leave a net revaluation effect of 12 together with a consumption charge 12 above the original rate. Finance can use that reconstruction to assess the appropriate treatment. The admissible price-change route also depends on valuation settings and, where relevant, Material Ledger period status. Escalate the authorization and period decision to the price owner with those figures in hand."
+    ]
+  ],
+  "visual": {
+    "title": "Changing the sequence of price change and issue",
+    "headers": [
+      "Event sequence",
+      "Value added by revaluation",
+      "Value charged for 400 pieces",
+      "Closing value for 2,000 pieces"
+    ],
+    "rows": [
+      [
+        "Change 18 to 21 per 100, then issue",
+        "72",
+        "84",
+        "420"
+      ],
+      [
+        "Issue, then change 18 to 21 per 100",
+        "60",
+        "72",
+        "420"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Accounting entries during a revaluation",
+      "https://help.sap.com/docs/SAP_ERP_SPV/c587d5cadece40a285ce9a6d4a2a4908/385fb6531de6b64ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Conditions for material price changes",
+      "https://help.sap.com/docs/SAP_ERP/c587d5cadece40a285ce9a6d4a2a4908/73a2b9537cceb44ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Changing material prices",
+      "https://help.sap.com/docs/SAP_ERP_SPV/56f7319a9048445eb86221af73cab72b/82a2b9537cceb44ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Material price control",
+      "https://help.sap.com/docs/SAP_ERP/56f7319a9048445eb86221af73cab72b/6a5eb6531de6b64ce10000000a174cb4.html"
+    ]
+  ],
+  "area": "stockval"
+}

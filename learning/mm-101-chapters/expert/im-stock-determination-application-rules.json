@@ -1,0 +1,97 @@
+{
+  "id": "im-stock-determination-application-rules",
+  "level": "Expert",
+  "area": "balance",
+  "topic": "Stock determination across production and shipping",
+  "title": "Why can a production backflush and a customer delivery select different owners for the same material?",
+  "keywords": [
+    "stock determination",
+    "stock determination group",
+    "stock determination rule",
+    "backflush",
+    "outbound delivery",
+    "vendor consignment",
+    "warehouse management"
+  ],
+  "visual": {
+    "title": "Independent trials from identical opening balances",
+    "headers": [
+      "Trial in the example plant",
+      "Own stock withdrawn",
+      "Vendor K stock withdrawn",
+      "Evidence that selects the strategy"
+    ],
+    "rows": [
+      [
+        "Backflush of 40 ea, own-first",
+        "24 ea",
+        "16 ea",
+        "Plant, order type and backflush business transaction"
+      ],
+      [
+        "Delivery of 40 ea, consignment-first",
+        "0 ea",
+        "40 ea",
+        "Delivery item category and material group for stock determination"
+      ],
+      [
+        "Backflush of 40, only 12 own eligible",
+        "12 ea",
+        "28 ea",
+        "Eligibility before sorting and split across eligible stock"
+      ],
+      [
+        "Backflush of 40, only 32 eligible across both owners",
+        "Insufficient eligible stock",
+        "Short by 8 ea",
+        "Check goods movement and any reprocessing record"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Stock determination for production orders",
+      "https://help.sap.com/docs/SAP_ERP_SPV/bfece09273bd474d82fdd97bae070c25/d103b753128eb44ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Executing stock determination in production order processing",
+      "https://help.sap.com/docs/SAP_ERP/bfece09273bd474d82fdd97bae070c25/a1ffb753128eb44ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Goods issue from vendor consignment stock for an outbound delivery",
+      "https://help.sap.com/docs/SAP_ERP/072e1e902dfa4546970c7966a47c42da/081cbf53d25ab64ce10000000a174cb4.html"
+    ],
+    [
+      "SAP S/4HANA on-premise · Stock determination in Inventory Management",
+      "https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/91b21005dded4984bcccf4a69ae1300c/eb64bd534f22b44ce10000000a174cb4.html"
+    ]
+  ],
+  "shelf": "Inventory & special procurement",
+  "lead": "An assembly line consumes a washer that the same plant also sells as a spare. The washer exists in company-owned stock and in vendor consignment stock. For a production order the warehouse expects company-owned stock to be used first. For an outbound spare-parts delivery the business has agreed to use the supplier's consignment stock first. Two teams report opposite withdrawal results for the same material and demand a common fix in its master record. In classic SAP ERP the relevant strategy depends on the application initiating stock determination. Reproducing the consumption event with an ordinary manual issue can therefore answer the wrong question.",
+  "sections": [
+    [
+      "Identify three decisions inside one word",
+      "When a planner says that SAP should determine stock, ask what decision has been delegated. A purchasing source determination chooses a supplier or agreement for a new requirement. An availability check addresses whether supply can cover a requirement according to its scope and date. Stock determination at issue can choose among eligible stocks, including locations and ownership categories. A batch determination may then decide which specific eligible batch meets selection and sorting rules. These decisions reference some common master data but they have different inputs, triggers and evidence. In the washer case there is already stock in the building and no new purchase requisition is being created.\n\nDefine the process narrowly enough to reproduce it. The worked examples use plant P100, the same washer material, one eligible location, twenty-four company-owned pieces, and forty pieces in vendor V's eligible consignment stock. Assume that both withdrawal routes are supported and properly set up for this material in the site, including stock determination, consignment master data where required, and permission for a requirement to be satisfied from more than one eligible stock. There is no batch or warehouse-management step in the first two trials. Those assumptions make the effect of the business transaction visible. They are parameters to test in a customer system rather than universal preferences delivered by SAP."
+    ],
+    [
+      "Find the rule at the application entry point",
+      "The stock determination group in the material master supplies one input. During production order processing SAP documents an assignment of a stock determination rule for a plant, order type and business transaction such as backflushing or picking. The rule and the material's group lead to the withdrawal strategy used for that context. Read the production order header to identify the actual order type, the component to identify its material and issue location, and the event that triggered consumption. A planner may call a confirmation entry a pick, even though the program running at save time is backflushing the component.\n\nShipping has a different entry point. For goods issue from vendor consignment stock SAP documents the stock determination rule in delivery item category configuration and a stock determination group for the material. Identify the delivery item category actually used by this delivery. A special delivery type or custom category can select settings different from the one on a reference process diagram. A match on material and plant therefore does not establish that both transactions should choose the same owner. To compare the rules, use the rule plus the group from each event and show the resulting strategy settings, eligible stock categories and priority data to the process owners."
+    ],
+    [
+      "Predict and prove the invoice-relevant split",
+      "The example's production strategy ranks company-owned stock first. Start from a clean snapshot and confirm a production quantity that requires forty washers. There are twenty-four eligible owned pieces. Under the assumed split strategy the remaining sixteen come from consignment stock of V. Owned washer stock closes at zero and V's stock at twenty-four. Establish those predictions before running the transaction. Record the component quantity required for the confirmation and check whether the operator changed the proposal. In the saved material movement identify the total forty, the individual withdrawals, issuing location and special stock assignment where relevant.\n\nThe ownership change matters beyond the warehouse. A consumption from vendor consignment is a relevant event for the procurement and settlement process in the applicable design. Finance or purchasing should be able to distinguish the sixteen vendor pieces from the twenty-four company-owned pieces. Do not infer a cash payment or completed vendor settlement simply from the decrease in the special-stock balance. Inspect the posted withdrawal and the evidence used by the site's consignment settlement process. A plausible combined inventory decrease of forty tells neither the production supervisor nor the settlement clerk which quantities belong on their respective records.\n\nFor the shipping trial, restore or independently prepare the same opening balances. Use the outbound delivery and item category for selling spare washers. Its configured priority uses vendor consignment first. Record a delivery requirement of forty and validate the eligible consignment quantity. Under those assumptions, the issue can be fulfilled with all forty vendor pieces. Owned stock remains at twenty-four and V's stock goes to zero. Running this trial immediately after the production trial without resetting stock would leave only twenty-four vendor pieces. A different split in such a sequential run would be consistent with the original strategy and would be a poor test of strategy determination."
+    ],
+    [
+      "Distinguish a priority result from missing eligible stock",
+      "Next, retain the production strategy and make twelve of the twenty-four owned pieces unavailable to the tested withdrawal. For example, place those pieces in a different location that the test strategy excludes and document the transfer. The expected split for forty becomes twelve owned and twenty-eight vendor units if the remaining vendor stock is still eligible. A high percentage of vendor issues in a live month can therefore have two different causes. The company may have changed priority. Alternatively, an unchanged priority has repeatedly exhausted the eligible company-owned stock. Historical balances at the decision time and the eligible candidate list are the evidence that distinguishes them.\n\nRun a shortage trial as a separate case with twelve eligible owned and only twenty eligible consignment pieces. The physical plant may still hold more washers in another stock type or location, but these two candidates can satisfy at most thirty-two. Investigate the actual consequence in the relevant application: examine the posted goods movement, material documents, error messages, and any backflush movements awaiting reprocessing. Keep the state of the production confirmation separate from the state of component withdrawal. A saved confirmation header without corresponding stock movements must not be reported as proof of consumption. Correct the underlying eligibility or stock issue and use the approved reprocessing route exactly once."
+    ],
+    [
+      "Identify when the determination actually ran",
+      "In ordinary shipping SAP documents determination at goods issue for the consignment scenario. With classic Warehouse Management or picking using WMS, the choice can already be made during transfer order creation. In that case a supervisor may be inspecting the stock situation at goods issue long after the source was selected. Locate the transfer order, its creation time, the picked quantity, the stock identification and any confirmation differences. Also inspect what changed between creation and goods issue. A new company-owned receipt that arrived after the pick cannot retrospectively prove that yesterday's determination ignored eligible stock.\n\nIn production, a test that calls stock determination from the goods movement overview may present a proposed source. The documented posting point in confirmation transactions is saving the confirmation. In a picking list or when reworking goods movements, the corresponding save triggers the movement. Record whether the evidence is a proposed line in an open transaction or an actual material document. If a second process consumes the selected stock before posting, the final situation can change. Audit reviewers need the time of proposal, the time of execution and any error or reprocessing event when these occurred at different times."
+    ],
+    [
+      "Inspect the smallest change that explains the result",
+      "Suppose both trials began to select consignment first only after an enhancement to the shipping process. Compare the actual rule, material group, strategy, item or order type and eligible stock snapshots with a previous known example. If only one material is affected, inspect its group and plant data as well as recent master changes. If every shipment for one delivery category changed, inspect the item category's rule assignment. If production alone changes for one order type, trace the assignment at that plant and business transaction. Those patterns lead to different tests. Altering a shared material group to compensate for one delivery category could affect all production orders carrying that material.\n\nConclude with a business-readable decision record. For each process give the triggering action, the strategy in effect, the stock actually eligible at that time, the resulting quantities by owner and the document proving execution. Include the original vendor assignment for consignment units so settlement can be reconciled independently. Write one sentence explaining the approved priority in words and have the production and shipping owners confirm their respective business requirements. The apparent contradiction then has a measurable explanation: a forty-piece consumption can validly leave twenty-four vendor pieces, while a forty-piece delivery, from the same opening positions in an independent trial, leaves twenty-four company-owned pieces. The two results answer different agreements about whose stock to draw first.\n\nDuring acceptance let the warehouse operator propose an explicitly named storage location in one trial and leave the corresponding choice to determination in another. Record which fields the application permits the operator to override and when. A manual proposal can legitimately narrow the candidate set or use a different sequence in the tested process. A design that promises automatic priority also needs to specify how supervisors handle permitted overrides and what evidence remains on the final document."
+    ]
+  ]
+}

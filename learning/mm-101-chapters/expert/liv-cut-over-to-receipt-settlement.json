@@ -1,0 +1,109 @@
+{
+  "id": "liv-cut-over-to-receipt-settlement",
+  "level": "Expert",
+  "topic": "Evaluated receipt settlement",
+  "title": "Switch a supplier to evaluated receipt settlement without paying an open delivery twice",
+  "lead": "A component manufacturer and its supplier want to stop exchanging routine invoices on a high-volume route. With evaluated receipt settlement, the buyer creates the invoice from an agreed purchase price and a recorded receipt. The hard part is crossing from supplier billing to self-billing while deliveries, invoices, returns and payments are already in flight. A reliable cutover gives each receipt one settlement route and proves that the supplier can reconcile the result.",
+  "keywords": [
+    "evaluated receipt settlement",
+    "ERS",
+    "MRRL",
+    "self-billing",
+    "cutover",
+    "supplier statement",
+    "return delivery",
+    "duplicate liability",
+    "GR-based invoice verification"
+  ],
+  "sections": [
+    [
+      "Define a business boundary that both parties can recognize",
+      "A buyer receives fasteners against recurring purchase orders. The supplier will stop invoicing eligible new orders after a negotiated cutover. Its staff can recognize a designated series of new PO numbers, and the buyer can recognize the same numbers in SAP. Older orders retain their agreed supplier-invoice process through completion. This is a design choice for this example. Another implementation could use a different boundary, but “everything this week” would be ambiguous for a truck dispatched before midnight and booked after the holiday.\n\nAgree on the settlement frequency, which legal entities and purchasing organizations participate, how delivery and return references will appear, which currency and prices apply, and how discrepancies will be resolved. Obtain the appropriate local finance and tax decisions on the self-billing arrangement and its output. In practice a vendor may trade with the company through several purchasing organizations, material combinations or arrangements. A vendor-wide instruction to stop sending all invoices can strand obligations outside the agreement, including unrelated freight or services. Provide recognizable examples of one included PO and one excluded PO to the supplier’s billing staff. A useful test is whether they would give the same answer as AP for an older order delivered immediately after cutover day."
+    ],
+    [
+      "Inventory the traffic already in both systems",
+      "Freeze an opening reconciliation at a stated time. On old order A there are 300 units at 4, all received and all invoiced for 1,200. The invoice remains unpaid. On old order B there are 200 units at 4, received but not yet invoiced, worth 800. The supplier has prepared a bill for B that the buyer has not received. On new eligible order C the buyer will receive 250 units at 5, and on new eligible order D it will receive 150 units at 5. Use zero tax, one currency and constant prices to isolate the routing decision. An unpaid FI item on A is an existing liability. An open GR/IR credit on B describes a receipt awaiting its invoice. Neither fact by itself establishes eligibility for the new process.\n\nHave AP list posted and parked invoices, inbound messages still being processed, and claims held by a shared-services team. Have the supplier supply its issued-but-unacknowledged invoice list and relevant shipment references. For receipts, include material document, year, item, PO and PO item. Preserve delivery note numbers as supporting evidence. A delivery note may repeat across suppliers or years, whereas the SAP material document identifier includes more context. This cross-party opening position explains why the first ERS run should settle C and D only. An attempt to eradicate the old GR/IR balance by including B would collide with the old supplier invoice route."
+    ],
+    [
+      "Check eligibility on actual order items",
+      "For a classic ECC material scenario, inspect the ERS setting in the supplier’s purchasing data and the actual ERS indicator in each participating order item. Evaluate the receipt-based invoice verification setting on the item, the purchase-tax code, the firm order price and the PO reference on the goods receipt. An estimated price signals that the object does not yet provide a firm commercial basis for automatic settlement. Check the applicable purchasing info record for an ERS exclusion. Default proposals and the settings that were actually saved on historical POs can differ. A demonstration using only a newly created ideal test order will not expose this distinction.\n\nGive each control a commercial interpretation. The receipt states which actual delivery earns a settlement. The firm price supplies the amount basis. Tax and payment data let the resulting payable and settlement document be usable. The supplier’s agreement and the order-item settings identify the population for which the buyer should issue documents. If C has all the expected settings but its receipt cites the wrong PO item, changing tax or price data will not repair the reference. If D appears fully received but its item is missing the agreed tax code, the warehouse cannot resolve the missing tax determination by repeating the receipt. Use these predictions when assigning failed tests to the right team. S/4HANA documentation may describe supplier data via Business Partner or Fiori apps. Use the purchasing master-data route supported by the ECC client for the same control questions."
+    ],
+    [
+      "Predict a test run and explain each omission",
+      "For the first eligible period, C contributes 250 × 5 = 1,250 and D contributes 150 × 5 = 750. The opening target for the eligible material receipts is therefore 2,000 before tax. MRRL provides the classic ERS settlement run. Use a narrowly defined test selection in the quality system and examine its log before an authorized production run. Test mode identifies eligible items and errors without posting invoices. Document the selection and grouping chosen, since one grouped invoice for a supplier and two documents split by order can both support the same net total. Reconcile receipt identities, item values and counts as well as the grand total.\n\nDeliberately run a case with D’s tax code missing. If the log reports a successful 1,250 and an exception on D, 750 remains unresolved. Keep D on an exception list with the commercial owner and reason. Do not report that ERS matched everything eligible without also explaining why D failed to settle. Conversely, if the list includes B’s 800, the test has found a scope problem even if the run technically considers the receipt settleable. Investigate the order indicator, selection or cutover design before allowing a payable to be created. An automated posting can be internally consistent with the PO and still be commercially duplicative. The downstream payment program cannot reliably infer that the supplier also sent a paper invoice."
+    ],
+    [
+      "Make the exception and recovery path testable",
+      "Imagine the live run posts C, then D fails, and a network interruption prevents the operator from seeing the final screen. First determine what SAP committed. Inspect the settlement log, order history and generated Logistics Invoice Verification and FI references for each receipt. Reconcile individual states before attempting recovery. The risk is an operator starting a conventional invoice for C out of caution while another operator reruns a corrected selection. Restrict recovery to the documented unresolved receipt, follow normal concurrency and job controls and verify the logs again after processing. A printed form or a missing email is insufficient evidence that posting succeeded or failed.\n\nDistinguish a technical processing failure from a supplier communication failure. C may already have created a valid invoice for 1,250 while its outbound settlement failed. The remedy is to investigate output and, when authorized, retransmit the documented settlement. Posting a second invoice to obtain another printout would distort the buyer's liability. Where output groups multiple receipts together, the supplier needs a usable cross-reference from settlement number to delivery note and amount. Keep output status, recipient and transmission evidence separate from the posting status. AP should be able to state that one receipt was settled, one charge is awaiting tax correction, and one posted message is awaiting dispatch without collapsing these into a single “job failed” status."
+    ],
+    [
+      "Carry returns and late paper invoices through the cutover",
+      "After C and D settle for 2,000, the buyer returns 20 units from C under a supported returns process. At 5 each the expected commercial credit is 100. Once the applicable return movement is eligible and settled, the combined net for C and D should be 1,900. Follow the return reference, the associated PO history and the generated credit memo. Observe the date of the return separately from the date the credit is settled. A statement sent between those two events can correctly show 2,000 while the warehouse has already dispatched the twenty units. Provide the supplier with the expected timing and the return identifier so a billing discrepancy can be distinguished from a reporting cutoff.\n\nOn the same day AP receives a supplier PDF for 750 citing order D. It may be a genuine legacy invoice that quotes the wrong PO in error, a duplicate commercial claim for an ERS delivery, or a document the supplier intended only as a packing valuation. Match its delivery reference, supplier invoice reference, schedule and lines to the purchasing history and outstanding legacy list. Route the discrepancy to the contact named in the agreement. Do not enter a conventional invoice for D solely because the document arrived in the AP inbox. Likewise the 800 invoice for the legitimate old order B still belongs in the conventional process. The receipt identity and the agreed boundary allow two superficially similar attachments to be handled correctly."
+    ],
+    [
+      "Decide what constitutes a successful first cycle",
+      "Reconcile three perspectives at the end of the cycle. Internally, the goods receipts selected for ERS, less any eligible returns, should explain the settlement values and their vendor postings. Operationally, the BI or job summary should reconcile to the detail log, including excluded items, still-open errors and outbound messages. Externally, the supplier should be able to match the settlement documents and credits to its deliveries and explain any timing differences on the statement. A net 1,900 settlement, an existing unpaid 1,200 legacy invoice and a newly received 800 legacy bill describe three distinct populations. Combining them into one total makes it too easy to overlook a missing supplier invoice or a double payment.\n\nChoose post-cutover support indicators that expose those failure modes. Track receipts with no expected settlement, settlements with failed output, supplier invoices arriving for ERS items, and returns outstanding across a settlement boundary. Give each exception a receipt or return reference and an owner. When a price is corrected retrospectively, use the appropriate approved price adjustment or revaluation process and document its effect separately. Repeating an initial receipt settlement indiscriminately is not proof that the supplier has been given the revised value. The design has achieved its aim when each party can point to one agreed obligation per delivery, follow later credits, and explain why any remaining balance is legitimate without opening every invoice manually."
+    ]
+  ],
+  "visual": {
+    "title": "Expected liabilities through the first settlement cycle",
+    "headers": [
+      "Population",
+      "Commercial facts",
+      "Expected settlement route",
+      "Amount"
+    ],
+    "rows": [
+      [
+        "Legacy order A",
+        "300 × 4, conventional invoice already posted",
+        "Existing vendor open item until paid",
+        "1,200"
+      ],
+      [
+        "Legacy order B",
+        "200 × 4, received and supplier invoice in transit",
+        "Conventional invoice when validated",
+        "800"
+      ],
+      [
+        "New order C",
+        "250 × 5, ERS eligible",
+        "Receipt settlement",
+        "1,250"
+      ],
+      [
+        "New order D",
+        "150 × 5, eligible after data issue resolved",
+        "Receipt settlement",
+        "750"
+      ],
+      [
+        "Return against order C",
+        "20 × 5 after settlement",
+        "Track return and ERS credit",
+        "−100"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP KBA 2713817 · ERS setup in ERP and S/4HANA",
+      "https://userapps.support.sap.com/sap/support/knowledge/en/2713817"
+    ],
+    [
+      "SAP ERP · Evaluated Receipt Settlement (ERS) role and activities",
+      "https://help.sap.com/docs/SAP_ERP/9cb886fbc4774e67bc741f93bb97b7ca/e1edc353b677b44ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Messages in Logistics Invoice Verification",
+      "https://help.sap.com/docs/SAP_ERP/98eed63ea3a544af84eb972dc68b0e84/ba0bb9537cceb44ce10000000a174cb4.html"
+    ],
+    [
+      "SAP Learning · Performing Receipt Settlements (S/4HANA and classic transaction references)",
+      "https://learning.sap.com/courses/invoice-verification-in-sap-s-4hana/performing-receipt-settlements"
+    ]
+  ],
+  "shelf": "Valuation & invoice verification",
+  "area": "invoice"
+}

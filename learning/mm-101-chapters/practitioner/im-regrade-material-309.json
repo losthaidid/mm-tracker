@@ -1,0 +1,92 @@
+{
+  "id": "im-regrade-material-309",
+  "shelf": "Inventory & special procurement",
+  "level": "Practitioner",
+  "topic": "Material-to-material transfer postings",
+  "title": "Regrade sixty kilograms under a new material number and explain the value difference",
+  "lead": "A processor holds 200 kilograms of grade A wax. Sixty kilograms have changed appearance during storage. Laboratory testing shows those sixty now meet the approved grade B specification. Both grades have existing material numbers and can be used in different product recipes. The drums stay on the same rack, but the system must stop offering the affected quantity as grade A. In this ECC case a material-to-material transfer changes the inventory identity. It also raises a finance question. The warehouse can account for exactly sixty kilograms on both sides while the total value assigned to the two stock accounts changes.",
+  "keywords": [
+    "movement 309",
+    "material to material",
+    "base unit of measure",
+    "transfer posting",
+    "moving average price",
+    "standard price",
+    "reclassification"
+  ],
+  "sections": [
+    [
+      "Establish what happened to the goods",
+      "Ask the quality owner to identify the affected drums, the approval date, the source grade and the destination specification. A report saying only that grade A inventory is excessive has a different meaning. A buyer might have raised the PO under the wrong material number. The supplier might actually have delivered grade B against an order for grade A. In that situation the receipt, purchasing history, quality claim and supplier invoice may all need investigation. A subsequent transfer would make the current stock display look plausible while leaving the commercial record saying the wrong product arrived.\n\nAnother possibility is that grade A is perfectly suitable and merely being moved from the main warehouse to a satellite location. Material identity continues across that movement. A normal location transfer is a candidate. If the plant heats, filters and blends grade A with an additive to manufacture grade B, check how production wants to record component consumption, yield, labor and activity costs. A one-step reclassification cannot describe that process. In the worked case the material already meets grade B specification and no manufacturing step occurs when the inventory record changes. That observation, signed off by the responsible function, justifies considering a transfer posting from one material to another."
+    ],
+    [
+      "Check the receiving material before opening the posting",
+      "Display both material masters and record their base units, plant data and the valuation information for the example's area. The standard ECC transfer from material to material moves unrestricted-use stock of the issuing material into unrestricted-use stock of the receiving material in one step. The receiving material must exist. Both materials must share their base unit of measure. Having similar descriptions or buying both materials by the drum does not establish that prerequisite. Packaging and order units can differ from the base quantity that SAP maintains.\n\nHere both base units are KG. The sixty kilograms happen to occupy three drums of twenty each. Imagine instead that the warehouse gives the receiver a material managed in individual drums as its base unit. Forty partly filled drums and forty full drums would then carry the same count and potentially very different masses. Simply entering KG on the movement screen does not create equivalence between the two base units. Escalate the discrepancy to the material and process owners. Ask whether they genuinely want a reclassification by equal base quantities, a repacking process with measured conversion, or a corrected material master design. Record the exact error from the trial and retain the original unit settings for explaining the outcome."
+    ],
+    [
+      "Predict the stock position on a sheet of paper",
+      "Write down the affected location and the two balances before the posting. Assume A has 200 kilograms of unrestricted-use stock and B has forty in that location. With a sixty-kilogram transfer, A should close at 140 and B at 100. The combined quantity stays at 240 kilograms. The three affected drums are relabelled under the approved procedure. A report summed only by plant and unit can therefore show no physical change, even though an order asking for 180 kilograms of grade A would now face a significant shortage.\n\nCheck whether the sixty kilograms really belong to the available source stock. An inspection lot, a quarantine instruction or a different batch still retained in the old identity can make the apparent plant total a poor measure of what the operator may transfer. If quality management owns the release into unrestricted-use stock, obtain its disposition and check the posted result. Moving stock out of a quality process purely to satisfy a transfer screen would destroy an important control. When batches are active, record both the source batch and the batch identity accepted for the receiving material. A drum's label and its certificate must still lead a colleague back through the regrading decision after both materials have had further movements."
+    ],
+    [
+      "Explain the value before the first posting",
+      "Assume both grades are valuated stock in the same valuation area and currency. The issuing grade is carried at 6.00 per kilogram. The receiving grade has standard price control and a standard price of 5.40 per kilogram. The posting relieves A of 360.00 for the sixty kilograms. It adds 324.00 to inventory of B because B enters at its standard price. The remaining 36.00 is a debit to the relevant transfer difference account in this simple case. The price basis and the direction of the movement together explain the difference. A quantity clerk counting identical masses has no reason to see thirty-six missing units.\n\nReverse the prices as a thought experiment. If A were valued at 5.40 and B at 6.00, the receiving inventory value would exceed the issuing value by 36.00. The balancing entry would change sign. That simple check catches a surprising number of explanations that call every stock transfer difference an expense. The actual account follows the company's account determination and valuation settings. In the accounting document check the inventory accounts, any difference account, currency, price unit and posting quantities. If both materials use the same inventory account name or number, use material document details and the accounting amounts together to understand the inventory changes."
+    ],
+    [
+      "Change the receiver's price control in the calculation",
+      "In a second, independently prepared example, B uses moving average price. It begins with forty kilograms valued at 200.00, an average of 5.00 per kilogram. Grade A still supplies sixty kilograms carrying 360.00. With straightforward positive stock coverage, no other movements and no rounding complications, B receives that 360.00. B now has 100 kilograms with a value of 560.00. Its new moving average price is 5.60 per kilogram. Existing stock has contributed its earlier acquisition value to the denominator and numerator. Posting all 100 kilograms at the issuing price of 6.00 would create a value never supplied by either balance.\n\nThe two examples use independent opening positions because the price control belongs to the receiving material's accounting data. Do not change price control on a live material to recreate a support example. Select suitable test materials, check the price unit and hold the starting quantities stable in a test client. A price displayed per hundred kilograms requires conversion to the same basis before multiplying by sixty. Capture the inventory values at the same time as the quantities. If another receipt enters B between the transfer and your price check, the new average includes that receipt as well. Reconstruct the sequence from posted documents before claiming that the transfer performed an unexpected calculation."
+    ],
+    [
+      "Read the document from both ends",
+      "Use the approved goods movement for a material-to-material transfer, commonly movement type 309, and enter the issuing and receiving materials deliberately. Have another person read both descriptions aloud during a test. Reversing the direction can pass a plausibility check when both grades carry stock. Compare material, plant, location, quantity, base unit and any batch information in the saved material document with the regrading approval. Then look at the accounting document if one was generated in the case at hand. Compare its signed currency amounts to the prediction. Note the posting date when tracing period balances.\n\nSuppose the consultant sees A decrease by sixty and no apparent increase of B. First check that the display is for the receiving material with its correct spelling, at the receiving location and with the appropriate stock filters. Review the saved document's receiving fields. Then inspect later issues of B. An operator could legitimately consume the sixty shortly after transfer. The current balance alone cannot tell whether B was ever received. In the opposite case the accounting team might see the expected value difference while a warehouse report still lists the old grade. Check the report's key date and whether it summarizes a warehouse bin assignment or IM stock by material. Both questions need an event and a time boundary."
+    ],
+    [
+      "Decide how the case can be closed",
+      "At the rack, the three drums should bear identifiers accepted for the grade B process. The old labels or their traceability record should be preserved according to the plant's quality procedure. In stock records, someone working from the post-transfer date should be able to reproduce 140 kilograms of A and 100 of B from the opening balances and the material document. In finance, a reviewer should be able to derive the 36.00 standard-price difference or the new average of 5.60 using the variant actually tested. Purchasing should be able to show why no supplier short delivery or supplier credit arises in this example.\n\nDocument what would change that decision. A later discovery that the goods were misidentified at the original receipt sends the case back to purchasing and quality. A subsequent sale or consumption of B makes the correction of a mistaken transfer a chain-of-documents problem. Locate those follow-on events before agreeing an adjustment, and coordinate the posting period with finance. A genuine loss of material between the two classifications calls for separate quantity evidence. These observations allow the owner to distinguish a correct regrading movement, a correction to an earlier transaction and a physical process with a yield. All three can begin with the same request to make stock appear under a different number."
+    ]
+  ],
+  "visual": {
+    "title": "Sixty kilograms move from grade A into grade B",
+    "headers": [
+      "Quantity or value",
+      "Receiving B at standard price",
+      "Receiving B at moving average"
+    ],
+    "rows": [
+      [
+        "A issues 60 kg at 6.00",
+        "360 credit to A inventory",
+        "360 credit to A inventory"
+      ],
+      [
+        "B receives 60 kg",
+        "324 debit at standard 5.40",
+        "360 debit transferred from A"
+      ],
+      [
+        "Value difference at transfer",
+        "36 debit to stock transfer difference",
+        "Zero in this example"
+      ],
+      [
+        "B after receipt",
+        "100 kg at 5.40 if opening was 40 kg at 5.40",
+        "100 kg, value 560, average 5.60 if opening was 40 kg at 5.00"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Transfer postings from material to material",
+      "https://help.sap.com/docs/SAP_ERP_SPV/96bf9ad642cf4b26a29595e3d573fb8c/cb64bd534f22b44ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Valuation when a material is transferred to another material",
+      "https://help.sap.com/docs/SAP_ERP/b704a8db767040a08100adc846218964/a95eb6531de6b64ce10000000a174cb4.html?version=6.18.latest"
+    ],
+    [
+      "SAP Support · M7105 and different base units in movement 309",
+      "https://userapps.support.sap.com/sap/support/knowledge/en/1521163"
+    ]
+  ],
+  "area": "inventory"
+}

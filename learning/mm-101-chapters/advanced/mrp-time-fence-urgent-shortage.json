@@ -1,0 +1,92 @@
+{
+  "id": "mrp-time-fence-urgent-shortage",
+  "level": "Advanced",
+  "shelf": "Purchasing",
+  "topic": "Firming and the planning time fence",
+  "title": "Which planning-time-fence policy left eighteen urgent parts uncovered?",
+  "lead": "An assembly cell needs eighteen extra housings before its next scheduled material release. The planner can see the shortage, a procurement proposal dated several days later, and an earlier proposal that MRP has left alone. Changing the vendor lead time would be an expensive guess. In classic ECC the planning time fence can protect an existing proposal, postpone new supply, or allow a near-term shortage to remain for human action. Each outcome points to a different policy decision.",
+  "keywords": [
+    "planning time fence",
+    "firming type",
+    "MRP type",
+    "shortage",
+    "manual firming",
+    "planned order",
+    "master production scheduling"
+  ],
+  "sections": [
+    [
+      "Start with a decision the factory has already made",
+      "The factory freezes procurement changes for the first part of its assembly schedule. Buyers use that time to agree quantities and transport with suppliers. The policy has a cost. When the sales team adds urgent work, a computer-generated date inside the protected window can imply flexibility that a real supplier no longer has. A planner ought to see the uncovered requirement and decide whether to expedite, reallocate stock, or renegotiate the promise. Eliminating every negative sign on a planning display is not a sufficient measure of success in that environment.\n\nUse a plant in which the material is planned with an appropriate firming MRP type. The example works with an existing MRP-generated procurement proposal, not an issued PO already agreed with the supplier. A planned receipt for 45 is available before a requirement for 45 and there is no starting stock. The plan was previously balanced. On Monday a customer change introduces an additional 18 required on Wednesday. The end of the planning time fence shown for this run falls on the following Monday. Assume all quantities are in pieces, the original proposal is well inside the fence on this run, timing is otherwise feasible, and lot-for-lot planning applies.\n\nThis leaves a real 18-piece scheduling question. If all 63 are needed before the end of the fence, a later supply proposal can restore a positive future balance yet still leave Wednesday uncovered. Look at the position on Wednesday, how much of the original 45 remains available, and the first date on which the balance recovers. The distinction matters to the cell supervisor deciding which production orders can start."
+    ],
+    [
+      "A time fence has a length and an operating rule",
+      "In standard ECC the end of the time fence is calculated relative to the planning date. The material's time-fence setting can come from its master data or the applicable MRP group, with a material-specific entry taking priority as documented. Record the end date for the run you are examining. A perfectly valid screen captured the following week can show a different protected interval with the same master data. If the support ticket provides only a date range copied from today's list, ask for the planning date that gave rise to the original result.\n\nThe duration of the fence is only part of the evidence. SAP configures the firming type on the MRP type. For the material at issue, discover which MRP type was assigned and inspect its effective firming setting in the client. An engineer who checked only “five days” in a master record has not established what the planning run should do with a newly uncovered requirement. A material using a different procedure can share the same nominal duration but receive different treatment for existing or new proposals.\n\nAsk a second practical question about each receipt. Was it independently firmed by a planner or by a manual change before this run? Distinguish individual firming from automatic behavior when an element moves into the fence. For planned orders the header data and components can have distinct firming meanings. During an investigation into externally procured housings, concentrate first on date and quantity of the actual receipt element. The fact that component planning can be protected independently in other scenarios is a reason to read the element details before describing a universal freeze."
+    ],
+    [
+      "Read the four firming choices as two business questions",
+      "Two questions help a consultant interpret the configured type. What happens to an existing proposal moving into the fence? How does planning handle new coverage required inside the fence? With firming type 1, eligible existing proposals moving inside are automatically firmed once their date lies at least one day before the end. Additional supply needed within the protected interval is scheduled at its end. The newly created delayed proposal is not automatically firmed merely by being created at that boundary. For the example, an 18-piece receipt at the fence end tells the planner both the amount and the unprotected date at which the run has proposed covering it.\n\nWith firming type 2, eligible existing proposals entering the fence receive the same automatic protection. For an additional shortage inside the fence the run does not create new supply there to balance it. In a controlled test with no other requirements, the new 18 can remain uncovered through the protected interval. That result can be the policy working exactly as configured. Before treating a missing same-week PR as an error, ask whether the business assigned short-horizon exceptions to a named planner and whether that person can see the change in demand.\n\nTypes 3 and 4 do not automatically firm existing proposals as they move into the fence. Type 3 displaces proposals needed for coverage to the end of the fence. Type 4 leaves new shortages inside it unbalanced. Because the treatment of existing proposals differs from types 1 and 2, establish the actual starting state before predicting an exact list of numbers. A manually firmed element has its own protection. Type 0 introduces no automatic firming by this mechanism. The matrix below is a guide to interpreting intent in the documented simple cases. Existing orders, explicit firming and other shortages can affect the final element list."
+    ],
+    [
+      "Use the eighteen pieces to test competing explanations",
+      "A purchaser argues that a longer planned delivery time is the whole explanation because the proposed extra supply happens to arrive next Monday. Take two independent predictions into QA. Under a lead-time explanation, moving the requirement date or changing the effective procurement times in an otherwise equivalent feasible test should give a date related to those intervals. Under the time-fence explanation for type 1, a feasible requirement moving from Wednesday to Thursday but remaining inside the same fence can still attract new supply at the same fence boundary. That difference in predictions is more informative than changing both parameters at once.\n\nRun a second pair of trials. Use equivalent baselines with the first 45 already in place, no manual firming and an identical new requirement. Keep the material inputs comparable and apply the approved QA policies corresponding to types 1 and 2 to separate test materials. Identify the original proposal, inspect whether it became protected, then locate any additional receipt for the 18. Preserve the evidence that the material was processed in each run and that the shortage was introduced before it. A result observed after a manual conversion into a purchasing document tests a different process.\n\nFinally, move the extra demand beyond the time fence and give it a feasible procurement interval. In the documented standard process, procurement proposals outside the protected interval are normally created under the ordinary planning rules. If the 18 are still absent, examine coverage, planning segment, lot sizing or planning-file selection. If an existing receipt already covers the quantity, changing firming type will not manufacture another uncovered need. A strong test has one branch on which the proposed explanation should cease to apply."
+    ],
+    [
+      "Separate a stable proposal from a supplier commitment",
+      "A star or firming indicator on a proposal explains something about automatic planning changes. It does not tell the workshop that a delivery truck will arrive on Wednesday. Pull the underlying document. A planned order can have a planner's protected quantity and date while sourcing and commercial execution remain outstanding. A purchase requisition can similarly represent a purchasing need before an order is placed. An external PO with schedule lines, supplier responses and a goods receipt history offers a different chain of evidence. This is the source of many arguments in a shortage call in which the teams use the word “fixed” for different facts.\n\nFor the existing 45, record the owner of the proposal and any external document created since the planning snapshot. For the additional 18, identify the owner of the urgent customer request. Suppose a buyer can obtain ten by Wednesday and the balance eight on Friday. That conversation changes the real options even though the time-fence calculation originally displaced all 18 to Monday. If the business agrees to expedite, represent the approved receipts and dates through its normal process, review any duplicate outstanding proposal, and rerun or refresh the appropriate planning evidence. The shop-floor promise should reflect what the supplier and receiving team can actually achieve.\n\nLowering a shared fence suddenly can let MRP move other proposals that several buyers have already discussed with suppliers. Increasing it can leave more shortages waiting for planner intervention. Review which materials inherit the relevant group setting and which override it, how long the supplier freeze really lasts, and who acts on exceptions. A shortage triggered by a one-off urgent order is quite different from a pattern of inaccurate protection in every planning cycle."
+    ],
+    [
+      "Design acceptance evidence around responsibility",
+      "Agree with the business in advance on an expected protected position. Inside the fence a planner should be able to explain the original quantity, whether the system may change it, and whether an additional shortage should receive a boundary proposal or await explicit intervention. Outside the fence an otherwise comparable new requirement should obtain supply under ordinary rules. At the boundary itself test the date precisely, including the rule for the existing proposal’s entry into automatic firming. Avoid treating every proposal whose displayed date equals the fence end as an already-firmed proposal.\n\nInclude a trial with an explicitly firmed original planned order, a trial with an unfirmed one, and a change made after the previous planning run. Identify which evidence comes from the saved run state and which is current. If the original design depends on planners seeing a Wednesday shortage, acceptance should include the view, responsible role and action time they actually use. A configuration can pass every numerical test and still fail operationally if nobody reviews unfunded demand before the production sequence locks.\n\nFor the assembly cell, write down the conclusion in business terms. The first 45 are covered by the identified planning element. Eighteen further pieces are required on Wednesday. The effective rule either delays the new proposal to Monday or leaves the requirement for the planner to resolve, depending on the tested type. The acceptance decision is whether that protection and its escalation path match the factory’s commitments. Once those are explicit, a planner can resolve the urgent order without sacrificing the stability the fence was introduced to provide."
+    ]
+  ],
+  "visual": {
+    "title": "Behavior when proposals enter the protected short horizon",
+    "headers": [
+      "Firming type",
+      "Automatically firms eligible existing proposals entering fence",
+      "New coverage needed within fence"
+    ],
+    "rows": [
+      [
+        "1",
+        "Yes, once sufficiently inside",
+        "New proposal at fence end"
+      ],
+      [
+        "2",
+        "Yes, once sufficiently inside",
+        "No new proposal to balance shortage within fence"
+      ],
+      [
+        "3",
+        "No",
+        "Required proposals displaced to fence end"
+      ],
+      [
+        "4",
+        "No",
+        "No new proposal to balance shortage within fence"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Firming type",
+      "https://help.sap.com/docs/SAP_ERP/85d3fce10e264972a0155c8b46ecf93b/15adce5314894208e10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Planning time fence",
+      "https://help.sap.com/docs/SAP_ERP/85d3fce10e264972a0155c8b46ecf93b/12adce5314894208e10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Firming planned order data and components",
+      "https://help.sap.com/docs/SAP_ERP_SPV/85d3fce10e264972a0155c8b46ecf93b/5aadce5314894208e10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · MRP list and stock/requirements list",
+      "https://help.sap.com/docs/SAP_ERP/66326f67e0e1416d83c0fdfa4060189d/0819ba53422bb54ce10000000a174cb4.html"
+    ]
+  ],
+  "area": "planning"
+}

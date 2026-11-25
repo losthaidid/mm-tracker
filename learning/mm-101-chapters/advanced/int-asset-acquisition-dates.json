@@ -1,0 +1,102 @@
+{
+  "id": "int-asset-acquisition-dates",
+  "level": "Advanced",
+  "shelf": "Valuation & invoice verification",
+  "area": "account",
+  "topic": "Integrated purchasing and Asset Accounting",
+  "title": "Which date explains the acquisition value on a purchased asset?",
+  "keywords": [
+    "asset account assignment",
+    "FI-AA",
+    "asset value date",
+    "GR non-valuated",
+    "acquisition and production costs",
+    "depreciation area",
+    "Asset Explorer",
+    "capitalization date"
+  ],
+  "visual": {
+    "title": "Two comparable purchases of an analyzer, with goods receipt first",
+    "headers": [
+      "Event",
+      "Valuated receipt",
+      "Non-valuated receipt",
+      "Evidence"
+    ],
+    "rows": [
+      [
+        "27 May, PO 36,000",
+        "No acquisition line from the PO",
+        "No acquisition line from the PO",
+        "PO item and assigned asset"
+      ],
+      [
+        "30 May, one unit received",
+        "36,000 recognized on the asset",
+        "No acquisition value from this receipt",
+        "Material document and asset transactions"
+      ],
+      [
+        "4 June, invoice 36,480",
+        "480 additional APC in this case",
+        "36,480 acquisition value in this case",
+        "Logistics invoice, FI document and asset line"
+      ],
+      [
+        "At review after invoice",
+        "36,480 total APC from this purchase",
+        "36,480 total APC from this purchase",
+        "Actual posted amounts in the same depreciation area"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Purchasing an asset and assigning the asset in the order",
+      "https://help.sap.com/docs/SAP_ERP/b350210eef6443b6bb3a155840ff905c/0e3fde531ed3424de10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Receipt and invoice for a purchased asset",
+      "https://help.sap.com/docs/SAP_ERP/b350210eef6443b6bb3a155840ff905c/113fde531ed3424de10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Period control method in Asset Accounting",
+      "https://help.sap.com/docs/SAP_ERP_SPV/b350210eef6443b6bb3a155840ff905c/8865d153c9684608e10000000a174cb4.html"
+    ],
+    [
+      "SAP glossary · Asset value date",
+      "https://help.sap.com/saphelp_SNC700_ehp01/helpdata/en/35/26b944afab52b9e10000009b38f974/content.htm"
+    ]
+  ],
+  "lead": "A laboratory receives an analyzer on 30 May. The supplier’s invoice is posted on 4 June. A buyer sees the asset number in the purchase order, the warehouse supervisor proves physical receipt in May, and the fixed asset accountant finds that SAP created the acquisition line in June. They can all be right. An asset investigation must distinguish the document that first updated acquisition and production costs, the financial posting date on that document, the asset value date used in Asset Accounting, and the basis for the first period of depreciation. Begin with the purchase order item and follow each dated event to the specific asset and depreciation area being reviewed.",
+  "sections": [
+    [
+      "Identify the asset actually bought",
+      "Consider a purchase of one analyzer priced at 36,000 in the company code currency. It will be posted directly to a single, initially unused asset master record using purchasing account assignment category A. Inventory valuation of a stock material is outside this example. A material number or maintenance equipment number can help identify the machine, but it does not by itself establish the asset receiving the purchase. Read the company code, main asset number and subnumber on the PO account assignment. Distinguish the intended equipment label attached to the instrument from the asset identifier used to record financial transactions.\n\nAsset Accounting may manage several areas, and an asset master record may already exist before any acquisition posts. An order in ME23N proves the purchasing decision and carries the account assignment. An asset master display proves that a record with those attributes exists. To establish a monetary acquisition, look for the asset transaction and its posted amount in the relevant depreciation area. Capture the fiscal year and display currency. A report of planned values for a different year, or a search on the main asset when a purchase went to a subnumber, can produce a plausible but misleading “missing asset” incident."
+    ],
+    [
+      "Separate a valuated receipt from the later invoice",
+      "On 27 May Purchasing issues the order. On 30 May Receiving posts one analyzer against it. In the first scenario the item expects a valuated goods receipt. SAP’s integrated asset purchasing flow capitalizes the acquisition based on the goods receipt. In this simplified purchase the acquisition is 36,000 at that event. No supplier invoice has yet been posted. Find the receipt in purchase order history and follow its accounting references to the asset transaction. Look for the debit to acquisition costs in the asset records. Use the actual accounts and document presentation in the installation if you need to explain the G/L side.\n\nOn 4 June the company posts an accepted vendor invoice of 36,480. For this worked case all of the 480 purchase price increase is attributable to the analyzer and updates acquisition and production costs, usually abbreviated APC. There is no tax, currency difference or separately expensed line. After both events the acquisition value attributable to this purchase is 36,480. Adding the 36,000 receipt and the full 36,480 invoice would double count the original purchase. The relevant pair of asset-side figures is 36,000 plus 480. The invoice total answers the different question of what the supplier billed."
+    ],
+    [
+      "Trace the same delivery with a non-valuated receipt",
+      "Now consider a separate but otherwise comparable order for another analyzer. Set up the comparison under the organization’s authorized purchasing procedure with a non-valuated goods receipt. The stockroom records one delivered unit on 30 May. The physical and purchasing history now supports the delivery, but the receipt itself has not updated the asset value. When the invoice for 36,480 is posted on 4 June, the initial acquisition update occurs. The ECC documentation for this receipt-first sequence also identifies the goods receipt date as the capitalization date. An acquisition line first created at invoice posting and a capitalization date based on the earlier receipt can coexist.\n\nThis distinction matters when a controller runs two reports at different times. On 31 May, before anyone has posted the invoice, the second asset can have a delivery record and no posted APC from the purchase. After 4 June the asset master can carry a date related to that May receipt. A report run in June showing a May capitalization date cannot prove that the organization already held a posted asset amount in its May trial balance on 31 May. Identify both the effective business dates and when the supporting financial entry was actually posted. Preserve an extract used at close if you need to reconstruct what the team knew then."
+    ],
+    [
+      "Understand four different dates",
+      "The document date can reflect the date on the supplier’s invoice. The posting date determines the financial period in which the entry is posted, subject to the system’s open-period controls. The capitalization date identifies the asset’s capitalization in its master data, with the actual source depending on its acquisition history. The asset value date belongs to the asset transaction and contributes to depreciation calculation. In an established asset, a further acquisition can have its own asset value date while the master retains its original capitalization date. A support note that says “SAP used the wrong date” needs to name the field and the transaction before proposing an explanation.\n\nThe FI-AA period control associated with the depreciation key translates the asset value date into a depreciation start or end for the relevant type of transaction. Consider a purely illustrative straight-line policy with no residual value, 60 equal monthly periods and acquisition-period depreciation beginning at the start of the month. An APC base of 36,000 gives a simple monthly amount of 600 before adjustments. A rule beginning in the next period would shift the first period receiving depreciation. The purchase price and day the truck arrived cannot determine the answer alone. Inspect the actual depreciation key, transaction type, period control and depreciation area in the company code, and distinguish planned depreciation from what has already been posted."
+    ],
+    [
+      "Establish posting sequence before diagnosing a discrepancy",
+      "Purchasing integration supports more than the two receipt-first examples above. If an invoice precedes a valuated receipt, the documented asset posting sequence differs. SAP describes the subsequent goods receipt as the event updating the fixed asset in that sequence and includes any difference between invoice and order then. If the invoice precedes a non-valuated goods receipt, SAP describes capitalization at invoice. Determine sequence from the documents for the particular asset purchase and from the effective indicator on the item. A vendor invoice with an earlier printed date may still have been entered after the receipt. Conversely a late-entered delivery can describe an earlier physical arrival.\n\nTake an example from a newly acquired plant with historical purchase orders. A May supplier invoice PDF may be indexed with its original paper date even though the purchasing history contains a June posting. Sort by actual transaction references and distinguish document date, posting date and system entry sequence where relevant. If two postings have the same posting date, use the detailed documents and references to identify which event was already present when the second was processed. If the process crosses a fiscal year, investigate the applicable FI-AA transaction and period rules explicitly. A result observed in a same-year example is an insufficient basis for dating a prior-year acquisition adjustment."
+    ],
+    [
+      "Build an evidence package Finance can use",
+      "For each item, capture the item-specific account assignment, the receipt valuation indicator, the expected invoice indicator, the quantity and price unit. Record the material document year and item, the invoice document and fiscal year, the respective FI references and the asset/subnumber on the resulting asset line. Verify whether the equipment in the building is the same individual purchased asset by matching the supplier reference or serial evidence where available. Keep the physical commissioning report if the accountant needs it for a policy decision. Installation or commissioning can have a different significance to the business from the warehouse receipt date.\n\nCalculate three totals from the actual evidence. First, record the ordered amount as the commercial baseline. Second, identify the value that went to the asset at receipt. Third, identify the incremental value that reached that asset from invoice posting. In the valuated case these figures are 36,000, 36,000 and 480. In the non-valuated case they are 36,000, zero and 36,480. For a multi-line invoice separate freight, services, taxes or other asset assignments before making the comparison. If the order first posts to an asset under construction or a project and later settles to a final asset, follow that additional transaction with its own references. Looking only at the eventual final asset omits a meaningful part of its acquisition story."
+    ],
+    [
+      "Choose a correction at the right level",
+      "A forgotten invoice, a wrong asset subnumber and a disputed depreciation start each require a different owner. An invoice that has yet to arrive should not be replicated merely to create an expected asset line. If the purchase was posted to the wrong asset, identify all follow-on transactions before the MM and FI-AA teams agree a documented correction. If the transaction is correct and the dispute concerns the accounting policy for depreciation, Finance should examine the asset terms and actual transaction dates. Altering a PO after the event is a poor substitute for explaining a financial entry that has already posted.\n\nA defensible conclusion for this incident might read as follows. The company received one analyzer on 30 May under a non-valuated receipt. The 4 June invoice posted the first acquisition value of 36,480 to the specified asset subnumber. The May date on the asset can be traced to the receipt-first acquisition sequence. Its first depreciation period follows the actual asset-area settings. That account lets Purchasing confirm the purchase, Receiving confirm physical delivery and Finance explain its own posting period. It also gives the next consultant a reusable method for distinguishing a real missing acquisition from a question about dates."
+    ]
+  ]
+}

@@ -1,0 +1,110 @@
+{
+  "id": "liv-release-a-multi-item-block",
+  "level": "Expert",
+  "topic": "Payment blocks and automatic release",
+  "title": "The warehouse fixed its receipt. Why did the whole invoice stay blocked?",
+  "lead": "A maintenance supplier’s invoice for 9,000 is overdue. The warehouse has fixed the quantity shortage, but the invoice stays out of the payment proposal. A manual release would take seconds. Before deciding whether it is justified, reconstruct every blocking reason across the invoice, determine which ones have changed, and check which document actually prevents payment.",
+  "keywords": [
+    "MRBR",
+    "release blocked invoices",
+    "quantity block",
+    "price block",
+    "payment proposal",
+    "invoice item",
+    "vendor line item",
+    "MIR4",
+    "FI payment block",
+    "release automatically"
+  ],
+  "sections": [
+    [
+      "Build the incident around one supplier liability",
+      "Start with an ECC stock purchase in a single company code and currency. Omit tax, freight and exchange differences. The supplier sent one invoice combining two PO items. On the first item it charged 100 filters at 50, totalling 5,000. At entry only 80 of those filters had been received. On the second item it charged 40 valves at 100, totalling 4,000. The warehouse had received all 40 valves, but the saved order showed a unit price of 90. For this example the company’s active tolerance checks permit posting and flag both variances for payment blocking. The display of the posted invoice confirms a quantity block on the filters and a price block on the valves.\n\nA clerk reads the total liability of 9,000 on the vendor account. This single figure represents the full invoice. The 20 missing filters correspond to 1,000 and the valve price difference is 400. The sum of those two discrepancies is 1,400, yet the unpaid amount in this case is 9,000. SAP records the payment block on the vendor line in the accounting document because the invoice settles as one payable. Individual invoice items carry reasons that explain that block. AP cannot infer that the other 7,600 is immediately available for automatic payment just by subtracting a spreadsheet total."
+    ],
+    [
+      "Separate prevention, posting and payment",
+      "Get the supplier invoice reference and locate the Logistics Invoice Verification document in MIR4. Follow its accounting document and vendor line. Identify the fiscal year, posting date, relevant PO items and initial line reasons. Check whether related cancellation documents exist. A parked document awaiting completion and an already posted blocked invoice can both be described by users as “waiting for approval.” A parked document has a different next step. For the present case obtain the number of the posted document and establish that its vendor item is still open before drawing conclusions from a release list.\n\nNow identify which process reported “blocked.” The result could come from the invoice-entry screen, the MRBR blocked-invoice selection, the accounting vendor line, the payment proposal exception list, or a workflow inbox. Record the exact message and the time of observation. An automatic payment proposal prepared Wednesday morning can continue to display an exclusion that was valid then, even after someone changes the underlying state on Wednesday afternoon. Checking the current invoice alone will not establish the state represented by an older report. Capture the payment proposal identification and run time alongside MRBR evidence. Rebuild or refresh any payment proposal only under the agreed Finance procedure after it is clear what changed."
+    ],
+    [
+      "Track each reason to its owner and evidence",
+      "For the filters, make a signed timeline of quantities by PO item. Receipt of 80 and invoice of 100 at the same price leave 20 invoiced units ahead of delivery. The missing goods have a value of 1,000 at 50 each. For this example, assume PO-based invoice verification without individual receipt assignments. The following day the warehouse records a valid second delivery of 20. The item now has 100 received and 100 invoiced. Check for a subsequent reversal or return before marking this reason ready for re-evaluation. If the order had used GR-based invoice verification, the analyst would also need to inspect quantities assigned to each receipt reference. A cumulative match can hide an incorrect allocation at that level.\n\nFor the valves, compute the invoice rate from the supplier amount and quantity. A net 4,000 divided by 40 is 100. The saved order had 90, producing 3,600 as the original comparison and 400 as the difference. Obtain the contractual price and any dated amendment. The warehouse's second filter receipt cannot change the authorized valve rate. A price discrepancy belongs with Purchasing and the supplier. A quantity discrepancy belongs with receiving and AP’s invoice assignment process. Record the supporting documents for each separately. An action log saying “goods received, please release” tells the release clerk nothing about the second reason."
+    ],
+    [
+      "Read the first automatic recheck correctly",
+      "Run MRBR with the authorized selection for the posted invoice and the appropriate blocking procedure. Automatic release examines whether eligible reasons are still valid. A later receipt or revised contract condition can remove the factual basis for a reason while the invoice still needs the release step. In the example the filter quantity reason can now clear, subject to the actual documents and comparison. The valve price reason remains valid. The liability can still be blocked at vendor level. Seeing a formerly flagged line improve while the invoice remains unpaid is an expected outcome in this sequence.\n\nCapture the selected mode, company code, posting or invoice identifiers, reason type and result. A zero-row selection means no invoice matched those criteria at the time. It is not evidence that somebody released the invoice. Likewise extracting a list or selecting an invoice does not itself prove a saved release. For an automatic run, use its actual result or job log and verify the vendor item. For manual processing, verify the resulting saved state. If the clerk sees a green status on one reason and assumes all others disappeared, have them show the remaining item and the accounting vendor line together. Those are different levels of the same incident."
+    ],
+    [
+      "Decide how to resolve the 400",
+      "Purchasing investigates and finds a signed amendment for the valves at 100. The changed rate applies to this delivery and the business approves correcting the order through its controlled change process. After that correction, the underlying basis for the price reason can change. Review the relevant history and perform the authorized recheck. Do not teach a buyer to increase order prices merely to free invoices. If the signed rate had remained 90, a change to 100 would manufacture agreement in the system and silently approve a 400 overcharge.\n\nA different legitimate outcome is that the supplier acknowledges the excess charge and sends a credit or price correction appropriate to the actual transaction. Match it to the original invoice and PO history and establish how the invoice-release logic evaluates the resulting facts. An unlinked FI credit on the vendor account can reduce the total financial exposure while failing to correct the material invoice reference that generated the reason. SAP documents examples in which a subsequent credit can remove the basis of a price block. The example is not authority to enter a subsequent credit without a commercial document or applicable agreement. A third possible outcome is an authorized exception accepting the difference under policy. Record it as such, with the approving role, reasoning and value. That evidence is different from proof that the original variance disappeared."
+    ],
+    [
+      "Inspect payment controls outside the two item reasons",
+      "Suppose the follow-up release run clears both automatic item reasons and the supplier still receives no payment. Reopen the vendor item and identify its current payment-block status and clearing status. Has a manual payment block been set? Is the due date in the selected payment run? Does the proposal include this vendor and company code, payment method and planned payment date? Has a prior payment already cleared the item? The appropriate owner now depends on the evidence. An FI master-data or payment selection issue cannot be diagnosed by editing the PO again.\n\nTreat a manual hold as a separate business decision and inspect its origin and scope. Behavior with a header hold and automatic item reasons can depend on the scenario and release. Use the release procedure available in the client and verify its actual effect. SAP publishes distinct guidance for manually blocked invoices. Obtain the owner’s justification before changing a manual hold imposed for a commercial or accounting reason. Editing the vendor line directly to remove an MM-origin payment block can leave the logistics blocking history inconsistent with the financial view. Use the approved MM release path for an MM block and reconcile both sides afterward. A successful release makes a document eligible for payment subject to FI controls. Cash has not moved until payment is actually posted and reconciled."
+    ],
+    [
+      "Test the release job against a deliberately mixed population",
+      "Create four test invoices in the quality system under controlled conditions. One has a sole quantity variance subsequently resolved by a genuine receipt. One retains a genuine price variance. One combines both reasons, with only the quantity resolved initially. One is deliberately subject to an independent manual payment hold. Record what the process owner expects to happen for each, including the required treatment of the manual hold in the exact release and scenario being tested. Set the test payment dates and use distinct vendor references so duplicate checks and due dates do not obscure the result. This population exposes a release job that appears to work only because all of its sample invoices have one reason.\n\nMeasure the outcome by invoice and reason. Count how many valid reasons were removed, how many remained and how many payable documents were actually released. A count of processed rows can exceed the number of invoices paid or released because one document has several lines. Retain evidence of residual exceptions and the separate Finance payment result for the scenario in which payment subsequently occurs. For the original supplier, the closing explanation can now be precise. Twenty filters had been missing, 400 of the valve charge required a purchasing decision, and the full 9,000 payable was blocked until the logistics reasons and applicable payment controls were dealt with. That account gives a support lead enough detail to recognize the same pattern on a much larger invoice."
+    ]
+  ],
+  "visual": {
+    "title": "Watch each invoice item and the vendor payable independently",
+    "headers": [
+      "At this point",
+      "Filters on item 10",
+      "Valves on item 20",
+      "9,000 vendor item"
+    ],
+    "rows": [
+      [
+        "Invoice posted",
+        "20 units beyond receipt",
+        "400 price variance",
+        "Blocked under the stated tolerances"
+      ],
+      [
+        "Another 20 filters received",
+        "Quantity basis now agrees",
+        "400 still unresolved",
+        "Release recheck pending"
+      ],
+      [
+        "First MRBR recheck",
+        "Quantity reason can clear",
+        "Price reason persists",
+        "Remains blocked"
+      ],
+      [
+        "Price basis validly corrected and rechecked",
+        "Resolved",
+        "Reason can clear",
+        "Inspect release and separate FI controls"
+      ],
+      [
+        "Payment subsequently posted",
+        "—",
+        "—",
+        "Confirm clearing and payment document"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Validity of a Block",
+      "https://help.sap.com/docs/SAP_ERP/98eed63ea3a544af84eb972dc68b0e84/8a70b6531de6b64ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Releasing Invoices",
+      "https://help.sap.com/docs/SAP_ERP/98eed63ea3a544af84eb972dc68b0e84/91b2ba538c95b54ce10000000a174cb4.html"
+    ],
+    [
+      "SAP Support · Invoice Release",
+      "https://help.sap.com/docs/SUPPORT_CONTENT/spmm/3362167830.html"
+    ],
+    [
+      "SAP ERP · Variance in an Invoice Item",
+      "https://help.sap.com/docs/SAP_ERP/98eed63ea3a544af84eb972dc68b0e84/7b70b6531de6b64ce10000000a174cb4.html"
+    ]
+  ],
+  "shelf": "Valuation & invoice verification",
+  "area": "invoice"
+}

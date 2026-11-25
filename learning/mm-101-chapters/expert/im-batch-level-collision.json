@@ -1,0 +1,102 @@
+{
+  "id": "im-batch-level-collision",
+  "level": "Expert",
+  "area": "batch",
+  "topic": "Batch level and cross-plant traceability",
+  "title": "Two plants used batch 0715. Can the batches share one identity after consolidation?",
+  "keywords": [
+    "batch level",
+    "batch uniqueness",
+    "batch classification",
+    "batch master",
+    "plant consolidation",
+    "recall",
+    "supplier lot",
+    "conversion"
+  ],
+  "visual": {
+    "title": "Test the proposed batch identities before loading balances",
+    "headers": [
+      "Source plant and material",
+      "Printed batch",
+      "Independent evidence",
+      "Target decision for the example"
+    ],
+    "rows": [
+      [
+        "N100, RESIN",
+        "0715",
+        "Supplier U lot U-71, certificate C19, 90 kg",
+        "Retain as target RESIN / N0715"
+      ],
+      [
+        "S200, RESIN",
+        "0715",
+        "Supplier V lot V-338, certificate C44, 60 kg",
+        "Retain separately as RESIN / S0715"
+      ],
+      [
+        "N100 to S200, RESIN",
+        "0820",
+        "One parent lot U-88, signed transfer of 25 kg",
+        "One verified target identity, quantities by plant"
+      ],
+      [
+        "S200, DYE",
+        "0715",
+        "Different material and supplier lot",
+        "Material-level key allows repeated batch text across materials"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Working with batches in inventory management",
+      "https://help.sap.com/docs/SAP_ERP/96bf9ad642cf4b26a29595e3d573fb8c/d664bd534f22b44ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Batch handling and levels of batch number assignment",
+      "https://help.sap.com/docs/SAP_ERP/072e1e902dfa4546970c7966a47c42da/3506b853ff98b44ce10000000a174cb4.html"
+    ],
+    [
+      "SAP Global Batch Traceability · Batch uniqueness in a connected ERP system",
+      "https://help.sap.com/saphelp_gbt10/helpdata/en/69/17b165364d48a6a9de4340cf05405d/content.htm?no_cache=true"
+    ],
+    [
+      "SAP S/4HANA on-premise 2022 · Batch level setup and prerequisites",
+      "https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/6ce333200159404793eb5784647ca0df/feb7d916c2a1403980801c832ef7733b.html?locale=en-US&state=PRODUCTION&version=2022"
+    ]
+  ],
+  "shelf": "Inventory & special procurement",
+  "lead": "Plant N100 has ninety kilograms of RESIN labelled 0715. Plant S200 has sixty kilograms of RESIN carrying the same four digits. Both plants have used their local batch numbering convention for years. During consolidation a team loads one 150-kilogram row into a target design using material-level batches. The trial balances reconcile and the finance representative signs the quantity sheet. Then quality asks which customers received resin made by Supplier V. A total of 150 kilograms cannot answer that question. The test of a batch conversion is whether a specific physical population retains its origin and disposition across documents, systems and time.",
+  "sections": [
+    [
+      "Understand what makes an identifier unique",
+      "In classic ERP, a plant-level batch is identified by the combination of plant, material and batch. With material-level uniqueness, material and batch identify it across plants. At client level the batch number is unique throughout the client. SAP Global Batch Traceability documents these keys for a connected ERP system. The distinction affects what can be inferred from seeing the same characters twice. Under plant-level uniqueness, RESIN/0715 in North and RESIN/0715 in South can legitimately denote two different batches. Under material-level uniqueness, those rows point to one material/batch identity when brought into the same client.\n\nThe location of a quantity is another dimension. One batch with a shared identity can have quantities across several plants, storage locations or stock types. Giving quality a single master identity across two sites does not mean the plants carry a common quantity balance or a common valuation area. Conversely two independently created identities need not have different spelling on their labels in the source. Specify which combination is the identity in each application before designing interfaces or counting duplicates. The sorting rule on a reporting spreadsheet is a poor place to discover that the source and target use different meanings for a key."
+    ],
+    [
+      "Resolve three superficially similar matches",
+      "Gather evidence for the two copies of 0715. North's receipt was from Supplier U under supplier lot U-71 with certificate C19. South's was received from Supplier V under lot V-338 with certificate C44. The certificates carry different test results. No interplant transfer links the two physical receipts. On those facts, merging the balances under one identity would make a V-only recall include U product or would let V stock inherit a characteristic from U. The proposed design assigns distinct internal identities N0715 and S0715 for RESIN. These are illustrative project identifiers. Number ranges, label length, scanner encoding and the business convention must support the actual choices.\n\nA second match, RESIN/0820 in each plant, has another history. North received Supplier U lot U-88 and transferred twenty-five kilograms of that identified product to South. Both receiving and issuing records link to the same movement chain, and the material has remained separate from other batches. The quality owners agree that the target should preserve one identity with stock in two places. Summing the quantities by plant is still necessary for the opening load, but creating a fresh master for each location would obscure that the two balances have a common origin.\n\nFinally, South also has DYE/0715. In a material-level target the material identifier distinguishes DYE from RESIN. A uniqueness report grouped by the printed batch alone would flag a false collision here. If the target decision instead used client-wide batch uniqueness, that same row would need examination. These three examples give a conversion team a test for any proposed rule. It has to split genuinely different populations, preserve a common origin when it exists, and respect the target level when distinct materials happen to use the same string."
+    ],
+    [
+      "Test the crosswalk with document lines and physical labels",
+      "A working mapping includes source system and client, plant, material, internal batch, source supplier lot where applicable, target material and batch, evidence supporting the decision and the person approving it. For a known split record why the populations are distinct. For a known merge record the transfer or production lineage and the quality approval. If only the date and batch text are known, mark the identity unresolved. There is no reliable way to infer that two suppliers produced the same lot purely because their numbering algorithms both generate a July date code.\n\nUse the mapping on actual records of different kinds. A scanner event may carry plant, material and the old four-digit label. A laboratory file may carry only a supplier lot and a material description. A historical delivery record may carry the old material and plant but no external supplier lot. Map each event through its own available keys and check whether it has exactly one valid interpretation as of the relevant date. If the lab file returns two candidates, its interface needs another discriminator or a controlled resolution process. Taking the first matching row would load successfully and silently attach measurements to the wrong batch.\n\nRun the same exercise at the rack. Each old label should resolve to an authoritative source identity, and the replacement label should point to its intended target identity. An operator must be able to distinguish S0715 from N0715 after an interplant movement. Work out how the plant will handle a drum that still carries an old supplier label when it arrives after the cutover. Maintaining a readable source-to-target reference is often more useful in that incident than printing an internal target number without any reference to the old mark."
+    ],
+    [
+      "Preserve contradictory characteristics as evidence",
+      "Suppose C19 records a viscosity of 730 and C44 records 880 in the same units. Each is valid for its own lot. A conversion that retains only the latest value, or averages the two, manufactures a result that at least one certificate cannot support. Decide which facts belong to the target batch identity, which refer to a particular inspection or sample, and which refer only to stock at one location. The fact that both lots are unrestricted in one plant does not resolve a disagreement about their material characteristics. Ask quality to identify the authoritative evidence for each field and retain its document reference.\n\nInvestigate apparent differences before marking a collision. A test result can be displayed in different units, a shelf-life date can be copied in a different date format, or a retest can supersede an earlier result for the same lot. Conversely equal readings are weak evidence of common origin when a supplier manufactures to a tight specification. In the 0820 case the transfer linkage and the supplier documentation establish a common population. Consistent characteristics corroborate that conclusion. In the 0715 case the independent receipts and certificates establish separate origins even if a future retest happens to yield identical values."
+    ],
+    [
+      "Rehearse a targeted recall in both directions",
+      "Build a trial query for Supplier V lot V-338. Starting with the certificate, find South's receipt, the S0715 target and the movement and delivery records for that population. Include on-hand stock, stock in other permitted segments, transfers and completed customer deliveries as appropriate to the case. Verify the target result against source evidence. The ninety kilograms in N0715 must remain outside the recalled population in this example. The completeness check must look beyond current stock because a lot entirely consumed or delivered can still matter for traceability.\n\nReverse the exercise from a customer's delivery item. Start with its material and batch as printed on the dispatch paperwork, then find the matching lot, source purchase receipt and certificate. This catches a defect the forward search can miss: engineering may have designed a new forward mapping but left customer service searching only by an ambiguous legacy label. Include a transfer before the cutover and a delivery afterward. Retaining read access to legacy records plus a reliable crosswalk may be part of the approved continuity design. Document how a service agent uses it and which system remains authoritative for each period."
+    ],
+    [
+      "Decide whether the proposed change is technically supportable",
+      "Separate a mapping exercise for a new target from changing the level of an already populated productive client. A correct crosswalk does not establish that flipping the configuration in place is supported. Check the actual release, relevant SAP conversion procedures, current stock, existing masters, classification, integrated systems and restrictions on the intended direction. For example, SAP's S/4HANA 2022 manual rework guidance calls out stock prerequisites when choosing broader uniqueness levels. Treat it as guidance scoped to that product and task. For an existing ECC client the supported migration path needs to be verified for that installation.\n\nThe cutover test should have an explicit boundary for new batch creation, open goods movements and messages in flight. A delivery queued with the old source identity could arrive after a target crosswalk has changed. Rehearse a late message for each of the two 0715 lots and demonstrate how the receiving application resolves both. Preserve the relationship between the external source identifier and the resulting target document so an operator can replay a delayed event through the approved process without creating a second material event."
+    ],
+    [
+      "Define evidence for acceptance",
+      "Reconcile stock by material, plant, storage location, stock segment and newly resolved batch. In the 0715 case the two new RESIN identities must reconcile separately to ninety and sixty kilograms. In the 0820 case reconcile the two plant balances under one proven identity. Review open documents containing any changed identifiers and run the forward and reverse traceability exercises with quality, warehouse and customer service. Include a query for an archived or zero-balance batch and an ambiguous old label. A user should either reach the correct source evidence or receive an explicit exception requiring examination.\n\nIf a site cannot reconstruct which 0715 lot went into a shipment during the transition, the open decision belongs in the release review even when all inventory quantities match. Quantities can prove that the load preserved mass. The certificates, movement references, application keys and recall results prove that the business can still distinguish one physical population from another. Those are separate acceptance tests, and each has a responsible owner capable of explaining a failed result."
+    ]
+  ]
+}

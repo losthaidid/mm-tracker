@@ -1,0 +1,103 @@
+{
+  "id": "liv-reconcile-coils-and-kilograms",
+  "level": "Practitioner",
+  "topic": "Order price quantities",
+  "title": "The invoice has the right number of coils and a different weight",
+  "lead": "Ten coils reach the receiving bay. Accounts Payable receives an invoice for ten coils at the agreed rate, yet SAP finds a difference. The answer sits in a second quantity. Purchasing ordered coils by count and priced them by kilogram. Comparing the two quantities at order, receipt and invoice makes it possible to locate the discrepancy and assign it to the person who can resolve it.",
+  "keywords": [
+    "order price quantity",
+    "order price unit",
+    "order unit",
+    "MIRO",
+    "kilograms",
+    "purchase order price quantity variance",
+    "weight",
+    "moving average price"
+  ],
+  "sections": [
+    [
+      "Read the two quantities as two promises",
+      "The supplier agrees to dispatch ten individually identified coils of steel. The contract price is 4 currency units per kilogram of net steel. The order estimates 200 kilograms per coil, so the purchasing document forecasts 2,000 kilograms and a net goods value of 8,000. Shipping must supply ten coils. The payable amount ultimately depends on the agreed measure of their chargeable weight. A count of ten can satisfy the first promise while the weight used to calculate the invoice still needs verification. Keep the words “per kilogram of net steel” on the working paper. They specify which number belongs in the price calculation.\n\nIn the PO item display, identify the order unit and the unit for the price. Also read the price unit number. A price of 400 per 100 kilograms is economically the same as 4 per kilogram. Treating 400 as a price per single kilogram would introduce an entirely different discrepancy. Trace the conversion and the item conditions that were effective for the order. A current purchasing info record or a prices spreadsheet can help explain where a proposal came from. The saved order provides the starting point for this transaction. For this case assume one PO item, one currency, zero tax and no freight conditions."
+    ],
+    [
+      "Weigh the receipt and preserve its basis",
+      "The warehouse counts all ten coil identification tags. Its receiving scale reports a total net weight of 1,980 kilograms after deducting pallets and wrapping. The receipt is recorded as ten coils and 1,980 kilograms for pricing. This example assumes the purchasing and receiving setup permits entry of the actual quantity in the order price unit. Some materials have a fixed conversion and the screen derives the second quantity. Check the unit definition and the fields actually recorded at receipt before using this method in a live case.\n\nThe ratio represented by the goods receipt is 198 kilograms per coil on average. That ratio summarizes the delivery. It says nothing about whether all individual coils weighed exactly 198. The goods receipt at the contracted rate values the batch at 7,920. The price per kilogram remains 4 even though the purchase value per coil implied by the receipt has fallen from the estimated 800 to 792. This explains a common communication problem. A buyer reporting prices per coil may say the price moved, while the contract manager correctly reports an unchanged kilogram price. Write both measures with their denominators. Record the weighbridge ticket, tare deduction, scale time and identities of the coils so somebody can reproduce the second quantity independently of SAP."
+    ],
+    [
+      "Work backwards from the invoice amount",
+      "The invoice shows ten coils, 2,020 kilograms and a net goods charge of 8,080. Dividing 8,080 by 2,020 returns the agreed 4 per kilogram. The invoice implies 202 kilograms per coil. Comparing the invoice with the posted receipt gives forty additional kilograms and a 160 currency-unit excess at the agreed rate. Comparing it with the original estimate gives only twenty additional kilograms and 80. Both calculations are arithmetically correct. Their different reference points answer different questions. For a receipt already posted, the recorded receipt ratio is decisive evidence when checking a variance in the order price quantity.\n\nExplain this to AP using a counterexample. If the invoice had shown ten coils, 1,980 kilograms, and 8,080, the weight would agree with the receipt and the implied rate would be about 4.0808 per kilogram. That would send the buyer to the price agreement, discounts and invoice arithmetic. In the actual case, the invoice rate is 4 and the warehouse and supplier disagree on the measured weight. A price negotiation cannot settle a disputed tare. One invoice can contain both problems, so calculate the invoiced kilograms per coil and the invoiced money per kilogram independently before deciding what the apparent unit-price variance represents."
+    ],
+    [
+      "Identify which comparison SAP can make",
+      "Enter or display the invoice item in Logistics Invoice Verification with the actual document reference. Find both the invoiced count in the order unit and the invoiced quantity expressed in the order price unit. Check that the receiving document you compared belongs to that PO item. Some screen layouts hide one of the quantities. Use the item detail or a display layout that exposes it and read technical information if two labels look alike. Capture the values as they were entered and the system’s proposal separately. A defaulted price quantity can make an invoice appear consistent if the operator never entered the supplier's actual second quantity.\n\nSAP distinguishes a variance in the order price quantity from an ordinary quantity variance and from an ordinary price variance. In the receipt-first case you have an observed ratio in the goods receipt to compare with the invoice. Where an invoice arrives first in a process that permits it, the agreed or planned order relationship is the available reference. Tolerance settings can address these sequences separately. The company code’s Logistics Invoice Verification tolerance configuration, together with messages in the client, determines whether the difference produces a block or a stronger entry restriction. Treat the observed weight difference and its arithmetic as facts. Document the system response as a separate observation from your own client."
+    ],
+    [
+      "Follow the money without increasing the stock count",
+      "Consider a simplified valuation example. The material has moving average price control, its base unit is a coil, and all ten coils remain in the same valuation area when the invoice is posted. Start with no other stock, sufficient stock coverage and no additional price elements. At receipt the stock account is debited 7,920 and GR/IR clearing is credited 7,920. If the invoice for 8,080 is accepted and posted, the GR/IR amount relating to this receipt is cleared and the remaining 160 increases inventory under the assumptions given. The supplier payable is 8,080. With all ten coils available, the value per coil moves from 792 to 808. There are still ten coils.\n\nThis financial illustration shows why changing the invoice weight can matter even though every coil is present. It also explains why a payment block is a separate question. Posting a blocked invoice can still update accounting. In a standard-price scenario the price-difference treatment differs. In a moving-average scenario where some stock has been consumed, check coverage and the actual distribution of the difference. Never use the simplified inventory debit as a universal posting instruction. In a support ticket, show the material price control, stock at the posting time and FI document lines beside the invoice units. The combination can explain the financial effect without suggesting that a clerk physically booked forty extra kilograms into a count-managed inventory item."
+    ],
+    [
+      "Decide whose measurement is authoritative",
+      "Ask what the purchase agreement defines as payable weight. Imagine three possible answers. First, it may specify the receiver’s certified net scale weight. If both parties identify the same ten coils and the receiver has a valid ticket for 1,980, Purchasing can use that evidence to request a revised invoice or credit for the disputed 160 under the agreed process. Second, the supplier's inspection certificate may define billable weight. Reconcile the coil serials and the certificate to the receiver's readings. If the difference is legitimate under contract, obtain authorization to accept the charge and establish whether any receipt measurement was actually wrong. Third, the agreement might specify a weight tolerance or an independent weighbridge. Apply the written comparison and escalation rule before anyone changes a document.\n\nDo a plausibility check on the forty kilograms. Four kilograms per coil might be wrapping, a tare denominator applied to the wrong number of pallets, a scale calibration issue or a duplicated weight from a previous delivery. Look for evidence that discriminates among those explanations. A packaging register showing ten four-kilogram protective frames is a lead. It becomes an explanation only after confirming whether those frames were included in each party’s reported weight and whether the contract pays for them. An operator's understandable desire to release the invoice should not substitute for that commercial decision."
+    ],
+    [
+      "Make the next delivery easier to verify",
+      "Rehearse one clean receipt and one disputed receipt with the receiving clerk and AP analyst in a quality system. Use agreed weights, record exactly what quantity is editable at each step and keep the output of a simulated invoice. In the clean case, ten coils weigh 1,980 kilograms in both documents and the amount is 7,920. In the disputed case, only the invoice weight changes to 2,020 with the same rate. The test should reveal the field that carries the weight, the message or block produced in that client and the person responsible for release or correction. Testing the second case with a different number of coils as well would obscure which comparison triggered the result.\n\nFor recurring purchases, make delivery note and invoice requirements precise enough for an AP analyst to compare the two measures without guessing. Include the coil tags, gross weight, tare and agreed chargeable weight where the parties' commercial documents support them. If the business always pays by count and never uses the weight for settlement, Purchasing should review how the agreement was represented before the next order is placed. A lasting resolution would let another clerk take a new invoice and independently reproduce both the physical quantity and the amount due. That is a stronger outcome than releasing the current document and hoping the next truck weighs the planned amount."
+    ]
+  ],
+  "visual": {
+    "title": "Separate physical count, pricing quantity and price",
+    "headers": [
+      "Document",
+      "Coils",
+      "Kilograms for pricing",
+      "Rate per kg",
+      "Net amount"
+    ],
+    "rows": [
+      [
+        "Purchase order estimate",
+        "10",
+        "2,000",
+        "4.00",
+        "8,000"
+      ],
+      [
+        "Recorded receipt",
+        "10",
+        "1,980",
+        "4.00",
+        "7,920"
+      ],
+      [
+        "Supplier invoice",
+        "10",
+        "2,020",
+        "4.00",
+        "8,080"
+      ],
+      [
+        "Invoice less receipt",
+        "0",
+        "40",
+        "0.00",
+        "160"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Posting Order Price Quantity Variances",
+      "https://help.sap.com/docs/sap_erp/98eed63ea3a544af84eb972dc68b0e84/6f70b6531de6b64ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Goods Receipt Reversal with PO Price Quantity Variance",
+      "https://help.sap.com/docs/SAP_ERP/c587d5cadece40a285ce9a6d4a2a4908/7360b6531de6b64ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Setting Tolerances",
+      "https://help.sap.com/docs/SAP_ERP_SPV/98eed63ea3a544af84eb972dc68b0e84/8770b6531de6b64ce10000000a174cb4.html"
+    ]
+  ],
+  "shelf": "Valuation & invoice verification",
+  "area": "invoice"
+}

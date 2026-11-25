@@ -1,0 +1,96 @@
+{
+  "id": "val-free-delivery-average-price",
+  "level": "Practitioner",
+  "area": "stockval",
+  "topic": "Free-of-charge receipts",
+  "title": "Explain a falling moving average after a supplier sends free pieces",
+  "lead": "A pump supplier includes an extra carton of seals as a rebate in kind. Stores accepts the carton and Purchasing records an agreed free delivery. At the end of the day the quantity in SAP has risen and the moving average price has fallen, although accounts payable has received no additional bill. The supervisor suspects the buyer entered an incorrect price. This chapter follows the 20 free pieces through a moving-average valuation record, then changes the price control to show why another plant could see a different accounting result for the same delivery.",
+  "keywords": [
+    "free-of-charge item",
+    "moving average price",
+    "price control V",
+    "rebate in kind",
+    "standard price",
+    "goods receipt",
+    "free item",
+    "MIGO"
+  ],
+  "sections": [
+    [
+      "First establish what the supplier actually promised",
+      "A carton appearing at the dock does not tell the receiver how the company acquired it. The vendor may have supplied extra units under the original promotional terms, replaced defective stock, sent consignment stock owned by the vendor, or simply shipped too much and expected the company to pay. Those arrangements create different responsibilities. Obtain the supplier's delivery note and the purchasing agreement. In the worked case the supplier expressly grants 20 pieces to the company at zero purchase price, with no invoice due and no future return requirement. They are the same accepted, usable material as the plant's existing seals.\n\nPurchasing has a valid free-of-charge PO item for the 20 pieces and expects a goods receipt for that item. Confirm the actual item settings and relevant item details. A blank price on an incomplete priced order gives the receiver poor evidence of a genuine free delivery. A subsequent credit for a rebate denominated in money would also be a different event. The chapter assumes a straightforward stock procurement, one plant valuation area, a price unit of one and no separately incurred freight, tax or other ancillary cost allocated to the free line. The objective is to account for twenty additional units that enter the company's stock while their commercial purchase cost is zero."
+    ],
+    [
+      "Rebuild the average from two totals",
+      "The receiving plant starts with 100 seals in its own stock. Their total inventory value is 1,200 in local currency and the moving average is 12 per piece. Write down both totals. The free delivery contributes 20 pieces and no purchase value. Immediately afterwards the company holds 120 pieces and the total inventory value stays at 1,200. The new average price is 1,200 divided by 120, or 10. SAP can reflect that change when the free delivery is posted for the moving-average material. The purchaser did not pay ten currency units for the carton. Ten is the average cost per piece of the whole stock following the receipt.\n\nCalculate the difference a second way. Before the free delivery each block of ten seals represented 120 of carrying value. Afterwards twelve blocks of ten share the very same 1,200, so each block represents 100. If a user multiplies the 20 newly received pieces by the old 12 and predicts another 240 of inventory value, ask for the source of that value. There is no agreed price or bill for it in the worked transaction. Using the old average as if it were a price paid would inflate the stock to 1,440 and would incorrectly leave the average at 12. The separate quantity and value columns expose which of the two budgets the user is thinking about."
+    ],
+    [
+      "Identify the evidence the receiver and accountant will see",
+      "Open the material document created by the receipt. It should refer to the actual free PO line and show 20 pieces in the correct plant, stock type, batch where relevant and unit. In purchase order history locate the received quantity and the reference, then check for any later reversal or duplicate receipt that changes the net quantity. For a straightforward moving-average free delivery with no separate value components there is no monetary change and SAP describes no debit or credit to accounts for that receipt. A material document is still needed because the plant physically received identifiable stock. A search limited to FI documents will therefore miss the source of the quantity increase in this case.\n\nTake the value record for the appropriate valuation unit and check 100 to 120 pieces, 1,200 to 1,200, and 12 to 10. If there were other receipts, issues or invoice adjustments during the shift, reconstruct their sequence before claiming to have isolated the effect of the free carton. A current material master is a convenient endpoint. By itself it cannot establish which posting caused a prior price change. Document history, recorded valuation changes and the absence or presence of other value-bearing postings provide the missing time dimension. A warehouse screenshot showing the additional carton can corroborate the quantity but rarely establishes its financial ownership and original value on its own."
+    ],
+    [
+      "Explain what happens at the next issue",
+      "Two days later the maintenance shop uses 30 seals from the same moving-average stock. Assume no intervening valuation change. The goods issue removes 30 times 10, or 300, from inventory and charges the recipient through the consumption posting. Ending stock is now 90 pieces worth 900. Start from the original 1,200, add the zero value on the free receipt, and subtract the 300 issue. The closing value agrees. Production does not need to identify whether the shop physically picked the exact seals in the free carton for this valuation calculation. The site's pooled average applies to the eligible goods issue in the example.\n\nCompare a second sequence. Assume the plant issues 30 pieces before the free carton arrives. The issue costs 360 at the old average of 12. That leaves 70 pieces worth 840. The free 20 then increase stock to 90 pieces with the same 840 value. The calculated average becomes 840 divided by 90, approximately 9.33 per piece at a two-decimal display precision. Both sequences end with 90 pieces. Their closing values differ by 60, exactly the difference between the two issues at 360 and 300. This is why explaining a moving-average price from a month-end quantity listing is unreliable. The chronology matters even where nobody made an input error and the supplier agreement is identical."
+    ],
+    [
+      "Compare the same free receipt at a standard-price plant",
+      "A sister plant manages the same material under price control S with a standard of 12 per piece. It also starts with 100 pieces valued at 1,200 and receives 20 free pieces under the same simple purchasing conditions. Stock quantity rises to 120. Since each piece in this valuation record carries the fixed standard, stock value rises by 240 to 1,440. The stock account receives the debit for the increase and the balancing gain from price differences is credited under the applicable account determination. The normal inventory asset has increased while the vendor is owed zero for the free item. The standard of 12 per piece continues to apply.\n\nIf this plant then issues 30 pieces, the issue removes 360 and leaves 90 pieces at 1,080. The favorable difference from the receipt is visible in the accounting treatment and the plant's standard inventory remains reproducible at 12 per piece. At the moving-average plant the procurement benefit first reduced the pooled unit cost and subsequently affected issues. The difference between the plants follows their price controls. It does not by itself show the buyer entered two different purchase prices. Check the price-control field in the material's accounting data for each valuation area and confirm the signed FI posting where one was generated. Avoid generalizing a sister plant's document list or G/L numbers to every free line."
+    ],
+    [
+      "Rule out lookalike cases before changing the order",
+      "An overdelivery on a priced PO line can also add 20 pieces to available stock, but the vendor may be entitled to invoice them. Inspect the actual item price and invoice expectation and ask what the supplier intended. Entering that case as a free receipt would lose the link to a genuine purchase obligation. A free replacement for a returned faulty item has another history again. Inspect the original receipt, return movement and any credit or replacement procedure before concluding that the twenty replacements represent a new purchase benefit. In both situations the warehouse sees a carton labelled with the same material number, so physical inspection alone cannot select the correct commercial interpretation.\n\nAnother useful comparison is the GR non-valuated indicator in applicable account-assigned purchasing scenarios. It describes when value is recognized on a purchase whose supplier may still expect payment. In contrast, the worked free item records a genuine purchase price of zero and the company expects no vendor invoice for it. The resulting absence of a value posting on the moving-average free receipt has its own explanation. If the material is actually consignment stock, ownership while it sits at the plant is different once again. Check which stock record received it and how subsequent withdrawal would be treated. A strategy of setting a field merely to suppress an FI document could misstate the process in any of these cases."
+    ],
+    [
+      "Link the answer to the next person's decision",
+      "When the buyer asks whether to correct the price, show the free item wording along with the numbers. For this agreed gift, 20 more pieces and unchanged value mathematically move the average from 12 to 10. A forecast based on the old price can be revised without editing the legitimate purchasing record. If the original agreement said the vendor would charge for the extra units, the same evidence points in the opposite direction. The buyer and accounts payable then need to reassess the commercial document and the authorized correction route. An eventual vendor invoice on the free line is a reason to revisit the purchasing agreement, delivery reference and actual item used.\n\nBefore closing the case, make the recipient of the explanation clear. Stores needs confirmation of the 120 physical pieces and whether they are available for issue. Purchasing needs confirmation of the rebate agreement and order-item reference. Finance needs the zero change in value on the moving-average receipt, the new unit cost, and any real subsequent material issue. Giving all three teams their part of the answer prevents a well-meaning price change that would add 240 of inventory value to a stock pool which cost the company only 1,200."
+    ]
+  ],
+  "visual": {
+    "title": "One free carton under two material valuation controls",
+    "headers": [
+      "Position",
+      "Quantity",
+      "Moving-average plant value",
+      "Standard-price plant value"
+    ],
+    "rows": [
+      [
+        "Before free receipt",
+        "100",
+        "1,200 at 12 each",
+        "1,200 at 12 each"
+      ],
+      [
+        "After 20 free pieces",
+        "120",
+        "1,200 at 10 each",
+        "1,440 at 12 each"
+      ],
+      [
+        "After later issue of 30",
+        "90",
+        "900 at 10 each",
+        "1,080 at 12 each"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Delivery free of charge and moving-average behavior",
+      "https://help.sap.com/docs/SAP_ERP/c587d5cadece40a285ce9a6d4a2a4908/9d5eb6531de6b64ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · PO goods-receipt posting components under standard and moving-average price control",
+      "https://help.sap.com/docs/SAP_ERP_SPV/b704a8db767040a08100adc846218964/8e5eb6531de6b64ce10000000a174cb4.html"
+    ],
+    [
+      "SAP Knowledge Base · Price differences for free PO items",
+      "https://userapps.support.sap.com/sap/support/knowledge/en/2603662"
+    ],
+    [
+      "SAP S/4HANA on-premise · Entering a delivery free of charge",
+      "https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/91b21005dded4984bcccf4a69ae1300c/1564bd534f22b44ce10000000a174cb4.html"
+    ]
+  ],
+  "shelf": "Valuation & invoice verification"
+}

@@ -1,0 +1,104 @@
+{
+  "id": "val-matched-order-open-fi-lines",
+  "level": "Practitioner",
+  "shelf": "Valuation & invoice verification",
+  "topic": "GR/IR and financial clearing",
+  "title": "Why does Finance still see open lines on a fully matched purchase order?",
+  "lead": "The buyer opens an order for 48 gauges and sees 48 received and 48 invoiced. The general ledger accountant sees four open lines on the goods receipt/invoice receipt clearing account. Both observations can be correct on the same day. This chapter follows one ECC stock purchase from the dock to the FI open-item display and shows what would actually settle the question. The skill is useful whenever someone attaches a screenshot of a red open-item symbol and asks Purchasing to arrange another invoice.",
+  "keywords": [
+    "GR/IR",
+    "open item management",
+    "FI clearing",
+    "ME23N",
+    "FBL3N",
+    "F.13",
+    "assignment",
+    "PO history",
+    "WRX"
+  ],
+  "sections": [
+    [
+      "Start with an item both teams can identify",
+      "The order has a single relevant item, number 10, for 48 gauges at 25 currency units each. The plant buys the material for its own stock. Goods receipts are valuated and invoices refer to this purchase order. The order and company code use the same currency. The standard price for a gauge is also 25. The example omits tax, delivery costs and rounding so that the clearing account entries can be read directly. These assumptions belong on the investigation sheet. They let another consultant reproduce the arithmetic and identify the first place where a real item departs from it.\n\nThe receiving team accepts 30 gauges on Monday and the remaining 18 on Thursday. The supplier sends two invoices covering 20 and 28 pieces. The two invoice quantities cross the boundaries of the physical deliveries. For this example the item permits purchase-order-based invoicing, with no requirement to assign each billing line to an individual receipt. Use the order number and item as the starting identity. The buyer's name and supplier invoice number are valuable search aids, but either can occur on several transactions. A bill for two items can reach the same clearing account twice. A supplier account balance can include invoices for dozens of orders. Selecting the item first keeps those additional populations outside the proof."
+    ],
+    [
+      "Build the purchasing quantity trail",
+      "Use Display Purchase Order in classic ECC, normally ME23N. Select item 10 before opening its purchase order history. Capture the document category, posting date, referenced document, quantity and unit on each line. Make signs explicit in your working copy. Receipts increase the cumulative received quantity and their cancellations reduce it. Invoice receipts increase the accumulated invoiced quantity and a quantity credit memo can reduce it. A subsequent adjustment can change value with no new billed quantity. A quick total that treats every displayed quantity as positive will fail as soon as somebody cancels an entry.\n\nIn this example the receipt side reads 30 plus 18, or 48 pieces. The invoice side reads 20 plus 28, also 48 pieces. Each agrees to the order quantity. Open the material documents and check that the quantities refer to this item and that the history contains the expected posting events. Then display the invoices and check their item references. This establishes that the supplier billed the quantity the plant accepted. It does not answer whether a particular FI line has a clearing document. The purchasing history and the FI line display describe different parts of the same chain. Keeping a column for the source document and a separate column for the FI document makes that difference visible to the person reading your case."
+    ],
+    [
+      "Reperform the four clearing-account postings",
+      "At the first receipt the system debits stock by 750 and credits GR/IR by 750. The second receipt adds 450 to stock and another credit of 450 to GR/IR. At invoice receipt the part of the first invoice belonging to this item debits GR/IR by 500 and credits the vendor by 500. The second invoice debits GR/IR by 700 and credits the vendor by 700. Those four clearing-account lines produce 1,200 of debits and 1,200 of credits. Their signed balance is zero. At that point the vendor can still be owed 1,200 if nothing has been paid.\n\nNow restrict the calculation to the first receipt and first invoice. The debit is 500 and the credit is 750. The 250 credit represents ten pieces at the order price awaiting a matching invoice at that point in the sequence. It has a business explanation without any master-data change. Adding the second receipt raises the unmatched credit by 450. Adding the second invoice removes 700. This reconstruction serves two purposes. It proves the direction of each posting and it reproduces what an accountant inspecting an earlier key date might have seen. Ask for the key date before trying to reproduce a screenshot on today's records."
+    ],
+    [
+      "Read the status at the right date",
+      "Display the clearing G/L account for the company code in the classic line-item display available to Finance, such as FBL3N where appropriate. Ask for the account actually credited in the FI document from the receipt. A verbal account description such as purchases clearing may refer to a different account in another company code. Start with all relevant items for the date range, then inspect the open-at-key-date selection used in the complaint. Show the document number and year, posting date, debit or credit, amount and currency, assignment, clearing document and clearing date. Field availability and saved layouts vary. A hidden column is an invitation to change the display layout or open the document.\n\nThe item can show all four lines as open because offsetting postings can exist before the FI clearing process has grouped them. A clearing document and a clearing date give evidence that a group has been cleared. A signed sum of zero gives evidence about value. It is possible to have the second piece of evidence before the first. It is also possible for a line that is cleared today to have been open on the date originally reported. Record both dates when reproducing an issue. If Finance used a key date preceding Thursday's goods receipt, a display made with today's open items will answer a different question."
+    ],
+    [
+      "Examine the group Finance intends to clear",
+      "The automatic clearing program applies grouping criteria and tests eligible open items. The standard procedure includes fixed criteria and can use additional criteria defined in configuration. The FI team can show the account, company code, applicable clearing currency and the extra fields used to group these items in this client. Purchase order and item are common business identifiers for GR/IR analysis. The actual assignment values on the posted lines matter. An order reference printed in the text is weak evidence that the corresponding grouping fields carry matching values.\n\nUse a test run of the applicable automatic clearing program with Finance, following the company's closing procedure. In a classic installation this may be F.13. Save the proposal or exception output for item 10. A proposal covering the four lines as a balanced group supports scheduling or executing the normal FI clearing process under the responsible role. A proposal that includes only the two receipts can point to a selection-date restriction, different assignments, an already cleared invoice line, or another grouping criterion. Compare actual field values before proposing configuration changes. A broad change that groups every line for a vendor together can affect unrelated orders, while a mismatch in one historical line may need a much narrower remedy. Test the consequences on a second item with a deliberate residual."
+    ],
+    [
+      "Try to break the apparent match",
+      "Suppose Finance sends a total of zero for a two-item order. Item 10 contains a receipt of 1,200 and an invoice debit of 1,000. Item 20 contains a receipt credit of 300 and an invoice debit of 500. The total receipt credit across both items is 1,500 and the invoice debit is also 1,500. Looking separately exposes a credit of 200 on the first item and a debit of 200 on the second. Each deserves its own explanation. One item could be awaiting a legitimate final bill while the other was billed against the wrong line. Clearing them solely because the total balances would hide both conditions.\n\nAnother variation retains the correct item reference but changes the unit. Five boxes at ten gauges per box appear next to 50 pieces. Use the document's own conversion and the relevant order or base unit before comparing the quantities. A price per 100 pieces also needs a different calculation from a price per single piece. If a currency conversion or price variance exists, compare the actual WRX line on each accounting document in the same currency. Using the total vendor line, including tax or freight, will attribute other posting components to GR/IR. When the actual clearing-account lines balance, keep a separate note of any genuine difference booked to another account."
+    ],
+    [
+      "Choose the person and the action",
+      "The buyer can finish the case by supplying the complete item history and references to both goods receipts and invoices. The accountant can finish it by showing which grouping rule admitted the four lines, whether the test run proposes a clearing, and which date the group will carry. If the matching group was already cleared, return the clearing document number and the date used in the user's report. If the normal clearing job has yet to run, explain its schedule and verify the resulting document after the run. A warehouse posting made simply to turn an FI status indicator green would change physical quantities and create a new issue.\n\nA separate route applies if the reconstructed group genuinely carries a balance. Return to the source event and ask whether another delivery, invoice, credit or reversal is expected. Documentation from the receiving department and the vendor can establish whether a final difference is permanent. That is the point at which GR/IR account maintenance becomes a meaningful topic. A fully matched item with equal amounts does not need a fabricated write-off. The actionable closure for the original case is precise. Item 10 has 48 pieces received and invoiced, its four clearing-account lines balance to zero, and Finance can identify their clearing status for the requested key date. Each conclusion points to its own document evidence."
+    ]
+  ],
+  "visual": {
+    "title": "One item, four financial lines",
+    "headers": [
+      "Event",
+      "Quantity",
+      "GR/IR debit",
+      "GR/IR credit",
+      "Running balance"
+    ],
+    "rows": [
+      [
+        "First receipt",
+        "30",
+        "0",
+        "750",
+        "750 credit"
+      ],
+      [
+        "First invoice",
+        "20",
+        "500",
+        "0",
+        "250 credit"
+      ],
+      [
+        "Second receipt",
+        "18",
+        "0",
+        "450",
+        "700 credit"
+      ],
+      [
+        "Second invoice",
+        "28",
+        "700",
+        "0",
+        "0"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · GR/IR clearing account and offsetting entries",
+      "https://help.sap.com/docs/SAP_ERP/17ec785ed2294431b933daf9a926af80/f47fd1538cdf4608e10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · How the clearing program groups open items",
+      "https://help.sap.com/docs/SAP_ERP/c587d5cadece40a285ce9a6d4a2a4908/2264d153c9684608e10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · When GR/IR account maintenance applies",
+      "https://help.sap.com/docs/SAP_ERP/c587d5cadece40a285ce9a6d4a2a4908/d95eb6531de6b64ce10000000a174cb4.html"
+    ]
+  ],
+  "area": "grir"
+}

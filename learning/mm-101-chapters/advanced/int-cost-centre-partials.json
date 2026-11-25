@@ -1,0 +1,98 @@
+{
+  "id": "int-cost-centre-partials",
+  "level": "Advanced",
+  "shelf": "Valuation & invoice verification",
+  "topic": "Multiple account assignment and controlling",
+  "title": "Why did one cost centre take the whole first receipt on a shared purchase?",
+  "keywords": [
+    "multiple account assignment",
+    "cost centre",
+    "proportional distribution",
+    "progressive fill-up",
+    "partial invoice indicator",
+    "valuated goods receipt",
+    "LOG_MM_MAA_1",
+    "purchase order history"
+  ],
+  "visual": {
+    "title": "A 70/30 purchase delivered in three instalments at 48 per kit",
+    "headers": [
+      "Receipt",
+      "Proportional debit North / South",
+      "Progressive debit North / South",
+      "Debit for receipt"
+    ],
+    "rows": [
+      [
+        "First 20 kits",
+        "672 / 288",
+        "960 / 0",
+        "960"
+      ],
+      [
+        "Next 60 kits",
+        "2,016 / 864",
+        "2,400 / 480",
+        "2,880"
+      ],
+      [
+        "Final 20 kits",
+        "672 / 288",
+        "0 / 960",
+        "960"
+      ],
+      [
+        "All 100 kits",
+        "3,360 / 1,440",
+        "3,360 / 1,440",
+        "4,800"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Entering account assignments and distribution for partial receipts",
+      "https://help.sap.com/docs/SAP_ERP/967e1c2a6a8c4183b7e07d28e7574445/b47db65334e6b54ce10000000a174cb4-103.html"
+    ],
+    [
+      "SAP ERP · Invoice verification for account-assigned purchasing items",
+      "https://help.sap.com/docs/SAP_ERP_SPV/98eed63ea3a544af84eb972dc68b0e84/d339b953495bb44ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP enhancement package 4 · Release notes for multiple account assignment and receipt valuation",
+      "https://help.sap.com/doc/7ff139b51158470f98d1a99ff6b436f0/6.04.19/en-US/Chapter_21__Procurement_and_Logistics_ExecutionE.PDF"
+    ]
+  ],
+  "lead": "Two laboratories order filter kits together. North is responsible for 70 percent of the purchase and South for 30 percent. The first receipt debits North for the entire delivery. South's controller reports a missing cost centre, because both centres are visible in the purchase order. A split on the complete order and a split on each instalment are two separate design choices. In ECC installations that support a valuated receipt with multiple account assignment, the partial invoice indicator can affect a partial goods receipt as well as a partial invoice. A 100-kit example lets you identify the chosen rule from the documents before considering a correction.",
+  "sections": [
+    [
+      "Establish which event posted the expense",
+      "Open the purchase order item and verify its account assignment category, goods receipt and invoice indicators, and whether goods receipt is non-valuated. In this example there is a standard account-assigned item for consumption, with category K, two cost centres and one expense account. The client supports multiple account assignment for a valuated receipt on this item and the buyer expects that receipt. The order price is 48 per kit, the price unit is one kit, and there are no delivery costs, tax, currency movements or invoice price differences affecting the calculations. Goods move directly to the consuming organization.\n\nThese assumptions determine where to look for the missing debit. Follow the material document for the first receipt to its accounting document and locate the expense. If the actual PO has a non-valuated receipt, repeating the search for a receipt expense may never find the value you want. Examine invoice timing and the invoice account assignments in that case. SAP introduced additional support for multiple account assignment through ERP enhancement packages and business functions. Confirm the functionality active in the system before applying results from another ECC client. The date printed on a training manual alone cannot establish which combinations an installation supports."
+    ],
+    [
+      "Read both distribution decisions",
+      "In the account assignment details identify North and South, their sequence, and whether the full order is distributed by percentage, quantity or another supported basis. Here the commitments represented by the purchased quantity correspond to 70 and 30 kits. Seventy times 48 gives North 3,360. Thirty times 48 gives South 1,440. These are end-of-order expectations if the full quantity is delivered and valued at that price. The costs add to 4,800. A screenshot showing the two final amounts demonstrates that the buyer assigned both centres. It leaves open the timing of their individual charges.\n\nFind the PO control for distributing partial amounts. In a proportional distribution each part reflects the agreed allocation. In a progressive fill-up distribution the first account assignment absorbs value up to its allocation, then the following assignment absorbs the next portion. Sequence therefore matters even when both centres ultimately receive exactly the same final costs under either method. Although the relevant indicator mentions the invoice, SAP documents its effect on partial valuated receipts in the supported scenario. At goods receipt the recipient cannot simply choose a different partial-distribution rule to satisfy the first controller who calls."
+    ],
+    [
+      "Follow the first 20 kits",
+      "A receipt of 20 kits costs 960. Under proportional distribution North receives 14 kits’ worth of cost, or 672, and South receives six kits’ worth, or 288. Under progressive fill-up all 20 fit within North’s remaining allocation of 70. North receives a debit of 960 and South receives zero on this receipt. A correctly formed posting can therefore have only one receiving cost centre at this stage. Inspect the debit amount and the cost centre on the actual accounting or controlling line item. The document header total of 960 will agree with both calculations.\n\nThere is another plausible cause of a debit only to North. A buyer might have ordered the first 20 on a separate, singly assigned PO item before creating the shared item. The same material description, delivery note and price would produce a similar-looking cost-centre report. Ask which PO item the material document actually referenced and compare its assigned centres as of the posting. A report grouped by material or delivery date can hide that distinction. Establishing the purchased item and its sequence is more informative than matching a 960 debit somewhere in the month.\n\nOn a live document, an expense posted to a single cost centre can have more than one accounting line. Freight conditions, non-deductible tax or a subsequent correction might account for some of those lines. First reconcile the net material cost alone, then introduce each additional component by document and sign. A match at that first stage identifies the portion for which this distribution model gives a reliable prediction."
+    ],
+    [
+      "Use the next receipt as a discriminating test",
+      "The supplier delivers another 60. Under proportional distribution the net debit is 2,880, split as 42 kits or 2,016 for North and 18 kits or 864 for South. Cumulative debits after 80 kits are 2,688 and 1,152. Under progressive fill-up North already has 20 kits. It can absorb another 50 kits costing 2,400. The remaining ten costing 480 go to South. Cumulative debits are now 3,360 and 480. The order total and cumulative goods receipts agree in both cases. The pattern within the second receipt distinguishes the two arrangements.\n\nThe third receipt is for 20. A proportional order produces another 672 and 288. The progressive order allocates its entire 960 to South because North has reached its allocation. Across all three receipts both methods produce 3,360 and 1,440. A tester who verifies only the final balances can pass a configuration that fails the business requirement that both labs bear a share of each delivery. Make the first and second receipts fall in different reporting periods in a controlled test. The controller can then see how two correct lifetime totals produce different expense profiles at month end."
+    ],
+    [
+      "Reconcile what the reports actually measured",
+      "The PO represents a commercial commitment, a receipt updates actuals under the assumptions here, and a cost report can show either commitments or actuals. First select the same controlling area, period, currency, cost element and cost centre as the accounting evidence. A cost centre group may include both labs and conceal the split. Conversely a report restricted to South will omit the entire first progressive debit. Check the transaction or document currency and the report currency before explaining a small variance as rounding. With one currency and whole kits, the example deliberately produces exact integers.\n\nNormalize price units before comparing the next case. If a supplier quotes 4,800 per 100 kits, the effective unit cost is still 48. A worksheet that multiplies 20 by 4,800 would raise a false valuation incident. If an actual item includes planned delivery costs, reconcile those components separately using the actual item data and the relevant distribution rules. A receipt reversal also changes the signed quantity history. Start with posted references and signs, then compare the running cumulative balance to the next receipt. A list of positive quantities pasted from delivery notes can suggest an assignment was already full when part of the earlier delivery had been cancelled."
+    ],
+    [
+      "When the posting disagrees with both models",
+      "Preserve the original PO item and the debit lines before asking anyone to edit the split. Check the partial-distribution control that applied at the time and any subsequent changes shown in the history available to the consultant. Verify whether the supposed missing posting was a receipt, an invoice difference or a later controlling reposting. At invoice entry the invoice allocation and follow-on accounting can complicate a net month-end figure. A sound investigation associates each amount with the document that created it, then inspects changes at the relevant stage. Two debits with the same date need not share the same origin.\n\nIf the relevant standard rule still fails to explain the distribution in a controlled reproduction, consult the MM application owner about active enhancements. SAP documents a BAdI called MB_ACCOUNTING_DISTRIBUTE for distribution of accounting data in this area. The existence of that enhancement point is a lead, not proof of a customer implementation. Compare the same small partial transaction with a known standard setup, capture the point where the outcome differs, and ask the responsible development team to trace its active logic if needed. Record the value that arrived from the order and the value that reached the accounting interface."
+    ],
+    [
+      "Choose an action that preserves the original business event",
+      "If the business requested progressive consumption and the first receipt correctly charged North, an explanation plus the expected pattern for the next deliveries resolves the symptom. If the business intended a proportional share per delivery, the purchasing design or order instruction needs attention. Distinguish potential corrections for future receipts from correction of an already posted expense. Agree the accounting treatment with the controller and the purchasing owner, consider any invoice or reversal already linked to the item, and simulate the remedy on a matching document. A controlling reposting and a reversal of the purchasing event have different effects on the evidence trail.\n\nFor sign-off, ask each lab to state which outcome it expects after exactly 20 kits, and again after exactly 80. An answer expressed in money and centres makes the requirement testable. The purchase order can then be created with an appropriate distribution indicator, full allocation and sequence. Store the reference documents from both partial receipts with the approved explanation. When the next ticket arrives, a support analyst can identify the PO item, the event that recognized expense, the split for the completed purchase, and the timing rule for the instalment. Those four facts usually explain why an apparently missing cost centre appears on a later posting."
+    ]
+  ],
+  "area": "account"
+}

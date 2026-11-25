@@ -1,0 +1,103 @@
+{
+  "id": "im-price-gas-pipeline-withdrawal",
+  "level": "Advanced",
+  "area": "special",
+  "topic": "Pipeline withdrawals and settlement",
+  "title": "Turn two gas meter readings into a pipeline withdrawal and prove the supplier liability",
+  "keywords": [
+    "pipeline",
+    "PIPE",
+    "special stock P",
+    "201 P",
+    "261 P",
+    "MRKO",
+    "pipeline info record",
+    "consumption",
+    "settlement"
+  ],
+  "visual": {
+    "title": "Two measured consumption intervals at the contract rates",
+    "headers": [
+      "Interval and cost object",
+      "Meter difference",
+      "Rate per 100 m³",
+      "Illustrative net withdrawal value"
+    ],
+    "rows": [
+      [
+        "First interval, cost centre A",
+        "900 m³",
+        "25.00",
+        "225.00"
+      ],
+      [
+        "Second interval, production order B",
+        "600 m³",
+        "28.00",
+        "168.00"
+      ],
+      [
+        "Both intervals",
+        "1,500 m³",
+        "Two distinct rates",
+        "393.00"
+      ],
+      [
+        "Supplier statement comparison",
+        "1,500 m³",
+        "28.00 applied to all",
+        "420.00, difference 27.00"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Pipeline handling and withdrawal updates",
+      "https://help.sap.com/docs/SAP_ERP_SPV/b704a8db767040a08100adc846218964/862abb536b13b44ce10000000a174cb4.html?locale=en-US&state=PRODUCTION&version=6.18.24"
+    ],
+    [
+      "SAP ERP · Creating a pipeline info record",
+      "https://help.sap.com/docs/SAP_ERP/b704a8db767040a08100adc846218964/5762bd534f22b44ce10000000a174cb4.html?locale=en-US"
+    ],
+    [
+      "SAP Support · MRKO and FI documents for consignment and pipeline settlement",
+      "https://userapps.support.sap.com/sap/support/knowledge/en/2672981"
+    ],
+    [
+      "SAP S/4HANA on-premise · Goods issue from the pipeline",
+      "https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/91b21005dded4984bcccf4a69ae1300c/5d62bd534f22b44ce10000000a174cb4.html"
+    ]
+  ],
+  "shelf": "Inventory & special procurement",
+  "lead": "A continuous gas supply feeds two activities at a plant. At month end the supplier presents a statement for 1,500 cubic metres and 420.00 in local currency. The plant also measured 1,500 cubic metres but calculated 393.00. A buyer cannot find a purchase order receipt for the gas and proposes entering one so that the invoice can be matched. In classic SAP ERP a pipeline withdrawal can carry the consumption and create a liability even though no warehouse stock was received. This example separates the physical measure, the price at withdrawal, the cost object and the subsequent settlement.",
+  "sections": [
+    [
+      "Recognize the procurement model before building a match",
+      "Use pipeline handling when the business draws material directly from a continuous supply into use under the chosen agreement. SAP gives oil, tap water and electricity as examples. Under material type PIPE, withdrawals are the permitted movements for that design. There is no inventory of pipeline cubes sitting on the plant's shelves awaiting issue, and warehouse physical inventory of the PIPE material is inappropriate. Other material types may permit both a pipeline route and conventional stock management when configured accordingly. Check the actual material type and the agreed physical process before inferring behavior from a material description that contains “gas.”\n\nThe distinction matters at sites that also buy filled cylinders or trucked deliveries into a storage tank. A cylinder receipt or a measured tank replenishment can be a stored procurement with its own stock method and controls. A continuous metered service may be billed commercially with a flat availability charge in addition to a volume rate. A plant may also procure utilities purely through a service or expense process. The worked agreement covers a known pipeline material, identifiable supplier, withdrawal valuation and periodic settlement. First establish that this is how the contract and SAP design intend to account for the gas. A utility company letterhead alone does not select the model."
+    ],
+    [
+      "Convert cumulative readings into quantities with a boundary",
+      "A meter reading is usually cumulative. Suppose the certified opening reading is 18,500 cubic metres. At a jointly witnessed change of tariff it is 19,400. At the closing cutoff it is 20,000. Consumption in the first interval is 900 cubic metres and the second is 600, for a total of 1,500. Posting the final reading of 20,000 as a withdrawal would confuse an instrument's lifetime total with this period's consumption. Preserve the meter identifier, unit, multipliers, date and time, and the previous accepted reading used as a starting point. Note any rollover, replacement or adjustment for temperature or pressure required by the contract.\n\nAssume submeter and job records independently support charging the first 900 to cost centre A and the later 600 to production order B. The time boundary happens to coincide with the cost-object boundary in this example. In a different plant a tariff period may contain several consuming cost centres or orders. Separate the allocation rule from the price split. One allocates quantity to the receiving object. The other assigns the relevant rate to the measured volume. If the team has only two end readings and no intermediate reading or authorized allocation method, it can establish the total but cannot prove that 900 units belong at the earlier price."
+    ],
+    [
+      "Identify the price basis and vendor",
+      "SAP ERP documents a pipeline-category purchasing info record for the vendor, material and standard purchasing organization assigned to the plant. Check the vendor relationship and the relevant conditions, currency, price unit and validity in the actual record. A standard-category info record for the same supplier and material can show a plausible amount on a screen while having no authority for a pipeline withdrawal. The worked record is agreed at 25.00 per 100 cubic metres during the first interval and 28.00 per 100 during the second. Inspect the contractual effective dates and ensure the posted valuation in the test reflects the intended interval.\n\nConvert the prices to comparable units before discussing the invoice variance. Nine hundreds of cubic metres at 25.00 give 225.00. Six hundreds at 28.00 give 168.00. Together they give 393.00 before taxes and any unrelated charges. Valuing the whole 1,500 at the later rate gives fifteen hundreds at 28.00, or 420.00. The difference of 27.00 equals nine hundreds multiplied by the 3.00 rate change. No physical consumption difference is needed to explain that amount. This calculation gives the buyer a precise hypothesis to take back to the supplier and gives the application consultant a way to spot a price-unit error immediately."
+    ],
+    [
+      "Post the measured use to the correct destination",
+      "A pipeline withdrawal uses special-stock indicator P. Determine whether the consuming object is a cost centre or an order and use the permitted withdrawal for that purpose. SAP's goods-issue examples include 201 P for a cost centre and 261 P for an order. Verify the vendor identified for the withdrawal in a plant where several suppliers could be valid. Record each interval, material, plant, account assignment, quantity and supporting meter reference so that the two material documents or material document lines can later be traced to the physical evidence.\n\nAt posting the pipeline withdrawal records consumption and a liability to be settled for the supplier. It does not reduce a conventional warehouse stock balance or change material availability on the premise that stock was picked from a bin. In this simplified case assume the cost allocation and price control post the measured net values to the consumption objects as expected. Inspect actual accounting documents for the posted currency, amounts and accounts, particularly if the material uses standard price control or the site has separate liability accounts. The vendor liability arising from pipeline use and an open payable due for payment are different stages of the financial process. Tell the accountant which document proves each stage."
+    ],
+    [
+      "Reconcile a statement through withdrawal and settlement",
+      "Before settlement obtain the signed readings and material document items for the two intervals. Identify any reversal or subsequent re-entry and its reason. In the regular consignment and pipeline settlement process, such as MRKO in ECC, examine the withdrawals in scope for the selected supplier and period. Distinguish the display of previously settled withdrawals from those awaiting settlement. Link the resulting settlement and FI evidence back to the withdrawal items. The number of accounting documents generated does not generally equal the number of meter readings. A document count can change with grouping and account assignments while all consumption is still represented.\n\nAssess the supplier's statement against these records. If its quantities match but it applied 28.00 to the full period, supply the tariff agreement and the intermediate meter reading supporting the 900/600 split. If the contract in fact applies the new rate to all consumption in the billing cycle, revisit the plant's interpretation with purchasing and determine the authorized adjustment to the affected documents. Entering a second gross claim as an unrelated expense while leaving the pipeline settlement in place can duplicate a liability. A supplier statement, a settlement-generated document and an actual outgoing payment must each have an identified purpose in the process."
+    ],
+    [
+      "Separate quantity, price and allocation incidents",
+      "Suppose finance reports that 393.00 is correct overall, but the maintenance cost centre absorbed both intervals. The total volume and liability can both be correct despite a cost-object error. Compare the order's operating records with the account assignments on the actual withdrawals. Correct the accounting or originating material movement through the route agreed with finance and production, considering settlement and period status. Repricing the supplier's info record would attack the wrong cause. Conversely, if the cost objects are right but the first segment was valued at 28.00, review the pricing record and posted dates before proposing any change to meter data.\n\nA more difficult incident occurs when two meters have similar serial numbers. An operator might copy a reading of 20,000 from a second meter with a different opening total. The resulting 1,500 might appear reasonable but belongs to a different supply point. Compare meter identity, supplier territory, connected consumers and physical reset history. A billing clerk seeing only a normal total and price will not catch the error. A signed meter handover at the tariff change serves two independently valuable purposes in this case: it identifies what was read and supplies the time boundary that makes the two rate calculations defensible."
+    ],
+    [
+      "Close the period without inventing warehouse stock",
+      "Prepare a closing record that shows each interval's opening and closing reading, net quantity, tariff and price unit, calculated amount, material document, account assignment and settlement status. Have production or facilities agree the use, purchasing agree the commercial basis, and finance trace the resulting liability to the appropriate ledger entries. Retain any fixed charge or tax dispute separately from the quantity-times-price bridge. An agreed volume of 1,500 does not imply that every line on the supplier's statement represents a pipeline withdrawal or uses its unit price.\n\nWhen testing a new plant, start with a small withdrawal of exactly one price unit to see the expected rate, then test a second supplier or tariff if supported by the design. Repeat a withdrawal to a different cost object and verify the postings and settlement selection. Demonstrate that the material's warehouse quantity has no matching decrease in this PIPE case. The operations team should finish able to explain how a real consumption of gas generated a real supplier obligation even though there was no storeroom balance, purchase order receipt or delivery truck to match."
+    ]
+  ]
+}

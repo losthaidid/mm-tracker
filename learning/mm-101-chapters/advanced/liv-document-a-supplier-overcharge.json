@@ -1,0 +1,99 @@
+{
+  "id": "liv-document-a-supplier-overcharge",
+  "level": "Advanced",
+  "topic": "Invoice reduction and vendor complaints",
+  "title": "A supplier bills 5,040 for an accepted order worth 4,800",
+  "lead": "A supplier has charged 42 for each of 120 switches. The signed price is 40, all the goods have arrived, and the buyer disputes the 240 difference. SAP ECC Logistics Invoice Verification supports an item-level invoice reduction that preserves both the supplier’s claim and the amount being challenged. The accounting, the complaint letter and the vendor statement must tell the same story.",
+  "keywords": [
+    "invoice reduction",
+    "vendor error",
+    "complaint document",
+    "credit memo",
+    "MIRO",
+    "invoice amount according to vendor",
+    "message determination",
+    "supplier statement",
+    "tax treatment"
+  ],
+  "sections": [
+    [
+      "First establish whose error it is",
+      "A project team ordered 120 switches after negotiating a net unit price of 40. The warehouse counted 120 on arrival. An invoice for 5,040 follows. There are no returns, tax, bonuses, planned freight, currency differences or earlier invoices in the example. The commercial agreement and the purchase order both say 40 a switch. The supplier’s invoice explicitly says 42 a switch. A recalculation gives 120 × 42 = 5,040. The arithmetic on the supplier's document is internally consistent. The error concerns the applied rate.\n\nLook for a dated price amendment, a surcharge clause, the price unit number and the currency. A price of 4,200 per hundred units is 42 per piece, and a quote issued before a documented price change may no longer be authoritative. Establish which rate applied to this delivery under the agreement. If the contract and amendment actually support 42, the underlying purchasing data require investigation. In that version of the case, automatically issuing a complaint for 240 would understate a valid obligation. Where the facts are still emerging, AP can follow the organization’s hold or parking procedure. Reducing an invoice asserts that the business can identify and support the amount it disputes, which requires more than an unexpected SAP proposal."
+    ],
+    [
+      "Keep three amounts on the working paper",
+      "Write down the amount according to the vendor, the amount the buyer accepts, and the disputed difference as separate figures. Here those are 5,040, 4,800 and 240. Keep the quantity at 120 in both versions. Reducing the accepted quantity to a number that happens to produce 4,800 changes the business history. The shipment was complete and the parties disagree only on the rate. Leaving the goods quantity accurate matters when a buyer later checks receipt completion or needs to trace how many switches were invoiced against this PO.\n\nAdd a second line to understand why item-level evidence counts. Suppose another ten switches appear on the same supplier invoice at an undisputed 50 each, against a separate item. The supplier's new invoice total would be 5,540 and the accepted total would be 5,300. The same 240 difference belongs entirely to the first item. A broad adjustment distributed across both would make the second item look disputed and leave a poor record for its buyer. On the original single-line example, record the vendor invoice reference and each order and receipt item. An analyst should be able to reproduce all three amounts using the supplier document and the agreed conditions, without having to infer that the difference was allocated arbitrarily."
+    ],
+    [
+      "Represent the claim and the correction at entry",
+      "In classic MIRO, use the actual invoice date, header reference and gross amount shown by the vendor, following the local process for entering tax. At item level, inspect the proposed quantity and amount. For an established supplier error, the item correction control offers the vendor-error invoice-reduction option. It exposes the supplier-entered quantity or amount as appropriate. Preserve the supplier claim and the justified amount in their respective fields. Read the field labels in your client before typing. Overwriting the accepted amount with the billed amount in an ordinary invoice item may instead accept a price variance.\n\nIn the example the material line supports a quantity of 120 and a net amount of 4,800. The supplier’s billed quantity is also 120, with a billed net amount of 5,040. A useful test is to ask what would happen if 42 were a legitimate retrospective price. With normal price-variance handling, the additional cost could affect stock or a difference account according to actual valuation conditions. With a documented invoice reduction, the buyer disputes the additional cost and expects a corresponding reduction of the vendor obligation. Those outcomes are commercially different. Enter the correction chosen by the authorized purchaser and check the document simulation. If the option or required values are unavailable, inspect the selected transaction and display variant and the company code's Settings before concluding that the function is missing."
+    ],
+    [
+      "Account for the document pair",
+      "Posting an item-level invoice reduction creates the accounting evidence of the vendor invoice and the associated credit resulting from the complaint. In our zero-tax example the vendor side can be reconciled as a 5,040 credit and a 240 debit. The net payable is therefore 4,800. The credit generated by the reduction is already an accounting event. It is important to identify the related document number rather than simply writing “vendor owes 240” in an email. Where the client uses an invoice reduction clearing account, follow the reciprocal entries in the accounting documents. They make the disputed portion traceable between the original invoice and its correction.\n\nBefore the invoice, a normal valuated stock receipt at 40 per unit generated a goods GR/IR credit of 4,800 and its corresponding inventory debit. The valid invoiced goods amount agrees at 4,800. Verify the clearing and vendor balances in the actual linked financial documents, including all currency columns and signs. A vendor balance of 4,800 by itself would also occur if someone simply keyed a normal invoice for 4,800 and discarded the supplier’s stated amount. In the reduction case the vendor can trace its original 5,040 invoice to a specific buyer-generated complaint for 240. That difference in the evidence chain is why posting just the net amount gives an incomplete account of the dispute."
+    ],
+    [
+      "Treat tax and correspondence as part of the design",
+      "The figures above deliberately use zero tax. In practice a tax-inclusive invoice can make an excellent test of whether the supplier and buyer are discussing net or gross differences. For illustration only, if the whole line attracted the same fully calculable 10 percent rate, a 240 net difference would correspond to 24 tax and 264 gross. The supplier claim would be 5,544 gross and the accepted amount would be 5,280 gross. These calculated amounts assume a single tax basis and no rounding exception. They do not decide which accounting document should carry the 24.\n\nSAP documents company-code settings for tax treatment during invoice reduction. Determine the applicable setting and local tax process with Finance, then use simulation and an approved QA test to establish how tax appears in the invoice and complaint documents. Preserve invoice and credit references that the supplier will recognize. Message determination in Logistics Invoice Verification controls how complaint messages can be generated and issued. An invoice posting can succeed even when the expected communication is missing from the recipient's records. Check the output status, address, language and transmission evidence. The reason given to the supplier should identify the item, the billed and accepted unit prices, the affected quantity and the resulting claim. A mysterious vendor debit that nobody can explain is likely to return at statement reconciliation."
+    ],
+    [
+      "Distinguish the supplier’s reply from a second correction",
+      "A week later the vendor sends its own credit note for 240, referencing the complaint. The AP inbox now contains a perfectly authentic credit note. The question is what it acknowledges. If it confirms precisely the correction already recognized in the SAP reduction, entering it again as an independent credit would reduce the vendor balance to 4,560 in the simple case. Compare the original supplier invoice number, PO item, units, net amount, tax amount and complaint reference. Have AP follow its established document-matching process and attach the vendor’s acknowledgement to the existing case where appropriate.\n\nSuppose the vendor accepts only 180, because the last thirty switches were authorized at 42. Recalculate the accepted goods value from the split agreement. Ninety at 40 is 3,600 and thirty at 42 is 1,260, giving 4,860. The true reduction against 5,040 is now 180. The amount previously recognized for recovery exceeds that by 60. Record the signed amendment or other valid entitlement, then coordinate the authorized correction with AP and Purchasing. The fact that a vendor-issued credit document arrived cannot determine its posting by itself. The decisive question is how its commercial amount compares with what the buyer has already recognized for this specific invoice. Cash payment and vendor-item clearing may already have occurred and constrain how correction is performed."
+    ],
+    [
+      "Test a disputed quantity separately",
+      "Change one fact in a QA copy. The PO now correctly prices each switch at 40, the supplier has billed 120 at 40, and only 114 switches were delivered. The difference is again 240. This time it represents six units. If the supplier confirms those units were billed in error and the business chooses item-level reduction, the recorded discrepancy concerns invoiced versus accepted quantity. Keep the receiving evidence and the carrier documentation that support the shortage. The receiving clerk must account for any later delivery of the missing six, and AP needs to determine whether a future invoice will become due. The equal money difference disguises a very different downstream task.\n\nAnother version would be an invoice that was correct on receipt followed by a physical return. That requires the business to deal with the actual return movement and corresponding financial documents under its returns process. A complaint created as if the supplier had originally overcharged cannot substitute for the warehouse’s return evidence. To close the original price case, confirm that 120 accepted switches remain documented, 240 has been recognized once as the disputed amount, and the parties can explain a net 4,800 obligation. That closing statement preserves both the physical and financial meaning of the transaction, even after the buyer, warehouse clerk and AP analyst move on to the next purchase."
+    ]
+  ],
+  "visual": {
+    "title": "The same 240 difference can represent very different obligations",
+    "headers": [
+      "Case",
+      "Invoice claim",
+      "Accepted amount",
+      "Evidence and accounting decision"
+    ],
+    "rows": [
+      [
+        "Price of 42 instead of 40 for 120",
+        "5,040",
+        "4,800",
+        "Compare price agreement and item correction"
+      ],
+      [
+        "Six switches missing at 40",
+        "4,800",
+        "4,560",
+        "Verify physical receipt and supplier billing error"
+      ],
+      [
+        "Vendor acknowledges a recorded 240 complaint",
+        "Original claim still 5,040",
+        "Already recorded as 4,800 net",
+        "Match supplier credit to the complaint before another posting"
+      ],
+      [
+        "30 switches later proved payable at 42",
+        "5,040",
+        "4,860",
+        "Reduce dispute to 180 and review correction for 60"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Invoice Reduction: Correcting Quantities or Values",
+      "https://help.sap.com/docs/SAP_ERP/98eed63ea3a544af84eb972dc68b0e84/df6fb6531de6b64ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Example: Invoice Reduction due to Price Variance",
+      "https://help.sap.com/docs/SAP_ERP/98eed63ea3a544af84eb972dc68b0e84/d66fb6531de6b64ce10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Messages in Logistics Invoice Verification",
+      "https://help.sap.com/docs/SAP_ERP/98eed63ea3a544af84eb972dc68b0e84/ba0bb9537cceb44ce10000000a174cb4.html"
+    ]
+  ],
+  "shelf": "Valuation & invoice verification",
+  "area": "invoice"
+}

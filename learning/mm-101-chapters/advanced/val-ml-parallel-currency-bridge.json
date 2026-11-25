@@ -1,0 +1,108 @@
+{
+  "id": "val-ml-parallel-currency-bridge",
+  "level": "Advanced",
+  "area": "ml",
+  "topic": "Parallel currencies in Material Ledger",
+  "title": "Why do the two Material Ledger prices disagree at the closing exchange rate?",
+  "lead": "A controller exports Material Price Analysis for one plant and multiplies its local-currency periodic unit price by the last exchange rate of the month. The answer differs from the group-currency price that Material Ledger calculated. Both prices use the same 100 units. One buyer, one supplier and one material can still produce this result. Rebuild a period in two currencies to determine whether you have historical translation, a different valuation view, an incomplete price determination or a genuine reporting problem.",
+  "keywords": [
+    "Material Ledger",
+    "CKM3",
+    "parallel currencies",
+    "exchange rate",
+    "periodic unit price",
+    "historical translation",
+    "legal valuation",
+    "actual costing"
+  ],
+  "sections": [
+    [
+      "Specify the currency and the valuation view separately",
+      "Begin with the heading of the analysis, including its material, plant, valuation type if relevant, period, fiscal year and currency or valuation selection. The name of a currency answers which monetary unit is used. The valuation view answers whose economic perspective is being reported. A group currency expressed in dollars can still show legal valuation. A group valuation in the same currency can follow a different set of values, for example where a group transfer price calculation removes internal profit. Two columns marked USD on two reports can therefore answer different questions. Ask Finance to identify the configured currency and valuation combination behind each heading before testing a rate.\n\nUse a single ECC valuation area with Material Ledger and actual costing active. Both selected columns carry legal valuation, one in local currency and one in group currency. There is no split valuation, exchange-rate hedge, internal transfer profit, tax, delivery cost or price-unit conversion in the example. Price determination is single-level or multilevel, and preliminary valuation uses a standard price. The material is purchased externally. This allows the example to isolate the currency amounts entering the period. In S/4HANA Material Ledger is built into inventory valuation while actual costing still requires activation. The presence of several currencies on an S/4HANA posting does not establish that a periodic actual price has been calculated for this material."
+    ],
+    [
+      "Lay out the receipt history without using the closing rate",
+      "The period opens with 20 pieces. The opening amounts carried into the two views are 200 in local currency and 100 in group currency. The carried group value is historical evidence. Resist the temptation to recompute it using today's quotation. The material receives a further 40 pieces in the first half of the month at a total local cost of 400 and another 40 pieces later for 400 local. In this teaching case the effective recorded translations of these two 400 amounts are 240 and 200 group units respectively. The implied rates are 0.60 and 0.50 group units per local unit. A separate month-end report applies a closing rate of 0.55.\n\nThe totals entering the period calculation are now 100 pieces, 1,000 local and 540 group. The local amount is 200 plus 400 plus 400. The group amount is 100 plus 240 plus 200. Both additions can be performed without looking up another exchange rate. Open the originating transactions if one number cannot be reproduced. The worked amounts represent the attributable procurement costs in each view after relevant price differences are included. Within an actual standard-price Material Ledger document, part of a receipt's cost can appear as preliminary inventory valuation and part as a difference. Do not force a single inventory G/L line to equal a total built from both categories."
+    ],
+    [
+      "Turn the actual totals into two independent prices",
+      "In the local view the rate per piece from these inputs is 1,000 divided by 100, or 10.00 local. In the group view it is 540 divided by 100, or 5.40 group. Assume the Material Ledger calculation can distribute all differences, quantities are eligible, the price unit is one, and there are no other procurement categories. A conversion of the local actual price using the closing rate would give 5.50 group. The discrepancy is 0.10 per piece. Over the entire 100 pieces that is 10 group units. It comes from substituting one rate for the mixture of opening and transaction values in the period.\n\nIn Material Price Analysis, compare the beginning inventory, receipts and cumulative inventory categories for the same run status in each view. If preliminary prices for this example are 10.00 local and 5.00 group, the cumulative preliminary valuation is 1,000 local and 500 group. Under the case assumptions there are no direct differences in local currency. There are 40 group units of difference between the 500 preliminary value and the 540 actual input value. The category or difference column in which a real system records an individual contribution depends on the source transaction and configuration. Read the actual price or exchange-difference lines. A worksheet that labels the whole 40 an exchange-rate-difference G/L posting before inspecting the records claims more than the arithmetic proves."
+    ],
+    [
+      "Follow consumption and inventory through the two views",
+      "During the period 60 of the 100 pieces go to an eligible final consumption and 40 remain in stock. There are no higher-level materials in this example. At periodic actual prices, 60 pieces correspond to 600 local or 324 group, and the 40 on hand correspond to 400 local or 216 group. The 324 and 216 add back to the original group amount of 540. In the group view the 40 of difference is economically attributable as 24 to consumption and 16 to ending stock. Under the assumptions, the comparable difference in the local view is zero. A reviewer can now explain why reconciling only the locally posted variances could miss a nonzero amount in another valuation currency.\n\nA manager who uses the month-end rate would translate the local ending stock of 400 into 220 group. That exceeds the historically built value by four. The same method would translate local consumption of 600 into 330 group, six more than the 324 above. Four plus six accounts for the entire ten-unit gap. This is a useful way to present the difference because Finance may be investigating an inventory value of four while a cost-center accountant sees six in consumption. Verify the period close posting and the configured treatment of consumption before claiming the recipient cost center actually received a separate six- or 24-unit adjustment. The calculated allocation and the accounting posting evidence answer distinct questions."
+    ],
+    [
+      "Trace a single surprising line back to its source",
+      "Suppose the group-currency receipt total appears as 420 in a report while the posted Material Ledger amounts add to 440. Start with the first 40-piece receipt. Is its group contribution shown as 240, as 220 translated at the closing rate, or as a preliminary 200 with the remaining 40 displayed elsewhere? Each output points to a different report definition. For the second receipt, an actual contribution of 200 should remain distinct from a translation of 220. A report that recasts both receipts at 0.55 happens to get 440 for the pair because the inputs are equal. Individual errors of minus 20 and plus 20 cancel. Reconciling only the pair would let the wrong algorithm pass.\n\nChange the scope of your check to include the opening inventory. Its 200 local and 100 group correspond to an implied 0.50 rate in this example. Translating that balance at 0.55 gives 110 and creates the ten-unit difference between the two full-period figures. Record the exact field reported, the amount in each currency and the retrieval period. Where available, drill from the price determination structure through the appropriate procurement alternative to the line items and the original document. Check the currency held on the document or ledger record. Dividing one aggregated display by another can yield a weighted historical relationship, but that quotient is poor evidence of the rate used on any individual posting."
+    ],
+    [
+      "Investigate a difference that historical translation cannot explain",
+      "Assume that, after reconstructing every source, the group view actually shows 570 while the demonstrable opening and receipt contributions still total 540. The earlier ten-unit comparison with the closing rate is irrelevant to this new excess of thirty. Expand the price determination structure and check additional receipts, invoice differences, settlement amounts, exchange-rate differences, beginning inventory adjustments and any lower-level cost passed into the material. Verify that both exports were taken at the same stage of the costing run. If an earlier extract preceded a late invoice or a rerun, the extracts describe different states even when the fiscal period name is identical.\n\nNext compare quantity units, price units and the selected valuation type. A price displayed per 100 pieces must be normalized before comparing it with a figure per one. A separately valued imported stock record can carry a different opening quantity or cost from the domestic stock. Finally test the valuation view selection using the company's currency and valuation settings. In a case involving an intercompany procurement with markup, a legal view and a group view can differ on economic grounds even when both are denominated in the same currency. The sample above intentionally excludes that transaction. Changing the view to make two totals look closer would discard the evidence required to diagnose a real selection or transfer-pricing issue."
+    ],
+    [
+      "Answer the question in the currency the reader needs",
+      "For the purchasing analyst, a useful explanation names the originating receipt and its historical translated value. For the controller, the explanation reconciles beginning inventory and the two procurement totals to a periodic unit price in each valuation currency. For the financial reporter, establish the purpose of the separate closing-rate translation and ask for the reporting rule that requires it. Consolidation reporting can legitimately need a translation different from a material subledger's historical valuation. The consultant can isolate the numerical difference while leaving the ledger and financial statement policy decision with its owner.\n\nClose the specific investigation with the input amounts and the independent totals. State that the material had 100 available pieces, with 1,000 local and 540 group of attributable cost. The actual unit prices are therefore 10.00 and 5.40 in their respective views. A report translating at 0.55 produces 5.50 and gives a closing stock difference of four on 40 remaining pieces. Retain the selected period, valuation view, price unit, currency pair and costing run status with these numbers. A colleague reviewing the case after the exchange rate changes again can reproduce every conclusion from the historical documents instead of relying on a current rate table."
+    ]
+  ],
+  "visual": {
+    "title": "Build each currency from recorded amounts",
+    "headers": [
+      "Period component",
+      "Pieces",
+      "Local amount",
+      "Group amount"
+    ],
+    "rows": [
+      [
+        "Opening stock",
+        "20",
+        "200",
+        "100"
+      ],
+      [
+        "First receipt and attributable differences",
+        "40",
+        "400",
+        "240"
+      ],
+      [
+        "Second receipt and attributable differences",
+        "40",
+        "400",
+        "200"
+      ],
+      [
+        "Total available",
+        "100",
+        "1,000",
+        "540"
+      ],
+      [
+        "Ending stock at periodic actual prices",
+        "40",
+        "400",
+        "216"
+      ]
+    ]
+  },
+  "refs": [
+    [
+      "SAP ERP · Material Ledger data by material and period",
+      "https://help.sap.com/docs/SAP_ERP_SPV/56f7319a9048445eb86221af73cab72b/57f1d353ca9f4408e10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Collection of postings in Material Ledger",
+      "https://help.sap.com/docs/SAP_ERP_SPV/56f7319a9048445eb86221af73cab72b/6ff1d353ca9f4408e10000000a174cb4.html"
+    ],
+    [
+      "SAP ERP · Material Price Analysis and the price-determination structure",
+      "https://help.sap.com/docs/SAP_ERP/56f7319a9048445eb86221af73cab72b/a787d353c6244308e10000000a174cb4.html"
+    ],
+    [
+      "SAP Learning · Material Ledger, historical currency translation and actual costing in S/4HANA",
+      "https://learning.sap.com/courses/product-cost-planning-in-sap-s-4hana/describing-material-ledger"
+    ]
+  ],
+  "shelf": "Valuation & invoice verification"
+}
