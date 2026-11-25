@@ -54,6 +54,11 @@
     task?.projectItemId
       ? d.specs.find(item => item.id === task.projectItemId && matches(task, item))
       : undefined;
+  // A parent reference groups independent tasks. Only a shared projectItemId drives progress.
+  const relatedItem = (d, task) =>
+    task?.parentItemId
+      ? d.specs.find(item => item.id === task.parentItemId && matches(task, item))
+      : itemForTask(d, task);
   const taskForItem = (d, item) =>
     d.tasks.find(task => task.projectItemId === item.id && matches(task, item));
   const issueForTask = (d, task) =>
@@ -62,6 +67,12 @@
     d.tasks.find(task => sourceProject(task) === projectId && task.goLiveIssueId === issueId);
   const itemForIssue = (d, projectId, issueId) =>
     d.specs.find(item => item.projectId === projectId && item.goLiveIssueId === issueId);
+
+  function inScope(item, projectId, companyId) {
+    if (!item || item.projectId !== projectId) return false;
+    if (Array.isArray(companyId)) return !companyId.length || companyId.includes(item.companyId);
+    return !companyId || item.companyId === companyId;
+  }
 
   const taskFields = ['task', 'priority', 'dueDate', 'remarks', 'feedback', 'subTasks'];
   const issueFields = [
@@ -169,20 +180,6 @@
     return item.id;
   }
 
-  function attach(d, task, itemId, uid) {
-    const item = itemForTask(d, { ...task, projectItemId: itemId });
-    if (!item) throw Error('Choose a project item from the linked project.');
-    const linked = taskForItem(d, item);
-    if (linked && linked.id !== task.id)
-      throw Error('That project item already has a linked task.');
-    const used = new Set(d.specs.flatMap(row => (row.subItems || []).map(sub => sub.id)));
-    const children = projectSubItems(task.subTasks).map(sub =>
-      used.has(sub.id) ? { ...sub, id: uid() } : sub
-    );
-    item.subItems.push(...children);
-    return item.id;
-  }
-
   const taskToIssue = {
     task: 'title',
     priority: 'priority',
@@ -241,35 +238,43 @@
     if (assigned) throw Error('This issue already has a Project Item.');
     if (current && current.id !== task.id)
       throw Error('This issue already has another linked task.');
+    const companyId =
+      task.taskType === 'Project' && task.linkId === projectId ? task.companyId : '';
     const itemId =
       choice === 'new'
-        ? create(d, { ...task, companyId: '' }, defaults.itemType, uid(), projectId)
+        ? create(d, { ...task, companyId }, defaults.itemType, uid(), projectId)
         : choice;
-    const item = d.specs.find(row => row.id === itemId && row.projectId === projectId);
-    if (!item || item.goLiveIssueId)
-      throw Error('Choose an available Project Item from this project.');
+    const item = d.specs.find(row => row.id === itemId);
+    if (!inScope(item, projectId, companyId) || item.goLiveIssueId)
+      throw Error('Choose an available Project Item from the source project and selected company.');
+    if (!defaults.existingTask && choice !== 'new') {
+      adopt(issue, task);
+      updateDetails(issue, task, defaults.prefill, taskToIssue, taskPriority);
+      task.sourceProjectId = projectId;
+      task.parentItemId = item.id;
+      task.goLiveIssueId = issueId;
+      return;
+    }
     const existing = taskForItem(d, item);
     if (existing?.goLiveIssueId && existing.goLiveIssueId !== issueId)
       throw Error('That task is already linked to a different Go-Live issue.');
-    if (current && existing && existing.id !== task.id)
-      throw Error('Choose a Project Item that can use this issue’s existing task.');
-    const target = existing || task;
+    if (existing && existing.id !== task.id)
+      throw Error('This Project Item already has a task. Choose another item or create a new one.');
     const children = combinedChildren(sharedChildren(issue, current), item.subItems);
-    adopt(issue, { ...target, subTasks: children });
-    issue.linkedTaskId = target.id;
+    adopt(issue, { ...task, subTasks: children });
+    issue.linkedTaskId = task.id;
     issue.subItems = children;
     updateDetails(issue, task, defaults.prefill, taskToIssue, taskPriority);
     item.goLiveIssueId = issueId;
-    target.sourceProjectId = projectId;
-    target.projectItemId = item.id;
-    target.goLiveIssueId = issueId;
-    target._issueTaskValues ||= {
-      ...taskValues(target),
+    task.sourceProjectId = projectId;
+    task.projectItemId = item.id;
+    task.goLiveIssueId = issueId;
+    task._issueTaskValues ||= {
+      ...taskValues(task),
       ...(existing ? {} : { remarks: '', feedback: '' }),
       subTasks: [],
     };
     projectItemFromIssue(item, issue);
-    return target;
   }
 
   function prepare(next, previous, canEdit, restoring, today) {
@@ -384,6 +389,8 @@
 
   root.WorkHubTaskProjectItems = {
     TYPES,
+    inScope,
+    relatedItem,
     itemForTask,
     taskForItem,
     issueForTask,
@@ -397,7 +404,6 @@
     stored,
     hydrate,
     create,
-    attach,
     connectIssue,
     prepare,
     finish,

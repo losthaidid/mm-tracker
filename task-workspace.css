@@ -852,6 +852,20 @@ body #modal .task-editor h3 {
 #modal .task-editor-details textarea {
   min-height: 60px;
 }
+.task-custom-field-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  margin-bottom: 12px;
+}
+.task-custom-field-row > label:first-child {
+  flex: 1 1 14rem;
+}
+.task-custom-field-row > .check-label {
+  align-self: end;
+  min-height: 38px;
+}
 #modal .task-editor > .modal-actions {
   position: sticky;
   bottom: 0;

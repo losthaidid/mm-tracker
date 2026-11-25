@@ -132,6 +132,10 @@
     };
   }
   function workContext(d, kind, id, includeLinked = true) {
+    if (includeLinked && kind === 'tasks' && record(d, kind, id)?.parentItemId) {
+      const item = root.WorkHubTaskProjectItems.relatedItem(d, record(d, kind, id));
+      return resolveContext(d, kind, id, item && { kind: 'specs', id: item.id });
+    }
     return resolveContext(d, kind, id, includeLinked ? contextPeer(d, kind, id) : undefined);
   }
   function patchContext(d, kind, id, values, includeLinked = true) {

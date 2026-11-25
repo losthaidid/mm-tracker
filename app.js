@@ -622,6 +622,7 @@ document.addEventListener('submit', e => {
       'progressForm',
       'scheduleForm',
       'listsForm',
+      'taskFieldSettingsForm',
       'projectForm',
       'planForm',
     ].includes(e.target.id)
@@ -651,6 +652,9 @@ document.addEventListener('submit', e => {
         break;
       case 'listsForm':
         saveLists(form);
+        break;
+      case 'taskFieldSettingsForm':
+        saveTaskFieldSettings(form);
         break;
     }
   } catch (err) {
@@ -1297,6 +1301,7 @@ function filteredTasks() {
             ...t,
             linkedRecord: taskLinkedLabel(t),
             company: taskCompanyLabel(t),
+            customFieldText: Object.values(t.customFieldValues || {}).join(' '),
             websiteReferences: (t.references || []).map(r => r.label + ' ' + r.url).join(' '),
             subTaskText: (t.subTasks || [])
               .map(sub => [sub.title, sub.status, sub.remarks, sub.feedback].join(' '))
@@ -1361,54 +1366,64 @@ function projectSourceTaskButton(projectId, kind, id, className = 'small') {
     kind === 'issue' &&
     source.task &&
     !source.item &&
+    !source.task.parentItemId &&
     canLinkIssue &&
     (!access || access.can('tasks', 'edit'))
       ? `<button type="button" ${attrs} data-action="project-link-issue-item">Link Project Item</button>`
       : '';
   return (
     `<button type="button" ${attrs} data-action="project-source-task">${source.task ? 'Open task' : '＋ Create task'}</button>` +
-    linkItem
+    linkItem +
+    (kind === 'item' && source.task && (!access || access.can('tasks', 'create'))
+      ? `<button type="button" ${attrs} data-action="project-new-item-task">＋ Create task</button>`
+      : '')
   );
 }
 
 function issueTaskItemField(source) {
   if (source?.kind !== 'issue') return '';
+  return `<div class="wide"><label for="issueTaskItem">Project Item *</label><select id="issueTaskItem" name="issueTaskItem" data-source-project="${esc(source.projectId)}" required></select><p class="hint">${source.task ? 'Link this issue and its existing task to a project item.' : 'Selecting an existing item sets the parent. Its sub-items stay in Projects.'}</p></div>`;
+}
+
+function updateIssueTaskItemOptions(picker, old, projectId, companyId) {
+  const sourceProject = picker.dataset.sourceProject;
+  const current = picker.value;
   const links = WorkHubTaskProjectItems;
   const options = state.specs
     .filter(item => {
-      if (item.projectId !== source.projectId || item.goLiveIssueId) return false;
+      if (
+        !links.inScope(item, sourceProject, projectId === sourceProject ? companyId : '') ||
+        item.goLiveIssueId
+      )
+        return false;
+      if (!old) return true;
       const linked = links.taskForItem(state, item);
-      return !source.task || !linked || linked.id === source.task.id;
+      return !linked || linked.id === old.id;
     })
     .map(item => {
-      const linked = links.taskForItem(state, item);
-      const label = [projectItemLabel(item), item.description, linked && 'Uses its linked task']
-        .filter(Boolean)
-        .join(' · ');
+      const label = [projectItemLabel(item), item.description].filter(Boolean).join(' · ');
       return `<option value="${esc(item.id)}">${esc(label)}</option>`;
     });
   if (!access || access.can('specs', 'create'))
     options.unshift('<option value="new">Create a Project Item</option>');
-  return `<div class="wide"><label for="issueTaskItem">Project Item *</label><select id="issueTaskItem" name="issueTaskItem" required><option value="">Choose a Project Item</option>${options.join('')}</select><p class="hint">The issue supplies the shared details. Existing sub-items from both records join the shared list.</p></div>`;
+  picker.innerHTML = '<option value="">Choose a Project Item</option>' + options.join('');
+  picker.value = [...picker.options].some(option => option.value === current) ? current : '';
 }
 
-function taskFromProjectSource(source) {
-  const { kind, record, projectId } = source;
-  const links = WorkHubTaskProjectItems,
-    item = kind === 'item',
-    boardStatus = item ? links.itemBoardStatus(record) : links.issueBoardStatus(record);
+function taskFromIssue(source) {
+  const { record, projectId } = source;
+  const boardStatus = WorkHubTaskProjectItems.issueBoardStatus(record);
   return {
     taskType: 'Project',
     linkId: projectId,
-    task: item ? record.description : record.title,
+    task: record.title,
     boardStatus,
     done: boardStatus === 'done',
-    doneDate: boardStatus === 'done' ? (item ? record.statusDate : record.resolvedDate) || '' : '',
-    companyId: item ? record.companyId || '' : '',
+    doneDate: boardStatus === 'done' ? record.resolvedDate || '' : '',
     dueDate: record.dueDate || '',
-    priority: links.taskPriority(record.priority),
-    remarks: item ? '' : record.description,
-    feedback: item ? '' : record.resolution,
+    priority: WorkHubTaskProjectItems.taskPriority(record.priority),
+    remarks: record.description,
+    feedback: record.resolution,
   };
 }
 
@@ -1417,7 +1432,7 @@ function taskLinkFields(r, source) {
   const project = type === 'Project' ? r.linkId : WorkHubTaskProjectItems.sourceProject(r);
   return (
     (source
-      ? `<div class="standup-task-context wide"><span class="standup-kicker">${source.kind === 'item' ? 'PROJECT ITEM' : 'GO-LIVE ISSUE'}</span><p>${source.kind === 'item' ? 'This task shares the project item’s status and sub-items.' : 'This task shares the Go-Live issue’s status.'}</p></div>`
+      ? `<div class="standup-task-context wide"><span class="standup-kicker">GO-LIVE ISSUE</span><p>This task shares the Go-Live issue’s status.</p></div>`
       : hub?.standup?.taskContext(r.id) || '') +
     `<div class="wide task-link-fields" data-task-link="Project"${type === 'Project' ? '' : ' hidden'}><label for="taskProjectLink">Linked project *</label><select id="taskProjectLink" name="projectLink"><option value="">Choose a project</option>${state.projects.map(p => `<option value="${esc(p.id)}"${project === p.id ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div>${taskCompanyField(r)}${source ? issueTaskItemField(source) : taskProjectItemFields(r)}<div class="wide task-link-fields" data-task-link="Ticket"${type === 'Ticket' ? '' : ' hidden'}><label for="taskTicketLink">Linked ticket *</label><select id="taskTicketLink" name="ticketLink"><option value="">Choose a ticket</option>${state.tickets.map(t => `<option value="${esc(t.id)}"${r.linkId === t.id ? ' selected' : ''}>${esc(t.ticket + ' — ' + t.description.slice(0, 90))}</option>`).join('')}</select></div><div class="wide task-link-fields" data-task-link="Custom"${type === 'Custom' ? '' : ' hidden'}><label for="taskCustomLink">Custom link / reference</label><input id="taskCustomLink" name="customLink" maxlength="500" value="${esc(r.customLink || '')}" placeholder="e.g. Internal follow-up or meeting"></div>`
   );
@@ -1437,28 +1452,31 @@ function taskProjectItemFields(task) {
     WorkHubProjectStandupEngine.data(state).actions.some(action => action.taskId === task.id)
   )
     return '';
-  const item = WorkHubTaskProjectItems.itemForTask(state, task);
+  const item = WorkHubTaskProjectItems.relatedItem(state, task);
+  const selected = item ? 'item:' + item.id : '';
+  const picker = `<select name="projectItemChoice" id="taskProjectItemChoice" aria-describedby="taskItemHint" data-project-scope="${esc(WorkHubTaskProjectItems.sourceProject(task) || task.linkId)}">
+    <option value="${esc(selected)}"></option></select>`;
+  const legacyEditor = task.id && !task.parentItemId;
   return `<div class="wide task-link-fields" data-task-link="Project"${task.taskType === 'Project' ? '' : ' hidden'}>
-    <label for="taskProjectWorkType">Project work type</label><select name="projectWorkType" id="taskProjectWorkType">
+    ${
+      legacyEditor
+        ? `<label for="taskProjectWorkType">Project work type</label><select name="projectWorkType" id="taskProjectWorkType">
       <option value="general">General project task</option><option value="item"${item ? ' selected' : ''}>Project item</option>
-    </select>
-    <div data-task-item-fields hidden>
-      <label for="taskProjectItemChoice">Project item *</label>
-      <select name="projectItemChoice" id="taskProjectItemChoice" data-project-scope="${esc(WorkHubTaskProjectItems.sourceProject(task) || task.linkId)}">
-        <option value="${item ? 'item:' + esc(item.id) : ''}"></option>
-      </select>
+      </select><div data-task-item-fields hidden><label for="taskProjectItemChoice">Project item *</label>${picker}
       <div data-task-item-create hidden><label for="taskProjectItemType">New item type</label>
-        <select name="newProjectItemType" id="taskProjectItemType">${selectOptions(state.lists.projectItemTypes, state.lists.projectItemTypes[0])}</select>
-      </div>
-    </div>
-    <p class="hint" data-task-item-hint></p>
-  </div>`;
+      <select name="newProjectItemType" id="taskProjectItemType">${selectOptions(state.lists.projectItemTypes, state.lists.projectItemTypes[0])}</select></div></div>`
+        : `<label for="taskProjectItemChoice">Parent project item <span class="muted">(optional)</span></label>${picker}`
+    }
+    <p class="hint" id="taskItemHint" data-task-item-hint aria-live="polite"></p></div>`;
 }
 
 function updateTaskProjectItemFields(form) {
   const type = form.elements.namedItem('taskType').value;
   const old = state.tasks.find(task => task.id === form.dataset.id);
   const projectId = type === 'Project' ? form.elements.namedItem('projectLink').value : '';
+  const companyId = projectId ? form.elements.namedItem('companyId').value : '';
+  const issuePicker = form.elements.namedItem('issueTaskItem');
+  if (issuePicker) updateIssueTaskItemOptions(issuePicker, old, projectId, companyId);
   const kind = form.elements.namedItem('projectWorkType');
   const picker = form.elements.namedItem('projectItemChoice');
   const newSource = taskSourceDrafts.has(form);
@@ -1471,18 +1489,15 @@ function updateTaskProjectItemFields(form) {
   if (picker) {
     const current = picker.dataset.projectScope === projectId ? picker.value : '';
     picker.dataset.projectScope = projectId;
-    kind.disabled = !projectId;
-    const show = !!projectId && kind.value === 'item';
-    picker.closest('[data-task-item-fields]').hidden = !show;
-    picker.required = show;
+    const show = !!projectId && (!kind || kind.value === 'item');
+    if (kind) {
+      kind.disabled = !projectId;
+      picker.closest('[data-task-item-fields]').hidden = !show;
+    }
+    picker.required = show && !!kind;
     picker.disabled = !show;
-    const used = new Set(
-      state.tasks
-        .filter(task => task.id !== old?.id && task.linkId === projectId)
-        .map(task => task.projectItemId)
-    );
     const items = show
-      ? state.specs.filter(item => item.projectId === projectId && !used.has(item.id))
+      ? state.specs.filter(item => WorkHubTaskProjectItems.inScope(item, projectId, companyId))
       : [];
     const options = items.map(item => {
       const company = state.projectCompanies.find(c => c.id === item.companyId);
@@ -1490,15 +1505,18 @@ function updateTaskProjectItemFields(form) {
         [projectItemLabel(item), item.description, company?.name].filter(Boolean).join(' · ')
       )}</option>`;
     });
-    if (!access || access.can('specs', 'create'))
-      options.unshift('<option value="create">Create project item from this task</option>');
-    picker.innerHTML = '<option value="">Choose a project item</option>' + options.join('');
+    if (kind && old && (!access || access.can('specs', 'create')))
+      options.unshift('<option value="create">Convert task to a new shared project item</option>');
+    picker.innerHTML =
+      `<option value=>${kind ? 'Choose a project item' : 'No parent project item'}</option>` +
+      options.join('');
     picker.value = [...picker.options].some(option => option.value === current) ? current : '';
     target = show ? picker.value : '';
-    form.querySelector('[data-task-item-create]').hidden = target !== 'create';
+    const createFields = form.querySelector('[data-task-item-create]');
+    if (createFields) createFields.hidden = target !== 'create';
     form.querySelector('[data-task-item-hint]').textContent =
       shared && target !== 'item:' + shared.id
-        ? 'The original project item keeps its sub-items.'
+        ? 'Choose a matching item or select General project task. The original project item keeps its sub-items.'
         : target === 'create'
           ? 'The new item uses this task’s title, status and sub-items.'
           : target.startsWith('item:')
@@ -1506,8 +1524,16 @@ function updateTaskProjectItemFields(form) {
               ? canEdit
                 ? 'Status and sub-items are shared with Projects.'
                 : 'Project item edit access is required to change shared progress.'
-              : 'The item supplies the status. This task’s sub-items are added to it.'
-            : 'General tasks appear under General project work in Daily stand-up.';
+              : 'This task has its own status and sub-items under the selected project item.'
+            : show
+              ? !items.length
+                ? companyId
+                  ? 'No available project items for this company.'
+                  : 'No available project items for this project.'
+                : companyId
+                  ? 'Showing items maintained for the selected company.'
+                  : 'Select a company to narrow the list.'
+              : 'General tasks appear under General project work in Daily stand-up.';
   }
   const keepLink =
     !!old?.projectItemId &&
@@ -1520,7 +1546,6 @@ function updateTaskProjectItemFields(form) {
   form.elements.boardStatus.disabled =
     newSource ||
     (keepIssue && (!canEdit || !issue)) ||
-    (!keepLink && target.startsWith('item:')) ||
     (keepLink && !keepIssue && (!canEdit || !shared));
   form.elements.doneDate.disabled = form.elements.boardStatus.disabled;
   const children = form.querySelector('[data-task-editor-children]');
@@ -2136,17 +2161,15 @@ function scheduleItemContext(row, d = state) {
       sub?.title || row.subItemTitle || plan?.subItemTitle || (subItemId ? 'Saved sub-item' : ''),
   };
 }
-function scheduleItemInScope(item, projectId, companyId) {
-  const ids = Array.isArray(companyId) ? companyId : companyId ? [companyId] : [];
-  return item.projectId === projectId && (!ids.length || ids.includes(item.companyId));
-}
 function scheduleItemHint(companyId) {
   return (Array.isArray(companyId) ? companyId.length : companyId)
     ? `Only items from the selected ${Array.isArray(companyId) && companyId.length > 1 ? 'companies' : 'company'}. Leave blank for general project work.`
     : 'Choose an item maintained in this project, or select a company to narrow the list.';
 }
 function scheduleItemOptions(projectId, companyId = '', selected = '', savedTitle = '') {
-  const items = state.specs.filter(item => scheduleItemInScope(item, projectId, companyId)),
+  const items = state.specs.filter(item =>
+      WorkHubTaskProjectItems.inScope(item, projectId, companyId)
+    ),
     former = selected && !state.specs.some(item => item.id === selected);
   return `<option value="">No project item / general project work</option>${items.map(item => `<option value="${esc(item.id)}" data-item-title="${esc(item.description)}"${item.id === selected ? ' selected' : ''}>${esc(projectItemLabel(item) + ' · ' + item.description)}</option>`).join('')}${former ? `<option value="${esc(selected)}" data-item-title="${esc(savedTitle)}" selected>${esc(savedTitle || 'Project item')} (saved item)</option>` : ''}`;
 }
@@ -2161,7 +2184,8 @@ function scheduleItemFields(row) {
   if (!projectId) return '';
   const context = scheduleItemContext(row),
     item = state.specs.find(item => item.id === context.itemId),
-    selected = !item || scheduleItemInScope(item, projectId, companyId) ? context.itemId : '';
+    selected =
+      !item || WorkHubTaskProjectItems.inScope(item, projectId, companyId) ? context.itemId : '';
   return `<div class="wide schedule-item-field"><label for="bookingItem">Project item <span class="muted">(optional)</span></label><select id="bookingItem" name="itemId" data-project-scope="${esc(projectId)}" data-company-scope="${esc(companyId)}" aria-describedby="bookingItemHint">${scheduleItemOptions(projectId, companyId, selected, context.itemTitle)}</select><p class="hint" id="bookingItemHint">${scheduleItemHint(companyId)}</p></div><div class="wide schedule-item-field"><label for="bookingSubItem">Sub-item <span class="muted">(optional)</span></label><select id="bookingSubItem" name="subItemId" data-item-scope="${esc(selected)}"${selected ? '' : ' disabled'}>${scheduleSubItemOptions(selected, selected ? context.subItemId : '', context.subItemTitle)}</select></div>`;
 }
 function updateScheduleItemFields(form) {
@@ -2176,7 +2200,7 @@ function updateScheduleItemFields(form) {
     keepItem =
       sameProject &&
       (item
-        ? scheduleItemInScope(item, projectId, companyId)
+        ? WorkHubTaskProjectItems.inScope(item, projectId, companyId)
         : select.dataset.companyScope === String(companyId)),
     selected = keepItem ? select.value : '',
     title = keepItem ? select.selectedOptions[0]?.dataset.itemTitle || '' : '';
@@ -2219,7 +2243,7 @@ function readScheduleItem(form, previous, row) {
     throw Error('Choose a project item from the selected project.');
   if (
     item &&
-    !scheduleItemInScope(
+    !WorkHubTaskProjectItems.inScope(
       item,
       projectId,
       scheduleCompanies(row).map(c => c.id)
@@ -2878,6 +2902,13 @@ async function action(b) {
     case 'edit-lists':
       closeSettingsMenu();
       editLists();
+      break;
+    case 'task-custom-fields':
+      closeSettingsMenu();
+      openTaskFieldSettings();
+      break;
+    case 'task-field-add':
+      WorkHubTaskTracking.addField(b.form, uid);
       break;
     case 'copy-charge':
       await copyCharge();
@@ -3854,6 +3885,41 @@ function editLists() {
   window.WorkHubLists.mount(form);
 }
 
+const taskFieldSettingsDrafts = new WeakMap();
+function openTaskFieldSettings() {
+  if (access && (!access.can('workspace', 'edit') || !access.can('tasks', 'edit')))
+    throw Error('Task and workspace edit access are required to manage custom fields.');
+  openModal('Task custom fields', WorkHubTaskTracking.settings(state.lists));
+  taskFieldSettingsDrafts.set($('taskFieldSettingsForm'), {
+    owner: cloud.user?.id,
+    generation: cloud.generation,
+    fields: JSON.stringify(WorkHubTaskTracking.definitions(state.lists)),
+  });
+}
+
+function saveTaskFieldSettings(form) {
+  const draft = taskFieldSettingsDrafts.get(form);
+  if (
+    !draft ||
+    form !== $('taskFieldSettingsForm') ||
+    !$('modal').open ||
+    draft.owner !== cloud.user?.id ||
+    draft.generation !== cloud.generation ||
+    (access && (!access.can('workspace', 'edit') || !access.can('tasks', 'edit')))
+  )
+    throw Error('Reopen task custom fields in the current account.');
+  if (draft.fields !== JSON.stringify(WorkHubTaskTracking.definitions(state.lists)))
+    throw Error('Your task custom fields changed. Reopen Settings to see the latest names.');
+  const fields = WorkHubTaskTracking.readSettings(form);
+  const saved =
+    JSON.stringify(fields) === draft.fields ||
+    mutate(d => {
+      d.lists.taskCustomFields = fields;
+    });
+  closeModal();
+  if (saved) tell('Task custom fields saved.');
+}
+
 function saveLists(form) {
   if (form.dataset.owner !== (cloud.user?.id || ''))
     throw Error('Reopen the built-in lists for the current account.');
@@ -4046,7 +4112,7 @@ function rootDateCapture(form, r, old) {
   window.WorkHubProjectDates.capture(form, r, old);
 }
 /** Build a ticket/task/project-item editor from FIELDS and attach its existing record ID. */
-function editRecord(group, id, source) {
+function editRecord(group, id, source, parentItem) {
   const old = id ? state[group].find(r => r.id === id) : null;
   if (id && !old) return;
   const defaults =
@@ -4071,7 +4137,23 @@ function editRecord(group, id, source) {
               dueDate: '',
             }
           : {};
-  const r = old || (source ? { ...defaults, ...taskFromProjectSource(source) } : defaults),
+  const r =
+      old ||
+      (source
+        ? { ...defaults, ...taskFromIssue(source) }
+        : parentItem
+          ? {
+              ...defaults,
+              taskType: 'Project',
+              linkId: parentItem.projectId,
+              parentItemId: parentItem.id,
+              companyId: state.projectCompanies.some(
+                c => c.id === parentItem.companyId && c.active !== false
+              )
+                ? parentItem.companyId
+                : '',
+            }
+          : defaults),
     projectId = old?.projectId || state.activeProjectId;
   if (group === 'tasks') {
     const { BOARD, status } = window.WorkHubTaskCompletion;
@@ -4088,11 +4170,12 @@ function editRecord(group, id, source) {
     };
     openModal(
       old ? 'Edit task' : 'Add task',
-      `<form id="editForm" class="task-editor" data-group="tasks" data-id="${esc(id || '')}" data-original-status="${currentStatus}" data-context-source-item="${esc(source?.kind === 'item' ? source.record.id : '')}">
+      `<form id="editForm" class="task-editor" data-group="tasks" data-id="${esc(id || '')}" data-original-status="${currentStatus}" data-context-source-item="${esc(parentItem?.id || '')}">
         <section class="task-editor-details" aria-labelledby="taskDetailsHeading"><h3 id="taskDetailsHeading">Main task</h3>
           <div class="form-grid">${taskField('task')}<div><label for="field-boardStatus">Status</label><select name="boardStatus" id="field-boardStatus">${values}</select></div>
           ${taskField('priority')}${taskField('dueDate')}${taskField('taskType')}${taskField('number')}<div data-task-finished-date>${taskField('doneDate')}</div>${taskLinkFields(r, source)}
           </div></section>
+        ${WorkHubTaskTracking.editor(r, state.lists)}
         ${window.WorkHubTaskWorkspace.editorChildren(r)}
         <details class="task-editor-context"><summary>Notes, links and references</summary>
           <div class="form-grid">${taskField('remarks')}${taskField('feedback')}${taskReferenceFields(r)}</div>
@@ -4113,9 +4196,9 @@ function editRecord(group, id, source) {
       });
     }
     window.WorkHubTaskWorkspace.attachEditor(form, old);
+    updateTaskProjectItemFields(form);
     if (source?.kind === 'issue' && (!access || access.can('specs', 'create')))
       form.elements.issueTaskItem.value = 'new';
-    updateTaskProjectItemFields(form);
     return;
   }
   openModal(
@@ -4169,8 +4252,7 @@ function saveEdit(form) {
   }
   let itemChoice = '',
     itemType = '',
-    issueItemChoice = '',
-    savedId = r.id;
+    issueItemChoice = '';
   if (group === 'tasks') {
     const workspace = window.WorkHubTaskWorkspace;
     workspace.syncAccount(cloud.user?.id || '', cloud.generation);
@@ -4181,7 +4263,7 @@ function saveEdit(form) {
       new Date().toISOString(),
       !form.querySelector('[data-task-editor-children]').hidden
     );
-    const sourceTask = source && (old || taskFromProjectSource(source));
+    const sourceTask = source && (old || taskFromIssue(source));
     window.WorkHubTaskCompletion.setStatus(
       r,
       sourceTask?.boardStatus || form.elements.boardStatus.value,
@@ -4198,18 +4280,15 @@ function saveEdit(form) {
     if (source) {
       r.sourceProjectId = source.projectId;
       r.doneDate = sourceTask.doneDate;
-      if (source.kind === 'item') r.projectItemId = source.record.id;
-      else {
-        issueItemChoice = form.elements.namedItem('issueTaskItem').value;
-        if (!issueItemChoice) throw Error('Choose the Project Item to link to the issue.');
-        if (
-          access &&
-          (!access.can('specs', 'edit') ||
-            (issueItemChoice === 'new' && !access.can('specs', 'create')))
-        )
-          throw Error('Project permissions are required to link this work.');
-        r.goLiveIssueId = source.record.id;
-      }
+      issueItemChoice = form.elements.namedItem('issueTaskItem').value;
+      if (!issueItemChoice) throw Error('Choose the Project Item to link to the issue.');
+      if (
+        access &&
+        (!access.can('specs', 'edit') ||
+          (issueItemChoice === 'new' && !access.can('specs', 'create')))
+      )
+        throw Error('Project permissions are required to link this work.');
+      r.goLiveIssueId = source.record.id;
     }
     r.customLink =
       r.taskType === 'Custom' ? form.elements.namedItem('customLink')?.value.trim() || '' : '';
@@ -4223,13 +4302,13 @@ function saveEdit(form) {
           c.id === r.companyId &&
           c.projectId === r.linkId &&
           (c.active !== false ||
-            (old?.taskType === 'Project' && old.linkId === r.linkId && old.companyId === c.id) ||
-            (source?.kind === 'item' && source.record.companyId === c.id))
+            (old?.taskType === 'Project' && old.linkId === r.linkId && old.companyId === c.id))
       )
     )
       throw Error('Choose an active company belonging to the linked project.');
     r.references = readTaskReferences(form);
     const kind = form.elements.namedItem('projectWorkType');
+    const picker = form.elements.namedItem('projectItemChoice');
     const previousProject = WorkHubTaskProjectItems.sourceProject(old);
     if (old?.goLiveIssueId && !source) {
       r.goLiveIssueId = old.goLiveIssueId;
@@ -4237,16 +4316,28 @@ function saveEdit(form) {
       if (old.projectItemId) r.projectItemId = old.projectItemId;
     }
     if (old?._issueTaskValues) r._issueTaskValues = old._issueTaskValues;
-    if (r.taskType === 'Project' && kind?.value === 'item') {
-      itemChoice = form.elements.namedItem('projectItemChoice').value;
-      if (!itemChoice) throw Error('Choose a project item or create one from this task.');
+    if (r.taskType === 'Project' && (kind?.value === 'item' || (!kind && picker?.value))) {
+      itemChoice = picker.value;
+      if (!itemChoice) throw Error('Choose a project item for this task.');
       if (itemChoice === 'create') {
-        if (access && !access.can('specs', 'create'))
-          throw Error('Your account cannot create project items.');
+        if (!kind || !old || (access && !access.can('specs', 'create')))
+          throw Error('Choose an existing project item for this task.');
         itemType = form.elements.namedItem('newProjectItemType').value;
         if (!state.lists.projectItemTypes.includes(itemType))
           throw Error('Choose a project item type.');
-      } else if (!itemChoice.startsWith('item:')) throw Error('Choose a valid project item.');
+      } else {
+        const item =
+          itemChoice.startsWith('item:') && state.specs.find(row => row.id === itemChoice.slice(5));
+        if (!WorkHubTaskProjectItems.inScope(item, r.linkId, r.companyId))
+          throw Error('Choose a project item from the linked project and selected company.');
+        if (old?.projectItemId !== item.id) {
+          r.parentItemId = item.id;
+          r.sourceProjectId = r.linkId;
+        }
+      }
+    } else if (old?.parentItemId && (!picker || r.taskType !== 'Project')) {
+      r.parentItemId = old.parentItemId;
+      r.sourceProjectId = previousProject;
     } else if (
       old?.projectItemId &&
       (!kind || r.taskType !== 'Project' || r.linkId !== previousProject)
@@ -4259,6 +4350,21 @@ function saveEdit(form) {
     } else if (old?.projectItemId && !r.projectItemId) {
       r.subTasks = [];
     }
+    if (
+      (r.projectItemId || r.parentItemId) &&
+      r.companyId &&
+      r.linkId === r.sourceProjectId &&
+      (!old || r.companyId !== old.companyId || r.linkId !== old.linkId) &&
+      (!access || access.can('specs')) &&
+      !WorkHubTaskProjectItems.inScope(
+        state.specs.find(item => item.id === (r.projectItemId || r.parentItemId)),
+        r.linkId,
+        r.companyId
+      )
+    )
+      throw Error(
+        'Choose the company maintained on the linked project item or leave the company blank.'
+      );
     if (r.archived && !r.done) {
       r.archived = false;
       r.archivedAt = '';
@@ -4302,21 +4408,21 @@ function saveEdit(form) {
     if (issueItemChoice) {
       if (issueItemChoice === 'new' && d.specs.length >= LIMIT)
         throw Error('The Project Items section is full.');
-      const target = WorkHubTaskProjectItems.connectIssue(
+      WorkHubTaskProjectItems.connectIssue(
         d,
         r,
         source.projectId,
         source.record.id,
         issueItemChoice,
-        { itemType: d.lists.projectItemTypes[0], prefill: old || taskFromProjectSource(source) },
+        {
+          itemType: d.lists.projectItemTypes[0],
+          prefill: old || taskFromIssue(source),
+          existingTask: !!old,
+        },
         uid
       );
-      savedId = target.id;
-      if (target !== r) {
-        hub?.batchA?.capture(d, form, group, target.id);
-        return;
-      }
     }
+    if (group === 'tasks') WorkHubTaskTracking.capture(form, r, old, d.lists);
     if (itemChoice === 'create') {
       if (d.specs.length >= LIMIT) throw Error('The Project Items section is full.');
       WorkHubTaskCompletion.prepare(
@@ -4326,11 +4432,6 @@ function saveEdit(form) {
         new Date().toISOString()
       );
       r.projectItemId = WorkHubTaskProjectItems.create(d, r, itemType, uid());
-      r.sourceProjectId = r.linkId;
-    } else if (itemChoice && !r.projectItemId) {
-      if (r.subTasks.length && access && !access.can('specs', 'edit'))
-        throw Error('Project item edit access is required to transfer these sub-items.');
-      r.projectItemId = WorkHubTaskProjectItems.attach(d, r, itemChoice.slice(5), uid);
       r.sourceProjectId = r.linkId;
     }
     if (old) d[group] = d[group].map(t => (t.id === id ? r : t));
@@ -4357,7 +4458,7 @@ function saveEdit(form) {
     );
   if (ok) {
     const completed =
-      group === 'tasks' && !old?.done && state.tasks.find(task => task.id === savedId)?.done;
+      group === 'tasks' && !old?.done && state.tasks.find(task => task.id === r.id)?.done;
     tell(completed ? 'Task and sub-items saved. View the task in Completed tasks.' : 'Saved.');
   }
 }
@@ -4833,18 +4934,23 @@ async function enhancementAction(b) {
   if (await workhubAction(b)) return true;
   const a = b.dataset.action,
     id = b.dataset.id;
-  if (a === 'project-source-task' || a === 'project-link-issue-item') {
+  if (['project-source-task', 'project-new-item-task', 'project-link-issue-item'].includes(a)) {
     if (access && (!access.can('specs') || !access.can('tasks')))
       throw Error('Projects and Tasks access are required to open this link.');
     const source = projectTaskSource(b.dataset.project, b.dataset.source, id);
     if (a === 'project-link-issue-item') {
       if (
         !source.task ||
+        source.task.parentItemId ||
         source.item ||
         (access && (!access.can('tasks', 'edit') || !access.can('specs', 'edit')))
       )
         throw Error('Open an issue with a task to link a Project Item.');
       editRecord('tasks', source.task.id, source);
+    } else if (source.kind === 'item' && (!source.task || a === 'project-new-item-task')) {
+      if (access && !access.can('tasks', 'create'))
+        throw Error('Your account cannot create tasks.');
+      editRecord('tasks', '', null, source.record);
     } else if (source.task) {
       await hub.handle({ dataset: { hub: 'task-detail', id: source.task.id } });
     } else {
@@ -5118,7 +5224,7 @@ function enhancementChange(el) {
   }
   if (id === 'taskProjectLink' || id === 'taskCompany') {
     updateTaskCompanyOptions(el.form);
-    if (id === 'taskProjectLink') updateTaskProjectItemFields(el.form);
+    updateTaskProjectItemFields(el.form);
     return true;
   }
   if (id === 'field-projectId' && el.form?.dataset.group === 'specs') {
@@ -5563,7 +5669,15 @@ function projectItemTrace(id, d = state) {
   return {
     feedback,
     gates: d.phaseGates.filter(g => gateIds.has(g.id)),
-    tasks: d.tasks.filter(t => links.some(x => x.type === 'Task' && x.id === t.id)),
+    tasks:
+      !access || access.can('tasks')
+        ? d.tasks.filter(
+            t =>
+              t.parentItemId === id ||
+              t.projectItemId === id ||
+              links.some(x => x.type === 'Task' && x.id === t.id)
+          )
+        : [],
     plans: d.projectPlans.filter(p => links.some(x => x.type === 'Schedule' && x.id === p.id)),
     decisions: d.projectDecisions.filter(x =>
       links.some(l => l.type === 'Decision' && l.id === x.id)
@@ -6610,8 +6724,6 @@ function viewItemLinks(id) {
   const item = state.specs.find(s => s.id === id);
   if (!item) throw Error('Project item not found.');
   const trace = projectItemTrace(id),
-    linkedTask =
-      (!access || access.can('tasks')) && WorkHubTaskProjectItems.taskForItem(state, item),
     mismatches = trace.feedback.filter(f => f.companyId && f.companyId !== item.companyId),
     sections = [
       [
@@ -6629,13 +6741,10 @@ function viewItemLinks(id) {
         ),
       ],
       [
-        'Created tasks',
-        (linkedTask && !trace.tasks.some(t => t.id === linkedTask.id)
-          ? [linkedTask, ...trace.tasks]
-          : trace.tasks
-        ).map(
+        'Linked tasks',
+        trace.tasks.map(
           t =>
-            `<div><span>${esc(t.number)}</span><strong>${esc(t.task)}</strong>${tag(t.done ? 'Completed' : 'Open')}</div>`
+            `<button type="button" data-hub="task-detail" data-id="${esc(t.id)}"><span>${esc(t.number)}</span><strong>${esc(t.task)}</strong>${tag(t.done ? 'Completed' : 'Open')}</button>`
         ),
       ],
       [
@@ -6716,6 +6825,7 @@ async function deleteProject(id) {
       if (WorkHubTaskProjectItems.sourceProject(t) === id) {
         delete t.sourceProjectId;
         delete t.projectItemId;
+        delete t.parentItemId;
         delete t.goLiveIssueId;
         delete t._issueTaskValues;
       }
@@ -7238,7 +7348,9 @@ function upgradeFeatures(d) {
           id,
           title: String(sub.title || sub.name || '').slice(0, 500),
           status,
-          ...(sub.taskType ? { taskType: sub.taskType } : {}),
+          ...(sub.taskType === undefined ? {} : { taskType: sub.taskType }),
+          statusDate: sub.statusDate,
+          statusHistory: sub.statusHistory,
           remarks: String(sub.remarks || '').slice(0, 32767),
           feedback: sub.feedback === undefined ? '' : sub.feedback,
           owner: String(sub.owner || '').slice(0, 200),
@@ -8121,6 +8233,7 @@ function upgradePreciseRecords(d) {
   return d;
 }
 function validatePreciseRecords(d) {
+  WorkHubTaskTracking.validate(d, checkText);
   const ids = new Set();
   let total = 0;
   const represented = new Set();
@@ -8142,6 +8255,11 @@ function validatePreciseRecords(d) {
     }
     if (task.projectItemId !== undefined && (!checkText(task.projectItemId, 100) || !project))
       throw Error('Check the linked project item.');
+    if (
+      task.parentItemId !== undefined &&
+      (!checkText(task.parentItemId, 100) || !task.parentItemId || !project || task.projectItemId)
+    )
+      throw Error('Check the task’s parent project item.');
     const linkedItem = WorkHubTaskProjectItems.itemForTask(d, task);
     if (linkedItem) {
       if (represented.has(linkedItem.id))
