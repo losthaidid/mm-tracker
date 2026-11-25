@@ -191,3 +191,37 @@
 [data-claim-visit-fields][hidden] {
   display: none !important;
 }
+.schedule-copy-dates {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: 12px;
+}
+.schedule-copy-bookings {
+  min-width: 0;
+  margin: 20px 0;
+  padding: 0;
+  border: 0;
+}
+.schedule-copy-bookings legend {
+  padding: 0;
+  font-weight: 700;
+}
+.schedule-copy-bookings .schedule-copy-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+.schedule-copy-row input {
+  flex: none;
+  width: auto;
+  margin: 0;
+}
+.schedule-copy-row small {
+  display: block;
+  color: var(--muted);
+}

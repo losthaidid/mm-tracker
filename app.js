@@ -621,6 +621,7 @@ document.addEventListener('submit', e => {
       'historyForm',
       'progressForm',
       'scheduleForm',
+      'scheduleCopyForm',
       'listsForm',
       'taskFieldSettingsForm',
       'projectForm',
@@ -649,6 +650,9 @@ document.addEventListener('submit', e => {
         break;
       case 'scheduleForm':
         saveSchedule(form);
+        break;
+      case 'scheduleCopyForm':
+        saveScheduleCopy(form);
         break;
       case 'listsForm':
         saveLists(form);
@@ -7830,7 +7834,7 @@ function renderSchedule() {
       month: 'long',
       year: 'numeric',
     });
-  return `<section class="panel workhub-schedule"><div class="panel-top schedule-heading"><div class="schedule-heading-copy"><span class="eyebrow">Your work, in view</span><h2>Schedule</h2><p class="muted">Bookings and project Go-Live milestones stay synchronized automatically.</p></div><div class="actions schedule-heading-controls"><div class="schedule-month-control"><label for="month">Month</label><input id="month" type="month" min="1900-01" max="9999-12" value="${esc(month)}"></div><button class="primary" data-action="new-range">Add date / time range</button></div></div><div class="schedule-metrics"><div><span>Daily bookings</span><strong>${metrics.bookings}</strong></div><div><span>Scheduled time</span><strong>${formatDuration(metrics.minutes)}</strong></div><div><span>Actual bookings</span><strong id="scheduleReviewCount">${metrics.review}</strong></div><div><span>Weekend TOIL</span><strong>${formatDuration(metrics.toilMinutes)}</strong></div><div class="go-live-metric"><span>Go-Lives this month</span><strong>${monthGoLives}</strong></div></div><div class="schedule-navigation"><div class="actions"><button class="small" data-action="schedule-month" data-step="-1" aria-label="Previous month">‹</button><h3>${esc(label)}</h3><button class="small" data-action="schedule-month" data-step="1" aria-label="Next month">›</button></div><div class="schedule-view-switch"><button class="active" data-action="schedule-layout" data-layout="calendar">Month &amp; agenda</button><button data-action="schedule-layout" data-layout="grid">Time grid</button></div></div><div class="workhub-schedule-body"><div class="workhub-calendar"><div class="weekday-row">${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => `<span>${d}</span>`).join('')}</div><div class="workhub-month-grid">${Array.from({ length: offset }, () => '<div class="calendar-pad" aria-hidden="true"></div>').join('')}${days
+  return `<section class="panel workhub-schedule"><div class="panel-top schedule-heading"><div class="schedule-heading-copy"><span class="eyebrow">Your work, in view</span><h2>Schedule</h2><p class="muted">Bookings and project Go-Live milestones stay synchronized automatically.</p></div><div class="actions schedule-heading-controls"><div class="schedule-month-control"><label for="month">Month</label><input id="month" type="month" min="1900-01" max="9999-12" value="${esc(month)}"></div>${scheduleCopyButton()}<button class="primary" data-action="new-range">Add date / time range</button></div></div><div class="schedule-metrics"><div><span>Daily bookings</span><strong>${metrics.bookings}</strong></div><div><span>Scheduled time</span><strong>${formatDuration(metrics.minutes)}</strong></div><div><span>Actual bookings</span><strong id="scheduleReviewCount">${metrics.review}</strong></div><div><span>Weekend TOIL</span><strong>${formatDuration(metrics.toilMinutes)}</strong></div><div class="go-live-metric"><span>Go-Lives this month</span><strong>${monthGoLives}</strong></div></div><div class="schedule-navigation"><div class="actions"><button class="small" data-action="schedule-month" data-step="-1" aria-label="Previous month">‹</button><h3>${esc(label)}</h3><button class="small" data-action="schedule-month" data-step="1" aria-label="Next month">›</button></div><div class="schedule-view-switch"><button class="active" data-action="schedule-layout" data-layout="calendar">Month &amp; agenda</button><button data-action="schedule-layout" data-layout="grid">Time grid</button></div></div><div class="workhub-schedule-body"><div class="workhub-calendar"><div class="weekday-row">${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => `<span>${d}</span>`).join('')}</div><div class="workhub-month-grid">${Array.from({ length: offset }, () => '<div class="calendar-pad" aria-hidden="true"></div>').join('')}${days
     .map(d => {
       const es = scheduleEntries(d),
         goLives = goLiveProjectsOn(d),
@@ -8148,18 +8152,258 @@ function scheduleEntries(date) {
     if (!entries.has(key))
       entries.set(key, {
         slot,
+        segments: [slot],
         time: slot.time,
         endTime: slotEnd(slot),
         hours: slotMinutes(slot) / 60,
       });
     else {
       const entry = entries.get(key);
+      entry.segments.push(slot);
       entry.endTime = slotEnd(slot);
       entry.hours += slotMinutes(slot) / 60;
     }
   }
   return [...entries.values()];
 }
+
+const scheduleCopyDrafts = new WeakMap();
+
+function scheduleCopyButton() {
+  return !access || access.can('schedule', 'create')
+    ? '<button type="button" data-action="schedule-copy-day" data-access-feature="schedule">Copy day</button>'
+    : '';
+}
+function openScheduleCopy() {
+  if (access && !access.can('schedule', 'create'))
+    throw Error('Schedule creation permission is required.');
+  const date = scheduleDay || today();
+  openModal(
+    'Copy schedule day',
+    `<form id="scheduleCopyForm" data-access-feature="schedule">
+      <div class="schedule-copy-dates">${field('sourceDate', 'Copy from', 'date', true, date)}${field('targetDate', 'Copy to', 'date', true, date < '9999-12-31' ? shiftDate(date, 1) : '')}</div>
+      <fieldset class="schedule-copy-bookings"><legend>Bookings to copy</legend><div data-copy-bookings></div></fieldset>
+      <div class="modal-actions"><button type="button" data-action="cancel">Cancel</button><button type="submit" class="primary" disabled>Copy bookings</button></div>
+    </form>`
+  );
+  const form = $('scheduleCopyForm');
+  scheduleCopyDrafts.set(form, { owner: cloud.user?.id, generation: cloud.generation });
+  refreshScheduleCopy(form);
+}
+
+function scheduleCopyIssue(slot, companies, item) {
+  if (
+    slot.kind === 'task' &&
+    !state.tasks.some(t => t.id === slot.linkId && !t.done && !t.archived)
+  )
+    return 'The linked task is no longer open.';
+  if (slot.kind === 'ticket' && !state.tickets.some(t => t.id === slot.linkId))
+    return 'The linked ticket is unavailable.';
+  if (window.WorkHubLeave.isLeave(slot.kind)) {
+    const type = window.WorkHubLeaveBalancesEngine.type(state, slot.kind);
+    if (!type || type.archived) return 'This leave type is no longer active.';
+  }
+  if (companies.some(c => !state.projectCompanies.some(p => p.id === c.id && p.active !== false)))
+    return 'A linked company is no longer active.';
+  if (slot.kind === 'project') {
+    if (!state.projects.some(p => p.id === slot.linkId))
+      return 'The linked project is unavailable.';
+    if (item.itemId) {
+      const record = state.specs.find(i => i.id === item.itemId);
+      if (
+        !WorkHubTaskProjectItems.inScope(
+          record,
+          slot.linkId,
+          companies.map(c => c.id)
+        )
+      )
+        return 'The project item is unavailable for this project and company.';
+      if (item.subItemId && !record.subItems.some(s => s.id === item.subItemId))
+        return 'The linked sub-item is unavailable.';
+    }
+  }
+  return '';
+}
+
+function scheduleCopyOptions(source, target) {
+  const occupied = state.schedule.filter(s => s.date === target);
+  return scheduleEntries(source).map(entry => {
+    const { slot, segments } = entry;
+    const title = scheduleEntryTitle(entry);
+    const companies = scheduleCompanies(slot);
+    const item = scheduleItemContext(slot);
+    const conflict = occupied.find(other =>
+      segments.some(segment => segment.time < slotEnd(other) && other.time < slotEnd(segment))
+    );
+    const issue = conflict
+      ? `Overlaps ${scheduleEntryTitle({ slot: conflict })} on the destination date.`
+      : scheduleCopyIssue(slot, companies, item);
+    return {
+      entry,
+      title,
+      companies,
+      item,
+      issue,
+      snapshot: JSON.stringify([segments, title, companies, item]),
+    };
+  });
+}
+function updateScheduleCopyCount(form) {
+  const count = form.querySelectorAll('[name="booking"]:checked:not(:disabled)').length;
+  const button = form.querySelector('[type="submit"]');
+  button.disabled = !count;
+  button.textContent = count ? `Copy ${count} booking${count === 1 ? '' : 's'}` : 'Copy bookings';
+}
+function refreshScheduleCopy(form, selected) {
+  const draft = scheduleCopyDrafts.get(form);
+  const source = form.elements.sourceDate.value;
+  const target = form.elements.targetDate.value;
+  let message = '';
+  if (!source || !target || !validDate(source) || !validDate(target))
+    message = 'Choose a valid source and destination date.';
+  else if (source === target) message = 'Choose a different destination date.';
+  const options = message ? [] : scheduleCopyOptions(source, target);
+  if (!message && !options.length) message = 'There are no bookings on the source date.';
+  if (draft.source !== source) draft.excluded = new Set();
+  if (selected)
+    for (const { entry, issue } of options)
+      if (!issue && !selected.has(entry.time)) draft.excluded.add(entry.time);
+  Object.assign(draft, {
+    source,
+    target,
+    snapshots: new Map(options.map(o => [o.entry.time, o.snapshot])),
+  });
+  const host = form.querySelector('[data-copy-bookings]');
+  host.innerHTML = message
+    ? `<p class="hint" role="status">${esc(message)}</p>`
+    : `<p class="hint">Selected bookings will keep their original times.${options.some(o => window.WorkHubLeave.isLeave(o.entry.slot.kind)) ? ' Copied leave starts as Planned.' : ''}${options.some(o => o.entry.slot.travel) ? ' Scheduled mileage counts on the new date.' : ''}</p>${options
+        .map(
+          ({ entry, title, issue }) =>
+            `<label class="schedule-copy-row"><input type="checkbox" name="booking" value="${esc(entry.time)}"${issue ? ' disabled' : draft.excluded.has(entry.time) ? '' : ' checked'}><span><strong>${esc(entry.time)}–${esc(entry.endTime)}</strong> ${esc(title)}${issue ? `<small>${esc(issue)}</small>` : ''}</span></label>`
+        )
+        .join('')}`;
+  updateScheduleCopyCount(form);
+}
+
+function appendScheduleCopy(d, { entry, title, companies, item }, date) {
+  const { slot, segments, time, endTime } = entry;
+  const id = uid();
+  const context = {
+    companies,
+    companyId: companies[0]?.id || '',
+    companyName: companies[0]?.name || '',
+    ...item,
+    ...(slot.ticketId ? { ticketId: slot.ticketId } : {}),
+  };
+  const project = slot.kind === 'project';
+  if (project) {
+    d.projectPlans.push({
+      ...context,
+      id,
+      projectId: slot.linkId,
+      title,
+      activity: slot.activity,
+      text: slot.text,
+      date,
+      endDate: date,
+      time,
+      endTime,
+      location: slot.location,
+      status: 'Planned',
+      source: 'Schedule',
+      actualSame: null,
+      actualTask: '',
+      actualReviewedAt: '',
+    });
+  }
+  for (const segment of segments) {
+    const copied = {
+      ...context,
+      date,
+      time: segment.time,
+      endTime: slotEnd(segment),
+      kind: segment.kind,
+      text: segment.text,
+      linkId: segment.linkId,
+      activity: segment.activity,
+      location: segment.location,
+      bookingId: id,
+      planId: project ? id : '',
+    };
+    if (segment.title !== undefined) copied.title = segment.title;
+    if (window.WorkHubLeave.isLeave(segment.kind)) {
+      copied.leave = {
+        ...segment.leave,
+        status: 'Planned',
+        reference: '',
+        mcSubmitted: false,
+        mcSubmittedDate: '',
+      };
+    } else {
+      if (segment.travel) copied.travel = clone(segment.travel);
+      if (segment.claimType !== undefined) copied.claimType = segment.claimType;
+      if (segment.claimLocationName !== undefined)
+        copied.claimLocationName = segment.claimLocationName;
+      copied.executionIdentity = window.WorkHubScheduleEngine.identity(copied, d);
+    }
+    d.schedule.push(copied);
+  }
+}
+
+function saveScheduleCopy(form) {
+  const draft = scheduleCopyDrafts.get(form);
+  if (
+    !draft ||
+    form !== $('scheduleCopyForm') ||
+    !$('modal').open ||
+    draft.owner !== cloud.user?.id ||
+    draft.generation !== cloud.generation ||
+    (CLOUD_MODE && !cloud.ready)
+  )
+    throw Error('Reopen Copy day for the current account.');
+  if (access && !access.can('schedule', 'create'))
+    throw Error('Schedule creation permission is required.');
+  const source = form.elements.sourceDate.value;
+  const target = form.elements.targetDate.value;
+  if (
+    !source ||
+    !target ||
+    !validDate(source) ||
+    !validDate(target) ||
+    source === target ||
+    draft.source !== source ||
+    draft.target !== target
+  ) {
+    refreshScheduleCopy(form);
+    throw Error('Review the source and destination dates.');
+  }
+  const selected = new Set(
+    Array.from(
+      form.querySelectorAll('[name="booking"]:checked:not(:disabled)'),
+      input => input.value
+    )
+  );
+  if (!selected.size) throw Error('Select at least one available booking.');
+  const options = scheduleCopyOptions(source, target).filter(o => selected.has(o.entry.time));
+  if (
+    options.length !== selected.size ||
+    options.some(o => o.issue || draft.snapshots.get(o.entry.time) !== o.snapshot)
+  ) {
+    refreshScheduleCopy(form, selected);
+    throw Error('The schedule changed. Review the bookings before copying.');
+  }
+  const ok = mutate(d => {
+    for (const option of options) appendScheduleCopy(d, option, target);
+    if (options.some(o => window.WorkHubLeave.isLeave(o.entry.slot.kind)))
+      window.WorkHubLeaveBalancesEngine.assertWithinBalance(state, d, today());
+  });
+  scheduleDay = target;
+  month = target.slice(0, 7);
+  closeModal();
+  render();
+  if (ok) tell(`Copied ${options.length} booking${options.length === 1 ? '' : 's'} to ${target}.`);
+}
+
 function scheduleTimeStatus(slot, d = state, date = null, time = null) {
   if (!slot) return '';
   if (window.WorkHubLeave.isLeave(slot.kind)) return slot.leave.status;
@@ -8547,7 +8791,7 @@ function renderScheduleGrid() {
     first = weekStart(selected),
     week = rangeDates(first, shiftDate(first, 6));
   scheduleDay = selected;
-  return `<section class="panel"><div class="panel-top"><div><span class="eyebrow">Week time grid</span><h2>${esc(first)} → ${esc(week.at(-1))}</h2><p class="muted">Exact times appear on every activity. Select one to view its details.</p></div><div class="actions"><button data-action="schedule-week" data-step="-7">Previous week</button><button data-action="schedule-today">Today</button><button data-action="schedule-week" data-step="7">Next week</button><button class="primary" data-action="schedule-add-day">+ Plan activity</button></div></div><div class="scroll precision-grid"><table><thead><tr><th>Hour</th>${week
+  return `<section class="panel"><div class="panel-top"><div><span class="eyebrow">Week time grid</span><h2>${esc(first)} → ${esc(week.at(-1))}</h2><p class="muted">Exact times appear on every activity. Select one to view its details.</p></div><div class="actions"><button data-action="schedule-week" data-step="-7">Previous week</button><button data-action="schedule-today">Today</button><button data-action="schedule-week" data-step="7">Next week</button>${scheduleCopyButton()}<button class="primary" data-action="schedule-add-day">+ Plan activity</button></div></div><div class="scroll precision-grid"><table><thead><tr><th>Hour</th>${week
     .map(
       date =>
         `<th>${esc(new Date(date + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' }))}${goLiveProjectsOn(
@@ -8592,6 +8836,10 @@ workhubAction = async function (button) {
   }
   if (action === 'edit-schedule-milestone') {
     editProject(button.dataset.id);
+    return true;
+  }
+  if (action === 'schedule-copy-day') {
+    openScheduleCopy();
     return true;
   }
   if (action === 'open-booking') {
@@ -8643,6 +8891,15 @@ workhubAction = async function (button) {
 };
 const workhubChangeV10Base = workhubChange;
 workhubChange = function (element) {
+  if (element.form?.id === 'scheduleCopyForm') {
+    if (element.name === 'booking') {
+      const excluded = scheduleCopyDrafts.get(element.form).excluded;
+      if (element.checked) excluded.delete(element.value);
+      else excluded.add(element.value);
+      updateScheduleCopyCount(element.form);
+    } else refreshScheduleCopy(element.form);
+    return true;
+  }
   if (element.id === 'bookingEndClock') {
     setBookingEnd(element.form, element.value);
     return true;
