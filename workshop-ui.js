@@ -67,8 +67,8 @@
           <ul>${rows
             .map(([id, question]) => {
               const answer = workshop.answers[id];
-              return `<li><div><strong>${esc(question)}</strong><span class="iw-status">${esc(answer?.status || 'Unanswered')}</span>
-              ${answer?.owner || answer?.due ? `<small>${[answer.owner, answer.due].filter(Boolean).map(esc).join(' · ')}</small>` : ''}
+              return `<li><div><strong>${esc(question)}</strong><div class="iw-question-meta"><span class="iw-status">${esc(answer?.status || 'Unanswered')}</span>
+              ${answer?.owner || answer?.due ? `<small>${[answer.owner, answer.due].filter(Boolean).map(esc).join(' · ')}</small>` : ''}</div>
               ${answer?.decision ? `<p class="iw-decision">${esc(answer.decision)}</p>` : ''}</div>
               <button type="button" data-iw="answer" data-question="${esc(id)}">${a.can('edit') && !workshop.completion ? (answer ? 'Edit answer' : 'Answer') : 'View answer'}</button></li>`;
             })
@@ -132,28 +132,28 @@
       const newButton = a.can('edit')
         ? '<button type="button" class="primary" data-iw="workshop">New workshop</button>'
         : '';
-      const header = `<div class="panel-top"><div><h2>Project implementation template</h2>
-        <p class="muted">${E.questions.length} SAP MM discovery questions across ${E.topics.length} topics.</p></div>${newButton}</div>`;
+      const header = `<header class="panel-top iw-heading"><div><h2>Project implementation template</h2>
+        <p class="muted">${E.questions.length} SAP MM discovery questions across ${E.topics.length} topics.</p></div>${newButton}</header>`;
       if (!workshop)
-        return `<section class="panel iw-workspace" id="iwWorkspace">${header}<p>Create a workshop for the whole project or for a company, site, process, or material group.</p></section>`;
+        return `<section class="panel iw-workspace" id="iwWorkspace">${header}<div class="iw-content"><p class="iw-empty">Create a workshop for the whole project or for a company, site, process, or material group.</p></div></section>`;
       const stats = E.progress(workshop);
       return `<section class="panel iw-workspace" id="iwWorkspace">${header}
-        <div class="iw-toolbar">
+        <div class="iw-content"><div class="iw-controls"><div class="iw-toolbar">
           <label>Workshop<select id="iwWorkshop">${E.rows(project)
             .map(row => option(row.id, row.name, workshop.id))
             .join('')}</select></label>
           <div class="actions">${a.can('edit') && !workshop.completion ? '<button type="button" data-iw="workshop" data-edit="true">Edit scope</button>' : ''}
           ${a.can('edit') && a.can('create') && !workshop.completion ? '<button type="button" class="primary" data-iw="complete">Complete workshop</button>' : ''}
           ${a.can('export') ? '<button type="button" data-iw="export">Export CSV</button>' : ''}</div>
-        </div>${workshop.scope ? `<p class="iw-scope">${esc(workshop.scope)}</p>` : ''}
-        ${workshop.completion ? `<p class="iw-completion"><strong>Completed ${esc(workshop.completion.date)}</strong> · <button type="button" class="small" data-action="project-view" data-view="companies">View published decisions</button></p>` : ''}
-        <div class="iw-progress"><progress max="${stats.total}" value="${stats.complete}" aria-label="Workshop questions resolved"></progress>
-          <span>${stats.complete} of ${stats.total} resolved · ${stats.followUps} follow-up${stats.followUps === 1 ? '' : 's'}</span></div>
+        </div>${workshop.scope ? `<p class="iw-scope"><strong>Scope</strong> ${esc(workshop.scope)}</p>` : ''}
+        ${workshop.completion ? `<div class="iw-completion"><strong>Completed ${esc(workshop.completion.date)}</strong><button type="button" class="small" data-action="project-view" data-view="companies">View published decisions</button></div>` : ''}
+        <div class="iw-progress"><span>${stats.complete} of ${stats.total} resolved · ${stats.followUps} follow-up${stats.followUps === 1 ? '' : 's'}</span>
+          <progress max="${stats.total}" value="${stats.complete}" aria-label="Workshop questions resolved"></progress></div>
         <div class="iw-filters">
           <label>Topic<select id="iwTopic">${E.topics.map(t => option(t.id, t.title, view.topic)).join('')}</select></label>
           <label>Status across all topics<select id="iwFilter">${['', 'Follow-ups', 'Unanswered', ...E.statuses].map(value => option(value, value || 'All statuses', view.filter)).join('')}</select></label>
           <label>Search all topics<input type="search" id="iwSearch" value="${esc(view.search)}" placeholder="Question, owner or decision"></label>
-        </div><div id="iwQuestions">${questionList(workshop)}</div></section>`;
+        </div></div><div id="iwQuestions">${questionList(workshop)}</div></div></section>`;
     }
 
     function field(label, name, value, type = 'text') {
