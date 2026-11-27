@@ -2479,6 +2479,158 @@ test('floating Focus hides behind dialogs and cancels pending sound when Stop au
 const adventureChoices={greetings:false,antics:false,reminders:false,chases:true};
 const adventureStorage=values=>({'mm-tracker.momo-adventures.v1':JSON.stringify({...adventureChoices,...values})});
 function submitLocal(window,form){form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));}
+function showSubjectShelf(ctx) {
+  ctx.api.showTab('snippets');
+  ctx.document.querySelector('[data-wl="shelf"][data-shelf="subjects"]').click();
+}
+async function addSubjectTemplate(ctx, title, body) {
+  const { api, document, window } = ctx;
+  showSubjectShelf(ctx);
+  document.querySelector('[data-wl="subject-new"]').click();
+  const form = document.getElementById('wlSubject');
+  fill(form, {title, body});
+  submitLocal(window, form);
+  await settle();
+  assert.equal(document.getElementById('modal').open, false, document.getElementById('toast').textContent);
+  return api.state().workhub.workLibrary.snippets.find(s => s.kind === 'email-subject' && s.title === title);
+}
+
+test('Email subject templates: dynamic fields, record prefills, live preview and clipboard stay independent of saved data', async t => {
+  const ctx = await app(t);
+  const { api, document, window, db } = ctx;
+  const ticket = addWishlistTicket(api, document);
+  const task = addMainTask(api, document, 'Release purchase order');
+  api.mutate(d => { d.tasks.find(r => r.id === task).trNumber = 'DEVK900012'; });
+  const body = '[{system}] {ticket} – {topic} – {ticket} ({today})';
+  const template = await addSubjectTemplate(ctx, 'UAT request', body);
+  const writes = db.calls.length;
+  document.querySelector('[data-wl="compose"]').click();
+  const form = document.getElementById('wlCompose');
+  assert.equal(form.querySelectorAll('[data-placeholder="ticket"]').length, 1);
+  assert.equal(form.elements.sourceRecord.disabled, true);
+  assert.equal(form.querySelector('[data-wl="copy"]').disabled, true);
+  assert.equal(form.elements.namedItem('copyFormat'), null);
+  const date = form.elements.p_today.value;
+  assert.match(date, /^\d{4}-\d{2}-\d{2}$/);
+  changeBookingField(window, form, 'sourceKind', 'tickets');
+  changeBookingField(window, form, 'sourceRecord', ticket);
+  assert.equal(form.elements.p_system.value, 'S4Q');
+  assert.equal(form.elements.p_ticket.value, 'AMS-2048');
+  const topic = 'UAT <urgent> & review';
+  form.elements.p_topic.value = topic;
+  form.elements.p_topic.dispatchEvent(new window.Event('input', {bubbles:true}));
+  const expected = `[S4Q] AMS-2048 – ${topic} – AMS-2048 (${date})`;
+  assert.equal(document.getElementById('wlMessagePreview').value, expected);
+  assert.equal(document.getElementById('wlRichPreview'), null);
+  let copied = '';
+  Object.defineProperty(window.navigator, 'clipboard', {configurable:true,value:{writeText:async text => { copied = text; }}});
+  form.querySelector('[data-wl="copy"]').click();
+  await settle();
+  assert.equal(copied, expected);
+  assert.equal(db.calls.length, writes);
+  assert.equal(api.state().workhub.workLibrary.snippets.find(s => s.id === template.id).body, body);
+  changeBookingField(window, form, 'sourceKind', '');
+  assert.equal(form.elements.p_system.value, '');
+  assert.equal(form.elements.p_ticket.value, '');
+  assert.equal(form.elements.p_topic.value, topic);
+  assert.equal(form.querySelector('[data-wl="copy"]').disabled, true);
+  api.closeModal();
+  await addSubjectTemplate(ctx, 'Transport handover', '{task} – {tr_number}');
+  const card = [...document.querySelectorAll('#wlSubjectCards article')].find(row => row.textContent.includes('Transport handover'));
+  card.querySelector('[data-wl="compose"]').click();
+  const next = document.getElementById('wlCompose');
+  changeBookingField(window, next, 'sourceKind', 'tasks');
+  changeBookingField(window, next, 'sourceRecord', task);
+  assert.equal(document.getElementById('wlMessagePreview').value, 'Release purchase order – DEVK900012');
+  Object.defineProperty(window.navigator, 'clipboard', {configurable:true,value:{writeText:async () => {throw Error('Unavailable');}}});
+  next.querySelector('[data-wl="copy"]').click();
+  await settle();
+  const preview = document.getElementById('wlMessagePreview');
+  assert.equal(document.activeElement, preview);
+  assert.equal(preview.selectionEnd - preview.selectionStart, preview.value.length);
+});
+
+test('Email subject templates: add, search, edit, remove and undo survive cloud reload and keep message bundles separate', async t => {
+  const ctx = await app(t);
+  const { api, document, window, db } = ctx;
+  api.showTab('snippets');
+  await api.hub.library.handle({dataset:{wl:'snippet-example'}});
+  const message = copy(api.state().workhub.workLibrary.snippets[0]);
+  const s = await addSubjectTemplate(ctx, 'Supplier follow-up', 'Follow up on {po_number}');
+  const search = document.getElementById('wlSubjectSearch');
+  search.value = 'po_number'; search.dispatchEvent(new window.Event('input',{bubbles:true}));
+  assert.equal(document.querySelectorAll('#wlSubjectCards article').length, 1);
+  search.value = 'absent'; search.dispatchEvent(new window.Event('input',{bubbles:true}));
+  assert.match(document.getElementById('wlSubjectCards').textContent, /No matching/);
+  search.value = ''; search.dispatchEvent(new window.Event('input',{bubbles:true}));
+  document.querySelector('[data-wl="subject-edit"]').click();
+  const f = document.getElementById('wlSubject');
+  f.elements.body.value = 'Status – draft';
+  f.elements.body.setSelectionRange(9,14);
+  f.querySelector('[data-wl="insert-placeholder"][data-field="project"]').click();
+  assert.equal(f.elements.body.value, 'Status – {project}');
+  f.elements.title.value = 'Project status';
+  submitLocal(window, f);
+  await settle();
+  const saved = api.state().workhub.workLibrary.snippets.find(row => row.id === s.id);
+  assert.equal(saved.body, 'Status – {project}');
+  assert.equal(saved.createdAt, s.createdAt);
+  document.querySelector('[data-wl="shelf"][data-shelf="messages"]').click();
+  assert.equal(document.querySelectorAll('#wlSnippetCards article').length, 1);
+  assert.ok(!document.getElementById('wlSnippetCards').textContent.includes('Project status'));
+  const ticket = addWishlistTicket(api, document);
+  api.hub.library.chooseSnippet('tickets',ticket);
+  assert.equal(document.querySelector(`#modal [data-wl="compose"][data-id="${s.id}"]`), null);
+  api.closeModal();
+  showSubjectShelf(ctx);
+  document.querySelector('[data-wl="snippet-remove"]').click();
+  await settle();
+  assert.ok(!api.state().workhub.workLibrary.snippets.some(row => row.id === s.id));
+  document.getElementById('wlUndo').click();
+  await settle();
+  await api.flushCloud();
+  const restored = api.parseBackup(api.payload(api.state()));
+  assert.deepEqual(copy(restored.workhub.workLibrary.snippets.find(row => row.id === message.id)), message);
+  assert.deepEqual(copy(restored.workhub.workLibrary.snippets.find(row => row.id === s.id)), copy(saved));
+  const reopened = await app(t,{login:false,remote:copy(db.row)});
+  await reopened.api.loadCloud(sessionUser);
+  await settle();
+  showSubjectShelf(reopened);
+  assert.match(reopened.document.querySelector('#wlSubjectCards article').textContent, /Project status.*Status – \{project\}/s);
+});
+
+test('Email subject templates: static subjects, stale drafts and account permissions', async t => {
+  const ctx = await app(t);
+  const { api, document, window, db } = ctx;
+  const s = await addSubjectTemplate(ctx, 'Weekly update', 'Weekly purchasing update');
+  document.querySelector('[data-wl="compose"]').click();
+  const form = document.getElementById('wlCompose');
+  assert.equal(form.querySelectorAll('[data-placeholder]').length, 0);
+  assert.equal(form.querySelector('[data-wl="copy"]').disabled, false);
+  api.mutate(d => { d.workhub.workLibrary.snippets.find(row => row.id === s.id).body = 'Updated wording'; });
+  await assert.rejects(api.hub.library.copyMessage(), /current wording/);
+  api.closeModal();
+  document.querySelector('[data-wl="subject-edit"]').click();
+  let editor = document.getElementById('wlSubject');
+  api.mutate(d => { d.workhub.workLibrary.snippets.find(row => row.id === s.id).title = 'Remote name'; });
+  await settle();
+  const writes = db.calls.length;
+  assert.throws(() => api.hub.library.submit(editor), /template changed/);
+  assert.equal(db.calls.length, writes);
+  api.closeModal();
+  document.querySelector('[data-wl="subject-new"]').click();
+  editor = document.getElementById('wlSubject');
+  fill(editor,{title:'Unfinished draft',body:'Private {topic}'});
+  api.cloud.generation++;
+  assert.throws(() => api.hub.library.submit(editor), /Reopen/);
+  assert.equal(db.calls.length, writes);
+  api.closeModal();
+  db.access = {...api.access.snapshot(),role:'member',version:2,permissions:window.WorkHubAccessCatalog.preset('view')};
+  await api.access.load(api.cloud.user);
+  showSubjectShelf(ctx);
+  assert.ok(document.querySelector('#wlSubjectCards [data-wl="compose"]'));
+  assert.equal(document.querySelector('[data-wl="subject-new"],[data-wl="subject-edit"],#wlSubjectCards [data-wl="snippet-remove"]'), null);
+});
 function rect(left,top,width,height){return{left,top,width,height,right:left+width,bottom:top+height,x:left,y:top};}
 
 test('Momo world: rename follows account, backup and controls without treating names as markup',async t=>{

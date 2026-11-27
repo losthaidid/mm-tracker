@@ -3,6 +3,20 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {JSDOM} from 'jsdom';
 const copy=x=>JSON.parse(JSON.stringify(x));
+test('subject templates render a single plain-text line, reuse fields and preserve ordinary message formatting', t => {
+  const { E, d } = setup(t);
+  const subject = { id:'sub-1', kind:'email-subject', title:'Release', body:'[{system}] {topic} / {system}', category:'', bundleId:'', createdAt:'', updatedAt:'' };
+  const message = { ...subject, id:'msg-1', body:'Line one\n{topic}' };
+  delete message.kind;
+  d.workhub.workLibrary.snippets.push(subject, message);
+  E.validate(d);
+  assert.deepEqual(copy(E.placeholders(subject.body)), ['system','topic']);
+  assert.deepEqual(copy(E.renderSnippet(subject, { system:'QAS', topic:'PO\nreview\u2028& <test>' }, 'email')), { missing:[], text:'[QAS] PO review & <test> / QAS', html:'' });
+  assert.deepEqual(copy(E.renderSnippet(subject, { system:'  ' }).missing), ['system','topic']);
+  assert.equal(E.renderSnippet(message, { topic:'PO\nreview' }).text, 'Line one\nPO\nreview');
+  subject.body = 'Line one\nLine two';
+  assert.throws(() => E.validate(d), /one line/);
+});
 function setup(t){const dom=new JSDOM('',{runScripts:'outside-only'});t.after(()=>dom.window.close());for(const f of ['validator-engine.js','batch-a-engine.js','work-library-engine.js'])dom.window.eval(readFileSync(new URL('../'+f,import.meta.url),'utf8'));const w=dom.window,E=w.WorkHubWorkLibraryEngine,B=w.WorkHubBatchEngine,V=w.WorkHubValidatorEngine,d={tasks:[{id:'a',task:'Prepare UAT',done:false,subTasks:[]},{id:'b',task:'Approve design',done:false,subTasks:[]}],tickets:[{id:'t',ticket:'AMS-001',description:'Preserve codes',created:'2026-10-01',status:'Pending',history:''}],projects:[],specs:[],schedule:[],workhub:{notes:[],sessions:[],ticketClosures:[]}};B.upgrade(d);E.upgrade(d);return{w,E,B,V,d};}
 test('snippets fill repeated placeholders once, expose missing details and escape rich output',t=>{const {E}=setup(t),s={title:'Testing <ready>',body:'Hi {name},\n\n{ticket} & {ticket}\n{next_step}'};assert.deepEqual(copy(E.placeholders(s.body)),['name','ticket','next_step']);let r=E.renderSnippet(s,{name:'<img src=x>',ticket:'0001'});assert.deepEqual(copy(r.missing),['next_step']);assert.ok(r.text.includes('{next_step}'));r=E.renderSnippet(s,{name:'<img src=x>',ticket:'0001',next_step:'Run UAT'},'email');assert.ok(r.html.includes('&lt;img src=x&gt;'));assert.ok(!r.html.includes('<img'));assert.ok(r.html.includes('<br>'));assert.equal(E.renderSnippet(s,{name:'A',ticket:'1',next_step:'Test'},'ticket').text.startsWith('### Testing <ready>\n\n'),true);});
 test('context prefills known technical details without guessing recipient or deadlines',t=>{const {E,B,d}=setup(t);const m=B.touch(d,'tickets','t');m.systemId='S4Q';m.client='010';const v=E.contextValues(d,'tickets','t');assert.equal(v.ticket,'AMS-001');assert.equal(v.system,'S4Q');assert.equal(v.client,'010');assert.equal(v.name,undefined);assert.equal(v.date,undefined);});

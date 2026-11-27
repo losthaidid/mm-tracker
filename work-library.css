@@ -871,6 +871,46 @@ body[data-motion='off'] .wl-button {
 }
 
 /* Snippets shelf: isolated from the global app header and shared library dialogs. */
+.wl-shelf-switch,
+.wl-subject-tokens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.wl-shelf-switch {
+  margin-bottom: 20px;
+}
+.wl-snippets-page .wl-shelf-switch button {
+  font-size: 0.875rem;
+}
+.wl-shelf-switch button[aria-pressed='true'] {
+  color: #fff;
+  background: #38634c;
+  border-color: #38634c;
+}
+.wl-subject-shelf .wl-card-actions {
+  margin-top: auto;
+}
+.wl-subject-tokens button {
+  min-height: 36px;
+  font-family: monospace;
+  font-size: 0.875rem;
+}
+.wl-subject-source {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.wl-subject-source [hidden] {
+  display: none;
+}
+.wl-composer-layout.wl-subject-static {
+  grid-template-columns: minmax(0, 1fr);
+}
+.wl-message-paper textarea.wl-subject-preview {
+  min-height: 6rem;
+  font-size: 1rem;
+}
 .wl-snippets-page {
   --wl-ink: #264b41;
   --wl-muted: #526c61;
