@@ -58,8 +58,9 @@ test('implementation workshops scope questions, preserve decisions, and guard pr
   const change = (id, value) => listeners.get('change')({ target: { id, value, closest: () => true } });
 
   E.validate(data.projects);
-  equal(E.questions.length, 223);
-  equal(new Set(E.questions.map(([id]) => id)).size, 223);
+  equal(E.questions.length, 237);
+  equal(new Set(E.questions.map(([id]) => id)).size, 237);
+  equal(E.topics.find(topic => topic.id === 'responsibilities').questions.length, 14);
   ok(ui.render(north).includes('New workshop'));
   click(scopeButton(false));
   submit({ name: 'Local sourcing', scope: 'North / fasteners' });

@@ -94,3 +94,23 @@
 .iw-fields p {
   margin: 0;
 }
+.iw-summary ul {
+  padding-inline-start: 0;
+  list-style: none;
+}
+.iw-summary li {
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.iw-summary li small {
+  display: block;
+  color: var(--muted);
+}
+.iw-summary summary {
+  padding: 8px 0;
+  cursor: pointer;
+}
+.iw-summary .iw-decision {
+  margin-bottom: 8px;
+}

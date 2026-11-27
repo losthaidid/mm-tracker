@@ -31,6 +31,26 @@
       ],
     },
     {
+      id: "responsibilities",
+      title: "Departments & responsibilities",
+      questions: [
+        ["responsibilities-1", "For each company and plant, which department performs, approves, supports, or must be informed at each step from request to payment?"],
+        ["responsibilities-2", "Who is the accountable process owner for Procurement, Inventory Management, invoice verification, and master data? Who provides backup cover?"],
+        ["responsibilities-3", "Which departments create purchase requests, validate the business need, confirm the cost object, and approve the budget?"],
+        ["responsibilities-4", "Who in Purchasing owns supplier selection, quotations, agreements, PO release, supplier communication, and overdue deliveries?"],
+        ["responsibilities-5", "How do Master Data, Purchasing, and Finance divide responsibility for material records, supplier onboarding, and sensitive changes?"],
+        ["responsibilities-6", "How do Receiving, Warehouse, and Quality hand off goods between unloading, receipt posting, inspection, quarantine, and putaway?"],
+        ["responsibilities-7", "Who authorizes issues, transfers, adjustments, returns, scrapping, and stock corrections? Who performs the posting?"],
+        ["responsibilities-8", "Which teams schedule counts, count stock, investigate differences, and independently approve adjustments?"],
+        ["responsibilities-9", "How do Accounts Payable, Purchasing, and Receiving divide responsibility for quantity or price variances, invoice blocks, credit notes, and GR/IR cleanup?"],
+        ["responsibilities-10", "Who owns replenishment decisions and shortages shared between Planning, Production, Purchasing, Sales, and Warehouse?"],
+        ["responsibilities-11", "Which responsibilities sit with external suppliers, carriers, warehouses, or subcontractors? How do they report exceptions to the internal owner?"],
+        ["responsibilities-12", "What information must travel with each handoff? Who accepts the handoff, and when is an unresolved exception escalated?"],
+        ["responsibilities-13", "Which responsibilities require separation of duties or a second reviewer? Who approves temporary delegations and system access?"],
+        ["responsibilities-14", "Who confirms the responsibility assignments, trains users, covers go-live, and owns each process after hypercare?"],
+      ],
+    },
+    {
       id: "materials",
       title: "Material master, products & units",
       questions: [

@@ -2643,7 +2643,7 @@ function editDecision(id = '') {
       ]),
     ]
       .filter(Boolean)
-      .map(v => `<option${v === value.category ? ' selected' : ''}>${v}</option>`)
+      .map(v => `<option${v === value.category ? ' selected' : ''}>${esc(v)}</option>`)
       .join(
         ''
       )}</select></div><div><label for="decisionStatus">Status *</label><select id="decisionStatus" name="status">${['Proposed', 'Approved', 'Superseded'].map(v => `<option${v === value.status ? ' selected' : ''}>${v}</option>`).join('')}</select></div><div><label for="decisionDate">Decision date</label><input id="decisionDate" name="date" type="date" min="1900-01-01" max="9999-12-31" value="${esc(value.date)}"></div><div class="span2"><label for="decisionOwner">Owner</label><input id="decisionOwner" name="owner" maxlength="200" value="${esc(value.owner)}"></div><div class="wide"><label for="decisionText">Decision *</label><textarea id="decisionText" name="decision" maxlength="32767" required>${esc(value.decision)}</textarea></div></div><div class="modal-actions"><span></span><div class="actions"><button type="button" data-action="cancel">Cancel</button><button class="primary" type="submit">Save decision</button></div></div></form>`
@@ -4924,7 +4924,7 @@ function renderProjectOverview(m) {
     statuses = [...new Set([...OPTIONS.specStatus, ...m.items.map(s => s.status)])],
     attention = m.overdue.slice(0, 5),
     gateDone = m.gates.filter(g => g.status !== 'Pending').length;
-  return `<div class="dashboard-grid">${hub?.standup?.card(p.id) || ''}${hub?.people?.card(p.id) || ''}${hub?.goLiveIssues?.card(p.id) || ''}${hub?.solution?.card(p.id) || ''}<section class="panel box"><h2>Project overview</h2><div class="view-details" style="margin-top:16px"><div><div class="detail-label">Current phase</div><div class="detail-value">${esc(p.phase)} · ${projectPhasePercent(p)}%</div></div><div><div class="detail-label">Health · automatic</div><div class="detail-value">${healthBadge(health)}<small class="health-summary">${esc(health.summary)}</small></div></div><div><div class="detail-label">Go-Live</div><div class="detail-value">${goLiveInfo(p)}</div></div><div class="wide"><div class="detail-label">Next milestone</div><div class="detail-value">${esc(p.nextMilestone) || 'Not set'}</div></div></div>${projectAlerts(p, m)}<h3 class="section-label">Project item progress</h3><div class="status-breakdown">${
+  return `<div class="dashboard-grid">${implementationWorkshop?.overview(p) || ''}${hub?.standup?.card(p.id) || ''}${hub?.people?.card(p.id) || ''}${hub?.goLiveIssues?.card(p.id) || ''}${hub?.solution?.card(p.id) || ''}<section class="panel box"><h2>Project overview</h2><div class="view-details" style="margin-top:16px"><div><div class="detail-label">Current phase</div><div class="detail-value">${esc(p.phase)} · ${projectPhasePercent(p)}%</div></div><div><div class="detail-label">Health · automatic</div><div class="detail-value">${healthBadge(health)}<small class="health-summary">${esc(health.summary)}</small></div></div><div><div class="detail-label">Go-Live</div><div class="detail-value">${goLiveInfo(p)}</div></div><div class="wide"><div class="detail-label">Next milestone</div><div class="detail-value">${esc(p.nextMilestone) || 'Not set'}</div></div></div>${projectAlerts(p, m)}<h3 class="section-label">Project item progress</h3><div class="status-breakdown">${
     statuses
       .map(s => {
         const n = m.items.filter(i => i.status === s).length;
@@ -7613,7 +7613,7 @@ function renderProjectCompanies() {
             : '<section class="governance-detail"><div class="governance-empty"><strong>All SAP MM areas are hidden</strong><p>Choose Manage areas to show an area again. All process records are preserved.</p><button data-action="manage-mm-areas">Manage areas</button></div></section>'
         }</div>`
       : '<div class="governance-empty"><strong>No project companies yet</strong><p>Use Add company above for a quick setup, or upload Excel to create companies and process mappings together. You can manage the SAP MM areas before adding a company.</p></div>'
-  }</section>`;
+  }</section>${implementationWorkshop?.decisions(p, state) || ''}`;
 }
 
 function subItemMetrics(item) {
@@ -11456,6 +11456,8 @@ hub = WorkHubStudio.install({
 });
 implementationWorkshop = WorkHubImplementationWorkshop.install({
   project: () => activeProject(),
+  state: () => state,
+  today,
   active: () =>
     tab === 'specs' &&
     projectView === 'implementation' &&
