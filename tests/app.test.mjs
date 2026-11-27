@@ -2479,6 +2479,93 @@ test('floating Focus hides behind dialogs and cancels pending sound when Stop au
 const adventureChoices={greetings:false,antics:false,reminders:false,chases:true};
 const adventureStorage=values=>({'mm-tracker.momo-adventures.v1':JSON.stringify({...adventureChoices,...values})});
 function submitLocal(window,form){form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));}
+
+test('Implementation workshops: complete once, publish scoped records, and keep them across cloud reload', async t => {
+  const { api, document, window, db } = await app(t);
+  const projectId = api.state().activeProjectId;
+  addCompany(api, document, 'North company');
+  await settle();
+  const companyId = api.state().projectCompanies.find(row => row.name === 'North company').id;
+  const click = selector => {
+    const button = document.querySelector(selector);
+    assert.ok(button, selector);
+    button.click();
+  };
+  const submit = values => {
+    const form = document.getElementById('iwForm');
+    fill(form, values);
+    submitLocal(window, form);
+    return form;
+  };
+  api.showTab('specs');
+  click('[data-action="project-view"][data-view="implementation"]');
+  await settle();
+  click('[data-iw="workshop"]');
+  submit({ name:'Inventory ownership workshop', scope:'North plant' });
+  const topic = document.getElementById('iwTopic');
+  topic.value = 'responsibilities';
+  topic.dispatchEvent(new window.Event('change', { bubbles:true }));
+  assert.match(document.querySelector('#iwQuestions h3').textContent, /Departments & responsibilities/);
+  click('[data-iw="answer"][data-question="responsibilities-1"]');
+  submit({ status:'Agreed', decision:'Warehouse posts receipts. Quality approves release.', requirement:'Post on the same day', owner:'Warehouse', confirmedBy:'Site lead', confirmedOn:'2026-11-27', due:'2026-12-04', itemTitle:'Configure receipt approval' });
+  click('[data-iw="answer"][data-question="responsibilities-2"]');
+  submit({ status:'Open', owner:'Finance' });
+  click('[data-iw="complete"]');
+  assert.match(document.getElementById('toast').textContent, /resolve the open follow-ups/i);
+  assert.equal(api.state().projectDecisions.length, 0);
+  click('[data-iw="answer"][data-question="responsibilities-2"]');
+  submit({ status:'Agreed', decision:'Finance owns invoice verification.' });
+  click('[data-iw="complete"]');
+  assert.match(document.getElementById('iwForm').textContent, /2 agreed decisions.*1 Project Item/s);
+  const stale = document.getElementById('iwForm');
+  api.mutate(d => {
+    d.projects.find(row => row.id === projectId).implementationWorkshops[0].answers['responsibilities-2'].decision += ' AP backs up.';
+  });
+  submit({ companyId, itemType:'Blueprint' });
+  assert.match(document.getElementById('toast').textContent, /workshop changed/i);
+  assert.equal(api.state().specs.length, 0);
+  api.closeModal();
+  click('[data-iw="complete"]');
+  const completed = submit({ companyId, itemType:'Blueprint' });
+  assert.equal(document.getElementById('modal').open, false, document.getElementById('toast').textContent);
+  submitLocal(window, completed);
+  submitLocal(window, stale);
+  await settle();
+  const workshop = api.state().projects.find(row => row.id === projectId).implementationWorkshops[0];
+  assert.equal(workshop.completion.outputs.length, 2);
+  const decision = api.state().projectDecisions.find(row => row.id === workshop.completion.outputs[0].decisionId);
+  assert.equal(decision.companyId, companyId);
+  assert.equal(decision.owner, 'Warehouse');
+  assert.equal(decision.date, '2026-11-27');
+  assert.equal(decision.category, 'Departments & responsibilities');
+  assert.equal(api.state().projectDecisions.length, 2);
+  const item = api.state().specs[0];
+  assert.equal(api.state().specs.length, 1);
+  assert.equal(item.id, workshop.completion.outputs[0].itemId);
+  assert.equal(item.description, 'Configure receipt approval');
+  assert.equal(item.dueDate, '2026-12-04');
+  assert.equal(item.companyId, companyId);
+  assert.equal(item.status, 'Not yet Started');
+  assert.match(item.remarks, /Responsible department or person\nWarehouse/);
+  assert.equal(document.querySelector('[data-iw="complete"]'), null);
+  click('[data-action="project-view"][data-view="overview"]');
+  await settle();
+  assert.match(document.querySelector('.iw-summary').textContent, /Inventory ownership workshop.*2 published decisions.*1 Project Item/s);
+  api.showCompanies();
+  assert.match(document.querySelector('.iw-summary').textContent, /Departments & responsibilities.*Warehouse posts receipts/s);
+  click('[data-action="project-view"][data-view="items"]');
+  await settle();
+  assert.match(document.getElementById('view').textContent, /Configure receipt approval/);
+  await api.flushCloud();
+  const snapshot = api.parseBackup(JSON.stringify(db.row.document));
+  assert.equal(snapshot.projectDecisions.length, 2);
+  assert.equal(snapshot.projects.find(row => row.id === projectId).implementationWorkshops[0].completion.outputs[0].itemId, item.id);
+  const reopened = await app(t, { login:false, remote:copy(db.row) });
+  await reopened.api.loadCloud(sessionUser);
+  reopened.api.showCompanies();
+  assert.match(reopened.document.querySelector('.iw-summary').textContent, /Finance owns invoice verification\. AP backs up\./);
+});
+
 function showSubjectShelf(ctx) {
   ctx.api.showTab('snippets');
   ctx.document.querySelector('[data-wl="shelf"][data-shelf="subjects"]').click();
