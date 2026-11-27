@@ -13,7 +13,8 @@ let filesLibrary = null,
 let access = null,
   userManagement = null,
   storageManager = null,
-  projectItemsWorkspace = null;
+  projectItemsWorkspace = null,
+  implementationWorkshop = null;
 
 // =============================================================================
 // 1. Defaults, field definitions and shared helpers
@@ -271,6 +272,7 @@ function validate(d) {
     throw Error('Invalid built-in lists.');
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(d.calendarMonth)) throw Error('Invalid calendar month.');
   validateProjects(d);
+  WorkHubImplementationEngine.validate(d.projects);
   validateFeatures(d);
   return d;
 }
@@ -5886,6 +5888,7 @@ function renderProjectDashboard() {
     ['companies', 'Companies & processes'],
     ['people', 'People & responsibilities'],
     ['solution', 'Solution Studio'],
+    ['implementation', 'Implementation template'],
     ['gates', 'Phase gates'],
     ['feedback', 'Phase Feedback'],
     ['go-live-issues', 'Go-Live issues'],
@@ -5896,7 +5899,7 @@ function renderProjectDashboard() {
     )
     .join(
       ''
-    )}</div><button class="primary" data-action="new-plan">Plan activity</button></div>${projectView === 'calendar' ? renderProjectCalendar() : projectView === 'items' ? renderProjectSpecs() : projectView === 'companies' ? renderProjectCompanies() : projectView === 'people' ? hub?.people?.render(p.id) || '' : projectView === 'solution' ? hub?.solution?.render(p.id) || '' : projectView === 'gates' ? renderPhaseGates() : projectView === 'feedback' ? renderPhaseFeedback() : projectView === 'go-live-issues' ? hub?.goLiveIssues?.render(p.id) || '' : renderProjectOverview(m) + watchlistPanel()}`;
+    )}</div><button class="primary" data-action="new-plan">Plan activity</button></div>${projectView === 'calendar' ? renderProjectCalendar() : projectView === 'items' ? renderProjectSpecs() : projectView === 'companies' ? renderProjectCompanies() : projectView === 'people' ? hub?.people?.render(p.id) || '' : projectView === 'solution' ? hub?.solution?.render(p.id) || '' : projectView === 'implementation' ? implementationWorkshop?.render(p) || '' : projectView === 'gates' ? renderPhaseGates() : projectView === 'feedback' ? renderPhaseFeedback() : projectView === 'go-live-issues' ? hub?.goLiveIssues?.render(p.id) || '' : renderProjectOverview(m) + watchlistPanel()}`;
 }
 
 function gateDueState(g) {
@@ -11450,6 +11453,22 @@ hub = WorkHubStudio.install({
   ticket(id) {
     detail(id);
   },
+});
+implementationWorkshop = WorkHubImplementationWorkshop.install({
+  project: () => activeProject(),
+  active: () =>
+    tab === 'specs' &&
+    projectView === 'implementation' &&
+    (!CLOUD_MODE || cloud.ready) &&
+    (!access || access.can('specs')),
+  account: () => JSON.stringify([cloud.user?.id || '', cloud.generation]),
+  can: action => !access || access.can('specs', action),
+  mutate,
+  openModal,
+  closeModal,
+  tell,
+  uid,
+  download,
 });
 projectItemsWorkspace = WorkHubProjectItems.install({
   state: () => state,
