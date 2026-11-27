@@ -1,0 +1,96 @@
+/* Implementation workshop controls and answer lists. */
+.iw-toolbar,
+.iw-filters,
+.iw-fields,
+.iw-editor {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: 12px 16px;
+}
+.iw-toolbar {
+  align-items: end;
+}
+.iw-toolbar .actions {
+  margin-bottom: 0.35rem;
+}
+.iw-workspace label,
+.iw-form label {
+  min-width: 0;
+}
+.iw-workspace label > input,
+.iw-workspace label > select,
+.iw-form label > input,
+.iw-form label > select,
+.iw-form label > textarea {
+  display: block;
+  width: 100%;
+  margin-top: 5px;
+}
+.iw-progress {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+  margin: 14px 0 18px;
+}
+.iw-progress progress {
+  width: min(100%, 16rem);
+  accent-color: var(--accent);
+}
+.iw-progress span,
+.iw-topic small,
+.iw-scope {
+  color: var(--muted);
+}
+.iw-scope,
+.iw-topic strong,
+.iw-decision {
+  overflow-wrap: anywhere;
+}
+.iw-topic {
+  margin-top: 18px;
+}
+.iw-topic ul {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+}
+.iw-topic li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+.iw-topic li > div {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+.iw-status {
+  display: inline-block;
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-left: 8px;
+}
+.iw-topic small {
+  display: block;
+}
+.iw-decision {
+  white-space: pre-wrap;
+  margin: 6px 0 0;
+}
+.iw-fields,
+.iw-wide {
+  grid-column: 1 / -1;
+}
+.iw-fields {
+  border: 0;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+}
+.iw-fields p {
+  margin: 0;
+}
