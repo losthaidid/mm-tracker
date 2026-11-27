@@ -41,11 +41,21 @@
       ...new Set([...String(body).matchAll(/\{([A-Za-z][A-Za-z0-9_]{0,63})\}/g)].map(m => m[1])),
     ];
   }
+  const isSubject = s => s?.kind === 'email-subject';
+  const singleLine = value =>
+    String(value ?? '')
+      .replace(/[\r\n\u0085\u2028\u2029]+/g, ' ')
+      .trim();
   function renderSnippet(s, values, format = 'plain') {
-    const value = k => (Object.hasOwn(values || {}, k) ? String(values[k] ?? '').trim() : ''),
-      keys = placeholders(s.body),
+    const subject = isSubject(s);
+    const value = k => {
+      if (!Object.hasOwn(values || {}, k)) return '';
+      return subject ? singleLine(values[k]) : String(values[k] ?? '').trim();
+    };
+    const keys = placeholders(s.body),
       missing = keys.filter(k => !value(k));
     const body = s.body.replace(/\{([A-Za-z][A-Za-z0-9_]{0,63})\}/g, (all, k) => value(k) || all);
+    if (subject) return { missing, text: singleLine(body), html: '' };
     const esc = x =>
       String(x).replace(
         /[&<>"']/g,
@@ -133,7 +143,7 @@
         throw Error('Use unique bundle names of up to 120 characters.');
       names.add(b.name.toLowerCase());
     }
-    for (const s of h.snippets)
+    for (const s of h.snippets) {
       if (
         !text(s.title, 120) ||
         !s.title.trim() ||
@@ -147,6 +157,11 @@
         !text(s.updatedAt, 50)
       )
         throw Error('Check the snippet title, message and bundle (up to 40 placeholders).');
+      if (isSubject(s) && (s.body !== singleLine(s.body) || s.bundleId))
+        throw Error(
+          'An email subject template must contain one line and belong to the subject section.'
+        );
+    }
     for (const f of h.fields) validateField(f);
     for (const e of h.events) {
       if (
@@ -565,6 +580,8 @@
     validate,
     prepare,
     placeholders,
+    isSubject,
+    singleLine,
     renderSnippet,
     contextValues,
     validateField,

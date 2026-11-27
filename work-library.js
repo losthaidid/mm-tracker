@@ -89,8 +89,13 @@
   function install(a) {
     const $ = id => document.getElementById(id),
       state = () => a.state(),
-      data = () => state().workhub.workLibrary;
+      data = () => state().workhub.workLibrary,
+      messages = () => data().snippets.filter(s => !E.isSubject(s)),
+      can = (feature, action = 'view') => a.can?.(feature, action) ?? true;
     let owner = '',
+      shelf = 'messages',
+      subjectQuery = '',
+      subjectEdit = null,
       bundle = '',
       query = '',
       compose = null,
@@ -103,7 +108,9 @@
       const next = a.owner?.() || '';
       if (owner !== next) {
         owner = next;
-        bundle = query = fieldQuery = '';
+        shelf = 'messages';
+        subjectEdit = null;
+        bundle = query = fieldQuery = subjectQuery = '';
         compose = fieldSource = insertField = timelineState = undo = null;
         $('wlUndo')?.remove();
       }
@@ -150,7 +157,7 @@
     }
     function snippetRows() {
       const q = query.toLowerCase();
-      return data().snippets.filter(
+      return messages().filter(
         s =>
           (!bundle || bundle === 'none' ? !bundle || !s.bundleId : s.bundleId === bundle) &&
           (s.title + ' ' + s.category + ' ' + s.body).toLowerCase().includes(q)
@@ -239,6 +246,9 @@
     }
     function render() {
       ready();
+      const savedMessages = messages();
+      const subjects = data().snippets.filter(E.isSubject);
+      const showingSubjects = shelf === 'subjects';
       const bundleButton = (id, name, count) =>
         btn(
           'bundle',
@@ -248,34 +258,167 @@
         );
       return (
         '<section class="wl-workspace wl-snippets-page" aria-label="Snippets library"><header class="wl-hero"><div class="wl-hero-copy"><span class="wl-eyebrow">YOUR COMMUNICATION SHELF</span><h2>The right words, ready.</h2><p>Keep your best wording. Make every message your own.</p><div class="wl-library-summary"><span><b>' +
-        data().snippets.length +
+        savedMessages.length +
         '</b> saved message' +
-        (data().snippets.length === 1 ? '' : 's') +
+        (savedMessages.length === 1 ? '' : 's') +
         '</span><span><b>' +
         data().bundles.length +
         '</b> bundle' +
         (data().bundles.length === 1 ? '' : 's') +
+        '</span><span><b>' +
+        subjects.length +
+        '</b> subject template' +
+        (subjects.length === 1 ? '' : 's') +
         '</span></div></div><div class="wl-actions">' +
-        btn('bundles', 'Manage bundles', '', 'wl-soft') +
-        btn('snippet-edit', '＋ New snippet', '', 'wl-primary') +
-        '</div></header><div class="wl-library-layout"><aside class="wl-sidebar" aria-label="Filter snippets by bundle"><span class="wl-eyebrow">YOUR BUNDLES</span>' +
-        bundleButton('', 'All snippets', data().snippets.length) +
-        data()
-          .bundles.map(b =>
-            bundleButton(b.id, b.name, data().snippets.filter(s => s.bundleId === b.id).length)
+        (showingSubjects
+          ? can('snippets', 'create')
+            ? btn('subject-new', 'New subject template', '', 'wl-primary')
+            : ''
+          : btn('bundles', 'Manage bundles', '', 'wl-soft') +
+            btn('snippet-edit', '＋ New snippet', '', 'wl-primary')) +
+        '</div></header><div class="wl-shelf-switch" role="group" aria-label="Snippets sections">' +
+        [
+          ['messages', 'Message snippets'],
+          ['subjects', 'Email subject templates'],
+        ]
+          .map(([key, label]) =>
+            btn('shelf', label, 'data-shelf="' + key + '" aria-pressed="' + (shelf === key) + '"')
           )
           .join('') +
-        bundleButton('none', 'Unbundled', data().snippets.filter(s => !s.bundleId).length) +
-        '<div class="wl-sidebar-note"><span aria-hidden="true">✉</span><h3>A little less retyping.</h3><p>Choose a message, fill in its fields, then review and copy.</p></div></aside><div class="wl-library-main"><div class="wl-search-bar"><label class="wl-search">Find a message<input id="wlSnippetSearch" type="search" value="' +
-        esc(query) +
-        '" placeholder="Search title, category or message…" aria-controls="wlSnippetCards"></label><span class="wl-search-note">Your wording, ready to reuse.</span></div><div id="wlSnippetCards">' +
-        cards() +
-        '</div></div></div></section>'
+        '</div>' +
+        (showingSubjects
+          ? subjectShelf()
+          : '<div class="wl-library-layout"><aside class="wl-sidebar" aria-label="Filter snippets by bundle"><span class="wl-eyebrow">YOUR BUNDLES</span>' +
+            bundleButton('', 'All snippets', savedMessages.length) +
+            data()
+              .bundles.map(b =>
+                bundleButton(b.id, b.name, savedMessages.filter(s => s.bundleId === b.id).length)
+              )
+              .join('') +
+            bundleButton('none', 'Unbundled', savedMessages.filter(s => !s.bundleId).length) +
+            '<div class="wl-sidebar-note"><span aria-hidden="true">✉</span><h3>A little less retyping.</h3><p>Choose a message, fill in its fields, then review and copy.</p></div></aside><div class="wl-library-main"><div class="wl-search-bar"><label class="wl-search">Find a message<input id="wlSnippetSearch" type="search" value="' +
+            esc(query) +
+            '" placeholder="Search title, category or message…" aria-controls="wlSnippetCards"></label><span class="wl-search-note">Your wording, ready to reuse.</span></div><div id="wlSnippetCards">' +
+            cards() +
+            '</div></div></div>') +
+        '</section>'
       );
+    }
+    function subjectShelf() {
+      return `<section class="wl-subject-shelf" aria-label="Email subject templates">
+        <div class="wl-search-bar"><label class="wl-search">Find a subject template<input type="search" id="wlSubjectSearch" value="${esc(subjectQuery)}" placeholder="Search names, subjects or placeholders" aria-controls="wlSubjectCards"></label></div>
+        <div id="wlSubjectCards">${subjectCards()}</div></section>`;
+    }
+    function subjectCards() {
+      const q = subjectQuery.trim().toLowerCase();
+      const rows = data().snippets.filter(
+        s => E.isSubject(s) && (s.title + ' ' + s.body).toLowerCase().includes(q)
+      );
+      const heading = `<div class="wl-result-line"><h3>Email subject templates</h3><span role="status">${rows.length} template${rows.length === 1 ? '' : 's'}</span></div>`;
+      if (!rows.length)
+        return (
+          heading +
+          (q
+            ? '<p class="wl-empty">No matching subject templates.</p>'
+            : '<div class="wl-empty"><h3>Save your first subject template</h3><p>For example, <code>[{project}] {ticket} – {topic}</code>. Fill in the details each time you use it.</p></div>')
+        );
+      return (
+        heading +
+        `<div class="wl-snippet-grid">${rows
+          .map(s => {
+            const id = `data-id="${esc(s.id)}"`;
+            return `<article class="wl-snippet"><div class="wl-snippet-content"><h3 class="hub-sensitive">${esc(s.title)}</h3><p class="wl-excerpt hub-sensitive">${esc(s.body)}</p></div>
+          <div class="wl-card-actions">${btn('compose', 'Use subject', id, 'wl-primary')}${can('snippets', 'edit') ? btn('subject-edit', 'Edit', id + ` aria-label="Edit ${esc(s.title)}"`) : ''}${can('snippets', 'delete') ? btn('snippet-remove', 'Remove', id + ` aria-label="Remove ${esc(s.title)}"`, 'wl-quiet') : ''}</div></article>`;
+          })
+          .join('')}</div>`
+      );
+    }
+    const subjectFields = ['project', 'ticket', 'system', 'client', 'tr_number', 'today'];
+    function sameSubject(current, original) {
+      return (
+        E.isSubject(current) &&
+        ['id', 'title', 'body', 'updatedAt'].every(key => current[key] === original[key])
+      );
+    }
+    function subjectEditor(id = '') {
+      ready();
+      if (!can('snippets', id ? 'edit' : 'create'))
+        throw Error('Your account cannot save this template.');
+      const s = data().snippets.find(row => row.id === id);
+      if (id && !E.isSubject(s)) throw Error('This subject template no longer exists.');
+      form(
+        id ? 'Edit email subject template' : 'New email subject template',
+        'wlSubject',
+        field(
+          'title',
+          'Template name',
+          s?.title,
+          'text',
+          'required maxlength="120" placeholder="Testing request"'
+        ) +
+          `<div class="wl-wide">${field('body', 'Subject line', s?.body, 'text', 'required maxlength="12000" placeholder="[{project}] {ticket} – {topic}"')}</div>
+         <div class="wl-wide"><p class="wl-help">Use braces around any field name, such as <code>{topic}</code> or <code>{po_number}</code>. Repeated fields share one value. <code>{today}</code> fills in the current date.</p>
+         <div class="wl-subject-tokens" role="group" aria-label="Insert a placeholder">${subjectFields.map(k => btn('insert-placeholder', '{' + k + '}', `data-field="${k}"`)).join('')}</div></div>`,
+        `data-id="${esc(id)}" data-access-feature="snippets"`
+      );
+      subjectEdit = {
+        form: $('wlSubject'),
+        id,
+        original: s ? E.copy(s) : null,
+        owner,
+        generation: a.cloud?.()?.generation,
+      };
+    }
+    function saveSubject(f, get) {
+      const draft = subjectEdit;
+      if (
+        !draft ||
+        draft.form !== f ||
+        f !== $('wlSubject') ||
+        !$('modal').open ||
+        owner !== draft.owner ||
+        a.cloud?.()?.generation !== draft.generation ||
+        !can('snippets', draft.id ? 'edit' : 'create')
+      )
+        throw Error('Reopen the subject template before saving.');
+      const title = get('title'),
+        body = E.singleLine(get('body'));
+      if (!title || !body) throw Error('Enter a template name and a subject line.');
+      if (E.placeholders(body).length > 40)
+        throw Error('Use up to 40 different placeholders in one subject.');
+      const ok = save(d => {
+        const rows = d.workhub.workLibrary.snippets;
+        const i = rows.findIndex(s => s.id === draft.id);
+        if (draft.id && !sameSubject(rows[i], draft.original))
+          throw Error('This template changed. Reopen it before saving.');
+        const now = E.now();
+        const record = {
+          ...rows[i],
+          id: draft.id || E.uid(),
+          kind: 'email-subject',
+          title,
+          body,
+          bundleId: '',
+          category: '',
+          createdAt: draft.original?.createdAt || now,
+          updatedAt: now,
+        };
+        if (i < 0) rows.push(record);
+        else rows[i] = record;
+      }, 'Subject template saved.');
+      if (ok) {
+        subjectEdit = null;
+        a.closeModal();
+        if (!(title + ' ' + body).toLowerCase().includes(subjectQuery.trim().toLowerCase())) {
+          subjectQuery = '';
+          a.render();
+        }
+      }
     }
     function snippetEditor(id = '') {
       ready();
       const s = data().snippets.find(s => s.id === id) || {};
+      if (E.isSubject(s)) return subjectEditor(id);
       form(
         id ? 'Edit message snippet' : 'A message worth keeping',
         'wlSnippet',
@@ -342,84 +485,205 @@
           '<button class="primary" type="submit">Add bundle</button></div></form>'
       );
     }
+    function subjectRecordValues(kind, id) {
+      if (
+        !['tickets', 'tasks', 'projects'].includes(kind) ||
+        !can(kind === 'projects' ? 'specs' : kind)
+      )
+        return {};
+      const record = E.record(state(), kind, id);
+      if (!record) return {};
+      const values = E.contextValues(state(), kind, id);
+      if (!can('tickets')) values.ticket = values.ticket_number = '';
+      if (!can('specs')) values.project = '';
+      if (kind === 'tasks') {
+        values.tr_number = record.trNumber || '';
+        values.transport = values.tr_number || values.transport;
+      }
+      return values;
+    }
+    function subjectSources(keys) {
+      const kinds = ['tickets', 'tasks', 'projects'].filter(kind => {
+        if (!can(kind === 'projects' ? 'specs' : kind) || !state()[kind]?.length) return false;
+        const values = subjectRecordValues(kind, state()[kind][0].id);
+        return keys.some(k => Object.hasOwn(values, k));
+      });
+      return kinds.length
+        ? '<div class="wl-subject-source">' +
+            select(
+              'sourceKind',
+              'Fill from a work record',
+              kinds.map(k => [k, kindNames[k]]),
+              '',
+              'Enter details manually'
+            ) +
+            '<label class="wl-field" hidden>Work record<select name="sourceRecord" disabled></select></label></div>'
+        : '';
+    }
+    function fillSubjectSource(f, changeKind) {
+      if (f !== compose?.form || !compose.subject) return;
+      const kind = f.elements.sourceKind.value,
+        picker = f.elements.sourceRecord;
+      if (changeKind) {
+        const rows =
+          ['tickets', 'tasks', 'projects'].includes(kind) &&
+          can(kind === 'projects' ? 'specs' : kind)
+            ? state()[kind]
+            : [];
+        picker.innerHTML = options(
+          rows.map(r => [r.id, E.singleLine(E.title(r, kind)).slice(0, 180)]),
+          '',
+          'Choose a record'
+        );
+        picker.disabled = !rows.length;
+        picker.parentElement.hidden = picker.disabled;
+      }
+      const values = subjectRecordValues(kind, picker.value);
+      const filled = Object.create(null);
+      for (const el of f.querySelectorAll('[data-placeholder]')) {
+        const key = el.dataset.placeholder;
+        if (key === 'today' || (el.value && el.value !== compose.prefilled[key])) continue;
+        const value = Object.hasOwn(values, key) ? E.singleLine(values[key]) : '';
+        el.value = value;
+        filled[key] = value;
+      }
+      compose.prefilled = filled;
+      updatePreview();
+    }
     function composer(id, kind = '', recordId = '') {
       ready();
       const s = data().snippets.find(s => s.id === id);
       if (!s) throw Error('This snippet no longer exists.');
-      compose = { id, kind, recordId };
-      const values = E.contextValues(state(), kind, recordId),
+      const subject = E.isSubject(s);
+      if (subject && !can('snippets')) throw Error('Your account cannot open subject templates.');
+      compose = {
+        id,
+        subject,
+        body: s.body,
+        owner,
+        generation: a.cloud?.()?.generation,
+        prefilled: Object.create(null),
+      };
+      const values = subject
+          ? { ...subjectRecordValues(kind, recordId), today: a.today() }
+          : E.contextValues(state(), kind, recordId),
         keys = E.placeholders(s.body);
-      open(
-        'Compose · ' + s.title,
-        '<form id="wlCompose" data-id="' +
-          esc(id) +
-          '"><div class="wl-composer-intro"><span class="wl-eyebrow">MAKE IT FIT THIS MOMENT</span><h3>' +
+      const staticSubject = subject && !keys.length;
+      const intro = subject
+        ? ''
+        : '<div class="wl-composer-intro"><span class="wl-eyebrow">MAKE IT FIT THIS MOMENT</span><h3>' +
           esc(s.title) +
           '</h3><p>' +
           (recordId
             ? 'Available record details are filled below. Review every value before copying.'
             : 'Fill the changing details, review the message, then copy it.') +
-          '</p></div><div class="wl-composer-layout"><section><h3 class="wl-small-heading">The details</h3><div class="wl-compose-fields">' +
+          '</p></div>';
+      open(
+        (subject ? 'Email subject · ' : 'Compose · ') + s.title,
+        '<form id="wlCompose" data-id="' +
+          esc(id) +
+          '"' +
+          (subject ? ' data-access-feature="snippets"' : '') +
+          '>' +
+          intro +
+          `<div class="wl-composer-layout${staticSubject ? ' wl-subject-static' : ''}"><section${staticSubject ? ' hidden' : ''}><h3 class="wl-small-heading">The details</h3>` +
+          (subject ? subjectSources(keys) : '') +
+          '<div class="wl-compose-fields">' +
           keys
             .map(k =>
               field(
                 'p_' + k,
                 k.replaceAll('_', ' '),
-                Object.hasOwn(values, k) ? values[k] : '',
+                Object.hasOwn(values, k) ? (subject ? E.singleLine(values[k]) : values[k]) : '',
                 'text',
                 'maxlength="4000" data-placeholder="' + esc(k) + '"'
               )
             )
             .join('') +
-          (!keys.length
+          (!subject && !keys.length
             ? '<p class="wl-help">This snippet has no placeholders. Its wording is ready to review.</p>'
             : '') +
           '</div>' +
-          select(
-            'copyFormat',
-            'Copy format',
-            [
-              ['plain', 'Plain text'],
-              ['email', 'Email layout (rich text)'],
-              ['ticket', 'Ticket comment (Markdown)'],
-            ],
-            'plain'
-          ) +
-          '</section><section class="wl-message-paper"><div class="wl-message-heading"><span class="wl-eyebrow">YOUR MESSAGE PREVIEW</span><span id="wlMissing" role="status"></span></div><div id="wlRichPreview" hidden></div><textarea id="wlMessagePreview" readonly aria-label="Completed message preview" rows="13"></textarea><div class="wl-copy-bar">' +
-          btn('copy', 'Copy message', '', 'wl-primary') +
-          '<small id="wlCopyHelp">Review before copying.</small></div></section></div></form>'
+          (subject
+            ? ''
+            : select(
+                'copyFormat',
+                'Copy format',
+                [
+                  ['plain', 'Plain text'],
+                  ['email', 'Email layout (rich text)'],
+                  ['ticket', 'Ticket comment (Markdown)'],
+                ],
+                'plain'
+              )) +
+          '</section><section class="wl-message-paper"><div class="wl-message-heading"><span class="wl-eyebrow">' +
+          (subject ? 'Subject preview' : 'YOUR MESSAGE PREVIEW') +
+          '</span><span id="wlMissing" role="status"></span></div>' +
+          (subject
+            ? '<textarea id="wlMessagePreview" class="wl-subject-preview" readonly aria-label="Completed subject preview" rows="3"></textarea>'
+            : '<div id="wlRichPreview" hidden></div><textarea id="wlMessagePreview" readonly aria-label="Completed message preview" rows="13"></textarea>') +
+          '<div class="wl-copy-bar">' +
+          btn('copy', subject ? 'Copy subject' : 'Copy message', '', 'wl-primary') +
+          '<small id="wlCopyHelp">' +
+          (subject ? '' : 'Review before copying.') +
+          '</small></div></section></div></form>'
       );
+      compose.form = $('wlCompose');
       updatePreview();
     }
     function composeResult() {
       const f = $('wlCompose'),
         s = data().snippets.find(s => s.id === compose?.id);
-      if (!f || !s) throw Error('Reopen the message composer.');
+      if (
+        !s ||
+        !f ||
+        f !== compose?.form ||
+        !$('modal').open ||
+        compose.owner !== a.owner?.() ||
+        compose.generation !== a.cloud?.()?.generation
+      )
+        throw Error('Reopen the composer.');
+      if (compose.subject && (!can('snippets') || !E.isSubject(s) || s.body !== compose.body))
+        throw Error('Reopen the subject template to use its current wording.');
       const values = Object.create(null);
       for (const el of f.querySelectorAll('[data-placeholder]'))
         values[el.dataset.placeholder] = el.value;
-      return {
-        ...E.renderSnippet(s, values, f.elements.namedItem('copyFormat').value),
-        format: f.elements.namedItem('copyFormat').value,
-      };
+      const format = compose.subject ? 'plain' : f.elements.namedItem('copyFormat').value;
+      return { ...E.renderSnippet(s, values, format), format };
     }
     function updatePreview() {
       if (!$('wlCompose')) return;
-      const r = composeResult();
+      let r;
+      try {
+        r = composeResult();
+      } catch (error) {
+        $('wlMessagePreview').value = '';
+        $('wlRichPreview')?.replaceChildren();
+        $('wlMissing').textContent = error.message;
+        $('wlCompose').querySelector('[data-wl="copy"]').disabled = true;
+        return;
+      }
       $('wlMessagePreview').value = r.text;
-      $('wlRichPreview').innerHTML = r.html;
-      $('wlRichPreview').hidden = r.format !== 'email';
+      const rich = $('wlRichPreview');
+      if (rich) {
+        rich.innerHTML = r.html;
+        rich.hidden = r.format !== 'email';
+      }
       $('wlMessagePreview').hidden = r.format === 'email';
       $('wlMissing').textContent = r.missing.length
         ? r.missing.length + ' detail' + (r.missing.length === 1 ? '' : 's') + ' to fill'
-        : 'Ready to review';
+        : compose.subject
+          ? 'Ready to copy'
+          : 'Ready to review';
       $('wlCompose').querySelector('[data-wl="copy"]').disabled = !!r.missing.length;
     }
     async function copyMessage() {
       ready();
       const r = composeResult();
       if (r.missing.length) throw Error('Fill the remaining placeholders before copying.');
-      const account = owner;
+      const account = owner,
+        form = compose.form,
+        subject = compose.subject;
       let rich = false;
       try {
         if (r.format === 'email' && root.ClipboardItem && navigator.clipboard?.write) {
@@ -432,21 +696,29 @@
           rich = true;
         } else if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(r.text);
         else throw Error('Clipboard unavailable');
-        if (account !== a.owner?.() || !$('wlCompose')) return;
+        if (account !== a.owner?.() || $('wlCompose') !== form || !$('modal').open) return;
         $('wlCopyHelp').textContent =
           r.format === 'email' && !rich
             ? 'Copied as plain text; rich copying is unavailable here.'
-            : 'Copied. Paste it into your communication tool.';
-        a.tell('Message copied.');
+            : subject
+              ? 'Copied. Paste into the email subject field.'
+              : 'Copied. Paste it into your communication tool.';
+        a.tell(subject ? 'Email subject copied.' : 'Message copied.');
       } catch {
-        if (account !== a.owner?.() || !$('wlCompose')) return;
-        $('wlRichPreview').hidden = true;
+        if (account !== a.owner?.() || $('wlCompose') !== form || !$('modal').open) return;
+        if ($('wlRichPreview')) $('wlRichPreview').hidden = true;
         $('wlMessagePreview').hidden = false;
         $('wlMessagePreview').focus();
         $('wlMessagePreview').select();
-        $('wlCopyHelp').textContent =
-          'Select the preview and copy it manually; browser copying is unavailable.';
-        a.tell('Your completed message is ready to select and copy.', true);
+        $('wlCopyHelp').textContent = subject
+          ? 'The subject is selected. Use your usual copy shortcut.'
+          : 'Select the preview and copy it manually; browser copying is unavailable.';
+        a.tell(
+          subject
+            ? 'Select and copy the subject preview.'
+            : 'Your completed message is ready to select and copy.',
+          true
+        );
       }
     }
     function chooseSnippet(kind, id) {
@@ -460,8 +732,8 @@
           '</span><h3 class="hub-sensitive">' +
           esc(E.title(r, kind)) +
           '</h3><p>Choose a message. Available ticket, project and system details will fill matching placeholders.</p></div><div class="wl-picker-list">' +
-          data()
-            .snippets.map(s =>
+          messages()
+            .map(s =>
               btn(
                 'compose',
                 '<strong>' +
@@ -476,9 +748,7 @@
             )
             .join('') +
           '</div>' +
-          (!data().snippets.length
-            ? '<p class="wl-empty">Create a message in Snippets first.</p>'
-            : '')
+          (!messages().length ? '<p class="wl-empty">Create a message in Snippets first.</p>' : '')
       );
     }
     function openFields(source = null, onInsert = null) {
@@ -787,6 +1057,29 @@
         a.closeModal();
         return;
       }
+      if (action === 'shelf') {
+        shelf = el.dataset.shelf === 'subjects' ? 'subjects' : 'messages';
+        a.render();
+        document.querySelector('[data-wl="shelf"][aria-pressed="true"]')?.focus();
+        return;
+      }
+      if (action === 'subject-new' || action === 'subject-edit') {
+        subjectEditor(action === 'subject-edit' ? id : '');
+        return;
+      }
+      if (action === 'insert-placeholder') {
+        const input = el.form?.elements.namedItem('body');
+        if (input && el.form === subjectEdit?.form && subjectFields.includes(el.dataset.field)) {
+          input.setRangeText(
+            '{' + el.dataset.field + '}',
+            input.selectionStart,
+            input.selectionEnd,
+            'end'
+          );
+          input.focus();
+        }
+        return;
+      }
       if (action === 'snippet-edit') {
         snippetEditor(id);
         return;
@@ -865,6 +1158,11 @@
                 : 'fields',
           r = data()[collection].find(x => x.id === id);
         if (!r) return;
+        const subject = collection === 'snippets' && E.isSubject(r);
+        const removalOwner = owner,
+          generation = a.cloud?.()?.generation;
+        if (subject && !can('snippets', 'delete'))
+          throw Error('Your account cannot remove this template.');
         if (
           !(await root.WorkHubDialogs.confirm(
             'Remove ' +
@@ -883,6 +1181,17 @@
         if (
           save(d => {
             const h = d.workhub.workLibrary;
+            if (
+              subject &&
+              (owner !== removalOwner ||
+                a.cloud?.()?.generation !== generation ||
+                !can('snippets', 'delete') ||
+                !sameSubject(
+                  h.snippets.find(x => x.id === id),
+                  r
+                ))
+            )
+              throw Error('Reopen the subject template before removing it.');
             h[collection] = h[collection].filter(x => x.id !== id);
             if (collection === 'bundles')
               for (const s of h.snippets) if (s.bundleId === id) s.bundleId = '';
@@ -924,6 +1233,7 @@
       const v = new FormData(formEl),
         get = k => String(v.get(k) || '').trim(),
         id = formEl.dataset.id;
+      if (formEl.id === 'wlSubject') return saveSubject(formEl, get);
       if (formEl.id === 'wlSnippet') {
         if (
           save(d => {
@@ -931,6 +1241,7 @@
               i = h.snippets.findIndex(s => s.id === id),
               old = h.snippets[i];
             if (id && i < 0) throw Error('Snippet no longer exists.');
+            if (E.isSubject(old)) throw Error('Open this template in Email subject templates.');
             const s = {
               id: id || E.uid(),
               title: get('title'),
@@ -1012,6 +1323,10 @@
       }
     });
     document.addEventListener('input', event => {
+      if (event.target.id === 'wlSubjectSearch') {
+        subjectQuery = event.target.value;
+        $('wlSubjectCards').innerHTML = subjectCards();
+      }
       if (event.target.id === 'wlSnippetSearch') {
         query = event.target.value;
         $('wlSnippetCards').innerHTML = cards();
@@ -1028,6 +1343,12 @@
       }
     });
     document.addEventListener('change', event => {
+      if (
+        event.target.form === compose?.form &&
+        compose?.subject &&
+        ['sourceKind', 'sourceRecord'].includes(event.target.name)
+      )
+        fillSubjectSource(event.target.form, event.target.name === 'sourceKind');
       if (event.target.name === 'copyFormat' && event.target.form?.id === 'wlCompose')
         updatePreview();
       if (event.target.name === 'timelineFilter' && timelineState) {
