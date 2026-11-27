@@ -1,5 +1,45 @@
 /* Implementation workshop controls and answer lists. */
-.iw-toolbar,
+.iw-workspace {
+  --iw-inset: clamp(14px, 2vw, 26px);
+}
+.iw-workspace .iw-heading {
+  padding: 20px var(--iw-inset);
+  border-bottom: 1px solid var(--vs-line, var(--line));
+}
+.iw-content {
+  padding: 18px var(--iw-inset) 22px;
+}
+.iw-empty {
+  margin: 0;
+  color: var(--hub-muted, var(--muted));
+}
+.iw-controls {
+  display: grid;
+  gap: 14px;
+  padding: clamp(12px, 1.4vw, 18px);
+  border: 1px solid var(--vs-line, var(--line));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--hub-accent, var(--accent)) 4%, var(--hub-surface, #fff));
+}
+.iw-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px 16px;
+}
+.iw-toolbar > label {
+  flex: 1 1 15rem;
+}
+.iw-toolbar .actions,
+.iw-completion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.iw-completion {
+  margin: 0;
+}
 .iw-filters,
 .iw-fields,
 .iw-editor {
@@ -7,15 +47,14 @@
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
   gap: 12px 16px;
 }
-.iw-toolbar {
-  align-items: end;
-}
-.iw-toolbar .actions {
-  margin-bottom: 0.35rem;
+.iw-filters {
+  padding-top: 14px;
+  border-top: 1px solid var(--vs-line, var(--line));
 }
 .iw-workspace label,
 .iw-form label {
   min-width: 0;
+  margin: 0;
 }
 .iw-workspace label > input,
 .iw-workspace label > select,
@@ -26,21 +65,34 @@
   width: 100%;
   margin-top: 5px;
 }
+.iw-controls label > input,
+.iw-controls label > select {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 2.5rem;
+  margin-bottom: 0;
+}
 .iw-progress {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 14px;
-  align-items: center;
-  margin: 14px 0 18px;
+  display: grid;
+  gap: 6px;
+  font-size: 0.875rem;
 }
 .iw-progress progress {
-  width: min(100%, 16rem);
-  accent-color: var(--accent);
+  width: min(100%, 26rem);
+  height: 0.6rem;
+  accent-color: var(--hub-accent, var(--accent));
 }
 .iw-progress span,
 .iw-topic small,
 .iw-scope {
-  color: var(--muted);
+  color: var(--hub-muted, var(--muted));
+}
+.iw-controls .iw-scope {
+  margin: 0;
+  font-size: 0.875rem;
+}
+.iw-scope strong {
+  margin-inline-end: 6px;
 }
 .iw-scope,
 .iw-topic strong,
@@ -48,34 +100,53 @@
   overflow-wrap: anywhere;
 }
 .iw-topic {
-  margin-top: 18px;
+  margin-top: 24px;
+}
+.iw-topic h3 {
+  margin: 0 0 10px;
 }
 .iw-topic ul {
   list-style: none;
-  margin: 8px 0;
+  margin: 0;
   padding: 0;
 }
 .iw-topic li {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: start;
   flex-wrap: wrap;
   gap: 8px 16px;
-  padding: 12px 0;
-  border-top: 1px solid var(--line);
+  padding: 14px 0;
+  border-top: 1px solid var(--vs-line, var(--line));
 }
 .iw-topic li > div {
   flex: 1 1 14rem;
   min-width: 0;
 }
-.iw-status {
-  display: inline-block;
-  color: var(--muted);
-  font-size: 0.8rem;
-  margin-left: 8px;
+.iw-topic li > button {
+  min-width: min(100%, 7rem);
 }
-.iw-topic small {
-  display: block;
+.iw-question-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+}
+.iw-status {
+  color: var(--hub-muted, var(--muted));
+  font-size: 0.8rem;
+  line-height: 1.4;
+  padding: 2px 8px;
+  border: 1px solid var(--vs-line, var(--line));
+  border-radius: 999px;
+}
+.iw-topic .hint {
+  margin: 0 0 10px;
+}
+#iwQuestions > .hint {
+  margin-bottom: 0;
 }
 .iw-decision {
   white-space: pre-wrap;
