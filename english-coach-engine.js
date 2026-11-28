@@ -44,7 +44,7 @@
     "(?:can(?:['’]t)?|(?:could|should|would|must|might)(?:n['’]t)?|may|shall|will|won['’]t|shan['’]t)";
   // Limit inverted noun phrases to familiar subject forms to avoid treating any following noun as a verb.
   const subjects = `(?:i|you|he|she|it|we|they|(?:the|a|an|this|that|our|your|my|their)${horizontal}(?:(?:new|current|original|revised|updated|purchase|project|support|finance)${horizontal})?(?:team|supplier|buyer|user|approver|manager|requester|system|order|request|report|document|file|invoice|PO|PR)s?)`;
-  const adverbs = '(?:please|not|still|also|really|just|already|ever|only|possibly)';
+  const adverbs = '(?:please|kindly|not|still|also|really|just|already|ever|only|possibly)';
   const modalPattern = new RegExp(
     String.raw`\b(${modals})(${horizontal}${subjects})?((?:${horizontal}${adverbs})?${horizontal})(${Object.keys(modalForms).join('|')})\b`,
     'gi'
@@ -413,6 +413,24 @@
     /```[\s\S]*?(?:```|$)|`[^`\r\n]+`|(?:https?:\/\/|www\.)[^\s<>]+|[\w.+-]+@[\w.-]+\.[a-z]{2,}|\b[\w.-]+\.(?:csv|xlsx?|docx?|pdf|pptx?|txt|json|xml|abap)\b|[A-Z0-9]+(?:_[A-Z0-9]+)+|\t/gi;
   const masked = '\ufffc';
 
+  function reviewText(draft) {
+    const text = draft
+      .replace(/[\u00a0\u2007\u202f]/g, ' ')
+      .replace(technicalText, token => token.replace(/[^\r\n]/g, masked));
+    if (!text.includes('  ')) return { scan: text, offset: index => index };
+
+    // Match ordinary word spacing and keep every boundary in the original draft.
+    const positions = [];
+    let scan = '';
+    for (let index = 0; index < text.length; index++) {
+      if (text[index] === ' ' && text[index - 1] === ' ') continue;
+      positions.push(index);
+      scan += text[index];
+    }
+    positions.push(text.length);
+    return { scan, offset: index => positions[index] };
+  }
+
   function changedRange(original, replacement, start) {
     let left = 0,
       before = original.length,
@@ -440,9 +458,8 @@
   function check(text, mode) {
     const found = [];
     const draft = text.slice(0, maxText);
-    const scan = draft
-      .replaceAll('\u00a0', ' ')
-      .replace(technicalText, token => token.replace(/[^\r\n]/g, masked));
+    const { scan, offset } = reviewText(draft);
+    if (!scan.trim()) return found;
     for (const { id, type, pattern, replace, reason, context } of checks) {
       if (context && mode !== context) continue;
       for (const match of scan.matchAll(pattern)) {
@@ -477,26 +494,45 @@
           /^ +(?:blades?|cutters?|teeth|dust|mills?|operators?)\b/i.test(scan.slice(end, end + 20))
         )
           continue;
-        const original = draft.slice(start, end);
+        const originalStart = offset(start),
+          originalEnd = offset(end);
+        const original = draft.slice(originalStart, originalEnd);
         const replacement = replace === null ? null : replace(...match, start, scan);
         if (replacement === undefined || replacement === match[0]) continue;
         if (replacement === null) {
-          found.push({ id, type, reason, start, end, original, replacement });
+          found.push({
+            id,
+            type,
+            reason,
+            start: originalStart,
+            end: originalEnd,
+            original,
+            replacement,
+          });
           continue;
         }
         const corrected = /^[A-Z]/.test(original)
           ? replacement.charAt(0).toUpperCase() + replacement.slice(1)
           : replacement;
-        if (original === corrected) continue;
+        if (match[0] === corrected) continue;
+        const change = changedRange(match[0], corrected, start);
+        const edit = {
+          start: offset(change.start),
+          end: offset(change.end),
+          replacement: change.replacement,
+        };
         found.push({
           id,
           type,
           reason,
-          start,
-          end,
+          start: originalStart,
+          end: originalEnd,
           original,
-          replacement: corrected,
-          edit: changedRange(original, corrected, start),
+          replacement:
+            draft.slice(originalStart, edit.start) +
+            edit.replacement +
+            draft.slice(edit.end, originalEnd),
+          edit,
         });
       }
     }

@@ -2530,6 +2530,43 @@ test('English Coach live feedback corrects both reported everyday sentences as t
   assert.equal(db.calls.length, writes);
 });
 
+test('English Coach live feedback corrects the reported time subject and refreshes stale suggestions', async t => {
+  const timers = new Map();
+  const { api, document, window } = await app(t, { startupTimers: timers });
+  api.showTab('knowledge');
+  document.querySelector('[data-mmk="tab"][data-mode="english"]').click();
+  const editor = document.getElementById('ecEditor');
+  const type = html => {
+    editor.innerHTML = html;
+    editor.dispatchEvent(new window.Event('input', { bubbles: true }));
+  };
+  const review = () => {
+    const pending = [...timers.values()].find(timer => timer.delay === 320);
+    assert.ok(pending, 'typing scheduled Live Feedback');
+    pending.callback();
+  };
+  const apply = () => document.querySelector('#ecIssues [data-ec="apply"]');
+  const count = document.getElementById('ecCount');
+  type('<p><strong>today</strong> &nbsp; <em>are</em> a fun day.</p>');
+  review();
+  assert.equal(count.textContent, '2 suggestions');
+  apply().click();
+  apply().click();
+  assert.equal(editor.textContent, 'Today \u00a0 is a fun day.');
+  assert.equal(editor.querySelector('strong').textContent, 'Today');
+  assert.equal(editor.querySelector('em').textContent, 'is');
+  assert.equal(count.textContent, '');
+
+  type('<p>Today are a fun day.</p>');
+  review();
+  assert.equal(count.textContent, '1 suggestion');
+  const outdated = apply();
+  type('<p>Today are you free?</p>');
+  outdated.click();
+  assert.equal(editor.textContent, 'Today are you free?');
+  assert.equal(apply(), null);
+});
+
 test('English Coach live feedback reviews multiple grammar topics, links their lessons and preserves draft formatting', async t => {
   const timers = new Map();
   const { api, document, window, db } = await app(t, { startupTimers: timers });

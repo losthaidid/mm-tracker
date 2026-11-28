@@ -15,7 +15,8 @@
   const clause = '(?:^|(?<=[.!?;\\n]) *)';
   const end = '(?=[ ,.?!;\\n]|$)';
   const terminal = '(?= *(?:[.!?;\\n]|$))';
-  const adverb = '(?:(?:not|just|already|never|ever|always|still|really|also|please|only) )?';
+  const adverb =
+    '(?:(?:not|just|already|never|ever|always|still|really|also|please|kindly|only) )?';
   const objectStart =
     '(?= +(?:the|this|that|these|those|our|their|your|my|his|her|its|it|them|him|me|us|you|breakfast|lunch|dinner)\\b)(?! +the (?:next|following|same) (?:day|week|month|year)\\b)';
   const writtenNumber = '(?:two|three|four|five|six|seven|eight|nine|ten|several)';
@@ -316,6 +317,51 @@
     tomorrows: 'tomorrow',
     tonights: 'tonight',
   };
+  const sentenceStart = '(?:^ *|(?<=[.!?\\n]) *)';
+  const calendarWord = '(?:today|yesterday|tomorrow|tonight)';
+  const followsAbbreviation = (text, index) =>
+    /\b(?:[a-z]\.[a-z]|(?:mr|mrs|ms|dr|prof|st|vs|fig|no|dept|approx))\.$/i.test(
+      text.slice(Math.max(0, index - 16), index).trimEnd()
+    );
+  const calendarAdjective =
+    '(?:busy|quiet|good|bad|tiring|fun|cold|hot|different|fine|special|exciting|hard|easy|important|nice|long|short|sunny|rainy|better|worse|lovely|unusual|difficult)';
+  const calendarComplement = `(?= +(?:(?:not|very|really|quite|particularly|still) +){0,2}(?:an?\\b|another\\b|going to be\\b|(?:the|my|our|your) (?:day|deadline|date|start|end|first day|last day|anniversary)\\b|${day}\\b|${calendarAdjective}\\b(?= *(?:[.!?;,\\n]|$)| +(?:for|because|compared|when|to)\\b)))`;
+  const calendarAgreement = {
+    are: 'is',
+    were: 'was',
+    "aren't": 'isn’t',
+    'aren’t': 'isn’t',
+    "weren't": 'wasn’t',
+    'weren’t': 'wasn’t',
+    have: 'has',
+    "haven't": 'hasn’t',
+    'haven’t': 'hasn’t',
+  };
+  use(
+    'agreement',
+    rx(
+      `${sentenceStart}${calendarWord} +(?:(are|were|(?:are|were)n['’]t)\\b${calendarComplement}|(have(?:n['’]t)?)\\b(?= +(?:not +)?been\\b))`
+    ),
+    (match, be, have, index, text) => {
+      if (followsAbbreviation(text, index)) return;
+      const verb = be || have;
+      return match.slice(0, -verb.length) + sameCase(verb, calendarAgreement[verb.toLowerCase()]);
+    },
+    'Use a singular verb when today, tomorrow, yesterday or tonight is the subject.'
+  );
+  use(
+    'capitals',
+    new RegExp(
+      `${sentenceStart}(${calendarWord})(?= +(?:is|are|was|were|has|have|will|would|can|could|should|may|might|starts?|ends?|marks?|begins?)(?:n['’]t)?\\b)`,
+      'g'
+    ),
+    (match, time, index, text) => {
+      if (followsAbbreviation(text, index)) return;
+      return match.slice(0, -time.length) + time[0].toUpperCase() + time.slice(1);
+    },
+    'Capitalise the first word of a sentence.',
+    'Capitalisation'
+  );
   word(
     'word-formation',
     '\\b',
@@ -934,6 +980,16 @@
     '(?= +(?:first|earlier|sooner|yesterday|before|by)\\b)',
     'Use modal + have + past participle when you refer to a past action.'
   );
+  const modalPastForms = {
+    ...Object.fromEntries(Object.keys(completedVerbs).map(form => [form, form])),
+    ...differentPast,
+  };
+  use(
+    'modal-past',
+    rx(`\\b((?:could|should|would|might|must)(?:n['’]t)?) +of +(${choices(modalPastForms)})\\b`),
+    (_, modal, form) => modal + ' have ' + sameCase(form, modalPastForms[form.toLowerCase()]),
+    'Use have after a modal when referring to the past. The contraction ’ve sounds like of.'
+  );
 
   use(
     'gerunds',
@@ -1158,20 +1214,24 @@
   ]);
   const passiveObject = `(?:${singularNoun}|${pluralNoun}|goods|labels?|receipts?|food|water|breakfast|lunch|dinner|rice)`;
   const passiveSubject = `(?:it|they|(?:the|this|that|these|those|our|your|their) +${nounModifiers}${passiveObject})`;
+  const bePassive = "(?:is|are|was|were)(?:n['’]t)?";
+  const havePassive = "(?:has|have|had)(?:n['’]t)?";
+  const modalPassive =
+    "(?:will|won['’]t|can(?:['’]t)?|(?:could|should|must|would|might)(?:n['’]t)?)";
   const passiveSuffix =
     '(?= +(?:by|on|to|from|before|after|yesterday|last|today|tomorrow|earlier|later|already|this (?:morning|week))\\b| *[,.!?;\\n]|$)';
   const passiveReason =
     'When the subject receives the action, use a past participle after be to form the passive.';
   word(
     'passive',
-    `\\b${passiveSubject} (?:(?:is|are|was|were|get|got)(?: already| just)?|(?:had|has|have) been|(?:will|should|must|can|could) be) `,
+    `\\b${passiveSubject} (?:${bePassive}|get|got|${havePassive} ${adverb}been|${modalPassive} ${adverb}be) ${adverb}`,
     passiveForm,
     passiveSuffix,
     passiveReason
   );
   word(
     'passive',
-    `${clause}(?:(?:is|are|was|were) ${passiveSubject}|(?:has|have|had) ${passiveSubject} been|(?:will|can|should|could) ${passiveSubject} be) ${adverb}`,
+    `${clause}(?:${bePassive} ${passiveSubject}|${havePassive} ${passiveSubject} ${adverb}been|${modalPassive} ${passiveSubject} ${adverb}be) ${adverb}`,
     passiveForm,
     passiveSuffix,
     passiveReason

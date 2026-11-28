@@ -182,11 +182,51 @@ test('the reported sentences and related everyday nouns, pronouns, tenses and pa
   }
 });
 
+const reliability = [
+  ['today are a fun day.', 'Today is a fun day.'],
+  ['yesterday were very tiring.', 'Yesterday was very tiring.'],
+  ['Tomorrow are going to be busy.', 'Tomorrow is going to be busy.'],
+  ['Tonight aren’t a holiday.', 'Tonight isn’t a holiday.'],
+  ['today have been a good day.', 'Today has been a good day.'],
+  ['Tomorrow are Monday.', 'Tomorrow is Monday.'],
+  ['A new release is due. today are our last day.', 'A new release is due. Today is our last day.'],
+  ['May   we\u00a0has a discussion\u00a0  ?', 'May   we\u00a0have a discussion?'],
+  ['I\u00a0 have  ate breakfast.', 'I\u00a0 have  eaten breakfast.'],
+  ['today\u202f  are\u2007a fun day.', 'Today\u202f  is\u2007a fun day.'],
+  ['I sent a   email.', 'I sent an   email.'],
+  ['The report was not send yesterday.', 'The report was not sent yesterday.'],
+  ['The form hasn’t been send to me.', 'The form hasn’t been sent to me.'],
+  ['It can’t be send today.', 'It can’t be sent today.'],
+  ['Has it not been send to the vendor?', 'Has it not been sent to the vendor?'],
+  ['Could you kindly sends the file?', 'Could you kindly send the file?'],
+  ['He could of called us.', 'He could have called us.'],
+  ['She should of went yesterday.', 'She should have gone yesterday.'],
+];
+
+test('time subjects, modal and passive forms, and pasted spacing produce range-safe edits', () => {
+  for (const mode of modes) {
+    assert.deepEqual(check(reliability[0][0], mode).map(issue => issue.id).sort(), ['agreement', 'capitals']);
+    for (const [mistake, corrected] of reliability) {
+      const issues = check(mistake, mode);
+      assert.equal(applyAll(mistake, issues), corrected, mistake + ' in ' + mode);
+      assert.deepEqual(check(corrected, mode), [], corrected + ' in ' + mode);
+      for (const issue of issues) {
+        assert.equal(mistake.slice(issue.start, issue.end), issue.original);
+        assert.equal(
+          applyAll(mistake, [issue]),
+          mistake.slice(0, issue.start) + issue.replacement + mistake.slice(issue.end)
+        );
+      }
+    }
+  }
+});
+
 test('the lesson examples and variants exercise every new pattern', () => {
   const examples = [
     ...Array.from(byId.values(), lesson => alternate[lesson.id]?.[0] ?? lesson.mistake.split(' → ')[0]),
     ...variations.map(([text]) => text),
     ...everyday.map(([text]) => text),
+    ...reliability.map(([text]) => text),
   ];
   for (const { id, pattern, replace } of globalThis.WorkHubEnglishGrammarChecks) {
     const exercised = examples.some(text =>
@@ -243,6 +283,16 @@ test('valid questions, alternate English forms, and text copied from SAP remain 
     'The family are eating. The group are getting ready.',
     'I have eaten breakfast. Have you read the letter?',
     'Please open a Windows application or an RFQ template.',
+    'The tickets that arrived today are on hold.',
+    'The files that arrived at 2 p.m. today are good to go.',
+    'At 2 p.m. today is still early in the review window.',
+    'Today are you free? Tomorrow are the tests running?',
+    'Tomorrow have the reports ready before noon.',
+    'The report wasn’t sent yesterday. The meeting is still open.',
+    'The team are ready to meet today. The class have completed the exercise.',
+    'The team   are ready. The form was sent  yesterday.',
+    'May\twe had a separate label',
+    'The sample is `today   are a fun day`.',
   ];
   for (const text of correct) {
     for (const mode of modes) assert.deepEqual(check(text, mode), [], text + ' in ' + mode);
