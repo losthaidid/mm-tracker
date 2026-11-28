@@ -2500,6 +2500,36 @@ test('English Coach live feedback applies both fixes to a formatted question', a
   assert.equal(db.calls.length, writes);
 });
 
+test('English Coach live feedback corrects both reported everyday sentences as they are typed', async t => {
+  const timers = new Map();
+  const { api, document, window, db } = await app(t, { startupTimers: timers });
+  api.showTab('knowledge');
+  document.querySelector('[data-mmk="tab"][data-mode="english"]').click();
+  const editor = document.getElementById('ecEditor');
+  const writes = db.calls.length;
+  const examples = [
+    ['<p><strong>Todays</strong> is a very good <em>days</em>.</p>', 'Today is a very good day.'],
+    ['<p>how are <strong>your</strong> doing?</p>', 'How are you doing?'],
+  ];
+  for (const [draft, corrected] of examples) {
+    editor.innerHTML = draft;
+    editor.dispatchEvent(new window.Event('input', { bubbles: true }));
+    const pending = [...timers.values()].find(timer => timer.delay === 320);
+    assert.ok(pending);
+    pending.callback();
+    assert.equal(document.getElementById('ecCount').textContent, '2 suggestions');
+    assert.equal(document.querySelectorAll('#ecIssues [data-ec="read-rule"]').length, 2);
+    document.querySelector('#ecIssues [data-ec="apply"]').click();
+    assert.equal(document.getElementById('ecCount').textContent, '1 suggestion');
+    document.querySelector('#ecIssues [data-ec="apply"]').click();
+    assert.equal(editor.textContent, corrected);
+    assert.match(document.getElementById('ecIssues').textContent, /No suggestions/);
+    assert.equal(editor.querySelector('strong').textContent, corrected.startsWith('Today') ? 'Today' : 'you');
+    assert.equal(editor.querySelector('em')?.textContent, corrected.startsWith('Today') ? 'day' : undefined);
+  }
+  assert.equal(db.calls.length, writes);
+});
+
 test('English Coach live feedback reviews multiple grammar topics, links their lessons and preserves draft formatting', async t => {
   const timers = new Map();
   const { api, document, window, db } = await app(t, { startupTimers: timers });
