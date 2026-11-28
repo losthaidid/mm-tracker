@@ -2666,6 +2666,110 @@ test('English Coach restores feedback when returning to the page even without in
   assert.match(issues.textContent, /What is her name/);
 });
 
+test('English Coach starts a LanguageTool check only on demand and applies its corrections to the draft', async t => {
+  const { api, document, window } = await app(t);
+  const calls = [];
+  const originalFetch = window.fetch;
+  window.fetch = async (url, options) => {
+    if (url !== 'https://api.languagetool.org/v2/check')
+      return originalFetch?.(url, options) ?? { ok: false };
+    calls.push({ url, options });
+    const text = options.body.get('text');
+    const match = (original, replacement, id) => ({
+      offset: text.indexOf(original),
+      length: original.length,
+      message: 'Check this wording.',
+      replacements: [{ value: replacement }],
+      rule: { id },
+    });
+    return { ok: true, json: async () => ({
+      matches: [
+        match('Me and my friend', 'My friend and I', 'PRONOUN'),
+        match('eror', 'error', 'SPELLING'),
+        match('speling', 'spelling', 'SPELLING'),
+      ],
+    }) };
+  };
+  api.showTab('knowledge');
+  document.querySelector('[data-mmk="tab"][data-mode="english"]').click();
+  const editor = document.getElementById('ecEditor');
+  const mode = document.getElementById('ecMode');
+  const button = document.getElementById('ecLanguageCheck');
+  const status = document.getElementById('ecLanguageStatus');
+  const issues = document.getElementById('ecIssues');
+  editor.innerHTML = '<p>Me and my friend go to the mall.</p><p>😀 This is an <strong>eror</strong> in the <em>speling</em>.</p>';
+  editor.dispatchEvent(new window.InputEvent('input', { bubbles: true, inputType: 'insertText' }));
+  mode.value = 'teams';
+  mode.dispatchEvent(new window.Event('change', { bubbles: true }));
+  await settle();
+  assert.equal(calls.length, 0);
+  assert.match(document.getElementById('ecLanguageNotice').textContent, /sends the draft text/);
+
+  button.click();
+  assert.equal(button.disabled, true);
+  assert.match(status.textContent, /Checking/);
+  await settle();
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, 'https://api.languagetool.org/v2/check');
+  assert.equal(calls[0].options.method, 'POST');
+  assert.equal(calls[0].options.credentials, 'omit');
+  assert.equal(calls[0].options.body.get('language'), 'en-GB');
+  assert.equal(calls[0].options.body.get('text'), 'Me and my friend go to the mall.\n😀 This is an eror in the speling.\n');
+  assert.equal(status.textContent, 'LanguageTool added 2 suggestions.');
+  assert.equal(issues.querySelectorAll('[data-ec="apply"]').length, 3, 'one local suggestion and two additional service suggestions');
+  assert.equal(issues.querySelectorAll('[data-ec="practice-rule"]').length, 1);
+
+  for (let remaining = 2; remaining >= 0; remaining--) {
+    issues.querySelector('[data-ec="apply"]').click();
+    assert.equal(issues.querySelectorAll('[data-ec="apply"]').length, remaining);
+  }
+  assert.equal(editor.textContent, 'My friend and I go to the mall.😀 This is an error in the spelling.');
+  assert.equal(editor.querySelector('strong').textContent, 'error');
+  assert.equal(editor.querySelector('em').textContent, 'spelling');
+  assert.equal(calls.length, 1, 'applying edits does not send the draft again');
+});
+
+test('English Coach discards a delayed LanguageTool result and keeps feedback available at the free limit', async t => {
+  const { api, document, window } = await app(t);
+  const calls = [];
+  const originalFetch = window.fetch;
+  let finish;
+  window.fetch = async (url, options) => {
+    if (url !== 'https://api.languagetool.org/v2/check')
+      return originalFetch?.(url, options) ?? { ok: false };
+    calls.push(options);
+    if (calls.length === 1) return new Promise(resolve => { finish = resolve; });
+    return { ok: false, status: 429 };
+  };
+  api.showTab('knowledge');
+  document.querySelector('[data-mmk="tab"][data-mode="english"]').click();
+  const editor = document.getElementById('ecEditor');
+  const mode = document.getElementById('ecMode');
+  const button = document.getElementById('ecLanguageCheck');
+  const setDraft = text => {
+    editor.textContent = text;
+    editor.dispatchEvent(new window.InputEvent('input', { bubbles: true, inputType: 'insertText' }));
+    mode.dispatchEvent(new window.Event('change', { bubbles: true }));
+  };
+  setDraft('This is an eror.');
+  button.click();
+  setDraft('Me and my friend go to mall.');
+  assert.equal(calls[0].signal.aborted, true);
+  finish({ ok: true, json: async () => ({
+    matches: [{ offset: 11, length: 4, message: 'Check this spelling.', replacements: [{ value: 'error' }] }],
+  }) });
+  await settle();
+  assert.doesNotMatch(document.getElementById('ecIssues').textContent, /error/);
+  assert.equal(editor.textContent, 'Me and my friend go to mall.');
+
+  button.click();
+  await settle();
+  assert.match(document.getElementById('ecLanguageStatus').textContent, /free limit/);
+  assert.equal(button.disabled, false);
+  assert.equal(document.querySelectorAll('#ecIssues [data-ec="apply"]').length, 2);
+  assert.equal(calls.length, 2, 'the service is never automatically retried');
+});
+
 test('English Coach corrects agreement and joined subjects in a formatted draft in both writing modes', async t => {
   const { api, document, window } = await app(t);
   api.showTab('knowledge');

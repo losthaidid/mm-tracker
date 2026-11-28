@@ -4,6 +4,7 @@
 
   const E = root.WorkHubEnglishCoachEngine;
   const R = root.WorkHubEnglishCoachRichText;
+  const LT = root.WorkHubEnglishCoachLanguageTool;
   const $ = id => document.getElementById(id);
   const esc = value =>
     String(value ?? '').replace(
@@ -48,7 +49,8 @@
       saved = true,
       reviewedText = '',
       issues = [],
-      dismissed = new Set();
+      dismissed = new Set(),
+      languageReview = null;
     let lessonId = Object.keys(E.lessons)[0],
       exerciseResult,
       editingCard = null,
@@ -93,6 +95,7 @@
     function sync(account) {
       if (account === owner) return;
       flush();
+      clearLanguageReview();
       draftChanges.disconnect();
       owner = account;
       editor = selection = null;
@@ -164,13 +167,24 @@
         ${button('show-feedback', 'Writing feedback <span id="ecFeedbackSummary">Start typing</span>', 'class="ec-feedback-jump" aria-controls="ecReview"')}
         <div id="ecEditor" class="ec-editor" role="textbox" aria-labelledby="ecDraftLabel" aria-describedby="ecStorage" aria-multiline="true" contenteditable="true" lang="en-GB" spellcheck="true"></div>
         <footer class="ec-copy-bar"><div class="actions">${button('copy-rich', 'Copy all', 'class="primary"')}${button('copy-plain', 'Copy as plain text')}</div>
-          <small id="ecStorage">Draft and practice progress are saved in this browser. WorkHub checks run on this device.</small></footer></section>
+          <small id="ecStorage">Draft and practice progress are saved in this browser. Live Feedback runs on this device.</small></footer></section>
         <section class="ec-review" id="ecReview" aria-labelledby="ecReviewTitle"><div class="ec-review-head"><h3 id="ecReviewTitle" tabindex="-1">Writing feedback</h3>
-          <span id="ecCount" class="ec-count" aria-live="polite"></span></div><div id="ecIssues"></div></section></div>`;
+          <span id="ecCount" class="ec-count" aria-live="polite"></span></div>
+          ${
+            LT
+              ? `<div class="ec-language-check">
+            ${button('check-language-tool', 'Check with LanguageTool', 'id="ecLanguageCheck" aria-describedby="ecLanguageNotice"')}
+            <small id="ecLanguageNotice">This free check sends the draft text to <a href="https://languagetool.org/" target="_blank" rel="noopener noreferrer">LanguageTool</a>. <a href="https://languagetool.org/legal/privacy" target="_blank" rel="noopener noreferrer">Privacy policy</a></small>
+            <p id="ecLanguageStatus" role="status"></p>
+          </div>`
+              : ''
+          }
+          <div id="ecIssues"></div></section></div>`;
     }
 
     function renderPane() {
       flush();
+      clearLanguageReview();
       draftChanges.disconnect();
       editor = selection = null;
       composing = false;
@@ -213,7 +227,26 @@
       const { text, pieces } = currentText();
       if (text !== reviewedText) dismissed.clear();
       reviewedText = text;
-      issues = E.check(text, state.mode).filter(issue => !dismissed.has(issueKey(issue)));
+      if (languageReview && languageReview.text !== text) clearLanguageReview();
+      const local = E.check(text, state.mode);
+      const additional = languageReview?.issues
+        ? LT.additionalIssues(local, languageReview.issues)
+        : [];
+      issues = [...local, ...additional]
+        .filter(issue => !dismissed.has(issueKey(issue)))
+        .sort((a, b) => a.start - b.start || b.end - a.end);
+      if (LT) {
+        const checking = !!languageReview?.controller;
+        $('ecLanguageCheck').disabled = checking || !text.trim();
+        $('ecLanguageStatus').textContent = checking
+          ? 'Checking with LanguageTool…'
+          : languageReview?.message ||
+            (languageReview?.issues
+              ? additional.length
+                ? `LanguageTool added ${additional.length} suggestion${additional.length === 1 ? '' : 's'}.`
+                : 'No additional LanguageTool suggestions.'
+              : '');
+      }
       const host = $('ecIssues');
       const count = issues.length
         ? `${issues.length} suggestion${issues.length === 1 ? '' : 's'}`
@@ -234,7 +267,7 @@
           ${issue.edit ? button('apply', 'Apply', `data-issue="${index}" class="small"`) : ''}
           ${button('locate', 'Find in draft', `data-issue="${index}" class="small"`)}
           ${button('dismiss', 'Dismiss', `data-issue="${index}" class="small"`)}
-          ${button('practice-rule', 'Practise this', `data-issue="${index}" class="small"`)}
+          ${Object.hasOwn(E.lessons, issue.id) ? button('practice-rule', 'Practise this', `data-issue="${index}" class="small"`) : ''}
           ${grammar && ruleLinks[issue.id] ? button('read-rule', 'Read lesson', `data-issue="${index}" class="small"`) : ''}
         </div></li>`
             )
@@ -250,6 +283,33 @@
           true
         );
       highlight(pieces);
+    }
+    function clearLanguageReview() {
+      languageReview?.controller?.abort();
+      languageReview = null;
+    }
+    async function checkWithLanguageTool() {
+      if (!LT || !editor?.isConnected || !permitted() || languageReview?.controller) return;
+      if (composing) {
+        editor.blur();
+        composing = false;
+      }
+      const { text } = currentText();
+      const pending = { text, controller: new AbortController() };
+      languageReview = pending;
+      refresh();
+      const timeout = setTimeout(() => pending.controller.abort(), 15000);
+      try {
+        const checked = await LT.check(text, pending.controller.signal);
+        if (languageReview !== pending) return;
+        languageReview = { text, issues: checked };
+      } catch (error) {
+        if (languageReview !== pending) return;
+        languageReview = { text, message: error.message };
+      } finally {
+        clearTimeout(timeout);
+      }
+      refresh();
     }
     function changed() {
       draftChanges.takeRecords();
@@ -405,6 +465,7 @@
         return;
       }
       if (action === 'practice-rule') {
+        if (!Object.hasOwn(E.lessons, issue.id)) return;
         counters(issue.id).seen++;
         save();
         lessonId = issue.id;
@@ -420,7 +481,9 @@
       } else if (issue.edit) {
         const editRange = R.range(document, pieces, issue.edit);
         if (editRange && command('insertText', issue.edit.replacement, editRange)) {
-          counters(issue.id).seen++;
+          if (languageReview?.issues)
+            languageReview = LT.afterEdit(languageReview, issue.edit, currentText().text);
+          if (Object.hasOwn(E.lessons, issue.id)) counters(issue.id).seen++;
           refresh();
           putStatus('Suggestion applied.');
         }
@@ -574,6 +637,7 @@
     function mount() {
       if (!permitted()) {
         flush();
+        clearLanguageReview();
         draftChanges.disconnect();
         editor = selection = null;
         root.CSS?.highlights?.delete?.('ec-review');
@@ -599,6 +663,7 @@
       const action = target.dataset.ec;
       if (action === 'screen') switchScreen(target.dataset.screen);
       else if (action === 'show-feedback' && editor) showFeedback();
+      else if (action === 'check-language-tool') void checkWithLanguageTool();
       else if (action === 'format' && editor && Object.hasOwn(commands, target.dataset.command))
         command(target.dataset.command);
       else if (action === 'table-controls') {
