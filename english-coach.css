@@ -218,6 +218,12 @@
 .ec-change ins {
   text-decoration: none;
 }
+.ec-review-quote {
+  margin-top: 4px;
+  padding-inline-start: 9px;
+  border-inline-start: 2px solid var(--ec-line);
+  font-weight: 650;
+}
 .ec-study > label {
   margin-top: 14px;
 }

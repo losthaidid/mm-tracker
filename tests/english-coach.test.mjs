@@ -2,12 +2,13 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { JSDOM } from 'jsdom';
 import '../english-grammar-data.js';
+import '../english-grammar-checks.js';
 import '../english-coach-engine.js';
 import '../english-coach-rich.js';
 
 test('grammar lessons cover three levels and every live feedback link resolves', () => {
-  const { groups, byId, ruleLinks } = globalThis.WorkHubEnglishGrammarData;
-  const { lessons, validState } = globalThis.WorkHubEnglishCoachEngine;
+  const { groups, byId } = globalThis.WorkHubEnglishGrammarData;
+  const { lessons, ruleLinks, validState } = globalThis.WorkHubEnglishCoachEngine;
   assert.deepEqual([...new Set(groups.map(group => group.level))].sort(), ['Advanced','Foundations','Intermediate']);
   assert.equal(byId.size, groups.flatMap(group => group.lessons).length);
   assert.equal(byId.size, 98);
@@ -91,7 +92,7 @@ test('live feedback catches the reported question and keeps valid modal question
     'Could you please check the PO? May I have the printout?',
     'The formula is ready ? success : wait.',
     'https://example.invalid/page?row=50',
-    'Can\nwe has a separate line',
+    'Can\nwe reached him?',
   ]) {
     assert.deepEqual(check(draft,'email'), [], draft);
   }

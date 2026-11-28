@@ -2,7 +2,8 @@
 (function (root) {
   'use strict';
 
-  const { groups, byId, references } = root.WorkHubEnglishGrammarData;
+  const { groups, byId, contextNotes, references } = root.WorkHubEnglishGrammarData;
+  const { liveLessons } = root.WorkHubEnglishCoachEngine;
   const levels = ['Foundations', 'Intermediate', 'Advanced'];
   const ordered = levels.flatMap(level => groups.filter(group => group.level === level));
   const sequence = ordered.flatMap(group => group.lessons.map(lesson => lesson.id));
@@ -80,7 +81,7 @@
       const last = byId.get(progress.last);
       return `<div class="eg-library" id="egLibrary">
         <header class="eg-intro"><div><h3 id="egHeading" tabindex="-1">Grammar Library</h3>
-          <p class="muted">Study a grammar rule, see it in a work message, and try a short exercise.</p></div>
+          <p class="muted">Live Feedback checks common patterns from ${liveLessons.size} lessons.</p></div>
           ${last ? button('open', 'Continue ' + last.title, last.id, 'primary') : ''}</header>
         <div class="eg-progress"><progress max="${sequence.length}" value="${count}" aria-label="Grammar lessons completed"></progress>
           <span>${count} of ${sequence.length} lessons completed</span></div>
@@ -115,6 +116,11 @@
         <header class="eg-intro"><div><p class="eg-meta">${escape(lesson.level)} · ${escape(group.title)}</p>
           <h3 id="egHeading" tabindex="-1">${escape(lesson.title)}</h3></div>${complete ? '<span id="egCompleted">Completed</span>' : '<span id="egCompleted" hidden>Completed</span>'}</header>
         <p class="eg-pattern">${escape(lesson.pattern)}</p><p class="eg-explanation">${escape(lesson.explanation)}</p>
+        <p class="eg-feedback-note">${
+          liveLessons.has(lesson.id)
+            ? '<strong>Live Feedback</strong> checks common patterns in this lesson as you type.'
+            : '<strong>Review in context.</strong> ' + escape(contextNotes[lesson.id])
+        }</p>
         <div class="eg-examples"><section><h4>In an email</h4><p>${escape(lesson.email)}</p></section>
           <section><h4>In Teams</h4><p>${escape(lesson.teams)}</p></section></div>
         <section class="eg-mistake"><h4>Common mistake</h4><p>${escape(lesson.mistake)}</p></section>

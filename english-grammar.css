@@ -144,6 +144,11 @@
 .eg-explanation {
   max-width: 75ch;
 }
+.eg-feedback-note {
+  max-width: 75ch;
+  padding-inline-start: 12px;
+  border-inline-start: 3px solid var(--ec-line);
+}
 .eg-examples section,
 .eg-mistake,
 .eg-exercise {

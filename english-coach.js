@@ -60,7 +60,7 @@
       progress: () => state.grammar,
       save,
     });
-    const ruleLinks = root.WorkHubEnglishGrammarData?.ruleLinks || {};
+    const { ruleLinks } = E;
     const putStatus = (message, error = false) => {
       const status = $('ecStatus');
       if (!status) return;
@@ -209,9 +209,13 @@
         ? `<ul class="ec-issues">${issues
             .map(
               (issue, index) =>
-                `<li><span class="ec-category">${issue.type}</span><div class="ec-change"><del>${esc(issue.original)}</del><ins>${esc(issue.replacement)}</ins></div>
+                `<li><span class="ec-category">${issue.type}</span>${
+                  issue.edit
+                    ? `<div class="ec-change"><del>${esc(issue.original)}</del><ins>${esc(issue.replacement)}</ins></div>`
+                    : `<div class="ec-review-quote">${esc(issue.original)}</div>`
+                }
         <p>${esc(issue.reason)}</p><div class="actions">
-          ${button('apply', 'Apply', `data-issue="${index}" class="small"`)}
+          ${issue.edit ? button('apply', 'Apply', `data-issue="${index}" class="small"`) : ''}
           ${button('locate', 'Find in draft', `data-issue="${index}" class="small"`)}
           ${button('dismiss', 'Dismiss', `data-issue="${index}" class="small"`)}
           ${button('practice-rule', 'Practise this', `data-issue="${index}" class="small"`)}
@@ -384,12 +388,9 @@
       if (action === 'locate') {
         place(selected);
         selected.startContainer.parentElement?.scrollIntoView({ block: 'nearest' });
-      } else {
-        const editRange = issue.edit ? R.range(document, pieces, issue.edit) : selected;
-        if (
-          editRange &&
-          command('insertText', issue.edit?.replacement ?? issue.replacement, editRange)
-        ) {
+      } else if (issue.edit) {
+        const editRange = R.range(document, pieces, issue.edit);
+        if (editRange && command('insertText', issue.edit.replacement, editRange)) {
           counters(issue.id).seen++;
           refresh();
           putStatus('Suggestion applied.');

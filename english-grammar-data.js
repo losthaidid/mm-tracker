@@ -1667,6 +1667,31 @@
     'ping-me': 'tone',
     'punctuation-spacing': 'punctuation',
   };
+  // These topics depend on the writer's meaning, emphasis or the surrounding conversation.
+  const contextNotes = {
+    'articles-the':
+      'Read the surrounding sentences to decide whether the reader can identify the particular item.',
+    'subject-questions': 'Check who is doing the action and whether do is being used for emphasis.',
+    'adverb-order': 'Read the sentence aloud and consider which words you want to emphasise.',
+    'modal-negatives':
+      'Decide whether the action is forbidden or optional before choosing the modal.',
+    'gerund-vs-infinitive':
+      'Check whether you mean doing the activity or doing something for a purpose.',
+    mixed: 'Work out when the condition and the result each apply before choosing the verb forms.',
+    unless: 'Choose unless for an exception and in case for a precaution.',
+    'participle-clauses':
+      'Check that the subject of the main clause is doing the action in the opening phrase.',
+    fragments:
+      'Read the message as the recipient. Short replies can work in Teams when the conversation supplies the missing detail.',
+    cohesion:
+      'Read the surrounding sentences to choose a connector that describes their relationship.',
+    'clear-references':
+      'Check whether the recipient can identify the record, action and timing from the information you’ve given.',
+    'place-prepositions':
+      'Picture the location and choose the preposition that describes where the item is.',
+    'by-until':
+      'Use by for a deadline and until for an activity or state that continues up to a time.',
+  };
   const references = [
     [
       'Cambridge English Grammar Today · Word classes',
@@ -1685,5 +1710,5 @@
       'https://learnenglish.britishcouncil.org/free-resources/grammar/c1',
     ],
   ];
-  root.WorkHubEnglishGrammarData = { groups, byId, ruleLinks, references };
+  root.WorkHubEnglishGrammarData = { groups, byId, ruleLinks, contextNotes, references };
 })(globalThis);

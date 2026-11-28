@@ -50,6 +50,13 @@
     'gi'
   );
   const questionPrefix = /(?:^|[.!?:;\n"'“(]|\b(?:why|when|where|how|what|which|who))\s*$/i;
+  const questionRules = new Set(['modal-base', 'does-base', 'modals', 'questions']);
+  const hypotheticalPrefix =
+    /\b(?:if|wish(?:es|ed)?|rather|suppose|supposing|imagine(?:d)?|as though) +$/i;
+  const possibleNounSubject =
+    /\b(?:calls|changes|checks|emails|files|orders|plans|posts|quotes|records|reports|requests|results|reviews|runs|shares|tests|updates|works)$/i;
+  const followingPredicate =
+    /^ +(?:affect|appear|arrive|be|begin|cause|change|come|continue|cost|end|fail|finish|follow|go|happen|have|help|last|lead|need|pass|proceed|remain|resume|run|show|start|stop|take|work)\b/i;
   const rules = [
     [
       'plural-be',
@@ -334,12 +341,41 @@
     'Choosing a tone for email',
     'Spacing before punctuation',
   ];
+  const library = root.WorkHubEnglishGrammarData;
+  const additionalChecks = root.WorkHubEnglishGrammarChecks || [];
+  const ruleLinks = { ...library?.ruleLinks };
   const lessons = Object.fromEntries(
     rules.map(([id, type, , , reason, prompt, choices], index) => [
       id,
       { id, type, title: titles[index], reason, prompt, choices },
     ])
   );
+  for (const { id, lessonId, type } of additionalChecks) {
+    const lesson = library.byId.get(lessonId);
+    ruleLinks[id] = lessonId;
+    lessons[id] ??= {
+      id,
+      type,
+      title: lesson.title,
+      reason: lesson.reason,
+      prompt: lesson.prompt,
+      choices: [lesson.answer, lesson.alternative],
+    };
+  }
+  const liveLessons = new Set(Object.values(ruleLinks));
+  const legacyChecks = rules.map(([id, type, pattern, replace, reason, , , context]) => ({
+    id,
+    type,
+    pattern,
+    replace,
+    reason,
+    context,
+  }));
+  const checks = [
+    ...legacyChecks.filter(check => check.id !== 'past-participle'),
+    ...additionalChecks,
+    legacyChecks.find(check => check.id === 'past-participle'),
+  ];
   const phrases = [
     [
       'Could you confirm whether…?',
@@ -373,48 +409,106 @@
     ],
   ];
 
+  const technicalText =
+    /```[\s\S]*?(?:```|$)|`[^`\r\n]+`|(?:https?:\/\/|www\.)[^\s<>]+|[\w.+-]+@[\w.-]+\.[a-z]{2,}|\b[\w.-]+\.(?:csv|xlsx?|docx?|pdf|pptx?|txt|json|xml|abap)\b|[A-Z0-9]+(?:_[A-Z0-9]+)+|\t/gi;
+  const masked = '\ufffc';
+
+  function changedRange(original, replacement, start) {
+    let left = 0,
+      before = original.length,
+      after = replacement.length;
+    while (left < before && left < after && original[left] === replacement[left]) left++;
+    while (before > left && after > left && original[before - 1] === replacement[after - 1]) {
+      before--;
+      after--;
+    }
+    // Keep an adjacent character for insertions so the editor can locate the edit in its text nodes.
+    if (left === before) {
+      if (left > 0) left--;
+      else {
+        before++;
+        after++;
+      }
+    }
+    return {
+      start: start + left,
+      end: start + before,
+      replacement: replacement.slice(left, after),
+    };
+  }
+
   function check(text, mode) {
     const found = [];
     const draft = text.slice(0, maxText);
-    for (const [id, type, pattern, replace, reason, , , context] of rules) {
+    const scan = draft
+      .replaceAll('\u00a0', ' ')
+      .replace(technicalText, token => token.replace(/[^\r\n]/g, masked));
+    for (const { id, type, pattern, replace, reason, context } of checks) {
       if (context && mode !== context) continue;
-      for (const match of draft.matchAll(pattern)) {
-        const prefix = draft.slice(Math.max(0, match.index - 18), match.index);
+      for (const match of scan.matchAll(pattern)) {
+        if (match[0].includes(masked)) continue;
+        const prefix = scan.slice(Math.max(0, match.index - 32), match.index);
         if (
           ['plural-be', 'singular-be'].includes(id) &&
           /\b(?:does|do|did|can|could|would|should|will|must|may|might)\s+$/i.test(prefix)
         )
           continue;
         if (id === 'subject-agreement' && !/(?:^|[.!?\n])\s*$/.test(prefix)) continue;
+        if (
+          (id === 'singular-be' || id === 'agreement') &&
+          /\bwere$/i.test(match[0]) &&
+          hypotheticalPrefix.test(prefix)
+        )
+          continue;
         // At a question opening a token after the modal may be its subject, as in “Can checks run?”.
         if (id === 'modal-base' && !match[2] && questionPrefix.test(prefix)) continue;
-        const original = match[0];
-        let replacement = replace(...match);
-        if (/^[A-Z]/.test(original))
-          replacement = replacement.charAt(0).toUpperCase() + replacement.slice(1);
-        const end = match.index + original.length;
-        const verbOffset = id === 'modal-base' ? original.length - match[4].length : 0;
+        const start = match.index,
+          end = start + match[0].length;
+        if (
+          questionRules.has(id) &&
+          questionPrefix.test(prefix) &&
+          possibleNounSubject.test(match[0]) &&
+          followingPredicate.test(scan.slice(end, end + 20))
+        )
+          continue;
+        if (
+          id === 'past-participle' &&
+          /\bsaw$/i.test(match[0]) &&
+          /^ +(?:blades?|cutters?|teeth|dust|mills?|operators?)\b/i.test(scan.slice(end, end + 20))
+        )
+          continue;
+        const original = draft.slice(start, end);
+        const replacement = replace === null ? null : replace(...match, start, scan);
+        if (replacement === undefined || replacement === match[0]) continue;
+        if (replacement === null) {
+          found.push({ id, type, reason, start, end, original, replacement });
+          continue;
+        }
+        const corrected = /^[A-Z]/.test(original)
+          ? replacement.charAt(0).toUpperCase() + replacement.slice(1)
+          : replacement;
+        if (original === corrected) continue;
         found.push({
           id,
           type,
           reason,
-          start: match.index,
+          start,
           end,
           original,
-          replacement,
-          ...(verbOffset
-            ? {
-                edit: {
-                  start: match.index + verbOffset,
-                  end,
-                  replacement: replacement.slice(verbOffset),
-                },
-              }
-            : {}),
+          replacement: corrected,
+          edit: changedRange(original, corrected, start),
         });
       }
     }
-    return found.sort((a, b) => a.start - b.start || b.end - a.end).slice(0, 100);
+    // Two lessons may teach the same form. Keep one correction per editable span.
+    const selected = found.filter(issue => !issue.edit);
+    let editEnd = -1;
+    for (const issue of found.filter(row => row.edit).sort((a, b) => a.edit.start - b.edit.start)) {
+      if (issue.edit.start < editEnd) continue;
+      selected.push(issue);
+      editEnd = issue.edit.end;
+    }
+    return selected.sort((a, b) => a.start - b.start || b.end - a.end).slice(0, 100);
   }
 
   function validState(raw) {
@@ -456,5 +550,13 @@
     return { mode, draft, vocab, counts, grammar };
   }
 
-  root.WorkHubEnglishCoachEngine = { maxText, check, lessons, phrases, validState };
+  root.WorkHubEnglishCoachEngine = {
+    maxText,
+    check,
+    lessons,
+    ruleLinks,
+    liveLessons,
+    phrases,
+    validState,
+  };
 })(globalThis);
