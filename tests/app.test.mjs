@@ -2593,6 +2593,36 @@ test('English Coach live feedback corrects the question opener and missing helpi
   }
 });
 
+test('English Coach shows a grammar correction, a modifier review and an Email-only style suggestion', async t => {
+  const { api, document, window } = await app(t);
+  api.showTab('knowledge');
+  document.querySelector('[data-mmk="tab"][data-mode="english"]').click();
+  const editor = document.getElementById('ecEditor');
+  const mode = document.getElementById('ecMode');
+  const issues = document.getElementById('ecIssues');
+  const changeMode = style => {
+    mode.value = style;
+    mode.dispatchEvent(new window.Event('change', { bubbles: true }));
+  };
+  const categories = () => [...issues.querySelectorAll('.ec-category')].map(node => node.textContent);
+
+  editor.innerHTML = '<p>Everyone in the class <strong>have</strong> finished their test.</p>' +
+    '<p>Who did you give the book to?</p><p>Walking down the street, the trees were beautiful.</p>';
+  editor.dispatchEvent(new window.Event('input', { bubbles: true }));
+  changeMode('email');
+  assert.deepEqual(categories(), ['Grammar', 'Formal style', 'Review']);
+  issues.querySelector('[data-ec="apply"]').click();
+  assert.equal(editor.querySelector('strong').textContent, 'has');
+  assert.deepEqual(categories(), ['Formal style', 'Review']);
+
+  changeMode('teams');
+  assert.deepEqual(categories(), ['Review']);
+  assert.equal(issues.querySelector('[data-ec="apply"]'), null);
+  assert.match(issues.textContent, /I saw that the trees were beautiful/);
+  issues.querySelector('[data-ec="read-rule"]').click();
+  assert.equal(document.getElementById('egHeading').textContent, 'Participle clauses');
+});
+
 test('English Coach live feedback reviews multiple grammar topics, links their lessons and preserves draft formatting', async t => {
   const timers = new Map();
   const { api, document, window, db } = await app(t, { startupTimers: timers });
@@ -2642,7 +2672,7 @@ test('English Coach live feedback reviews multiple grammar topics, links their l
 
   click('[data-ec="screen"][data-screen="grammar"]');
   click('[data-eg="all"]');
-  assert.match(document.querySelector('.eg-intro').textContent, /85 lessons/);
+  assert.match(document.querySelector('.eg-intro').textContent, /87 lessons/);
   click('[data-eg="open"][data-value="unless"]');
   assert.match(document.querySelector('.eg-feedback-note').textContent, /Review in context.*exception/);
   assert.equal(db.calls.length, writes);

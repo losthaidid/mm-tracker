@@ -52,6 +52,13 @@
   const questionPrefix =
     /(?:^|[.!?:;\n"'“(]|\b(?:why|when|where|how(?: (?:much|many|long|often|far))?|what|which|who))\s*$/i;
   const questionRules = new Set(['modal-base', 'does-base', 'modals', 'questions']);
+  const baseVerbRules = new Set([...questionRules, 'negatives']);
+  const otherBaseVerbs = {
+    saw: /^ +(?:(?:through|into|off|up|apart|down)\b|(?:(?:the|a|some|these|those) +)?(?:wood|lumber|boards?|logs?|planks?|branches|pipes?|timber|metals?|trees?)\b)/i,
+    fell: /^ +(?:(?:the|a|some|these|those) +)?(?:trees?|timber|pines?|oaks?)\b/i,
+    found:
+      /^ +(?:(?:the|a|an|our|their) +)?(?:compan(?:y|ies)|organi[sz]ations?|charit(?:y|ies)|business(?:es)?|schools?|colleges?|universit(?:y|ies)|start-?ups?|associations?|foundations?)\b/i,
+  };
   const hypotheticalPrefix =
     /\b(?:if|wish(?:es|ed)?|rather|suppose|supposing|imagine(?:d)?|as though) +$/i;
   const possibleNounSubject =
@@ -265,7 +272,7 @@
     [
       'revert-back',
       'Word choice',
-      /\b(?:kindly |please )?revert back to me\b|\b(?:kindly |please )revert\b/gi,
+      /\b(?:(?<=could you |can you |would you |will you )revert (?:back )?to (?:me|us)|(?:kindly |please )revert(?: (?:back )?to (?:me|us))?)(?= *(?:[,.;!?\n]|$)| +(?:once|when|if|with|by|before|after|soon|today|tomorrow|as soon as)\b)/gi,
       () => 'please reply',
       'In international workplace English, “reply” makes it clear you want a response.',
       'Could you ___ once the PO is approved?',
@@ -482,6 +489,15 @@
         if (id === 'modal-base' && !match[2] && questionPrefix.test(prefix)) continue;
         const start = match.index,
           end = start + match[0].length;
+        if (baseVerbRules.has(id)) {
+          // Saw, fell and found can be valid base verbs with a different meaning.
+          const alternative = /\b(saw|fell|found)$/i.exec(match[0]);
+          if (
+            alternative &&
+            otherBaseVerbs[alternative[1].toLowerCase()].test(scan.slice(end, end + 70))
+          )
+            continue;
+        }
         if (
           questionRules.has(id) &&
           questionPrefix.test(prefix) &&

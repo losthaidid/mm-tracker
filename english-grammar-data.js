@@ -24,7 +24,7 @@
           'pronouns',
           'Pronouns and reference',
           'subject, object and possessive pronouns',
-          'Pronouns stand in for noun phrases. Use I, she and they as subjects and me, her and them as objects. In a question like “How are you doing?”, you is the subject and comes after are. A possessive like your introduces a noun, as in “your notes”.',
+          'Pronouns stand in for noun phrases. Use I, she and they as subjects and me, her and them as objects. This still applies in a pair, as in “My colleague and I agreed” or “between my colleague and me”. A possessive like your introduces a noun. In a question about the recipient of an action, who is natural and whom is a formal option.',
           'Aisha has the report. She will send it today.',
           'Tag me when you have the results.',
           'Send the file to Aisha and I. → Send the file to Aisha and me.',
@@ -211,9 +211,9 @@
         ],
         [
           'quantity',
-          'Some, any, much and many',
-          'many + countable plural · much + uncountable',
-          'Use many with plural countable nouns and much with uncountable nouns. Ask “how much” for a price or amount and “how many” for a count. Some is common in positive statements. Any is frequent in questions and negatives. Offers can use some, as in “Would you like some help?”',
+          'Quantifiers and amounts',
+          'many requests · much time · fewer people · less time',
+          'Use many and fewer with plural countable nouns. Use much and less with an uncountable amount. Ask “how much” for a price or amount and “how many” for a count. Use less than for a measurement such as “less than an hour”. Some is common in positive statements and offers. Any is frequent in questions and negatives.',
           'Do you have any questions about the rollout?',
           'I don’t have much time before the call.',
           'We received much requests. → We received many requests.',
@@ -324,7 +324,7 @@
           'agreement',
           'Subject–verb agreement',
           'the change is · the changes are',
-          'The main noun in the subject controls the verb. Words between the main noun and the verb may belong to a separate phrase. A time word can also be the subject, as in “Today is a fun day”.',
+          'The main noun in the subject controls the verb. In “The list of items is ready”, list controls is. Indefinite pronouns such as everyone also take a singular verb, even with a phrase such as “in the class” in between. In formal writing, use a singular verb with neither of or either of as the subject. A time word can also be the subject, as in “Today is a fun day”.',
           'The list of open issues is attached.',
           'The changes are ready.',
           'The list of items are ready. → The list of items is ready.',
@@ -1589,7 +1589,7 @@
           'word-formation',
           'Word families and suffixes',
           'approve · approval · approved',
-          'A word family can contain several parts of speech. Approve is a verb and approval is a noun. Check what the sentence slot needs before choosing a related form.',
+          'Check whether the sentence needs an action or a noun. Approve and advise are verbs. Approval and advice are nouns. Affect usually means to influence something, while an effect is the result. In “the delay had an effect on the launch”, the sentence needs the noun.',
           'The manager must approve the request.',
           'The approval is already in the tracker.',
           'We need your approve. → We need your approval.',
@@ -1679,8 +1679,6 @@
       'Check whether you mean doing the activity or doing something for a purpose.',
     mixed: 'Work out when the condition and the result each apply before choosing the verb forms.',
     unless: 'Choose unless for an exception and in case for a precaution.',
-    'participle-clauses':
-      'Check that the subject of the main clause is doing the action in the opening phrase.',
     fragments:
       'Read the message as the recipient. Short replies can work in Teams when the conversation supplies the missing detail.',
     cohesion:
@@ -1689,10 +1687,12 @@
       'Check whether the recipient can identify the record, action and timing from the information you’ve given.',
     'place-prepositions':
       'Picture the location and choose the preposition that describes where the item is.',
-    'by-until':
-      'Use by for a deadline and until for an activity or state that continues up to a time.',
   };
   const references = [
+    [
+      'Perfect English Grammar · Grammar explanations',
+      'https://www.perfect-english-grammar.com/grammar-explanations.html',
+    ],
     [
       'Cambridge English Grammar Today · Word classes',
       'https://dictionary.cambridge.org/grammar/british-grammar/word-classes-and-phrase-',
@@ -1708,6 +1708,10 @@
     [
       'British Council LearnEnglish · Advanced grammar',
       'https://learnenglish.britishcouncil.org/free-resources/grammar/c1',
+    ],
+    [
+      'Purdue OWL · Dangling modifiers',
+      'https://owl.purdue.edu/owl/general_writing/mechanics/dangling_modifiers_and_how_to_correct_them.html',
     ],
   ];
   root.WorkHubEnglishGrammarData = { groups, byId, ruleLinks, contextNotes, references };
