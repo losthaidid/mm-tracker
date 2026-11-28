@@ -54,6 +54,9 @@
       editingCard = null,
       recall = 0,
       revealed = false;
+    const draftChanges = new root.MutationObserver(() => {
+      if (editor?.isConnected && permitted()) changed();
+    });
     const key = () => 'workhub.english-coach.v1:' + encodeURIComponent(owner);
     const permitted = () => !!owner && a.active();
     const grammar = root.WorkHubEnglishGrammar?.install({
@@ -80,7 +83,9 @@
     }
     function flush() {
       clearTimeout(timer);
-      if (!editor || !draftDirty || !owner) return;
+      if (!editor || !owner) return;
+      const pendingEdits = draftChanges.takeRecords().length;
+      if (!draftDirty && !pendingEdits) return;
       state.draft = R.sanitize(document, editor.innerHTML);
       draftDirty = false;
       save();
@@ -88,6 +93,7 @@
     function sync(account) {
       if (account === owner) return;
       flush();
+      draftChanges.disconnect();
       owner = account;
       editor = selection = null;
       draftDirty = composing = false;
@@ -155,15 +161,17 @@
             .map(([id, label]) => button(id, label))
             .join('')}</div>
         </div>
+        ${button('show-feedback', 'Writing feedback <span id="ecFeedbackSummary">Start typing</span>', 'class="ec-feedback-jump" aria-controls="ecReview"')}
         <div id="ecEditor" class="ec-editor" role="textbox" aria-labelledby="ecDraftLabel" aria-describedby="ecStorage" aria-multiline="true" contenteditable="true" lang="en-GB" spellcheck="true"></div>
         <footer class="ec-copy-bar"><div class="actions">${button('copy-rich', 'Copy all', 'class="primary"')}${button('copy-plain', 'Copy as plain text')}</div>
           <small id="ecStorage">Draft and practice progress are saved in this browser. WorkHub checks run on this device.</small></footer></section>
-        <section class="ec-review" aria-labelledby="ecReviewTitle"><div class="ec-review-head"><h3 id="ecReviewTitle">Writing feedback</h3>
+        <section class="ec-review" id="ecReview" aria-labelledby="ecReviewTitle"><div class="ec-review-head"><h3 id="ecReviewTitle" tabindex="-1">Writing feedback</h3>
           <span id="ecCount" class="ec-count" aria-live="polite"></span></div><div id="ecIssues"></div></section></div>`;
     }
 
     function renderPane() {
       flush();
+      draftChanges.disconnect();
       editor = selection = null;
       composing = false;
       const pane = $('ecPane');
@@ -172,6 +180,7 @@
         pane.innerHTML = editorMarkup();
         editor = $('ecEditor');
         editor.innerHTML = R.sanitize(document, state.draft);
+        draftChanges.observe(editor, { childList: true, characterData: true, subtree: true });
         $('ecRows').value = '3';
         $('ecCols').value = '2';
         refresh();
@@ -191,21 +200,27 @@
     const issueKey = issue => `${issue.id}|${issue.start}|${issue.original}`;
     function highlight(pieces) {
       if (!root.CSS?.highlights || !root.Highlight) return;
-      const ranges = issues.map(issue => R.range(document, pieces, issue)).filter(Boolean);
-      root.CSS.highlights.set('ec-review', new root.Highlight(...ranges));
+      try {
+        const ranges = issues.map(issue => R.range(document, pieces, issue)).filter(Boolean);
+        root.CSS.highlights.set('ec-review', new root.Highlight(...ranges));
+      } catch {
+        // The feedback list is usable even when the browser cannot draw custom highlights.
+      }
     }
     function refresh() {
-      if (!editor?.isConnected || !permitted() || composing) return;
+      if (!editor?.isConnected || !permitted()) return;
       flush();
       const { text, pieces } = currentText();
+      if (text !== reviewedText) dismissed.clear();
       reviewedText = text;
       issues = E.check(text, state.mode).filter(issue => !dismissed.has(issueKey(issue)));
-      highlight(pieces);
-      const count = $('ecCount'),
-        host = $('ecIssues');
-      count.textContent = issues.length
+      const host = $('ecIssues');
+      const count = issues.length
         ? `${issues.length} suggestion${issues.length === 1 ? '' : 's'}`
         : '';
+      $('ecCount').textContent = count;
+      $('ecFeedbackSummary').textContent =
+        count || (text.trim() ? 'No suggestions' : 'Start typing');
       host.innerHTML = issues.length
         ? `<ul class="ec-issues">${issues
             .map(
@@ -234,11 +249,22 @@
           'Browser storage is unavailable. Copy your draft before closing this page.',
           true
         );
+      highlight(pieces);
     }
     function changed() {
+      draftChanges.takeRecords();
       draftDirty = true;
       clearTimeout(timer);
-      if (!composing) timer = setTimeout(refresh, 320);
+      // Reviewing reads the editor without replacing its content, even during composition.
+      timer = setTimeout(refresh, 320);
+    }
+    function showFeedback() {
+      editor.blur();
+      composing = false;
+      refresh();
+      const heading = $('ecReviewTitle');
+      heading.focus({ preventScroll: true });
+      heading.scrollIntoView?.({ block: 'start' });
     }
     function saveSelection() {
       if (!editor?.isConnected || !permitted()) return;
@@ -361,8 +387,12 @@
     function feedback(action, index) {
       const issue = issues[index];
       if (!issue) return;
+      if (composing) {
+        editor.blur();
+        composing = false;
+      }
       const { text, pieces } = currentText();
-      if (composing || text !== reviewedText) return refresh();
+      if (text !== reviewedText) return refresh();
       if (action === 'dismiss') {
         dismissed.add(issueKey(issue));
         refresh();
@@ -513,7 +543,7 @@
       $('ecWorkspace')
         .querySelectorAll('[data-screen]')
         .forEach(node => node.setAttribute('aria-pressed', String(node.dataset.screen === next)));
-      root.CSS?.highlights?.delete('ec-review');
+      root.CSS?.highlights?.delete?.('ec-review');
       putStatus('');
       renderPane();
     }
@@ -544,8 +574,9 @@
     function mount() {
       if (!permitted()) {
         flush();
+        draftChanges.disconnect();
         editor = selection = null;
-        root.CSS?.highlights?.delete('ec-review');
+        root.CSS?.highlights?.delete?.('ec-review');
         return;
       }
       if ($('ecPane') && !$('ecPane').childElementCount) renderPane();
@@ -553,6 +584,12 @@
 
     document.addEventListener('selectionchange', saveSelection);
     root.addEventListener('pagehide', flush);
+    root.addEventListener('pageshow', event => {
+      if (event.persisted) {
+        composing = false;
+        refresh();
+      }
+    });
     document.addEventListener('mousedown', event => {
       if (permitted() && event.target.closest?.('.ec-toolbar button')) event.preventDefault();
     });
@@ -561,6 +598,7 @@
       if (!target || !permitted()) return;
       const action = target.dataset.ec;
       if (action === 'screen') switchScreen(target.dataset.screen);
+      else if (action === 'show-feedback' && editor) showFeedback();
       else if (action === 'format' && editor && Object.hasOwn(commands, target.dataset.command))
         command(target.dataset.command);
       else if (action === 'table-controls') {
@@ -663,9 +701,12 @@
     });
     document.addEventListener('input', event => {
       if (event.target === editor && permitted()) {
-        dismissed.clear();
+        if (event.isComposing === false) composing = false;
         changed();
       }
+    });
+    document.addEventListener('focusout', event => {
+      if (event.target === editor) composing = false;
     });
     document.addEventListener('compositionstart', event => {
       if (event.target === editor) composing = true;

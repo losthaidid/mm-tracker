@@ -78,6 +78,12 @@
   padding: 10px 14px;
   border-top: 1px solid var(--ec-line);
 }
+.ec-draft .ec-feedback-jump {
+  display: none;
+}
+#ecReviewTitle {
+  scroll-margin-top: 4rem;
+}
 .ec-workspace [hidden] {
   display: none;
 }
@@ -261,6 +267,26 @@
   .ec-draft-layout,
   .ec-vocab-layout {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .ec-draft .ec-feedback-jump {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    min-height: 44px;
+    padding: 8px 14px;
+    border: 0;
+    border-top: 1px solid var(--ec-line);
+    border-radius: 0;
+    color: inherit;
+    background: var(--ec-soft);
+    text-align: start;
+  }
+  .ec-feedback-jump span {
+    color: var(--ec-muted);
+    font-weight: 500;
+    text-align: end;
   }
   .ec-issues {
     max-height: 15rem;
