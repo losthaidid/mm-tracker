@@ -7,13 +7,15 @@
   const choices = words => Object.keys(words).join('|');
   const pronouns = '(?:I|you|we|they|he|she|it)';
   const people =
-    '(?:buyer|supplier|vendor|requester|approver|manager|reviewer|tester|user|colleague|developer|customer|friend|brother|sister|parent|neighbour|neighbor|student|teacher|coordinator)';
+    '(?:buyer|supplier|vendor|requester|approver|manager|reviewer|tester|user|colleague|developer|customer|friend|cousin|brother|sister|parent|daughter|son|aunt|uncle|neighbour|neighbor|student|teacher|coordinator|assistant|supervisor|engineer)';
   const workspace =
     '(?:file|report|document|form|request|order|invoice|quote|message|email|delivery|application|system|process|record|update|attachment|purchase order|test|result|item|issue|ticket|PO|PR|RFQ)';
   const named = `(?:the|this|that|our|their|your|my|its) (?:${people}|${workspace})s?`;
   const subject = `(?:${pronouns}|${named})`;
   const clause = '(?:^|(?<=[.!?;\\n]) *)';
   const sentenceStart = '(?:^ *|(?<=[.!?\\n]) *)';
+  // Quoted speech can start a sentence. A closing quote can also follow its punctuation.
+  const proseStart = `(?:${sentenceStart}[“"‘']? *|(?<=[.!?][”"’']) *|(?<=[,:]) +[“"‘'] *)`;
   const end = '(?=[ ,.?!;\\n]|$)';
   const terminal = '(?= *(?:[.!?;\\n]|$))';
   const adverb =
@@ -79,25 +81,6 @@
     'Use an object pronoun after between. Both people in “between you and me” take the object form.'
   );
   const subjectCase = { me: 'I', him: 'he', her: 'she', us: 'we', them: 'they' };
-  const jointPerson = `(?:${pronouns}|${choices(subjectCase)}|(?:my|your|our|their|his|her|the) +(?:best |close |older |younger )?${people}|[\\p{L}’'-]{2,30})`;
-  use(
-    'pronouns',
-    new RegExp(
-      `${sentenceStart}(${jointPerson}) +and +(${jointPerson})(?= +(?:are|were|have|do|can|could|may|might|must|should|will|would|go|like|live|need|play|walk|want|work)\\b)`,
-      'giu'
-    ),
-    (_, first, second) => {
-      const left = Object.hasOwn(subjectCase, first.toLowerCase())
-        ? subjectCase[first.toLowerCase()]
-        : first;
-      const right = Object.hasOwn(subjectCase, second.toLowerCase())
-        ? subjectCase[second.toLowerCase()]
-        : second;
-      if (left === first && right === second) return;
-      return left === 'I' ? `${right} and I` : `${left} and ${right}`;
-    },
-    'Use subject pronouns when two people do the action. Put I after the other person in the pair.'
-  );
 
   word(
     'adjectives',
@@ -210,16 +193,18 @@
   };
   const nounForms = {
     ...Object.fromEntries(
-      'answer apple appointment attachment bag bike bird book bottle call car cat chair change childminder coat colleague computer cup day department desk detail document dog email error event example field file flower form friend game garden goal group hour idea image invoice issue item job lesson letter list meeting message minute month morning note office option order page paper parent photo picture plan plant problem project question quote record report request result review road room rule schedule school seat shop sign student supplier table task teacher test ticket tool train trip update user visit week window word year material po pr rfq'
+      'age answer apple appointment attachment bag bike bird book bottle call car cat chair change childminder coat colleague computer cup date day department desk detail document dog email error event example field file flower form friend game garden goal group hour idea image invoice issue item job key lesson letter list meeting message minute month morning name note number office option order page paper parent passport pen photo picture plan plant problem project question quote record report request result review road room rule schedule school seat shop sign student supplier table task teacher test ticket tool train update user visit week window winner word year material po pr rfq'
         .split(' ')
         .concat('purchase order')
         .map(noun => [noun, noun + 's'])
     ),
     ...plurals,
+    address: 'addresses',
     batch: 'batches',
     box: 'boxes',
     bus: 'buses',
     class: 'classes',
+    delivery: 'deliveries',
   };
   const singularForms = Object.fromEntries(
     Object.entries(nounForms).map(([singular, plural]) => [plural, singular])
@@ -227,7 +212,7 @@
   const singularNoun = `(?:${choices(nounForms)})`;
   const pluralNoun = `(?:${choices(singularForms)})`;
   const nounModifiers =
-    '(?:(?:(?:very|really|quite|rather|especially|extremely|particularly|surprisingly|unusually|incredibly|so) +){0,2}(?:amazing|annual|available|awful|bad|beautiful|big|bright|busy|clean|clear|cold|comfortable|complete|correct|current|difficult|different|easy|early|empty|exciting|excellent|final|fine|first|fresh|fun|funny|good|great|happy|hard|heavy|helpful|hot|important|interesting|large|last|late|latest|long|lovely|missing|modern|new|nice|old|open|original|outstanding|overdue|pending|pleasant|positive|productive|quiet|ready|recent|red|revised|short|simple|small|special|strange|successful|sunny|terrible|useful|updated|unusual|urgent|warm|white|wonderful|wrong|young) +){0,3}';
+    '(?:(?:(?:very|really|quite|rather|especially|extremely|particularly|surprisingly|unusually|incredibly|so) +){0,2}(?:amazing|annual|available|awful|bad|beautiful|big|bright|busy|clean|clear|cold|comfortable|complete|correct|current|difficult|different|easy|early|empty|exciting|excellent|favou?rite|final|fine|first|fresh|fun|funny|good|great|happy|hard|heavy|helpful|hot|important|interesting|large|last|late|latest|long|lovely|missing|modern|new|nice|old|open|original|outstanding|overdue|pending|pleasant|positive|productive|quiet|ready|recent|red|revised|short|simple|small|special|strange|successful|sunny|terrible|useful|updated|unusual|urgent|warm|white|wonderful|wrong|young) +){0,3}';
   const countNounEnd = `(?:${nounEnd}|(?= +(?:and|or|about|at|by|before|after|for|from|in|on|to|with|without|that|which|who|came|went|arrived|returned|joined|passed|ahead|left|today|tomorrow|yesterday|last (?:week|month|year))\\b))`;
   use(
     'countability',
@@ -312,6 +297,20 @@
     },
     'Choose a or an by the sound that immediately follows it.'
   );
+  // Titles for a unique position, such as president or chair, can appear without an article.
+  const occupation =
+    '(?:accountant|architect|buyer|developer|doctor|electrician|engineer|lawyer|mechanic|nurse|pilot|programmer|teacher|tester|writer)';
+  use(
+    'articles-a-an',
+    rx(
+      `${proseStart}(?:(?:I|you|he|she|we|they) +(?:am|is|are|was|were|became|become)|(?:am|is|are|was|were) +(?:I|you|he|she|we|they)) +(${occupation})(?= *(?:[.!?;\\n]|$)| +(?:last (?:year|month)|(?:this|next) (?:year|month)|by profession)\\b)`
+    ),
+    (match, job) => {
+      if (job === job.toLowerCase())
+        return match.slice(0, -job.length) + articleForWord(job) + ' ' + job;
+    },
+    'Use a or an before a single countable occupation, as in “She is an engineer.”'
+  );
 
   function quantityWord(lesson, options, nouns, explanation) {
     word(lesson, '\\b', options, `(?= +${nounModifiers}${nouns}\\b${countNounEnd})`, explanation);
@@ -349,7 +348,7 @@
   );
   use(
     'few-little',
-    rx(`\\ba little(?= ${pluralNoun}\\b${nounEnd})`),
+    rx(`\\ba little(?= ${pluralNoun}\\b(?:${countNounEnd}|(?= +available\\b)))`),
     () => 'a few',
     'Use a few for a small number of countable things.'
   );
@@ -485,6 +484,72 @@
     'Use me when someone else sends something to you. Myself refers back to I in the same clause.'
   );
 
+  const comparativeAdjective =
+    '(?:better|worse|faster|slower|easier|harder|greater|higher|lower|longer|shorter|earlier|later|quicker|cheaper|bigger|smaller|larger|taller)';
+  const comparedAmount = `(?:more|less|fewer)(?: +${nounModifiers}(?:${pluralNoun}|${mass}|time|money|work|space))?`;
+  word(
+    'confused-words',
+    `\\b(?:${comparativeAdjective}|${comparedAmount}) +`,
+    { then: 'than' },
+    `(?= +(?:(?:expected|planned|before|usual)\\b|(?:(?:the|this|that|these|those|my|your|our|their) +${nounModifiers}(?:${singularNoun}|${pluralNoun}|estimate)|${pronouns}|${numeral})${terminal}))`,
+    'Use than for a comparison. Then describes what happens next.',
+    'Word choice'
+  );
+  word(
+    'confused-words',
+    '\\b(?:am|is|are|was|were|seems?|seemed|looks?|looked) +',
+    { to: 'too' },
+    '(?= +(?:busy|tired|small|big|large|young|old|late|early|weak|hot|cold|heavy|difficult|good|short|slow|tall|long) +to\\b)',
+    'Use too when something is more than wanted or possible.',
+    'Word choice'
+  );
+  word(
+    'confused-words',
+    '\\b(?:driv(?:e|es|ing)|drove|walk(?:s|ed|ing)?|ran|run(?:s|ning)?|speak(?:s|ing)?|spoke|mov(?:e|es|ed|ing)) +',
+    { to: 'too' },
+    `(?= +(?:fast|slowly|quickly|late|early)${terminal})`,
+    'Use too before an adverb when the action goes beyond what is wanted.',
+    'Word choice'
+  );
+  use(
+    'confused-words',
+    rx(
+      `${proseStart}who['’]s(?= +${nounModifiers}(?:${singularNoun}|${pluralNoun}) +(?:is|are|was|were|has|have)\\b[^.!?;\\n]{0,80}\\?)`
+    ),
+    match => match.slice(0, -5) + 'Whose',
+    'Use whose to ask who something belongs to. Who’s means who is or who has.',
+    'Word choice'
+  );
+  word(
+    'confused-words',
+    '\\b(?:updat(?:e|es|ed)|shar(?:e|es|ed)|sent|brought|lost|left|check(?:s|ed)?|misplaced|review(?:s|ed)?) +',
+    { there: 'their', "they're": 'their', 'they’re': 'their' },
+    `(?= +${nounModifiers}(?:${singularNoun}|${pluralNoun})\\b${countNounEnd})`,
+    'Their shows possession. There refers to a place and they’re means they are.',
+    'Word choice'
+  );
+
+  word(
+    'verb-objects-meaning',
+    '\\b(?:to|can|could|should|will|must|may|might) +',
+    { lay: 'lie' },
+    '(?= +down +(?:to +rest|for +(?:a while|an? (?:hour|minute)|[a-z0-9]+ +(?:hours|minutes)))\\b)',
+    'Use lie down when you recline. Lay down means to put an object down.'
+  );
+  use(
+    'verb-objects-meaning',
+    /\b(?:(?<=please )|(?<=to )|(?<=can )|(?<=could )|(?<=should )|(?<=will )|(?<=must ))rise(?= +(?:my|your|his|her|our|their) +(?:hand|hands|arm|arms)\b)/gi,
+    () => 'raise',
+    'Raise takes an object. Rise describes something going up on its own.'
+  );
+  word(
+    'verb-objects-meaning',
+    '\\b(?:(?:can|could|will|would) +you|please) +',
+    { borrow: 'lend' },
+    `(?= +(?:me|us|him|her|them) +your +${singularNoun}\\b)`,
+    'The person who gives something temporarily lends it. The person who receives it borrows it.'
+  );
+
   // Common verbs and their forms. Keep unchanged participles when they are already valid.
   const spellingChanges = {
     cancel: ['cancelled', 'cancelling'],
@@ -591,6 +656,57 @@
   Object.assign(verbs, irregular);
   const knownVerb = `(?:${choices(verbs)})`;
   const participles = [...new Set(Object.values(verbs).map(([, , participle]) => participle))];
+  const pastVerbs = [...new Set(Object.values(verbs).map(([, past]) => past))];
+  const personWord = "[\\p{L}’'-]{2,30}";
+  const teamNoun = '(?:team|staff|committee|group|family)';
+  const personPhrase = `(?:${pronouns}|${choices(subjectCase)}|(?:my|your|our|their|his|her|the) +${nounModifiers}(?:(?:best|close|older|younger|project|delivery|team|site|support|finance|logistics|testing) +){0,2}(?:${people}s?|${teamNoun})|${personWord})`;
+  const jointPerson = `(?:${personPhrase}|${personWord}(?: +${personWord}){1,2})`;
+  const ordinaryPerson = new RegExp(`^${personPhrase}$`, 'iu');
+  const capitalisedName = /^\p{Lu}[\p{L}’'-]{1,29}(?: +\p{Lu}[\p{L}’'-]{1,29}){1,2}$/u;
+  const isJointPerson = value => ordinaryPerson.test(value) || capitalisedName.test(value);
+  const introductoryPhrase = `(?:on +${day}s?|(?:before|after) +(?:work|lunch|school|dinner|this +${singularNoun})|(?:this|next|last|every) +(?:week|month|year|morning|afternoon|evening|${day})|(?:earlier +|later +)?(?:today|tomorrow|yesterday)|then|later)`;
+  const introductoryClause =
+    '(?:if|when|while|before|after|once|because|although|since|until|unless|as soon as) +[^,;.!?\\n]{2,88},';
+  const reportingClause = `${subject} +(?:think|believe|know|hope|said|says|heard|suspect|remember|mentioned|agreed|decided)(?: +that)?`;
+  const compoundStart = `(?:${proseStart}(?:(?:${introductoryPhrase} *,?|${introductoryClause}|${reportingClause}|and|but|so) +)?|(?<=[,;]) +(?:and|but|so) +)`;
+  const compoundAux =
+    "(?:(?:are|were|is|was|has|have|does|do|did|can|could|may|might|must|shall|should|will|would)(?:n['’]t)?|won['’]t|am)";
+  const compoundVerb = `(?:${compoundAux}|${choices(verbs)}|${pastVerbs.join('|')})`;
+  const invertedCompound = `${proseStart}(?:(?:where|when|why|how) +)?${compoundAux} +`;
+  use(
+    'stative-verbs',
+    /\b(I|you|he|she|we|they) +(?:am|is|are) +agree(?= +(?:with|that|on|about)\b)/gi,
+    (_, actor) => actor + (/^(?:he|she)$/i.test(actor) ? ' agrees' : ' agree'),
+    'Use agree as the main verb to describe a present opinion.'
+  );
+  use(
+    'verb-complements',
+    rx(`\\b((?:let|lets|made|make|makes) +(?:me|you|him|her|us|them) +)to +(?=${knownVerb}\\b)`),
+    (_, lead) => lead,
+    'Let and active make take a person followed by the base verb. For example, “Let me check.”'
+  );
+  use(
+    'pronouns',
+    new RegExp(
+      `(${invertedCompound}|${compoundStart})(${jointPerson}) +and +(${jointPerson})(?= +${adverb}(?:${compoundVerb}|going|waiting|ready|available|here|there)\\b)`,
+      'giu'
+    ),
+    (_, lead, first, second, index, text) => {
+      if (followsAbbreviation(text, index) || !isJointPerson(first) || !isJointPerson(second))
+        return;
+      const left = Object.hasOwn(subjectCase, first.toLowerCase())
+        ? subjectCase[first.toLowerCase()]
+        : first;
+      const right = Object.hasOwn(subjectCase, second.toLowerCase())
+        ? subjectCase[second.toLowerCase()]
+        : second;
+      if (left === first && right === second) return;
+      const pair = left.toLowerCase() === 'i' ? `${right} and I` : `${left} and ${right}`;
+      const beginsSentence = /^(?: *[“"‘']? *)$/.test(lead);
+      return lead + (beginsSentence ? pair.charAt(0).toUpperCase() + pair.slice(1) : pair);
+    },
+    'Use subject pronouns when two people do the action. Put I after the other person in the pair.'
+  );
   // A direct instruction such as “Everyone have a seat” can have an explicit subject.
   word(
     'agreement',
@@ -736,9 +852,10 @@
   use(
     'clause-order',
     rx(
-      `${clause}(received|approved|posted|released|checked|sent) (the (?:team|warehouse|buyer|supplier|vendor|reviewer)) (the|this|those|our|their) (?=(?:${workspace}s?|goods)\\b)`
+      `(${proseStart})(received|approved|posted|released|checked|sent) (${subject}|the (?:team|warehouse)) (the|this|those|our|their) (?=(?:${workspace}s?|goods)\\b[^.!?;\\n]{0,75}(?:[.!;\\n]|$))`
     ),
-    (_, verb, actor, article) => `${actor} ${verb.toLowerCase()} ${article} `,
+    (_, lead, verb, actor, article) =>
+      `${lead}${actor.charAt(0).toUpperCase()}${actor.slice(1)} ${verb.toLowerCase()} ${article} `,
     'In an ordinary statement, put the subject before the verb.'
   );
   word(
@@ -748,10 +865,7 @@
     '',
     'Match the verb to the head noun, such as list or batch.'
   );
-  const joinedSubject = new RegExp(
-    `${clause}(?:(?:today|tomorrow|yesterday|then|later) +)?${jointPerson} +and +$`,
-    'iu'
-  );
+  const joinedSubject = new RegExp(`${compoundStart}(${jointPerson}) +and +$`, 'iu');
   for (const [actor, forms, reason] of [
     ['we|you', pluralBe, 'Use are, were, have or do with we and you.'],
     ['he|she|it', { are: 'is', were: 'was' }, 'Use is or was with he, she and it.'],
@@ -761,7 +875,8 @@
       'agreement',
       rx(`\\b((?:${actor}) +)(${choices(forms)})\\b`),
       (_, lead, verb, index, text) => {
-        if (!joinedSubject.test(text.slice(Math.max(0, index - 140), index)))
+        const joined = joinedSubject.exec(text.slice(Math.max(0, index - 140), index));
+        if (!joined || !isJointPerson(joined[1]))
           return lead + sameCase(verb, forms[verb.toLowerCase()]);
       },
       reason
@@ -779,7 +894,9 @@
   const massQuantity = `(?:${mass}|time|money|space|water|work)`;
   const quantityPhrase = `(?:much|many)(?: +${nounModifiers}(?:${countQuantity}|${massQuantity}))?`;
   const whQuestion = `(?:(?:how|what) +${quantityPhrase}|how +(?:long|far|often)|what|when|where|why)`;
-  const questionNounSubject = `(?:a|an|the|this|that|these|those|my|your|our|their|his|her|its) +${nounModifiers}(?:${singularNoun}|${pluralNoun}|${workspace}s?|${people}s?|(?:unit|product|package|device|team)s?)`;
+  const nounAdjunct =
+    '(?:(?:purchase|sales|news|project|quality|support|goods|material|delivery|stock|test|office|order|invoice|warehouse|team|product) +){0,2}';
+  const questionNounSubject = `(?:a|an|the|this|that|these|those|my|your|our|their|his|her|its) +${nounModifiers}(?:(?:${people}|${workspace})(?:['’]s|s['’]) +)?${nounAdjunct}(?:${singularNoun}|${pluralNoun}|${workspace}s?|${people}s?|(?:unit|product|package|device|team|file)s?)`;
   const questionSubject = `(?:${questionNounSubject}|${pronouns}|this|that|these|those)`;
   use(
     'pronouns',
@@ -810,6 +927,51 @@
   const questionTag =
     "(?:right|correct|okay|(?:is|are|was|were|do|does|did|will|would|can|could)(?:n['’]t)? (?:it|they|we|you|he|she|I))";
   const directQuestionEnd = `(?=(?!${questionTail}, +${questionTag} *\\?)${questionTail}\\?)`;
+  const questionTopic = `(?:${whQuestion}|who|which|what +time|how +(?:old|tall|high|heavy|wide|fast|soon)|(?:what|which) +${nounModifiers}${countQuantity})`;
+  const agreementQuestionEnd = `(?:${directQuestionEnd}|(?=${questionTail}(?:\\n|$)))`;
+  const questionAgreementNouns = `(?:${questionNounSubject}|${pronouns}|(?:these|those|this|that|there)|${indefiniteSubject}|(?:the|this|that|your|our|their|her|his) +${nounModifiers}(?:${massQuantity}|news|goods|staff))`;
+  const questionAgreementAux = 'am|is|are|was|were|has|have|do|does';
+  const invertedSubject = `(?:(?:${questionAgreementAux})(?:n['’]t)? +${questionAgreementNouns}\\b)`;
+  const mainAfterDo = new RegExp(`^ +${adverb}(?:${choices(verbs)}|${choices(baseForm)})\\b`, 'i');
+  const actionAfterHave = new RegExp(`^ +${adverb}(?:${participles.join('|')})\\b`, 'i');
+  const collectiveSubject = /\b(?:team|company|family|class|group|party|staff)$/i;
+  const pluralSubject = new RegExp(
+    `(?:^| +)(?:you|we|they|these|those|${countQuantity}|${people}s|systems|devices|packages|products)$`,
+    'i'
+  );
+  const coordinated = /^ *(?:,|and\b|or\b|nor\b)/i;
+  use(
+    'questions',
+    rx(
+      `(${proseStart}((?:${questionTopic} +)?))(${questionAgreementAux})(n['’]t)? +(${questionAgreementNouns})\\b${agreementQuestionEnd}`
+    ),
+    (match, lead, topic, auxiliary, negative, actor, index, text) => {
+      if (followsAbbreviation(text, index) || collectiveSubject.test(actor)) return;
+      const tail = text.slice(index + match.length, index + match.length + 140);
+      if (coordinated.test(tail) || /^[’'-]/.test(tail)) return;
+      const verb = auxiliary.toLowerCase();
+      const existential = actor.toLowerCase() === 'there';
+      if (existential && !/^how +(?:many|much)\b/i.test(topic)) return;
+      const plural = existential ? /^how +many\b/i.test(topic) : pluralSubject.test(actor);
+      const firstPerson = /^i$/i.test(actor);
+      let expected;
+      if (verb === 'do' || verb === 'does') {
+        if (!mainAfterDo.test(tail)) return;
+        expected = plural || firstPerson ? 'do' : 'does';
+      } else if (verb === 'has' || verb === 'have') {
+        if (!actionAfterHave.test(tail)) return;
+        expected = plural || firstPerson ? 'have' : 'has';
+      } else if (verb === 'was' || verb === 'were') {
+        expected = plural ? 'were' : 'was';
+      } else {
+        expected = firstPerson ? (negative ? 'are' : 'am') : plural ? 'are' : 'is';
+      }
+      return lead + sameCase(auxiliary, expected) + match.slice(lead.length + auxiliary.length);
+    },
+    'Match the helping verb to the subject after it. For example, “What is her name?” and “What are her plans?”',
+    'Grammar',
+    'question-agreement'
+  );
   const questionAdverb = '(?:(?:usually|often|always|really|still|normally|already|actually) )?';
   const doAuxiliary = '(?:do|does|did)';
   const questionMainVerb = `(?:${choices(questionForms)})\\b`;
@@ -899,7 +1061,9 @@
   );
   use(
     'capitals',
-    rx(`${sentenceStart}(${whQuestion} +)(?=${directQuestionClause}|${invertedQuestionClause})`),
+    rx(
+      `${proseStart}(${questionTopic} +)(?=${directQuestionClause}|${invertedQuestionClause}|${invertedSubject}${agreementQuestionEnd})`
+    ),
     (match, opening, index, text) => {
       if (/^what +(?:much|many)\b/i.test(opening) || followsAbbreviation(text, index)) return;
       return match.slice(0, -opening.length) + opening[0].toUpperCase() + opening.slice(1);
@@ -1314,6 +1478,20 @@
   use(
     'relative-defining',
     rx(
+      `\\b((?:the|this|that|our|your|their) +${nounModifiers}${workspace} +(that|which) +${pronouns} +(?:sent|received|attached|checked|approved|read|found|opened|updated|reviewed) +)(?:it|them)\\b(?= +(?:today|yesterday|already|earlier|last +${day}|is|are|was|were|has|have)\\b| *[,.;!?\\n]|$)(?! +(?:today|yesterday|earlier|already) +(?:to|for|about|with)\\b)`
+    ),
+    (_, lead) => lead.trimEnd(),
+    'The relative word already stands for the object, so it does not need a second pronoun.'
+  );
+  use(
+    'relative-extra',
+    /\b(who +)(he|she|they) +(?=(?:live[sd]?|work(?:s|ed)?|stud(?:y|ies|ied)) +(?:nearby|here|there|abroad) *,)/gi,
+    (_, relative) => relative,
+    'Who already does the action in this relative clause. Omit the extra subject pronoun.'
+  );
+  use(
+    'relative-defining',
+    rx(
       `\\b((?:use|open|choose|send|read|click|review|update|check) (?:the|this|that) ${workspace}), +(that) (?=${pronouns} (?:added|attached|shared|sent|updated|marked|mentioned|created|posted)\\b[^,;.!?\\n]{0,85}${terminal})`
     ),
     (_, noun, relative) => noun + ' ' + relative + ' ',
@@ -1448,7 +1626,7 @@
   );
   use(
     'comparisons',
-    /\bmost +(best|worst|fastest|slowest|easiest|hardest|longest|shortest|clearest|simplest|cheapest|largest|smallest|tallest|highest|lowest|earliest|latest)\b/gi,
+    /\bmost +(best|worst|fastest|slowest|quickest|easiest|hardest|longest|shortest|clearest|simplest|cheapest|largest|smallest|tallest|highest|lowest|earliest|latest)\b/gi,
     (_, superlative) => superlative,
     'Use one superlative form. Words such as easiest and best already express the highest degree.'
   );
@@ -1462,7 +1640,7 @@
   );
   use(
     'too-enough',
-    /\benough (small|large|clear|simple|accurate|complete|safe|fast|light|easy|close|strong|detailed|short|long|good)(?= to\b)/gi,
+    /\benough (small|large|clear|simple|accurate|complete|safe|fast|light|easy|close|strong|detailed|short|long|good|warm|cold|quiet|bright|clean|old|young)(?= to\b)/gi,
     (_, adjective) => adjective + ' enough',
     'Put enough after an adjective when it describes the degree needed to do something.'
   );
@@ -1721,6 +1899,13 @@
   );
   use(
     'capitals',
+    new RegExp(`${proseStart}(i)(?= +${adverb}(?:${pastVerbs.join('|')})\\b)`, 'g'),
+    (match, pronoun) => match.slice(0, -pronoun.length) + 'I',
+    'Capitalise the pronoun I.',
+    'Capitalisation'
+  );
+  use(
+    'capitals',
     /(?:^ *|(?<=[.!?\n]) *)(how|what|when|where|who|why|which)(?= +(?:(?:long|often|much|far) +)?(?:am|is|are|was|were|do|does|did|can|could|will|would|should|has|have|had)\b[^.!?\n]{1,140}\?)/g,
     (match, opening) =>
       match.slice(0, -opening.length) + opening[0].toUpperCase() + opening.slice(1),
@@ -1843,6 +2028,12 @@
     (_, verb, person, object) => `${verb} ${object} to ${person}`,
     'Put the thing being explained before to and the person receiving the explanation.'
   );
+  use(
+    'object-order',
+    /\b((?:explain(?:s|ed)?|mention(?:s|ed)?) +)(me|us|him|her|them)(?= +(?:that|how|why|whether)\b)/gi,
+    (_, verb, person) => verb + 'to ' + person,
+    'Use to before the person receiving the explanation when a clause follows.'
+  );
   word(
     'singular-they',
     '\\bthey ',
@@ -1874,6 +2065,12 @@
     /\b((?:decide[sd]?|discuss(?:es|ed)?|talk(?:s|ed)? about|depends? on|asked|cho(?:ose|se)|unsure|uncertain|a question of) +)if(?= to +[a-z])/gi,
     (_, lead) => lead + 'whether',
     'Use whether before a to-infinitive that expresses a choice.'
+  );
+  use(
+    'whether-if',
+    rx(`\\b(whether +or +not) +if(?= +${subject}\\b)`),
+    (_, lead) => lead,
+    'Whether or not already introduces the two possibilities.'
   );
   word(
     'too-much-agreement',

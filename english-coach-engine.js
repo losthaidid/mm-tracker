@@ -480,6 +480,13 @@
           continue;
         if (id === 'subject-agreement' && !/(?:^|[.!?\n])\s*$/.test(prefix)) continue;
         if (
+          id === 'plural-be' &&
+          /\b(?:one|each|either|neither|(?:the|a|this|our|your) +(?:number|list|set|collection|batch|copy|summary|risk|cost)) +of +$/i.test(
+            prefix
+          )
+        )
+          continue;
+        if (
           (id === 'singular-be' || id === 'agreement') &&
           /\bwere$/i.test(match[0]) &&
           hypotheticalPrefix.test(prefix)

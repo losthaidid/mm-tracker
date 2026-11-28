@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import '../english-grammar-data.js';
 import '../english-grammar-checks.js';
 import '../english-coach-engine.js';
+import { corrections, additionalCorrections } from './fixtures/english-standard-examples.mjs';
 
 const { groups, byId, contextNotes } = globalThis.WorkHubEnglishGrammarData;
 const { check, liveLessons, ruleLinks } = globalThis.WorkHubEnglishCoachEngine;
@@ -29,9 +30,9 @@ function applyAll(text, issues) {
   return text;
 }
 
-test('all 98 lessons have an audited live check or a note about the context to review', () => {
+test('all 100 lessons have an audited live check or a note about the context to review', () => {
   const topics = Object.keys(contextNotes);
-  assert.equal(liveLessons.size, 87);
+  assert.equal(liveLessons.size, 89);
   assert.equal(topics.length, 11);
   assert.ok(topics.every(id => contextNotes[id].trim() && !liveLessons.has(id)));
   assert.deepEqual([...liveLessons, ...topics].sort(), [...byId.keys()].sort());
@@ -357,6 +358,8 @@ test('the lesson examples and variants exercise every new pattern', () => {
     ...directQuestions.map(([text]) => text),
     ...reportedExamples.map(([text]) => text),
     ...widerGrammarExamples.map(([text]) => text),
+    ...corrections.map(([, text]) => text),
+    ...additionalCorrections.map(([text]) => text),
     formalQuestion,
     danglingModifier,
   ];
