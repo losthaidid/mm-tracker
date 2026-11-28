@@ -211,9 +211,11 @@
   margin-top: 4px;
   font-weight: 650;
 }
+.ec-change :is(del, ins) {
+  white-space: pre-wrap;
+}
 .ec-change del {
   color: var(--ec-muted);
-  white-space: pre-wrap;
 }
 .ec-change ins {
   text-decoration: none;

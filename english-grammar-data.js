@@ -324,7 +324,7 @@
           'agreement',
           'Subject–verb agreement',
           'the change is · the changes are',
-          'The main noun in the subject controls the verb. Words between the main noun and the verb may belong to a separate phrase. Identify what the sentence is mainly talking about.',
+          'The main noun in the subject controls the verb. Words between the main noun and the verb may belong to a separate phrase. A time word can also be the subject, as in “Today is a fun day”.',
           'The list of open issues is attached.',
           'The changes are ready.',
           'The list of items are ready. → The list of items is ready.',

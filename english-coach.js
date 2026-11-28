@@ -46,6 +46,7 @@
     let timer,
       draftDirty = false,
       saved = true,
+      reviewedText = '',
       issues = [],
       dismissed = new Set();
     let lessonId = Object.keys(E.lessons)[0],
@@ -97,6 +98,7 @@
       recall = 0;
       revealed = false;
       saved = true;
+      reviewedText = '';
       issues = [];
       dismissed = new Set();
       try {
@@ -196,9 +198,8 @@
       if (!editor?.isConnected || !permitted() || composing) return;
       flush();
       const { text, pieces } = currentText();
-      issues = E.check(text.replaceAll('\u00a0', ' '), state.mode).filter(
-        issue => !dismissed.has(issueKey(issue))
-      );
+      reviewedText = text;
+      issues = E.check(text, state.mode).filter(issue => !dismissed.has(issueKey(issue)));
       highlight(pieces);
       const count = $('ecCount'),
         host = $('ecIssues');
@@ -361,8 +362,7 @@
       const issue = issues[index];
       if (!issue) return;
       const { text, pieces } = currentText();
-      if (text.slice(issue.start, issue.end).replaceAll('\u00a0', ' ') !== issue.original)
-        return refresh();
+      if (composing || text !== reviewedText) return refresh();
       if (action === 'dismiss') {
         dismissed.add(issueKey(issue));
         refresh();
@@ -383,8 +383,7 @@
         return;
       }
       const selected = R.range(document, pieces, issue);
-      if (!selected || selected.toString().replaceAll('\u00a0', ' ') !== issue.original)
-        return refresh();
+      if (!selected || selected.toString() !== issue.original) return refresh();
       if (action === 'locate') {
         place(selected);
         selected.startContainer.parentElement?.scrollIntoView({ block: 'nearest' });
