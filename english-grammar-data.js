@@ -1326,12 +1326,12 @@
         ],
         [
           'punctuation',
-          'Colons, semicolons and dashes',
+          'Punctuation marks and spacing',
           'complete lead-in + colon + list',
-          'A colon can introduce a list or explanation after a complete lead-in. A semicolon can link closely related independent clauses. A dash can mark an interruption or extra emphasis. Choose punctuation that makes the structure easy to follow.',
+          'In English, put a question mark or exclamation mark directly after the word it follows. A colon can introduce a list or explanation after a complete lead-in. A semicolon can link closely related independent clauses. A dash can mark an interruption or extra emphasis.',
           'Please bring two things: the approved PO and the receipt.',
           'The test passed; the report is ready.',
-          'Please bring: the approved PO. → Please bring the approved PO.',
+          'Can you approve the PO ? → Can you approve the PO?',
           'Which uses a colon after a complete lead-in?',
           'Bring two items: the PO and the receipt.',
           'Bring: the PO and the receipt.',
@@ -1665,6 +1665,7 @@
     'do-needful': 'requests',
     asap: 'requests',
     'ping-me': 'tone',
+    'punctuation-spacing': 'punctuation',
   };
   const references = [
     [

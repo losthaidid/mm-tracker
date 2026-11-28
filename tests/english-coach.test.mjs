@@ -62,3 +62,37 @@ test('English Coach rich clipboard keeps supported styles, lists and table value
   assert.equal(container.querySelectorAll('tr').length,3);
   assert.equal(container.querySelectorAll('th').length,2);
 });
+
+test('live feedback catches the reported question and keeps valid modal questions', () => {
+  const { check } = globalThis.WorkHubEnglishCoachEngine;
+  const sample = 'Sorry to keep you waiting. May we has a discussion on something ?  ';
+  for (const mode of ['email', 'teams']) {
+    const issues = check(sample, mode);
+    assert.deepEqual(issues.map(({id, original, replacement}) => [id, original, replacement]), [
+      ['modal-base', 'May we has', 'May we have'],
+      ['punctuation-spacing', ' ?', '?'],
+    ]);
+    assert.ok(issues.every(issue => sample.slice(issue.start,issue.end) === issue.original));
+  }
+  for (const [draft, fixed] of [
+    ['Could you please sends the email?', 'Could you please send'],
+    ['Can the supplier sent the quote?', 'Can the supplier send'],
+    ['The buyer can checked the order.', 'can check'],
+    ['Why can’t we just changed this?', 'can’t we just change'],
+    ['Should we not has a call?', 'Should we not have'],
+    ['Can we proceed\u00a0? I’m ready.', '?'],
+  ]) {
+    assert.deepEqual(check(draft, 'email').map(issue => issue.replacement), [fixed], draft);
+  }
+  for (const draft of [
+    'Sorry to keep you waiting. May we have a discussion on something?',
+    'Can checks run now? When can reviews resume?',
+    'Can the supplier send the quote? Shall we discuss it?',
+    'Could you please check the PO? May I have the printout?',
+    'The formula is ready ? success : wait.',
+    'https://example.invalid/page?row=50',
+    'Can\nwe has a separate line',
+  ]) {
+    assert.deepEqual(check(draft,'email'), [], draft);
+  }
+});

@@ -2480,6 +2480,27 @@ const adventureChoices={greetings:false,antics:false,reminders:false,chases:true
 const adventureStorage=values=>({'mm-tracker.momo-adventures.v1':JSON.stringify({...adventureChoices,...values})});
 function submitLocal(window,form){form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));}
 
+test('English Coach live feedback applies both fixes to a formatted question', async t => {
+  const { api, document, window, db } = await app(t);
+  api.showTab('knowledge');
+  document.querySelector('[data-mmk="tab"][data-mode="english"]').click();
+  const editor = document.getElementById('ecEditor');
+  editor.innerHTML = '<p>Sorry to keep you waiting. May we <b>has</b> a discussion on <i>something</i> ?  </p>';
+  editor.dispatchEvent(new window.Event('input', { bubbles:true }));
+  document.getElementById('ecMode').dispatchEvent(new window.Event('change', { bubbles:true }));
+  assert.equal(document.getElementById('ecCount').textContent, '2 suggestions');
+  const writes = db.calls.length;
+  document.querySelector('[data-ec="apply"]').click();
+  assert.equal(document.getElementById('ecCount').textContent, '1 suggestion');
+  document.querySelector('[data-ec="apply"]').click();
+  assert.equal(editor.textContent.trim(), 'Sorry to keep you waiting. May we have a discussion on something?');
+  assert.equal(editor.querySelector('b').textContent,'have');
+  assert.equal(editor.querySelector('i').textContent,'something');
+  assert.equal(document.querySelector('[data-ec="apply"]'), null);
+  assert.equal(db.calls.length, writes);
+});
+
+
 test('Grammar Library opens from live feedback, preserves a draft and saves lesson progress', async t => {
   const { api, document, window, db } = await app(t);
   const click = selector => {
