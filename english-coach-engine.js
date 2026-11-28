@@ -3,6 +3,53 @@
   'use strict';
 
   const maxText = 20000;
+  const modalForms = {
+    am: 'be',
+    is: 'be',
+    are: 'be',
+    was: 'be',
+    were: 'be',
+    has: 'have',
+    had: 'have',
+    does: 'do',
+    did: 'do',
+    goes: 'go',
+    went: 'go',
+    sends: 'send',
+    sent: 'send',
+    changes: 'change',
+    changed: 'change',
+    needs: 'need',
+    checks: 'check',
+    checked: 'check',
+    reviewed: 'review',
+    reviews: 'review',
+    confirms: 'confirm',
+    confirmed: 'confirm',
+    posted: 'post',
+    posts: 'post',
+    receives: 'receive',
+    received: 'receive',
+    joins: 'join',
+    joined: 'join',
+    shares: 'share',
+    shared: 'share',
+    makes: 'make',
+    made: 'make',
+    approves: 'approve',
+    approved: 'approve',
+  };
+  const horizontal = '[ \\t\\u00a0]+';
+  const modals =
+    "(?:can(?:['’]t)?|(?:could|should|would|must|might)(?:n['’]t)?|may|shall|will|won['’]t|shan['’]t)";
+  // Limit inverted noun phrases to familiar subject forms to avoid treating any following noun as a verb.
+  const subjects = `(?:i|you|he|she|it|we|they|(?:the|a|an|this|that|our|your|my|their)${horizontal}(?:(?:new|current|original|revised|updated|purchase|project|support|finance)${horizontal})?(?:team|supplier|buyer|user|approver|manager|requester|system|order|request|report|document|file|invoice|PO|PR)s?)`;
+  const adverbs = '(?:please|not|still|also|really|just|already|ever|only|possibly)';
+  const modalPattern = new RegExp(
+    String.raw`\b(${modals})(${horizontal}${subjects})?((?:${horizontal}${adverbs})?${horizontal})(${Object.keys(modalForms).join('|')})\b`,
+    'gi'
+  );
+  const questionPrefix = /(?:^|[.!?:;\n"'“(]|\b(?:why|when|where|how|what|which|who))\s*$/i;
   const rules = [
     [
       'plural-be',
@@ -53,28 +100,10 @@
     [
       'modal-base',
       'Grammar',
-      /\b(can|could|should|would|must|may|might|will) (sends|sent|goes|went|does|needs|has|checks|checked|reviewed|reviews|confirms|confirmed|posted|posts)\b/gi,
-      (_, helper, verb) =>
-        helper +
-        ' ' +
-        {
-          sends: 'send',
-          sent: 'send',
-          goes: 'go',
-          went: 'go',
-          does: 'do',
-          needs: 'need',
-          has: 'have',
-          checks: 'check',
-          checked: 'check',
-          reviewed: 'review',
-          reviews: 'review',
-          confirms: 'confirm',
-          confirmed: 'confirm',
-          posted: 'post',
-          posts: 'post',
-        }[verb.toLowerCase()],
-      'After a modal verb like can or should, use the base verb.',
+      modalPattern,
+      (_, modal, subject, spacing, verb) =>
+        modal + (subject || '') + spacing + modalForms[verb.toLowerCase()],
+      'Use the base verb with a modal such as may, can, or should, even with the subject in between. For example, “we may have” and “may we have”.',
       'Could you ___ the test results?',
       ['review', 'reviewed'],
     ],
@@ -272,6 +301,15 @@
       ['let me know', 'make me know'],
       'email',
     ],
+    [
+      'punctuation-spacing',
+      'Punctuation',
+      /(?<=[\p{L}\p{N})\]])[ \t\u00a0]+([?!])(?=$|[\r\n?!’”'"\])]|[ \t\u00a0]+(?:$|[\r\n\p{Lu}]))/gu,
+      (_, mark) => mark,
+      'Put a question mark or exclamation mark directly after the preceding word in English.',
+      'Which question uses standard punctuation spacing?',
+      ['May we discuss this?', 'May we discuss this ?'],
+    ],
   ];
 
   const titles = [
@@ -294,6 +332,7 @@
     'Making a clear request',
     'Giving a deadline',
     'Choosing a tone for email',
+    'Spacing before punctuation',
   ];
   const lessons = Object.fromEntries(
     rules.map(([id, type, , , reason, prompt, choices], index) => [
@@ -347,18 +386,31 @@
         )
           continue;
         if (id === 'subject-agreement' && !/(?:^|[.!?\n])\s*$/.test(prefix)) continue;
+        // At a question opening a token after the modal may be its subject, as in “Can checks run?”.
+        if (id === 'modal-base' && !match[2] && questionPrefix.test(prefix)) continue;
         const original = match[0];
         let replacement = replace(...match);
         if (/^[A-Z]/.test(original))
           replacement = replacement.charAt(0).toUpperCase() + replacement.slice(1);
+        const end = match.index + original.length;
+        const verbOffset = id === 'modal-base' ? original.length - match[4].length : 0;
         found.push({
           id,
           type,
           reason,
           start: match.index,
-          end: match.index + original.length,
+          end,
           original,
           replacement,
+          ...(verbOffset
+            ? {
+                edit: {
+                  start: match.index + verbOffset,
+                  end,
+                  replacement: replacement.slice(verbOffset),
+                },
+              }
+            : {}),
         });
       }
     }

@@ -213,6 +213,7 @@
 }
 .ec-change del {
   color: var(--ec-muted);
+  white-space: pre-wrap;
 }
 .ec-change ins {
   text-decoration: none;

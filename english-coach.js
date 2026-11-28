@@ -384,10 +384,16 @@
       if (action === 'locate') {
         place(selected);
         selected.startContainer.parentElement?.scrollIntoView({ block: 'nearest' });
-      } else if (command('insertText', issue.replacement, selected)) {
-        counters(issue.id).seen++;
-        refresh();
-        putStatus('Suggestion applied.');
+      } else {
+        const editRange = issue.edit ? R.range(document, pieces, issue.edit) : selected;
+        if (
+          editRange &&
+          command('insertText', issue.edit?.replacement ?? issue.replacement, editRange)
+        ) {
+          counters(issue.id).seen++;
+          refresh();
+          putStatus('Suggestion applied.');
+        }
       }
     }
 
