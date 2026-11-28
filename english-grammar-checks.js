@@ -9,10 +9,11 @@
   const people =
     '(?:buyer|supplier|vendor|requester|approver|manager|reviewer|tester|user|colleague|developer|customer|friend|brother|sister|parent|neighbour|neighbor|student|teacher|coordinator)';
   const workspace =
-    '(?:file|report|document|form|request|order|invoice|quote|message|email|delivery|application|system|process|record|update|attachment|purchase order|test|result|item|issue|PO|PR|RFQ)';
+    '(?:file|report|document|form|request|order|invoice|quote|message|email|delivery|application|system|process|record|update|attachment|purchase order|test|result|item|issue|ticket|PO|PR|RFQ)';
   const named = `(?:the|this|that|our|their|your|my|its) (?:${people}|${workspace})s?`;
   const subject = `(?:${pronouns}|${named})`;
   const clause = '(?:^|(?<=[.!?;\\n]) *)';
+  const sentenceStart = '(?:^ *|(?<=[.!?\\n]) *)';
   const end = '(?=[ ,.?!;\\n]|$)';
   const terminal = '(?= *(?:[.!?;\\n]|$))';
   const adverb =
@@ -24,8 +25,8 @@
   const nounEnd =
     '(?= *(?:[,.!?;:\\n]|$)| +(?:is|are|was|were|has|have|needs?|require[sd]?|remain[sed]*|will|can|must|should|on hold|in stock)\\b)';
 
-  function use(lessonId, pattern, replace, reason, type = 'Grammar', id = lessonId) {
-    rules.push({ id, lessonId, pattern, replace, reason, type });
+  function use(lessonId, pattern, replace, reason, type = 'Grammar', id = lessonId, context) {
+    rules.push({ id, lessonId, pattern, replace, reason, type, context });
   }
 
   function sameCase(word, replacement) {
@@ -52,6 +53,8 @@
   }
 
   const day = '(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)';
+  const month =
+    '(?:January|February|March|April|May|June|July|August|September|October|November|December)';
   use(
     'nouns',
     /\b((?:[Oo]n|[Bb]y|[Nn]ext|[Ll]ast|[Ee]very|[Uu]ntil|[Tt]his) +)(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/g,
@@ -66,6 +69,34 @@
     /\b((?:to|for|with|from|between|beside|without) +(?:(?:[A-Z][\p{L}’-]{1,29}|the team) +and +)?)(I|we|he|she|they)\b(?= *(?:[,.;!?\n]|$)| +(?:today|tomorrow|later|first)\b)/gu,
     (_, before, wrong) => before + objectPronoun[wrong.toLowerCase()],
     'Use an object pronoun after a preposition, including when someone else is named with it.'
+  );
+  use(
+    'pronouns',
+    rx(
+      `\\b(between +(?:you|me|us|him|her|them|(?:my|your|our|their|the) +${people}) +and +)(I|we|he|she|they)(?= *(?:[,.;!?\\n]|$))`
+    ),
+    (_, before, wrong) => before + objectPronoun[wrong.toLowerCase()],
+    'Use an object pronoun after between. Both people in “between you and me” take the object form.'
+  );
+  const subjectCase = { me: 'I', him: 'he', her: 'she', us: 'we', them: 'they' };
+  const jointPerson = `(?:${pronouns}|${choices(subjectCase)}|(?:my|your|our|their|his|her|the) +(?:best |close |older |younger )?${people}|[\\p{L}’'-]{2,30})`;
+  use(
+    'pronouns',
+    new RegExp(
+      `${sentenceStart}(${jointPerson}) +and +(${jointPerson})(?= +(?:are|were|have|do|can|could|may|might|must|should|will|would|go|like|live|need|play|walk|want|work)\\b)`,
+      'giu'
+    ),
+    (_, first, second) => {
+      const left = Object.hasOwn(subjectCase, first.toLowerCase())
+        ? subjectCase[first.toLowerCase()]
+        : first;
+      const right = Object.hasOwn(subjectCase, second.toLowerCase())
+        ? subjectCase[second.toLowerCase()]
+        : second;
+      if (left === first && right === second) return;
+      return left === 'I' ? `${right} and I` : `${left} and ${right}`;
+    },
+    'Use subject pronouns when two people do the action. Put I after the other person in the pair.'
   );
 
   word(
@@ -95,6 +126,22 @@
     terminal,
     'Use an adverb to describe how the action was done.'
   );
+  const mannerAdverbs = {
+    beautiful: 'beautifully',
+    good: 'well',
+    clear: 'clearly',
+    careful: 'carefully',
+  };
+  use(
+    'adverbs',
+    rx(
+      `\\b((?:sings?|sang|speaks?|spoke|drives?|drove|walks?|walked) +)(${choices(mannerAdverbs)})\\b${terminal}`
+    ),
+    (_, lead, manner) => {
+      if (manner === manner.toLowerCase()) return lead + mannerAdverbs[manner];
+    },
+    'Use an adverb to describe how someone sings, speaks or moves.'
+  );
   for (const [pattern, wrong, correct] of [
     ['responsible', 'of', 'for'],
     ['interested', 'on', 'in'],
@@ -109,12 +156,26 @@
       `Use “${correct}” in this expression. Fixed combinations like “responsible for” have their own preposition.`
     );
   }
+  word(
+    'prepositions',
+    '\\binsist(?:s|ed)? +',
+    { in: 'on' },
+    '(?= +[a-z]+ing\\b)',
+    'Use “insist on” before the action someone insists on.'
+  );
+  word(
+    'prepositions',
+    '\\b(?:am|is|are|was|were) +(?:good|bad|skilled) +',
+    { in: 'at' },
+    '(?= +(?:doing|solving|handling|working|explaining|answering|learning|writing|reading|teaching|cooking)\\b)(?! +[a-z]+ing +(?:class|school|course|lessons?)\\b)',
+    'Use “good at” or “skilled at” when describing how well someone does an activity.'
+  );
   use(
     'conjunctions',
     rx(
-      `${clause}(Although [^,.;!?:\\n]{4,110}, +)but (?=(?:${subject}|there|two|three|several|both)\\b)`
+      `${clause}(Although [^,.;!?:\\n]{4,110}?)(?:,)? +but +(?=(?:${subject}|there|two|three|several|both)\\b)`
     ),
-    (_, lead) => lead,
+    (_, lead) => lead + ', ',
     'Although already introduces the contrast. The main clause can follow it directly.'
   );
   use(
@@ -149,7 +210,7 @@
   };
   const nounForms = {
     ...Object.fromEntries(
-      'apple appointment attachment bag bike bird book bottle call car cat chair change childminder coat colleague computer cup day desk detail document dog email error event example field file flower form friend game garden goal group hour idea image invoice issue item job lesson letter list meeting message minute month morning note office option order page paper parent photo picture plan plant problem project question quote record report request result review road room rule schedule school seat shop sign student supplier table task teacher test ticket tool train trip update user visit week window word year material po pr rfq'
+      'answer apple appointment attachment bag bike bird book bottle call car cat chair change childminder coat colleague computer cup day department desk detail document dog email error event example field file flower form friend game garden goal group hour idea image invoice issue item job lesson letter list meeting message minute month morning note office option order page paper parent photo picture plan plant problem project question quote record report request result review road room rule schedule school seat shop sign student supplier table task teacher test ticket tool train trip update user visit week window word year material po pr rfq'
         .split(' ')
         .concat('purchase order')
         .map(noun => [noun, noun + 's'])
@@ -167,7 +228,7 @@
   const pluralNoun = `(?:${choices(singularForms)})`;
   const nounModifiers =
     '(?:(?:(?:very|really|quite|rather|especially|extremely|particularly|surprisingly|unusually|incredibly|so) +){0,2}(?:amazing|annual|available|awful|bad|beautiful|big|bright|busy|clean|clear|cold|comfortable|complete|correct|current|difficult|different|easy|early|empty|exciting|excellent|final|fine|first|fresh|fun|funny|good|great|happy|hard|heavy|helpful|hot|important|interesting|large|last|late|latest|long|lovely|missing|modern|new|nice|old|open|original|outstanding|overdue|pending|pleasant|positive|productive|quiet|ready|recent|red|revised|short|simple|small|special|strange|successful|sunny|terrible|useful|updated|unusual|urgent|warm|white|wonderful|wrong|young) +){0,3}';
-  const countNounEnd = `(?:${nounEnd}|(?= +(?:and|or|about|at|by|before|after|for|from|in|on|to|with|without|that|which|who|came|went|arrived|returned|joined|passed|ahead|left|today|tomorrow|yesterday)\\b))`;
+  const countNounEnd = `(?:${nounEnd}|(?= +(?:and|or|about|at|by|before|after|for|from|in|on|to|with|without|that|which|who|came|went|arrived|returned|joined|passed|ahead|left|today|tomorrow|yesterday|last (?:week|month|year))\\b))`;
   use(
     'countability',
     rx(
@@ -189,6 +250,13 @@
     { childrens: 'children', peopleses: 'people', analysises: 'analyses', shelfes: 'shelves' },
     '',
     'This noun already has an irregular plural form.'
+  );
+  word(
+    'countability',
+    `\\b(?:some|much|any|gave|offer(?:s|ed)?|need(?:s|ed)?) +${nounModifiers}`,
+    { advices: 'advice' },
+    countNounEnd,
+    'Use advice as an uncountable noun. To count individual suggestions, use pieces of advice.'
   );
 
   // Choose the article by sound. Leave optional pronunciations such as SAP, SQL and FAQ alone.
@@ -259,6 +327,15 @@
   quantityWord('quantity', { many: 'much' }, mass, 'Use much with an uncountable noun.');
   word(
     'quantity',
+    '(?<!more or )\\b',
+    { less: 'fewer' },
+    `(?= +${pluralNoun}\\b(?:${countNounEnd}|(?= +(?:here|there|now|than|available)\\b)))`,
+    'Use fewer for a smaller number of people or things you can count. Use less for an amount, such as less time.',
+    'Word choice',
+    'less-fewer'
+  );
+  word(
+    'quantity',
     `\\b(?:many|both|a few) +${nounModifiers}`,
     nounForms,
     countNounEnd,
@@ -278,6 +355,21 @@
   );
   const singularBe = { are: 'is', were: 'was', have: 'has', do: 'does', "don't": 'doesn’t' };
   const pluralBe = { is: 'are', was: 'were', has: 'have', does: 'do' };
+  const indefiniteSubject = '(?:everyone|everybody|someone|somebody|anyone|anybody|no one|nobody)';
+  const subjectPostmodifier = `(?: +(?:here|there)| +(?:in|on|at|from|with|among) +(?:the|this|that|these|those|my|your|our|their) +${nounModifiers}(?:${singularNoun}|${pluralNoun}|teams?|staff))?`;
+  const indefiniteLead = `${sentenceStart}${indefiniteSubject}${subjectPostmodifier} +`;
+  const indefiniteReason =
+    'Words like everyone take a singular verb. A phrase such as “in the class” adds detail to the subject.';
+  word('agreement', indefiniteLead, { are: 'is', were: 'was' }, '', indefiniteReason);
+  word(
+    'agreement',
+    `${sentenceStart}(?:either|neither) +of +(?:(?:the|these|those|your|our|their) +${nounModifiers}${pluralNoun}|us|you|them) +`,
+    singularBe,
+    '',
+    'In formal writing, use a singular verb when either of or neither of is the subject.',
+    'Formal style',
+    'either-neither-agreement'
+  );
   word(
     'each-every',
     `\\b(?:each|every|one) of (?:the|these|those|your|our|their) ${pluralNoun} `,
@@ -301,7 +393,9 @@
   );
   use(
     'possessives',
-    /\b((?:changed?|lost|loses|updated?|keeps?|kept|uses?|used|retains?|retained) +)it['’]s(?= +(?:code|name|format|formatting|value|status|position|shape|colour|color|number|label|meaning)\b)/gi,
+    rx(
+      `\\b((?:change[sd]?|lost|loses|update[sd]?|keeps?|kept|use[sd]?|retain(?:s|ed)?|wags?|wagged|lick(?:s|ed)?|shakes?|shook) +)it['’]s(?= +${nounModifiers}(?:code|name|format|formatting|value|status|position|shape|colour|color|number|label|meaning|tails?|paws?|ears?|wings?|fur)\\b)`
+    ),
     (_, before) => before + 'its',
     'Use its for possession. It’s means “it is” or “it has”.'
   );
@@ -317,7 +411,6 @@
     tomorrows: 'tomorrow',
     tonights: 'tonight',
   };
-  const sentenceStart = '(?:^ *|(?<=[.!?\\n]) *)';
   const calendarWord = '(?:today|yesterday|tomorrow|tonight)';
   const followsAbbreviation = (text, index) =>
     /\b(?:[a-z]\.[a-z]|(?:mr|mrs|ms|dr|prof|st|vs|fig|no|dept|approx))\.$/i.test(
@@ -397,6 +490,7 @@
     cancel: ['cancelled', 'cancelling'],
     log: ['logged', 'logging'],
     plan: ['planned', 'planning'],
+    prefer: ['preferred', 'preferring'],
     refer: ['referred', 'referring'],
     stop: ['stopped', 'stopping'],
     shop: ['shopped', 'shopping'],
@@ -449,6 +543,7 @@
     pay: ['pays', 'paid', 'paid', 'paying'],
     put: ['puts', 'put', 'put', 'putting'],
     read: ['reads', 'read', 'read', 'reading'],
+    ride: ['rides', 'rode', 'ridden', 'riding'],
     run: ['runs', 'ran', 'run', 'running'],
     say: ['says', 'said', 'said', 'saying'],
     see: ['sees', 'saw', 'seen', 'seeing'],
@@ -475,7 +570,7 @@
   const verbs = Object.fromEntries(
     [
       ...baseVerbs,
-      ...'ask bake bark bathe brush believe charge clean climb cook dance enjoy exercise jump last like listen live love miss rain remember rest save shop smile sneeze study travel visit walk wash weigh'.split(
+      ...'ask bake bark bathe brush believe charge clean climb cook dance enjoy exercise hike jump last like listen live love miss prefer rain remember rest save shop smile sneeze study travel visit walk wash weigh'.split(
         ' '
       ),
     ].map(base => {
@@ -494,6 +589,47 @@
     })
   );
   Object.assign(verbs, irregular);
+  const knownVerb = `(?:${choices(verbs)})`;
+  const participles = [...new Set(Object.values(verbs).map(([, , participle]) => participle))];
+  // A direct instruction such as “Everyone have a seat” can have an explicit subject.
+  word(
+    'agreement',
+    indefiniteLead,
+    { have: 'has' },
+    `(?= +${adverb}(?:${participles.join('|')})\\b)`,
+    indefiniteReason
+  );
+
+  // A possessive can also introduce a gerund subject, as in “Your going to work early helped.”
+  const gerundPredicate =
+    '(?:is|are|was|were|has|have|had|will|would|can|could|might|helps?|helped|makes?|made|causes?|caused|saves?|saved|means?|meant|came|surprised|kept|left|led|prevented|resulted)';
+  word(
+    'possessives',
+    sentenceStart,
+    { your: "you're", their: "they're" },
+    `(?= +going +to +${knownVerb}\\b)(?! +going +to +${knownVerb}\\b[^,.;!?\\n]{0,95} +${gerundPredicate}\\b)`,
+    'Use you’re or they’re when you mean you are or they are. Your and their show possession.',
+    'Word choice',
+    'future-contractions'
+  );
+  word(
+    'word-formation',
+    '\\b(?:have|has|had|having) +(?:a|an|the|no|some) +(?:(?:very |really )?(?:strong|weak|major|significant|positive|negative|long-term|adverse|direct|immediate|noticeable|great|huge|large|real|bad|good|big|small|little|detrimental) +)?',
+    { affect: 'effect', affects: 'effects' },
+    '(?= +on\\b)',
+    'In “have an effect on”, effect is the result. The usual verb meaning influence is affect.',
+    'Word choice',
+    'affect-effect'
+  );
+  word(
+    'word-formation',
+    `\\b(?:please +|(?:(?:could|can|would|will|might) +(?:${subject} +)?|to +)${adverb})`,
+    { advice: 'advise' },
+    '(?= +(?:me|you|us|them|him|her|the (?:team|client|customer|supplier))\\b)',
+    'Advise is the action. Advice is the guidance someone gives.',
+    'Word choice',
+    'advice-advise'
+  );
 
   const actions =
     'accept add answer approve attach bring buy cancel change check close complete confirm correct create delay deliver describe discuss document email explain file fill finish fix give handle include join link log make mention move open order pay pick plan post prepare print process provide read receive record reject release remove report request resolve return review revise schedule see sell send share show sign start stop store submit support tag take test transfer update upload use validate watch write'.split(
@@ -564,6 +700,13 @@
     'Use a subject pronoun after the helping verb in a question. A possessive like your introduces a noun.';
   const ingVerbs = choices(verbsOf([4], 0, Object.keys(verbs)));
   word(
+    'adjectives',
+    "\\b(?:I am|I['’]m|(?:he|she) is|(?:he|she)['’]s|(?:we|you|they) are|(?:we|you|they)['’]re) +",
+    { interesting: 'interested' },
+    `(?= +in +(?:${ingVerbs})\\b)`,
+    'Use interested for the feeling someone has. Interesting describes what holds their attention.'
+  );
+  word(
     'pronouns',
     `${questionOpening}(?:are|were)(?:n['’]t)? +`,
     Object.fromEntries(
@@ -605,22 +748,25 @@
     '',
     'Match the verb to the head noun, such as list or batch.'
   );
-  word('agreement', '\\b(?:we|you) ', pluralBe, '', 'Use are, were, have or do with we and you.');
-  word(
-    'agreement',
-    '\\b(?:he|she|it) ',
-    { are: 'is', were: 'was' },
-    '',
-    'Use is or was with he, she and it.',
-    'Grammar'
+  const joinedSubject = new RegExp(
+    `${clause}(?:(?:today|tomorrow|yesterday|then|later) +)?${jointPerson} +and +$`,
+    'iu'
   );
-  word(
-    'agreement',
-    '\\bI ',
-    { is: 'am', are: 'am', has: 'have', does: 'do' },
-    '',
-    'Use am, have and do with I.'
-  );
+  for (const [actor, forms, reason] of [
+    ['we|you', pluralBe, 'Use are, were, have or do with we and you.'],
+    ['he|she|it', { are: 'is', were: 'was' }, 'Use is or was with he, she and it.'],
+    ['I', { is: 'am', are: 'am', has: 'have', does: 'do' }, 'Use am, have and do with I.'],
+  ]) {
+    use(
+      'agreement',
+      rx(`\\b((?:${actor}) +)(${choices(forms)})\\b`),
+      (_, lead, verb, index, text) => {
+        if (!joinedSubject.test(text.slice(Math.max(0, index - 140), index)))
+          return lead + sameCase(verb, forms[verb.toLowerCase()]);
+      },
+      reason
+    );
+  }
   const individualNouns = Object.keys(nounForms)
     .filter(noun => !['group', 'class', 'company', 'party', 'family'].includes(noun))
     .join('|');
@@ -635,6 +781,17 @@
   const whQuestion = `(?:(?:how|what) +${quantityPhrase}|how +(?:long|far|often)|what|when|where|why)`;
   const questionNounSubject = `(?:a|an|the|this|that|these|those|my|your|our|their|his|her|its) +${nounModifiers}(?:${singularNoun}|${pluralNoun}|${workspace}s?|${people}s?|(?:unit|product|package|device|team)s?)`;
   const questionSubject = `(?:${questionNounSubject}|${pronouns}|this|that|these|those)`;
+  use(
+    'pronouns',
+    rx(
+      `(${sentenceStart})who(?= +(?:do|does|did|can|could|will|would|should) +${questionSubject} +(?:give|send|show|lend|hand|offer|pass|forward) +(?:${questionRecipient}|${questionNoun}) +to *\\?)`
+    ),
+    (_, lead) => lead + 'whom',
+    'Who works in this question. For a formal email, you can use whom for the person receiving the item.',
+    'Formal style',
+    'formal-whom',
+    'email'
+  );
   const subjectTakesDo = new RegExp(
     `(?:^| +)(?:I|you|we|they|these|those|${pluralNoun}|${people}s|units|products|packages|systems|devices|teams)$`,
     'i'
@@ -908,7 +1065,7 @@
     'Use the simple present to describe a state such as knowing something or owning something.'
   );
   const finishedTime = `(?:yesterday(?: morning| afternoon| evening)?|last (?:${day}|week|month|year)|${numeral} (?:days|weeks|months|years) ago)`;
-  const pastActions = [...new Set([...actions, ...timedActions, 'eat', 'drink', 'fall'])];
+  const pastActions = [...new Set([...actions, ...dailyActions, ...timedActions, 'fall', 'ride'])];
   word(
     'past-simple',
     `\\b${finishedTime},? +${subject} ${adverb}`,
@@ -1107,12 +1264,14 @@
     'Use modal + have + past participle when you refer to a past action.'
   );
   const modalPastForms = {
-    ...Object.fromEntries(Object.keys(completedVerbs).map(form => [form, form])),
+    ...Object.fromEntries(participles.map(participle => [participle, participle])),
     ...differentPast,
   };
   use(
     'modal-past',
-    rx(`\\b((?:could|should|would|might|must)(?:n['’]t)?) +of +(${choices(modalPastForms)})\\b`),
+    rx(
+      `\\b((?:could|should|would|may|might|must)(?:n['’]t| +not)?(?: +${subject})?) +of +(${choices(modalPastForms)})\\b`
+    ),
     (_, modal, form) => modal + ' have ' + sameCase(form, modalPastForms[form.toLowerCase()]),
     'Use have after a modal when referring to the past. The contraction ’ve sounds like of.'
   );
@@ -1186,6 +1345,20 @@
       (_, lead, auxiliary, actor) => `${lead}${actor} ${auxiliary}`,
       reason
     );
+    use(
+      lesson,
+      rx(
+        `\\b(${opening} (?:what|who|when|where|how(?: (?:long|much|many))?|why|whether|if) +)(do|does|did) +(${embeddedSubject}) +(?!be\\b)(${knownVerb})\\b`
+      ),
+      (_, lead, helper, actor, verb) => {
+        const form =
+          helper.toLowerCase() === 'did'
+            ? sameCase(verb, verbs[verb.toLowerCase()][1])
+            : presentVerb(actor, verb);
+        return `${lead}${actor} ${form}`;
+      },
+      reason
+    );
   }
   embedded(
     'indirect-questions',
@@ -1204,6 +1377,13 @@
     'Use told before the person receiving the message, or use said to.'
   );
   use(
+    'verb-complements',
+    rx(`\\b(suggest(?:s|ed)?) +(me|you|him|her|us|them) +to +(${knownVerb})\\b`),
+    (_, suggest, person, verb) =>
+      `${suggest} that ${subjectCase[person.toLowerCase()] ?? person} ${verb}`,
+    'To suggest an action for someone else, use suggest that, the person doing it, then the base verb.'
+  );
+  use(
     'because-although',
     rx(
       `\\bdespite(?= ${subject} (?:is|are|was|were|had|has|have|could|ran|failed|stopped|arrived)\\b[^,;\\n.!?]{0,85},)`
@@ -1216,6 +1396,12 @@
     /\bbecause (?=(?:the|a|this|that) (?:delay|outage|weather|error|change|deadline|incident)(?:[,.!?;\n]|$))/gi,
     match => match + 'of ',
     'Use because of before a noun phrase that gives the reason.'
+  );
+  use(
+    'because-although',
+    /\bdespite +of(?= +(?:the|a|an|this|that|my|our|your|their|it|them|having|being)\b)/gi,
+    () => 'despite',
+    'Use despite directly before the reason. The equivalent expression in spite of takes of.'
   );
 
   const eventVerbs = [
@@ -1261,6 +1447,20 @@
     'Use one comparative form. Words such as faster and better already express a comparison.'
   );
   use(
+    'comparisons',
+    /\bmost +(best|worst|fastest|slowest|easiest|hardest|longest|shortest|clearest|simplest|cheapest|largest|smallest|tallest|highest|lowest|earliest|latest)\b/gi,
+    (_, superlative) => superlative,
+    'Use one superlative form. Words such as easiest and best already express the highest degree.'
+  );
+  const comparedNoun = `(?:${mass}|tea|coffee|water|(?:the|this|that|these|those) +${nounModifiers}(?:${singularNoun}|${pluralNoun}))`;
+  word(
+    'comparisons',
+    `\\bprefer(?:s|red)? +${comparedNoun} +`,
+    { than: 'to' },
+    `(?= +${comparedNoun}\\b)`,
+    'Use prefer one thing to another when comparing nouns.'
+  );
+  use(
     'too-enough',
     /\benough (small|large|clear|simple|accurate|complete|safe|fast|light|easy|close|strong|detailed|short|long|good)(?= to\b)/gi,
     (_, adjective) => adjective + ' enough',
@@ -1273,6 +1473,15 @@
     ),
     (_, lead, gerund) => lead + sameCase(gerund, ingToBase[gerund.toLowerCase()]),
     'Use matching verb forms for the actions in this list.'
+  );
+  const listGerund = `(?:${ingVerbs})\\b[^,;\\n.!?]{0,65}`;
+  use(
+    'parallelism',
+    rx(
+      `\\b((?:like[sd]?|love[sd]?|prefer(?:s|red)?|enjoy(?:s|ed)?) +${listGerund}, +${listGerund},? +(?:and|or) +)to +(${knownVerb})\\b`
+    ),
+    (_, lead, verb) => lead + sameCase(verb, verbs[verb.toLowerCase()][3]),
+    'Use the same verb form for each action in the list. The first two activities use -ing.'
   );
 
   const passiveVerbs = [
@@ -1344,6 +1553,13 @@
   const havePassive = "(?:has|have|had)(?:n['’]t)?";
   const modalPassive =
     "(?:will|won['’]t|can(?:['’]t)?|(?:could|should|must|would|might)(?:n['’]t)?)";
+  word(
+    'modals',
+    `\\b(?:am|${bePassive}) +`,
+    { suppose: 'supposed' },
+    `(?= +to +${knownVerb}\\b)`,
+    'Use supposed to after be when something is expected or required.'
+  );
   const passiveSuffix =
     '(?= +(?:by|on|to|from|before|after|yesterday|last|today|tomorrow|earlier|later|already|this (?:morning|week))\\b| *[,.!?;\\n]|$)';
   const passiveReason =
@@ -1380,6 +1596,13 @@
       lead + ' ' + (base.toLowerCase() === 'be' ? 'were' : verbs[base.toLowerCase()][1]),
     'In this hypothetical conditional, use a past form after if and would in the result.'
   );
+  word(
+    'second',
+    `${sentenceStart}if +(?:I|he|she) +`,
+    { was: 'were' },
+    '(?= +(?:you|in +(?:your|his|her|their) +(?:position|shoes|place)) *(?:[,.;!?\\n]|$))',
+    'Use were in this hypothetical expression, as in “If I were you” when giving advice.'
+  );
   use(
     'third',
     rx(
@@ -1398,6 +1621,25 @@
         verb.toLowerCase()
       ],
     'For a wish about your current situation, use a past form after wish.'
+  );
+
+  use(
+    'participle-clauses',
+    rx(
+      `${sentenceStart}(?:walking|running|hiking|cycling|driving) +(?:down|up|along|through|past|around|across) +[^,.;!?\\n]{1,60}, +(?:the|this|that|these|those) +(?:trees?|buildings?|houses?|mountains?|scenery|landscape|view|traffic lights?)\\b(?= +(?:is|are|was|were|seems?|seemed|looks?|looked|appears?|appeared)\\b)`
+    ),
+    null,
+    'Name the person moving after the comma. If you were walking, you could write “Walking down the street, I saw that the trees were beautiful.”',
+    'Review'
+  );
+  use(
+    'participle-clauses',
+    rx(
+      `${sentenceStart}(?:checking|reviewing|reading|examining|having checked|having reviewed) +(?:the|a|an|our|your|my) +[^,.;!?\\n]{1,60}, +(?:the|this|that) +(?:cause|issue|problem|error|result|answer|difference) +(?:became|appeared|emerged|was|seemed)\\b`
+    ),
+    null,
+    'The subject after the comma should be the person who did the initial action. If you checked the logs, try “Checking the logs, I found the cause.”',
+    'Review'
   );
 
   use(
@@ -1559,16 +1801,39 @@
   use(
     'time-prepositions',
     rx(
-      `\\bin (${day})(?= *(?:$|[,.!?;\\n])| +(?:morning|afternoon|evening|at [0-9]|next week)\\b)`
+      `\\b(?:in|at) (${day})(?= *(?:$|[,.!?;\\n])| +(?:morning|afternoon|evening|at [0-9]|next week)\\b)`
     ),
     (_, weekday) => 'on ' + weekday,
     'Use on with a weekday.'
   );
   use(
     'time-prepositions',
-    /\bon (?=(?:[01]?\d|2[0-3]):[0-5]\d\b|\d{1,2} *(?:a\.?m\.?|p\.?m\.?)\b)/gi,
+    /\b(?:on (?=(?:[01]?\d|2[0-3]):[0-5]\d\b)|(?:in|on) (?=\d{1,2}(?::[0-5]\d)? *(?:a\.?m\.?|p\.?m\.?)\b))/gi,
     () => 'at ',
     'Use at with a clock time.'
+  );
+  word(
+    'time-prepositions',
+    '\\b(?:arriv(?:e|es|ed)|start(?:s|ed)?|end(?:s|ed)?|launch(?:es|ed)?|close[sd]?|(?:meet|see) +(?:me|you|us|them)) +',
+    { on: 'in' },
+    `(?= +${month}(?: +(?:at|this year|next year)\\b| *[.!?;\\n]|$))`,
+    'Use in for a month on its own. Use on when the date includes a specific day.'
+  );
+  word(
+    'prepositions',
+    '\\b(?:arriv(?:e|es|ed|ing)) +',
+    { to: 'at' },
+    '(?= +(?:the|a|an|our|your|their) +(?:airport|station|office|warehouse|hotel|cinema|venue|site|restaurant|receiving bay)\\b)',
+    'Use arrive at for a specific destination. Arrive in can describe reaching a city, region or country.'
+  );
+  use(
+    'by-until',
+    rx(
+      `${sentenceStart}(?:please +)?(?:submit|send|approve|return|sign|complete) +(?:(?:me|us) +)?(?:the|this|that) +${nounModifiers}${singularNoun} +until +(?:${day}|tomorrow|tonight|noon|midnight)\\b`
+    ),
+    null,
+    'If you mean the deadline for completing this action, use by. For example, “Submit the file by Friday.” Use until for something that continues up to that time.',
+    'Review'
   );
   use(
     'object-order',
@@ -1656,7 +1921,7 @@
   );
   use(
     'numbers-dates',
-    /\b([1-9][0-9]*)(st|nd|rd|th)(?= +(?:of +)?(?:January|February|March|April|May|June|July|August|September|October|November|December)\b)/gi,
+    rx(`\\b([1-9][0-9]*)(st|nd|rd|th)(?= +(?:of +)?${month}\\b)`),
     (_, number, old) => {
       const suffix = /^1[123]$/.test(number.slice(-2))
         ? 'th'

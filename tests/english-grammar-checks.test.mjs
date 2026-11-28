@@ -19,7 +19,7 @@ const alternate = {
   ellipsis: ['I can join the call, but Aisha can’t to join.', 'I can join the call, but Aisha can’t join.'],
   requests: ['Please do the needful.', 'Please take the required action.'],
 };
-const advisory = new Set(['commas', 'coordination', 'subjunctive', 'tone']);
+const advisory = new Set(['commas', 'coordination', 'subjunctive', 'tone', 'participle-clauses', 'by-until']);
 
 function applyAll(text, issues) {
   const edits = issues.flatMap(issue => issue.edit ? [issue.edit] : []);
@@ -31,8 +31,8 @@ function applyAll(text, issues) {
 
 test('all 98 lessons have an audited live check or a note about the context to review', () => {
   const topics = Object.keys(contextNotes);
-  assert.equal(liveLessons.size, 85);
-  assert.equal(topics.length, 13);
+  assert.equal(liveLessons.size, 87);
+  assert.equal(topics.length, 11);
   assert.ok(topics.every(id => contextNotes[id].trim() && !liveLessons.has(id)));
   assert.deepEqual([...liveLessons, ...topics].sort(), [...byId.keys()].sort());
 });
@@ -261,6 +261,93 @@ test('direct questions get quantity, helping verb and base verb corrections in E
   }
 });
 
+const reportedExamples = [
+  ['The list of items are on the desk.', 'The list of items is on the desk.'],
+  ['Everyone in the class have finished their test.', 'Everyone in the class has finished their test.'],
+  ['Neither of the answers are correct.', 'Neither of the answers is correct.'],
+  ['Yesterday, I go to the store to buy milk.', 'Yesterday, I went to the store to buy milk.'],
+  ['She has went to the library already.', 'She has gone to the library already.'],
+  ['If I was you, I would accept the offer.', 'If I were you, I would accept the offer.'],
+  ["He didn't knew the answer to the question.", "He didn't know the answer to the question."],
+  ['Me and my friend are going to the cinema.', 'My friend and I are going to the cinema.'],
+  ['Between you and I, this is a bad idea.', 'Between you and me, this is a bad idea.'],
+  ["The dog wagged it's tail happily.", 'The dog wagged its tail happily.'],
+  ['Your going to love this new restaurant.', "You're going to love this new restaurant."],
+  ['Their going to arrive at 8:00 PM.', "They're going to arrive at 8:00 PM."],
+  ['The weather had a strong affect on our plans.', 'The weather had a strong effect on our plans.'],
+  ['There are less people here today than yesterday.', 'There are fewer people here today than yesterday.'],
+  ['I could of helped you if you had asked.', 'I could have helped you if you had asked.'],
+  ['She is more taller than her brother.', 'She is taller than her brother.'],
+  ["I don't need no help with my homework.", "I don't need any help with my homework."],
+  ['He likes swimming, hiking, and to ride bikes.', 'He likes swimming, hiking, and riding bikes.'],
+];
+
+const widerGrammarExamples = [
+  ['Nobody in the department are ready.', 'Nobody in the department is ready.'],
+  ['Someone from our team have already sent it.', 'Someone from our team has already sent it.'],
+  ['Either of these reports have enough detail.', 'Either of these reports has enough detail.'],
+  ['Yesterday, we run in the park.', 'Yesterday, we ran in the park.'],
+  ['If she was in your position, she would wait.', 'If she were in your position, she would wait.'],
+  ['Amir and me are working together.', 'Amir and I are working together.'],
+  ['Her and her sister work here.', 'She and her sister work here.'],
+  ['This is between your colleague and I.', 'This is between your colleague and me.'],
+  ['The cat licked it’s paws.', 'The cat licked its paws.'],
+  ['We handled less requests than last week.', 'We handled fewer requests than last week.'],
+  ['Might they of forgotten to put it back?', 'Might they have forgotten to put it back?'],
+  ['We prefer reviewing invoices, checking prices and to confirm delivery dates.', 'We prefer reviewing invoices, checking prices and confirming delivery dates.'],
+  ['He insisted in paying the bill.', 'He insisted on paying the bill.'],
+  ['I am good in solving problems.', 'I am good at solving problems.'],
+  ['The meeting is in 9:30 am.', 'The meeting is at 9:30 am.'],
+  ['I will see you on June.', 'I will see you in June.'],
+  ['I arrived to the airport at noon.', 'I arrived at the airport at noon.'],
+  ['This is the most easiest way.', 'This is the easiest way.'],
+  ['She sings beautiful.', 'She sings beautifully.'],
+  ['Please tell me what did he say.', 'Please tell me what he said.'],
+  ['She asked me where did I work.', 'She asked me where I worked.'],
+  ['Can you confirm why does she need it?', 'Can you confirm why she needs it?'],
+  ['I am interesting in applying.', 'I am interested in applying.'],
+  ['Can you advice me on this?', 'Can you advise me on this?'],
+  ['He gave me some good advices.', 'He gave me some good advice.'],
+  ['They ordered an equipment last week.', 'They ordered some equipment last week.'],
+  ['The ticket, that was already closed, was reopened.', 'The ticket, which was already closed, was reopened.'],
+  ['Despite of the rain, we continued.', 'Despite the rain, we continued.'],
+  ['Although the order was late but we received it.', 'Although the order was late, we received it.'],
+  ['I prefer coffee than tea.', 'I prefer coffee to tea.'],
+  ['She suggested me to join the project.', 'She suggested that I join the project.'],
+  ['We were suppose to check the stock.', 'We were supposed to check the stock.'],
+  ['Did you saw what happened?', 'Did you see what happened?'],
+];
+
+const formalQuestion = 'Who did you give the book to?';
+const danglingModifier = 'Walking down the street, the trees were beautiful.';
+
+test('the reported corrections and wider grammar audit work in Email and Teams', () => {
+  for (const mode of modes) {
+    for (const [mistake, corrected] of [...reportedExamples, ...widerGrammarExamples]) {
+      const issues = check(mistake, mode);
+      assert.equal(applyAll(mistake, issues), corrected, mistake + ' in ' + mode);
+      assert.deepEqual(check(corrected, mode), [], corrected + ' in ' + mode);
+    }
+  }
+});
+
+test('formal wording is optional and modifier feedback asks the writer who did the action', () => {
+  const [formal] = check(formalQuestion, 'email');
+  assert.equal(formal.type, 'Formal style');
+  assert.equal(applyAll(formalQuestion, [formal]), 'Whom did you give the book to?');
+  assert.deepEqual(check(formalQuestion, 'teams'), []);
+  for (const mode of modes) {
+    const issues = check(danglingModifier, mode);
+    assert.equal(issues.length, 1);
+    assert.equal(ruleLinks[issues[0].id], 'participle-clauses');
+    assert.equal(issues[0].type, 'Review');
+    assert.equal(issues[0].edit, undefined);
+    assert.match(issues[0].reason, /Walking down the street, I saw that the trees were beautiful/);
+    assert.deepEqual(check('Walking down the street, I saw that the trees were beautiful.', mode), []);
+    assert.deepEqual(check('Whom did you give the book to?', mode), []);
+  }
+});
+
 test('the lesson examples and variants exercise every new pattern', () => {
   const examples = [
     ...Array.from(byId.values(), lesson => alternate[lesson.id]?.[0] ?? lesson.mistake.split(' → ')[0]),
@@ -268,6 +355,10 @@ test('the lesson examples and variants exercise every new pattern', () => {
     ...everyday.map(([text]) => text),
     ...reliability.map(([text]) => text),
     ...directQuestions.map(([text]) => text),
+    ...reportedExamples.map(([text]) => text),
+    ...widerGrammarExamples.map(([text]) => text),
+    formalQuestion,
+    danglingModifier,
   ];
   for (const { id, pattern, replace } of globalThis.WorkHubEnglishGrammarChecks) {
     const exercised = examples.some(text =>
@@ -347,6 +438,28 @@ test('valid questions, alternate English forms, and text copied from SAP remain 
     'What caused the price to change? What is the total price?',
     'The note heading reads “How much this costs”.',
     'The formula is `what much this cost?`.',
+    'Does everyone in the class have another chance?',
+    'Everyone have a seat, please. Anyone have a spare pen?',
+    'Neither the buyer nor the suppliers are ready. Does either of the answers have merit?',
+    'If I was rude yesterday, I apologise. She asked if I was you.',
+    'They invited me and my friend. Please wait between Amir and me.',
+    'The dog stopped because it’s tired. Who gave you the book?',
+    'To whom did you send the book? Who did you give the book to review?',
+    'Your going to the library helped us. Your going to work early saved us time.',
+    'Their going to meet the tester kept the team busy.',
+    'The patient showed a flat affect on examination. The policy could effect real change.',
+    'We used less time and fewer resources. It took less than three hours.',
+    'We handled less urgent requests first. Choose a less people-focused approach.',
+    'The can of baked beans is open. May of this year was unusually warm.',
+    'Walking through the park, the dog stopped. Reviewing the log, I found the cause.',
+    'I like to swim, hike and ride my bike. I prefer listening to reading.',
+    'She sings Beautiful. We’re good in cooking class. He insisted in court that this happened.',
+    'Can you tell me what went wrong? She asked me where I worked.',
+    'I ran the mile in 9:30. I’ll see you on June 12.',
+    'She arrived to find everyone waiting. They arrived in Kuala Lumpur at 7 pm.',
+    'Please keep the file open until Friday. The file was received by Tuesday.',
+    'Did she saw through the board? Could they fell the trees? May I found a company?',
+    'Please revert the configuration. The ownership will revert back to me.',
   ];
   for (const text of correct) {
     for (const mode of modes) assert.deepEqual(check(text, mode), [], text + ' in ' + mode);
