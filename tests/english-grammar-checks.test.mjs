@@ -221,12 +221,53 @@ test('time subjects, modal and passive forms, and pasted spacing produce range-s
   }
 });
 
+const directQuestions = [
+  ['what much this cost?', 'How much does this cost?'],
+  ['What much does it cost?', 'How much does it cost?'],
+  ['how much it costs?', 'How much does it cost?'],
+  ['How much does this costs?', 'How much does this cost?'],
+  ['How much do it cost?', 'How much does it cost?'],
+  ['How much did the new order costs?', 'How much did the new order cost?'],
+  ['How much does your team usually spends?', 'How much does your team usually spend?'],
+  ['How much this cost yesterday?', 'How much did this cost yesterday?'],
+  ['How much the device will cost?', 'How much will the device cost?'],
+  ['how much you have spent?', 'How much have you spent?'],
+  ['How much you have to pay?', 'How much do you have to pay?'],
+  ['How much it is?', 'How much is it?'],
+  ['How much these cost?', 'How much do these cost?'],
+  ['How much it usually weighs?', 'How much does it usually weigh?'],
+  ['How much time we have?', 'How much time do we have?'],
+  ['How many boxes this holds?', 'How many boxes does this hold?'],
+  ['How many units these packages holds?', 'How many units do these packages hold?'],
+  ['What many boxes are in stock?', 'How many boxes are in stock?'],
+  ['How much boxes did you buy?', 'How many boxes did you buy?'],
+  ['How many equipment do we have?', 'How much equipment do we have?'],
+  ['how much boxes you bought?', 'How many boxes did you buy?'],
+  ['What this means?', 'What does this mean?'],
+  ['When you sent the PO?', 'When did you send the PO?'],
+  ['what  much\u00a0this cost ?', 'How  much does this cost?'],
+];
+
+test('direct questions get quantity, helping verb and base verb corrections in Email and Teams', () => {
+  for (const mode of modes) {
+    const [reported] = directQuestions;
+    assert.deepEqual(check(reported[0], mode).map(issue => issue.id).sort(), ['quantity', 'questions']);
+    for (const [mistake, corrected] of directQuestions) {
+      const issues = check(mistake, mode);
+      assert.equal(applyAll(mistake, issues), corrected, mistake + ' in ' + mode);
+      assert.deepEqual(check(corrected, mode), [], corrected + ' in ' + mode);
+      for (const issue of issues) assert.equal(mistake.slice(issue.start, issue.end), issue.original);
+    }
+  }
+});
+
 test('the lesson examples and variants exercise every new pattern', () => {
   const examples = [
     ...Array.from(byId.values(), lesson => alternate[lesson.id]?.[0] ?? lesson.mistake.split(' → ')[0]),
     ...variations.map(([text]) => text),
     ...everyday.map(([text]) => text),
     ...reliability.map(([text]) => text),
+    ...directQuestions.map(([text]) => text),
   ];
   for (const { id, pattern, replace } of globalThis.WorkHubEnglishGrammarChecks) {
     const exercised = examples.some(text =>
@@ -294,6 +335,18 @@ test('valid questions, alternate English forms, and text copied from SAP remain 
     'The team   are ready. The form was sent  yesterday.',
     'May\twe had a separate label',
     'The sample is `today   are a fun day`.',
+    'How many boxes fit on a pallet? How much of the order was delivered?',
+    'Could you tell me how much this costs? Could you check how many boxes we need?',
+    'What did the order costs include? What did the delivery charges cover?',
+    'How much did the order costs increase?',
+    'What many people do after work is relax, right?',
+    'What the new order costs is a separate issue, right?',
+    'What many people do this for is the reward, right?',
+    'What this will cost is up to you, right?',
+    'How much do the company usually charge?',
+    'What caused the price to change? What is the total price?',
+    'The note heading reads “How much this costs”.',
+    'The formula is `what much this cost?`.',
   ];
   for (const text of correct) {
     for (const mode of modes) assert.deepEqual(check(text, mode), [], text + ' in ' + mode);

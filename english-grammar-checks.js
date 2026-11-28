@@ -420,6 +420,7 @@
     catch: ['catches', 'caught', 'caught', 'catching'],
     choose: ['chooses', 'chose', 'chosen', 'choosing'],
     come: ['comes', 'came', 'come', 'coming'],
+    cost: ['costs', 'cost', 'cost', 'costing'],
     cut: ['cuts', 'cut', 'cut', 'cutting'],
     do: ['does', 'did', 'done', 'doing'],
     draw: ['draws', 'drew', 'drawn', 'drawing'],
@@ -474,7 +475,7 @@
   const verbs = Object.fromEntries(
     [
       ...baseVerbs,
-      ...'ask bake bark bathe brush believe clean climb cook dance enjoy exercise jump like listen live love miss rain remember rest shop smile sneeze study travel visit walk wash'.split(
+      ...'ask bake bark bathe brush believe charge clean climb cook dance enjoy exercise jump last like listen live love miss rain remember rest save shop smile sneeze study travel visit walk wash weigh'.split(
         ' '
       ),
     ].map(base => {
@@ -625,6 +626,130 @@
     .join('|');
   const singularSubjectPhrase = `(?:a|an|the|this|that|my|your|our|their|his|her) +${nounModifiers}(?:${individualNouns})`;
   const pluralSubjectPhrase = `(?:the|these|those|my|your|our|their|his|her) +${nounModifiers}${pluralNoun}`;
+
+  // Require a subject and a known main verb in a direct question. In a question such
+  // as “How many boxes fit?”, the question phrase itself is the subject.
+  const countQuantity = `(?:${pluralNoun}|units|pallets|deliveries|goods)`;
+  const massQuantity = `(?:${mass}|time|money|space|water|work)`;
+  const quantityPhrase = `(?:much|many)(?: +${nounModifiers}(?:${countQuantity}|${massQuantity}))?`;
+  const whQuestion = `(?:(?:how|what) +${quantityPhrase}|how +(?:long|far|often)|what|when|where|why)`;
+  const questionNounSubject = `(?:a|an|the|this|that|these|those|my|your|our|their|his|her|its) +${nounModifiers}(?:${singularNoun}|${pluralNoun}|${workspace}s?|${people}s?|(?:unit|product|package|device|team)s?)`;
+  const questionSubject = `(?:${questionNounSubject}|${pronouns}|this|that|these|those)`;
+  const subjectTakesDo = new RegExp(
+    `(?:^| +)(?:I|you|we|they|these|those|${pluralNoun}|${people}s|units|products|packages|systems|devices|teams)$`,
+    'i'
+  );
+  const questionVerbs =
+    'add arrive bring buy charge check contain cost deliver do finish go have hold know last leave make mean need open pay receive release save say sell send show spend start take use wait weigh work'.split(
+      ' '
+    );
+  const pastQuestionForms = verbsOf([2], 0, questionVerbs);
+  const questionForms = {
+    ...Object.fromEntries(questionVerbs.map(verb => [verb, verb])),
+    ...verbsOf([1], 0, questionVerbs),
+    ...pastQuestionForms,
+  };
+  const questionTail = '[^.!?;\\n]{0,120}';
+  const questionTag =
+    "(?:right|correct|okay|(?:is|are|was|were|do|does|did|will|would|can|could)(?:n['’]t)? (?:it|they|we|you|he|she|I))";
+  const directQuestionEnd = `(?=(?!${questionTail}, +${questionTag} *\\?)${questionTail}\\?)`;
+  const questionAdverb = '(?:(?:usually|often|always|really|still|normally|already|actually) )?';
+  const doAuxiliary = '(?:do|does|did)';
+  const questionMainVerb = `(?:${choices(questionForms)})\\b`;
+  const directQuestionClause = `(?:${doAuxiliary} +)?${questionSubject} +${questionAdverb}${questionMainVerb}${directQuestionEnd}`;
+  const pastQuestionTime = new RegExp(
+    `^ +(?:yesterday|last (?:${day}|week|month|year)|${numeral} (?:days|weeks|months|years) ago)\\b`,
+    'i'
+  );
+  const anotherQuestionVerb = new RegExp(`^ +(?:${questionVerbs.join('|')})\\b`, 'i');
+  const quantityWithAuxiliary = `(?:(?:am|is|are|was|were|do|does|did|can|could|will|would|should|has|have|had) +${questionSubject}\\b${directQuestionEnd}|(?:is|are|was|were) +(?:left|available|ready|in stock|on hold) *(?=\\?))`;
+  const questionParticiples = verbsOf([3], 0, [...new Set([...actions, ...questionVerbs, 'be'])]);
+  const participleAfterHave = `(?= +${adverb}(?:${choices(questionParticiples)})\\b)`;
+  const startsWithParticiple = new RegExp(`^${participleAfterHave}`, 'i');
+  const invertedQuestionAuxiliary = `(?:(?:(?:can(?:['’]t)?|(?:could|would|should|must|might)(?:n['’]t)?|will|won['’]t|may)\\b)(?= +${adverb}${questionMainVerb})|(?:am|is|are|was|were)\\b|(?:has|have|had)(?:n['’]t)?\\b${participleAfterHave})`;
+  const invertedQuestionClause = `${questionSubject} +${invertedQuestionAuxiliary}${directQuestionEnd}`;
+  const amountQuestionClause = new RegExp(
+    `^ +(?:${quantityWithAuxiliary}|${directQuestionClause}|${invertedQuestionClause})`,
+    'i'
+  );
+  const amountQuestionFollows = (text, index) =>
+    amountQuestionClause.test(text.slice(index, index + 240));
+
+  use(
+    'quantity',
+    rx(`${sentenceStart}(what)( +${quantityPhrase})(?= )`),
+    (match, opening, amount, index, text) => {
+      if (followsAbbreviation(text, index) || !amountQuestionFollows(text, index + match.length))
+        return;
+      return (
+        match.slice(0, -(opening.length + amount.length)) +
+        (opening === 'WHAT' ? 'HOW' : 'How') +
+        amount
+      );
+    },
+    'Use “how much” to ask about a price or an amount, and “how many” to ask for a count.'
+  );
+  use(
+    'quantity',
+    rx(
+      `(${sentenceStart}how +)(?:(much)( +${nounModifiers}${countQuantity})|(many)( +${nounModifiers}(?:advice|equipment|feedback|furniture|information|luggage|evidence|software|water)))(?= )`
+    ),
+    (match, opening, much, count, many, amount, index, text) => {
+      if (!amountQuestionFollows(text, index + match.length)) return;
+      const quantity = much ? sameCase(much, 'many') : sameCase(many, 'much');
+      return opening + quantity + (count || amount);
+    },
+    'Use “how many” for a count of individual things and “how much” for an uncountable amount.'
+  );
+  use(
+    'questions',
+    rx(
+      `(${sentenceStart}${whQuestion} +)(?:(${doAuxiliary}) +)?(${questionSubject}) +(${questionAdverb})(${questionMainVerb})${directQuestionEnd}`
+    ),
+    (match, opening, auxiliary, actor, modifier, verb, index, text) => {
+      if (followsAbbreviation(text, index)) return;
+      const form = verb.toLowerCase();
+      const base = questionForms[form];
+      const tail = text.slice(index + match.length, index + match.length + 120);
+      // A second verb may make do or have an auxiliary, or follow a full subject clause.
+      if (
+        !auxiliary &&
+        ((base === 'do' && anotherQuestionVerb.test(tail)) ||
+          (base === 'have' && startsWithParticiple.test(tail)) ||
+          /^ +(?:is|are|was|were|depends?|varies?|matters?|means?)\b/i.test(tail))
+      )
+        return;
+      const past = auxiliary
+        ? auxiliary.toLowerCase() === 'did'
+        : Object.hasOwn(pastQuestionForms, form) || pastQuestionTime.test(tail);
+      const collective = /\b(?:team|company|family|class|group|party)$/i.test(actor);
+      const helper = past ? 'did' : subjectTakesDo.test(actor) ? 'do' : 'does';
+      const corrected = auxiliary ? (collective ? auxiliary : sameCase(auxiliary, helper)) : helper;
+      return opening + corrected + ' ' + actor + ' ' + modifier + sameCase(verb, base);
+    },
+    'Put do, does or did before the subject in this type of direct question. Use the base form of the main verb.'
+  );
+  use(
+    'questions',
+    rx(
+      `(${sentenceStart}${whQuestion} +)(${questionSubject}) +(${invertedQuestionAuxiliary})${directQuestionEnd}`
+    ),
+    (match, opening, actor, auxiliary, index, text) => {
+      if (followsAbbreviation(text, index)) return;
+      return opening + auxiliary + ' ' + actor;
+    },
+    'Put the helping verb before the subject in this direct question.'
+  );
+  use(
+    'capitals',
+    rx(`${sentenceStart}(${whQuestion} +)(?=${directQuestionClause}|${invertedQuestionClause})`),
+    (match, opening, index, text) => {
+      if (/^what +(?:much|many)\b/i.test(opening) || followsAbbreviation(text, index)) return;
+      return match.slice(0, -opening.length) + opening[0].toUpperCase() + opening.slice(1);
+    },
+    'Capitalise the first word of a complete question.',
+    'Capitalisation'
+  );
   word(
     'agreement',
     `${clause}${singularSubjectPhrase} +`,

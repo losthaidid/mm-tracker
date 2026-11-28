@@ -49,14 +49,15 @@
     String.raw`\b(${modals})(${horizontal}${subjects})?((?:${horizontal}${adverbs})?${horizontal})(${Object.keys(modalForms).join('|')})\b`,
     'gi'
   );
-  const questionPrefix = /(?:^|[.!?:;\n"'“(]|\b(?:why|when|where|how|what|which|who))\s*$/i;
+  const questionPrefix =
+    /(?:^|[.!?:;\n"'“(]|\b(?:why|when|where|how(?: (?:much|many|long|often|far))?|what|which|who))\s*$/i;
   const questionRules = new Set(['modal-base', 'does-base', 'modals', 'questions']);
   const hypotheticalPrefix =
     /\b(?:if|wish(?:es|ed)?|rather|suppose|supposing|imagine(?:d)?|as though) +$/i;
   const possibleNounSubject =
-    /\b(?:calls|changes|checks|emails|files|orders|plans|posts|quotes|records|reports|requests|results|reviews|runs|shares|tests|updates|works)$/i;
+    /\b(?:calls|changes|charges|checks|costs|emails|files|orders|plans|posts|quotes|records|releases|reports|requests|results|reviews|runs|shares|tests|updates|works)$/i;
   const followingPredicate =
-    /^ +(?:affect|appear|arrive|be|begin|cause|change|come|continue|cost|end|fail|finish|follow|go|happen|have|help|last|lead|need|pass|proceed|remain|resume|run|show|start|stop|take|work)\b/i;
+    /^ +(?:affect|appear|arrive|be|begin|cause|change|come|contain|continue|cost|cover|end|fail|finish|follow|go|happen|have|help|include|increase|last|lead|matter|mean|need|pass|proceed|remain|resume|run|show|start|stop|take|work)\b/i;
   const rules = [
     [
       'plural-be',
