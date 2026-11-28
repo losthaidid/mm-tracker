@@ -144,6 +144,10 @@
     const mayRead = () => a.ready() && a.canView();
     const selected = () => mode !== 'notes' && mayRead();
     const referenceSelected = () => mode === 'reference' && mayRead();
+    const english = root.WorkHubEnglishCoach?.install({
+      active: () => mode === 'english' && a.active() && mayRead(),
+      canExport: () => a.can?.('knowledge', 'export') ?? true,
+    });
     const terms = root.WorkHubSapTerms?.install(
       {
         ...a,
@@ -168,6 +172,7 @@
       }
       if (!a.active() && document.querySelector('#modal[open] .mmk-reader')) a.closeModal();
       terms?.sync();
+      english?.sync(now);
     }
 
     function tabs() {
@@ -177,6 +182,7 @@
         ['notes', 'Knowledge notes'],
         ['reference', 'MM Configuration'],
         ...(terms ? [['terms', 'Transaction Keys & Account Modifiers']] : []),
+        ...(english ? [['english', 'English Coach']] : []),
       ]
         .map(
           ([id, title]) =>
@@ -200,6 +206,7 @@
       const switcher = tabs();
       if (!selected()) return '';
       if (mode === 'terms') return switcher + terms.render();
+      if (mode === 'english') return switcher + english.render();
       const results = search(query, edition, area);
       return `${switcher}<section class="mmk-workspace" data-access-feature="knowledge"><header class="mmk-hero"><div><h2>SAP MM Configuration</h2><p>Look up the settings, maintenance screens, and checks for your SAP process.</p></div><div class="mmk-orbit" aria-hidden="true"><i></i><i></i><i></i></div></header>
       <div class="mmk-controls"><label>Search the reference<input id="mmkQuery" type="search" placeholder="Try batch maintenance, earliest expiry, or OBYC" maxlength="200" value="${esc(query)}" autocomplete="off"></label><label>SAP edition<select id="mmkEdition">${option('', 'All editions', edition)}${Object.entries(
@@ -249,8 +256,17 @@
       const action = button.dataset.mmk;
       if (action === 'tab') {
         const next = button.dataset.mode;
-        if (!['notes', 'reference', ...(terms ? ['terms'] : [])].includes(next) || next === mode)
+        if (
+          ![
+            'notes',
+            'reference',
+            ...(terms ? ['terms'] : []),
+            ...(english ? ['english'] : []),
+          ].includes(next) ||
+          next === mode
+        )
           return;
+        if (mode === 'english') english.flush();
         mode = next;
         a.render();
         document.querySelector('.mmk-tabs [aria-pressed="true"]')?.focus({ preventScroll: true });
@@ -291,9 +307,11 @@
       tabs,
       render,
       sync,
+      mount: () => english?.mount(),
       selected,
       patchRender() {
         sync();
+        if (mode === 'english') return selected() && !!$('ecWorkspace');
         return selected() && !!$(mode === 'terms' ? 'saptResults' : 'mmkResults');
       },
     };
