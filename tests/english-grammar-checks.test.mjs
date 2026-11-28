@@ -287,6 +287,7 @@ test('valid questions, alternate English forms, and text copied from SAP remain 
     'The files that arrived at 2 p.m. today are good to go.',
     'At 2 p.m. today is still early in the review window.',
     'Today are you free? Tomorrow are the tests running?',
+    'Today are a few people coming? Today are the start dates available?',
     'Tomorrow have the reports ready before noon.',
     'The report wasn’t sent yesterday. The meeting is still open.',
     'The team are ready to meet today. The class have completed the exercise.',
