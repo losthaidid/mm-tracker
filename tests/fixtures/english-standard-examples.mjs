@@ -132,6 +132,12 @@ export const additionalCorrections = [
   ['“what are her name?”', '“What is her name?”'],
   ['She asked, “what are her name?”', 'She asked, “What is her name?”'],
   ['Me and my friend go to the mall', 'My friend and I go to the mall'],
+  ['Me and my friend go to mall.', 'My friend and I go to the mall.'],
+  ['We went to cinema last night.', 'We went to the cinema last night.'],
+  ['We met at office before lunch.', 'We met at the office before lunch.'],
+  ['Kindly your help to test', 'Please help test'],
+  ['Kindly your help to test the fix.', 'Please help test the fix.'],
+  ['Please your assistance in reviewing the draft.', 'Please help with reviewing the draft.'],
   ['Could me and my friend leave?', 'Could my friend and I leave?'],
   ['Me and my friend don’t go there.', 'My friend and I don’t go there.'],
   ['Siti Rahman and me go to the market.', 'Siti Rahman and I go to the market.'],
@@ -167,6 +173,12 @@ export const additionalCorrections = [
 ];
 
 export const validLookalikes = [
+  'We went to school, then to work. She went to hospital.',
+  'We went to a mall. She went to two malls.',
+  'We went to airport security. We walked to Central Park.',
+  'We went to park the car.',
+  'Kindly test the fix. Kindly provide your help with testing.',
+  'We need your help testing this. Thank you for your help with testing.',
   'What is her name?',
   'What are her names?',
   'What are her plans?',
