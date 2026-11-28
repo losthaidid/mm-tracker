@@ -613,6 +613,7 @@
   root.WorkHubEnglishCoachEngine = {
     maxText,
     check,
+    changedRange,
     lessons,
     ruleLinks,
     liveLessons,

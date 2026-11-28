@@ -5,6 +5,7 @@ import '../english-grammar-data.js';
 import '../english-grammar-checks.js';
 import '../english-coach-engine.js';
 import '../english-coach-rich.js';
+import '../english-coach-languagetool.js';
 
 test('grammar lessons cover three levels and every live feedback link resolves', () => {
   const { groups, byId } = globalThis.WorkHubEnglishGrammarData;
@@ -96,4 +97,25 @@ test('live feedback catches the reported question and keeps valid modal question
   ]) {
     assert.deepEqual(check(draft,'email'), [], draft);
   }
+});
+
+test('LanguageTool insertions use real editor characters around emoji and paragraph breaks', async t => {
+  const draft = '😀\nHello';
+  const match = (offset, length, value) => ({ offset, length, message: 'Check this.', replacements: [{ value }] });
+  const fetch = t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => ({
+      matches: [match(2, 0, '!'), match(3, 0, 'Say '), match(0, 1, 'invalid'), match(8, 1, 'invalid')],
+    }),
+  }));
+  const checker = globalThis.WorkHubEnglishCoachLanguageTool;
+  const signal = new AbortController().signal;
+  const checked = await checker.check(draft, signal);
+  assert.deepEqual(checked.map(issue => issue.edit), [
+    { start: 0, end: 2, replacement: '😀!' },
+    { start: 3, end: 4, replacement: 'Say H' },
+  ]);
+  assert.ok(checked.every(issue => draft.slice(issue.start, issue.end) === issue.original));
+  await assert.rejects(checker.check('😀'.repeat(5001), signal), /20 KB limit/);
+  assert.equal(fetch.mock.callCount(), 1);
 });

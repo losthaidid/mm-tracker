@@ -66,6 +66,27 @@
   margin: 0;
   font-size: 1rem;
 }
+.ec-language-check {
+  display: grid;
+  gap: 6px;
+  padding-block: 12px;
+  border-bottom: 1px solid var(--ec-line);
+}
+.ec-language-check button {
+  justify-self: start;
+  min-height: 44px;
+}
+.ec-language-check small,
+#ecLanguageStatus {
+  color: var(--ec-muted);
+  line-height: 1.45;
+}
+#ecLanguageStatus {
+  margin: 0;
+}
+#ecLanguageStatus:empty {
+  display: none;
+}
 .ec-draft-head label,
 .ec-table-insert label {
   display: flex;
