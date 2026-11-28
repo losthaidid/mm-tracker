@@ -2567,6 +2567,32 @@ test('English Coach live feedback corrects the reported time subject and refresh
   assert.equal(apply(), null);
 });
 
+test('English Coach live feedback corrects the question opener and missing helping verb', async t => {
+  const { api, document, window } = await app(t);
+  api.showTab('knowledge');
+  document.querySelector('[data-mmk="tab"][data-mode="english"]').click();
+  const editor = document.getElementById('ecEditor');
+  const mode = document.getElementById('ecMode');
+  const count = document.getElementById('ecCount');
+  const issues = document.getElementById('ecIssues');
+  for (const style of ['email', 'teams']) {
+    editor.innerHTML = '<p>what much <strong>this</strong> <em>cost</em>?</p>';
+    editor.dispatchEvent(new window.Event('input', { bubbles: true }));
+    mode.value = style;
+    mode.dispatchEvent(new window.Event('change', { bubbles: true }));
+    assert.equal(count.textContent, '2 suggestions');
+    assert.equal(issues.querySelectorAll('[data-ec="read-rule"]').length, 2);
+    for (const left of ['1 suggestion', '']) {
+      issues.querySelector('[data-ec="apply"]').click();
+      assert.equal(count.textContent, left);
+    }
+    assert.equal(editor.textContent, 'How much does this cost?');
+    assert.equal(editor.querySelector('strong').textContent, 'this');
+    assert.equal(editor.querySelector('em').textContent, 'cost');
+    assert.match(issues.textContent, /No suggestions/);
+  }
+});
+
 test('English Coach live feedback reviews multiple grammar topics, links their lessons and preserves draft formatting', async t => {
   const timers = new Map();
   const { api, document, window, db } = await app(t, { startupTimers: timers });
