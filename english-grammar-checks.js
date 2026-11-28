@@ -325,7 +325,8 @@
     );
   const calendarAdjective =
     '(?:busy|quiet|good|bad|tiring|fun|cold|hot|different|fine|special|exciting|hard|easy|important|nice|long|short|sunny|rainy|better|worse|lovely|unusual|difficult)';
-  const calendarComplement = `(?= +(?:(?:not|very|really|quite|particularly|still) +){0,2}(?:an?\\b|another\\b|going to be\\b|(?:the|my|our|your) (?:day|deadline|date|start|end|first day|last day|anniversary)\\b|${day}\\b|${calendarAdjective}\\b(?= *(?:[.!?;,\\n]|$)| +(?:for|because|compared|when|to)\\b)))`;
+  const calendarNounPhrase = `(?:an?|another|the|my|our|your) +${nounModifiers}(?:${singularNoun}|holiday|occasion|milestone|deadline|start|end|anniversary)\\b${countNounEnd}`;
+  const calendarComplement = `(?= +(?:(?:not|very|really|quite|particularly|still) +){0,2}(?:${calendarNounPhrase}|going to be\\b|${day}\\b|${calendarAdjective}\\b(?= *(?:[.!?;,\\n]|$)| +(?:for|because|compared|when|to)\\b)))`;
   const calendarAgreement = {
     are: 'is',
     were: 'was',
