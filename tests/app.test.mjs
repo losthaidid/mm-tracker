@@ -2500,6 +2500,61 @@ test('English Coach live feedback applies both fixes to a formatted question', a
   assert.equal(db.calls.length, writes);
 });
 
+test('English Coach live feedback reviews multiple grammar topics, links their lessons and preserves draft formatting', async t => {
+  const timers = new Map();
+  const { api, document, window, db } = await app(t, { startupTimers: timers });
+  const click = selector => {
+    const element = document.querySelector(selector);
+    assert.ok(element, selector);
+    element.click();
+  };
+  api.showTab('knowledge');
+  click('[data-mmk="tab"][data-mode="english"]');
+  const sample = '<p>Yesterday I <strong>go</strong> to the office. I sent <em>a email</em>.</p>' +
+    '<p>The report was <strong>send</strong> yesterday. The file arrived, the attachment was empty.</p>';
+  let editor = document.getElementById('ecEditor');
+  const writes = db.calls.length;
+  editor.innerHTML = sample;
+  editor.dispatchEvent(new window.Event('input', { bubbles: true }));
+  const pending = [...timers].find(([, timer]) => timer.delay === 320);
+  assert.ok(pending, 'checking is scheduled from the input event');
+  pending[1].callback();
+  assert.equal(document.getElementById('ecCount').textContent, '4 suggestions');
+  assert.deepEqual(
+    [...document.querySelectorAll('#ecIssues ins')].map(node => node.textContent),
+    ['Yesterday I went', 'an email', 'The report was sent']
+  );
+  assert.equal(document.querySelector('.ec-review-quote').closest('li').querySelector('[data-ec="apply"]'), null);
+
+  click('#ecIssues [data-ec="read-rule"]');
+  assert.equal(document.getElementById('egHeading').textContent, window.WorkHubEnglishGrammarData.byId.get('past-simple').title);
+  assert.match(document.querySelector('.eg-feedback-note').textContent, /Live Feedback.*as you type/);
+  click('.eg-article-nav [data-ec="screen"][data-screen="draft"]');
+  editor = document.getElementById('ecEditor');
+  assert.equal(editor.innerHTML, sample);
+
+  const mode = document.getElementById('ecMode');
+  mode.value = 'teams';
+  mode.dispatchEvent(new window.Event('change', { bubbles: true }));
+  for (let left = 3; left >= 1; left--) {
+    click('[data-ec="apply"]');
+    assert.equal(document.getElementById('ecCount').textContent, left === 1 ? '1 suggestion' : left + ' suggestions');
+  }
+  assert.equal(editor.querySelector('strong').textContent, 'went');
+  assert.equal(editor.querySelector('em').textContent, 'an email');
+  assert.equal(editor.querySelector('p + p strong').textContent, 'sent');
+  assert.match(editor.textContent, /The file arrived, the attachment was empty\./);
+  click('[data-ec="dismiss"]');
+  assert.match(document.getElementById('ecIssues').textContent, /No suggestions/);
+
+  click('[data-ec="screen"][data-screen="grammar"]');
+  click('[data-eg="all"]');
+  assert.match(document.querySelector('.eg-intro').textContent, /85 lessons/);
+  click('[data-eg="open"][data-value="unless"]');
+  assert.match(document.querySelector('.eg-feedback-note').textContent, /Review in context.*exception/);
+  assert.equal(db.calls.length, writes);
+});
+
 
 test('Grammar Library opens from live feedback, preserves a draft and saves lesson progress', async t => {
   const { api, document, window, db } = await app(t);
