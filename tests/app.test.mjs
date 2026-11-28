@@ -2593,6 +2593,79 @@ test('English Coach live feedback corrects the question opener and missing helpi
   }
 });
 
+test('English Coach reviews phone keyboard input even while composition is pending', async t => {
+  const timers = new Map();
+  const { api, document, window } = await app(t, { startupTimers: timers });
+  api.showTab('knowledge');
+  document.querySelector('[data-mmk="tab"][data-mode="english"]').click();
+  const editor = document.getElementById('ecEditor');
+  editor.focus();
+  editor.dispatchEvent(new window.CompositionEvent('compositionstart', { bubbles: true }));
+  editor.textContent = 'Me and my friend go to mall.';
+  editor.dispatchEvent(new window.InputEvent('input', {
+    bubbles: true, inputType: 'insertCompositionText', isComposing: true,
+  }));
+  const review = [...timers.values()].findLast(timer => timer.delay === 320);
+  assert.ok(review, 'composition must not indefinitely delay feedback');
+  review.callback();
+  assert.equal(document.getElementById('ecCount').textContent, '2 suggestions');
+  assert.equal(editor.textContent, 'Me and my friend go to mall.');
+  assert.equal(document.activeElement, editor);
+
+  const feedback = document.querySelector('[data-ec="show-feedback"]');
+  assert.match(feedback.textContent, /2 suggestions/);
+  feedback.click();
+  assert.equal(document.activeElement.id, 'ecReviewTitle');
+  const apply = () => document.querySelector('#ecIssues [data-ec="apply"]');
+  apply().click();
+  apply().click();
+  assert.equal(editor.textContent, 'My friend and I go to the mall.');
+  assert.match(feedback.textContent, /No suggestions/);
+});
+
+test('English Coach reviews a text replacement when the keyboard sends no input event', async t => {
+  const timers = new Map();
+  const { api, document, window } = await app(t, { startupTimers: timers });
+  api.showTab('knowledge');
+  document.querySelector('[data-mmk="tab"][data-mode="english"]').click();
+  const editor = document.getElementById('ecEditor');
+  editor.focus();
+  editor.append(document.createTextNode('Please help test'));
+  await settle();
+  [...timers.values()].findLast(timer => timer.delay === 320)?.callback();
+
+  editor.firstChild.data = 'Kindly your help to test';
+  await settle();
+  const review = [...timers.values()].findLast(timer => timer.delay === 320);
+  assert.ok(review, 'an editor mutation should schedule feedback');
+  review.callback();
+  assert.equal(document.getElementById('ecCount').textContent, '1 suggestion');
+  assert.match(document.getElementById('ecIssues').textContent, /Please help/);
+  const stored = Object.keys(window.localStorage).find(key => key.startsWith('workhub.english-coach.'));
+  assert.equal(JSON.parse(window.localStorage.getItem(stored)).draft, 'Kindly your help to test');
+});
+
+test('English Coach restores feedback when returning to the page even without inline highlights', async t => {
+  const timers = new Map();
+  const { api, document, window } = await app(t, { startupTimers: timers });
+  api.showTab('knowledge');
+  document.querySelector('[data-mmk="tab"][data-mode="english"]').click();
+  const editor = document.getElementById('ecEditor');
+  const issues = document.getElementById('ecIssues');
+  window.CSS ??= {};
+  window.CSS.highlights = new Map();
+  window.Highlight = class {
+    constructor() { throw new Error('Custom highlights unavailable'); }
+  };
+  editor.textContent = 'What are her name?';
+  editor.dispatchEvent(new window.InputEvent('input', { bubbles: true, inputType: 'insertText' }));
+  window.dispatchEvent(new window.PageTransitionEvent('pagehide', { persisted: true }));
+  assert.doesNotMatch(issues.textContent, /What is her name/);
+  window.dispatchEvent(new window.PageTransitionEvent('pageshow', { persisted: true }));
+  assert.equal(document.getElementById('ecCount').textContent, '1 suggestion');
+  assert.match(issues.textContent, /What is her name/);
+});
+
 test('English Coach corrects agreement and joined subjects in a formatted draft in both writing modes', async t => {
   const { api, document, window } = await app(t);
   api.showTab('knowledge');
