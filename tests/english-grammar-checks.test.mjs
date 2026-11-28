@@ -132,10 +132,61 @@ test('live grammar checks also handle adjacent mistakes, acronyms, time expressi
   }
 });
 
+const everyday = [
+  ['Todays is a very good days.', 'Today is a very good day.'],
+  ['how are your doing?', 'How are you doing?'],
+  ['Yesterdays report is attached.', 'Yesterday’s report is attached.'],
+  ['I need this by tomorrows.', 'I need this by tomorrow.'],
+  ['A old chairs are available.', 'Old chairs are available.'],
+  ['We have a unusual questions for the team.', 'We have an unusual question for the team.'],
+  ['There is a very big cats in the garden.', 'There is a very big cat in the garden.'],
+  ['There are a good days ahead.', 'There are good days ahead.'],
+  ['There is two big dogs in the garden.', 'There are two big dogs in the garden.'],
+  ['We saw an old birds in the park.', 'We saw an old bird in the park.'],
+  ['There are many red apple on the table.', 'There are many red apples on the table.'],
+  ['I got an important advice.', 'I got some important advice.'],
+  ['I bought two big box for the move.', 'I bought two big boxes for the move.'],
+  ['Two small child came to the show.', 'Two small children came to the show.'],
+  ['Are your coming tonight?', 'Are you coming tonight?'],
+  ['What are your working on?', 'What are you working on?'],
+  ['Can your send the report?', 'Can you send the report?'],
+  ['Does your know the answer?', 'Do you know the answer?'],
+  ['She walk to school every day.', 'She walks to school every day.'],
+  ['He don’t like coffee.', 'He doesn’t like coffee.'],
+  ['They studies at home.', 'They study at home.'],
+  ['The dog bark every morning.', 'The dog barks every morning.'],
+  ['My dogs barks every night.', 'My dogs bark every night.'],
+  ['My cat are asleep.', 'My cat is asleep.'],
+  ['The children is drawing.', 'The children are drawing.'],
+  ['She is eat breakfast.', 'She is eating breakfast.'],
+  ['I have ate breakfast.', 'I have eaten breakfast.'],
+  ['She have wrote the letter.', 'She has written the letter.'],
+  ['I have already eat lunch.', 'I have already eaten lunch.'],
+  ['I have never go there.', 'I have never gone there.'],
+  ['He hasn’t drank water.', 'He hasn’t drunk water.'],
+  ['She’s sang that song before.', 'She’s sung that song before.'],
+  ['How often have you went there?', 'How often have you gone there?'],
+  ['Has she eat lunch?', 'Has she eaten lunch?'],
+  ['The food was eat yesterday.', 'The food was eaten yesterday.'],
+];
+
+test('the reported sentences and related everyday nouns, pronouns, tenses and participles get applicable fixes', () => {
+  for (const mode of modes) {
+    const [first, second] = everyday;
+    assert.equal(check(first[0], mode).length, 2, first[0]);
+    assert.equal(check(second[0], mode).length, 2, second[0]);
+    for (const [mistake, corrected] of everyday) {
+      assert.equal(applyAll(mistake, check(mistake, mode)), corrected, mistake + ' in ' + mode);
+      assert.deepEqual(check(corrected, mode), [], corrected + ' in ' + mode);
+    }
+  }
+});
+
 test('the lesson examples and variants exercise every new pattern', () => {
   const examples = [
     ...Array.from(byId.values(), lesson => alternate[lesson.id]?.[0] ?? lesson.mistake.split(' → ')[0]),
     ...variations.map(([text]) => text),
+    ...everyday.map(([text]) => text),
   ];
   for (const { id, pattern, replace } of globalThis.WorkHubEnglishGrammarChecks) {
     const exercised = examples.some(text =>
@@ -181,6 +232,17 @@ test('valid questions, alternate English forms, and text copied from SAP remain 
     'Note\tinvoices have been sent',
     'We can\tchecks completed',
     'I’ve heard that yesterday the file was approved.',
+    'How are your test results? Are your running shoes dry? Is her singing good?',
+    'Did your report the supplier mentioned arrive yet?',
+    'Are your reviewing the file and her writing the answer both enough?',
+    'Today’s report is ready. Yesterday was a very good day. We had a few good days.',
+    'I remember our yesterdays. A people with a shared history can have many languages.',
+    'A children’s book, a sports day, and a goods receipt are listed in the examples.',
+    'A lot of days have passed. A pair of birds landed in the garden.',
+    'The dog walk to school was cancelled. The room was clean yesterday.',
+    'The family are eating. The group are getting ready.',
+    'I have eaten breakfast. Have you read the letter?',
+    'Please open a Windows application or an RFQ template.',
   ];
   for (const text of correct) {
     for (const mode of modes) assert.deepEqual(check(text, mode), [], text + ' in ' + mode);

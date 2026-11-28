@@ -7,7 +7,7 @@
   const choices = words => Object.keys(words).join('|');
   const pronouns = '(?:I|you|we|they|he|she|it)';
   const people =
-    '(?:buyer|supplier|vendor|requester|approver|manager|reviewer|tester|user|colleague|developer|customer)';
+    '(?:buyer|supplier|vendor|requester|approver|manager|reviewer|tester|user|colleague|developer|customer|friend|brother|sister|parent|neighbour|neighbor|student|teacher|coordinator)';
   const workspace =
     '(?:file|report|document|form|request|order|invoice|quote|message|email|delivery|application|system|process|record|update|attachment|purchase order|test|result|item|issue|PO|PR|RFQ)';
   const named = `(?:the|this|that|our|their|your|my|its) (?:${people}|${workspace})s?`;
@@ -17,25 +17,27 @@
   const terminal = '(?= *(?:[.!?;\\n]|$))';
   const adverb = '(?:(?:not|just|already|never|ever|always|still|really|also|please|only) )?';
   const objectStart =
-    '(?= +(?:the|this|that|these|those|our|their|your|my|his|her|its|it|them|him|me|us|you)\\b)(?! +the (?:next|following|same) (?:day|week|month|year)\\b)';
+    '(?= +(?:the|this|that|these|those|our|their|your|my|his|her|its|it|them|him|me|us|you|breakfast|lunch|dinner)\\b)(?! +the (?:next|following|same) (?:day|week|month|year)\\b)';
   const writtenNumber = '(?:two|three|four|five|six|seven|eight|nine|ten|several)';
   const numeral = `(?:${writtenNumber}|[2-9]|[1-9][0-9]+)`;
   const nounEnd =
     '(?= *(?:[,.!?;:\\n]|$)| +(?:is|are|was|were|has|have|needs?|require[sd]?|remain[sed]*|will|can|must|should|on hold|in stock)\\b)';
 
-  function use(lessonId, pattern, replace, reason, type = 'Grammar') {
-    rules.push({ id: lessonId, lessonId, pattern, replace, reason, type });
+  function use(lessonId, pattern, replace, reason, type = 'Grammar', id = lessonId) {
+    rules.push({ id, lessonId, pattern, replace, reason, type });
   }
 
   function sameCase(word, replacement) {
-    if (/^(?:PO|PR)$/.test(word) && replacement === word.toLowerCase() + 's') return word + 's';
+    if (/^(?:PO|PR|RFQ)$/.test(word) && replacement === word.toLowerCase() + 's') return word + 's';
+    if (/^(?:PO|PR|RFQ)s$/.test(word) && replacement === word.slice(0, -1).toLowerCase())
+      return word.slice(0, -1);
     if (/^[A-Z]{2,}$/.test(word)) return replacement.toUpperCase();
     if (/^[A-Z]/.test(word)) return replacement.charAt(0).toUpperCase() + replacement.slice(1);
     return replacement;
   }
 
   // The prefix is kept verbatim. The suffix is lookahead and supplies context for the edit.
-  function word(lesson, prefix, words, suffix, reason, type) {
+  function word(lesson, prefix, words, suffix, reason, type, id) {
     use(
       lesson,
       rx(`${prefix}(${choices(words)})\\b${suffix}`),
@@ -43,7 +45,8 @@
         return match.slice(0, -original.length) + sameCase(original, words[original.toLowerCase()]);
       },
       reason,
-      type
+      type,
+      id
     );
   }
 
@@ -134,18 +137,49 @@
     shelf: 'shelves',
     company: 'companies',
     status: 'statuses',
+    activity: 'activities',
+    city: 'cities',
+    family: 'families',
+    memory: 'memories',
+    mouse: 'mice',
+    party: 'parties',
+    story: 'stories',
+    watch: 'watches',
   };
+  const nounForms = {
+    ...Object.fromEntries(
+      'apple appointment attachment bag bike bird book bottle call car cat chair change childminder coat colleague computer cup day desk detail document dog email error event example field file flower form friend game garden goal group hour idea image invoice issue item job lesson letter list meeting message minute month morning note office option order page paper parent photo picture plan plant problem project question quote record report request result review road room rule schedule school seat shop sign student supplier table task teacher test ticket tool train trip update user visit week window word year material po pr rfq'
+        .split(' ')
+        .concat('purchase order')
+        .map(noun => [noun, noun + 's'])
+    ),
+    ...plurals,
+    batch: 'batches',
+    box: 'boxes',
+    bus: 'buses',
+    class: 'classes',
+  };
+  const singularForms = Object.fromEntries(
+    Object.entries(nounForms).map(([singular, plural]) => [plural, singular])
+  );
+  const singularNoun = `(?:${choices(nounForms)})`;
+  const pluralNoun = `(?:${choices(singularForms)})`;
+  const nounModifiers =
+    '(?:(?:(?:very|really|quite|rather|especially|extremely|particularly|surprisingly|unusually|incredibly|so) +){0,2}(?:amazing|annual|available|awful|bad|beautiful|big|bright|busy|clean|clear|cold|comfortable|complete|correct|current|difficult|different|easy|early|empty|exciting|excellent|final|fine|first|fresh|fun|funny|good|great|happy|hard|heavy|helpful|hot|important|interesting|large|last|late|latest|long|lovely|missing|modern|new|nice|old|open|original|outstanding|overdue|pending|pleasant|positive|productive|quiet|ready|recent|red|revised|short|simple|small|special|strange|successful|sunny|terrible|useful|updated|unusual|urgent|warm|white|wonderful|wrong|young) +){0,3}';
+  const countNounEnd = `(?:${nounEnd}|(?= +(?:and|or|about|at|by|before|after|for|from|in|on|to|with|without|that|which|who|came|went|arrived|returned|joined|passed|ahead|left|today|tomorrow|yesterday)\\b))`;
   use(
     'countability',
-    rx(`\\ban? (${mass})\\b${nounEnd}`),
-    (_, noun) => 'some ' + noun,
+    rx(
+      `\\ban? +(${nounModifiers}(?:advice|equipment|feedback|furniture|information|luggage|research|evidence|software))\\b${countNounEnd}`
+    ),
+    (_, description) => 'some ' + description,
     'Use some with these uncountable nouns, or name the unit you mean, such as a piece of equipment.'
   );
   word(
     'plural-nouns',
-    `\\b(?:${numeral}|both|many|several) `,
+    `\\b(?:${numeral}|both|many|several) +${nounModifiers}`,
     plurals,
-    nounEnd,
+    countNounEnd,
     'A quantity greater than one takes a plural noun. This noun has a spelling change in the plural.'
   );
   word(
@@ -164,34 +198,54 @@
     /^(?:and|or|but|the|a|an|is|are|was|were|has|have|can|will|should|could|would|may|might|must|to|of|for|in|on|at|as|my|your|their|our|its|this|that|these|those|not|herb|homage|historic)$/i;
   const labelBefore =
     /\b(?:option|grade|letter|section|line|column|plant|company|warehouse|item|choice|answer|class|group|type|tier|tab|figure|appendix) +$/i;
+  const startsWithLabelA = (article, index, text) =>
+    article === 'A' && labelBefore.test(text.slice(Math.max(0, index - 25), index));
+  function articleForWord(next) {
+    if (articleFollowing.test(next)) return;
+    const initials = next.split('-')[0];
+    if (/^(?:ERP|RFQ|HR|HTTP|HTTPS|MRI|MBA|MRP|SLA|SSO|XML|XLS|HTML)$/.test(initials)) return 'an';
+    if (/^(?:PO|PR|PDF|CSV|VAT|UAT|USB|URL)$/.test(initials)) return 'a';
+    if (/^[A-Z]{2,}$/.test(initials) || initials.length === 1) return;
+    return vowelSound.test(next) && !consonantVowelStart.test(next) ? 'an' : 'a';
+  }
+
+  // “A people” can refer to a single community or nation.
+  const articleNoun = `(a|an)( +${nounModifiers})((?!people\\b)${pluralNoun})\\b${countNounEnd}`;
+  const articleNumber = new RegExp(`^${articleNoun}`, 'i');
+  use(
+    'articles-a-an',
+    rx(`\\b${articleNoun}`),
+    (match, article, modifiers, noun, index, text) => {
+      if (startsWithLabelA(article, index, text) || noun === 'Windows') return;
+      if (
+        /^ +(?:are|were|have)\b/i.test(text.slice(index + match.length)) ||
+        /\bthere +(?:are|were)(?: +(?:still|only|also))? +$/i.test(
+          text.slice(Math.max(0, index - 24), index)
+        )
+      )
+        return match.slice(article.length).trimStart();
+      const singular = sameCase(noun, singularForms[noun.toLowerCase()]);
+      const next = modifiers.trim().split(/ +/)[0] || singular;
+      return (
+        sameCase(article, articleForWord(next) || article.toLowerCase()) + modifiers + singular
+      );
+    },
+    'Use a or an with a singular countable noun. Use the plural by itself when you mean more than one.'
+  );
   use(
     'articles-a-an',
     /\b(a|an) +([A-Za-z]+(?:-[A-Za-z]+)*)\b/gi,
     (match, article, next, index, text) => {
-      if (
-        articleFollowing.test(next) ||
-        (article === 'A' && labelBefore.test(text.slice(Math.max(0, index - 25), index)))
-      )
-        return;
-      const initials = next.split('-')[0];
-      let vowel;
-      if (/^(?:ERP|RFQ|HR|HTTP|HTTPS|MRI|MBA|MRP|SLA|SSO|XML|XLS|HTML)$/.test(initials))
-        vowel = true;
-      else if (/^(?:PO|PR|PDF|CSV|VAT|UAT|USB|URL)$/.test(initials)) vowel = false;
-      else if (/^[A-Z]{2,}$/.test(initials) || initials.length === 1) return;
-      else vowel = vowelSound.test(next) && !consonantVowelStart.test(next);
-      const corrected = vowel ? 'an' : 'a';
-      if (article.toLowerCase() !== corrected)
+      if (startsWithLabelA(article, index, text) || articleNumber.test(text.slice(index))) return;
+      const corrected = articleForWord(next);
+      if (corrected && article.toLowerCase() !== corrected)
         return sameCase(article, corrected) + match.slice(article.length);
     },
     'Choose a or an by the sound that immediately follows it.'
   );
 
-  const singularNoun =
-    '(?:file|report|document|form|request|order|invoice|quote|message|email|record|update|attachment|test|result|item|issue|field|error|task|supplier|option|project|material|question|box|day|week|hour|purchase order|PO|PR|RFQ)';
-  const pluralNoun = `(?:${singularNoun}s|boxes|people|children|analyses|companies|policies)`;
   function quantityWord(lesson, options, nouns, explanation) {
-    word(lesson, '\\b', options, `(?= ${nouns}\\b${nounEnd})`, explanation);
+    word(lesson, '\\b', options, `(?= +${nounModifiers}${nouns}\\b${countNounEnd})`, explanation);
   }
   quantityWord(
     'demonstratives',
@@ -202,6 +256,13 @@
   quantityWord('demonstratives', { this: 'these' }, pluralNoun, 'Use these with a plural noun.');
   quantityWord('quantity', { much: 'many' }, pluralNoun, 'Use many with plural count nouns.');
   quantityWord('quantity', { many: 'much' }, mass, 'Use much with an uncountable noun.');
+  word(
+    'quantity',
+    `\\b(?:many|both|a few) +${nounModifiers}`,
+    nounForms,
+    countNounEnd,
+    'Use a plural countable noun after many, both or a few.'
+  );
   use(
     'few-little',
     rx(`\\ba few(?= (?:${mass}|time|work|space)\\b${nounEnd})`),
@@ -249,6 +310,34 @@
     () => 'it’s',
     'Use it’s when you mean “it is”.'
   );
+  const timeWords = {
+    todays: 'today',
+    yesterdays: 'yesterday',
+    tomorrows: 'tomorrow',
+    tonights: 'tonight',
+  };
+  word(
+    'word-formation',
+    '\\b',
+    timeWords,
+    '(?= +(?:is|was|has|starts?|ends?|marks?|begins?)\\b)',
+    'Use today, yesterday, tomorrow or tonight when the word itself names the time.'
+  );
+  word(
+    'word-formation',
+    '\\b(?:by|until|since|as of) +',
+    timeWords,
+    terminal,
+    'Use the time word without an s when it gives a deadline or starting point.'
+  );
+  use(
+    'possessives',
+    rx(
+      `\\b(today|yesterday|tomorrow|tonight)s(?= +${nounModifiers}(?:${singularNoun}|${pluralNoun})\\b${countNounEnd})`
+    ),
+    (_, time) => time + '’s',
+    'Add an apostrophe before the s when a time word modifies a noun, as in “today’s meeting”.'
+  );
   use(
     'reflexives',
     /\b((?:please|(?:could|can|would|will) you) (?:reply|respond|send|forward|return|write|give|email)(?: +[^,.;!?\n]{1,55}?)? +to +)myself\b/gi,
@@ -256,16 +345,18 @@
     'Use me when someone else sends something to you. Myself refers back to I in the same clause.'
   );
 
-  // Common workplace verbs and their forms. Keep unchanged participles when they are already valid.
+  // Common verbs and their forms. Keep unchanged participles when they are already valid.
   const spellingChanges = {
     cancel: ['cancelled', 'cancelling'],
     log: ['logged', 'logging'],
     plan: ['planned', 'planning'],
     refer: ['referred', 'referring'],
     stop: ['stopped', 'stopping'],
+    shop: ['shopped', 'shopping'],
     submit: ['submitted', 'submitting'],
     tag: ['tagged', 'tagging'],
     transfer: ['transferred', 'transferring'],
+    travel: ['travelled', 'travelling'],
   };
   const baseVerbs =
     'accept add agree allow answer apply approve arrive attach call cancel change check close complete confirm consider contain correct count create deal decide delay deliver describe discuss document e-mail email explain fail file fill finish fix follow handle help include inform join keep know launch learn leave link list log look mention move need open order pass paste pick plan play point post prepare print process provide receive record refer reject release remain remove reply report request require resolve respond return review revise schedule share show sign start stay stop store submit support tag talk test transfer try update upload use validate wait want watch work'.split(
@@ -289,6 +380,7 @@
     drive: ['drives', 'drove', 'driven', 'driving'],
     eat: ['eats', 'ate', 'eaten', 'eating'],
     fall: ['falls', 'fell', 'fallen', 'falling'],
+    feel: ['feels', 'felt', 'felt', 'feeling'],
     find: ['finds', 'found', 'found', 'finding'],
     forget: ['forgets', 'forgot', 'forgotten', 'forgetting'],
     get: ['gets', 'got', 'got', 'getting'],
@@ -316,9 +408,13 @@
     send: ['sends', 'sent', 'sent', 'sending'],
     set: ['sets', 'set', 'set', 'setting'],
     show: ['shows', 'showed', 'shown', 'showing'],
+    sing: ['sings', 'sang', 'sung', 'singing'],
+    sit: ['sits', 'sat', 'sat', 'sitting'],
+    sleep: ['sleeps', 'slept', 'slept', 'sleeping'],
     speak: ['speaks', 'spoke', 'spoken', 'speaking'],
     spend: ['spends', 'spent', 'spent', 'spending'],
     stand: ['stands', 'stood', 'stood', 'standing'],
+    swim: ['swims', 'swam', 'swum', 'swimming'],
     take: ['takes', 'took', 'taken', 'taking'],
     teach: ['teaches', 'taught', 'taught', 'teaching'],
     tell: ['tells', 'told', 'told', 'telling'],
@@ -329,7 +425,12 @@
     write: ['writes', 'wrote', 'written', 'writing'],
   };
   const verbs = Object.fromEntries(
-    baseVerbs.map(base => {
+    [
+      ...baseVerbs,
+      ...'ask bake bark bathe brush believe clean climb cook dance enjoy exercise jump like listen live love miss rain remember rest shop smile sneeze study travel visit walk wash'.split(
+        ' '
+      ),
+    ].map(base => {
       const endingY = /[^aeiou]y$/.test(base);
       const third = endingY
         ? base.slice(0, -1) + 'ies'
@@ -350,6 +451,16 @@
     'accept add answer approve attach bring buy cancel change check close complete confirm correct create delay deliver describe discuss document email explain file fill finish fix give handle include join link log make mention move open order pay pick plan post prepare print process provide read receive record reject release remove report request resolve return review revise schedule see sell send share show sign start stop store submit support tag take test transfer update upload use validate watch write'.split(
       ' '
     );
+  const dailyActions =
+    'ask bake bark bathe believe brush clean climb come cook dance draw drink drive eat enjoy exercise feel find forget give go grow hear jump know learn like listen live look love meet miss play rain remember rest run shop sing sit sleep smile sneeze speak study swim talk teach travel try visit walk wash wear'.split(
+      ' '
+    );
+  const transitiveActions = [
+    ...actions,
+    ...'ask bake brush clean cook draw drink eat find grow learn like love play remember study visit wash wear'.split(
+      ' '
+    ),
+  ];
   const timedActions =
     'arrive begin call check close complete confirm finish go join leave meet move open post receive reply return review send start submit test update work'.split(
       ' '
@@ -368,12 +479,67 @@
   const activeWas = `(?:(?:I|he|she|it|the ${people}) was|(?:we|you|they) were)`;
   const workplaceActor = `(?:I|we|you|they|he|she|the ${people}s?)`;
   const timeMarker = `(?= +(?:since|for|when|now|today|tomorrow|this (?:morning|afternoon|evening|week)|at [0-9])\\b)`;
-  const activities = 'check finish join review start stop submit test work wait'.split(' ');
+  const activities =
+    'check finish join review start stop submit test work wait walk sleep cook eat play read travel study'.split(
+      ' '
+    );
 
   function progressive(lesson, lead, reason) {
-    word(lesson, lead, verbsOf([0], 4, actions), objectStart, reason);
+    word(lesson, lead, verbsOf([0], 4, transitiveActions), objectStart, reason);
     word(lesson, lead, verbsOf([0], 4, activities), timeMarker, reason);
   }
+
+  const questionWord = '(?:how(?: +(?:long|often|much|far))?|what|where|when|why|who|which)';
+  const questionOpening = `${clause}(?:${questionWord} +)?`;
+  const questionTime =
+    '(?:today|tomorrow|tonight|now|later|already|again|yet|here|there|right now|these days|at the moment|this (?:morning|afternoon|evening|week)|next (?:week|month))';
+  const questionRecipient = '(?:it|them|him|her|me|us|you|this|that|these|those)';
+  const questionNoun = `(?:a|an|the|this|that|those|these|my|your|our|their) +${nounModifiers}(?:${singularNoun}|${pluralNoun}|door|answer|breakfast|lunch|dinner)\\b`;
+  const questionArgument = `(?:${questionRecipient}|${questionNoun}|(?:to|for|at|in|on|with) +${questionNoun})`;
+  const questionClose = '(?= *(?:\\?|\\n|$))';
+  const questionPronoun = {
+    my: 'I',
+    your: 'you',
+    its: 'it',
+    his: 'he',
+    her: 'she',
+    our: 'we',
+    their: 'they',
+    "you're": 'you',
+    'you’re': 'you',
+    "we're": 'we',
+    'we’re': 'we',
+    "they're": 'they',
+    'they’re': 'they',
+  };
+  const pronounReason =
+    'Use a subject pronoun after the helping verb in a question. A possessive like your introduces a noun.';
+  const ingVerbs = choices(verbsOf([4], 0, Object.keys(verbs)));
+  word(
+    'pronouns',
+    `${questionOpening}(?:are|were)(?:n['’]t)? +`,
+    Object.fromEntries(
+      Object.entries(questionPronoun).filter(([, form]) => /^(?:you|we|they)$/.test(form))
+    ),
+    `(?= +(?:${ingVerbs})\\b(?: +(?:${questionArgument}|well|fine|okay|better|worse|on|for|with))?(?: +${questionTime})?${questionClose})`,
+    pronounReason
+  );
+  use(
+    'pronouns',
+    rx(
+      `${questionOpening}(can|could|will|would|should|may|might|must|do|does|did)( +)(${choices(questionPronoun)})\\b(?= +(?:${[...new Set([...actions, ...dailyActions, 'be', 'have', 'need'])].join('|')})\\b(?: +(?:${questionArgument}|free|ready|available))?(?: +${questionTime})?${questionClose})`
+    ),
+    (match, auxiliary, space, form) => {
+      const pronoun = questionPronoun[form.toLowerCase()];
+      const singular = /^(?:he|she|it)$/.test(pronoun);
+      const verb = /^do(?:es)?$/i.test(auxiliary)
+        ? sameCase(auxiliary, singular ? 'does' : 'do')
+        : auxiliary;
+      const opening = match.slice(0, -(auxiliary.length + space.length + form.length));
+      return opening + verb + space + pronoun;
+    },
+    pronounReason
+  );
 
   // Clauses and common agreement errors.
   use(
@@ -407,23 +573,42 @@
     '',
     'Use am, have and do with I.'
   );
+  const individualNouns = Object.keys(nounForms)
+    .filter(noun => !['group', 'class', 'company', 'party', 'family'].includes(noun))
+    .join('|');
+  const singularSubjectPhrase = `(?:a|an|the|this|that|my|your|our|their|his|her) +${nounModifiers}(?:${individualNouns})`;
+  const pluralSubjectPhrase = `(?:the|these|those|my|your|our|their|his|her) +${nounModifiers}${pluralNoun}`;
+  word(
+    'agreement',
+    `${clause}${singularSubjectPhrase} +`,
+    singularBe,
+    '',
+    'A singular subject takes a singular verb.'
+  );
+  word(
+    'agreement',
+    `${clause}${pluralSubjectPhrase} +`,
+    pluralBe,
+    '',
+    'A plural subject takes a plural verb.'
+  );
   word(
     'there-it',
     '\\bthere ',
     { is: 'are', was: 'were' },
-    `(?= (?:both|${numeral}) ${pluralNoun}\\b)`,
+    `(?= +(?:both|${numeral}) +${nounModifiers}${pluralNoun}\\b)`,
     'Use a plural verb after there when you introduce more than one thing.'
   );
   word(
     'there-it',
     '\\bthere ',
     { are: 'is', were: 'was' },
-    `(?= (?:a|an|one) ${singularNoun}\\b)`,
+    `(?= +(?:a|an|one) +${nounModifiers}${singularNoun}\\b)`,
     'Use a singular verb after there when you introduce one thing.'
   );
   use(
     'there-it',
-    rx(`\\bthere['’]s(?= (?:both|${numeral}) ${pluralNoun}\\b)`),
+    rx(`\\bthere['’]s(?= +(?:both|${numeral}) +${nounModifiers}${pluralNoun}\\b)`),
     () => 'there are',
     'There’s is short for there is. Use there are to introduce a plural noun.'
   );
@@ -460,30 +645,63 @@
     'The helping verb do takes the base verb directly.'
   );
 
-  word(
-    'present-simple',
-    `${clause}(?:he|she|it|(?:the|this|that|our|your|their|my) ${people}) ${adverb}`,
-    verbsOf([0], 1, [
+  const presentActions = [
+    ...new Set([
       ...actions,
+      ...dailyActions,
       'do',
       'have',
       'need',
       'want',
-      'go',
       'work',
       'wait',
       'say',
       'require',
     ]),
+  ];
+  const singularPresent = {
+    ...verbsOf([0], 1, presentActions),
+    "don't": 'doesn’t',
+    'don’t': 'doesn’t',
+  };
+  const pluralPresent = {
+    ...verbsOf([1], 0, presentActions),
+    "doesn't": 'don’t',
+    'doesn’t': 'don’t',
+  };
+  const singularPresentReason =
+    'In a present-tense statement, a singular third-person subject takes forms like walks or has.';
+  const pluralPresentReason =
+    'In a present-tense statement, use the base verb with a plural subject or with I, you, we and they.';
+  word(
+    'present-simple',
+    `${clause}(?:he|she|it|(?:the|this|that|our|your|their|my) ${people}) +${adverb}`,
+    singularPresent,
     '',
-    'In a present-tense statement, a singular third-person subject takes forms like checks or has.'
+    singularPresentReason
   );
   word(
     'present-simple',
-    `${clause}(?:I|we|you|they|the ${people}s) ${adverb}`,
-    verbsOf([1], 0, [...actions, 'do', 'have', 'need', 'want', 'go', 'work', 'wait', 'say']),
+    `${clause}(?:I|we|you|they|the ${people}s) +${adverb}`,
+    pluralPresent,
     '',
-    'In a present-tense statement, use the base verb with I, you, we and they.'
+    pluralPresentReason
+  );
+  const activityTail =
+    '(?= +(?:every (?:day|morning|week|evening|night)|daily|often|together|at home|to school|to work|at night|in the (?:morning|evening)|outdoors)\\b(?: *[.!?;,\\n]|$| +(?:and|but|before|after|because)\\b))';
+  word(
+    'present-simple',
+    `${clause}${singularSubjectPhrase} +${adverb}`,
+    verbsOf([0], 1, dailyActions),
+    activityTail,
+    singularPresentReason
+  );
+  word(
+    'present-simple',
+    `${clause}${pluralSubjectPhrase} +${adverb}`,
+    verbsOf([1], 0, dailyActions),
+    activityTail,
+    pluralPresentReason
   );
   progressive(
     'present-continuous',
@@ -526,36 +744,64 @@
     '',
     'A finished time such as yesterday usually goes with the simple past.'
   );
-  const perfectActions = verbsOf([0], 3, actions);
+  const perfectActions = verbsOf([0, 1], 3, transitiveActions);
   const differentPast = Object.fromEntries(
     Object.entries(irregular)
       .filter(
         ([base, [, past, participle]]) =>
-          past !== participle && !['be', 'see', 'show', 'drink'].includes(base)
+          past !== participle && !['be', 'see', 'show'].includes(base)
       )
       .map(([, [, past, participle]]) => [past, participle])
   );
   const perfectReason = 'Use a past participle after have, has or had to form a perfect tense.';
-  const have = `(?:have|has|(?:I|you|we|they)['’]ve|(?:he|she|it)['’]s)`;
-  word('present-perfect', `\\b${have} ${adverb}`, perfectActions, objectStart, perfectReason);
+  const have = "(?:(?:has|have)(?:n['’]t)?|(?:I|you|we|they)['’]ve|(?:he|she|it)['’]s)";
+  word('present-perfect', `\\b${have} +${adverb}`, perfectActions, objectStart, perfectReason);
   word(
     'present-perfect',
     `\\b${have} ${adverb}`,
-    { saw: 'seen', drank: 'drunk', showed: 'shown' },
+    { saw: 'seen', showed: 'shown' },
     objectStart,
     perfectReason
   );
   word(
-    'present-perfect',
-    `\\b(?:(?:I|you|we|they)['’]ve|(?:he|she|it)['’]s) ${adverb}`,
+    'past-participles',
+    `\\b${have} +${adverb}`,
     differentPast,
     '',
+    perfectReason,
+    'Grammar',
+    'past-participle'
+  );
+  word(
+    'present-perfect',
+    `\\b${have} +(?:not|just|already|never|ever|recently) +`,
+    verbsOf([0, 1], 3, ['go', 'come', 'arrive', 'begin', 'fall', 'return', 'swim']),
+    '(?= +(?:home|back|abroad|there|here|to|before|since|by|yet)\\b| *[.!?;\\n]|$)',
     perfectReason
   );
-  word('past-perfect', `\\bhad ${adverb}`, perfectActions, objectStart, perfectReason);
+  const perfectQuestion = `${questionOpening}(?:has|have|had)(?:n['’]t)? +${subject} +${adverb}`;
+  word(
+    'past-participles',
+    perfectQuestion,
+    differentPast,
+    '',
+    perfectReason,
+    'Grammar',
+    'past-participle'
+  );
+  word(
+    'past-participles',
+    perfectQuestion,
+    perfectActions,
+    objectStart,
+    perfectReason,
+    'Grammar',
+    'past-participle'
+  );
+  word('past-perfect', `\\bhad(?:n['’]t)? +${adverb}`, perfectActions, objectStart, perfectReason);
   word(
     'past-perfect',
-    `\\bhad ${adverb}`,
+    `\\bhad(?:n['’]t)? +${adverb}`,
     differentPast,
     '',
     'Use had with a past participle to describe the earlier of two past events.'
@@ -892,9 +1138,26 @@
     'validate',
     'write',
   ];
-  const passiveForm = verbsOf([0, 2], 3, passiveVerbs);
-  const passiveObject = `(?:${workspace}|goods|labels|forms|orders|files|invoices|documents|messages|receipts|items|materials)`;
-  const passiveSubject = `(?:it|they|(?:the|this|that|these|those|our|your|their) ${passiveObject}s?)`;
+  const passiveForm = verbsOf([0, 1, 2], 3, [
+    ...passiveVerbs,
+    'bake',
+    'bring',
+    'build',
+    'buy',
+    'choose',
+    'cook',
+    'draw',
+    'drink',
+    'eat',
+    'find',
+    'make',
+    'see',
+    'take',
+    'wash',
+    'wear',
+  ]);
+  const passiveObject = `(?:${singularNoun}|${pluralNoun}|goods|labels?|receipts?|food|water|breakfast|lunch|dinner|rice)`;
+  const passiveSubject = `(?:it|they|(?:the|this|that|these|those|our|your|their) +${nounModifiers}${passiveObject})`;
   const passiveSuffix =
     '(?= +(?:by|on|to|from|before|after|yesterday|last|today|tomorrow|earlier|later|already|this (?:morning|week))\\b| *[,.!?;\\n]|$)';
   const passiveReason =
@@ -1026,6 +1289,14 @@
     /\bi(?=['’](?:m|ll|ve|d)\b| (?:am|was|will|can|could|would|should|have|had|did|do|need|want|think|sent|saw|went|wrote|checked|received|emailed|said|will)\b)/g,
     () => 'I',
     'Capitalise the pronoun I, including in a contraction.',
+    'Capitalisation'
+  );
+  use(
+    'capitals',
+    /(?:^ *|(?<=[.!?\n]) *)(how|what|when|where|who|why|which)(?= +(?:(?:long|often|much|far) +)?(?:am|is|are|was|were|do|does|did|can|could|will|would|should|has|have|had)\b[^.!?\n]{1,140}\?)/g,
+    (match, opening) =>
+      match.slice(0, -opening.length) + opening[0].toUpperCase() + opening.slice(1),
+    'Capitalise the first word of a complete question.',
     'Capitalisation'
   );
   use(
@@ -1183,52 +1454,18 @@
     `(?:${nounEnd}|(?= +(?:by|before)\\b))`,
     'Use the noun form here, where the phrase names the thing you need or are waiting for.'
   );
-  const regularNouns = Object.fromEntries(
-    [
-      'file',
-      'report',
-      'document',
-      'form',
-      'request',
-      'order',
-      'invoice',
-      'quote',
-      'message',
-      'email',
-      'record',
-      'attachment',
-      'test',
-      'result',
-      'item',
-      'issue',
-      'field',
-      'error',
-      'task',
-      'supplier',
-      'option',
-      'project',
-      'material',
-      'question',
-      'day',
-      'week',
-      'hour',
-      'purchase order',
-      'po',
-      'pr',
-    ].map(noun => [noun, noun + 's'])
-  );
   word(
     'each-every',
-    '\\bone of (?:the|these|those|your|our|their) ',
-    { ...regularNouns, ...plurals, box: 'boxes' },
-    nounEnd,
+    `\\bone of (?:the|these|those|your|our|their) +${nounModifiers}`,
+    nounForms,
+    countNounEnd,
     'Use the plural noun to name the group after one of.'
   );
   word(
     'numbers-dates',
-    `\\b${numeral} `,
-    { ...regularNouns, box: 'boxes', batch: 'batches', class: 'classes' },
-    nounEnd,
+    `\\b${numeral} +${nounModifiers}`,
+    nounForms,
+    countNounEnd,
     'Use the plural noun after a number greater than one.'
   );
   use(
