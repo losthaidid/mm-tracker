@@ -3163,6 +3163,7 @@
       if (tab !== 'processhub') clearTimeout(walkTimer);
       viewTab = tab;
       mmKnowledge?.sync();
+      mmKnowledge?.mount();
       knowledgeGarden?.sync();
       purchasingGuide?.sync();
       const processAccount = a.cloud().ready ? a.cloud().user?.id || '' : '';

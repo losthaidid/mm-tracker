@@ -2480,6 +2480,54 @@ const adventureChoices={greetings:false,antics:false,reminders:false,chases:true
 const adventureStorage=values=>({'mm-tracker.momo-adventures.v1':JSON.stringify({...adventureChoices,...values})});
 function submitLocal(window,form){form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));}
 
+test('English Coach opens from Knowledge and keeps draft, practice and vocabulary private to the browser account', async t => {
+  const ctx = await app(t);
+  const { api, document, window, db } = ctx;
+  const click = selector => {
+    const button = document.querySelector(selector);
+    assert.ok(button, selector);
+    button.click();
+  };
+  api.showTab('knowledge');
+  click('[data-mmk="tab"][data-mode="english"]');
+  const draft = document.getElementById('ecEditor');
+  assert.ok(draft);
+  const writes = db.calls.length;
+  draft.innerHTML = '<p><strong>The changes is ready.</strong></p><ul><li>Confirm the PO</li></ul>';
+  draft.dispatchEvent(new window.Event('input',{bubbles:true}));
+  const mode = document.getElementById('ecMode');
+  mode.value = 'teams';
+  mode.dispatchEvent(new window.Event('change',{bubbles:true}));
+  assert.match(document.getElementById('ecIssues').textContent,/The changes are/);
+  let formats;
+  window.ClipboardItem = class { constructor(value) { this.value = value; } };
+  Object.defineProperty(window.navigator,'clipboard',{configurable:true,value:{write:async items=>{formats=items[0].value;}}});
+  click('[data-ec="copy-rich"]');
+  await settle();
+  assert.match(await formats['text/html'].text(), /<strong>The changes is ready.<\/strong>/);
+  assert.equal(await formats['text/plain'].text(),'The changes is ready.\n• Confirm the PO');
+  click('[data-ec="practice-rule"]');
+  assert.match(document.getElementById('ecPane').textContent,/The files ___ ready/);
+  click('[data-ec="exercise"][data-choice="0"]');
+  assert.match(document.querySelector('.ec-practice-result').textContent,/Correct/);
+  click('[data-ec="screen"][data-screen="vocabulary"]');
+  click('[data-ec="save-example"][data-index="0"]');
+  click('[data-ec="reveal"]');
+  assert.match(document.querySelector('.ec-recall-answer').textContent,/Could you confirm/);
+  click('[data-ec="screen"][data-screen="draft"]');
+  assert.equal(document.getElementById('ecEditor').innerHTML,'<p><strong>The changes is ready.</strong></p><ul><li>Confirm the PO</li></ul>');
+  api.showTab('tasks');
+  api.showTab('knowledge');
+  assert.match(document.getElementById('ecEditor').textContent,/Confirm the PO/);
+  assert.equal(db.calls.length,writes);
+  api.cloud.generation++;
+  api.cloud.user = { id:'different-account' };
+  api.showTab('knowledge');
+  assert.equal(document.getElementById('ecEditor'),null);
+  assert.ok(!document.getElementById('view').textContent.includes('The changes is ready'));
+});
+
+
 test('Implementation workshops: complete once, publish scoped records, and keep them across cloud reload', async t => {
   const { api, document, window, db } = await app(t);
   const projectId = api.state().activeProjectId;

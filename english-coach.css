@@ -1,0 +1,259 @@
+/* English Coach follows the workspace palette in every theme. */
+.ec-workspace {
+  --ec-line: var(--hub-border, var(--line));
+  --ec-muted: var(--hub-muted, var(--muted));
+  --ec-soft: var(--hub-surface-soft, #f3f7fb);
+  --ec-surface: var(--hub-surface, #fff);
+  --ec-accent: var(--hub-accent, #2b68af);
+  --ec-pad: clamp(14px, 2vw, 24px);
+  min-width: 0;
+}
+.ec-workspace .ec-header {
+  padding: 18px var(--ec-pad);
+  border-bottom: 1px solid var(--ec-line);
+}
+.ec-content {
+  padding: var(--ec-pad);
+}
+.ec-content .ec-tabs {
+  margin: 0 0 16px;
+}
+.ec-draft-layout,
+.ec-vocab-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(min(100%, 19rem), 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.ec-draft,
+.ec-review,
+.ec-study {
+  min-width: 0;
+  border: 1px solid var(--ec-line);
+  border-radius: 12px;
+  background: var(--ec-surface);
+}
+.ec-review,
+.ec-study {
+  padding: 16px;
+}
+.ec-study + .ec-study {
+  margin-top: 16px;
+}
+.ec-draft-head,
+.ec-review-head,
+.ec-toolbar,
+.ec-table-insert,
+#ecTableEdit,
+.ec-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.ec-draft-head,
+.ec-review-head {
+  justify-content: space-between;
+}
+.ec-draft-head {
+  background: var(--ec-soft);
+  border-radius: 12px 12px 0 0;
+  padding: 12px 14px;
+}
+.ec-draft-head h3,
+.ec-review h3,
+.ec-study h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.ec-draft-head label,
+.ec-table-insert label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+.ec-toolbar {
+  padding: 10px 14px;
+  border-top: 1px solid var(--ec-line);
+}
+.ec-workspace [hidden] {
+  display: none;
+}
+.ec-toolbar button,
+.ec-toolbar select,
+.ec-draft-head select {
+  width: auto;
+  max-width: 100%;
+  min-height: 36px;
+  margin: 0;
+  font-size: 0.875rem;
+}
+.ec-toolbar [data-command='bold'] {
+  font-weight: 750;
+}
+.ec-toolbar [data-command='italic'] {
+  font-style: italic;
+}
+.ec-toolbar [aria-pressed='true'],
+.ec-toolbar [aria-expanded='true'] {
+  background: var(--ec-soft);
+  border-color: var(--ec-accent);
+}
+.ec-table-toolbar {
+  align-items: end;
+  background: var(--ec-soft);
+}
+.ec-editor {
+  min-height: clamp(13rem, 42vh, 32rem);
+  max-height: min(65vh, 44rem);
+  padding: 14px;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  border-block: 1px solid var(--ec-line);
+  font-size: 1rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+.ec-editor:focus-visible {
+  outline: 2px solid var(--ec-accent);
+  outline-offset: -2px;
+}
+.ec-editor p {
+  margin: 0 0 0.6em;
+}
+.ec-editor ul,
+.ec-editor ol {
+  padding-inline-start: 1.65em;
+}
+.ec-editor table {
+  min-width: 50%;
+  width: auto;
+  max-width: 100%;
+  table-layout: fixed;
+  margin: 0.5em 0;
+}
+.ec-editor :is(td, th) {
+  min-width: 2.5rem;
+  padding: 6px 9px;
+  border: 1px solid var(--ec-line);
+  background: transparent;
+  color: inherit;
+  white-space: pre-wrap;
+}
+.ec-editor th {
+  background: var(--ec-soft);
+}
+::highlight(ec-review) {
+  text-decoration-line: underline;
+  text-decoration-style: wavy;
+  text-decoration-color: #c05015;
+}
+.ec-copy-bar {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+}
+.ec-copy-bar small,
+.ec-count,
+.ec-empty,
+.ec-status,
+.ec-vocab-list small {
+  color: var(--ec-muted);
+}
+.ec-empty {
+  line-height: 1.5;
+}
+.ec-status {
+  margin: 10px 0 0;
+}
+.ec-status:empty {
+  margin: 0;
+}
+.ec-error {
+  font-weight: 650;
+}
+.ec-copy-fallback {
+  min-height: 5em;
+  margin-top: 8px;
+}
+.ec-issues,
+.ec-vocab-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  overflow-wrap: anywhere;
+}
+.ec-issues {
+  max-height: min(58vh, 38rem);
+  overflow: auto;
+}
+.ec-issues > li,
+.ec-vocab-list > li {
+  padding: 12px 0;
+  border-top: 1px solid var(--ec-line);
+}
+.ec-issues p,
+.ec-vocab-list p {
+  margin: 5px 0 8px;
+  line-height: 1.45;
+}
+.ec-category {
+  color: var(--ec-muted);
+  font-size: 0.8rem;
+}
+.ec-change {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  gap: 4px 8px;
+  margin-top: 4px;
+  font-weight: 650;
+}
+.ec-change del {
+  color: var(--ec-muted);
+}
+.ec-change ins {
+  text-decoration: none;
+}
+.ec-study > label {
+  margin-top: 14px;
+}
+.ec-study input,
+.ec-study select,
+.ec-study textarea {
+  display: block;
+  width: 100%;
+  margin: 5px 0 0;
+}
+.ec-vocab-form {
+  display: grid;
+  gap: 9px;
+  margin-top: 12px;
+}
+.ec-vocab-form label {
+  margin: 0;
+}
+.ec-vocab-list small {
+  display: block;
+}
+.ec-vocab-list small + button,
+.ec-vocab-list .actions {
+  margin-top: 8px;
+}
+.ec-practice-prompt,
+.ec-recall-answer {
+  font-size: 1.05rem;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 850px) {
+  .ec-draft-layout,
+  .ec-vocab-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ec-issues {
+    max-height: 15rem;
+  }
+}
