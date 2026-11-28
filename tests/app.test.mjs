@@ -2603,15 +2603,16 @@ test('English Coach corrects agreement and joined subjects in a formatted draft 
   const apply = () => issues.querySelector('[data-ec="apply"]');
   for (const style of ['email', 'teams']) {
     editor.innerHTML = '<p>She asked, “<strong>what</strong> <em>are</em> her name?”</p>' +
-      '<p>It is Friday. &nbsp;Me and my friend go to the mall.</p>' +
+      '<p>It is Friday. &nbsp;Me and my friend go to <strong>mall</strong>.</p>' +
       '<p>On Saturdays, me and my cousin visit the market. They invited me and my friend.</p>' +
-      '<p>One of the invoices was misplaced. We updated there address yesterday.</p>';
+      '<p>One of the invoices was misplaced. We updated there address yesterday.</p>' +
+      '<p>Kindly your help to <em>test</em></p>';
     editor.dispatchEvent(new window.Event('input', { bubbles: true }));
     mode.value = style;
     mode.dispatchEvent(new window.Event('change', { bubbles: true }));
 
-    assert.equal(issues.querySelectorAll('[data-ec="apply"]').length, 5, style);
-    for (let left = 4; left >= 0; left--) {
+    assert.equal(issues.querySelectorAll('[data-ec="apply"]').length, 7, style);
+    for (let left = 6; left >= 0; left--) {
       apply().click();
       assert.equal(issues.querySelectorAll('[data-ec="apply"]').length, left, style);
     }
@@ -2622,6 +2623,7 @@ test('English Coach corrects agreement and joined subjects in a formatted draft 
       'It is Friday. \u00a0My friend and I go to the mall.',
       'On Saturdays, my cousin and I visit the market. They invited me and my friend.',
       'One of the invoices was misplaced. We updated their address yesterday.',
+      'Please help test',
     ]);
     assert.match(issues.textContent, /No suggestions/);
   }

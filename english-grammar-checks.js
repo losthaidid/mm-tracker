@@ -167,6 +167,18 @@
     (_, possessive) => possessive,
     'Use the possessive determiner by itself before this noun phrase.'
   );
+  use(
+    'determiners',
+    rx(
+      `\\b((?:(?:go(?:es|ing)?|went|gone|walk(?:s|ed|ing)?|driv(?:e|es|ing)|drove|head(?:s|ed|ing)?|return(?:s|ed|ing)?|comes?|came) +(?:to|from)|(?:arriv(?:e|es|ed|ing)|meet(?:s|ing)?|met|stop(?:s|ped|ping)?) +at|(?:leaves?|left) +from) +)(mall|cinema|airport|office|supermarket|museum|library|pharmacy|theatre|theater|gym|warehouse|hotel|cafeteria|restroom)\\b(?= *(?:[,.;!?”"’)\\n]|$)| +(?:today|tomorrow|tonight|yesterday|now|later|early|again|first|together|with|before|after|on +${day}s?|at +[0-9]|(?:this|last|next) +(?:morning|afternoon|evening|week|night))\\b)`
+    ),
+    (_, lead, place) => {
+      if (place === place.toLowerCase()) return lead + 'the ' + place;
+    },
+    'Use a determiner with a singular place like mall. Use the for the place you have in mind, or a/an if any location of that kind will do.',
+    'Grammar',
+    'place-determiner'
+  );
 
   const mass =
     '(?:advice|equipment|feedback|furniture|information|luggage|research|evidence|software|stock|training)';
@@ -815,6 +827,16 @@
   const pronounReason =
     'Use a subject pronoun after the helping verb in a question. A possessive like your introduces a noun.';
   const ingVerbs = choices(verbsOf([4], 0, Object.keys(verbs)));
+  use(
+    'requests',
+    rx(
+      `(${proseStart})(?:kindly|please) +your +(?:help|assistance|support) +(?:to +(?=${knownVerb}\\b)|(in|with) +(?=(?:${ingVerbs})\\b))`
+    ),
+    (_, lead, preposition) => lead + 'Please help ' + (preposition ? 'with ' : ''),
+    'Kindly and please introduce a request. Use a verb after them, as in “Please help test”, or write “We would appreciate your help testing this.”',
+    'Grammar',
+    'incomplete-help-request'
+  );
   word(
     'adjectives',
     "\\b(?:I am|I['’]m|(?:he|she) is|(?:he|she)['’]s|(?:we|you|they) are|(?:we|you|they)['’]re) +",
