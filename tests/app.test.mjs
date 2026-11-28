@@ -2480,6 +2480,60 @@ const adventureChoices={greetings:false,antics:false,reminders:false,chases:true
 const adventureStorage=values=>({'mm-tracker.momo-adventures.v1':JSON.stringify({...adventureChoices,...values})});
 function submitLocal(window,form){form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));}
 
+test('Grammar Library opens from live feedback, preserves a draft and saves lesson progress', async t => {
+  const { api, document, window, db } = await app(t);
+  const click = selector => {
+    const element = document.querySelector(selector);
+    assert.ok(element, selector);
+    element.click();
+  };
+  api.showTab('knowledge');
+  click('[data-mmk="tab"][data-mode="english"]');
+  const editor = document.getElementById('ecEditor');
+  const sample = '<p>I have <strong>wrote</strong> the email.</p>';
+  editor.innerHTML = sample;
+  editor.dispatchEvent(new window.Event('input', { bubbles: true }));
+  const mode = document.getElementById('ecMode');
+  mode.dispatchEvent(new window.Event('change', { bubbles:true }));
+  const writes = db.calls.length;
+
+  click('[data-ec="read-rule"]');
+  assert.equal(document.getElementById('egHeading').textContent, 'Past participles');
+  assert.match(document.querySelector('.eg-explanation').textContent,/verb form/);
+  click('[data-eg="answer"][data-value="incorrect"]');
+  assert.match(document.getElementById('egFeedback').textContent,/Try again/);
+  assert.equal(document.getElementById('egCompleted').hidden,true);
+  click('[data-eg="answer"][data-value="correct"]');
+  click('[data-eg="answer"][data-value="correct"]');
+  assert.match(document.getElementById('egFeedback').textContent,/Correct.*Written/s);
+  assert.equal(document.getElementById('egCompleted').hidden,false);
+  click('.eg-article-nav [data-ec="screen"][data-screen="draft"]');
+  assert.equal(document.getElementById('ecEditor').innerHTML,sample);
+  click('[data-ec="screen"][data-screen="grammar"]');
+  click('[data-eg="all"]');
+  assert.match(document.querySelector('.eg-progress').textContent,/1 of 98/);
+  const search = document.getElementById('egSearch');
+  search.value = 'past participles';
+  search.dispatchEvent(new window.Event('input', { bubbles:true }));
+  assert.ok(document.querySelector('#egResults [data-value="past-participles"]'));
+  const level = document.getElementById('egLevel');
+  level.value = 'Foundations';
+  level.dispatchEvent(new window.Event('change', { bubbles:true }));
+  assert.equal(document.querySelector('#egResults [data-value="past-participles"]'),null);
+  assert.equal(db.calls.length,writes);
+
+  const storedKey = [...Object.keys(window.localStorage)].find(key => key.startsWith('workhub.english-coach.v1:'));
+  const stored = window.localStorage.getItem(storedKey);
+  const reopened = await app(t,{ storage:{[storedKey]:stored} });
+  reopened.api.showTab('knowledge');
+  reopened.document.querySelector('[data-mmk="tab"][data-mode="english"]').click();
+  reopened.document.querySelector('[data-ec="screen"][data-screen="grammar"]').click();
+  assert.match(reopened.document.querySelector('.eg-progress').textContent,/1 of 98/);
+  reopened.document.querySelector('.eg-intro [data-eg="open"]').click();
+  assert.equal(reopened.document.getElementById('egHeading').textContent,'Past participles');
+});
+
+
 test('English Coach opens from Knowledge and keeps draft, practice and vocabulary private to the browser account', async t => {
   const ctx = await app(t);
   const { api, document, window, db } = ctx;
