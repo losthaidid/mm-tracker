@@ -11,7 +11,7 @@ test('grammar lessons cover three levels and every live feedback link resolves',
   const { lessons, ruleLinks, validState } = globalThis.WorkHubEnglishCoachEngine;
   assert.deepEqual([...new Set(groups.map(group => group.level))].sort(), ['Advanced','Foundations','Intermediate']);
   assert.equal(byId.size, groups.flatMap(group => group.lessons).length);
-  assert.equal(byId.size, 98);
+  assert.equal(byId.size, 100);
   assert.deepEqual(Object.keys(ruleLinks).sort(), Object.keys(lessons).sort());
   assert.ok(Object.values(ruleLinks).every(id => byId.has(id)));
   for (const row of byId.values()) {

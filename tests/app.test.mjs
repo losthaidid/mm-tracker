@@ -2593,6 +2593,40 @@ test('English Coach live feedback corrects the question opener and missing helpi
   }
 });
 
+test('English Coach corrects agreement and joined subjects in a formatted draft in both writing modes', async t => {
+  const { api, document, window } = await app(t);
+  api.showTab('knowledge');
+  document.querySelector('[data-mmk="tab"][data-mode="english"]').click();
+  const editor = document.getElementById('ecEditor');
+  const mode = document.getElementById('ecMode');
+  const issues = document.getElementById('ecIssues');
+  const apply = () => issues.querySelector('[data-ec="apply"]');
+  for (const style of ['email', 'teams']) {
+    editor.innerHTML = '<p>She asked, “<strong>what</strong> <em>are</em> her name?”</p>' +
+      '<p>It is Friday. &nbsp;Me and my friend go to the mall.</p>' +
+      '<p>On Saturdays, me and my cousin visit the market. They invited me and my friend.</p>' +
+      '<p>One of the invoices was misplaced. We updated there address yesterday.</p>';
+    editor.dispatchEvent(new window.Event('input', { bubbles: true }));
+    mode.value = style;
+    mode.dispatchEvent(new window.Event('change', { bubbles: true }));
+
+    assert.equal(issues.querySelectorAll('[data-ec="apply"]').length, 5, style);
+    for (let left = 4; left >= 0; left--) {
+      apply().click();
+      assert.equal(issues.querySelectorAll('[data-ec="apply"]').length, left, style);
+    }
+    assert.equal(editor.querySelector('strong').textContent, 'What');
+    assert.equal(editor.querySelector('em').textContent, 'is');
+    assert.deepEqual([...editor.querySelectorAll('p')].map(p => p.textContent), [
+      'She asked, “What is her name?”',
+      'It is Friday. \u00a0My friend and I go to the mall.',
+      'On Saturdays, my cousin and I visit the market. They invited me and my friend.',
+      'One of the invoices was misplaced. We updated their address yesterday.',
+    ]);
+    assert.match(issues.textContent, /No suggestions/);
+  }
+});
+
 test('English Coach shows a grammar correction, a modifier review and an Email-only style suggestion', async t => {
   const { api, document, window } = await app(t);
   api.showTab('knowledge');
@@ -2672,7 +2706,7 @@ test('English Coach live feedback reviews multiple grammar topics, links their l
 
   click('[data-ec="screen"][data-screen="grammar"]');
   click('[data-eg="all"]');
-  assert.match(document.querySelector('.eg-intro').textContent, /87 lessons/);
+  assert.match(document.querySelector('.eg-intro').textContent, /89 lessons/);
   click('[data-eg="open"][data-value="unless"]');
   assert.match(document.querySelector('.eg-feedback-note').textContent, /Review in context.*exception/);
   assert.equal(db.calls.length, writes);
@@ -2710,7 +2744,7 @@ test('Grammar Library opens from live feedback, preserves a draft and saves less
   assert.equal(document.getElementById('ecEditor').innerHTML,sample);
   click('[data-ec="screen"][data-screen="grammar"]');
   click('[data-eg="all"]');
-  assert.match(document.querySelector('.eg-progress').textContent,/1 of 98/);
+  assert.match(document.querySelector('.eg-progress').textContent,/1 of 100/);
   const search = document.getElementById('egSearch');
   search.value = 'past participles';
   search.dispatchEvent(new window.Event('input', { bubbles:true }));
@@ -2727,7 +2761,7 @@ test('Grammar Library opens from live feedback, preserves a draft and saves less
   reopened.api.showTab('knowledge');
   reopened.document.querySelector('[data-mmk="tab"][data-mode="english"]').click();
   reopened.document.querySelector('[data-ec="screen"][data-screen="grammar"]').click();
-  assert.match(reopened.document.querySelector('.eg-progress').textContent,/1 of 98/);
+  assert.match(reopened.document.querySelector('.eg-progress').textContent,/1 of 100/);
   reopened.document.querySelector('.eg-intro [data-eg="open"]').click();
   assert.equal(reopened.document.getElementById('egHeading').textContent,'Past participles');
 });
