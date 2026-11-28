@@ -1,8 +1,29 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { JSDOM } from 'jsdom';
+import '../english-grammar-data.js';
 import '../english-coach-engine.js';
 import '../english-coach-rich.js';
+
+test('grammar lessons cover three levels and every live feedback link resolves', () => {
+  const { groups, byId, ruleLinks } = globalThis.WorkHubEnglishGrammarData;
+  const { lessons, validState } = globalThis.WorkHubEnglishCoachEngine;
+  assert.deepEqual([...new Set(groups.map(group => group.level))].sort(), ['Advanced','Foundations','Intermediate']);
+  assert.equal(byId.size, groups.flatMap(group => group.lessons).length);
+  assert.equal(byId.size, 98);
+  assert.deepEqual(Object.keys(ruleLinks).sort(), Object.keys(lessons).sort());
+  assert.ok(Object.values(ruleLinks).every(id => byId.has(id)));
+  for (const row of byId.values()) {
+    for (const key of ['title','pattern','explanation','email','teams','mistake','prompt','answer','alternative','reason'])
+      assert.ok(row[key].trim(), row.id + ' ' + key);
+    assert.notEqual(row.answer, row.alternative, row.id);
+  }
+  assert.deepEqual(validState({ draft:'Existing draft', grammar:{
+    completed:['past-participles','past-participles','invalid'],
+    last:'invalid',
+  }}).grammar, {completed:['past-participles'], last:''});
+  assert.deepEqual(validState().grammar, {completed:[], last:''});
+});
 
 test('English Coach checks common mistakes, honours writing style, and preserves procurement terminology', () => {
   const E = globalThis.WorkHubEnglishCoachEngine;

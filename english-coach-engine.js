@@ -393,7 +393,15 @@
         ])
       );
     }
-    return { mode, draft, vocab, counts };
+    const grammarIds = root.WorkHubEnglishGrammarData?.byId;
+    const grammar = {
+      completed:
+        grammarIds && Array.isArray(raw?.grammar?.completed)
+          ? [...new Set(raw.grammar.completed.slice(0, 1000).filter(id => grammarIds.has(id)))]
+          : [],
+      last: grammarIds?.has(raw?.grammar?.last) ? raw.grammar.last : '',
+    };
+    return { mode, draft, vocab, counts, grammar };
   }
 
   root.WorkHubEnglishCoachEngine = { maxText, check, lessons, phrases, validState };

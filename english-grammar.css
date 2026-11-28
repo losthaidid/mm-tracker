@@ -1,0 +1,189 @@
+/* Grammar Library styles inherit the English Coach palette. */
+.eg-library {
+  max-width: 66rem;
+}
+.eg-intro,
+.eg-article-nav,
+.eg-answers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: center;
+}
+.eg-intro {
+  justify-content: space-between;
+}
+.eg-intro h3 {
+  margin: 0;
+  font-size: clamp(1.2rem, 2.5vw, 1.65rem);
+}
+.eg-filters,
+.eg-examples {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: 12px;
+}
+.eg-filters {
+  padding: 12px;
+  background: var(--ec-soft);
+  border: 1px solid var(--ec-line);
+  border-radius: 10px;
+}
+.eg-filters label {
+  min-width: 0;
+  margin: 0;
+}
+.eg-filters :is(input, select) {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 5px 0 0;
+}
+.eg-progress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 16px 0;
+}
+.eg-progress progress {
+  width: min(100%, 17rem);
+  accent-color: var(--ec-accent);
+}
+.eg-progress span,
+.eg-result-count,
+.eg-group summary span:last-child,
+.eg-group small,
+.eg-meta,
+#egCompleted {
+  color: var(--ec-muted);
+  font-size: 0.875rem;
+}
+.eg-result-count {
+  margin: 16px 0 8px;
+}
+.eg-group {
+  border: 1px solid var(--ec-line);
+  border-radius: 10px;
+}
+.eg-group + .eg-group {
+  margin-top: 8px;
+}
+.eg-group summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  padding: 12px 14px;
+}
+.eg-group summary span:first-child {
+  display: grid;
+  gap: 2px;
+}
+.eg-group summary::after {
+  content: '+';
+  margin-inline-start: auto;
+  font-size: 1.1rem;
+}
+.eg-group[open] summary::after {
+  content: '−';
+}
+.eg-group ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  list-style: none;
+  padding: 0 12px 12px;
+  margin: 0;
+  gap: 6px 10px;
+}
+.eg-group li {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: center;
+  padding: 5px 0;
+  border-top: 1px solid var(--ec-line);
+}
+.eg-group li button {
+  border-color: transparent;
+  text-align: start;
+  background: transparent;
+  white-space: normal;
+}
+.eg-references {
+  margin-top: 16px;
+}
+.eg-references summary {
+  cursor: pointer;
+}
+.eg-references li + li {
+  margin-top: 6px;
+}
+.eg-article {
+  max-width: 55rem;
+  line-height: 1.6;
+}
+.eg-article-nav {
+  margin-bottom: 18px;
+}
+.eg-meta {
+  margin: 0 0 3px;
+}
+.eg-pattern {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 7px;
+  background: var(--ec-soft);
+  font-weight: 650;
+  margin: 12px 0 0;
+  overflow-wrap: anywhere;
+}
+.eg-explanation {
+  max-width: 75ch;
+}
+.eg-examples section,
+.eg-mistake,
+.eg-exercise {
+  border: 1px solid var(--ec-line);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.eg-examples h4,
+.eg-mistake h4,
+.eg-exercise h4 {
+  font-size: 0.94rem;
+  margin: 0 0 4px;
+}
+.eg-examples p,
+.eg-mistake p {
+  margin: 0;
+}
+.eg-mistake,
+.eg-exercise,
+.eg-sequence {
+  margin-top: 14px;
+}
+.eg-mistake {
+  background: var(--ec-soft);
+}
+.eg-exercise p {
+  margin: 4px 0 10px;
+}
+.eg-answers button {
+  white-space: normal;
+  text-align: start;
+  line-height: 1.35;
+}
+.eg-exercise #egFeedback {
+  margin: 10px 0 0;
+  font-weight: 600;
+}
+.eg-exercise #egFeedback:empty {
+  margin: 0;
+}
+.eg-article-nav.eg-sequence {
+  margin-bottom: 0;
+}

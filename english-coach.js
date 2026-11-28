@@ -55,6 +55,12 @@
       revealed = false;
     const key = () => 'workhub.english-coach.v1:' + encodeURIComponent(owner);
     const permitted = () => !!owner && a.active();
+    const grammar = root.WorkHubEnglishGrammar?.install({
+      active: () => screen === 'grammar' && permitted(),
+      progress: () => state.grammar,
+      save,
+    });
+    const ruleLinks = root.WorkHubEnglishGrammarData?.ruleLinks || {};
     const putStatus = (message, error = false) => {
       const status = $('ecStatus');
       if (!status) return;
@@ -85,6 +91,7 @@
       editor = selection = null;
       draftDirty = composing = false;
       screen = 'draft';
+      grammar?.reset();
       lessonId = Object.keys(E.lessons)[0];
       exerciseResult = editingCard = null;
       recall = 0;
@@ -104,6 +111,7 @@
         <header class="panel-top ec-header"><div><h2>English Coach</h2><p class="muted">Practise English with the emails and Teams replies you write at work.</p></div></header>
         <div class="ec-content"><div class="mmk-tabs ec-tabs" role="group" aria-label="English Coach sections">${[
           ['draft', 'Write a draft'],
+          ...(grammar ? [['grammar', 'Grammar Library']] : []),
           ['practice', 'Practice'],
           ['vocabulary', 'Vocabulary'],
         ]
@@ -165,7 +173,8 @@
         $('ecRows').value = '3';
         $('ecCols').value = '2';
         refresh();
-      } else if (screen === 'practice') showPractice();
+      } else if (screen === 'grammar') pane.innerHTML = grammar.render();
+      else if (screen === 'practice') showPractice();
       else showVocabulary();
       if (!saved)
         putStatus(
@@ -206,6 +215,7 @@
           ${button('locate', 'Find in draft', `data-issue="${index}" class="small"`)}
           ${button('dismiss', 'Dismiss', `data-issue="${index}" class="small"`)}
           ${button('practice-rule', 'Practise this', `data-issue="${index}" class="small"`)}
+          ${grammar && ruleLinks[issue.id] ? button('read-rule', 'Read lesson', `data-issue="${index}" class="small"`) : ''}
         </div></li>`
             )
             .join('')}</ul>`
@@ -354,6 +364,12 @@
         refresh();
         return;
       }
+      if (action === 'read-rule' && grammar && ruleLinks[issue.id]) {
+        grammar.open(ruleLinks[issue.id], 'draft');
+        switchScreen('grammar');
+        $('egHeading')?.focus({ preventScroll: true });
+        return;
+      }
       if (action === 'practice-rule') {
         counters(issue.id).seen++;
         save();
@@ -485,7 +501,8 @@
           .join('')}</ul></section></div></div>`;
     }
     function switchScreen(next) {
-      if (!['draft', 'practice', 'vocabulary'].includes(next)) return;
+      if (!['draft', 'practice', 'vocabulary', ...(grammar ? ['grammar'] : [])].includes(next))
+        return;
       screen = next;
       $('ecWorkspace')
         .querySelectorAll('[data-screen]')
@@ -550,7 +567,10 @@
         ['insert-table', 'row-add', 'row-remove', 'column-add', 'column-remove'].includes(action)
       )
         tableAction(action);
-      else if (editor && ['apply', 'locate', 'dismiss', 'practice-rule'].includes(action))
+      else if (
+        editor &&
+        ['apply', 'locate', 'dismiss', 'practice-rule', 'read-rule'].includes(action)
+      )
         feedback(action, Number(target.dataset.issue));
       else if (editor && ['copy-rich', 'copy-plain'].includes(action))
         void copyDraft(action === 'copy-rich');
