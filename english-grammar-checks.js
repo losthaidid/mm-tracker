@@ -657,13 +657,22 @@
   const knownVerb = `(?:${choices(verbs)})`;
   const participles = [...new Set(Object.values(verbs).map(([, , participle]) => participle))];
   const pastVerbs = [...new Set(Object.values(verbs).map(([, past]) => past))];
-  const jointPerson = `(?:${pronouns}|${choices(subjectCase)}|(?:my|your|our|their|his|her|the) +(?:(?:best|close|older|younger|new|project|delivery|team|site) +){0,2}${people}s?|[\\p{L}’'-]{2,30})`;
+  const personWord = "[\\p{L}’'-]{2,30}";
+  const teamNoun = '(?:team|staff|committee|group|family)';
+  const personPhrase = `(?:${pronouns}|${choices(subjectCase)}|(?:my|your|our|their|his|her|the) +${nounModifiers}(?:(?:best|close|older|younger|project|delivery|team|site|support|finance|logistics|testing) +){0,2}(?:${people}s?|${teamNoun})|${personWord})`;
+  const jointPerson = `(?:${personPhrase}|${personWord}(?: +${personWord}){1,2})`;
+  const ordinaryPerson = new RegExp(`^${personPhrase}$`, 'iu');
+  const capitalisedName = /^\p{Lu}[\p{L}’'-]{1,29}(?: +\p{Lu}[\p{L}’'-]{1,29}){1,2}$/u;
+  const isJointPerson = value => ordinaryPerson.test(value) || capitalisedName.test(value);
   const introductoryPhrase = `(?:on +${day}s?|(?:before|after) +(?:work|lunch|school|dinner|this +${singularNoun})|(?:this|next|last|every) +(?:week|month|year|morning|afternoon|evening|${day})|(?:earlier +|later +)?(?:today|tomorrow|yesterday)|then|later)`;
   const introductoryClause =
     '(?:if|when|while|before|after|once|because|although|since|until|unless|as soon as) +[^,;.!?\\n]{2,88},';
   const reportingClause = `${subject} +(?:think|believe|know|hope|said|says|heard|suspect|remember|mentioned|agreed|decided)(?: +that)?`;
   const compoundStart = `(?:${proseStart}(?:(?:${introductoryPhrase} *,?|${introductoryClause}|${reportingClause}|and|but|so) +)?|(?<=[,;]) +(?:and|but|so) +)`;
-  const compoundVerb = `(?:are|were|am|is|was|has|have|does|do|can|could|may|might|must|shall|should|will|would|${choices(verbs)}|${pastVerbs.join('|')})`;
+  const compoundAux =
+    "(?:(?:are|were|is|was|has|have|does|do|did|can|could|may|might|must|shall|should|will|would)(?:n['’]t)?|won['’]t|am)";
+  const compoundVerb = `(?:${compoundAux}|${choices(verbs)}|${pastVerbs.join('|')})`;
+  const invertedCompound = `${proseStart}(?:(?:where|when|why|how) +)?${compoundAux} +`;
   use(
     'stative-verbs',
     /\b(I|you|he|she|we|they) +(?:am|is|are) +agree(?= +(?:with|that|on|about)\b)/gi,
@@ -679,11 +688,12 @@
   use(
     'pronouns',
     new RegExp(
-      `(${compoundStart})(${jointPerson}) +and +(${jointPerson})(?= +${adverb}${compoundVerb}\\b)`,
+      `(${invertedCompound}|${compoundStart})(${jointPerson}) +and +(${jointPerson})(?= +${adverb}(?:${compoundVerb}|going|waiting|ready|available|here|there)\\b)`,
       'giu'
     ),
     (_, lead, first, second, index, text) => {
-      if (followsAbbreviation(text, index)) return;
+      if (followsAbbreviation(text, index) || !isJointPerson(first) || !isJointPerson(second))
+        return;
       const left = Object.hasOwn(subjectCase, first.toLowerCase())
         ? subjectCase[first.toLowerCase()]
         : first;
@@ -855,7 +865,7 @@
     '',
     'Match the verb to the head noun, such as list or batch.'
   );
-  const joinedSubject = new RegExp(`${compoundStart}${jointPerson} +and +$`, 'iu');
+  const joinedSubject = new RegExp(`${compoundStart}(${jointPerson}) +and +$`, 'iu');
   for (const [actor, forms, reason] of [
     ['we|you', pluralBe, 'Use are, were, have or do with we and you.'],
     ['he|she|it', { are: 'is', were: 'was' }, 'Use is or was with he, she and it.'],
@@ -865,7 +875,8 @@
       'agreement',
       rx(`\\b((?:${actor}) +)(${choices(forms)})\\b`),
       (_, lead, verb, index, text) => {
-        if (!joinedSubject.test(text.slice(Math.max(0, index - 140), index)))
+        const joined = joinedSubject.exec(text.slice(Math.max(0, index - 140), index));
+        if (!joined || !isJointPerson(joined[1]))
           return lead + sameCase(verb, forms[verb.toLowerCase()]);
       },
       reason
